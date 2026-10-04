@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-04T08:04Z",
+ "generated_at": "2026-10-04T08:22Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": -63859278.0,
  "cash_locked": 0,
@@ -28,6 +28,13 @@
    "proceeds": 34557735.0,
    "why": "debt",
    "chance": null,
+   "offer": 34557735.0,
+   "offer_odds": [
+    0.06,
+    0.999993088
+   ],
+   "waiting": 39418035.513415195,
+   "take": false,
    "done": true
   },
   {
@@ -37,6 +44,13 @@
    "proceeds": 21807654.0,
    "why": "debt",
    "chance": null,
+   "offer": 21807654.0,
+   "offer_odds": [
+    0.04,
+    1.0
+   ],
+   "waiting": 25550936.080028262,
+   "take": false,
    "done": true
   },
   {
@@ -46,6 +60,13 @@
    "proceeds": 1195140.0,
    "why": "debt",
    "chance": null,
+   "offer": 1195140.0,
+   "offer_odds": [
+    0.5,
+    0.8464614399999999
+   ],
+   "waiting": 1217963.3276028621,
+   "take": false,
    "done": true
   },
   {
@@ -55,12 +76,19 @@
    "proceeds": 7129015.0,
    "why": "debt",
    "chance": null,
-   "done": true
+   "offer": 7129015.0,
+   "offer_odds": [
+    0.8,
+    0.3177856000000001
+   ],
+   "waiting": 6978382.294067545,
+   "take": true,
+   "done": false
   }
  ],
  "plan_gain": -75.33408473742502,
  "backup": [],
- "ping": "Field Alex Baena",
+ "ping": "Field Alex Baena; Accept the offer for Sergio Carreira (7.1M)",
  "bid_beats": 0.8,
  "confidence": 0.7,
  "exposed": [
