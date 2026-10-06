@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-10-06T05:17Z",
+ "generated_at": "2026-10-06T08:04Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
- "cash": -9750366.0,
+ "cash": -9650366.0,
  "cash_locked": 0,
  "finish": 2.39,
  "p_win": 0.116,
@@ -26,12 +26,12 @@
    "label": "sell Yeray Alvarez",
    "name": "Yeray Alvarez",
    "pos": "DEF",
-   "proceeds": 4998769.9953633975,
-   "offer": 4712650.0,
+   "proceeds": 4977580.0,
+   "offer": null,
    "take": false,
    "gain": -1.8514161046558684,
-   "per_million": -0.37037433336063613,
-   "done": true
+   "per_million": -0.37195104943684854,
+   "done": false
   },
   {
    "what": "sell",
@@ -61,8 +61,8 @@
    "done": false
   }
  ],
- "cash_after": 13944832.9953634,
- "ping": "field Georges Mikautadze, Dakonam Djene",
+ "cash_after": 14023643.0,
+ "ping": "field Georges Mikautadze, Dakonam Djene; sell Yeray Alvarez",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -177,7 +177,7 @@
    "trend": -4.121231942895976,
    "paid": 21511188.0,
    "per_million": null,
-   "offer": 23608573.0
+   "offer": null
   },
   {
    "name": "Natan",
@@ -189,8 +189,8 @@
    "value": 57555931.0,
    "trend": 17.37321463052941,
    "paid": 37492727.0,
-   "per_million": -1.3082142746258527,
-   "offer": 59729933.0
+   "per_million": -1.3886272278086378,
+   "offer": null
   },
   {
    "name": "Marcos Alonso",
@@ -202,8 +202,8 @@
    "value": 22470452.0,
    "trend": -10.809680527709109,
    "paid": 28589508.0,
-   "per_million": -2.1078477203632184,
-   "offer": 23121641.0
+   "per_million": -2.168932706511944,
+   "offer": null
   },
   {
    "name": "Omar El Hilali",
@@ -228,8 +228,8 @@
    "value": 4977580.0,
    "trend": -14.065653320958653,
    "paid": 6931556.0,
-   "per_million": -0.37037433336063613,
-   "offer": 4712650.0
+   "per_million": -0.37195104943684854,
+   "offer": null
   },
   {
    "name": "Zaid Romero",
@@ -241,8 +241,8 @@
    "value": 37843972.0,
    "trend": 13.729864867768223,
    "paid": 28662117.0,
-   "per_million": -2.185678870182533,
-   "offer": 40105295.0
+   "per_million": -2.316281596021083,
+   "offer": null
   },
   {
    "name": "Dakonam Djene",
@@ -254,8 +254,8 @@
    "value": 24132987.0,
    "trend": 6.642632795951643,
    "paid": 16059124.0,
-   "per_million": -1.4993272350573443,
-   "offer": 24585104.0
+   "per_million": -1.5599780149161162,
+   "offer": null
   },
   {
    "name": "Pablo Fornals",
@@ -357,7 +357,7 @@
    "mean": 2185.8561076741153,
    "lo": 2017.4139492183028,
    "hi": 2356.7183558854463,
-   "cash": -84907765.0,
+   "cash": -84807765.0,
    "p_above": 0.16333333333333333
   },
   {
@@ -367,7 +367,7 @@
    "mean": 2039.6228483655138,
    "lo": 1874.7963962105566,
    "hi": 2211.0202729670964,
-   "cash": -111017531.0,
+   "cash": -110917531.0,
    "p_above": 0.45366666666666666
   },
   {
@@ -377,7 +377,7 @@
    "mean": 2015.8534792460189,
    "lo": 1870.137021372724,
    "hi": 2166.664249028884,
-   "cash": -9750366.0,
+   "cash": -9650366.0,
    "p_above": null
   },
   {
@@ -387,7 +387,7 @@
    "mean": 1581.6668701174212,
    "lo": 1464.5829669729087,
    "hi": 1701.7025165598595,
-   "cash": 43193671.0,
+   "cash": 43293671.0,
    "p_above": 0.9986666666666667
   },
   {
@@ -397,7 +397,7 @@
    "mean": 1564.6038780395509,
    "lo": 1446.5871931670738,
    "hi": 1686.2818809470225,
-   "cash": -8716483.0,
+   "cash": -8616483.0,
    "p_above": 0.9993333333333333
   }
  ]
