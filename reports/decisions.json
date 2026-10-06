@@ -1,25 +1,25 @@
 {
- "generated_at": "2026-10-06T20:39Z",
+ "generated_at": "2026-10-06T22:00Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": -9650366.0,
  "cash_locked": 0,
- "finish": 2.31,
- "p_win": 0.175,
+ "finish": 2.15,
+ "p_win": 0.213,
  "band": [
-  1869.6703822690472,
-  2157.1520804891484
+  1868.4335155883487,
+  2160.5777210797005
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Sergio Gomez, Georges Mikautadze",
+   "label": "field Georges Mikautadze, Dakonam Djene",
    "legal": true,
    "on": [
-    "Sergio Gomez",
-    "Georges Mikautadze"
+    "Georges Mikautadze",
+    "Dakonam Djene"
    ],
    "off": [],
-   "gain": -1.320858675059415
+   "gain": -2.5745947161266383
   },
   {
    "what": "sell",
@@ -29,8 +29,8 @@
    "proceeds": 4977580.0,
    "offer": null,
    "take": false,
-   "gain": -1.5496162157376148,
-   "per_million": -0.31131919843329786,
+   "gain": -2.457756693456872,
+   "per_million": -0.49376538266725445,
    "done": false
   },
   {
@@ -41,35 +41,21 @@
    "proceeds": 19702313.0,
    "offer": 19702313.0,
    "take": true,
-   "gain": -11.783225529199058,
-   "per_million": -0.5980630563121729,
-   "done": false
-  },
-  {
-   "what": "buy",
-   "label": "buy Sergio Gomez",
-   "name": "Sergio Gomez",
-   "pos": "DEF",
-   "ask": 14456187.0,
-   "bid": 15022166.571589794,
-   "gain": 13.870157227145683,
-   "per_million": 0.9233127033338311,
-   "chance": 0.711,
-   "trend": -2.865534145113081,
-   "placed": null,
+   "gain": -9.990210705740083,
+   "per_million": -0.507057760463966,
    "done": false
   }
  ],
- "plan_gain": 13.870157227145683,
+ "plan_gain": 0.0,
  "backup": [
   {
    "name": "Alejandro Catena",
    "pos": "DEF",
    "ask": 21658307.0,
    "bid": 22506259.45919413,
-   "gain": 22.308951963163736,
-   "per_million": 0.9912332168573756,
-   "chance": 0.759,
+   "gain": 21.74233950038513,
+   "per_million": 0.9660574445880686,
+   "chance": 0.745,
    "trend": -15.142896935112958,
    "placed": null,
    "done": false
@@ -79,16 +65,16 @@
    "pos": "DEF",
    "ask": 28751238.0,
    "bid": 29876888.447515395,
-   "gain": 17.01644779864705,
-   "per_million": 0.5695522085085859,
-   "chance": 0.7,
+   "gain": 16.022878513483874,
+   "per_million": 0.5362967613455196,
+   "chance": 0.703,
    "trend": 8.042530142151001,
    "placed": null,
    "done": false
   }
  ],
- "cash_after": 7360.42841020599,
- "ping": "field Sergio Gomez, Georges Mikautadze; sell Yeray Alvarez; sell Omar El Hilali; buy Sergio Gomez",
+ "cash_after": 15029527.0,
+ "ping": "field Georges Mikautadze, Dakonam Djene; sell Yeray Alvarez; sell Omar El Hilali",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -215,7 +201,7 @@
    "value": 57555931.0,
    "trend": 17.37321463052941,
    "paid": 37492727.0,
-   "per_million": -1.3964327023440695,
+   "per_million": -1.366463188852188,
    "offer": null
   },
   {
@@ -228,7 +214,7 @@
    "value": 22470452.0,
    "trend": -10.809680527709109,
    "paid": 28589508.0,
-   "per_million": -2.2016950848240473,
+   "per_million": -2.202997238101669,
    "offer": null
   },
   {
@@ -241,7 +227,7 @@
    "value": 18696429.0,
    "trend": 13.773046008062375,
    "paid": null,
-   "per_million": -0.5980630563121729,
+   "per_million": -0.507057760463966,
    "offer": 19702313.0
   },
   {
@@ -254,7 +240,7 @@
    "value": 4977580.0,
    "trend": -14.065653320958653,
    "paid": 6931556.0,
-   "per_million": -0.31131919843329786,
+   "per_million": -0.49376538266725445,
    "offer": null
   },
   {
@@ -267,7 +253,7 @@
    "value": 37843972.0,
    "trend": 13.729864867768223,
    "paid": 28662117.0,
-   "per_million": -2.3085097312180607,
+   "per_million": -2.263334093799111,
    "offer": null
   },
   {
@@ -280,7 +266,7 @@
    "value": 24132987.0,
    "trend": 6.642632795951643,
    "paid": 16059124.0,
-   "per_million": -1.592599560609337,
+   "per_million": -1.5867136735737806,
    "offer": null
   },
   {
@@ -293,7 +279,7 @@
    "value": 37632528.0,
    "trend": 1.4695223243107494,
    "paid": 58220110.0,
-   "per_million": -1.59451063414897,
+   "per_million": -1.5515954950659112,
    "offer": 34764820.0
   },
   {
@@ -306,7 +292,7 @@
    "value": 16425843.0,
    "trend": 14.103523599014284,
    "paid": 5891526.0,
-   "per_million": -2.1972644051382875,
+   "per_million": -2.115641781245811,
    "offer": 16319788.0
   },
   {
@@ -319,7 +305,7 @@
    "value": 13682028.0,
    "trend": 3.155130557333254,
    "paid": 13966262.0,
-   "per_million": -2.67628697793825,
+   "per_million": -2.5226306937283662,
    "offer": 13961160.0
   },
   {
@@ -332,7 +318,7 @@
    "value": 15748690.0,
    "trend": 12.389024430780449,
    "paid": null,
-   "per_million": -2.28206481671143,
+   "per_million": -2.2382238468291527,
    "offer": 16004066.0
   },
   {
@@ -345,7 +331,7 @@
    "value": 18688936.0,
    "trend": -17.781475190080258,
    "paid": 5307217.0,
-   "per_million": -3.0289669624276443,
+   "per_million": -3.1359820187298,
    "offer": 20116618.0
   },
   {
@@ -358,7 +344,7 @@
    "value": 26450345.0,
    "trend": -8.10577372736851,
    "paid": null,
-   "per_million": -1.631918205892017,
+   "per_million": -1.71211196952222,
    "offer": 25672301.0
   },
   {
@@ -371,7 +357,7 @@
    "value": 41510125.0,
    "trend": -9.5169649138657,
    "paid": 42016585.0,
-   "per_million": -1.9084013408345133,
+   "per_million": -1.8812933956426938,
    "offer": null
   }
  ],
@@ -380,51 +366,51 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 311.0,
-   "mean": 2122.0291315379964,
-   "lo": 1959.7432078712902,
-   "hi": 2287.658778345407,
+   "mean": 2118.2689244527014,
+   "lo": 1951.860802232071,
+   "hi": 2288.5175260564642,
    "cash": 484745.0,
-   "p_above": 0.266
-  },
-  {
-   "manager": "Albert Laporta",
-   "me": false,
-   "now": 272.0,
-   "mean": 2047.7299483595978,
-   "lo": 1877.3312303304308,
-   "hi": 2225.236068295751,
-   "cash": -110917531.0,
-   "p_above": 0.42633333333333334
+   "p_above": 0.273
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 371.0,
-   "mean": 2012.6554430851377,
-   "lo": 1869.6703822690472,
-   "hi": 2157.1520804891484,
+   "mean": 2013.6018553693689,
+   "lo": 1868.4335155883487,
+   "hi": 2160.5777210797005,
    "cash": -9650366.0,
    "p_above": null
+  },
+  {
+   "manager": "Albert Laporta",
+   "me": false,
+   "now": 272.0,
+   "mean": 1979.658173595178,
+   "lo": 1809.560219547437,
+   "hi": 2154.617906813063,
+   "cash": -42836685.0,
+   "p_above": 0.578
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1579.960998738385,
-   "lo": 1464.3875032205303,
-   "hi": 1698.1620935661997,
+   "mean": 1581.1896281985587,
+   "lo": 1458.769661772344,
+   "hi": 1704.7705169556843,
    "cash": 43293671.0,
-   "p_above": 0.9986666666666667
+   "p_above": 0.9976666666666667
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1565.6559155645275,
-   "lo": 1448.9373194607033,
-   "hi": 1682.8542984222108,
-   "cash": -8616483.0,
-   "p_above": 0.9993333333333333
+   "mean": 1563.5609824172573,
+   "lo": 1444.2499363019854,
+   "hi": 1687.1497077842887,
+   "cash": 6840512.0,
+   "p_above": 0.9986666666666667
   }
  ]
 }
