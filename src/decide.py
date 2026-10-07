@@ -232,8 +232,9 @@ def cheapest_cover(sales: list[Move], short: float, fieldable) -> list[Move] | N
 def fill(u, good: list[Move], rows: list[Move], base: Standings,
          order) -> tuple[list[Move], float]:
     """Moves in this order, each taken, with the sales that pay for it,
-    if it shares no player with those taken and adds to their joint gain;
-    again until none is taken."""
+    if it shares no player with those taken and the whole set, so paid
+    for, clears the bar (verdict) and gains more than before; again until
+    none is taken."""
     picked: list[Move] = []
     gain, grew = 0.0, True
     while grew:
@@ -241,16 +242,17 @@ def fill(u, good: list[Move], rows: list[Move], base: Standings,
         for r in sorted(good, key=order):
             if r in picked or (trial := raised(u, [*picked, r], rows)) is None:
                 continue
-            total = joint_gain(u, trial, base)
-            if total > gain:
-                picked, gain, grew = trial, total, True
+            total = joint(u, trial, base)
+            if verdict(total) is None and total.d_pts > gain:
+                picked, gain, grew = trial, total.d_pts, True
     return picked, gain
 
 
-def joint_gain(u, moves: list[Move], base: Standings) -> float:
+def joint(u, moves: list[Move], base: Standings) -> Move:
+    """These moves made together, scored against doing nothing."""
     acts = [mv.action for mv in moves]
     after = score_many(u, [apply(u, *acts)], FINAL_TRIALS, 1)[0]
-    return median_gain(paired(after, base, u.me))
+    return _move(Action("plan"), paired(after, base, u.me))
 
 
 def blocked(u, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
@@ -627,6 +629,15 @@ def _selftest() -> None:
     assert raised(star, [sale, sale], rows) is None, "a player is in one move at most"
     assert raised(star, [ace], rows) == [ace, sale], "what a buy leaves below zero, sales raise"
     assert blocked(star, [sale], sale.action, rows) == "star is in sell star"
+    real = globals()["joint"]
+    try:
+        globals()["joint"] = lambda u, moves, base: Move(Action("plan"), 5.0, 0.6)
+        assert plan(uk, uk.rank(uk.candidates()).rows, uk.state) == ([], 0.0), \
+            "a set that gains in the median but helps in 60% of seasons is no plan: one bar"
+    finally:
+        globals()["joint"] = real
+    whole = joint(uk, board(uk).plan, board(uk).base)
+    assert verdict(whole) is None and whole.d_pts == board(uk).gain, "the plan passes its own bar"
 
     print("decide self-test OK")
 

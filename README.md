@@ -103,13 +103,14 @@ Every forecast is the same product, for every player and jornada, and
      (`Move.per_million`).
   3. **verdict**: a gain in the median, and better off in at least 70% of
      seasons (`CONFIDENCE`); below that its gain is noise.
-  4. **plan**: the best set that shares no player and adds to the joint
-     gain, built best first and best per million first (one dear move can
+  4. **plan**: the best set that shares no player and, paid for, clears
+     the same bar as one move (`verdict` on the whole set) while adding to
+     its gain, built best first and best per million first (one dear move can
      crowd out two cheaper ones that gain more), keeping the set that gains
      more. Money has no price of its own: it only bounds the set, by the
      game's one money rule, a balance of at least zero at the lock (below
      it you score nothing). What a debt or a buy leaves below zero is
-     raised by the ranked sales that cost fewest points
+     raised by the set of ranked sales that covers it at fewest points
      (`decide.raised`).
 
   `python tools/ask.py why <player>` names the step a player stopped at,
