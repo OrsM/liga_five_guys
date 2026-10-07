@@ -110,7 +110,7 @@ Every forecast is the same product, for every player and jornada, and
      game's one money rule, a balance of at least zero at the lock (below
      it you score nothing). What a debt or a buy leaves below zero is
      raised by the ranked sales that cost fewest points a million
-     (`decide.raised`). The rest that clear the bar are the backups.
+     (`decide.raised`).
 
   `python tools/ask.py why <player>` names the step a player stopped at,
   `ask.py whatif buy X sell Y` scores a move of your own the same way, and

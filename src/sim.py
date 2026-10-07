@@ -4,7 +4,7 @@ import json
 import sys
 
 from assemble import universe
-from decide import CONFIDENCE, at_risk, board, verdict
+from decide import CONFIDENCE, at_risk, board
 from ffcore.league import app_fielded
 from ffcore.render import title_name
 from ffcore.clock import run_now
@@ -14,7 +14,6 @@ from ffcore.tidy import REPORTS
 __all__ = ["report"]
 
 SLOT_ORDER = {"POR": 0, "DEF": 1, "MED": 2, "DEL": 3}
-BACKUPS = 3
 
 
 def xi_change(marked: list[str], best) -> dict:
@@ -96,7 +95,6 @@ def report(u, b, fielded: list[str], lock_at=None) -> dict:
     todo += [{"what": "buy" if r.action.buy else "sell", "label": r.action.label(names),
               **(buy_row(m, r) if r.action.buy else sell_row(m, r, r.action.sell[0]))}
              for r in b.plan]
-    backup = [buy_row(m, r) for r in b.others][:BACKUPS]
     lo, hi = base.band(u.me)
     return {
         "generated_at": run_now().strftime("%Y-%m-%dT%H:%MZ"),
@@ -105,7 +103,7 @@ def report(u, b, fielded: list[str], lock_at=None) -> dict:
         "finish": round(base.expected_position(), 2),
         "p_win": round(base.position().get(1, 0.0), 3),
         "band": [lo, hi],
-        "do": todo, "plan_gain": b.gain, "backup": backup,
+        "do": todo, "plan_gain": b.gain,
         "cash_after": m.left([r.action for r in b.plan]),
         "ping": "; ".join(d["label"] for d in todo if not d.get("done")),
         "exposed": exposed(u),
@@ -163,7 +161,6 @@ def _selftest() -> None:
     sold = [k for p in b.plan for k in p.action.sell]
     assert len(sold) == len(set(sold)), sold
     assert b.gain >= max(r.d_pts for r in b.plan) - 5.0, (b.gain, b.plan)
-    assert all(r not in b.plan and verdict(r) is None for r in b.others)
 
     doc = report(ub, b, [])
     after = ub.after(*(r.action for r in b.plan))
@@ -177,13 +174,13 @@ def _selftest() -> None:
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
-    assert all(b["name"].lower() not in bought for b in doc["backup"])
+    assert "backup" not in doc, "the plan is the one judgement; nothing second-guesses it"
     assert doc["cash_after"] == ub.market.left([r.action for r in b.plan])
     rich = replace(ub, rival_cash={"riv": 25e6},
                    market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))
     assert [(e["name"].lower(), e["by"]) for e in exposed(rich)] == [("star", ["riv"])], \
         "exposed: what a rival can take now and can afford"
-    assert all(CONFIDENCE <= d["chance"] <= 1.0 for d in doc["do"] + doc["backup"]
+    assert all(CONFIDENCE <= d["chance"] <= 1.0 for d in doc["do"]
                if "chance" in d), "only moves that clear the bar are shown"
     assert [s["pos"] for s in doc["squad"]][0] == "POR", doc["squad"]
     assert sum(s["xi"] for s in doc["squad"]) == 11

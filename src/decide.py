@@ -57,12 +57,6 @@ class Board(NamedTuple):
         return next((r for r in self.rows
                      if not r.action.buy and r.action.sell == (k, )), None)
 
-    @property
-    def others(self) -> list[Move]:
-        """Other players worth getting, should a bid fail."""
-        return [r for r in self.rows
-                if r.action.buy and r not in self.plan and verdict(r) is None]
-
 
 @dataclass(frozen=True)
 class Universe:
@@ -591,7 +585,6 @@ def _selftest() -> None:
     assert raised(star, [sale, sale], rows) is None, "a player is in one move at most"
     assert raised(star, [ace], rows) == [ace, sale], "what a buy leaves below zero, sales raise"
     assert blocked(star, [sale], sale.action, rows) == "star is in sell star"
-    assert all(r.action.buy for r in board(star).others), "backups are buys"
 
     print("decide self-test OK")
 
