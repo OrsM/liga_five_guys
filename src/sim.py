@@ -129,7 +129,7 @@ def report(u, b, fielded: list[str], lock_at=None) -> dict:
              "lo": base.band(mgr)[0], "hi": base.band(mgr)[1],
              "cash": m.cash if mgr == u.me else u.rival_cash.get(mgr, 0.0),
              "estimated": mgr != u.me,
-             "p_above": None if mgr == u.me else base.beat(mgr)}
+             "p_above": None if mgr == u.me else 1.0 - base.beat(mgr)}
             for mgr in sorted(u.state.squads, key=lambda g: -base.mean(g))],
     }
 
@@ -210,6 +210,9 @@ def _selftest() -> None:
     assert report(ub, b._replace(plan=[]), [])["cash_after"] is None, \
         "no cash line when the plan moves no money"
     assert [r["estimated"] for r in doc["standings"] if r["me"]] == [False]
+    riv_row = next(r for r in doc["standings"] if not r["me"])
+    assert riv_row["p_above"] == 1.0 - b.base.beat("riv"), \
+        "above you: the chance he finishes above you, not that you beat him"
     assert all(r["estimated"] for r in doc["standings"] if not r["me"]), \
         "rival cash is estimated from the feed"
     assert [s["pos"] for s in doc["squad"]][0] == "POR", doc["squad"]
