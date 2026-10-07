@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# A pipeline run that touches nothing in the tracked repo — for testing and
+# profiling changes to src/, not for producing a report.
+#
+# WHY THIS EXISTS. lfg-run writes data/tidy, data/decisions, data/season and
+# reports/{METHOD.md,decisions.json} straight into the tracked working tree,
+# because that IS the product: report-bot's own commits are the point (see
+# lfg-run's own comments). A run done only to check "does this still work"
+# or "how much memory/time does this use" was leaving those same files
+# modified in the real repo, which meant `git stash push -u -- data/... `
+# before every real code commit — pure friction, and easy to get wrong.
+#
+# This runs the same generate chain against a SCRATCH copy instead. data/raw
+# (the immutable source archives ingest.py reads from) is symlinked in
+# read-only, so parse still has real history to rebuild from; everything
+# parse/points/squads/methodology/sim/digest WRITE — tidy, season, decisions,
+# reports, .runtime — lands under the scratch dir via the env vars
+# ffcore/tidy.py and report.py/sim.py already support for exactly this
+# (FF_ROOT, LFG_REPORTS, LFG_PARTS, LFG_ALERTS, LFG_WARNINGS). The tracked
+# repo never sees a diff, so there is nothing to stash before a real commit.
+#
+#     tools/lfg-dry-run                 self-tests + the 10-stage generate chain
+#     tools/lfg-dry-run sim digest      just those stages, same args run.py takes
+#     tools/lfg-dry-run --selftest      just the self-test suite, no generate
+#
+# NOT a substitute for lfg-run: no fetch, no publish, no commit. This never
+# talks to the network or the phone and never writes to git — it is
+# deliberately inert outside its own scratch directory.
+#
+# The scratch dir is reused across calls (keyed by default on $REPO) rather
+# than rebuilt every time, so repeated profiling runs don't re-symlink or
+# re-mkdir for nothing. Safe to `rm -rf` it whenever — it holds nothing that
+# isn't rebuilt from data/raw and .venv the next time this runs.
+
+set -euo pipefail
+
+REPO="${LFG_REPO:-$(cd "$(dirname "$0")/.." && pwd)}"
+UV="$HOME/.local/bin/uv"
+cd "$REPO"
+
+SCRATCH="${LFG_DRY_SCRATCH:-${TMPDIR:-/tmp}/lfg-dry-run}"
+mkdir -p "$SCRATCH/data" "$SCRATCH/reports" "$SCRATCH/.runtime"
+# A symlink, not a copy: data/raw is the append-only archive store (40MB and
+# growing) and never gets WRITTEN by anything a dry run touches, so there is
+# nothing to isolate it from. Re-linked every call — cheap, and it means a
+# stale symlink (repo moved, raw dir recreated) never lingers.
+ln -sfn "$REPO/data/raw" "$SCRATCH/data/raw"
+
+export PYTHONPATH=src
+export FF_ROOT="$SCRATCH/data"
+export LFG_REPORTS="$SCRATCH/reports"
+export LFG_PARTS="$SCRATCH/.runtime/parts"
+export LFG_ALERTS="$SCRATCH/.runtime/alerts.md"
+export LFG_WARNINGS="$SCRATCH/.runtime/warnings.json"
+
+echo "lfg-dry-run: scratch=$SCRATCH (tracked repo untouched)"
+
+if [ "${1:-}" = "--selftest" ]; then
+    # The one test list is tools/selftests.sh; a copy here went stale (it still
+    # named ffcore/model.py and attributes.py after both were gone).
+    exec bash "$REPO/tools/selftests.sh"
+fi
+
+"$UV" run --frozen python src/run.py "$@"
