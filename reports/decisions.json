@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-07T19:45Z",
+ "generated_at": "2026-10-07T20:37Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 10251947.0,
  "cash_locked": 0,
- "finish": 2.08,
- "p_win": 0.242,
+ "finish": 1.44,
+ "p_win": 0.643,
  "band": [
-  1875.3843225174728,
-  2177.7410595115025
+  1878.7817247366265,
+  2170.7795883078197
  ],
  "do": [],
  "plan_gain": 0.0,
@@ -19,6 +19,7 @@
    "pos": "POR",
    "clause": 25436578.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -29,26 +30,49 @@
    "pos": "DEF",
    "clause": 38410047.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
    "season": 171.42366240665848
   },
   {
+   "name": "Natan",
+   "pos": "DEF",
+   "clause": 58651449.0,
+   "by": [
+    "BurtonGM89"
+   ],
+   "xi": true,
+   "season": 162.90905978137667
+  },
+  {
    "name": "Miguel Roman",
    "pos": "MED",
    "clause": 18265661.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": false,
    "season": 145.15634582530225
   },
   {
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "clause": 58220110.0,
+   "by": [
+    "BurtonGM89"
+   ],
+   "xi": true,
+   "season": 143.74183546940844
+  },
+  {
    "name": "Marcos Alonso",
    "pos": "DEF",
    "clause": 28589508.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -59,6 +83,7 @@
    "pos": "DEL",
    "clause": 31271675.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -69,6 +94,7 @@
    "pos": "DEF",
    "clause": 24317222.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": false,
@@ -79,6 +105,7 @@
    "pos": "MED",
    "clause": 16711458.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -89,6 +116,7 @@
    "pos": "MED",
    "clause": 15970247.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -99,6 +127,7 @@
    "pos": "DEF",
    "clause": 6931556.0,
    "by": [
+    "BurtonGM89",
     "Magic Mike 333",
     "SusoGattuso"
    ],
@@ -118,7 +147,7 @@
    "trend": -5.992883233292588,
    "paid": 21511188.0,
    "per_million": null,
-   "offer": null
+   "offer": 27170201.0
   },
   {
    "name": "Natan",
@@ -130,8 +159,8 @@
    "value": 58651449.0,
    "trend": 16.010744894023237,
    "paid": 37492727.0,
-   "per_million": -1.1654955204676614,
-   "offer": null
+   "per_million": -1.1281786048195812,
+   "offer": 61355883.0
   },
   {
    "name": "Marcos Alonso",
@@ -143,8 +172,8 @@
    "value": 22211764.0,
    "trend": -9.68381709612637,
    "paid": 28589508.0,
-   "per_million": -1.8132607392340527,
-   "offer": null
+   "per_million": -1.7638094562731506,
+   "offer": 23498514.0
   },
   {
    "name": "Yeray Alvarez",
@@ -156,8 +185,8 @@
    "value": 4892731.0,
    "trend": -14.33872656159101,
    "paid": 6931556.0,
-   "per_million": -0.9783994090598513,
-   "offer": null
+   "per_million": -1.047976683477444,
+   "offer": 4918139.0
   },
   {
    "name": "Zaid Romero",
@@ -169,8 +198,8 @@
    "value": 38410047.0,
    "trend": 12.582280596648449,
    "paid": 28662117.0,
-   "per_million": -1.9832928459318389,
-   "offer": null
+   "per_million": -1.992805491026084,
+   "offer": 39310163.0
   },
   {
    "name": "Dakonam Djene",
@@ -182,8 +211,8 @@
    "value": 24317222.0,
    "trend": 6.421598715934247,
    "paid": 16059124.0,
-   "per_million": -1.1859141021611206,
-   "offer": null
+   "per_million": -1.1965016155040205,
+   "offer": 23938033.0
   },
   {
    "name": "Pablo Fornals",
@@ -195,8 +224,8 @@
    "value": 37987553.0,
    "trend": 7.935561213199883,
    "paid": 58220110.0,
-   "per_million": -1.249988272934874,
-   "offer": 34764820.0
+   "per_million": -1.32182096487861,
+   "offer": null
   },
   {
    "name": "Lucien Agoume",
@@ -208,8 +237,8 @@
    "value": 16711458.0,
    "trend": 14.626332701827444,
    "paid": 5891526.0,
-   "per_million": -1.5117252125207858,
-   "offer": 16319788.0
+   "per_million": -1.5982261666356041,
+   "offer": null
   },
   {
    "name": "German Valera",
@@ -221,8 +250,8 @@
    "value": 13743249.0,
    "trend": 3.7638477508158776,
    "paid": 13966262.0,
-   "per_million": -1.9143653287807325,
-   "offer": 13961160.0
+   "per_million": -1.9782445622603257,
+   "offer": null
   },
   {
    "name": "Pepelu",
@@ -234,8 +263,8 @@
    "value": 15970247.0,
    "trend": 11.833770568142976,
    "paid": null,
-   "per_million": -1.5441961769859769,
-   "offer": 16004066.0
+   "per_million": -1.6836426270009877,
+   "offer": null
   },
   {
    "name": "Miguel Roman",
@@ -247,8 +276,8 @@
    "value": 18265661.0,
    "trend": -19.051103874154684,
    "paid": 5307217.0,
-   "per_million": -2.814600715177759,
-   "offer": 20116618.0
+   "per_million": -3.16584019281353,
+   "offer": null
   },
   {
    "name": "Iñigo Vicente",
@@ -260,8 +289,8 @@
    "value": 26216782.0,
    "trend": -7.427707742529085,
    "paid": null,
-   "per_million": -1.2655977619534113,
-   "offer": 25672301.0
+   "per_million": -1.3052818825373154,
+   "offer": null
   },
   {
    "name": "Georges Mikautadze",
@@ -273,29 +302,18 @@
    "value": 40996842.0,
    "trend": -10.401235816928446,
    "paid": 42016585.0,
-   "per_million": -1.7021308974441516,
-   "offer": null
+   "per_million": -1.675818091480413,
+   "offer": 37386934.0
   }
  ],
  "standings": [
   {
-   "manager": "BurtonGM89",
-   "me": false,
-   "now": 311.0,
-   "mean": 2121.792340826091,
-   "lo": 1953.6482620550662,
-   "hi": 2291.4915367376843,
-   "cash": 684745.0,
-   "estimated": true,
-   "p_above": 0.7046666666666667
-  },
-  {
    "manager": "miguel_autentico",
    "me": true,
    "now": 371.0,
-   "mean": 2021.5319682940503,
-   "lo": 1875.3843225174728,
-   "hi": 2177.7410595115025,
+   "mean": 2025.661544451122,
+   "lo": 1878.7817247366265,
+   "hi": 2170.7795883078197,
    "cash": 10251947.0,
    "estimated": false,
    "p_above": null
@@ -304,34 +322,45 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 1967.7917052543542,
-   "lo": 1798.8948924554943,
-   "hi": 2142.2986698836253,
-   "cash": -42636685.0,
+   "mean": 1910.7800687636998,
+   "lo": 1743.354923975363,
+   "hi": 2082.441323958742,
+   "cash": -10273351.0,
    "estimated": true,
-   "p_above": 0.3753333333333333
+   "p_above": 0.2433333333333333
+  },
+  {
+   "manager": "BurtonGM89",
+   "me": false,
+   "now": 311.0,
+   "mean": 1889.4836483933968,
+   "lo": 1746.138674307131,
+   "hi": 2035.535124868345,
+   "cash": 190135322.0,
+   "estimated": true,
+   "p_above": 0.19866666666666666
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1581.0613975849967,
-   "lo": 1461.0325220762002,
-   "hi": 1698.743448587853,
+   "mean": 1580.832301337839,
+   "lo": 1460.5817770789574,
+   "hi": 1701.5826562845898,
    "cash": 43493671.0,
    "estimated": true,
-   "p_above": 0.0003333333333332966
+   "p_above": 0.0010000000000000009
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1565.9499351938837,
-   "lo": 1444.3621451825043,
-   "hi": 1686.9470892615877,
+   "mean": 1565.5291279817948,
+   "lo": 1441.596755999112,
+   "hi": 1687.5194443333014,
    "cash": 7040512.0,
    "estimated": true,
-   "p_above": 0.0006666666666667043
+   "p_above": 0.0013333333333332975
   }
  ]
 }
