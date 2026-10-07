@@ -117,6 +117,9 @@ Every forecast is the same product, for every player and jornada, and
   `ask.py forecast <player>` prints his forecast factor by factor. The
   board also lists your players a rival can take by clause now, and who
   can afford them.
+  Each line of the board is one `sim.row`: the move (`Action.label`), the
+  step it takes in the app, whether it is done, its points and the numbers
+  that made it. The page lays rows out and decides nothing.
 - **The ledger** (`ffcore/league.py`, `ledger`): the activity feed read
   once, each event keyed like every other table. Rival cash and the price
   paid (each owned player's last buy or transfer to his owner) are both
