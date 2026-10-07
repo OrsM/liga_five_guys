@@ -188,22 +188,45 @@ def raised(u, moves: list[Move], rows: list[Move]) -> list[Move] | None:
     """These moves and the sales that pay for them, or None if they cannot
     be made together: a player is in one move at most, and the game's one
     money rule is a balance of at least zero at the lock (below it you
-    score nothing), so what they leave below zero is raised by the ranked
-    sales that cost fewest points a million, a side left to field."""
+    score nothing), so what they leave below zero is raised by the set of
+    ranked sales that covers it at fewest points, a side left to field."""
     m, out = u.market, list(moves)
     players = [k for mv in out for k in mv.action.players]
     taken = set(players)
     if len(taken) < len(players):
         return None
+    short = -m.left([mv.action for mv in out])
+    if short <= 0:
+        return out
     sales = sorted((r for r in rows if not r.action.buy and r.action.proceeds
-                    and not taken & set(r.action.sell)),
-                   key=lambda r: -r.per_million)
-    for r in sales:
-        if m.left([mv.action for mv in out]) >= 0:
-            break
-        if _fieldable(u.squad_after(*(mv.action for mv in out), r.action)):
-            out.append(r)
-    return out if m.left([mv.action for mv in out]) >= 0 else None
+                    and not taken & set(r.action.sell)), key=lambda r: -r.d_pts)
+    cover = cheapest_cover(sales, short, lambda chosen: _fieldable(u.squad_after(
+        *(mv.action for mv in out), *(r.action for r in chosen))))
+    return None if cover is None else out + cover
+
+
+def cheapest_cover(sales: list[Move], short: float, fieldable) -> list[Move] | None:
+    """The sales raising at least short that lose fewest points in sum (a
+    sale that gains counts as losing none), leaving a side fieldable; None
+    if none do. Sales come fewest points lost first."""
+    cost = [max(-r.d_pts, 0.0) for r in sales]
+    rest = [sum(r.action.proceeds for r in sales[i:]) for i in range(len(sales) + 1)]
+    best: list = [None, float("inf")]
+
+    def go(i: int, chosen: list[Move], lost: float, got: float) -> None:
+        if lost >= best[1]:
+            return
+        if got >= short:
+            if fieldable(chosen):
+                best[:] = [list(chosen), lost]
+            return
+        if got + rest[i] < short:
+            return
+        go(i + 1, chosen + [sales[i]], lost + cost[i], got + sales[i].action.proceeds)
+        go(i + 1, chosen, lost, got)
+
+    go(0, [], 0.0, 0.0)
+    return best[0]
 
 
 def fill(u, good: list[Move], rows: list[Move], base: Standings,
@@ -559,7 +582,26 @@ def _selftest() -> None:
     owed = board(owing)
     got = [r.action.label() for r in owed.plan]
     assert got == [Action("sell", sell=("idle",)).label()], \
-        ("a debt is raised by the sale that costs fewest points a million", got)
+        ("a debt is raised by the sale that costs fewest points", got)
+    perc = {j: {**perk[j], "big": (3.0, 1.0), "small": (1.0, 1.0)} for j in js}
+    short = Universe(state=LeagueState({"me": {**ks, "big": "MED", "small": "MED"}}, js, "me"),
+                     forecaster=Bootstrap(perc),
+                     market=Market(cash=-5e6, pos={**uk.market.pos, "big": "MED", "small": "MED"},
+                                   price=uk.market.price, value={"big": 60e6, "small": 6e6}))
+    by = {r.action.label(): r for r in short.rank(short.candidates()).rows}
+    assert by["sell big"].per_million > by["sell small"].per_million, "the case: big is cheaper a million"
+    got = [r.action.label() for r in board(short).plan]
+    assert got[0] == "sell small", ("a 5M gap is not raised by a 60M sale costing more points", got)
+    perx = {j: {**perk[j], "x1": (0.1, 1.0), "x2": (2.0, 1.0), "f3": (3.0, 1.0)} for j in js}
+    sq = {**{k: p for k, p in ks.items() if k not in ("d3", "d4")},
+          "x1": "DEF", "x2": "DEF", "f3": "DEL"}
+    tight = Universe(state=LeagueState({"me": sq}, js, "me"), forecaster=Bootstrap(perx),
+                     market=Market(cash=-8e6, pos={**uk.market.pos, "x1": "DEF", "x2": "DEF", "f3": "DEL"},
+                                   price=uk.market.price, value={"x1": 1e6, "x2": 10e6}))
+    got = [r.action.label() for r in board(tight).plan]
+    assert got[:1] == ["sell x2"], (
+        "the sales that cover the gap at fewest points, though the cheapest one leaves"
+        " no second defender to sell", got)
     assert owed.gain == 0.0 and owed.sale("idle") is owed.plan[0], \
         "measured from the sales the money rule forces, not from a debt you cannot keep"
     assert owing.after(owed.plan[0].action).market.cash == 1e6, "after a move, its cash too"
