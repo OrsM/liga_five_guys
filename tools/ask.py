@@ -18,8 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from assemble import scorer, universe  # noqa: E402
-from decide import (FUNNEL, Action, Universe, blocked, board, plan,  # noqa: E402
-                    verdict)
+from decide import (FUNNEL, Action, Move, Universe, blocked, board, joint,  # noqa: E402
+                    plan, raised, verdict)
 from ffcore.render import title_name  # noqa: E402
 from sim import holding  # noqa: E402
 from ffcore.schedule import jornada_dates, jornada_expectation  # noqa: E402
@@ -62,13 +62,20 @@ def not_offered(u, k: str) -> str:
 
 def fate(u, b, r) -> str:
     """Where a ranked move stopped: at verdict, or at plan and why. The plan
-    last tried every move it left out against all of itself."""
+    last tried every move it left out against all of itself, paid for."""
     if r in b.plan:
         return step(plan, "in the plan")
     if (no := verdict(r)) is not None:
         return step(verdict, no)
-    return step(plan, "clears the bar, left out: %s" % (
-        blocked(u, b.plan, r.action, b.rows) or "it adds nothing alongside the plan"))
+    if (no := blocked(u, b.plan, r.action, b.rows)) is not None:
+        return step(plan, "clears the bar alone, left out: %s" % no)
+    funded = raised(u, [*b.plan, r], b.rows)
+    paid = [m.action.label(named(u)) for m in funded[len(b.plan) + 1:]]
+    total = joint(u, funded, b.base)
+    return step(plan, "clears the bar alone, left out%s: %s" % (
+        " (paid for by %s)" % ", ".join(paid) if paid else "",
+        verdict(total) or "together %+.1f, no more than the plan's %+.1f" % (
+            total.d_pts, b.gain)))
 
 
 def why(u, k: str) -> None:
@@ -115,15 +122,10 @@ def whatif(u, words: list[str]) -> None:
         a = replace(a, sell=(sold, ), proceeds=m.fetches(sold))
     mv = u.rank([a]).rows[0]
     print(show(u, mv))
-    if (no := verdict(mv)) is not None:
-        print(step(verdict, no))
-        return
     b = board(u)
-    picked, gain = plan(u, [*b.rows, mv], b.base)
-    print(step(plan, "the plan would take it: together %+.1f, against %+.1f" % (gain, b.gain)
-               if mv in picked else "clears the bar, but alongside the board's plan: %s" % (
-                   blocked(u, b.plan, mv.action, b.rows)
-                   or "it adds nothing to it")))
+    picked, gain = plan(u, [*b.rows, mv], b.base) if verdict(mv) is None else ([], 0.0)
+    print(step(plan, "the plan would take it: together %+.1f, against %+.1f" % (gain, b.gain))
+          if mv in picked else fate(u, b, mv))
 
 
 def forecast(u, k: str, ahead: int) -> None:
@@ -197,9 +199,20 @@ def _selftest() -> None:
         if r in b.plan:
             assert said == "4/4 plan: in the plan", said
         elif verdict(r) is None:
-            assert said.startswith("4/4 plan: clears the bar, left out: "), said
+            assert said.startswith("4/4 plan: clears the bar alone, left out"), said
         else:
             assert said == "3/4 verdict: " + verdict(r), said
+    poor = replace(u, market=replace(u.market, cash=1e6))
+    pb = board(poor)
+    cand = next(r for r in pb.rows if r.action.buy == "cand_free")
+    real = globals()["joint"]
+    try:
+        globals()["joint"] = lambda u, moves, base: Move(Action("plan"), 5.0, 0.6)
+        said = fate(poor, pb._replace(plan=[], gain=0.0), cand)
+    finally:
+        globals()["joint"] = real
+    assert said == ("4/4 plan: clears the bar alone, left out (paid for by sell bench_m,"
+                    " sell bench_k): better off in 60% of seasons, under 70%"), said
     assert not_offered(u, "cand_rival") == \
         "1/4 candidates: riv's player"
     assert not_offered(u, "nobody") == "1/4 candidates: nobody's, and not on the market now"
