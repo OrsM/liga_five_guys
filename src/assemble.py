@@ -20,7 +20,7 @@ from ffcore.pricing import (Momentum, auction_ratios, offer_ratios,
                             premium_to_beat, steps)
 from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import fit_promoted_discount, per_jornada_current, Scorer, totals
-from ffcore.rules import SLOT
+from ffcore.rules import slot
 from ffcore.season import LeagueState
 from ffcore.startprob import (StartOdds, calibrate, fit_availability,
                               last_fit_listing, outcomes)
@@ -75,10 +75,7 @@ def fixture_ratings(market: list[dict]):
 
 
 def _pos_of(raw: str) -> str:
-    mapped = SLOT.get(raw.lower())
-    if mapped:
-        return mapped
-    return raw if raw in ("POR", "DEF", "MED", "DEL") else "MED"
+    return slot(raw) or "MED"
 
 
 def _nights_left(offers: list[dict]) -> int:

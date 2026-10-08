@@ -7,7 +7,7 @@ from typing import NamedTuple
 from ffcore.parse import text
 from ffcore.startprob import NEUTRAL_START, StartOdds
 from ffcore.text import norm, row_key
-from ffcore.rules import SLOT, minutes_played
+from ffcore.rules import minutes_played, slot
 from stats import shrink
 
 __all__ = ["Rating", "Rates", "Scorer", "per_jornada_current", "totals",
@@ -26,9 +26,9 @@ def position_priors(market: list[dict], history: dict
     samples: dict[str, list[float]] = {}
     for r in market:
         h = history.get(row_key(r))
-        slot = SLOT.get((r.get("position") or "").lower())
-        if h and slot and h["pj"] >= 10:
-            samples.setdefault(slot, []).append(h["pts"] / h["pj"])
+        pos = slot(r.get("position"))
+        if h and pos and h["pj"] >= 10:
+            samples.setdefault(pos, []).append(h["pts"] / h["pj"])
     priors = {k: statistics.median(v) for k, v in samples.items() if v}
     flat = [p for v in samples.values() for p in v]
     return priors, (statistics.median(flat) if flat else 0.0)
@@ -48,7 +48,7 @@ def fit_promoted_discount(market: list[dict], history: dict,
                           played: list) -> float:
     promoted = detect_promoted(market, history)
     priors = position_priors(market, history)[0]
-    prior_of = {row_key(r): priors.get(SLOT.get((r.get("position") or "").lower()))
+    prior_of = {row_key(r): priors.get(slot(r.get("position")))
                 for r in market if r.get("club") in promoted}
     pts = expected = n = 0.0
     for s in played:
@@ -149,7 +149,7 @@ class Scorer:
         rate (or that rate, discounted for a promoted club); then this
         season pulled toward that."""
         key = row_key(rec)
-        prior = self.priors.get(SLOT.get((rec.get("position") or "").lower(), ""),
+        prior = self.priors.get(slot(rec.get("position")),
                                 self.global_prior)
         k = self.shrink_k
         h = self.last_season.get(key)
@@ -170,7 +170,7 @@ class Scorer:
 
     def rates(self, rec: dict) -> Rates:
         key = row_key(rec)
-        return Rates(key, SLOT.get((rec.get("position") or "").lower(), ""),
+        return Rates(key, slot(rec.get("position")),
                      self.rate(rec).ppm, self.starts.picked(key, True),
                      self.starts.picked(key, False), self.rate(rec).pj)
 

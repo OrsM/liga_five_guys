@@ -3,10 +3,12 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["SLOT", "SLOT_LABEL", "SLOT_MIN", "MAX_SLOT", "FREE_FORMATIONS",
-           "MATCH_LEN", "minutes_played"]
+__all__ = ["POSITIONS", "slot", "MAX_SLOT", "FREE_FORMATIONS", "MATCH_LEN",
+           "minutes_played"]
 
-SLOT = {
+POSITIONS = ("POR", "DEF", "MED", "DEL")
+
+_SLOT = {
     "portero": "POR",
     "defensa": "DEF",
     "mediocampista": "MED",
@@ -14,15 +16,18 @@ SLOT = {
     "delantero": "DEL",
 }
 
-SLOT_LABEL = {"POR": "portero", "DEF": "defensa", "MED": "mediocampista",
-              "DEL": "delantero"}
-
-SLOT_MIN = {"POR": 1, "DEF": 3, "MED": 3, "DEL": 1}
-
-MAX_SLOT = {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}
-
 FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]
+
+# The most of each position any formation fields.
+MAX_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(max, zip(*FREE_FORMATIONS))))}
+
+
+def slot(raw) -> str:
+    """A position as the game writes it (portero, Centrocampista, MED...)
+    as one of POSITIONS, or "" if it is none of them."""
+    t = (raw or "").strip()
+    return t if t in POSITIONS else _SLOT.get(t.lower(), "")
 
 MATCH_LEN = 90.0
 
@@ -45,9 +50,11 @@ def _selftest() -> None:
     assert minutes_played("sub", "64") == 26.0
     assert minutes_played("coach", "") == 0.0
     assert minutes_played("starter", "0") == 0.0
-    assert SLOT["centrocampista"] == SLOT["mediocampista"] == "MED"
+    assert slot("Centrocampista") == slot("mediocampista") == slot("MED") == "MED"
+    assert slot(None) == slot("") == slot("utillero") == "", "unknown is empty, never guessed"
+    assert POSITIONS == ("POR", "DEF", "MED", "DEL")
     assert all(1 + d + m + f == 11 for d, m, f in FREE_FORMATIONS)
-    assert all(SLOT_MIN[s] <= MAX_SLOT[s] for s in MAX_SLOT)
+    assert MAX_SLOT == {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}, MAX_SLOT
     print("ffcore.rules self-test OK")
 
 

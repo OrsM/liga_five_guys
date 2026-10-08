@@ -7,13 +7,13 @@ from assemble import universe
 from decide import CONFIDENCE, at_risk, board
 from ffcore.league import app_fielded
 from ffcore.render import title_name
+from ffcore.rules import POSITIONS
 from ffcore.clock import run_now
 from ffcore.jornadas import load_deadline
 from ffcore.tidy import REPORTS
 
 __all__ = ["report"]
 
-SLOT_ORDER = {"POR": 0, "DEF": 1, "MED": 2, "DEL": 3}
 ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
 
 
@@ -122,7 +122,7 @@ def report(u, b, fielded: list[str], lock_at=None) -> dict:
         "ping": "; ".join(d["label"] for d in todo if not d.get("done")),
         "exposed": exposed(u),
         "squad": [holding(u, b, k) for k in sorted(
-            mine, key=lambda k: (SLOT_ORDER.get(mine[k], 9), -exp.get(k, 0.0)))],
+            mine, key=lambda k: (POSITIONS.index(mine[k]) if mine[k] in POSITIONS else 9, -exp.get(k, 0.0)))],
         "standings": [
             {"manager": mgr, "me": mgr == u.me,
              "now": u.state.carried.get(mgr, 0.0), "mean": base.mean(mgr),
