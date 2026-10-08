@@ -145,7 +145,7 @@ def snapshot_stamp(s: str):
     return _digits_to_dt(s, timezone.utc)
 
 
-def kickoff_stamp(s: str):
+def kickoff_stamp(s: str | None):
     try:
         when = datetime.fromisoformat((s or "").strip())
     except ValueError:
@@ -202,9 +202,8 @@ def _selftest() -> None:
 
     fmt_cases = {2050000.0: "2.05M", 700000.0: "700K", -468693.0: "-469K",
                  0.0: "0K", None: "—"}
-    for raw, want in fmt_cases.items():
-        got = fmt_money(raw)
-        assert got == want, f"fmt_money({raw!r}) -> {got!r}, wanted {want!r}"
+    for amount, shown in fmt_cases.items():
+        assert fmt_money(amount) == shown, f"fmt_money({amount!r}), wanted {shown!r}"
 
     print("ffcore.parse self-test OK")
 

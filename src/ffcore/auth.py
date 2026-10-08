@@ -150,7 +150,7 @@ if __name__ == "__main__":
         if "error" in q:
             sys.exit(f"B2C said: {q['error'][0]} — "
                      f"{q.get('error_description', [''])[0]}")
-        if want and (q.get("state") or [None])[0] != want:
+        if want and (q.get("state") or [""])[0] != want:
             sys.exit("state mismatch — that reply is not to this request.")
         code = (q.get("code") or [got])[0]
         res = _post(f"{TENANT}/token?p={SIGNIN_POLICY}", {
@@ -172,8 +172,8 @@ if __name__ == "__main__":
 
     import tempfile
 
-    with tempfile.TemporaryDirectory() as d:
-        p = Path(d) / "token.json"
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "token.json"
         s = TokenStore(p)
 
         try:
@@ -187,7 +187,7 @@ if __name__ == "__main__":
                 "obtained_at": int(time.time())})
         assert oct(p.stat().st_mode)[-3:] == "600", oct(p.stat().st_mode)
 
-        calls = []
+        calls: list[tuple] = []
 
         def never(url, form):
             calls.append(form)
@@ -228,11 +228,12 @@ if __name__ == "__main__":
         except TypeError:
             pass
         assert p.read_text() == before, "a failed save damaged the token"
-        assert not list(Path(d).glob("*.tmp")), "left a temp file behind"
+        assert not list(Path(tmp).glob("*.tmp")), "left a temp file behind"
 
         s.save({"refresh_token": "R", "refresh_token_expires_in": 86400 * 10,
                 "obtained_at": int(time.time())})
-        assert 9.9 < s.expiry_days() < 10.1, s.expiry_days()
+        days = s.expiry_days()
+        assert days is not None and 9.9 < days < 10.1, days
 
     import base64
     import hashlib

@@ -15,7 +15,7 @@ XI_SIZE = 11
 
 
 def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
-    by_slot: dict[str, list[float]] = {}
+    by_slot: dict[str, list[tuple[float, str]]] = {}
     for k, slot in squad.items():
         by_slot.setdefault(slot, []).append((value.get(k, 0.0), k))
     for rows in by_slot.values():

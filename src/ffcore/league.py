@@ -23,7 +23,7 @@ class Config:
 
 def load_config(name: str = "league.ini") -> Config:
     cp = configparser.ConfigParser(inline_comment_prefixes=(";", "#"))
-    cp.optionxform = str
+    cp.optionxform = str  # type: ignore[assignment,method-assign]  # keep keys' case: configparser's own idiom
     path = input_path(name)
     if path.exists():
         cp.read(path, encoding="utf-8")

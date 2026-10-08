@@ -39,6 +39,8 @@ fi
 wait "$session_pid" || session_ok=1
 structure_ok=0
 "$UV" run --frozen python tools/structure.py --check >&2 || structure_ok=1
+"$UV" run --frozen mypy src tools >/dev/null 2>&1 \
+    || { echo "  FAILED: mypy src tools" >&2; "$UV" run --frozen mypy src tools | tail -20 >&2; structure_ok=1; }
 
 if [ "$tests_ok" -eq 0 ] && [ "$session_ok" -eq 0 ] && [ "$structure_ok" -eq 0 ]; then
     echo "selftests: $(( ${#TESTS[@]} + ${#SESSION_TESTS[@]} )) suites pass"

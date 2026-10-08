@@ -7,7 +7,7 @@ PARTICLES = {"de", "del", "van", "von", "der", "den", "di", "da", "dos",
              "do", "y", "bin", "ibn", "ter"}
 
 
-def title_name(s: str) -> str:
+def title_name(s: str | None) -> str:
     s = (s or "").strip()
     if not s or s != s.lower():
         return s

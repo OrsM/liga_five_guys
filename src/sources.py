@@ -15,7 +15,7 @@ from ffcore.laliga_api import (API_LEAGUES_KEY, API_LEAGUES_URL,
                                parse_api_players_all)
 from ffcore.source import Source
 
-__all__ = ["Source", "sources", "source_for"]
+__all__ = ["Source", "sources", "source", "source_for"]
 
 
 def _played_matches(calendar_html: str, _context: dict) -> list[Source]:
@@ -54,6 +54,14 @@ def source_for(key: str) -> Source | None:
             or offer_source(key))
 
 
+def source(key: str) -> Source:
+    """The source behind a page fetched before: one must exist."""
+    s = source_for(key)
+    if s is None:
+        raise KeyError("no source for page %r" % key)
+    return s
+
+
 def _selftest() -> None:
     from ffcore.footballdata import FD_SEASONS_BACK, _FD_CUR, parse_fd_results
     from ffcore.futbolfantasy import (_CAL_FIXTURE, _FIXTURE, _MARKET_FIXTURE,
@@ -62,27 +70,30 @@ def _selftest() -> None:
                                    parse_api_market,
                                    parse_api_offer)
 
-    assert source_for("fd_2627").parse is parse_fd_results
+    assert source("fd_2627").parse is parse_fd_results
     for k in ("api_market", "api_teams", "api_activity_0", "api_activity_1"):
-        assert source_for(k) is not None, k
-        assert source_for(k).table == ("api_activity"
+            assert source(k).table == ("api_activity"
                                        if "activity" in k else k), k
-    assert source_for("api_market").parse is parse_api_market
+    assert source("api_market").parse is parse_api_market
 
     assert not any(s.auth for s in sources() if not s.key.startswith("api_"))
-    assert source_for("api_players_all").parse is parse_api_players_all
-    assert source_for("api_players_all").table == "api_players_all"
-    assert source_for("api_players_all").cadence == "daily"
-    assert source_for("api_players_all").auth is True
-    assert source_for("api_offer_24338726").parse is parse_api_offer
-    assert source_for("api_offer_24338726").table == "api_offers"
-    assert source_for("match_22421-alaves-getafe").parse is parse_starters
-    assert source_for("api_lineup_38").table == "api_lineup"
+    assert source("api_players_all").parse is parse_api_players_all
+    assert source("api_players_all").table == "api_players_all"
+    assert source("api_players_all").cadence == "daily"
+    assert source("api_players_all").auth is True
+    assert source("api_offer_24338726").parse is parse_api_offer
+    assert source("api_offer_24338726").table == "api_offers"
+    assert source("match_22421-alaves-getafe").parse is parse_starters
+    assert source("api_lineup_38").table == "api_lineup"
 
-    cal = source_for(CAL_KEY).follow(_CAL_FIXTURE, {})
+    follow = source(CAL_KEY).follow
+    assert follow is not None
+    cal = follow(_CAL_FIXTURE, {})
     assert [s.key for s in cal] == [s.key for s in played_sources(_CAL_FIXTURE)] \
         and cal, "the calendar follows to the matches it says were played"
-    lgs = source_for(API_LEAGUES_KEY).follow(_API_LEAGUES_FIXTURE, {})
+    follow = source(API_LEAGUES_KEY).follow
+    assert follow is not None
+    lgs = follow(_API_LEAGUES_FIXTURE, {})
     assert [s.key for s in lgs] == [s.key for s in league_sources(
         _API_LEAGUES_FIXTURE)] and lgs, "the leagues list follows to its pages"
     assert all(s.follow is None for s in sources()
@@ -100,7 +111,7 @@ def _selftest() -> None:
                                       "matches",
                                       "api_leagues", "results_history",
                                       "api_players_all"}
-    assert source_for("team_celta").parse is parse_team
+    assert source("team_celta").parse is parse_team
     assert source_for("gone") is None
 
     samples = {"market": _MARKET_FIXTURE, "points": _POINTS_FIXTURE,

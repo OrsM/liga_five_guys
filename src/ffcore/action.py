@@ -12,11 +12,6 @@ class Action:
     cost: float = 0.0
     proceeds: float = 0.0
 
-    def __post_init__(self):
-        if isinstance(self.sell, str):
-            object.__setattr__(self, "sell",
-                               (self.sell,) if self.sell else ())
-
     @property
     def net(self) -> float:
         return self.cost - self.proceeds
@@ -35,13 +30,12 @@ class Action:
 
 
 def _selftest() -> None:
-    assert Action("swap", buy="X", sell="Y").label() == "buy X · sell Y"
-    assert Action("swap", buy="X", sell="Y").sell == ("Y",)
+    assert Action("swap", buy="X", sell=("Y",)).label() == "buy X · sell Y"
     assert Action("buy", buy="X").sell == ()
-    assert Action("buy", buy="X", sell="Y").players == ("X", "Y")
-    assert Action("sell", sell="Y").players == ("Y", )
-    assert Action("sell", sell="y").label({"y": "Yuri"}) == "sell Yuri"
-    assert Action("swap", buy="x", sell="y").label({"x": "Xavi"}) \
+    assert Action("buy", buy="X", sell=("Y",)).players == ("X", "Y")
+    assert Action("sell", sell=("Y",)).players == ("Y", )
+    assert Action("sell", sell=("y",)).label({"y": "Yuri"}) == "sell Yuri"
+    assert Action("swap", buy="x", sell=("y",)).label({"x": "Xavi"}) \
         == "buy Xavi · sell y"
     print("ffcore.action self-test OK")
 

@@ -7,7 +7,7 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 from types import MappingProxyType
-from typing import NamedTuple
+from typing import Mapping, NamedTuple
 
 from ffcore.clock import on_reset, run_now
 from ffcore.parse import snapshot_stamp
@@ -72,7 +72,7 @@ def _parse_csv(path) -> list[dict]:
         return [dict(zip(fieldnames, map(sys.intern, row))) for row in r if row]
 
 
-def read_csv(path) -> list[dict]:
+def read_csv(path) -> list[Mapping[str, str]]:
     rows = mtime_cached(path, _READ_CACHE, str(Path(path)), _parse_csv, path)
     return [MappingProxyType(r) for r in (rows or [])]
 
@@ -262,7 +262,7 @@ def _selftest_cache() -> None:
         assert [r["a"] for r in first] == ["1", "2"], first
 
         try:
-            first[0]["a"] = "999"
+            first[0]["a"] = "999"  # type: ignore[index]  # the point: it must refuse
             raise AssertionError("read_csv rows must be read-only")
         except TypeError:
             pass
@@ -310,7 +310,8 @@ def _selftest_tables() -> None:
             assert stats == {("1", "1"), ("2", "5")}, stats
             assert current("market") == [] and history("market") == []
             assert age_hours("market") is None
-            assert abs(age_hours("lineups") - 3.0) < 1e-9
+            age = age_hours("lineups")
+            assert age is not None and abs(age - 3.0) < 1e-9
             set_now(snapshot_stamp("2026-08-01T1000Z"))
             assert stats != {(r["activity_id"], r["value"])
                              for r in current("api_activity")}

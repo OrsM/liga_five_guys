@@ -3,6 +3,7 @@ calendar and match sheets."""
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
@@ -204,7 +205,8 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
     slug = key[5:] if key.startswith("team_") else key
     doc = lh.fromstring(html)
     fitness = parse_fitness(doc)
-    rows, seen = [], set()
+    rows: list[dict] = []
+    seen: set[str] = set()
     for role, selector in zip(("starter", "sub"), XI_SELECTORS):
         for el in _css(doc, selector):
             name, pct, href = _team_player(el)
@@ -232,7 +234,7 @@ WANT = {
 }
 
 
-_SELECTORS: dict[str, object] = {}
+_SELECTORS: dict[str, Callable] = {}
 
 
 def _css(node, css: str):
@@ -399,7 +401,8 @@ def _calendar_row(a, observed_at: str) -> dict | None:
 
 def parse_calendar(html: str, observed_at: str,
                    key: str = "calendario") -> list[dict]:
-    rows, seen = [], set()
+    rows: list[dict] = []
+    seen: set[str] = set()
     for el in _css(lh.fromstring(html), 'a[href*="/partidos/"]'):
         row = _calendar_row(el, observed_at)
         if row is not None and _once(seen, row.pop("key")):
@@ -463,8 +466,8 @@ def match_source(key: str) -> Source | None:
 
 
 def played_sources(cal_html: str, observed_at: str = "") -> list[Source]:
-    return [match_source("match_%s" % r["path"])
-            for r in parse_calendar(cal_html, observed_at) if r["score"]]
+    return [s for r in parse_calendar(cal_html, observed_at)
+            if r["score"] and (s := match_source("match_%s" % r["path"]))]
 
 
 _FIXTURE = """
@@ -722,7 +725,7 @@ def _selftest() -> None:
 
     xi = parse_starters(_MATCH_FIXTURE, "2026-01-01T0000Z",
                         "match_22421-alaves-getafe")
-    got = {}
+    got: dict[tuple[str, str], int] = {}
     for r in xi:
         got[(r["team_slug"], r["role"])] = got.get((r["team_slug"], r["role"]),
                                                    0) + 1
@@ -748,8 +751,8 @@ def _selftest() -> None:
                           "match_22421-alaves-getafe") == []
     assert parse_starters(_MATCH_FIXTURE, "t", "market") == []
     assert match_source("market") is None
-    assert match_source("match_22421-alaves-getafe").key \
-        == "match_22421-alaves-getafe"
+    ms = match_source("match_22421-alaves-getafe")
+    assert ms is not None and ms.key == "match_22421-alaves-getafe"
 
     print("ffcore.futbolfantasy self-test OK")
 

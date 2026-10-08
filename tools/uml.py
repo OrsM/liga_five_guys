@@ -57,11 +57,11 @@ def module_diagram() -> str:
            "    classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111"]
     placed = set()
     for key, title, members in LAYERS + [("util", "Pure utilities", set(mods))]:
-        members = sorted(m for m in members if m in mods and m not in placed
-                         and not m.endswith("fixtures"))
-        placed |= set(members)
+        layer = sorted(m for m in members if m in mods and m not in placed
+                       and not m.endswith("fixtures"))
+        placed |= set(layer)
         out.append('    subgraph %s["%s"]' % (key, title))
-        for m in members:
+        for m in layer:
             label = "%s %d" % (node(m), size[m])
             if fan_out[m] >= 10 or fan_in[m] >= 10:
                 label += "<br/>in %d · out %d" % (fan_in[m], fan_out[m])
@@ -142,9 +142,9 @@ def class_diagram() -> str:
                                             if ann and len(ann) < 30 else ""))
         if len(fields) > 8:
             out.append("        ...%d more fields" % (len(fields) - 8))
-        for f in c.body:
-            if isinstance(f, ast.FunctionDef) and not f.name.startswith("_"):
-                out.append("        +%s()" % f.name)
+        for node in c.body:
+            if isinstance(node, ast.FunctionDef) and not node.name.startswith("_"):
+                out.append("        +%s()" % node.name)
         out.append("    }")
         for f, ann in fields:
             for other in classes:
@@ -159,13 +159,16 @@ def funnel_diagram() -> str:
     tree = ast.parse((SRC / "decide.py").read_text(encoding="utf-8"))
     defs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))}
     steps = next(n.value.elts for n in tree.body if isinstance(n, ast.Assign)
+                 and isinstance(n.value, ast.Tuple)
                  and any(getattr(t, "id", "") == "FUNNEL" for t in n.targets))
     out = ["flowchart LR"]
+    fn: ast.FunctionDef | ast.ClassDef
     for i, step in enumerate(steps):
-        if isinstance(step, ast.Attribute):
+        if isinstance(step, ast.Attribute) and isinstance(step.value, ast.Name):
             owner, name = defs[step.value.id], step.attr
-            fn = next(n for n in owner.body if getattr(n, "name", "") == name)
+            fn = next(n for n in owner.body if isinstance(n, ast.FunctionDef) and n.name == name)
         else:
+            assert isinstance(step, ast.Name), ast.dump(step)
             name = step.id
             fn = defs[name]
         first = " ".join((ast.get_docstring(fn) or "").split(". ")[0].split())

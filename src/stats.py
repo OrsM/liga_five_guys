@@ -1,8 +1,9 @@
 
 import statistics
+from collections.abc import Sequence
 
 
-def percentile(data: list[float], p: float) -> float:
+def percentile(data: Sequence[float], p: float) -> float:
     if len(data) < 2:
         return float(data[0]) if data else 0.0
     cuts = statistics.quantiles(sorted(data), n=100, method="inclusive")

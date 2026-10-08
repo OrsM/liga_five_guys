@@ -46,7 +46,8 @@ class Crosswalk:
 
 
     def _reindex(self) -> None:
-        self._by_ff, self._by_app = {}, {}
+        self._by_ff: dict[str, str] = {}
+        self._by_app: dict[str, str] = {}
         self._clash: dict[str, set] = {}
         names: dict[str, set] = {}
         for p in self.players.values():

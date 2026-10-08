@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from collections.abc import Mapping
 import functools
 import hashlib
 import io
@@ -27,7 +28,7 @@ from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv,
 from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
                                   season_label)
 from ffcore.laliga_api import ROW_TABLE
-from sources import source_for, sources
+from sources import source, source_for, sources
 
 from ffcore.auth import TokenStore
 from ffcore.parse import snapshot_stamp
@@ -68,9 +69,9 @@ def snapshots() -> list[Path]:
 def _read(path: Path, only: set | None = None) -> dict[str, str]:
     want = None if only is None else set(only) | {MANIFEST}
     with tarfile.open(path, "r:xz") as tf:
-        return {m.name: tf.extractfile(m).read().decode("utf-8", "replace")
+        return {m.name: f.read().decode("utf-8", "replace")
                 for m in tf.getmembers()
-                if m.isfile() and (want is None or m.name in want)}
+                if (want is None or m.name in want) and (f := tf.extractfile(m))}
 
 
 def _write(path: Path, members: dict[str, str]) -> None:
@@ -254,9 +255,8 @@ def fetch() -> Path:
                                + random.uniform(*DELAY)))
                 last[host] = time.monotonic()
             t0 = time.monotonic()
-            kw = {"headers": extra} if extra else {}
             try:
-                r = c.get(url, **kw)
+                r = c.get(url, headers=extra or None)
             except httpx.RequestError as e:
                 timing.append((time.monotonic() - t0, src.key, "FAILED"))
                 fails[src.key] = type(e).__name__
@@ -360,7 +360,7 @@ def parse() -> None:
         pending: dict[str, list[dict]] = {}
         for stamp, docs in chunk:
             for page, (ck, _origin) in sorted(docs.items()):
-                route(pending, cache.get(ck, []), source_for(page).table, stamp)
+                route(pending, cache.get(ck, []), source(page).table, stamp)
         for table, rows in pending.items():
             _store(TIDY / f"{table}.csv", rows,
                    TABLES.get(table, Table(True)))
@@ -443,7 +443,7 @@ def fingerprint(fn) -> str:
 
 
 def _parsed_key(page: str, ck: str) -> str:
-    return "%s:%s" % (ck, fingerprint(source_for(page).parse))
+    return "%s:%s" % (ck, fingerprint(source(page).parse))
 
 
 def _parse_origin(task) -> dict:
@@ -451,7 +451,7 @@ def _parse_origin(task) -> dict:
     out = {}
     for stamp, page, html in documents({origin: want}):
         try:
-            rows = source_for(page).parse(html, stamp, page)
+            rows = source(page).parse(html, stamp, page)
         except Exception as e:
             print(f"  warn: {stamp}/{page}: {type(e).__name__}: {e}")
             rows = []
@@ -496,7 +496,7 @@ def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
         tables.setdefault(table, []).append(d)
 
 
-def _content(r: dict) -> tuple:
+def _content(r: Mapping) -> tuple:
     return tuple(sorted((k, str(v)) for k, v in r.items()
                         if k != "observed_at" and v not in ("", None)))
 
@@ -671,8 +671,8 @@ def _selftest() -> None:
             f = Path(tmp) / "t.csv"
             for rows in batches:
                 _store(f, rows, spec)
-            got = f.read_text(encoding="utf-8")
-            assert got == want, (batches, got)
+            written = f.read_text(encoding="utf-8")
+            assert written == want, (batches, written)
 
     out: dict[str, list] = {}
     route(out, [{"a": "1"}, {ROW_TABLE: "api_standings", "stat": "goals"}],
@@ -702,7 +702,7 @@ def _selftest() -> None:
     assert due(twice, {}, "2026-08-15T0000Z")
 
     got = [x.key for x in _by_host([
-        Source(k, "t", "https://%s/%s" % (k[0], k), None, None, "every_run")
+        Source(k, "t", "https://%s/%s" % (k[0], k), lambda *_: [])
         for k in ("a1", "a2", "a3", "b1", "b2")])]
     assert got == ["a1", "b1", "a2", "b2", "a3"], got
     assert not due(twice, {"m": {"seen": "2026-08-15T2340Z"}},
@@ -710,6 +710,7 @@ def _selftest() -> None:
 
     from ffcore.futbolfantasy import match_source
     once = match_source("match_22421-alaves-getafe")
+    assert once is not None
     assert due(once, {}, "2026-08-15")
     assert not due(once, {once.key: {"seen": "2026-08-15T0940Z"}}, "2026-08-16")
 

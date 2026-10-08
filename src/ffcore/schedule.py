@@ -194,11 +194,11 @@ def _selftest() -> None:
              {"DEF": 2}),
             (ph_sq["m"], {"DEF": 3, "MED": 1})]:
         topped = phantom_topup(squad)
-        got = {}
-        for k, slot in topped.items():
+        stand_ins: dict[str, int] = {}
+        for k, pos in topped.items():
             if k.startswith("__phantom_"):
-                got[slot] = got.get(slot, 0) + 1
-        assert got == added, (squad, got)
+                stand_ins[pos] = stand_ins.get(pos, 0) + 1
+        assert stand_ins == added, (squad, stand_ins)
         assert all(topped[k] == v for k, v in squad.items())
 
     print("ffcore.schedule self-test OK")

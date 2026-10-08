@@ -4,48 +4,48 @@ flowchart LR
     subgraph stages["Stages (src/)"]
         assemble["assemble 165<br/>in 2 · out 16"]:::hub
         crosswalk["crosswalk 157"]
-        decide["decide 637"]
+        decide["decide 638"]
         grading["grading 249"]
-        ingest["ingest 758"]
-        run["run 82"]
+        ingest["ingest 759"]
+        run["run 83"]
         sim["sim 288"]
     end
     subgraph fetch["Fetch and parse"]
-        auth["auth 247"]
+        auth["auth 248"]
         footballdata["footballdata 131"]
-        futbolfantasy["futbolfantasy 758"]
-        laliga_api["laliga_api 586"]
+        futbolfantasy["futbolfantasy 761"]
+        laliga_api["laliga_api 587"]
         source["source 50"]
-        sources["sources 119"]
+        sources["sources 130"]
     end
     subgraph data["Tables and time"]
         clock["clock 84"]
-        ff_crosswalk["ff_crosswalk 185"]
+        ff_crosswalk["ff_crosswalk 186"]
         jornadas["jornadas 94"]
         league["league 263"]
         players["players 111"]
         points["points 109"]
-        tidy["tidy 353<br/>in 10 · out 2"]:::hub
+        tidy["tidy 354<br/>in 10 · out 2"]:::hub
     end
     subgraph model["Model"]
-        action["action 50"]
+        action["action 44"]
         fixture["fixture 169"]
         forecast["forecast 58"]
-        market["market 182"]
+        market["market 183"]
         outlook["outlook 87"]
         pricing["pricing 178"]
         rules["rules 85"]
         schedule["schedule 208"]
         score["score 305"]
         season["season 272"]
-        startprob["startprob 569"]
+        startprob["startprob 572"]
     end
     subgraph util["Pure utilities"]
-        locks["locks 86"]:::leaf
-        parse["parse 213<br/>in 13 · out 0"]:::hub
+        locks["locks 87"]:::leaf
+        parse["parse 212<br/>in 13 · out 0"]:::hub
         render["render 37"]:::leaf
         text["text 120"]:::leaf
-        stats["stats 35"]:::leaf
+        stats["stats 36"]:::leaf
     end
     run -. "by name" .-> ingest
     run -. "by name" .-> crosswalk

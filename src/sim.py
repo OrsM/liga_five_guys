@@ -180,13 +180,13 @@ def _selftest() -> None:
     doc = report(ub, b, [])
     after = ub.after(*(r.action for r in b.plan))
     field = doc["do"][0]
-    sold = {k for r in b.plan for k in r.action.sell}
+    gone = {k for r in b.plan for k in r.action.sell}
     on = field["label"].removeprefix("field ").split(", ")
     benched = dict((f[0], f[1]) for f in field["facts"]).get("bench", "")
     assert field["what"] == "field" and set(on) == {
         player(ub.market, k)["name"] for k in after.outlook.xi.ranked()}, \
         "the line-up is the plan's: the squad after its moves"
-    assert not {player(ub.market, k)["name"] for k in sold} & set(on + benched.split(", ")), \
+    assert not {player(ub.market, k)["name"] for k in gone} & set(on + benched.split(", ")), \
         "a sold player is neither fielded nor benched"
     assert (field["step"], field["gain"], field["per"]) == ("check line-up", None, "next"), \
         "a line-up the app has not given is a step to take, in the row"

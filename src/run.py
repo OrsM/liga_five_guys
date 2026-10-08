@@ -44,7 +44,8 @@ def main(argv: list[str]) -> int:
     for name, spec in stages:
         t0 = time.time()
         print("%s" % name, flush=True)
-        hits, stop = collections.Counter(), threading.Event()
+        hits: collections.Counter[str] = collections.Counter()
+        stop = threading.Event()
         threading.Thread(target=_sample, daemon=True, args=(
             hits, stop, threading.get_ident())).start()
         try:

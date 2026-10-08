@@ -109,8 +109,10 @@ def _selftest() -> None:
     odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, nights_left=2,
                   offer_ratios=(0.9, 1.0, 1.0, 1.1))
     rising = replace(odds, trend={"s": 20.0}, carry=(0.5, 1.0))
-    assert rising.waiting("s") > odds.waiting("s"), "a rising value makes the offers to come dearer"
-    assert abs(odds.waiting("s") - (1.0 + 1.0 + 1.0 + 1.1) / 4 * 10e6) < 1, \
+    up, flat = rising.waiting("s"), odds.waiting("s")
+    assert up is not None and flat is not None
+    assert up > flat, "a rising value makes the offers to come dearer"
+    assert abs(flat - (1.0 + 1.0 + 1.0 + 1.1) / 4 * 10e6) < 1, \
         "the last night's offer is taken; the night before's only above it"
     low = replace(odds, offer={"s": 10.1e6})
     assert odds.takes("s") and not low.takes("s"), (odds.waiting("s"), low.offer)
@@ -130,7 +132,7 @@ def _selftest() -> None:
     assert Market(my_bid={"a": 1e6, "b": 2.5e6}).locked_cash == 3.5e6
     assert Market().locked_cash == 0.0
     try:
-        Market().prceeds  # noqa: B018
+        Market().prceeds  # type: ignore[attr-defined]  # noqa: B018  # the point: it must fail
     except AttributeError:
         pass
     else:
@@ -145,8 +147,7 @@ def _selftest() -> None:
         {"player_name": "Unjoinable", "sale_price": "1000000",
          "seller": "marketPlayerTeam"},
     ]
-    for r, k in zip(mkt_rows, ["free_agent", "listed_rival", "not_priced",
-                               None]):
+    for r, k in zip(mkt_rows, ["free_agent", "listed_rival", "not_priced", ""]):
         r["key"] = k
     price, route = market_routes(mkt_rows)
     assert price == {"free_agent": 5000000.0, "listed_rival": 8000000.0}, price

@@ -71,6 +71,7 @@ def fate(u, b, r) -> str:
     if (no := blocked(u, b.plan, r.action, b.rows)) is not None:
         return step(plan, "clears the bar alone, left out: %s" % no)
     funded = raised(u, [*b.plan, r], b.rows)
+    assert funded is not None, "blocked said it can be raised"
     paid = [m.action.label(named(u)) for m in funded[len(b.plan) + 1:]]
     total = joint(u, funded, b.base)
     return step(plan, "clears the bar alone, left out%s: %s" % (
@@ -202,7 +203,7 @@ def _selftest() -> None:
         elif verdict(r) is None:
             assert said.startswith("4/4 plan: clears the bar alone, left out"), said
         else:
-            assert said == "3/4 verdict: " + verdict(r), said
+            assert said == "3/4 verdict: %s" % verdict(r), said
     poor = replace(u, market=replace(u.market, cash=1e6))
     pb = board(poor)
     cand = next(r for r in pb.rows if r.action.buy == "cand_free")

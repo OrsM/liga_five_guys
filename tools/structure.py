@@ -46,7 +46,7 @@ def measure() -> dict:
         tests = [n for n in tree.body if isinstance(n, ast.FunctionDef)
                  and n.name.startswith("_selftest")]
         in_test = {id(x) for n in tests for x in ast.walk(n)}
-        code += len(src.splitlines()) - sum(n.end_lineno - n.lineno + 1
+        code += len(src.splitlines()) - sum((n.end_lineno or n.lineno) - n.lineno + 1
                                             for n in tests)
         reach += len(REACH.findall(src))
         top = {id(n) for n in tree.body}

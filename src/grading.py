@@ -33,7 +33,7 @@ def _jornada_points() -> dict[tuple, float]:
 def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
                    j: int) -> dict:
     errs = [p - actual.get((k, j), 0.0) for k, p in pred.items()]
-    top = sorted(pred, key=pred.get, reverse=True)[:TOP_N]
+    top = sorted(pred, key=lambda k: pred[k], reverse=True)[:TOP_N]
     return {"n": len(errs),
             "rmse": math.sqrt(sum(e * e for e in errs) / len(errs)) if errs else None,
             "bias": sum(errs) / len(errs) if errs else None,
@@ -50,7 +50,7 @@ def backtest(ahead: int = 0) -> list[dict]:
     done = {j for _k, j in actual}
     out = []
     try:
-        for i in sorted(done & set(locks), key=locks.get):
+        for i in sorted(done & set(locks), key=lambda j: locks[j]):
             set_now(locks[i] - dt.timedelta(minutes=1))
             market = current("market")
             sc = scorer(market, current("lineups", LINEUP_SOURCE))
@@ -83,7 +83,7 @@ def decisions() -> list[dict]:
     prices = steps(history("market"))
     out = []
     try:
-        for i in sorted(done & set(locks), key=locks.get):
+        for i in sorted(done & set(locks), key=lambda j: locks[j]):
             set_now(locks[i] - dt.timedelta(minutes=1))
             universe.cache_clear()
             try:
@@ -148,12 +148,12 @@ def compare(a: dict[str, dict], b: dict[str, dict]) -> list[dict]:
     def nxt(d):
         return {int(k.split(">")[-1]): v for k, v in d.items()
                 if ">" not in k or len(set(k.split(">"))) == 1}
-    a, b = nxt(a), nxt(b)
+    na, nb = nxt(a), nxt(b)
     out = []
-    for j in sorted(set(a) & set(b)):
-        keys = set(a[j]) & set(b[j])
-        pa = {k: a[j][k] for k in keys}
-        pb = {k: b[j][k] for k in keys}
+    for j in sorted(set(na) & set(nb)):
+        keys = set(na[j]) & set(nb[j])
+        pa = {k: na[j][k] for k in keys}
+        pb = {k: nb[j][k] for k in keys}
         sa, sb = score_forecast(pa, actual, j), score_forecast(pb, actual, j)
         out.append({"jornada": j, "n": len(keys), "rmse": (sa["rmse"], sb["rmse"]),
                     "top": (sa["top"], sb["top"])})

@@ -69,7 +69,8 @@ def _selftest() -> None:
     assert 2 not in jl
     assert cal.round_lock(1) == jl[1] and cal.round_lock(2) is None
     assert cal.team_lock(1, "alaves") == jl[1]
-    assert cal.team_lock(1, "espanyol") > jl[1]
+    late = cal.team_lock(1, "espanyol")
+    assert late is not None and late > jl[1]
     assert cal.next_deadline(
         datetime(2026, 8, 15, 20, tzinfo=timezone.utc)) is None
     assert cal.next_deadline(

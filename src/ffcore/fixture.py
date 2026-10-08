@@ -100,8 +100,8 @@ def season_board(ratings: "_Ratings", matches: list[dict], jornadas
             continue
         for team, opp in ((r.get("home"), r.get("away")),
                           (r.get("away"), r.get("home"))):
-            if team in ratings.diff and team not in board[int(j)]:
-                board[int(j)][team] = _match_for(ratings, opp)
+            if team and team in ratings.diff and team not in board[int(j)]:
+                board[int(j)][team] = _match_for(ratings, opp or "")
     return board
 
 

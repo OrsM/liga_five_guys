@@ -131,8 +131,8 @@ class Universe:
         m = self.market
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s))
                for s in fieldable_spares(self)]
-        return out + [self.acquire(k) for k in sorted(m.price)
-                      if self.why_not(k) is None]
+        return out + [a for k in sorted(m.price)
+                      if self.why_not(k) is None and (a := self.acquire(k))]
 
     def why_not(self, k: str) -> str | None:
         """Why getting him is not a candidate, or None if it is."""
@@ -378,7 +378,7 @@ def _selftest() -> None:
     assert "dud" not in names, names
     assert "star" in names, names
     assert u.why_not("star") is None
-    assert u.why_not("dud").startswith("worth nothing at a glance: buy dud "), u.why_not("dud")
+    assert (u.why_not("dud") or "").startswith("worth nothing at a glance: buy dud "), u.why_not("dud")
     assert u.why_not("nobody") == "nobody's, and not on the market now"
     assert u.why_not("th_m1") == "riv's player"
 
@@ -411,10 +411,10 @@ def _selftest() -> None:
         "a buy is offered from your cash; sales are moves of their own"
     assert any(r.action.buy == "dear" for r in u3.rank(acts3).rows), \
         "and ranked though you cannot pay for it yet"
-    got = board(u3).plan
-    assert {r.action.buy for r in got} - {""} == {"dear"}, got
-    assert sorted(k for r in got for k in r.action.sell) == [
-        "me_bench", "me_spare2", "me_spare3"], ("no one spare pays for him; three together do", got)
+    plan3 = board(u3).plan
+    assert {r.action.buy for r in plan3} - {""} == {"dear"}, plan3
+    assert sorted(k for r in plan3 for k in r.action.sell) == [
+        "me_bench", "me_spare2", "me_spare3"], ("no one spare pays for him; three together do", plan3)
 
     af = apply(u, Action("buy", buy="star", sell=("me_bench",)))
     assert "me_bench" not in af["me"] and "star" in af["me"]
@@ -620,9 +620,10 @@ def _selftest() -> None:
     assert raised(star, [ace], rows) == [ace, sale], "what a buy leaves below zero, sales raise"
     assert blocked(star, [sale], sale.action, rows) == "star is in sell star"
     real = globals()["joint"]
+    ranked = uk.rank(uk.candidates())
     try:
         globals()["joint"] = lambda u, moves, base: Move(Action("plan"), 5.0, 0.6)
-        assert plan(uk, uk.rank(uk.candidates()).rows, uk.state) == ([], 0.0), \
+        assert plan(uk, ranked.rows, ranked.base) == ([], 0.0), \
             "a set that gains in the median but helps in 60% of seasons is no plan: one bar"
     finally:
         globals()["joint"] = real

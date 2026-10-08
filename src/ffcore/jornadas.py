@@ -47,7 +47,7 @@ def jornada_of_match() -> dict[str, int]:
             if not mid or mid in out:
                 continue
             try:
-                out[mid] = int(m.get("jornada"))
+                out[mid] = int(m.get("jornada") or "")
             except (TypeError, ValueError):
                 continue
         _JORNADA_OF_MATCH.append(out)
@@ -83,7 +83,7 @@ def _selftest() -> None:
         mid = (m.get("match_id") or "").strip()
         if mid and mid not in expect:
             try:
-                expect[mid] = int(m.get("jornada"))
+                expect[mid] = int(m.get("jornada") or "")
             except (TypeError, ValueError):
                 continue
     assert j1 == expect, "jornada_of_match() must be first-write-wins"

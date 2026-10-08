@@ -58,7 +58,7 @@ def scored() -> list[Scored]:
             continue
         last[key] = now
         at = r["observed_at"]
-        played = [j for t, j in games.get(club.get(key), every) if t <= at]
+        played = [j for t, j in games.get(club.get(key) or "", every) if t <= at]
         if at != first and played:
             out.append(Scored(key, played[-1], now[0] - before[0],
                               now[1] - before[1], at))

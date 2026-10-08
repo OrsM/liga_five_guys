@@ -276,7 +276,8 @@ def offer_source(key: str) -> Source | None:
 
 def offer_sources(teams_json: str, me: str, league: str,
                   observed_at: str = "") -> list[Source]:
-    out, seen = [], set()
+    out: list[Source] = []
+    seen: set[str] = set()
     for r in parse_api_teams(teams_json, observed_at):
         if r.get(ROW_TABLE) != "api_teams" or r.get("manager") != me:
             continue
@@ -528,11 +529,11 @@ def _selftest() -> None:
     assert all(s.cadence == "every_run" for s in disc if s.key == "api_teams")
     assert "017998544" in disc[0].url and "{base}" in disc[0].url
     assert league_sources("<html>") == []
-    teams = next(s for s in disc if s.key == "api_teams")
-    assert [s.key for s in teams.follow(_API_TEAMS_FIXTURE,
-                                        {"me": "miguel_autentico"})] \
+    follow = next(s for s in disc if s.key == "api_teams").follow
+    assert follow is not None
+    assert [s.key for s in follow(_API_TEAMS_FIXTURE, {"me": "miguel_autentico"})] \
         == ["api_offer_24338726"], "api_teams follows to your offers"
-    assert teams.follow(_API_TEAMS_FIXTURE, {"me": "nobody"}) == []
+    assert follow(_API_TEAMS_FIXTURE, {"me": "nobody"}) == []
     assert all(s.follow is None for s in disc if s.key != "api_teams")
     assert api_source("market") is None
 

@@ -86,7 +86,7 @@ def grade(by_player: dict[str, list[tuple[str, float]]],
 
 
 def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
-    ends = {}
+    ends: dict[tuple[str, datetime], dict] = {}
     for r in listings:
         if r.get("seller") != "marketPlayerLeague" or not r.get("expires_at"):
             continue

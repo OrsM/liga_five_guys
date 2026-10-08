@@ -5,7 +5,7 @@ import datetime as dt
 import math
 import re
 from dataclasses import dataclass, replace
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -113,7 +113,7 @@ def prognosis_of(status: str, note: str, seen: dt.date
         (IMPLIED[status], None) if status in IMPLIED else None)
 
 
-def bucket(prog: tuple[str, object], jornada: int, when: dt.date,
+def bucket(prog: tuple[str, Any], jornada: int, when: dt.date | None,
            next_j: int) -> str:
     """Where a jornada falls against a prognosis: 'doubt_for:at',
     'out_until:days_before', ... - the row of the availability table."""
@@ -123,6 +123,7 @@ def bucket(prog: tuple[str, object], jornada: int, when: dt.date,
     if arg is None:
         arg = next_j
     if kind == "out_until":
+        assert when is not None, "an out_until prognosis needs the jornada's date"
         days = (when - arg).days
         return "out_until:" + ("weeks_before" if days < -14 else
                                "days_before" if days < 0 else "after")
@@ -138,7 +139,7 @@ class Availability:
     def __init__(self, level: dict[str, float] | None = None):
         self.level = {**PRIOR, **(level or {})}
 
-    def of(self, prog: tuple[str, object], jornada: int, when: dt.date,
+    def of(self, prog: tuple[str, Any], jornada: int, when: dt.date | None,
            next_j: int) -> float:
         return self.level[bucket(prog, jornada, when, next_j)]
 
@@ -184,7 +185,9 @@ def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
             continue
         for i, oi in seen.items():
             prog = prognosis_of(oi.status, oi.note, _day(oi.at))
-            for j, oj in seen.items() if prog else ():
+            if prog is None:
+                continue
+            for j, oj in seen.items():
                 if j >= i:
                     t = tally.setdefault(bucket(prog, j, _day(oj.at), i),
                                          [0.0, 0.0])
@@ -216,7 +219,7 @@ class StartOdds:
         self.start_pct: dict[str, float] = {}
         self.listed: set[str] = set()
         self.status: dict[str, str] = {}
-        self.prognosis: dict[str, tuple[str, object]] = {}
+        self.prognosis: dict[str, tuple[str, Any] | None] = {}
         for r in xi or []:
             key = xw.key_of(r) if xw else None
             if not key:
@@ -351,7 +354,7 @@ def outcomes(lineups, starters, locks: dict, jornada_of: dict, xw
     out = []
     for (match, team), squad in sorted(squads.items()):
         j = jornada_of.get(match)
-        if j not in locks:
+        if j is None or j not in locks:
             continue
         cut = locks[j].strftime("%Y-%m-%dT%H%MZ")
         before = {slug: row for slug, hist in wide.get(team, {}).items()
@@ -555,8 +558,8 @@ def _selftest() -> None:
     assert not by["t:surprise-man"].listed and by["t:surprise-man"].mins == 45.0
     assert outcomes(lineups, [], locks, {}, None) == []
 
-    obs = {o.ff: o.started for o in observations(outs)}
-    assert obs == {0.8: 1.0, 0.2: 0.0, 0.6: 0.0, 0.15: 1.0}, obs
+    started = {o.ff: o.started for o in observations(outs)}
+    assert started == {0.8: 1.0, 0.2: 0.0, 0.6: 0.0, 0.15: 1.0}, started
     npct, apct = fit_start_fallbacks(outs)
     assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, npct
     assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, apct
