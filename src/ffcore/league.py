@@ -64,9 +64,16 @@ class Entry(NamedTuple):
     key: str | None
     amount: float
 
+    @property
+    def buyer(self) -> str | None:
+        """Who paid amount for the player: a buy's or a clause's who."""
+        return self.who if self.kind in ("buy", "transfer") else None
 
-PAYS = ("buy", "transfer")   # who paid amount for the player
-EARNS = ("sell", "bonus")    # who was paid amount
+    @property
+    def seller(self) -> str | None:
+        """Who parted with the player and was paid amount: a sale's who, a
+        clause's other."""
+        return {"sell": self.who, "transfer": self.other}.get(self.kind)
 
 
 def ledger(activity, users: dict, key_of, seen=()) -> list[Entry]:
@@ -100,10 +107,8 @@ def _unrecorded_exits(feed: list[Entry], seen, key_of) -> list[Entry]:
                 shown.setdefault((who, k), []).append(Entry(b, "sell", who, None, k, value))
     recorded: dict[tuple, int] = {}
     for e in feed:
-        if e.kind == "sell" and e.who:
-            recorded[e.who, e.key] = recorded.get((e.who, e.key), 0) + 1
-        elif e.kind == "transfer" and e.other:
-            recorded[e.other, e.key] = recorded.get((e.other, e.key), 0) + 1
+        if e.seller:
+            recorded[e.seller, e.key] = recorded.get((e.seller, e.key), 0) + 1
     return [x for wk, xs in shown.items() for x in xs[recorded.get(wk, 0):]]
 
 
@@ -111,12 +116,12 @@ def estimate_cash(entries: list[Entry], managers, me: str, my_cash: float | None
                   budget: float) -> dict[str, float]:
     feed = {m: budget for m in managers}
     for e in entries:
-        if e.who and e.kind in EARNS:
+        if e.buyer:
+            feed[e.buyer] -= e.amount
+        if e.seller:
+            feed[e.seller] += e.amount
+        if e.who and e.kind == "bonus":
             feed[e.who] += e.amount
-        elif e.who and e.kind in PAYS:
-            feed[e.who] -= e.amount
-        if e.other and e.kind == "transfer":
-            feed[e.other] += e.amount
     untracked = my_cash - feed[me] if my_cash is not None and me in feed else 0.0
     return {m: (my_cash if m == me and my_cash is not None else v + untracked)
             for m, v in feed.items()}
@@ -126,7 +131,7 @@ def price_paid(entries: list[Entry], owner: dict) -> dict[str, float]:
     """What each owned player's owner paid for him: his last buy or
     transfer to that manager. Players from the starting squad have none."""
     return {e.key: e.amount for e in entries
-            if e.key and e.kind in PAYS and e.who == owner.get(e.key)}
+            if e.key and e.buyer and e.buyer == owner.get(e.key)}
 
 
 class League:
