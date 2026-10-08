@@ -3,8 +3,8 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["POSITIONS", "slot", "MAX_SLOT", "FREE_FORMATIONS", "MATCH_LEN",
-           "minutes_played"]
+__all__ = ["POSITIONS", "slot", "MAX_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
+           "MATCH_LEN", "minutes_played"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
 
@@ -19,8 +19,22 @@ _SLOT = {
 FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
                    (3, 5, 2), (3, 4, 3)]
 
+# Each formation as the players it fields by position.
+SHAPES = [dict(zip(POSITIONS, (1, d, m, f))) for d, m, f in FREE_FORMATIONS]
+
 # The most of each position any formation fields.
 MAX_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(max, zip(*FREE_FORMATIONS))))}
+
+
+def shortfall(squad: dict[str, str]) -> dict[str, int]:
+    """The players a squad (player: position) is short of the nearest
+    formation, by position: empty when it can field one. On a tie, the
+    first formation in FREE_FORMATIONS."""
+    have = {p: 0 for p in POSITIONS}
+    for p in squad.values():
+        have[p] = have.get(p, 0) + 1
+    return min(({p: n - have[p] for p, n in shape.items() if n > have[p]} for shape in SHAPES),
+               key=lambda short: sum(short.values()))
 
 
 def slot(raw) -> str:
@@ -55,6 +69,15 @@ def _selftest() -> None:
     assert POSITIONS == ("POR", "DEF", "MED", "DEL")
     assert all(1 + d + m + f == 11 for d, m, f in FREE_FORMATIONS)
     assert MAX_SLOT == {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}, MAX_SLOT
+    four_four_two = {"k": "POR", **{f"d{i}": "DEF" for i in range(4)},
+                     **{f"m{i}": "MED" for i in range(4)}, "f1": "DEL", "f2": "DEL"}
+    assert shortfall(four_four_two) == {}
+    assert shortfall({k: p for k, p in four_four_two.items() if k != "k"}) == {"POR": 1}
+    two_backs = {"k": "POR", "d0": "DEF", "d1": "DEF", **{f"m{i}": "MED" for i in range(5)},
+                 "f0": "DEL", "f1": "DEL", "f2": "DEL"}
+    assert shortfall(two_backs) == {"DEF": 1}, "the nearest formation, not the first"
+    assert shortfall({}) == {"POR": 1, "DEF": 5, "MED": 4, "DEL": 1}, \
+        "an empty squad: the first of the formations short of all eleven"
     print("ffcore.rules self-test OK")
 
 

@@ -5,14 +5,13 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ffcore.rules import FREE_FORMATIONS, MAX_SLOT
+from ffcore.rules import MAX_SLOT, SHAPES
 from stats import percentile
 
 __all__ = ["LeagueState", "Standings", "expected_totals", "simulate",
            "simulate_many", "best_xi"]
 
 XI_SIZE = 11
-SHAPES = [{"POR": 1, "DEF": d, "MED": m, "DEL": f} for d, m, f in FREE_FORMATIONS]
 
 
 def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:

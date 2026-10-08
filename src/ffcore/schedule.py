@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 from ffcore.fixture import season_board
 from ffcore.locks import JornadaClock
-from ffcore.rules import FREE_FORMATIONS, MAX_SLOT
+from ffcore.rules import MAX_SLOT, shortfall
 
 
 def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
@@ -82,26 +82,9 @@ def expectations(sc, ratings, keys, matches: list[dict]
 
 
 def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
-
-    counts: dict[str, int] = {}
-    for slot in sq.values():
-        counts[slot] = counts.get(slot, 0) + 1
-
-    best = None
-    for d, m, f in FREE_FORMATIONS:
-        want = {"POR": 1, "DEF": d, "MED": m, "DEL": f}
-        short = {s: n - counts.get(s, 0) for s, n in want.items()
-                if n - counts.get(s, 0) > 0}
-        cost = sum(short.values())
-        if best is None or cost < best[0]:
-            best = (cost, short)
-    if not best or not best[1]:
-        return sq
-    sq = dict(sq)
-    for s, n in best[1].items():
-        for i in range(n):
-            sq["__phantom_%s_%d" % (s, i)] = s
-    return sq
+    """The squad with a stand-in for each player it is short of a formation."""
+    short = shortfall(sq)
+    return {**sq, **{"__phantom_%s_%d" % (p, i): p for p, n in short.items() for i in range(n)}}
 
 
 def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict],

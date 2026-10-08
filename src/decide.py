@@ -10,7 +10,7 @@ from ffcore.forecast import Bootstrap
 from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.render import title_name
-from ffcore.rules import FREE_FORMATIONS
+from ffcore.rules import shortfall
 from ffcore.schedule import phantom_topup
 from ffcore.season import LeagueState, Standings, expected_totals, simulate_many
 from stats import percentile
@@ -299,13 +299,7 @@ def at_risk(u) -> list[str]:
 
 
 def _fieldable(squad: dict[str, str]) -> bool:
-    depth: dict[str, int] = {}
-    for slot in squad.values():
-        depth[slot] = depth.get(slot, 0) + 1
-    if depth.get("POR", 0) < 1:
-        return False
-    return any(depth.get("DEF", 0) >= d and depth.get("MED", 0) >= m
-              and depth.get("DEL", 0) >= n for d, m, n in FREE_FORMATIONS)
+    return not shortfall(squad)
 
 
 def score_many(u: Universe, many: list, trials: int, seed: int):
