@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-08T08:04Z",
+ "generated_at": "2026-10-08T12:17Z",
  "lock_at": "2026-10-09T19:00:00+00:00",
  "cash": 10351947.0,
  "cash_locked": 0,
- "finish": 1.37,
- "p_win": 0.711,
+ "finish": 1.73,
+ "p_win": 0.281,
  "band": [
-  1873.316171164648,
-  2173.068382863602
+  1876.0944632134226,
+  2172.670331006858
  ],
  "do": [],
  "plan_gain": 0.0,
@@ -20,7 +20,6 @@
    "clause": 25285592.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -32,7 +31,6 @@
    "clause": 38819093.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -43,8 +41,7 @@
    "pos": "DEF",
    "clause": 59519432.0,
    "by": [
-    "Albert Laporta",
-    "BurtonGM89"
+    "Albert Laporta"
    ],
    "xi": true,
    "season": 162.90905978137667
@@ -55,7 +52,6 @@
    "clause": 17853818.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": false,
@@ -66,8 +62,7 @@
    "pos": "MED",
    "clause": 58220110.0,
    "by": [
-    "Albert Laporta",
-    "BurtonGM89"
+    "Albert Laporta"
    ],
    "xi": true,
    "season": 143.74183546940844
@@ -78,7 +73,6 @@
    "clause": 28589508.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -90,7 +84,6 @@
    "clause": 31271675.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -102,7 +95,6 @@
    "clause": 24423852.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": false,
@@ -114,7 +106,6 @@
    "clause": 16966785.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -126,7 +117,6 @@
    "clause": 16152571.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333"
    ],
    "xi": true,
@@ -138,12 +128,11 @@
    "clause": 6931556.0,
    "by": [
     "Albert Laporta",
-    "BurtonGM89",
     "Magic Mike 333",
     "SusoGattuso"
    ],
    "xi": true,
-   "season": 91.98887169376677
+   "season": 92.09898225723423
   }
  ],
  "squad": [
@@ -170,7 +159,7 @@
    "value": 59519432.0,
    "trend": 12.501206794961227,
    "paid": 37492727.0,
-   "per_million": -1.1472124152332333,
+   "per_million": -1.1271224989946345,
    "offer": 61355883.0
   },
   {
@@ -183,20 +172,20 @@
    "value": 22004253.0,
    "trend": -7.891826681150856,
    "paid": 28589508.0,
-   "per_million": -1.7316441335512691,
+   "per_million": -1.71445569613671,
    "offer": 23498514.0
   },
   {
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "xi": true,
-   "start": 0.7550876222328158,
-   "next": 4.28666757510466,
-   "season": 91.98887169376677,
+   "start": 0.7744833701173071,
+   "next": 4.396778138572112,
+   "season": 92.09898225723423,
    "value": 4824082.0,
    "trend": -11.85229199139069,
    "paid": 6931556.0,
-   "per_million": -0.8904401200619209,
+   "per_million": -0.9201772777689717,
    "offer": 4918139.0
   },
   {
@@ -209,8 +198,8 @@
    "value": 38819093.0,
    "trend": 8.995944708676626,
    "paid": 28662117.0,
-   "per_million": -1.9445828881403138,
-   "offer": 39310163.0
+   "per_million": -1.752042969348309,
+   "offer": 42500000.0
   },
   {
    "name": "Dakonam Djene",
@@ -222,7 +211,7 @@
    "value": 24423852.0,
    "trend": 3.7041188719827565,
    "paid": 16059124.0,
-   "per_million": -1.156907636975383,
+   "per_million": -1.1998123897256034,
    "offer": 23938033.0
   },
   {
@@ -235,7 +224,7 @@
    "value": 38446423.0,
    "trend": 10.203938026535432,
    "paid": 58220110.0,
-   "per_million": -1.2582398577538865,
+   "per_million": -1.2646203720801168,
    "offer": null
   },
   {
@@ -248,7 +237,7 @@
    "value": 16966785.0,
    "trend": 12.906303292466742,
    "paid": 5891526.0,
-   "per_million": -1.53802317723884,
+   "per_million": -1.495024904469645,
    "offer": null
   },
   {
@@ -261,7 +250,7 @@
    "value": 13815280.0,
    "trend": 4.427407484890137,
    "paid": 13966262.0,
-   "per_million": -1.9247605037156628,
+   "per_million": -1.9448860958685186,
    "offer": null
   },
   {
@@ -274,7 +263,7 @@
    "value": 16152571.0,
    "trend": 9.643877231934493,
    "paid": null,
-   "per_million": -1.6248316891244738,
+   "per_million": -1.5704909408676369,
    "offer": null
   },
   {
@@ -287,7 +276,7 @@
    "value": 17853818.0,
    "trend": -19.046525461105986,
    "paid": 5307217.0,
-   "per_million": -3.2755794815187085,
+   "per_million": -3.142555899483798,
    "offer": null
   },
   {
@@ -300,7 +289,7 @@
    "value": 26035530.0,
    "trend": -5.840135057165533,
    "paid": null,
-   "per_million": -1.2959130414895854,
+   "per_million": -1.298581480419049,
    "offer": null
   },
   {
@@ -313,65 +302,65 @@
    "value": 40579513.0,
    "trend": -8.598993615088512,
    "paid": 42016585.0,
-   "per_million": -1.6897787649897222,
+   "per_million": -1.8428643209185365,
    "offer": 37386934.0
   }
  ],
  "standings": [
   {
+   "manager": "BurtonGM89",
+   "me": false,
+   "now": 311.0,
+   "mean": 2117.5293301624465,
+   "lo": 1954.727626493391,
+   "hi": 2282.031507853524,
+   "cash": 1012317.0,
+   "estimated": true,
+   "p_above": 0.7186666666666667
+  },
+  {
    "manager": "miguel_autentico",
    "me": true,
    "now": 371.0,
-   "mean": 2024.4235728090666,
-   "lo": 1873.316171164648,
-   "hi": 2173.068382863602,
+   "mean": 2020.603217216733,
+   "lo": 1876.0944632134226,
+   "hi": 2172.670331006858,
    "cash": 10351947.0,
    "estimated": false,
    "p_above": null
   },
   {
-   "manager": "BurtonGM89",
-   "me": false,
-   "now": 311.0,
-   "mean": 1890.9326488975744,
-   "lo": 1748.0909965096891,
-   "hi": 2039.9542702183417,
-   "cash": 190235322.0,
-   "estimated": true,
-   "p_above": 0.20333333333333337
-  },
-  {
    "manager": "Albert Laporta",
    "me": false,
    "now": 272.0,
-   "mean": 1859.3803311264214,
-   "lo": 1694.1660163775741,
-   "hi": 2027.7840815745856,
-   "cash": 78089468.0,
+   "mean": 1634.5197805969985,
+   "lo": 1497.7016247551894,
+   "hi": 1771.9208029281406,
+   "cash": 268252264.0,
    "estimated": true,
-   "p_above": 0.16000000000000003
+   "p_above": 0.007000000000000006
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 271.0,
-   "mean": 1584.87182601501,
-   "lo": 1466.8341802900447,
-   "hi": 1705.3320235918582,
+   "mean": 1579.8417923560708,
+   "lo": 1459.8043300220625,
+   "hi": 1699.1665526030142,
    "cash": 43593671.0,
    "estimated": true,
-   "p_above": 0.0006666666666667043
+   "p_above": 0.0023333333333332984
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 211.0,
-   "mean": 1564.984955227124,
-   "lo": 1443.6961658349196,
-   "hi": 1687.3693295415442,
+   "mean": 1566.332081212571,
+   "lo": 1449.585616745698,
+   "hi": 1685.5475819148874,
    "cash": 7140512.0,
    "estimated": true,
-   "p_above": 0.0023333333333332984
+   "p_above": 0.0010000000000000009
   }
  ]
 }
