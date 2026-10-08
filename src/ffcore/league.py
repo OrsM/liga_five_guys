@@ -8,7 +8,7 @@ from typing import NamedTuple
 from ffcore.parse import money, text
 from ffcore.text import norm
 from ffcore.players import load_crosswalk
-from ffcore.tidy import current, input_path
+from ffcore.tidy import current, history, input_path
 
 from ffcore.crosswalk import Crosswalk
 __all__ = ["Config", "Entry", "load_config", "app_fielded", "estimate_cash", "ledger",
@@ -69,13 +69,42 @@ PAYS = ("buy", "transfer")   # who paid amount for the player
 EARNS = ("sell", "bonus")    # who was paid amount
 
 
-def ledger(activity, users: dict, key_of) -> list[Entry]:
-    """The activity feed read once: each event once, oldest first."""
+def ledger(activity, users: dict, key_of, seen=()) -> list[Entry]:
+    """The activity feed read once, each event once, completed by the squads
+    seen (api_teams history): the feed leaves out some exits, so those are
+    sales at the player's last value (_unrecorded_exits). Oldest first."""
     rows = {r.get("activity_id") or id(r): r for r in activity}.values()
-    return sorted((Entry(r.get("at") or "", r.get("kind") or "",
-                         users.get(text(r, "user_id")), users.get(text(r, "counterparty")),
-                         key_of(text(r, "player_id")), money(r.get("amount")) or 0.0)
-                   for r in rows), key=lambda e: e.at)
+    feed = [Entry(r.get("at") or "", r.get("kind") or "",
+                  users.get(text(r, "user_id")), users.get(text(r, "counterparty")),
+                  key_of(text(r, "player_id")), money(r.get("amount")) or 0.0)
+            for r in rows]
+    return sorted(feed + _unrecorded_exits(feed, seen, key_of), key=lambda e: e.at)
+
+
+def _unrecorded_exits(feed: list[Entry], seen, key_of) -> list[Entry]:
+    """For each manager and player, the exits the squads show beyond those
+    the feed records (a sale by him, a clause paid to him), as sales at the
+    player's last value. Counted, not matched by time: the squads and the
+    feed are stamped minutes apart."""
+    snaps: dict[str, dict] = {}
+    for r in seen:
+        if (k := key_of(text(r, "player_id"))) and text(r, "manager"):
+            snaps.setdefault(r["observed_at"], {})[k] = (text(r, "manager"),
+                                                         money(r.get("market_value")) or 0.0)
+    shown: dict[tuple, list] = {}
+    stamps = sorted(snaps)
+    for a, b in zip(stamps, stamps[1:]):
+        managers = {who for who, _ in snaps[b].values()}
+        for k, (who, value) in snaps[a].items():
+            if who in managers and snaps[b].get(k, (None,))[0] != who:
+                shown.setdefault((who, k), []).append(Entry(b, "sell", who, None, k, value))
+    recorded: dict[tuple, int] = {}
+    for e in feed:
+        if e.kind == "sell" and e.who:
+            recorded[e.who, e.key] = recorded.get((e.who, e.key), 0) + 1
+        elif e.kind == "transfer" and e.other:
+            recorded[e.other, e.key] = recorded.get((e.other, e.key), 0) + 1
+    return [x for wk, xs in shown.items() for x in xs[recorded.get(wk, 0):]]
 
 
 def estimate_cash(entries: list[Entry], managers, me: str, my_cash: float | None,
@@ -103,7 +132,7 @@ def price_paid(entries: list[Entry], owner: dict) -> dict[str, float]:
 class League:
 
     def __init__(self, cfg: Config, xw: Crosswalk, api_teams=(), standings=(),
-                 activity=()):
+                 activity=(), seen=()):
         self.cfg, self.xw, self.standings = cfg, xw, standings
         self.owner = {k: text(r, "manager") for r in api_teams
                       if (k := xw.player(app_id=text(r, "player_id")))
@@ -113,7 +142,7 @@ class League:
         mine = next((money(r.get("team_money")) for r in standings
                      if text(r, "manager") == cfg.me and r.get("team_money")),
                     None)
-        entries = ledger(activity, users, self.key_of_app)
+        entries = ledger(activity, users, self.key_of_app, seen)
         self.cash = estimate_cash(entries, users.values(), cfg.me, mine, cfg.budget)
         self.paid = price_paid(entries, self.owner)
         self.managers = sorted({cfg.me} | set(self.owner.values())
@@ -122,7 +151,7 @@ class League:
     @classmethod
     def load(cls) -> "League":
         return cls(load_config(), load_crosswalk(), current("api_teams"),
-                   current("api_standings"), current("api_activity"))
+                   current("api_standings"), current("api_activity"), history("api_teams"))
 
     @property
     def me(self) -> str:
@@ -160,6 +189,26 @@ def _selftest() -> None:
     got = estimate_cash(entries, users.values(), "me", 116.0, 100.0)
     assert got == {"me": 116.0, "riv": 91.0, "quiet": 106.0}, got
     assert estimate_cash(entries, users.values(), "me", None, 100.0)["riv"] == 85.0
+
+    seen = [{"observed_at": "2026-09-01T1000Z", "manager": "riv", "player_id": "7", "market_value": "30"},
+            {"observed_at": "2026-09-02T1000Z", "manager": "riv", "player_id": "8", "market_value": "5"}]
+    key = {"7": "p", "8": "q"}.get
+    gone = ledger(feed, users, key, seen)
+    assert estimate_cash(gone, users.values(), "me", None, 100.0)["riv"] == 85.0 + 30, \
+        "a player who left with no event in the feed was sold at his last value"
+    sold = feed + [{"activity_id": "f", "kind": "sell", "user_id": "2", "player_id": "7",
+                    "amount": "31", "at": "2026-09-01T15:00:00+02:00"}]
+    assert estimate_cash(ledger(sold, users, key, seen), users.values(), "me", None,
+                         100.0)["riv"] == 85.0 + 31, "a recorded sale is not counted twice"
+    taken = feed + [{"activity_id": "g", "kind": "transfer", "user_id": "1", "player_id": "7",
+                     "counterparty": "2", "amount": "33", "at": "2026-09-02T12:00:30+02:00"}]
+    assert estimate_cash(ledger(taken, users, key, seen), users.values(), "me", None,
+                         100.0)["riv"] == 85.0 + 33, \
+        "nor a clause paid for him, stamped after the snapshot that shows him gone"
+    away = seen[:1] + [{"observed_at": "2026-09-02T1000Z", "manager": "me", "player_id": "8",
+                        "market_value": "5"}]
+    assert estimate_cash(ledger(feed, users, key, away), users.values(), "me", None,
+                         100.0)["riv"] == 85.0, "a snapshot without his squad shows no exit"
 
     xw = Crosswalk({"p": Player("p", app_id="7")})
     lg = League(Config(me="me", budget=100.0), xw,
