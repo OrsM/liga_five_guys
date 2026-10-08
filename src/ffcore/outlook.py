@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Mapping, NamedTuple
 
-from ffcore.forecast import Bootstrap
+from ffcore.forecast import Bootstrap, expected_points
 from ffcore.season import LeagueState, best_xi
 
 __all__ = ["Outlook", "XI"]
@@ -43,7 +43,7 @@ class Outlook:
 
     @cached_property
     def xi(self) -> XI:
-        exp = {k: pts * p for k, (pts, p) in self.next_up.items()}
+        exp = {k: expected_points(cell) for k, cell in self.next_up.items()}
         return XI(exp, set(best_xi(self.state.squads.get(self.state.me, {}), exp)))
 
     @cached_property

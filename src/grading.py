@@ -8,6 +8,7 @@ import json
 import sys
 from pathlib import Path
 
+from ffcore.forecast import expected_points
 from ffcore.schedule import expectations
 from ffcore.jornadas import clock_history
 from ffcore.points import scored
@@ -59,7 +60,7 @@ def backtest(ahead: int = 0) -> list[dict]:
             for j in range(i, i + ahead + 1):
                 if j not in done or j not in per_j:
                     continue
-                pred = {k: pts * p for k, (pts, p) in per_j[j].items()}
+                pred = {k: expected_points(cell) for k, cell in per_j[j].items()}
                 hurt = {k: v for k, v in pred.items() if k in flagged}
                 out.append({"jornada": j, "from": i, "pred": pred,
                             **score_forecast(pred, actual, j),
@@ -115,7 +116,7 @@ def decisions() -> list[dict]:
                              "cleared" if verdict(r) is None else "rejected",
                     "kind": "sell" if not a.buy else "get",
                     "chance": r.p_better,
-                    "pred": change(a, lambda k, j: math.prod(per_j[j].get(k, (0.0, 0.0)))),
+                    "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
                     "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
                     "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
                     "value_real": worth(a, rose)})

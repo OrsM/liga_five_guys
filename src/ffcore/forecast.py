@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import statistics
 
-__all__ = ["Bootstrap", "SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE"]
+__all__ = ["Bootstrap", "expected_points", "SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE"]
 
 SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
              1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3,
@@ -12,6 +12,12 @@ SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
 MIN_POOL = 200
 
 PERSISTENT_SHARE = 0.08
+
+
+def expected_points(cell) -> float:
+    """A forecast cell (points if he plays, chance he plays) as expected
+    points; no cell is none."""
+    return cell[0] * cell[1] if cell else 0.0
 
 
 class Bootstrap:
@@ -30,14 +36,16 @@ class Bootstrap:
         return self._order.get(jornada, [])
 
     def expected(self, jornada: int) -> dict[str, float]:
-        return {k: pts * p
-                for k, (pts, p) in self.per_jornada.get(jornada, {}).items()}
+        return {k: expected_points(cell)
+                for k, cell in self.per_jornada.get(jornada, {}).items()}
 
 
 def _selftest() -> None:
     fc = Bootstrap({1: {"nailed": (5.0, 1.0), "rota": (5.0, 0.5),
                         "out": (5.0, 0.0)}})
     assert fc.expected(1) == {"nailed": 5.0, "rota": 2.5, "out": 0.0}
+    assert expected_points((5.0, 0.5)) == 2.5 and expected_points(None) == 0.0, \
+        "a cell (points if he plays, chance he plays) is worth their product"
     assert fc.expected(99) == {}, "a jornada nobody plays is empty, not an error"
     assert Bootstrap({}, pool=[1, 2, 3]).pool == SEED_POOL
     big = list(range(MIN_POOL))

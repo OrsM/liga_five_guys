@@ -24,6 +24,7 @@ from ffcore.render import title_name  # noqa: E402
 from sim import holding  # noqa: E402
 from ffcore.schedule import jornada_dates, jornada_expectation  # noqa: E402
 from ffcore.startprob import bucket  # noqa: E402
+from ffcore.forecast import expected_points  # noqa: E402
 from ffcore.tidy import LINEUP_SOURCE, current  # noqa: E402
 
 
@@ -177,7 +178,7 @@ def forecast(u, k: str, ahead: int) -> None:
         fit = sc.fit(k, j, dates.get(j), first)
         print("%-4d %-10s %6.2f %7.2f %7.2f %6.2f %6.2f %8.2f  %s" % (
             j, dates.get(j, ""), pts, pts / r.ppm if r.ppm else 0.0, picked,
-            fit, p, pts * p, bucket(prog, j, dates.get(j), first) if prog else "-"))
+            fit, p, expected_points(cell), bucket(prog, j, dates.get(j), first) if prog else "-"))
         shown += 1
     where = ("in your best eleven" if k in u.outlook.xi.players else
              "on your bench" if k in u.mine else "not in your squad")

@@ -5,7 +5,7 @@ flowchart LR
         assemble["assemble 165<br/>in 2 · out 16"]:::hub
         crosswalk["crosswalk 157"]
         decide["decide 637"]
-        grading["grading 248"]
+        grading["grading 249"]
         ingest["ingest 758"]
         run["run 82"]
         sim["sim 288"]
@@ -30,7 +30,7 @@ flowchart LR
     subgraph model["Model"]
         action["action 50"]
         fixture["fixture 169"]
-        forecast["forecast 50"]
+        forecast["forecast 58"]
         market["market 182"]
         outlook["outlook 87"]
         pricing["pricing 178"]
@@ -128,6 +128,7 @@ flowchart LR
     grading --> assemble
     grading --> decide
     grading --> clock
+    grading --> forecast
     grading --> jornadas
     grading --> points
     grading --> pricing
