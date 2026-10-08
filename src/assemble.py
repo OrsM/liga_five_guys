@@ -8,7 +8,6 @@ from datetime import datetime
 from functools import cache
 
 from decide import Universe, _fieldable
-from ffcore.clock import run_now
 from ffcore.fixture import difficulty_ratings
 from ffcore.forecast import Bootstrap
 from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
@@ -63,14 +62,12 @@ def app_status(xw) -> dict[str, str]:
 
 
 def open_clauses(teams: list[dict]) -> dict[str, float]:
-    """Owned players whose release clause can be paid now: their protection
-    after a transfer has ended. Checked against the league's own clause
-    buys: each paid exactly the listed clause, to the owner."""
-    now = run_now()
+    """Each owned player's release clause: any can be paid now. Checked
+    against the league's own clause buys: each paid exactly the listed
+    clause, to the owner, and two came before the player's buyout_until
+    (Luismi Cruz, Yamal), so that date protects no one."""
     return {r["key"]: amount for r in teams
-            if r.get("key") and (amount := num(r, "buyout")) and (
-                not r.get("buyout_until")
-                or datetime.fromisoformat(r["buyout_until"]) <= now)}
+            if r.get("key") and (amount := num(r, "buyout"))}
 
 
 def fixture_ratings(market: list[dict]):

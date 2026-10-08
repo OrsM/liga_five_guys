@@ -81,9 +81,9 @@ def holding(u, b, k) -> dict:
 
 def exposed(u) -> list[dict]:
     m, o = u.market, u.outlook
-    return [{**player(m, k), "clause": m.clause[k], "by": by,
+    return [{**player(m, k), "clause": m.clause[k],
              "xi": k in o.xi.players, "season": o.season.get(k, 0.0)}
-            for k, by in at_risk(u)]
+            for k in at_risk(u)]
 
 
 def report(u, b, fielded: list[str], lock_at=None) -> dict:
@@ -201,10 +201,16 @@ def _selftest() -> None:
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
     assert "backup" not in doc, "the plan is the one judgement; nothing second-guesses it"
     assert doc["cash_after"] == ub.market.left([r.action for r in b.plan])
+    from assemble import open_clauses
+    assert open_clauses([{"key": "p", "buyout": "9", "buyout_until": "2099-01-01T00:00:00+02:00"},
+                         {"key": "q", "buyout": ""}]) == {"p": 9.0}, \
+        "buyout_until protects no one: Luismi Cruz and Yamal were taken before it"
     rich = replace(ub, rival_cash={"riv": 25e6},
                    market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))
-    assert [(e["name"].lower(), e["by"]) for e in exposed(rich)] == [("star", ["riv"])], \
-        "exposed: what a rival can take now and can afford"
+    assert [e["name"].lower() for e in exposed(rich)] == ["star", "dead"], \
+        "exposed: every player with a clause, most valuable first"
+    assert all("by" not in e for e in exposed(rich)), \
+        "no 'who can afford him': a rival's cash is no limit when sales to the game pay at once"
     assert all(CONFIDENCE <= v <= 1.0 for d in doc["do"] for _, v, unit in d["facts"]
                if unit == "seasons"), "only moves that clear the bar are shown"
     assert report(ub, b._replace(plan=[]), [])["cash_after"] is None, \
@@ -248,7 +254,8 @@ def _selftest() -> None:
         return (next(d for d in doc["do"] if d["what"] == "sell"),
                 doc["ping"].split("; ")[-1])
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
-    facts = lambda d: {f[0]: f[1] for f in d["facts"]}
+    def facts(d):
+        return {f[0]: f[1] for f in d["facts"]}
     assert (take["step"], take["amount"], take["done"]) == ("take offer", 1.1e6, False)
     assert facts(take)["raises"] == 1.1e6
     assert said == "sell dead", said

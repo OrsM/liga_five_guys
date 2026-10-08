@@ -116,8 +116,9 @@ Every forecast is the same product, for every player and jornada, and
   `python tools/ask.py why <player>` names the step a player stopped at,
   `ask.py whatif buy X sell Y` scores a move of your own the same way, and
   `ask.py forecast <player>` prints his forecast factor by factor. The
-  board also lists your players a rival can take by clause now, and who
-  can afford them.
+  board also lists your players a rival can take by clause now (`decide.at_risk`):
+  all of them, since a sale to the game pays at once and any rival can raise
+  a clause that way.
   Each line of the board is one `sim.row`: the move (`Action.label`), the
   step it takes in the app, whether it is done, its points and the numbers
   that made it. The page lays rows out and decides nothing.
@@ -147,8 +148,9 @@ which move wins.
   player's value has outgrown 1.5x what his owner paid (Raphinha: bought
   for 80.0M, raided at his 141.4M value). Not needed by the model: the
   feed gives each clause, and a raid pays exactly that.
-- **Protection after a transfer** is set per league. Read from the feed
-  (`buyoutClauseLockedEndTime`), not assumed.
+- **No protection after a transfer in this league.** The feed's
+  `buyoutClauseLockedEndTime` is not one: Luismi Cruz was taken 6 days and
+  Yamal 13 days before it. Every clause counts as payable (`open_clauses`).
 - **Clause buys close before the matchday** (24h by default; 24–72h per
   league). Not modelled: ours paid one 9h before kickoff, and the app
   refuses a closed one anyway.

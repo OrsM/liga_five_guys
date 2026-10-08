@@ -2,13 +2,13 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 171<br/>in 2 · out 17"]:::hub
+        assemble["assemble 168<br/>in 2 · out 16"]:::hub
         crosswalk["crosswalk 157"]
-        decide["decide 647"]
+        decide["decide 643"]
         grading["grading 248"]
         ingest["ingest 758"]
         run["run 82"]
-        sim["sim 281"]
+        sim["sim 288"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 247"]
@@ -51,7 +51,6 @@ flowchart LR
     run -. "by name" .-> crosswalk
     run -. "by name" .-> sim
     assemble --> decide
-    assemble --> clock
     assemble --> fixture
     assemble --> forecast
     assemble --> jornadas

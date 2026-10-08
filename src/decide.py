@@ -289,17 +289,13 @@ def board(u) -> Board:
     return Board(forced + picked, gain, forced + rows, base)
 
 
-def at_risk(u) -> list[tuple[str, list[str]]]:
-    """Your players a rival can take now by paying their clause, with the
-    rivals whose estimated cash covers it, most valuable to you first."""
-    m, season = u.market, u.outlook.season
-    out = []
-    for k in sorted(u.mine, key=lambda k: -season.get(k, 0.0)):
-        by = sorted(g for g, cash in u.rival_cash.items()
-                    if k in m.clause and cash >= m.clause[k])
-        if by:
-            out.append((k, by))
-    return out
+def at_risk(u) -> list[str]:
+    """Your players a rival can take now by paying their clause, most
+    valuable to you first. Any rival can: a sale to the game pays at once
+    (Laporta sold Raphinha for 192.6M the minute he paid 189.5M for Yamal),
+    so cash is no limit."""
+    season = u.outlook.season
+    return sorted((k for k in u.mine if k in u.market.clause), key=lambda k: -season.get(k, 0.0))
 
 
 def _fieldable(squad: dict[str, str]) -> bool:
