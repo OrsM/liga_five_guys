@@ -3,7 +3,7 @@ per player, and the crosswalk of ids between the sources."""
 from __future__ import annotations
 
 from ffcore.parse import money, pct100
-from ffcore.text import norm, row_key
+from ffcore.names import Name, row_key
 from ffcore.tidy import LINEUP_SOURCE, current, mtime_cached, table_path
 
 from ffcore.crosswalk import Crosswalk
@@ -72,7 +72,7 @@ def _selftest() -> None:
           {"player_name": "Cai Coro", "team_slug": "celta",
            "start_pct": "85", "status": "ok"}]
     p = _merge(_merge({}, mkt, row_key, "name", MARKET_FIELDS), xi,
-               lambda r: norm(r["player_name"]), "player_name", XI_FIELDS)
+               lambda r: Name(r["player_name"]).key, "player_name", XI_FIELDS)
 
     a = p["ane aldea"]
     assert a["value"] == 2050000.0 and a["delta_1d"] == -12000.0

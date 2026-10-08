@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from ffcore.parse import kickoff_stamp
-from ffcore.text import norm
+from ffcore.names import row_key
 from ffcore.tidy import current, history
 
 __all__ = ["Scored", "scored"]
@@ -50,8 +50,7 @@ def scored() -> list[Scored]:
     last: dict[str, tuple[float, float]] = {}
     out = []
     for r in rows:
-        key = (r.get("ff_id") or "").strip() or norm(
-            r.get("player_name_full") or r.get("player_name") or "")
+        key = row_key(r, ("player_name_full", "player_name"))
         now = (float(r["points"]), float(r["games"]))
         before = last.get(key, (0.0, 0.0))
         if not key or now == before:

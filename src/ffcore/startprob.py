@@ -10,7 +10,7 @@ from typing import Any, NamedTuple
 import numpy as np
 
 from ffcore.parse import pct100, snapshot_stamp, year_for
-from ffcore.text import norm
+from ffcore.names import Name
 from ffcore.rules import minutes_played
 from stats import shrink
 
@@ -347,7 +347,7 @@ def outcomes(lineups, starters, locks: dict, jornada_of: dict, xw
                               {})[r["player_slug"]] = r
     wide: dict[str, dict[str, list]] = {}
     for r in sorted(lineups, key=lambda r: r.get("observed_at", "")):
-        slug = r.get("player_slug") or norm(r.get("player_name"))
+        slug = r.get("player_slug") or Name(r.get("player_name")).key
         wide.setdefault(r.get("team_slug"), {}).setdefault(
             slug, []).append((r.get("observed_at", ""), r))
 

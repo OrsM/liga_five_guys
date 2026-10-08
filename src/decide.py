@@ -9,7 +9,6 @@ from ffcore.action import Action
 from ffcore.forecast import Bootstrap
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.render import title_name
 from ffcore.rules import shortfall
 from ffcore.schedule import phantom_topup
 from ffcore.season import LeagueState, Standings, expected_totals, simulate_many
@@ -258,7 +257,7 @@ def joint(u, moves: list[Move], base: Standings) -> Move:
 def blocked(u, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
     """Why raised refuses a move alongside these, in words. None if it
     does not."""
-    names = {k: title_name(n) for k, n in u.market.name.items()}
+    names = u.market.names
     for p in picked:
         if shared := set(p.action.players) & set(a.players):
             return "%s is in %s" % (" + ".join(names.get(k, k) for k in shared),

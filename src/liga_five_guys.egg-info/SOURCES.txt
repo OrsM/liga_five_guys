@@ -24,12 +24,12 @@ src/ffcore/laliga_api.py
 src/ffcore/league.py
 src/ffcore/locks.py
 src/ffcore/market.py
+src/ffcore/names.py
 src/ffcore/outlook.py
 src/ffcore/parse.py
 src/ffcore/players.py
 src/ffcore/points.py
 src/ffcore/pricing.py
-src/ffcore/render.py
 src/ffcore/rules.py
 src/ffcore/schedule.py
 src/ffcore/score.py

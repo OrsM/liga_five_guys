@@ -10,7 +10,7 @@ export FF_ROOT=./data
 
 TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py
        ffcore/fixtures.py ffcore/auth.py
-       ffcore/forecast.py ffcore/season.py ffcore/outlook.py ffcore/render.py
+       ffcore/forecast.py ffcore/season.py ffcore/outlook.py ffcore/names.py
        ffcore/clock.py ffcore/jornadas.py ffcore/points.py ffcore/players.py
        ffcore/rules.py ffcore/locks.py
        ffcore/startprob.py ffcore/crosswalk.py sources.py ffcore/source.py

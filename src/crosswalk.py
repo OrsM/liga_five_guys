@@ -6,7 +6,8 @@ import sys
 
 from ffcore.parse import money, text
 from ffcore.crosswalk import Crosswalk, Player
-from ffcore.text import norm, row_key, tokens
+from ffcore.names import AppId, Name, app_id, row_key
+from ffcore.text import tokens
 from ffcore.tidy import current, history, TIDY
 
 PLAYERS = "players.csv"
@@ -15,12 +16,12 @@ PLAYERS = "players.csv"
 def group_by_name(players) -> dict[str, list]:
     out: dict[str, list] = {}
     for p in players:
-        out.setdefault(norm(p.name), []).append(p)
+        out.setdefault(Name(p.name).key, []).append(p)
     return out
 
 
 def _named(named: dict, name: str, club: str = ""):
-    hits = named.get(norm(name)) or []
+    hits = named.get(Name(name).key) or []
     if len(hits) != 1 and club:
         hits = [p for p in hits if p.club_id == club]
     return hits[0] if len(hits) == 1 else None
@@ -44,7 +45,7 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
             p.ff_slug = slug
 
     value = {row_key(r): money(r.get("value")) for r in market}
-    app = {text(r, "player_id"): r for r in api_rows}
+    app = {app_id(r): r for r in api_rows}
     words = {pid: set(tokens(p.name)) for pid, p in out.items()}
     weak = set()
     for pid, p in out.items():
@@ -63,9 +64,9 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
             weak.add(pid)
 
     held = {p.app_id for p in out.values() if p.app_id}
-    for app_id, r in app.items():
+    for aid, r in app.items():
         theirs = money(r.get("market_value"))
-        if not app_id or app_id in held or not theirs:
+        if not aid or aid in held or not theirs:
             continue
         theirs_words = [set(tokens(n)) for n in (r.get("player_name"),
                                                  r.get("player_name_full"))
@@ -77,12 +78,12 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
                         for w in theirs_words)]
         if len(hits) == 1:
             print("  app id %s (%s) attached to %s"
-                  % (app_id, r.get("player_name"), out[hits[0]].name))
+                  % (aid, r.get("player_name"), out[hits[0]].name))
             weak.discard(hits[0])
             held.discard(out[hits[0]].app_id)
-            out[hits[0]].app_id = app_id
+            out[hits[0]].app_id = aid
             out[hits[0]].app_names.add(text(r, "player_name"))
-            held.add(app_id)
+            held.add(aid)
     return out
 
 
@@ -120,11 +121,10 @@ def _selftest() -> None:
                  "player_slug": "jonny-castro-ff", "role": "starter"}]
     players = build_players({}, market, lineups + starters, [])
     xw = Crosswalk(players)
-    for ids, want in [({"name": "Alvaro Fernandez"}, "alvaro fernandez"),
-                      ({"ff_slug": "alvaro-fdez"}, "alvaro fernandez"),
-                      ({"ff_slug": "jonny-castro-ff"}, "jonny castro"),
-                      ({"app_id": "9999"}, None)]:
-        assert xw.player(**ids) == want, (ids, xw.player(**ids))
+    assert xw.player(name="Alvaro Fernandez") == "alvaro fernandez"
+    assert xw.player(ff_slug="alvaro-fdez") == "alvaro fernandez"
+    assert xw.player(ff_slug="jonny-castro-ff") == "jonny castro"
+    assert xw.player(app_id=AppId("9999")) is None
     assert players["alvaro fernandez"].club_id == "espanyol"
 
     twins = [{"name": n, "club": c, "ff_id": i, "value": v} for n, c, i, v in [

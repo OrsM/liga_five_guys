@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 from ffcore.parse import text
 from ffcore.startprob import NEUTRAL_START, StartOdds
-from ffcore.text import norm, row_key
+from ffcore.names import Name, row_key
 from ffcore.rules import minutes_played, slot
 from stats import shrink
 
@@ -187,7 +187,7 @@ def _selftest() -> None:
 
     market = [dict(row, name=n) for n in
               ["p%d" % i for i in range(10)] + ["Sub", "Newbie"]]
-    xw = Crosswalk({norm(n): Player(norm(n), n)
+    xw = Crosswalk({Name(n).key: Player(Name(n).key, n)
                     for n in [r["name"] for r in market] + ["Attacker"]})
     hist = {"p%d" % i: {"pts": 100.0 + i, "pj": 34.0} for i in range(10)}
     hist["sub"] = {"pts": 20.0, "pj": 4.0}

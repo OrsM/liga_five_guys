@@ -13,6 +13,7 @@ from ffcore.forecast import Bootstrap
 from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
+from ffcore.names import Name, app_id
 from ffcore.parse import num, ratio, text
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
@@ -58,7 +59,7 @@ def scorer(market: list[dict], xi_rows: list[dict]) -> Scorer:
 def app_status(xw) -> dict[str, str]:
     """The LaLiga app's status for each player it lists."""
     return {k: r["player_status"] for r in current("api_players_all")
-            if (k := xw.player(app_id=r["player_id"])) and r.get("player_status")}
+            if (k := xw.player(app_id=app_id(r))) and r.get("player_status")}
 
 
 def open_clauses(teams: list[dict]) -> dict[str, float]:
@@ -115,7 +116,7 @@ def universe() -> Universe:
     players = load_players()
     m = current("matches")
 
-    teams, mkt = ([dict(r, key=lg.key_of_app(text(r, "player_id")))
+    teams, mkt = ([dict(r, key=lg.key_of_app(app_id(r)))
                    for r in current(name)] for name in ("api_teams", "api_market"))
     price, route = market_routes(mkt)
     pt_to_key = {r["player_team_id"]: r["key"] for r in teams
@@ -135,7 +136,7 @@ def universe() -> Universe:
     prices = Momentum(steps(history("market")))
     market = Market(
         cash=lg.cash[me], premium=_premium(me),
-        name={k: rec.get("name") or k for k, rec in players.items()},
+        name={k: Name(rec.get("name") or k) for k, rec in players.items()},
         pos=pos,
         price={k: v for k, v in price.items() if k in players},
         route={k: v for k, v in route.items() if k in players},

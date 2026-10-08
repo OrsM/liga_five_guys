@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import configparser
+from collections.abc import Callable
 import sys
 from dataclasses import dataclass
 from typing import NamedTuple
 
 from ffcore.parse import money, text
-from ffcore.text import norm
 from ffcore.players import load_crosswalk
 from ffcore.tidy import current, history, input_path
 
 from ffcore.crosswalk import Crosswalk
+from ffcore.names import AppId, Name, PlayerKey, app_id
 __all__ = ["Config", "Entry", "load_config", "app_fielded", "estimate_cash", "ledger",
            "League", "price_paid"]
 
@@ -33,18 +34,19 @@ def load_config(name: str = "league.ini") -> Config:
         budget=money(cp.get("league", "budget", fallback=str(base.budget))) or 0.0)
 
 
-def app_fielded(squad, names: dict, rows=None, xw=None) -> list[str]:
-
+def app_fielded(squad, names: dict[str, Name], rows=None, xw=None) -> list[str]:
+    """Your eleven as the app has it, as our keys: by app id, else by name;
+    [] if any of them is not in your squad."""
     rows = current("api_lineup") if rows is None else rows
     xw = xw or load_crosswalk() or Crosswalk()
     squad = set(squad)
-    by_name = {norm(names.get(k, k)): k for k in squad}
+    by_name = {names.get(k) or Name(k): k for k in squad}
     out = []
     for r in rows or []:
-        key = xw.player(app_id=text(r, "player_id"))
+        key = xw.player(app_id=app_id(r))
         if key is None:
             for field in ("player_name", "player_name_full"):
-                key = by_name.get(norm(r.get(field) or ""))
+                key = by_name.get(Name(r.get(field)))
                 if key:
                     break
         if not key or key not in squad:
@@ -76,26 +78,28 @@ class Entry(NamedTuple):
         return {"sell": self.who, "transfer": self.other}.get(self.kind)
 
 
-def ledger(activity, users: dict, key_of, seen=()) -> list[Entry]:
+def ledger(activity, users: dict, key_of: Callable[[AppId], PlayerKey | None],
+           seen=()) -> list[Entry]:
     """The activity feed read once, each event once, completed by the squads
     seen (api_teams history): the feed leaves out some exits, so those are
     sales at the player's last value (_unrecorded_exits). Oldest first."""
     rows = {r.get("activity_id") or id(r): r for r in activity}.values()
     feed = [Entry(r.get("at") or "", r.get("kind") or "",
                   users.get(text(r, "user_id")), users.get(text(r, "counterparty")),
-                  key_of(text(r, "player_id")), money(r.get("amount")) or 0.0)
+                  key_of(app_id(r)), money(r.get("amount")) or 0.0)
             for r in rows]
     return sorted(feed + _unrecorded_exits(feed, seen, key_of), key=lambda e: e.at)
 
 
-def _unrecorded_exits(feed: list[Entry], seen, key_of) -> list[Entry]:
+def _unrecorded_exits(feed: list[Entry], seen,
+                      key_of: Callable[[AppId], PlayerKey | None]) -> list[Entry]:
     """For each manager and player, the exits the squads show beyond those
     the feed records (a sale by him, a clause paid to him), as sales at the
     player's last value. Counted, not matched by time: the squads and the
     feed are stamped minutes apart."""
     snaps: dict[str, dict] = {}
     for r in seen:
-        if (k := key_of(text(r, "player_id"))) and text(r, "manager"):
+        if (k := key_of(app_id(r))) and text(r, "manager"):
             snaps.setdefault(r["observed_at"], {})[k] = (text(r, "manager"),
                                                          money(r.get("market_value")) or 0.0)
     shown: dict[tuple, list] = {}
@@ -140,7 +144,7 @@ class League:
                  activity=(), seen=()):
         self.cfg, self.xw, self.standings = cfg, xw, standings
         self.owner = {k: text(r, "manager") for r in api_teams
-                      if (k := xw.player(app_id=text(r, "player_id")))
+                      if (k := xw.player(app_id=app_id(r)))
                       and text(r, "manager")}
         users = {text(r, "user_id"): text(r, "manager") for r in standings
                  if text(r, "user_id") and text(r, "manager")}
@@ -162,7 +166,7 @@ class League:
     def me(self) -> str:
         return self.cfg.me
 
-    def key_of_app(self, app_id: str) -> str | None:
+    def key_of_app(self, app_id: AppId) -> PlayerKey | None:
         return self.xw.player(app_id=app_id)
 
     def squad(self, handle: str) -> list[str]:
@@ -197,7 +201,8 @@ def _selftest() -> None:
 
     seen = [{"observed_at": "2026-09-01T1000Z", "manager": "riv", "player_id": "7", "market_value": "30"},
             {"observed_at": "2026-09-02T1000Z", "manager": "riv", "player_id": "8", "market_value": "5"}]
-    key = {"7": "p", "8": "q"}.get
+    def key(app_id: AppId) -> PlayerKey | None:
+        return {"7": PlayerKey("p"), "8": PlayerKey("q")}.get(app_id)
     gone = ledger(feed, users, key, seen)
     assert estimate_cash(gone, users.values(), "me", None, 100.0)["riv"] == 85.0 + 30, \
         "a player who left with no event in the feed was sold at his last value"
@@ -248,7 +253,8 @@ def _selftest() -> None:
              []),
             ({}, {}, [], {}, [])]:
         xw_f = Crosswalk({k: Player(k, app_id=a) for a, k in app_ids.items()})
-        assert app_fielded(sq, names, rows, xw_f) == want, (app_ids, want)
+        assert app_fielded(sq, {k: Name(n) for k, n in names.items()}, rows, xw_f) == want, \
+            (app_ids, want)
 
     print("ffcore.league self-test OK")
 

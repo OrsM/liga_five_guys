@@ -20,7 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from assemble import scorer, universe  # noqa: E402
 from decide import (FUNNEL, Action, Move, Universe, blocked, board, joint,  # noqa: E402
                     plan, raised, verdict)
-from ffcore.render import title_name  # noqa: E402
+from ffcore.names import Name  # noqa: E402
+from ffcore.text import resolve  # noqa: E402
 from sim import holding  # noqa: E402
 from ffcore.schedule import jornada_dates, jornada_expectation  # noqa: E402
 from ffcore.startprob import bucket  # noqa: E402
@@ -29,13 +30,15 @@ from ffcore.tidy import LINEUP_SOURCE, current  # noqa: E402
 
 
 def find(u, words: list[str]) -> str | None:
-    want = " ".join(words).lower()
-    hits = [k for k, n in u.market.name.items() if n and want in n.lower()]
-    exact = [k for k in hits if u.market.name[k].lower() == want]
-    if len(hits) == 1 or len(exact) == 1:
-        return (exact or hits)[0]
+    """The player these words name, by text.resolve over his Name: exact,
+    then whole words, then every word; None, saying who matched, if not one."""
+    want = " ".join(words)
+    rows = [{"name": n.raw, "key": k} for k, n in u.market.name.items() if n]
+    row, hits = resolve(want, rows)
+    if row:
+        return row["key"]
     print("%s players match %r%s" % (len(hits) or "no", want, ": " + ", ".join(
-        sorted(title_name(u.market.name[k]) for k in hits)[:10]) if hits else ""))
+        sorted(u.market.shown(r["key"]) for r in hits)[:10]) if hits else ""))
     return None
 
 
@@ -43,12 +46,8 @@ def step(fn, why: str) -> str:
     return "%d/%d %s: %s" % (FUNNEL.index(fn) + 1, len(FUNNEL), fn.__name__, why)
 
 
-def named(u) -> dict[str, str]:
-    return {k: title_name(n) for k, n in u.market.name.items()}
-
-
 def show(u, mv) -> str:
-    names = named(u)
+    names = u.market.names
     return ("%s: %+.1f points (%+.2f a million), better off in %.0f%% of seasons"
             " (at a glance %+.1f points over whoever plays instead)") % (
         mv.action.label(names), mv.d_pts, mv.per_million, 100 * mv.p_better,
@@ -72,7 +71,7 @@ def fate(u, b, r) -> str:
         return step(plan, "clears the bar alone, left out: %s" % no)
     funded = raised(u, [*b.plan, r], b.rows)
     assert funded is not None, "blocked said it can be raised"
-    paid = [m.action.label(named(u)) for m in funded[len(b.plan) + 1:]]
+    paid = [m.action.label(u.market.names) for m in funded[len(b.plan) + 1:]]
     total = joint(u, funded, b.base)
     return step(plan, "clears the bar alone, left out%s: %s" % (
         " (paid for by %s)" % ", ".join(paid) if paid else "",
@@ -139,7 +138,7 @@ def forecast(u, k: str, ahead: int) -> None:
     owner = m.owner.get(k) or ("on the market at %.2fM" % (m.price[k] / 1e6)
                                if k in m.price else "free agent")
     print("%s (%s), %s; value %s, trend %s" % (
-        title_name(m.name[k]), m.pos.get(k, "?"), owner,
+        m.shown(k), m.pos.get(k, "?"), owner,
         "%.2fM" % (m.value[k] / 1e6) if k in m.value else "?",
         "%+.1f%%" % m.trend[k] if k in m.trend else "?"))
     if rec is None:
@@ -215,6 +214,10 @@ def _selftest() -> None:
         globals()["joint"] = real
     assert said == ("4/4 plan: clears the bar alone, left out (paid for by sell bench_m,"
                     " sell bench_k): better off in 60% of seasons, under 70%"), said
+    accented = replace(u, market=replace(u.market, name={
+        **u.market.name, "cand_free": Name("Iñigo Vicente"), "cand_rival": Name("Iñigo Martínez")}))
+    assert find(accented, ["inigo", "vicente"]) == "cand_free", "accents never count"
+    assert find(accented, ["INIGO"]) is None, "two Iñigos: ask which"
     assert not_offered(u, "cand_rival") == \
         "1/4 candidates: riv's player"
     assert not_offered(u, "nobody") == "1/4 candidates: nobody's, and not on the market now"

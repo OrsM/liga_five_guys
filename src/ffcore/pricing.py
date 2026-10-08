@@ -4,6 +4,8 @@ import math
 from datetime import datetime, timezone
 from statistics import mean, median
 
+from ffcore.names import app_id
+
 CLIP = 20.0
 PRICE_WINDOW = 50
 BID_BEATS = 0.8
@@ -90,7 +92,7 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
     for r in listings:
         if r.get("seller") != "marketPlayerLeague" or not r.get("expires_at"):
             continue
-        k = (r["player_id"], datetime.fromisoformat(r["expires_at"])
+        k = (app_id(r), datetime.fromisoformat(r["expires_at"])
              .astimezone(timezone.utc))
         if k not in ends or r["observed_at"] > ends[k]["observed_at"]:
             ends[k] = r
@@ -98,7 +100,7 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
     for b in buys:
         at = datetime.fromisoformat(b["at"]).astimezone(timezone.utc)
         for (pid, close), r in ends.items():
-            if pid == b["player_id"] and abs((at - close).total_seconds()) < 600 \
+            if pid == app_id(b) and abs((at - close).total_seconds()) < 600 \
                     and float(r["sale_price"] or 0) > 0:
                 out.append(float(b["amount"]) / float(r["sale_price"]))
                 break

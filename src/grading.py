@@ -111,7 +111,7 @@ def decisions() -> list[dict]:
             for r in b.rows:
                 a = r.action
                 out.append({
-                    "lock": i, "jornadas": len(later), "move": a.label(u.market.name),
+                    "lock": i, "jornadas": len(later), "move": a.label(u.market.names),
                     "group": "plan" if r in b.plan else
                              "cleared" if verdict(r) is None else "rejected",
                     "kind": "sell" if not a.buy else "get",

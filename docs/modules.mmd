@@ -2,38 +2,38 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 165<br/>in 2 · out 16"]:::hub
+        assemble["assemble 166<br/>in 2 · out 17"]:::hub
         crosswalk["crosswalk 157"]
-        decide["decide 638"]
+        decide["decide 637"]
         grading["grading 249"]
         ingest["ingest 759"]
         run["run 83"]
-        sim["sim 288"]
+        sim["sim 287"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 248"]
         footballdata["footballdata 131"]
-        futbolfantasy["futbolfantasy 761"]
+        futbolfantasy["futbolfantasy 762"]
         laliga_api["laliga_api 587"]
         source["source 50"]
         sources["sources 130"]
     end
     subgraph data["Tables and time"]
         clock["clock 84"]
-        ff_crosswalk["ff_crosswalk 186"]
+        ff_crosswalk["ff_crosswalk 184"]
         jornadas["jornadas 94"]
-        league["league 263"]
+        league["league 269"]
         players["players 111"]
-        points["points 109"]
+        points["points 108"]
         tidy["tidy 354<br/>in 10 · out 2"]:::hub
     end
     subgraph model["Model"]
         action["action 44"]
         fixture["fixture 169"]
         forecast["forecast 58"]
-        market["market 183"]
+        market["market 198"]
         outlook["outlook 87"]
-        pricing["pricing 178"]
+        pricing["pricing 180"]
         rules["rules 85"]
         schedule["schedule 208"]
         score["score 305"]
@@ -42,9 +42,9 @@ flowchart LR
     end
     subgraph util["Pure utilities"]
         locks["locks 87"]:::leaf
-        parse["parse 212<br/>in 13 · out 0"]:::hub
-        render["render 37"]:::leaf
-        text["text 120"]:::leaf
+        names["names 92<br/>in 11 · out 2"]:::hub
+        parse["parse 212<br/>in 14 · out 0"]:::hub
+        text["text 115"]:::leaf
         stats["stats 36"]:::leaf
     end
     run -. "by name" .-> ingest
@@ -56,6 +56,7 @@ flowchart LR
     assemble --> jornadas
     assemble --> league
     assemble --> market
+    assemble --> names
     assemble --> parse
     assemble --> players
     assemble --> points
@@ -67,6 +68,7 @@ flowchart LR
     assemble --> startprob
     assemble --> tidy
     crosswalk --> ff_crosswalk
+    crosswalk --> names
     crosswalk --> parse
     crosswalk --> text
     crosswalk --> tidy
@@ -74,17 +76,17 @@ flowchart LR
     decide --> forecast
     decide --> market
     decide --> outlook
-    decide --> render
     decide --> rules
     decide --> schedule
     decide --> season
     decide --> stats
     clock --> parse
-    ff_crosswalk --> text
+    ff_crosswalk --> names
     ff_crosswalk --> tidy
     fixture --> parse
     footballdata --> futbolfantasy
     footballdata --> source
+    futbolfantasy --> names
     futbolfantasy --> parse
     futbolfantasy --> source
     futbolfantasy --> text
@@ -93,35 +95,39 @@ flowchart LR
     jornadas --> tidy
     laliga_api --> source
     league --> ff_crosswalk
+    league --> names
     league --> parse
     league --> players
-    league --> text
     league --> tidy
     locks --> parse
     market --> action
+    market --> names
     market --> pricing
+    names --> parse
+    names --> text
     outlook --> forecast
     outlook --> season
     players --> ff_crosswalk
+    players --> names
     players --> parse
-    players --> text
     players --> tidy
+    points --> names
     points --> parse
-    points --> text
     points --> tidy
+    pricing --> names
     schedule --> fixture
     schedule --> locks
     schedule --> rules
+    score --> names
     score --> parse
     score --> rules
     score --> startprob
-    score --> text
     score --> stats
     season --> rules
     season --> stats
+    startprob --> names
     startprob --> parse
     startprob --> rules
-    startprob --> text
     startprob --> stats
     tidy --> clock
     tidy --> parse
@@ -146,7 +152,6 @@ flowchart LR
     sim --> clock
     sim --> jornadas
     sim --> league
-    sim --> render
     sim --> rules
     sim --> tidy
     sources --> footballdata

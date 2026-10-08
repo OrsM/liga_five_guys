@@ -6,7 +6,6 @@ import sys
 from assemble import universe
 from decide import CONFIDENCE, at_risk, board
 from ffcore.league import app_fielded
-from ffcore.render import title_name
 from ffcore.rules import POSITIONS
 from ffcore.clock import run_now
 from ffcore.jornadas import load_deadline
@@ -27,7 +26,7 @@ def xi_change(marked: list[str], best) -> dict:
 
 
 def player(m, k) -> dict:
-    return {"name": title_name(m.name.get(k, k)), "pos": m.pos.get(k, "")}
+    return {"name": m.shown(k), "pos": m.pos.get(k, "")}
 
 
 def row(what: str, label: str, step: str | None, amount: float | None, done: bool,
@@ -105,7 +104,7 @@ def report(u, b, fielded: list[str], lock_at=None) -> dict:
             (sum(then.get(k, 0.0) for k in chg["in"])
              - sum(exp.get(k, 0.0) for k in chg["out"])) if chg["legal"] else None,
             "next", [("bench", off or None, "names")]))
-    names = {k: player(m, k)["name"] for k in m.name}
+    names = m.names
     todo += [buy_row(m, r, r.action.label(names)) if r.action.buy
              else sell_row(m, r, r.action.sell[0], r.action.label(names))
              for r in b.plan]

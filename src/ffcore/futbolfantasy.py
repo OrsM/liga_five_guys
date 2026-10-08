@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 from lxml import html as lh
 
+from ffcore.names import Name
 from ffcore.text import match_one, norm
 from ffcore.parse import year_for
 from ffcore.source import Source, _once, _rebuild
@@ -162,7 +163,7 @@ def parse_fitness(doc) -> dict[str, dict]:
         if not status:
             continue
         name, slug = _flagged_name(el)
-        key = norm(name)
+        key = Name(name).key
         prev = found.get(key)
         if not key or (prev and SEVERITY.index(prev["status"])
                        <= SEVERITY.index(status)):
@@ -210,14 +211,14 @@ def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict
     for role, selector in zip(("starter", "sub"), XI_SELECTORS):
         for el in _css(doc, selector):
             name, pct, href = _team_player(el)
-            if not _once(seen, name.lower()):
+            if not _once(seen, Name(name).key):
                 continue
-            fit = fitness.get(norm(name))
+            fit = fitness.get(Name(name).key)
             rows.append(_lineup_row(
                 observed_at, SOURCE, slug, name,
                 _slug('href="%s"' % href) if href else None, role, pct,
                 fit["status"] if fit else "ok", fit["note"] if fit else ""))
-    named = {norm(r["player_name"]) for r in rows}
+    named = {Name(r["player_name"]).key for r in rows}
     for fkey, fit in fitness.items():
         if fkey not in named:
             rows.append(_lineup_row(

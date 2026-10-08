@@ -148,18 +148,26 @@ classDiagram
         ffcore.market
         +cash: float
         +premium: float
-        +name: dict~str str~
+        +name: dict~str Name~
         +pos: dict~str str~
         +price: dict~str float~
         +route: dict~str str~
         +owner: dict~str str~
         +value: dict~str float~
         ...8 more fields
+        +shown()
+        +names()
         +locked_cash()
         +fetches()
         +waiting()
         +takes()
         +left()
+    }
+    class Name {
+        ffcore.names
+        +raw
+        +key
+        +shown()
     }
     class XI {
         <<NamedTuple>>
@@ -329,6 +337,7 @@ classDiagram
     Board *-- Standings : base
     League *-- Config : cfg
     League *-- Crosswalk : xw
+    Market *-- Name : name
     Move *-- Action : action
     Outlook *-- Bootstrap : forecaster
     Outlook *-- LeagueState : state

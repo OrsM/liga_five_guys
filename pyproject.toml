@@ -26,6 +26,7 @@ dependencies = [
 ]
 
 [tool.mypy]
+check_untyped_defs = true
 # lxml ships no usable stubs: lxml-stubs types every XPath result as a
 # six-way union, which is noise, not safety.
 [[tool.mypy.overrides]]

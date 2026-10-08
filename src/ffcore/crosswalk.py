@@ -5,7 +5,7 @@ import csv
 import os
 from dataclasses import dataclass, field
 
-from ffcore.text import norm
+from ffcore.names import AppId, Name, PlayerKey
 from ffcore.tidy import write_csv
 
 __all__ = ["Player", "Crosswalk", "PLAYER_COLS"]
@@ -46,13 +46,13 @@ class Crosswalk:
 
 
     def _reindex(self) -> None:
-        self._by_ff: dict[str, str] = {}
-        self._by_app: dict[str, str] = {}
+        self._by_ff: dict[str, PlayerKey] = {}
+        self._by_app: dict[str, PlayerKey] = {}
         self._clash: dict[str, set] = {}
         names: dict[str, set] = {}
         for p in self.players.values():
             if p.name:
-                names.setdefault(norm(p.name), set()).add(p.player_id)
+                names.setdefault(Name(p.name).key, set()).add(p.player_id)
             for idx, key, label in (
                     (self._by_ff, p.ff_slug, "ff_slug"),
                     (self._by_app, p.app_id, "app_id")):
@@ -60,33 +60,32 @@ class Crosswalk:
                     continue
                 if key in idx and idx[key] != p.player_id:
                     self._clash.setdefault(label, set()).add(key)
-                idx[key] = p.player_id
+                idx[key] = PlayerKey(p.player_id)
         for label, keys in self._clash.items():
             idx = {"ff_slug": self._by_ff, "app_id": self._by_app}[label]
             for k in keys:
                 idx.pop(k, None)
-        self._by_name = {n: next(iter(ids)) for n, ids in names.items()
+        self._by_name = {n: PlayerKey(next(iter(ids))) for n, ids in names.items()
                          if len(ids) == 1}
 
     def clashes(self) -> dict:
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
 
-    def player(self, *, name=None, ff_slug=None, app_id=None) -> str | None:
+    def player(self, *, name: str | None = None, ff_slug: str | None = None,
+               app_id: AppId | None = None) -> PlayerKey | None:
+        """Our key for a player, by futbolfantasy slug, app id or name."""
         for key, idx in ((ff_slug, self._by_ff), (app_id, self._by_app)):
             if key and key in idx:
                 return idx[key]
-        if name:
-            k = norm(name)
-            if k in self.players:
-                return k
-            if k in self._by_name:
-                return self._by_name[k]
-        return None
+        k = Name(name).key
+        if k in self.players:
+            return PlayerKey(k)
+        return self._by_name.get(k)
 
-    def key_of(self, r) -> str | None:
+    def key_of(self, r) -> PlayerKey | None:
         fid = (r.get("ff_id") or "").strip()
         if fid in self.players:
-            return fid
+            return PlayerKey(fid)
         return self.player(ff_slug=(r.get("player_slug") or "").strip() or None,
                            name=r.get("player_name_full")
                            or r.get("player_name"))
@@ -133,9 +132,8 @@ def _selftest() -> None:
                                app_names={"Jonny Otto"}),
     })
 
-    for kw in ({"name": "Alvaro Fernandez"}, {"ff_slug": "alvaro-fernandez"},
-               {"app_id": "2101"}):
-        assert xw.player(**kw) == "alvaro fernandez", kw
+    assert xw.player(name="Alvaro Fernandez") == xw.player(ff_slug="alvaro-fernandez") \
+        == xw.player(app_id=AppId("2101")) == "alvaro fernandez"
     assert xw.player(name="Álvaro Fernández") == "alvaro fernandez"
     assert xw.player(ff_slug="who-is-this") is None
     assert xw.player() is None
@@ -143,11 +141,11 @@ def _selftest() -> None:
     clash = Crosswalk({
         "carlos romero": Player("carlos romero", app_id="2614"),
         "isaac romero": Player("isaac romero", app_id="2614")})
-    assert clash.player(app_id="2614") is None, clash.player(app_id="2614")
+    assert clash.player(app_id=AppId("2614")) is None
     assert clash.clashes() == {"app_id": ["2614"]}, clash.clashes()
     solo = Crosswalk({"carlos romero": Player("carlos romero", app_id="2614"),
                       "isaac romero": Player("isaac romero")})
-    assert solo.player(app_id="2614") == "carlos romero"
+    assert solo.player(app_id=AppId("2614")) == "carlos romero"
     assert solo.clashes() == {}
 
 

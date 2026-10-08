@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 
 from ffcore.action import Action
+from ffcore.names import Name
 from ffcore.pricing import PRICE_WINDOW
 
 __all__ = ["Market", "LISTED_SELLER", "market_routes", "pending"]
@@ -24,7 +25,7 @@ class Market:
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
     premium: float = 1.0
-    name: dict[str, str] = field(default_factory=dict)
+    name: dict[str, Name] = field(default_factory=dict)
     pos: dict[str, str] = field(default_factory=dict)
     price: dict[str, float] = field(default_factory=dict)
     route: dict[str, str] = field(default_factory=dict)
@@ -38,6 +39,16 @@ class Market:
     offer_ratios: tuple[float, ...] = ()
     nights_left: int = 0
     carry: tuple[float, ...] = ()
+
+    def shown(self, k: str) -> str:
+        """How the board writes him: his Name, or his key without one."""
+        n = self.name.get(k)
+        return n.shown if n else k
+
+    @property
+    def names(self) -> dict[str, str]:
+        """Every player as shown, for Action.label."""
+        return {k: n.shown for k, n in self.name.items()}
 
     @property
     def locked_cash(self) -> float:
@@ -129,6 +140,10 @@ def _selftest() -> None:
     assert Market(cash=2e6).left([buy, sale]) == 2e6 - 1e6 + 3e6
 
 
+    named = Market(name={"k": Name("iñigo vicente")})
+    assert named.shown("k") == "Iñigo Vicente" and named.shown("unknown") == "unknown", \
+        "a player is shown by his Name, or his key when he has none"
+    assert named.names == {"k": "Iñigo Vicente"}
     assert Market(my_bid={"a": 1e6, "b": 2.5e6}).locked_cash == 3.5e6
     assert Market().locked_cash == 0.0
     try:
