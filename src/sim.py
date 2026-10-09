@@ -201,8 +201,10 @@ def _selftest() -> None:
     assert "backup" not in doc, "the plan is the one judgement; nothing second-guesses it"
     assert doc["cash_after"] == ub.market.left([r.action for r in b.plan])
     from assemble import open_clauses
-    assert open_clauses([{"key": "p", "buyout": "9", "buyout_until": "2099-01-01T00:00:00+02:00"},
-                         {"key": "q", "buyout": ""}]) == {"p": 9.0}, \
+    from ffcore.tidy import typed
+    assert open_clauses(typed("api_teams", [
+        {"key": "p", "buyout": "9", "buyout_until": "2099-01-01T00:00:00+02:00"},
+        {"key": "q", "buyout": ""}])) == {"p": 9.0}, \
         "buyout_until protects no one: Luismi Cruz and Yamal were taken before it"
     rich = replace(ub, rival_cash={"riv": 25e6},
                    market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ffcore.parse import Rows
 from dataclasses import dataclass, field, replace
 
 from ffcore.action import Action
@@ -90,14 +91,14 @@ class Market:
 LISTED_SELLER = "marketPlayerTeam"
 
 
-def market_routes(mkt: list[dict]) -> tuple[dict[str, float], dict[str, str]]:
+def market_routes(mkt: Rows) -> tuple[dict[str, float], dict[str, str]]:
     price: dict[str, float] = {}
     route: dict[str, str] = {}
     for r in mkt:
         k = r["key"]
         if not k or not r.get("sale_price"):
             continue
-        price[k] = float(r["sale_price"])
+        price[k] = r["sale_price"]
         route[k] = "listed" if r.get("seller") == LISTED_SELLER else "free"
     return price, route
 
@@ -107,7 +108,7 @@ def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
     for r in rows:
         if (r.get(status_field) or "") != "pending":
             continue
-        amt = float(r.get(money_field) or 0)
+        amt = r.get(money_field) or 0.0
         if not amt:
             continue
         k = r["key"]
@@ -117,6 +118,7 @@ def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
 
 
 def _selftest() -> None:
+    from ffcore.tidy import typed
     odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, nights_left=2,
                   offer_ratios=(0.9, 1.0, 1.0, 1.1))
     rising = replace(odds, trend={"s": 20.0}, carry=(0.5, 1.0))
@@ -152,7 +154,7 @@ def _selftest() -> None:
         pass
     else:
         raise AssertionError("a misspelt table must fail, not read as empty")
-    mkt_rows = [
+    mkt_rows = typed("api_market", [
         {"player_name": "Free Agent", "sale_price": "5000000",
          "seller": "marketPlayerLeague", "bids": "0"},
         {"player_name": "Listed Rival", "sale_price": "8000000",
@@ -161,19 +163,19 @@ def _selftest() -> None:
          "seller": "marketPlayerLeague"},
         {"player_name": "Unjoinable", "sale_price": "1000000",
          "seller": "marketPlayerTeam"},
-    ]
-    for r, k in zip(mkt_rows, ["free_agent", "listed_rival", "not_priced", ""]):
-        r["key"] = k
-    price, route = market_routes(mkt_rows)
+    ])
+    keyed = [dict(r, key=k) for r, k in
+             zip(mkt_rows, ["free_agent", "listed_rival", "not_priced", ""])]
+    price, route = market_routes(keyed)
     assert price == {"free_agent": 5000000.0, "listed_rival": 8000000.0}, price
     assert route == {"free_agent": "free", "listed_rival": "listed"}, route
     assert "not_priced" not in route and "not_priced" not in price
-    unknown_seller = [{"player_name": "Free Agent", "sale_price": "1",
-                       "seller": "something_new", "key": "free_agent"}]
+    unknown_seller = typed("api_market", [{"player_name": "Free Agent", "sale_price": "1",
+                       "seller": "something_new", "key": "free_agent"}])
     _, r2 = market_routes(unknown_seller)
     assert r2 == {"free_agent": "free"}, r2
 
-    mkt_bids = [
+    mkt_bids = typed("api_market", [
         {"player_name": "A", "bid_status": "pending", "bid_money": "5600000"},
         {"player_name": "B", "bid_status": "pending", "bid_money": "6795815"},
         {"player_name": "C", "bid_status": "", "bid_money": ""},
@@ -181,15 +183,15 @@ def _selftest() -> None:
         {"player_name": "E", "bid_status": "pending", "bid_money": ""},
         {"player_name": "A", "bid_status": "pending", "bid_money": "5100000"},
         {"player_name": "", "bid_status": "pending", "bid_money": "9000000"},
-    ]
+    ])
     sent = pending([dict(r, key=r["player_name"]) for r in mkt_bids],
                    "bid_status", "bid_money")
     assert sent == {"A": 5600000.0, "B": 6795815.0}, sent
     assert pending([], "bid_status", "bid_money") == {}
-    offers = [{"key": k, "status": st, "money": m} for k, st, m in [
+    offers = typed("api_offers", [{"key": k, "status": st, "money": m} for k, st, m in [
         ("me_a", "pending", "6795815"), ("me_a", "pending", "1000000"),
         ("me_b", "accepted", "9000000"), ("me_b", "", ""),
-        (None, "pending", "1")]]
+        (None, "pending", "1")]])
     assert pending(offers, "status", "money") == {"me_a": 6795815.0}
     print("ffcore.market self-test OK")
 

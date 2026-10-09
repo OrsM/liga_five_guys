@@ -7,13 +7,13 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 from types import MappingProxyType
-from typing import Mapping, NamedTuple
+from typing import Any, Mapping, NamedTuple
 
 from ffcore.clock import on_reset, run_now
-from ffcore.parse import snapshot_stamp
+from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "SEASON", "REPORTS", "TABLES", "Table",
-           "current", "history", "age_hours", "table_path", "tables_in",
+           "current", "history", "typed", "age_hours", "table_path", "tables_in",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
            "csv_string", "mtime_cached", "table_stats",
            "LINEUP_SOURCE"]
@@ -45,10 +45,12 @@ def input_path(name: str) -> Path:
 
 
 _READ_CACHE: dict[str, tuple] = {}
+_TYPED_CACHE: dict[str, tuple] = {}
 
 
 def _forget(path) -> None:
     _READ_CACHE.pop(str(Path(path)), None)
+    _TYPED_CACHE.pop(str(Path(path)), None)
 
 
 def mtime_cached(path, cache: dict, key, build, *args):
@@ -136,27 +138,46 @@ def append_csv(path, rows, fieldnames=None) -> None:
 
 
 class Table(NamedTuple):
+    """How a table is kept, and its numeric columns with the parser each
+    is read by: current() and history() hand them out parsed, so no
+    reader parses a number."""
     snapshot: bool
     key: tuple = ()
     store: str = ""
+    numbers: tuple = ()
+
+
+def _cols(parse, *cols: str) -> tuple:
+    return tuple((c, parse) for c in cols)
 
 
 TABLES: dict[str, Table] = {
-    "market": Table(True, ("ff_id",), "daily"),
-    "lineups": Table(True, ("source", "team_slug", "player_slug"), "daily"),
-    "matches": Table(False, ("match_id",), "once"),
-    "points": Table(False, ("season", "ff_id"), "once"),
-    "api_teams": Table(True),
-    "api_standings": Table(True),
-    "api_market": Table(True),
-    "api_offers": Table(True),
-    "api_lineup": Table(True),
-    "api_leagues": Table(True),
-    "api_players_all": Table(False, ("player_id",), "daily"),
-    "results_history": Table(False, ("season", "date", "home_name",
-                                     "away_name"), "once"),
-    "starters": Table(False, ("match_id", "team_slug", "player_slug"), "once"),
-    "api_activity": Table(False, ("activity_id",), "once"),
+    "market": Table(True, ("ff_id",), "daily",
+                    _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d")),
+    "lineups": Table(True, ("source", "team_slug", "player_slug"), "daily",
+                     _cols(pct100, "start_pct")),
+    "matches": Table(False, ("match_id",), "once", _cols(count, "jornada")),
+    "points": Table(False, ("season", "ff_id"), "once", _cols(ratio, "points", "games", "avg")),
+    "api_teams": Table(True, numbers=_cols(money, "market_value", "buyout") + _cols(ratio, "points")),
+    "api_standings": Table(True, numbers=_cols(count, "position", "previous_position")
+                           + _cols(ratio, "team_points", "fixture_points")
+                           + _cols(money, "team_value", "team_money")),
+    "api_market": Table(True, numbers=_cols(money, "market_value", "sale_price", "bid_money")
+                        + _cols(count, "bids")),
+    "api_offers": Table(True, numbers=_cols(money, "money")),
+    "api_lineup": Table(True, numbers=_cols(count, "week") + _cols(money, "market_value")
+                        + _cols(ratio, "points")),
+    "api_leagues": Table(True, numbers=_cols(count, "managers") + _cols(money, "money", "team_value")
+                         + _cols(ratio, "team_points")),
+    "api_players_all": Table(False, ("player_id",), "daily", _cols(money, "market_value")),
+    "results_history": Table(False, ("season", "date", "home_name", "away_name"), "once",
+                             _cols(ratio, "home_goals", "away_goals", "home_xg", "away_xg",
+                                   "home_shots", "away_shots", "home_shots_on_target",
+                                   "away_shots_on_target", "home_corners", "away_corners")),
+    "starters": Table(False, ("match_id", "team_slug", "player_slug"), "once",
+                      _cols(ratio, "minute")),
+    "api_activity": Table(False, ("activity_id",), "once",
+                          _cols(money, "amount") + _cols(count, "week")),
 }
 
 
@@ -164,9 +185,24 @@ def _cut() -> str:
     return run_now().strftime("%Y-%m-%dT%H%MZ")
 
 
+def typed(name: str, rows) -> list[Mapping[str, Any]]:
+    """Rows of a table as it is written (text) with its numeric columns
+    parsed (Table.numbers): what current() and history() hand out."""
+    numbers = TABLES[name].numbers if name in TABLES else ()
+    return [MappingProxyType({**r, **{c: parse(r.get(c)) for c, parse in numbers if c in r}})
+            for r in rows]
+
+
+def _rows(name: str) -> list[Mapping[str, Any]]:
+    """Every row of a table, its numeric columns parsed (Table.numbers)."""
+    path = table_path(name)
+    return mtime_cached(path, _TYPED_CACHE, str(path),
+                        lambda: typed(name, read_csv(path))) or []
+
+
 def history(name: str, source: str = "") -> list:
     cut = _cut()
-    return [r for r in read_csv(table_path(name))
+    return [r for r in _rows(name)
             if r.get("observed_at", "") <= cut
             and (not source or r.get("source") == source)]
 
@@ -181,7 +217,7 @@ def _closed_days(name: str) -> dict[str, str]:
 
 def _current_rows(name: str, cut: str) -> tuple:
     spec = TABLES[name]
-    rows = sorted((r for r in read_csv(table_path(name))
+    rows = sorted((r for r in _rows(name)
                    if r.get("observed_at", "") <= cut),
                   key=lambda r: r.get("observed_at", ""))
     if spec.snapshot:
@@ -309,6 +345,20 @@ def _selftest_tables() -> None:
             stats = {(r["activity_id"], r["value"]) for r in current("api_activity")}
             assert stats == {("1", "1"), ("2", "5")}, stats
             assert current("market") == [] and history("market") == []
+            write_csv(tidy / "matches.csv", [
+                {"observed_at": a, "match_id": "m1", "jornada": "8", "home": "x", "score": "2-0"},
+                {"observed_at": a, "match_id": "m2", "jornada": "", "home": "y", "score": ""}])
+            write_csv(tidy / "api_market.csv", [
+                {"observed_at": b, "source": "laliga", "player_id": "7",
+                 "sale_price": "5000000", "bids": "2", "bid_money": ""}])
+            ms = {r["match_id"]: r for r in current("matches")}
+            assert (ms["m1"]["jornada"], ms["m2"]["jornada"]) == (8, None), \
+                "numbers are parsed once, where the table is read"
+            assert ms["m1"]["home"] == "x" and ms["m1"]["score"] == "2-0", "text stays text"
+            assert [r["jornada"] for r in history("matches")] == [8, None]
+            mk = current("api_market")[0]
+            assert (mk["sale_price"], mk["bids"], mk["bid_money"], mk["player_id"]) \
+                == (5e6, 2, None, "7"), mk
             assert age_hours("market") is None
             age = age_hours("lineups")
             assert age is not None and abs(age - 3.0) < 1e-9

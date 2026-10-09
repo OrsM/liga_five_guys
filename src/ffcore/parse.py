@@ -2,14 +2,21 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping, Sequence
+from typing import Any
 from datetime import datetime, timezone
 from functools import lru_cache
 
-__all__ = ["money", "ratio", "pct100", "fmt_money", "text", "num", "whole",
+__all__ = ["Rows", "money", "ratio", "pct100", "count", "fmt_money", "text", "num", "whole",
            "flag", "snapshot_stamp", "kickoff_stamp"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
 _CLEAN = str.maketrans({"\u00a0": "", " ": "", "\u202f": ""})
+
+
+# Rows of a table as current() and history() hand them out: read-only,
+# numeric columns already parsed (tidy.Table.numbers).
+Rows = Sequence[Mapping[str, Any]]
 
 
 def _strip(v) -> tuple[str, bool]:
@@ -95,6 +102,12 @@ def num(row, col: str, default=None):
         return float(s)
     except (TypeError, ValueError):
         return default
+
+
+def count(v) -> int | None:
+    """A whole number as a table cell holds it ("8", "8.0"), or None."""
+    x = ratio(v)
+    return None if x is None or x != int(x) else int(x)
 
 
 def whole(row, col: str, default=None):

@@ -197,13 +197,15 @@ rather than reaching through them; ruff flags reads of private members.
 
     src/            run, ingest, sources, crosswalk, assemble, decide, sim,
                     grading, stats
-    src/ffcore/     tidy (paths, CSVs, current/history), clock (now, stamps),
+    src/ffcore/     tidy (paths, CSVs, current/history: rows with their numbers
+                    parsed, per Table.numbers), clock (now, stamps),
                     jornadas (locks), points (points history), players,
-                    rules (slots, formations, minutes),
+                    rules (positions, formations, shortfall, minutes),
+                    names (Name, PlayerKey, AppId: who a player is),
                     source, futbolfantasy, footballdata, laliga_api, parse,
                     text, auth, crosswalk, league, score, startprob, fixture,
                     schedule, forecast, season, outlook, market, pricing,
-                    action, render, fixtures (test data)
+                    action, fixtures (test data)
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      tables rebuilt from raw; players.csv is tracked

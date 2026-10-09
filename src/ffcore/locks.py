@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ffcore.parse import kickoff_stamp
+from ffcore.parse import Rows, kickoff_stamp
 
 __all__ = ["JornadaClock", "lock_order"]
 
@@ -16,13 +16,13 @@ def lock_order(locks: dict[int, datetime]) -> list[int]:
 
 class JornadaClock:
 
-    def __init__(self, matches: list[dict]):
+    def __init__(self, matches: Rows):
         latest: dict[tuple, tuple[int, datetime]] = {}
         for m in sorted(matches, key=lambda r: r.get("observed_at", "")):
             when = kickoff_stamp(m.get("kickoff"))
-            jor = m.get("jornada") or ""
-            if when is not None and str(jor).isdigit():
-                latest[(m.get("home"), m.get("away"))] = (int(jor), when)
+            jor = m.get("jornada")
+            if when is not None and jor is not None:
+                latest[(m.get("home"), m.get("away"))] = (jor, when)
         self.team_locks: dict[tuple[int, str], datetime] = {}
         for (home, away), (jor, when) in latest.items():
             for team in (home, away):
@@ -53,7 +53,9 @@ class JornadaClock:
 def _selftest() -> None:
     from datetime import timezone
 
-    jl_matches = [
+    from ffcore.tidy import typed
+
+    jl_matches = typed("matches", [
         {"observed_at": "2026-08-10T0900Z", "jornada": "1", "home": "alaves",
          "away": "getafe", "kickoff": "2026-08-14T19:30:00+00:00"},
         {"observed_at": "2026-08-12T0900Z", "jornada": "1", "home": "alaves",
@@ -62,7 +64,7 @@ def _selftest() -> None:
          "home": "espanyol", "away": "levante",
          "kickoff": "2026-08-16T17:00:00+00:00"},
         {"observed_at": "2026-08-12T0900Z", "jornada": "2",
-         "home": "rayo-vallecano", "away": "alaves", "kickoff": ""}]
+         "home": "rayo-vallecano", "away": "alaves", "kickoff": ""}])
     cal = JornadaClock(jl_matches)
     jl = cal.round_locks
     assert list(jl) == [1] and jl[1].day == 15, jl

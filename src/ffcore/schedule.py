@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+from ffcore.parse import Rows
 from datetime import date, timedelta
 
 from ffcore.fixture import season_board
@@ -10,18 +11,18 @@ from ffcore.rules import MAX_SLOT, shortfall
 
 def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
 
-    js = {r["jornada"] for r in matches if (r.get("jornada") or "").isdigit()}
+    js = {r["jornada"] for r in matches if r.get("jornada") is not None}
     finished = {j for j in js
-                if all(r.get("score") for r in matches if r["jornada"] == j)}
-    open_j = {int(j) for j in js - finished}
+                if all(r.get("score") for r in matches if r.get("jornada") == j)}
+    open_j = js - finished
     clock_order = [j for j in JornadaClock(matches).order if j in open_j]
     rem = clock_order + sorted(open_j - set(clock_order))
 
     played: dict[int, set[str]] = {}
     for r in matches:
-        j = r.get("jornada") or ""
-        if j.isdigit() and int(j) in rem and r.get("score"):
-            played.setdefault(int(j), set()).update(
+        j = r.get("jornada")
+        if j in rem and r.get("score"):
+            played.setdefault(j, set()).update(
                 c for c in (r.get("home"), r.get("away")) if c)
     return rem, played
 
@@ -38,7 +39,7 @@ def jornada_expectation(r, match, first: bool, fit: float = 1.0
     return max(0.0, r.ppm * fix), (r.p_now if first else r.p_rest) * fit
 
 
-def jornada_dates(matches: list[dict], rem: list[int]) -> dict[int, date]:
+def jornada_dates(matches: Rows, rem: list[int]) -> dict[int, date]:
     clock = JornadaClock(matches)
     known = {j: when.date() for j in rem if (when := clock.round_lock(j))}
     return {j: known[j] if j in known else known[near] + timedelta(weeks=j - near)
@@ -66,7 +67,7 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
     return per_j, first_of
 
 
-def expectations(sc, ratings, keys, matches: list[dict]
+def expectations(sc, ratings, keys, matches: Rows
                  ) -> tuple[dict[int, dict], dict[str, int], dict, list[int],
                             dict[int, set[str]]]:
 
@@ -117,10 +118,11 @@ def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict]
 
 def _selftest() -> None:
     from ffcore.score import Rates as R
+    from ffcore.tidy import typed
 
-    fixt = [{"jornada": "8", "home": "a", "away": "b",
+    fixt = typed("matches", [{"jornada": "8", "home": "a", "away": "b",
              "kickoff": "2026-10-11T14:00:00+00:00", "score": ""},
-            {"jornada": "9", "home": "a", "away": "c", "kickoff": "", "score": ""}]
+            {"jornada": "9", "home": "a", "away": "c", "kickoff": "", "score": ""}])
     got = jornada_dates(fixt, [8, 9, 10])
     assert got == {8: date(2026, 10, 11), 9: date(2026, 10, 18),
                    10: date(2026, 10, 25)}, got
@@ -131,11 +133,11 @@ def _selftest() -> None:
         "chance he plays = picked if fit x fit"
     assert jornada_expectation(hurt, None, False, 0.5) == (4.0, 0.4)
 
-    ms = [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
+    ms = typed("matches", [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
           {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
           {"jornada": "2", "home": "alaves", "away": "celta", "score": ""},
           {"jornada": "3", "home": "alaves", "away": "getafe", "score": "1-1"},
-          {"jornada": "", "home": "alaves", "away": "celta", "score": ""}]
+          {"jornada": "", "home": "alaves", "away": "celta", "score": ""}])
     rem, done = rounds_left(ms)
     assert rem == [1, 2], rem
     assert done == {1: {"alaves", "getafe"}}, done

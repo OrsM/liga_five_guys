@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 
 
-from ffcore.parse import money, text
+from ffcore.parse import text
 from ffcore.crosswalk import Crosswalk, Player
 from ffcore.names import AppId, Name, app_id, row_key
 from ffcore.text import tokens
@@ -44,7 +44,7 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
         if p is not None and slug and not p.ff_slug:
             p.ff_slug = slug
 
-    value = {row_key(r): money(r.get("value")) for r in market}
+    value = {row_key(r): r.get("value") for r in market}
     app = {app_id(r): r for r in api_rows}
     words = {pid: set(tokens(p.name)) for pid, p in out.items()}
     weak = set()
@@ -52,7 +52,7 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
         r = app.get(p.app_id)
         if r is None:
             continue
-        ratio = ((money(r.get("market_value")) or 0) / value[pid]
+        ratio = ((r.get("market_value") or 0) / value[pid]
                  if value.get(pid) else 1.0)
         related = {w[:4] for w in words[pid]} & {
             w[:4] for w in tokens(r.get("player_name"))}
@@ -65,7 +65,7 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
 
     held = {p.app_id for p in out.values() if p.app_id}
     for aid, r in app.items():
-        theirs = money(r.get("market_value"))
+        theirs = r.get("market_value")
         if not aid or aid in held or not theirs:
             continue
         theirs_words = [set(tokens(n)) for n in (r.get("player_name"),
@@ -110,15 +110,16 @@ def main() -> None:
 
 
 def _selftest() -> None:
-    market = [{"name": "Álvaro Fernández", "team": "Espanyol",
+    from ffcore.tidy import typed
+    market = typed("market", [{"name": "Álvaro Fernández", "team": "Espanyol",
                "club": "espanyol"},
-              {"name": "Jonny Castro", "team": "Alavés", "club": "alaves"}]
-    lineups = [
+              {"name": "Jonny Castro", "team": "Alavés", "club": "alaves"}])
+    lineups = typed("lineups", [
         {"source": "futbolfantasy", "team_slug": "espanyol",
          "player_name": "Álvaro Fernández", "player_slug": "alvaro-fdez"},
-    ]
-    starters = [{"team_slug": "alaves", "player_name": "Jonny Castro",
-                 "player_slug": "jonny-castro-ff", "role": "starter"}]
+    ])
+    starters = typed("starters", [{"team_slug": "alaves", "player_name": "Jonny Castro",
+                 "player_slug": "jonny-castro-ff", "role": "starter"}])
     players = build_players({}, market, lineups + starters, [])
     xw = Crosswalk(players)
     assert xw.player(name="Alvaro Fernandez") == "alvaro fernandez"
@@ -127,18 +128,18 @@ def _selftest() -> None:
     assert xw.player(app_id=AppId("9999")) is None
     assert players["alvaro fernandez"].club_id == "espanyol"
 
-    twins = [{"name": n, "club": c, "ff_id": i, "value": v} for n, c, i, v in [
+    twins = typed("market", [{"name": n, "club": c, "ff_id": i, "value": v} for n, c, i, v in [
         ("Pablo Fornals", "betis", "a", "5000000"),
         ("Pablo Fornals", "villarreal", "b", "9000000"),
-        ("Fermin Lopez", "barcelona", "c", "100000000")]]
-    api = [{"player_name": "Fermín", "player_id": "1715",
+        ("Fermin Lopez", "barcelona", "c", "100000000")]])
+    api = typed("api_teams", [{"player_name": "Fermín", "player_id": "1715",
             "market_value": "108000000"},
            {"player_name": "Fer López", "player_id": "2929",
             "market_value": "15000000"},
            {"player_name": "Pablo Fornals", "player_id": "12",
             "market_value": "5100000"},
            {"player_name": "Fornals", "player_id": "99",
-            "market_value": "40000000"}]
+            "market_value": "40000000"}])
     got = build_players({"c": Player("c", app_id="2929"),
                          "gone": Player("gone", "Left The League")},
                         twins, [], api)

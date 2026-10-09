@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from ffcore.parse import Rows
 import math
 from datetime import datetime, timezone
+from collections.abc import Mapping
 from statistics import mean, median
 
 from ffcore.names import app_id
@@ -11,14 +13,11 @@ PRICE_WINDOW = 50
 BID_BEATS = 0.8
 
 
-def steps(rows: list[dict]) -> dict[str, list[tuple[str, float]]]:
+def steps(rows: Rows) -> dict[str, list[tuple[str, float]]]:
     vals: dict[str, list[tuple[str, float]]] = {}
     for r in sorted(rows, key=lambda r: r["observed_at"]):
-        try:
-            vals.setdefault(r["ff_id"], []).append(
-                (r["observed_at"][:10], float(r["value"])))
-        except (KeyError, ValueError):
-            pass
+        if r.get("ff_id") and r.get("value") is not None:
+            vals.setdefault(r["ff_id"], []).append((r["observed_at"][:10], r["value"]))
     return {k: [(b[0], 100 * (b[1] / a[1] - 1)) for a, b in zip(v, v[1:])
                 if a[1] > 0] for k, v in vals.items()}
 
@@ -87,8 +86,8 @@ def grade(by_player: dict[str, list[tuple[str, float]]],
             for h, v in pairs.items() if v}
 
 
-def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
-    ends: dict[tuple[str, datetime], dict] = {}
+def auction_ratios(listings: Rows, buys: Rows) -> list[float]:
+    ends: dict[tuple[str, datetime], Mapping] = {}
     for r in listings:
         if r.get("seller") != "marketPlayerLeague" or not r.get("expires_at"):
             continue
@@ -101,23 +100,23 @@ def auction_ratios(listings: list[dict], buys: list[dict]) -> list[float]:
         at = datetime.fromisoformat(b["at"]).astimezone(timezone.utc)
         for (pid, close), r in ends.items():
             if pid == app_id(b) and abs((at - close).total_seconds()) < 600 \
-                    and float(r["sale_price"] or 0) > 0:
-                out.append(float(b["amount"]) / float(r["sale_price"]))
+                    and (r.get("sale_price") or 0) > 0:
+                out.append(b["amount"] / r["sale_price"])
                 break
     return out
 
 
-def offer_ratios(offers: list[dict], teams: list[dict]) -> list[float]:
+def offer_ratios(offers: Rows, teams: Rows) -> list[float]:
     """The game's nightly offers for listed players, each over the player's
     value when it was made, oldest first: each offer once."""
-    value = {(r["observed_at"], r.get("player_team_id")): float(r.get("market_value") or 0)
+    value = {(r["observed_at"], r.get("player_team_id")): r.get("market_value") or 0.0
              for r in teams}
     seen: dict[str, tuple[str, float]] = {}
     for r in offers:
         v = value.get((r["observed_at"], r.get("player_team_id")))
         if r.get("from_market") == "true" and r.get("money") and v \
                 and r.get("offer_id") and r["offer_id"] not in seen:
-            seen[r["offer_id"]] = (r.get("created_at") or "", float(r["money"]) / v)
+            seen[r["offer_id"]] = (r.get("created_at") or "", r["money"] / v)
     return [x for _at, x in sorted(seen.values())]
 
 
@@ -129,11 +128,12 @@ def premium_to_beat(ratios: list[float]) -> float:
 
 
 def _selftest() -> None:
+    from ffcore.tidy import typed
     days = ["2026-08-%02d" % d for d in range(10, 30)]
-    rows = [{"observed_at": d + "T2359Z", "ff_id": k + str(i),
+    rows = typed("market", [{"observed_at": d + "T2359Z", "ff_id": k + str(i),
              "value": str(100 * g ** n)}
             for k, g in (("up", 1.05), ("down", 0.98), ("flat", 1.0))
-            for i in range(12) for n, d in enumerate(days)]
+            for i in range(12) for n, d in enumerate(days)])
     by = steps(rows)
     assert by["up0"][0][0] == "2026-08-11" and abs(by["up0"][0][1] - 5.0) < 1e-9
     assert by["flat0"][0][1] == 0.0
@@ -153,18 +153,18 @@ def _selftest() -> None:
     assert g[1]["mae"] < g[1]["zero"] and g[2]["n"] > 0, g
 
     close = "2026-09-02T22:24:00+02:00"
-    lst = [{"seller": "marketPlayerLeague", "player_id": "7", "expires_at": close,
+    lst = typed("api_market", [{"seller": "marketPlayerLeague", "player_id": "7", "expires_at": close,
             "sale_price": "10000000", "observed_at": "a"},
            {"seller": "marketPlayerTeam", "player_id": "8", "expires_at": close,
-            "sale_price": "10000000", "observed_at": "a"}]
-    buys = [{"player_id": "7", "at": "2026-09-02T22:24:10+02:00", "amount": "10400000"},
+            "sale_price": "10000000", "observed_at": "a"}])
+    buys = typed("api_activity", [{"player_id": "7", "at": "2026-09-02T22:24:10+02:00", "amount": "10400000"},
             {"player_id": "8", "at": "2026-09-02T22:24:10+02:00", "amount": "99"},
-            {"player_id": "7", "at": "2026-09-05T10:00:00+02:00", "amount": "1"}]
+            {"player_id": "7", "at": "2026-09-05T10:00:00+02:00", "amount": "1"}])
     assert auction_ratios(lst, buys) == [1.04], auction_ratios(lst, buys)
 
-    teams = [{"observed_at": "t1", "player_team_id": "9", "market_value": "10"}]
-    offers = [{"observed_at": "t1", "player_team_id": "9", "from_market": "true", "money": "11",
-               "offer_id": "o", "created_at": "c"}] * 2 + [
+    teams = typed("api_teams", [{"observed_at": "t1", "player_team_id": "9", "market_value": "10"}])
+    offers = typed("api_offers", [{"observed_at": "t1", "player_team_id": "9", "from_market": "true", "money": "11",
+               "offer_id": "o", "created_at": "c"}]) * 2 + [
               {"observed_at": "t1", "player_team_id": "9", "from_market": "false", "money": "12",
                "offer_id": "m", "created_at": "c"}]
     assert offer_ratios(offers, teams) == [1.1], "the game's offers, each once, over value"

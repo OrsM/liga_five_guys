@@ -11,7 +11,7 @@ from lxml import html as lh
 
 from ffcore.names import Name
 from ffcore.text import match_one, norm
-from ffcore.parse import year_for
+from ffcore.parse import ratio, year_for
 from ffcore.source import Source, _once, _rebuild
 
 __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
@@ -57,13 +57,6 @@ OPTION_RE = re.compile(r'<option[^>]*value="(\d+)"[^>]*>([^<]+)</option>')
 def _attr(chunk: str, name: str) -> str | None:
     m = re.search(rf'data-{name}="([^"]*)"', chunk)
     return m.group(1) if m else None
-
-
-def _num(v):
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return None
 
 
 HREF_RE = re.compile(r'href="[^"]*?/jugadores/([^"?#]+)"')
@@ -113,8 +106,8 @@ def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]
             "team": teams.get(team_id or "", ""),
             "club": club_slug(teams.get(team_id or "", "")),
             "value": int(value),
-            "delta_1d": _num(el.get("data-diferencia1")),
-            "delta_pct_1d": _num(el.get("data-diferencia-pct1")),
+            "delta_1d": ratio(el.get("data-diferencia1")),
+            "delta_pct_1d": ratio(el.get("data-diferencia-pct1")),
         })
     return rows
 

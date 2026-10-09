@@ -225,7 +225,7 @@ classDiagram
     }
     class Scorer {
         ffcore.score
-        +market: list~dict~
+        +market: Rows
         +starts: StartOdds
         +last_season: dict | None
         +shrink_k: float
@@ -327,6 +327,7 @@ classDiagram
         +snapshot: bool
         +key: tuple
         +store: str
+        +numbers: tuple
     }
     class Sigs {
         ingest

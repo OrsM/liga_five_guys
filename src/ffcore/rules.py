@@ -46,24 +46,25 @@ def slot(raw) -> str:
 MATCH_LEN = 90.0
 
 
-def minutes_played(role: str, raw_minute, match_len: float = MATCH_LEN) -> float:
-    raw = (raw_minute or "").strip()
+def minutes_played(role: str, minute: float | None, match_len: float = MATCH_LEN) -> float:
+    """Minutes a starter or sub played, from the minute he came off or on
+    (None: the whole match for a starter, none for a sub)."""
     if role == "starter":
-        mins = float(raw) if raw else match_len
+        mins = match_len if minute is None else minute
     elif role == "sub":
-        mins = (match_len - float(raw)) if raw else 0.0
+        mins = 0.0 if minute is None else match_len - minute
     else:
         return 0.0
     return max(0.0, mins)
 
 
 def _selftest() -> None:
-    assert minutes_played("starter", "") == 90.0
-    assert minutes_played("starter", "64") == 64.0
-    assert minutes_played("sub", "") == 0.0
-    assert minutes_played("sub", "64") == 26.0
-    assert minutes_played("coach", "") == 0.0
-    assert minutes_played("starter", "0") == 0.0
+    assert minutes_played("starter", None) == 90.0
+    assert minutes_played("starter", 64.0) == 64.0
+    assert minutes_played("sub", None) == 0.0
+    assert minutes_played("sub", 64.0) == 26.0
+    assert minutes_played("coach", None) == 0.0
+    assert minutes_played("starter", 0.0) == 0.0
     assert slot("Centrocampista") == slot("mediocampista") == slot("MED") == "MED"
     assert slot(None) == slot("") == slot("utillero") == "", "unknown is empty, never guessed"
     assert POSITIONS == ("POR", "DEF", "MED", "DEL")

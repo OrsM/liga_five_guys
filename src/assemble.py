@@ -14,7 +14,7 @@ from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
 from ffcore.names import Name, app_id
-from ffcore.parse import num, ratio, text
+from ffcore.parse import Rows, text
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
 from ffcore.pricing import (Momentum, auction_ratios, offer_ratios,
@@ -26,19 +26,19 @@ from ffcore.season import LeagueState
 from ffcore.startprob import (StartOdds, calibrate, fit_availability,
                               last_fit_listing, outcomes)
 from ffcore.tidy import (LINEUP_SOURCE, SEASON, age_hours, current,
-                         history, read_csv)
+                         history, read_csv, typed)
 
 __all__ = ["universe", "scorer", "fixture_ratings", "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
 
 
-def scorer(market: list[dict], xi_rows: list[dict]) -> Scorer:
+def scorer(market: Rows, xi_rows: Rows) -> Scorer:
     xw = load_crosswalk()
     files = sorted(SEASON.glob("points_*.csv"))
-    last_season = {r["ff_id"]: {"pts": ratio(r.get("points")) or 0.0,
-                                "pj": ratio(r.get("games")) or 0.0}
-                   for r in (read_csv(files[-1]) if files else ())
+    last_season = {r["ff_id"]: {"pts": r.get("points") or 0.0,
+                                "pj": r.get("games") or 0.0}
+                   for r in (typed("points", read_csv(files[-1])) if files else ())
                    if r.get("ff_id")}
     played = scored()
     by_key = per_jornada_current(current("starters"), played,
@@ -62,16 +62,16 @@ def app_status(xw) -> dict[str, str]:
             if (k := xw.player(app_id=app_id(r))) and r.get("player_status")}
 
 
-def open_clauses(teams: list[dict]) -> dict[str, float]:
+def open_clauses(teams: Rows) -> dict[str, float]:
     """Each owned player's release clause: any can be paid now. Checked
     against the league's own clause buys: each paid exactly the listed
     clause, to the owner, and two came before the player's buyout_until
     (Luismi Cruz, Yamal), so that date protects no one."""
     return {r["key"]: amount for r in teams
-            if r.get("key") and (amount := num(r, "buyout"))}
+            if r.get("key") and (amount := r.get("buyout"))}
 
 
-def fixture_ratings(market: list[dict]):
+def fixture_ratings(market: Rows):
     return difficulty_ratings(market, current("results_history"))
 
 
@@ -79,7 +79,7 @@ def _pos_of(raw: str) -> str:
     return slot(raw) or "MED"
 
 
-def _nights_left(offers: list[dict]) -> int:
+def _nights_left(offers: Rows) -> int:
     """The game's nightly offers still to come before the lock: one as each
     standing offer expires, then one a day."""
     ends = [datetime.fromisoformat(r["expires_at"]) for r in offers
@@ -157,7 +157,7 @@ def universe() -> Universe:
 
     fc = Bootstrap(per_j, pool=[s.pts for s in scored() if s.games == 1])
 
-    carried = {r["manager"]: num(r, "team_points", default=0.0)
+    carried = {r["manager"]: r.get("team_points") or 0.0
                for r in lg.standings if r.get("manager")}
     return Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc,

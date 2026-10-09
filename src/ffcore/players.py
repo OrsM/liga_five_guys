@@ -2,7 +2,7 @@
 per player, and the crosswalk of ids between the sources."""
 from __future__ import annotations
 
-from ffcore.parse import money, pct100
+from ffcore.parse import Rows
 from ffcore.names import Name, row_key
 from ffcore.tidy import LINEUP_SOURCE, current, mtime_cached, table_path
 
@@ -18,16 +18,14 @@ def load_crosswalk():
     return mtime_cached(path, _XW_CACHE, "xw", Crosswalk.read, path)
 
 
-MARKET_FIELDS = [("team", "team", None), ("club", "club", None),
-                 ("pos", "position", None),
-                 ("value", "value", money), ("delta_1d", "delta_1d", money)]
+MARKET_FIELDS = [("team", "team"), ("club", "club"), ("pos", "position"),
+                 ("value", "value"), ("delta_1d", "delta_1d")]
 
 
-XI_FIELDS = [("club", "team_slug", None), ("start", "start_pct", pct100),
-             ("status", "status", None)]
+XI_FIELDS = [("club", "team_slug"), ("start", "start_pct"), ("status", "status")]
 
 
-def _merge(players: dict, rows: list[dict], key_of, name_col: str,
+def _merge(players: dict, rows: Rows, key_of, name_col: str,
            fields) -> dict:
     for r in rows:
         key = key_of(r)
@@ -35,12 +33,11 @@ def _merge(players: dict, rows: list[dict], key_of, name_col: str,
             continue
         rec = players.setdefault(key, {})
         rec.setdefault("name", (r.get(name_col) or "").strip())
-        for field, col, parse in fields:
-            raw = r.get(col)
-            if field in rec or raw in (None, ""):
-                continue
-            val = parse(raw) if parse else str(raw).strip()
-            if val is not None:
+        for field, col in fields:
+            val = r.get(col)
+            if isinstance(val, str):
+                val = val.strip()
+            if field not in rec and val not in (None, ""):
                 rec[field] = val
     return players
 
@@ -60,17 +57,17 @@ def _selftest() -> None:
     from pathlib import Path
 
     from ffcore.crosswalk import PLAYER_COLS
-    from ffcore.tidy import tables_in, write_csv
+    from ffcore.tidy import tables_in, typed, write_csv
 
 
-    mkt = [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
+    mkt = typed("market", [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},
            {"name": "Bo Bidal", "team": "Betis", "position": "delantero",
-            "value": "", "delta_1d": "0"}]
-    xi = [{"player_name": "Ane Aldea", "team_slug": "alaves",
+            "value": "", "delta_1d": "0"}])
+    xi = typed("lineups", [{"player_name": "Ane Aldea", "team_slug": "alaves",
            "start_pct": "0.72", "status": "doubt"},
           {"player_name": "Cai Coro", "team_slug": "celta",
-           "start_pct": "85", "status": "ok"}]
+           "start_pct": "85", "status": "ok"}])
     p = _merge(_merge({}, mkt, row_key, "name", MARKET_FIELDS), xi,
                lambda r: Name(r["player_name"]).key, "player_name", XI_FIELDS)
 

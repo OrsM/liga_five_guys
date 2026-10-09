@@ -22,14 +22,14 @@ class Scored(NamedTuple):
 def _club_matches() -> dict[str, list[tuple[str, int]]]:
     when: dict[tuple, tuple[str, int]] = {}
     for m in sorted(history("matches"), key=lambda r: r.get("observed_at", "")):
-        pair, jor = (m.get("home"), m.get("away")), m.get("jornada") or ""
-        if not str(jor).isdigit():
+        pair, jor = (m.get("home"), m.get("away")), m.get("jornada")
+        if jor is None:
             continue
         kick = kickoff_stamp(m.get("kickoff"))
         if kick is not None:
-            when[pair] = (kick.strftime("%Y-%m-%dT%H%MZ"), int(jor))
+            when[pair] = (kick.strftime("%Y-%m-%dT%H%MZ"), jor)
         elif m.get("score") and pair not in when:
-            when[pair] = (m.get("observed_at", ""), int(jor))
+            when[pair] = (m.get("observed_at", ""), jor)
     out: dict[str, list[tuple[str, int]]] = {}
     for pair, at in when.items():
         for club in pair:
@@ -51,7 +51,7 @@ def scored() -> list[Scored]:
     out = []
     for r in rows:
         key = row_key(r, ("player_name_full", "player_name"))
-        now = (float(r["points"]), float(r["games"]))
+        now = (r["points"], r["games"])
         before = last.get(key, (0.0, 0.0))
         if not key or now == before:
             continue

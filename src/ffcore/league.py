@@ -86,7 +86,7 @@ def ledger(activity, users: dict, key_of: Callable[[AppId], PlayerKey | None],
     rows = {r.get("activity_id") or id(r): r for r in activity}.values()
     feed = [Entry(r.get("at") or "", r.get("kind") or "",
                   users.get(text(r, "user_id")), users.get(text(r, "counterparty")),
-                  key_of(app_id(r)), money(r.get("amount")) or 0.0)
+                  key_of(app_id(r)), r.get("amount") or 0.0)
             for r in rows]
     return sorted(feed + _unrecorded_exits(feed, seen, key_of), key=lambda e: e.at)
 
@@ -101,7 +101,7 @@ def _unrecorded_exits(feed: list[Entry], seen,
     for r in seen:
         if (k := key_of(app_id(r))) and text(r, "manager"):
             snaps.setdefault(r["observed_at"], {})[k] = (text(r, "manager"),
-                                                         money(r.get("market_value")) or 0.0)
+                                                         r.get("market_value") or 0.0)
     shown: dict[tuple, list] = {}
     stamps = sorted(snaps)
     for a, b in zip(stamps, stamps[1:]):
@@ -148,7 +148,7 @@ class League:
                       and text(r, "manager")}
         users = {text(r, "user_id"): text(r, "manager") for r in standings
                  if text(r, "user_id") and text(r, "manager")}
-        mine = next((money(r.get("team_money")) for r in standings
+        mine = next((r.get("team_money") for r in standings
                      if text(r, "manager") == cfg.me and r.get("team_money")),
                     None)
         entries = ledger(activity, users, self.key_of_app, seen)
@@ -174,6 +174,7 @@ class League:
 
 
 def _selftest() -> None:
+    from ffcore.tidy import typed
     import tempfile
     from pathlib import Path
     from ffcore.crosswalk import Crosswalk, Player
@@ -186,37 +187,37 @@ def _selftest() -> None:
     assert (cfg.me, cfg.budget) == ("someone", 100e6), cfg
 
     users = {"1": "me", "2": "riv", "3": "quiet"}
-    feed = [{"activity_id": "a", "kind": "buy", "user_id": "1", "amount": "30"},
+    feed = typed("api_activity", [{"activity_id": "a", "kind": "buy", "user_id": "1", "amount": "30"},
             {"activity_id": "a", "kind": "buy", "user_id": "1", "amount": "30"},
             {"activity_id": "b", "kind": "sell", "user_id": "2", "amount": "20"},
             {"activity_id": "c", "kind": "bonus", "user_id": "2", "amount": "5"},
             {"activity_id": "d", "kind": "transfer", "user_id": "2",
              "counterparty": "1", "amount": "40"},
-            {"activity_id": "e", "kind": "joined", "user_id": "3"}]
+            {"activity_id": "e", "kind": "joined", "user_id": "3"}])
     entries = ledger(feed, users, lambda _id: None)
     assert len(entries) == 5, "each event once"
     got = estimate_cash(entries, users.values(), "me", 116.0, 100.0)
     assert got == {"me": 116.0, "riv": 91.0, "quiet": 106.0}, got
     assert estimate_cash(entries, users.values(), "me", None, 100.0)["riv"] == 85.0
 
-    seen = [{"observed_at": "2026-09-01T1000Z", "manager": "riv", "player_id": "7", "market_value": "30"},
-            {"observed_at": "2026-09-02T1000Z", "manager": "riv", "player_id": "8", "market_value": "5"}]
+    seen = typed("api_teams", [{"observed_at": "2026-09-01T1000Z", "manager": "riv", "player_id": "7", "market_value": "30"},
+            {"observed_at": "2026-09-02T1000Z", "manager": "riv", "player_id": "8", "market_value": "5"}])
     def key(app_id: AppId) -> PlayerKey | None:
         return {"7": PlayerKey("p"), "8": PlayerKey("q")}.get(app_id)
     gone = ledger(feed, users, key, seen)
     assert estimate_cash(gone, users.values(), "me", None, 100.0)["riv"] == 85.0 + 30, \
         "a player who left with no event in the feed was sold at his last value"
-    sold = feed + [{"activity_id": "f", "kind": "sell", "user_id": "2", "player_id": "7",
-                    "amount": "31", "at": "2026-09-01T15:00:00+02:00"}]
+    sold = feed + typed("api_activity", [{"activity_id": "f", "kind": "sell", "user_id": "2", "player_id": "7",
+                    "amount": "31", "at": "2026-09-01T15:00:00+02:00"}])
     assert estimate_cash(ledger(sold, users, key, seen), users.values(), "me", None,
                          100.0)["riv"] == 85.0 + 31, "a recorded sale is not counted twice"
-    taken = feed + [{"activity_id": "g", "kind": "transfer", "user_id": "1", "player_id": "7",
-                     "counterparty": "2", "amount": "33", "at": "2026-09-02T12:00:30+02:00"}]
+    taken = feed + typed("api_activity", [{"activity_id": "g", "kind": "transfer", "user_id": "1", "player_id": "7",
+                     "counterparty": "2", "amount": "33", "at": "2026-09-02T12:00:30+02:00"}])
     assert estimate_cash(ledger(taken, users, key, seen), users.values(), "me", None,
                          100.0)["riv"] == 85.0 + 33, \
         "nor a clause paid for him, stamped after the snapshot that shows him gone"
-    away = seen[:1] + [{"observed_at": "2026-09-02T1000Z", "manager": "me", "player_id": "8",
-                        "market_value": "5"}]
+    away = seen[:1] + typed("api_teams", [{"observed_at": "2026-09-02T1000Z", "manager": "me", "player_id": "8",
+                        "market_value": "5"}])
     assert estimate_cash(ledger(feed, users, key, away), users.values(), "me", None,
                          100.0)["riv"] == 85.0, "a snapshot without his squad shows no exit"
 
@@ -224,18 +225,18 @@ def _selftest() -> None:
     lg = League(Config(me="me", budget=100.0), xw,
                 api_teams=[{"manager": "riv", "player_id": "7"},
                            {"manager": "riv", "player_id": "404"}],
-                standings=[{"user_id": "1", "manager": "me", "team_money": "116"},
-                           {"user_id": "2", "manager": "riv"}],
+                standings=typed("api_standings", [{"user_id": "1", "manager": "me", "team_money": "116"},
+                           {"user_id": "2", "manager": "riv"}]),
                 activity=feed)
     assert lg.owner == {"p": "riv"} and lg.squad("riv") == ["p"], lg.owner
     assert lg.paid == {}, "nobody bought p"
     bought = League(Config(me="me", budget=100.0), xw,
                     api_teams=[{"manager": "riv", "player_id": "7"}],
-                    standings=[{"user_id": "1", "manager": "me"}, {"user_id": "2", "manager": "riv"}],
-                    activity=[{"activity_id": "x", "kind": "buy", "user_id": "1", "player_id": "7",
+                    standings=typed("api_standings", [{"user_id": "1", "manager": "me"}, {"user_id": "2", "manager": "riv"}]),
+                    activity=typed("api_activity", [{"activity_id": "x", "kind": "buy", "user_id": "1", "player_id": "7",
                                "amount": "9", "at": "2026-09-01"},
                               {"activity_id": "y", "kind": "transfer", "user_id": "2", "player_id": "7",
-                               "counterparty": "1", "amount": "12", "at": "2026-09-20"}])
+                               "counterparty": "1", "amount": "12", "at": "2026-09-20"}]))
     assert bought.paid == {"p": 12.0}, ("what his owner paid, not the one before", bought.paid)
     assert lg.managers == ["me", "riv"] and lg.cash["riv"] == 91.0, lg.cash
 

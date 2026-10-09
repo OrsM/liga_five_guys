@@ -9,7 +9,7 @@ from typing import Any, NamedTuple
 
 import numpy as np
 
-from ffcore.parse import pct100, snapshot_stamp, year_for
+from ffcore.parse import Rows, snapshot_stamp, year_for
 from ffcore.names import Name
 from ffcore.rules import minutes_played
 from stats import shrink
@@ -207,7 +207,7 @@ class StartOdds:
     chance he is picked if fit. history is his record this season as
     (appearances, matchday squads), which is what picking is pulled toward."""
 
-    def __init__(self, xi: list[dict], xw, cal: Calibration | None = None,
+    def __init__(self, xi: Rows, xw, cal: Calibration | None = None,
                  avail: Availability | None = None,
                  history: dict[str, tuple[float, float]] | None = None,
                  last_fit: dict[str, float] | None = None,
@@ -225,7 +225,7 @@ class StartOdds:
             if not key:
                 continue
             self.listed.add(key)
-            p = pct100(r.get("start_pct"))
+            p = r.get("start_pct")
             if p is not None and p >= 0:
                 self.start_pct[key] = max(self.start_pct.get(key, 0.0), p)
             if r.get("status") and r["status"] != "ok":
@@ -332,10 +332,8 @@ def _last_before(hist: list, cut: str):
 
 
 def _pct(row) -> float | None:
-    try:
-        return float(row.get("start_pct")) / 100.0
-    except (TypeError, ValueError):
-        return None
+    pct = row.get("start_pct")
+    return None if pct is None else pct / 100.0
 
 
 def outcomes(lineups, starters, locks: dict, jornada_of: dict, xw
@@ -410,17 +408,18 @@ def calibrate(outs: list[Outcome]) -> Calibration:
 
 
 def _selftest() -> None:
+    from ffcore.tidy import typed
     from ffcore.crosswalk import Crosswalk, Player
 
     xw = Crosswalk({"ana": Player("ana", "Ana"), "bo": Player("bo", "Bo")})
-    odds = StartOdds([{"player_name": "Ana", "start_pct": "80", "status": "ok"},
+    odds = StartOdds(typed("lineups", [{"player_name": "Ana", "start_pct": "80", "status": "ok"},
                       {"player_name": "Ana", "start_pct": "90"},
                       {"player_name": "Bo", "start_pct": "", "status": "doubt"},
-                      {"player_name": "Nobody", "start_pct": "99"}], xw)
+                      {"player_name": "Nobody", "start_pct": "99"}]), xw)
     assert odds.p_now("ana") == 0.9, "the higher of two listings"
     assert odds.p_now("bo") == NEUTRAL_START / 100 and odds.status_of("bo") == "doubt"
     assert odds.p_now("cai") == ABSENT_START / 100 and odds.status_of("cai") == ""
-    assert StartOdds([{"player_name": "Ana", "start_pct": "80"}], None).listed == set()
+    assert StartOdds(typed("lineups", [{"player_name": "Ana", "start_pct": "80"}]), None).listed == set()
 
     sept = dt.date(2026, 9, 28)
     assert prognosis("Lesión Desde 13/09 (15 días) Duda para la jornada 8", sept) \
@@ -446,10 +445,10 @@ def _selftest() -> None:
     assert prognosis_of("doubt", "Duda para la jornada 9", sept) == ("doubt_for", 9)
     assert prognosis_of("ok", "Duda para la jornada 9", sept) is None
     assert prognosis_of("gone", "", sept) == ("indefinite", None)
-    both = StartOdds([{"player_name": "Ana", "start_pct": "90", "status": "ok"}], xw,
+    both = StartOdds(typed("lineups", [{"player_name": "Ana", "start_pct": "90", "status": "ok"}]), xw,
                      app={"ana": "injured"})
     assert both.status_of("ana") == "", "injuries come from futbolfantasy"
-    gone = StartOdds([{"player_name": "Ana", "start_pct": "90", "status": "ok"}], xw,
+    gone = StartOdds(typed("lineups", [{"player_name": "Ana", "start_pct": "90", "status": "ok"}]), xw,
                      app={"ana": "out_of_league"})
     assert gone.fit("ana", 9, sept, 8) == 0.0, "left the league: out for good"
     assert bucket(("out_for", None), 8, sept, 8) == "out_for:at"
@@ -466,21 +465,21 @@ def _selftest() -> None:
     assert fitted.level["doubt_for:at"] == 0.0, "doubtful for 4, missed 4"
     assert fitted.level["doubt_for:after"] == 1.0, "and was back for 5"
     assert fit_availability([]).level == PRIOR
-    odds = StartOdds([{"player_name": "Ana", "status": "doubt",
+    odds = StartOdds(typed("lineups", [{"player_name": "Ana", "status": "doubt",
                        "observed_at": "2026-09-28T0400Z",
-                       "note": "Duda para la jornada 8"}], xw, avail=fitted)
+                       "note": "Duda para la jornada 8"}]), xw, avail=fitted)
     assert odds.fit("ana", 8, sept, 8) == 0.0
     assert odds.fit("ana", 9, sept, 8) == 1.0
     assert odds.fit("bo", 8, sept, 8) == 1.0, "not flagged, fit"
-    rec = StartOdds([{"player_name": "Ana", "start_pct": "20", "status": "ok"},
+    rec = StartOdds(typed("lineups", [{"player_name": "Ana", "start_pct": "20", "status": "ok"},
                      {"player_name": "Bo", "start_pct": "0", "status": "injured",
-                      "note": "Duda para la jornada 8"}], xw,
+                      "note": "Duda para la jornada 8"}]), xw,
                     history={"ana": (9.0, 10.0)}, last_fit={"bo": 70.0})
     assert rec.picked("ana", True) == shrink(0.2, PICK_K, 9.0, 10.0)
     assert rec.picked("ana", False) == shrink(NEUTRAL_START / 100, PICK_K, 9.0, 10.0)
     assert rec.picked("bo", True) == rec.picked("bo", False) == 0.7, \
         "no record: his listing before the injury, not the 0% it caused"
-    assert StartOdds([{"player_name": "Bo", "status": "injured"}], xw).picked(
+    assert StartOdds(typed("lineups", [{"player_name": "Bo", "status": "injured"}]), xw).picked(
         "bo", False) == ABSENT_START / 100, "never listed fit: not in the squad"
     assert last_fit_listing([
         Outcome("2026-08-01T1800Z", 1, "m", "t:a", "a", True, 0.8, "ok", True, 90.0),
@@ -520,7 +519,7 @@ def _selftest() -> None:
 
     locks = {1: dt.datetime(2026, 8, 15, 19, 30, tzinfo=dt.timezone.utc)}
     before, after = "2026-08-14T1000Z", "2026-08-16T1000Z"
-    lineups = [
+    lineups = typed("lineups", [
         {"observed_at": before, "source": "futbolfantasy", "team_slug": "t",
          "player_slug": "starter-man", "player_name": "Starter Man",
          "start_pct": "80", "role": "starter"},
@@ -536,8 +535,8 @@ def _selftest() -> None:
         {"observed_at": before, "source": "futbolfantasy", "team_slug": "other",
          "player_slug": "elsewhere", "player_name": "Elsewhere",
          "start_pct": "90", "role": "starter"},
-    ]
-    starters = [
+    ])
+    starters = typed("starters", [
         {"match_id": "m1", "team_slug": "t", "player_slug": "starter-man",
          "player_name": "Starter Man", "role": "starter", "minute": ""},
         {"match_id": "m1", "team_slug": "t", "player_slug": "bench-man",
@@ -546,7 +545,7 @@ def _selftest() -> None:
          "player_name": "Surprise Man", "role": "starter", "minute": "45"},
         {"match_id": "m9", "team_slug": "t", "player_slug": "starter-man",
          "player_name": "Starter Man", "role": "starter", "minute": ""},
-    ]
+    ])
     outs = outcomes(lineups, starters, locks, {"m1": 1, "m9": 9}, None)
     by = {o.who: o for o in outs}
     assert set(by) == {"t:starter-man", "t:bench-man", "t:vague-man",

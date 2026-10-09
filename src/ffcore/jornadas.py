@@ -26,8 +26,8 @@ def clock_history() -> JornadaClock:
     if not _CLOCK_HISTORY:
         rows = history("matches")
         dated = {(r.get("home"), r.get("away")) for r in rows if r.get("kickoff")}
-        blind = {int(r["jornada"]) for r in rows
-                 if r.get("score") and str(r.get("jornada")).isdigit()
+        blind = {r["jornada"] for r in rows
+                 if r.get("score") and r.get("jornada") is not None
                  and (r.get("home"), r.get("away")) not in dated}
         full = JornadaClock(rows)
         full.round_locks = {j: t for j, t in full.round_locks.items()
@@ -44,12 +44,8 @@ def jornada_of_match() -> dict[str, int]:
         out: dict[str, int] = {}
         for m in current("matches"):
             mid = (m.get("match_id") or "").strip()
-            if not mid or mid in out:
-                continue
-            try:
-                out[mid] = int(m.get("jornada") or "")
-            except (TypeError, ValueError):
-                continue
+            if mid and mid not in out and m.get("jornada") is not None:
+                out[mid] = m["jornada"]
         _JORNADA_OF_MATCH.append(out)
     return _JORNADA_OF_MATCH[0]
 
@@ -81,11 +77,8 @@ def _selftest() -> None:
     expect: dict[str, int] = {}
     for m in current("matches"):
         mid = (m.get("match_id") or "").strip()
-        if mid and mid not in expect:
-            try:
-                expect[mid] = int(m.get("jornada") or "")
-            except (TypeError, ValueError):
-                continue
+        if mid and mid not in expect and m.get("jornada") is not None:
+            expect[mid] = m["jornada"]
     assert j1 == expect, "jornada_of_match() must be first-write-wins"
     print("ffcore.jornadas self-test OK")
 

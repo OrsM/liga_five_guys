@@ -1,10 +1,10 @@
 
 from __future__ import annotations
 
+from ffcore.parse import Rows
 from typing import NamedTuple
 
 
-from ffcore.parse import money
 
 FIX_BAND = 0.12
 
@@ -14,28 +14,25 @@ class Match(NamedTuple):
     def_factor: float
 
 
-def team_strength(market: list[dict]) -> dict[str, float]:
+def team_strength(market: Rows) -> dict[str, float]:
     tot: dict[str, float] = {}
     for r in market:
         if r.get("club"):
-            tot[r["club"]] = tot.get(r["club"], 0.0) + (money(r.get("value"))
-                                                         or 0.0)
+            tot[r["club"]] = tot.get(r["club"], 0.0) + (r.get("value") or 0.0)
     return tot
 
 
 MIN_AD_MATCHES = 10
 
-def _match_goals(results: list[dict]):
+def _match_goals(results: Rows):
     for r in results:
         home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
-        try:
-            hg, ag = float(r["home_goals"]), float(r["away_goals"])
-        except (TypeError, ValueError, KeyError):
-            continue
-        yield home, away, hg, ag
+        hg, ag = r.get("home_goals"), r.get("away_goals")
+        if hg is not None and ag is not None:
+            yield home, away, hg, ag
 
 
-def attack_defense(results: list[dict], teams
+def attack_defense(results: Rows, teams
                    ) -> dict[str, tuple[float, float]]:
     scored: dict[str, float] = {}
     conceded: dict[str, float] = {}
@@ -78,7 +75,7 @@ class _Ratings(NamedTuple):
     ad: dict
 
 
-def difficulty_ratings(market: list[dict], results=None) -> _Ratings:
+def difficulty_ratings(market: Rows, results=None) -> _Ratings:
     value = team_strength(market)
     return _Ratings(diff=difficulty(value),
                     ad=attack_defense(results, list(value)) if results else {})
@@ -91,27 +88,29 @@ def _match_for(ratings: "_Ratings", opp: str) -> Match:
                    else (base, base)))
 
 
-def season_board(ratings: "_Ratings", matches: list[dict], jornadas
+def season_board(ratings: "_Ratings", matches: Rows, jornadas
                  ) -> dict[int, dict[str, Match]]:
     board: dict[int, dict[str, Match]] = {j: {} for j in set(jornadas)}
     for r in matches:
-        j = r.get("jornada") or ""
-        if not j.isdigit() or int(j) not in board:
+        j = r.get("jornada")
+        if j not in board:
             continue
         for team, opp in ((r.get("home"), r.get("away")),
                           (r.get("away"), r.get("home"))):
-            if team and team in ratings.diff and team not in board[int(j)]:
-                board[int(j)][team] = _match_for(ratings, opp or "")
+            if team and team in ratings.diff and team not in board[j]:
+                board[j][team] = _match_for(ratings, opp or "")
     return board
 
 
 def _selftest() -> None:
 
-    mk = [{"club": "Rich", "value": "100.00M"},
+    from ffcore.tidy import typed
+
+    mk = typed("market", [{"club": "Rich", "value": "100.00M"},
           {"club": "Rich", "value": "100.00M"},
           {"club": "Mid", "value": "50.00M"},
           {"club": "Poor", "value": "10.00M"},
-          {"club": "", "value": "999.00M"}]
+          {"club": "", "value": "999.00M"}])
 
     st = team_strength(mk)
     assert st == {"Rich": 200e6, "Mid": 50e6, "Poor": 10e6}, st
@@ -122,7 +121,7 @@ def _selftest() -> None:
     assert difficulty({"Only": 1.0}) == {"Only": 1.0}
 
 
-    results = (
+    results = typed("results_history",
         [{"home": "Strong", "away": "Weak", "home_goals": "3", "away_goals": "0"},
          {"home": "Weak", "away": "Strong", "home_goals": "0", "away_goals": "2"}]
         * 5
@@ -133,19 +132,19 @@ def _selftest() -> None:
     assert set(ad) == {"Strong", "Weak"}, ad
     assert ad["Strong"][0] > 1.0 > ad["Weak"][0], ad
     assert ad["Weak"][1] > 1.0 > ad["Strong"][1], ad
-    only = attack_defense(
+    only = attack_defense(typed("results_history",
         [{"home": "Strong", "away": "", "home_goals": "5", "away_goals": "0"}]
-        * MIN_AD_MATCHES,
+        * MIN_AD_MATCHES),
         ["Strong"])
     assert set(only) == {"Strong"}, only
     assert attack_defense([], ["Strong"]) == {}
-    assert attack_defense([{"home": "A", "away": "B", "home_goals": "",
-                            "away_goals": ""}], ["A", "B"]) == {}
+    assert attack_defense(typed("results_history", [{"home": "A", "away": "B", "home_goals": "",
+                            "away_goals": ""}]), ["A", "B"]) == {}
 
-    ms = [{"jornada": "1", "home": "Rich", "away": "Poor", "score": "2-0"},
+    ms = typed("matches", [{"jornada": "1", "home": "Rich", "away": "Poor", "score": "2-0"},
           {"jornada": "2", "home": "Mid", "away": "Rich", "score": ""},
           {"jornada": "2", "home": "Poor", "away": "", "score": ""},
-          {"jornada": "3", "home": "Poor", "away": "Mid", "score": ""}]
+          {"jornada": "3", "home": "Poor", "away": "Mid", "score": ""}])
     sb = season_board(difficulty_ratings(mk), ms, [1, 2, 3])
     assert set(sb) == {1, 2, 3} and 4 not in sb, sb
     assert sb[2]["Mid"] == Match((1.0 - FIX_BAND),
@@ -154,8 +153,8 @@ def _selftest() -> None:
     assert sb[2]["Poor"] == Match(1.0, 1.0), sb[2]
     assert season_board(difficulty_ratings(mk), [], [1, 2]) == {1: {}, 2: {}}
 
-    ad_results = [{"home": "Rich", "away": "x", "home_goals": "3",
-                   "away_goals": "5"}] * MIN_AD_MATCHES
+    ad_results = typed("results_history", [{"home": "Rich", "away": "x", "home_goals": "3",
+                   "away_goals": "5"}] * MIN_AD_MATCHES)
     real = season_board(difficulty_ratings(mk, results=ad_results), ms, [2])[2]
     assert abs(real["Mid"].def_factor - (1.0 / 0.75)) < 1e-9
     assert abs(real["Mid"].atk_factor - 1.25) < 1e-9
