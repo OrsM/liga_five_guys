@@ -2,20 +2,24 @@
 per player, and the crosswalk of ids between the sources."""
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
+from typing import Any
+
 from ffcore.parse import Rows
 from ffcore.names import Name, row_key
-from ffcore.tidy import LINEUP_SOURCE, current, mtime_cached, table_path
+from ffcore.tidy import LINEUP_SOURCE, Stamp, current, mtime_cached, table_path
 
 from ffcore.crosswalk import Crosswalk
 __all__ = ["load_crosswalk", "load_players", "MARKET_FIELDS", "XI_FIELDS"]
 
 
-_XW_CACHE: dict = {}
+_XW_CACHE: dict[str, tuple[Stamp, Crosswalk]] = {}
 
 
-def load_crosswalk():
+def load_crosswalk() -> Crosswalk:
+    """players.csv as a Crosswalk, empty if there is none yet."""
     path = table_path("players")
-    return mtime_cached(path, _XW_CACHE, "xw", Crosswalk.read, path)
+    return mtime_cached(path, _XW_CACHE, str(path), Crosswalk.read, path) or Crosswalk()
 
 
 MARKET_FIELDS = [("team", "team"), ("club", "club"), ("pos", "position"),
@@ -25,8 +29,9 @@ MARKET_FIELDS = [("team", "team"), ("club", "club"), ("pos", "position"),
 XI_FIELDS = [("club", "team_slug"), ("start", "start_pct"), ("status", "status")]
 
 
-def _merge(players: dict, rows: Rows, key_of, name_col: str,
-           fields) -> dict:
+def _merge(players: dict[str, dict[str, Any]], rows: Rows,
+           key_of: Callable[[Mapping[str, Any]], str | None], name_col: str,
+           fields: list[tuple[str, str]]) -> dict[str, dict[str, Any]]:
     for r in rows:
         key = key_of(r)
         if not key:
@@ -42,13 +47,13 @@ def _merge(players: dict, rows: Rows, key_of, name_col: str,
     return players
 
 
-def load_players() -> dict[str, dict]:
+def load_players() -> dict[str, dict[str, Any]]:
     market, xi = current("market"), current("lineups", LINEUP_SOURCE)
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % table_path("players").parent)
     xw = load_crosswalk()
     players = _merge({}, market, row_key, "name", MARKET_FIELDS)
-    return _merge(players, xi, xw.key_of if xw else (lambda r: None),
+    return _merge(players, xi, xw.key_of,
                   "player_name", XI_FIELDS)
 
 
@@ -85,7 +90,7 @@ def _selftest() -> None:
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
-                assert load_crosswalk() is None
+                assert load_crosswalk().players == {}
                 write_csv(table_path("players"),
                          [{"player_id": "a", "name": "A", "club_id": "c"}],
                          PLAYER_COLS)

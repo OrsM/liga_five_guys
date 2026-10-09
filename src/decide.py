@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import NamedTuple
@@ -9,7 +10,7 @@ from ffcore.action import Action
 from ffcore.forecast import Bootstrap
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.rules import shortfall
+from ffcore.rules import Squad, Squads, shortfall
 from ffcore.schedule import phantom_topup
 from ffcore.season import LeagueState, Standings, simulate_many
 from stats import percentile
@@ -74,7 +75,7 @@ class Universe:
         return self.state.me
 
     @property
-    def mine(self) -> dict[str, str]:
+    def mine(self) -> Squad:
         return self.state.squads.get(self.me, {})
 
     @cached_property
@@ -96,7 +97,7 @@ class Universe:
         return replace(self, state=replace(self.state, squads=apply(self, *acts)),
                        market=replace(self.market, cash=self.market.left(acts)))
 
-    def squad_after(self, *acts: Action) -> dict[str, str]:
+    def squad_after(self, *acts: Action) -> Squad:
         sq = dict(self.mine)
         for a in acts:
             for k in a.sell:
@@ -150,7 +151,7 @@ def verdict(mv: Move) -> str | None:
     return None
 
 
-def plan(u, rows: list[Move], base: Standings) -> tuple[list[Move], float]:
+def plan(u: Universe, rows: list[Move], base: Standings) -> tuple[list[Move], float]:
     """The best set of moves to make together. The moves that clear the
     bar, built twice: best first and best per million it ties up first,
     since one dear move can crowd out two cheaper ones that gain more; the
@@ -161,7 +162,7 @@ def plan(u, rows: list[Move], base: Standings) -> tuple[list[Move], float]:
         lambda r: -r.d_pts, lambda r: -r.per_million)), key=lambda pg: pg[1])
 
 
-def raised(u, moves: list[Move], rows: list[Move]) -> list[Move] | None:
+def raised(u: Universe, moves: list[Move], rows: list[Move]) -> list[Move] | None:
     """These moves and the sales that pay for them, or None if they cannot
     be made together: a player is in one move at most, and the game's one
     money rule is a balance of at least zero at the lock (below it you
@@ -182,20 +183,23 @@ def raised(u, moves: list[Move], rows: list[Move]) -> list[Move] | None:
     return None if cover is None else out + cover
 
 
-def cheapest_cover(sales: list[Move], short: float, fieldable) -> list[Move] | None:
+def cheapest_cover(sales: list[Move], short: float,
+                   fieldable: Callable[[list[Move]], bool]) -> list[Move] | None:
     """The sales raising at least short that lose fewest points in sum (a
     sale that gains counts as losing none), leaving a side fieldable; None
     if none do. Sales come fewest points lost first."""
     cost = [max(-r.d_pts, 0.0) for r in sales]
     rest = [sum(r.action.proceeds for r in sales[i:]) for i in range(len(sales) + 1)]
-    best: list = [None, float("inf")]
+    best: list[Move] | None = None
+    least = float("inf")
 
     def go(i: int, chosen: list[Move], lost: float, got: float) -> None:
-        if lost >= best[1]:
+        nonlocal best, least
+        if lost >= least:
             return
         if got >= short:
             if fieldable(chosen):
-                best[:] = [list(chosen), lost]
+                best, least = list(chosen), lost
             return
         if got + rest[i] < short:
             return
@@ -203,11 +207,11 @@ def cheapest_cover(sales: list[Move], short: float, fieldable) -> list[Move] | N
         go(i + 1, chosen, lost, got)
 
     go(0, [], 0.0, 0.0)
-    return best[0]
+    return best
 
 
-def fill(u, good: list[Move], rows: list[Move], base: Standings,
-         order) -> tuple[list[Move], float]:
+def fill(u: Universe, good: list[Move], rows: list[Move], base: Standings,
+         order: Callable[[Move], float]) -> tuple[list[Move], float]:
     """Moves in this order, each taken, with the sales that pay for it,
     if it shares no player with those taken and the whole set, so paid
     for, clears the bar (verdict) and gains more than before; again until
@@ -225,14 +229,14 @@ def fill(u, good: list[Move], rows: list[Move], base: Standings,
     return picked, gain
 
 
-def joint(u, moves: list[Move], base: Standings) -> Move:
+def joint(u: Universe, moves: list[Move], base: Standings) -> Move:
     """These moves made together, scored against doing nothing."""
     acts = [mv.action for mv in moves]
     after = score_many(u, [apply(u, *acts)], FINAL_TRIALS, 1)[0]
     return _move(Action("plan"), paired(after, base, u.me))
 
 
-def blocked(u, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
+def blocked(u: Universe, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
     """Why raised refuses a move alongside these, in words. None if it
     does not."""
     names = u.market.names
@@ -253,7 +257,7 @@ def blocked(u, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
 FUNNEL = (Universe.candidates, Universe.rank, verdict, plan)
 
 
-def board(u) -> Board:
+def board(u: Universe) -> Board:
     """The funnel end to end: what the report shows and ask.py explains.
     Doing nothing must obey the money rule too: in debt, the sales raised
     clears it with are made first, and every move is measured from there."""
@@ -266,7 +270,7 @@ def board(u) -> Board:
     return Board(forced + picked, gain, forced + rows, base)
 
 
-def at_risk(u) -> list[str]:
+def at_risk(u: Universe) -> list[str]:
     """Your players a rival can take now by paying their clause, most
     valuable to you first. Any rival can: a sale to the game pays at once
     (Laporta sold Raphinha for 192.6M the minute he paid 189.5M for Yamal),
@@ -275,11 +279,11 @@ def at_risk(u) -> list[str]:
     return sorted((k for k in u.mine if k in u.market.clause), key=lambda k: -season.get(k, 0.0))
 
 
-def _fieldable(squad: dict[str, str]) -> bool:
+def _fieldable(squad: Squad) -> bool:
     return not shortfall(squad)
 
 
-def score_many(u: Universe, many: list, trials: int, seed: int):
+def score_many(u: Universe, many: list[Squads], trials: int, seed: int) -> list[Standings]:
     under_way = fielded(u)
     return simulate_many(
         [LeagueState(squads=sq, jornadas=u.state.jornadas, me=u.me,
@@ -287,29 +291,29 @@ def score_many(u: Universe, many: list, trials: int, seed: int):
         u.forecaster, trials=trials, seed=seed)
 
 
-def fielded(u) -> dict[int, dict[str, dict[str, str]]]:
+def fielded(u: Universe) -> dict[int, Squads]:
     """The squads as they stand, for the jornadas already under way: a
     move made now cannot change those."""
     now = apply(u)
     return {j: now for j in u.part_played}
 
 
-def paired(after, base, me) -> list[float]:
+def paired(after: Standings, base: Standings, me: str) -> list[float]:
     return sorted(x - y for x, y in zip(after.totals.get(me, []),
                                         base.totals.get(me, [])))
 
 
-def median_gain(pairs) -> float:
+def median_gain(pairs: list[float]) -> float:
     return percentile(pairs, 50) if pairs else 0.0
 
 
-def fieldable_spares(u) -> list[str]:
+def fieldable_spares(u: Universe) -> list[str]:
     mine_squad = u.mine
     return [k for k in mine_squad if _fieldable(
         {p: s for p, s in mine_squad.items() if p != k})]
 
 
-def apply(u, *acts: Action) -> dict[str, dict[str, str]]:
+def apply(u: Universe, *acts: Action) -> Squads:
     sq = {m: dict(s) for m, s in u.state.squads.items()}
     sq[u.me] = u.squad_after(*acts)
     return {m: phantom_topup(s) for m, s in sq.items()}

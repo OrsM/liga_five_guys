@@ -8,7 +8,8 @@ from datetime import datetime
 from functools import cache
 
 from decide import Universe, _fieldable
-from ffcore.fixture import difficulty_ratings
+from ffcore.crosswalk import Crosswalk
+from ffcore.fixture import Ratings, difficulty_ratings
 from ffcore.forecast import Bootstrap
 from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
@@ -56,7 +57,7 @@ def scorer(market: Rows, xi_rows: Rows) -> Scorer:
         promoted_discount=fit_promoted_discount(market, last_season, played))
 
 
-def app_status(xw) -> dict[str, str]:
+def app_status(xw: Crosswalk) -> dict[str, str]:
     """The LaLiga app's status for each player it lists."""
     return {k: r["player_status"] for r in current("api_players_all")
             if (k := xw.player(app_id=app_id(r))) and r.get("player_status")}
@@ -71,7 +72,7 @@ def open_clauses(teams: Rows) -> dict[str, float]:
             if r.get("key") and (amount := r.get("buyout"))}
 
 
-def fixture_ratings(market: Rows):
+def fixture_ratings(market: Rows) -> Ratings:
     return difficulty_ratings(market, current("results_history"))
 
 

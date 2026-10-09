@@ -1,6 +1,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
+
 from ffcore.parse import Rows
 from typing import NamedTuple
 
@@ -24,7 +26,7 @@ def team_strength(market: Rows) -> dict[str, float]:
 
 MIN_AD_MATCHES = 10
 
-def _match_goals(results: Rows):
+def _match_goals(results: Rows) -> Iterator[tuple[str, str, float, float]]:
     for r in results:
         home, away = (r.get("home") or "").strip(), (r.get("away") or "").strip()
         hg, ag = r.get("home_goals"), r.get("away_goals")
@@ -32,7 +34,7 @@ def _match_goals(results: Rows):
             yield home, away, hg, ag
 
 
-def attack_defense(results: Rows, teams
+def attack_defense(results: Rows, teams: Iterable[str]
                    ) -> dict[str, tuple[float, float]]:
     scored: dict[str, float] = {}
     conceded: dict[str, float] = {}
@@ -70,25 +72,25 @@ def difficulty(strength: dict[str, float]) -> dict[str, float]:
             for i, team in enumerate(order)}
 
 
-class _Ratings(NamedTuple):
-    diff: dict
-    ad: dict
+class Ratings(NamedTuple):
+    diff: dict[str, float]
+    ad: dict[str, tuple[float, float]]
 
 
-def difficulty_ratings(market: Rows, results=None) -> _Ratings:
+def difficulty_ratings(market: Rows, results: Rows | None = None) -> Ratings:
     value = team_strength(market)
-    return _Ratings(diff=difficulty(value),
+    return Ratings(diff=difficulty(value),
                     ad=attack_defense(results, list(value)) if results else {})
 
 
-def _match_for(ratings: "_Ratings", opp: str) -> Match:
+def _match_for(ratings: "Ratings", opp: str) -> Match:
     base = ratings.diff.get(opp, 1.0) if opp else 1.0
     opp_ad = ratings.ad.get(opp) if opp else None
     return Match(*((opp_ad[1], 1.0 / opp_ad[0]) if opp_ad is not None
                    else (base, base)))
 
 
-def season_board(ratings: "_Ratings", matches: Rows, jornadas
+def season_board(ratings: Ratings, matches: Rows, jornadas: Iterable[int]
                  ) -> dict[int, dict[str, Match]]:
     board: dict[int, dict[str, Match]] = {j: {} for j in set(jornadas)}
     for r in matches:

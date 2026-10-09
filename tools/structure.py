@@ -17,6 +17,7 @@ import ast
 import collections
 import re
 import sys
+from typing import Any
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent.parent / "src"
@@ -37,7 +38,7 @@ def modules() -> dict[str, Path]:
             if p.name != "__init__.py"}
 
 
-def measure() -> dict:
+def measure() -> dict[str, Any]:
     mods = modules()
     edges, lazy, code, reach, classes = set(), [], 0, 0, []
     for name, path in mods.items():
@@ -87,7 +88,7 @@ def measure() -> dict:
 LAZY_OK = {("ffcore.futbolfantasy", "ffcore.parse")}
 
 
-def problems(m: dict) -> list[str]:
+def problems(m: dict[str, Any]) -> list[str]:
     mods = modules()
     out = ["model imports the data layer: %s -> %s" % ab
            for ab in m["model_to_data"]]

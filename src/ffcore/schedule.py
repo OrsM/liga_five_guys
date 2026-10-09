@@ -1,15 +1,21 @@
 
 from __future__ import annotations
 
-from ffcore.parse import Rows
+from collections.abc import Callable, Iterable
 from datetime import date, timedelta
 
-from ffcore.fixture import season_board
+from ffcore.fixture import Match, Ratings, season_board
+from ffcore.forecast import Cell, PerJornada
 from ffcore.locks import JornadaClock
-from ffcore.rules import MAX_SLOT, shortfall
+from ffcore.parse import Rows
+from ffcore.rules import MAX_SLOT, Squad, Squads, shortfall
+from ffcore.score import Rates, Scorer
+
+# The chance a player is fit in a jornada: (player, jornada, his first jornada).
+Fit = Callable[[str, int, int], float]
 
 
-def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
+def rounds_left(matches: Rows) -> tuple[list[int], dict[int, set[str]]]:
 
     js = {r["jornada"] for r in matches if r.get("jornada") is not None}
     finished = {j for j in js
@@ -21,7 +27,7 @@ def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
     played: dict[int, set[str]] = {}
     for r in matches:
         j = r.get("jornada")
-        if j in rem and r.get("score"):
+        if j is not None and j in rem and r.get("score"):
             played.setdefault(j, set()).update(
                 c for c in (r.get("home"), r.get("away")) if c)
     return rem, played
@@ -30,8 +36,8 @@ def rounds_left(matches) -> tuple[list[int], dict[int, set[str]]]:
 UNSCORED_DEFAULT = (2.0, 0.5)
 
 
-def jornada_expectation(r, match, first: bool, fit: float = 1.0
-                        ) -> tuple[float, float]:
+def jornada_expectation(r: Rates, match: Match | None, first: bool, fit: float = 1.0
+                        ) -> Cell:
     """(points if he plays, chance he plays): points per match times the
     fixture, and the chance he is picked if fit times the chance he is fit."""
     fix = 1.0 if match is None else (
@@ -47,10 +53,10 @@ def jornada_dates(matches: Rows, rem: list[int]) -> dict[int, date]:
             for near in [min(known, key=lambda k: abs(k - j))]}
 
 
-def season(rates: dict, club: dict[str, str], rem: list[int],
-           played: dict[int, set[str]], board: dict[int, dict],
-           fit=None) -> tuple[dict[int, dict], dict[str, int]]:
-    per_j: dict[int, dict] = {}
+def season(rates: dict[str, Rates | None], club: dict[str, str], rem: list[int],
+           played: dict[int, set[str]], board: dict[int, dict[str, Match]],
+           fit: Fit | None = None) -> tuple[PerJornada, dict[str, int]]:
+    per_j: PerJornada = {}
     first_of: dict[str, int] = {}
     for j in rem:
         layer = {}
@@ -61,40 +67,39 @@ def season(rates: dict, club: dict[str, str], rem: list[int],
             if first:
                 first_of[k] = j
             layer[k] = UNSCORED_DEFAULT if r is None else jornada_expectation(
-                r, board.get(j, {}).get(club.get(k)), first,
+                r, board.get(j, {}).get(club.get(k, "")), first,
                 fit(k, j, first_of[k]) if fit else 1.0)
         per_j[j] = layer
     return per_j, first_of
 
 
-def expectations(sc, ratings, keys, matches: Rows
-                 ) -> tuple[dict[int, dict], dict[str, int], dict, list[int],
+def expectations(sc: Scorer, ratings: Ratings, keys: Iterable[str], matches: Rows
+                 ) -> tuple[PerJornada, dict[str, int], dict[str, Rates | None], list[int],
                             dict[int, set[str]]]:
 
     rem, played = rounds_left(matches)
     rates = {k: sc.rates(sc.lookup[k]) if k in sc.lookup else None
              for k in keys}
-    club = {k: sc.lookup[k].get("club") for k in keys if k in sc.lookup}
+    club = {k: c for k in keys if k in sc.lookup and (c := sc.lookup[k].get("club"))}
     dates = jornada_dates(matches, rem)
     per_j, first_of = season(
         rates, club, rem, played, season_board(ratings, matches, rem),
-        lambda k, j, first: sc.fit(k, j, dates.get(j), first))
+        lambda k, j, first_j: sc.fit(k, j, dates.get(j), first_j))
     return per_j, first_of, rates, rem, played
 
 
-def phantom_topup(sq: dict[str, str]) -> dict[str, str]:
+def phantom_topup(sq: Squad) -> Squad:
     """The squad with a stand-in for each player it is short of a formation."""
     short = shortfall(sq)
     return {**sq, **{"__phantom_%s_%d" % (p, i): p for p, n in short.items() for i in range(n)}}
 
 
-def phantom_fill(squads: dict[str, dict[str, str]], per_jornada: dict[int, dict],
-                 pos: dict[str, str]
-                 ) -> tuple[dict[str, dict[str, str]], dict[int, dict]]:
+def phantom_fill(squads: Squads, per_jornada: PerJornada, pos: dict[str, str]
+                 ) -> tuple[Squads, PerJornada]:
 
     squads = {m: dict(sq) for m, sq in squads.items()}
     per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}
-    avg: dict[int, dict[str, tuple[float, float]]] = {}
+    avg: dict[int, dict[str, Cell]] = {}
     for j, layer in per_jornada.items():
         by_pos: dict[str, list[tuple[float, float]]] = {}
         for k, (pts, p) in layer.items():

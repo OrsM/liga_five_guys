@@ -3,7 +3,8 @@ from __future__ import annotations
 from ffcore.parse import Rows
 import math
 from datetime import datetime, timezone
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from typing import Any
 from statistics import mean, median
 
 from ffcore.names import app_id
@@ -71,7 +72,7 @@ class Momentum:
 
 
 def grade(by_player: dict[str, list[tuple[str, float]]],
-          horizons=(1, 3, 5)) -> dict[int, dict]:
+          horizons: Sequence[int] = (1, 3, 5)) -> dict[int, dict[str, float]]:
     days = sorted({d for s in by_player.values() for d, _ in s})
     pairs: dict[int, list[tuple[float, float]]] = {h: [] for h in horizons}
     for d in days[len(days) // 4:]:
@@ -87,7 +88,7 @@ def grade(by_player: dict[str, list[tuple[str, float]]],
 
 
 def auction_ratios(listings: Rows, buys: Rows) -> list[float]:
-    ends: dict[tuple[str, datetime], Mapping] = {}
+    ends: dict[tuple[str, datetime], Mapping[str, Any]] = {}
     for r in listings:
         if r.get("seller") != "marketPlayerLeague" or not r.get("expires_at"):
             continue

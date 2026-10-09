@@ -7,7 +7,9 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping, NamedTuple
+from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping, Sequence
+from datetime import datetime
+from typing import Any, NamedTuple, TypeVar
 
 from ffcore.clock import on_reset, run_now
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
@@ -29,7 +31,7 @@ def table_path(name: str) -> Path:
 
 
 @contextmanager
-def tables_in(path: Path):
+def tables_in(path: Path) -> Iterator[Path]:
     global TIDY
     real = TIDY
     TIDY = Path(path)
@@ -44,16 +46,20 @@ def input_path(name: str) -> Path:
     return p if p.exists() else Path(name)
 
 
-_READ_CACHE: dict[str, tuple] = {}
-_TYPED_CACHE: dict[str, tuple] = {}
+Stamp = tuple[int, int]
+_READ_CACHE: dict[str, tuple[Stamp, list[dict[str, str]]]] = {}
+_TYPED_CACHE: dict[str, tuple[Stamp, list[Mapping[str, Any]]]] = {}
+T = TypeVar("T")
 
 
-def _forget(path) -> None:
+def _forget(path: str | Path) -> None:
     _READ_CACHE.pop(str(Path(path)), None)
     _TYPED_CACHE.pop(str(Path(path)), None)
 
 
-def mtime_cached(path, cache: dict, key, build, *args):
+def mtime_cached(path: str | Path, cache: dict[Any, tuple[Stamp, T]], key: Hashable,
+                 build: Callable[..., T], *args: Any) -> T | None:
+    """build(*args), kept until the file at path changes; None if it is gone."""
     path = Path(path)
     try:
         st = path.stat()
@@ -67,27 +73,28 @@ def mtime_cached(path, cache: dict, key, build, *args):
     return hit[1]
 
 
-def _parse_csv(path) -> list[dict]:
+def _parse_csv(path: str | Path) -> list[dict[str, str]]:
     with Path(path).open(encoding="utf-8") as fh:
         r = csv.reader(fh)
         fieldnames = next(r, [])
         return [dict(zip(fieldnames, map(sys.intern, row))) for row in r if row]
 
 
-def read_csv(path) -> list[Mapping[str, str]]:
+def read_csv(path: str | Path) -> list[Mapping[str, str]]:
     rows = mtime_cached(path, _READ_CACHE, str(Path(path)), _parse_csv, path)
     return [MappingProxyType(r) for r in (rows or [])]
 
 
 @contextmanager
-def _csv_dictwriter(path, fieldnames, mode, **writer_kw):
+def _csv_dictwriter(path: Path, fieldnames: Sequence[str], mode: str,
+                    **writer_kw: Any) -> Iterator[csv.DictWriter[str]]:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open(mode, newline="", encoding="utf-8") as fh:
         yield csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
                              lineterminator="\n", **writer_kw)
 
 
-def csv_string(rows, fieldnames) -> str:
+def csv_string(rows: Iterable[Mapping[str, Any]], fieldnames: Sequence[str]) -> str:
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\n")
     w.writeheader()
@@ -95,7 +102,8 @@ def csv_string(rows, fieldnames) -> str:
     return buf.getvalue()
 
 
-def write_csv(path, rows, fieldnames=None) -> None:
+def write_csv(path: str | Path, rows: Sequence[Mapping[str, Any]],
+              fieldnames: Sequence[str] | None = None) -> None:
     path = Path(path)
     _forget(path)
     if not rows:
@@ -106,7 +114,7 @@ def write_csv(path, rows, fieldnames=None) -> None:
         w.writerows(rows)
 
 
-def widen_csv(path, fieldnames) -> bool:
+def widen_csv(path: str | Path, fieldnames: Sequence[str]) -> bool:
     path = Path(path)
     if not path.exists():
         return False
@@ -121,7 +129,8 @@ def widen_csv(path, fieldnames) -> bool:
     return True
 
 
-def append_csv(path, rows, fieldnames=None) -> None:
+def append_csv(path: str | Path, rows: Sequence[Mapping[str, Any]],
+               fieldnames: Sequence[str] | None = None) -> None:
     path = Path(path)
     _forget(path)
     if not rows:
@@ -142,12 +151,13 @@ class Table(NamedTuple):
     is read by: current() and history() hand them out parsed, so no
     reader parses a number."""
     snapshot: bool
-    key: tuple = ()
+    key: tuple[str, ...] = ()
     store: str = ""
-    numbers: tuple = ()
+    numbers: tuple[tuple[str, Callable[[object], Any]], ...] = ()
 
 
-def _cols(parse, *cols: str) -> tuple:
+def _cols(parse: Callable[[object], Any], *cols: str
+          ) -> tuple[tuple[str, Callable[[object], Any]], ...]:
     return tuple((c, parse) for c in cols)
 
 
@@ -185,7 +195,7 @@ def _cut() -> str:
     return run_now().strftime("%Y-%m-%dT%H%MZ")
 
 
-def typed(name: str, rows) -> list[Mapping[str, Any]]:
+def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     """Rows of a table as it is written (text) with its numeric columns
     parsed (Table.numbers): what current() and history() hand out."""
     numbers = TABLES[name].numbers if name in TABLES else ()
@@ -200,7 +210,7 @@ def _rows(name: str) -> list[Mapping[str, Any]]:
                         lambda: typed(name, read_csv(path))) or []
 
 
-def history(name: str, source: str = "") -> list:
+def history(name: str, source: str = "") -> list[Mapping[str, Any]]:
     cut = _cut()
     return [r for r in _rows(name)
             if r.get("observed_at", "") <= cut
@@ -215,7 +225,7 @@ def _closed_days(name: str) -> dict[str, str]:
     return out
 
 
-def _current_rows(name: str, cut: str) -> tuple:
+def _current_rows(name: str, cut: str) -> tuple[Mapping[str, Any], ...]:
     spec = TABLES[name]
     rows = sorted((r for r in _rows(name)
                    if r.get("observed_at", "") <= cut),
@@ -233,23 +243,23 @@ def _current_rows(name: str, cut: str) -> tuple:
     return tuple(r for k, r in latest.items() if all(k))
 
 
-_CURRENT_CACHE: dict = {}
+_CURRENT_CACHE: dict[tuple[str, str], tuple[Stamp, tuple[Mapping[str, Any], ...]]] = {}
 
 
-def current(name: str, source: str = "") -> list[dict]:
+def current(name: str, source: str = "") -> list[dict[str, Any]]:
     cut = _cut()
     rows = mtime_cached(table_path(name), _CURRENT_CACHE, (name, cut),
                          _current_rows, name, cut) or ()
     return [dict(r) for r in rows if not source or r.get("source") == source]
 
 
-def age_hours(name: str, now=None) -> float | None:
+def age_hours(name: str, now: datetime | None = None) -> float | None:
     stamps = [r.get("observed_at", "") for r in current(name)]
     when = snapshot_stamp(max(stamps)) if stamps else None
     return None if when is None else ((now or run_now()) - when).total_seconds() / 3600
 
 
-def table_stats(path, col: str = "observed_at") -> tuple[int, str]:
+def table_stats(path: str | Path, col: str = "observed_at") -> tuple[int, str]:
     path = Path(path)
     try:
         st = path.stat()

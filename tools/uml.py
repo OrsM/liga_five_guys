@@ -30,7 +30,7 @@ def node(m: str) -> str:
     return m.replace("ffcore.", "ff_") if m == "ffcore.crosswalk" else m.replace("ffcore.", "")
 
 
-def imports(tree) -> set[str]:
+def imports(tree: ast.Module) -> set[str]:
     tests = {id(x) for n in tree.body if isinstance(n, ast.FunctionDef)
              and n.name.startswith("_selftest") for x in ast.walk(n)}
     out = set()
@@ -90,7 +90,7 @@ def _fields(c: ast.ClassDef) -> list[tuple[str, str]]:
                  and f.name == "__init__"), None)
     params = {a.arg: ast.unparse(a.annotation) for a in init.args.args
               if a.annotation} if init else {}
-    def source(v):
+    def source(v: ast.expr) -> str | None:
         if isinstance(v, ast.BoolOp):
             v = v.values[0]
         return v.id if isinstance(v, ast.Name) and v.id in params else None

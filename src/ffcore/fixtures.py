@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from decide import Universe
@@ -22,7 +22,8 @@ DEFAULT_SQUAD: dict[str, str] = {
 
 DEFAULT_JORNADAS: list[int] = [1, 2]
 
-def _with_overrides(name: str, defaults: dict, overrides: dict) -> dict:
+def _with_overrides(name: str, defaults: dict[str, Any], overrides: dict[str, Any]
+                    ) -> dict[str, Any]:
     for k in overrides:
         if k not in defaults:
             raise TypeError(f"{name}: unknown override {k!r}")
@@ -31,7 +32,7 @@ def _with_overrides(name: str, defaults: dict, overrides: dict) -> dict:
     return defaults
 
 
-def tiny_state(**overrides) -> "LeagueState":
+def tiny_state(**overrides: Any) -> LeagueState:
     from ffcore.season import LeagueState
 
     defaults = dict(
@@ -43,7 +44,7 @@ def tiny_state(**overrides) -> "LeagueState":
     return LeagueState(**_with_overrides("tiny_state", defaults, overrides))
 
 
-def tiny_bootstrap(**overrides) -> "Bootstrap":
+def tiny_bootstrap(**overrides: Any) -> Bootstrap:
     from ffcore.forecast import Bootstrap
 
     default_per_jornada = {
@@ -56,7 +57,8 @@ def tiny_bootstrap(**overrides) -> "Bootstrap":
     return Bootstrap(**_with_overrides("tiny_bootstrap", defaults, overrides))
 
 
-def _universe(defaults: dict, market: dict, overrides: dict) -> "Universe":
+def _universe(defaults: dict[str, Any], market: dict[str, Any], overrides: dict[str, Any]
+              ) -> Universe:
     from dataclasses import fields
 
     from decide import Universe
@@ -68,12 +70,12 @@ def _universe(defaults: dict, market: dict, overrides: dict) -> "Universe":
     return Universe(market=Market(**market), **defaults)
 
 
-def tiny_universe(**overrides) -> "Universe":
+def tiny_universe(**overrides: Any) -> Universe:
     return _universe(dict(state=tiny_state(), forecaster=tiny_bootstrap()),
                      {"pos": dict(DEFAULT_SQUAD), "cash": 20e6}, overrides)
 
 
-def tiny_market_universe(**overrides) -> "Universe":
+def tiny_market_universe(**overrides: Any) -> Universe:
     squad = dict(DEFAULT_SQUAD)
     squad["bench_m"] = "MED"
     squad["bench_k"] = "POR"

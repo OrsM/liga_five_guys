@@ -2,27 +2,20 @@
 latest match his club had played, and minutes from a line-up role."""
 from __future__ import annotations
 
-from typing import NamedTuple
+
 
 from ffcore.parse import kickoff_stamp
 from ffcore.names import row_key
+from ffcore.score import Scored, points_by_jornada
 from ffcore.tidy import current, history
 
-__all__ = ["Scored", "scored"]
-
-
-class Scored(NamedTuple):
-    key: str
-    jornada: int
-    pts: float
-    games: float
-    at: str
+__all__ = ["scored"]
 
 
 def _club_matches() -> dict[str, list[tuple[str, int]]]:
-    when: dict[tuple, tuple[str, int]] = {}
+    when: dict[tuple[str, str], tuple[str, int]] = {}
     for m in sorted(history("matches"), key=lambda r: r.get("observed_at", "")):
-        pair, jor = (m.get("home"), m.get("away")), m.get("jornada")
+        pair, jor = (m.get("home") or "", m.get("away") or ""), m.get("jornada")
         if jor is None:
             continue
         kick = kickoff_stamp(m.get("kickoff"))
@@ -33,7 +26,8 @@ def _club_matches() -> dict[str, list[tuple[str, int]]]:
     out: dict[str, list[tuple[str, int]]] = {}
     for pair, at in when.items():
         for club in pair:
-            out.setdefault(club, []).append(at)
+            if club:
+                out.setdefault(club, []).append(at)
     return {c: sorted(v) for c, v in out.items()}
 
 
@@ -67,6 +61,10 @@ def scored() -> list[Scored]:
 def _selftest() -> None:
     import tempfile
     from pathlib import Path
+
+    two = [Scored("a", 1, 3.0, 1.0, "t1"), Scored("a", 1, 2.0, 1.0, "t2"), Scored("b", 2, 4.0, 1.0, "t1")]
+    assert points_by_jornada(two) == {("a", 1): 5.0, ("b", 2): 4.0}, \
+        "each player's points in each jornada, summed once"
 
     from ffcore.clock import set_now
     from ffcore.parse import snapshot_stamp

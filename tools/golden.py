@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 HOME = Path(os.environ.get("LFG_GOLDEN", Path.home() / ".cache" / "lfg-golden"))
 
@@ -30,7 +31,7 @@ def stamps(n: int) -> list[str]:
     return sorted({seen[round(i * (len(seen) - 1) / (n - 1))] for i in range(n)})
 
 
-def build(now: str, hash_seed: str) -> dict | None:
+def build(now: str, hash_seed: str) -> dict[str, Any] | None:
     scratch, out = HOME / "scratch", HOME / "out"
     if not scratch.exists():
         shutil.copytree(HOME / "data", scratch, symlinks=True)
@@ -47,7 +48,7 @@ def build(now: str, hash_seed: str) -> dict | None:
     return board
 
 
-def diff(a, b, at="") -> list[str]:
+def diff(a: object, b: object, at: str = "") -> list[str]:
     if isinstance(a, dict) and isinstance(b, dict):
         return [d for k in sorted(set(a) | set(b), key=str)
                 for d in diff(a.get(k), b.get(k), "%s.%s" % (at, k))]
@@ -57,7 +58,7 @@ def diff(a, b, at="") -> list[str]:
     return [] if a == b else ["%s: %r != %r" % (at or ".", a, b)]
 
 
-def kinds(board: dict | None) -> str:
+def kinds(board: dict[str, Any] | None) -> str:
     if board is None:
         return "no board"
     return " ".join(sorted(d["what"] for d in board["do"])) or "nothing to do"

@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import traceback
+from collections.abc import Callable
 
 
 STAGES: list[tuple[str, str]] = [
@@ -17,12 +18,12 @@ STAGES: list[tuple[str, str]] = [
 ]
 
 
-def call(spec: str):
+def call(spec: str) -> Callable[[], object]:
     mod, fn = spec.split(":")
     return getattr(__import__(mod), fn)
 
 
-def _sample(hits, stop, tid) -> None:
+def _sample(hits: collections.Counter[str], stop: threading.Event, tid: int) -> None:
     while not stop.wait(0.25):
         f, at = sys._current_frames().get(tid), "(outside src/)"  # noqa: SLF001 -- the sampler needs another thread's frame
         while f is not None:

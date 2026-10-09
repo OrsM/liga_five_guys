@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Mapping
+from collections.abc import Iterable, Iterator, Mapping
 import functools
 import hashlib
 import io
@@ -17,10 +17,11 @@ import time
 import types
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 
-from ffcore.auth import API_BASE
+from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
 from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv,
                          csv_string, read_csv, table_stats, widen_csv,
@@ -30,8 +31,8 @@ from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
 from ffcore.laliga_api import ROW_TABLE
 from sources import source, source_for, sources
 
-from ffcore.auth import TokenStore
-from ffcore.parse import snapshot_stamp
+from ffcore.parse import Row, snapshot_stamp
+from ffcore.source import Source
 __all__ = ["snapshots", "state", "doc_keys", "documents", "due",
           "fetch", "parse", "baseline"]
 
@@ -46,8 +47,8 @@ HEADERS = {
 DELAY = (1.0, 2.0)
 
 
-def _by_host(srcs) -> list:
-    lanes: dict[str, list] = {}
+def _by_host(srcs: Iterable[Source]) -> list[Source]:
+    lanes: dict[str, list[Source]] = {}
     for s in srcs:
         lanes.setdefault(urlparse(s.url).netloc, []).append(s)
     return [s for row in itertools.zip_longest(*lanes.values())
@@ -66,7 +67,7 @@ def snapshots() -> list[Path]:
     return sorted(RAW.glob("dt=*.tar.xz"), key=_stamp_of)
 
 
-def _read(path: Path, only: set | None = None) -> dict[str, str]:
+def _read(path: Path, only: set[str] | None = None) -> dict[str, str]:
     want = None if only is None else set(only) | {MANIFEST}
     with tarfile.open(path, "r:xz") as tf:
         return {m.name: f.read().decode("utf-8", "replace")
@@ -90,11 +91,11 @@ def _write(path: Path, members: dict[str, str]) -> None:
     tmp.replace(path)
 
 
-def _manifest(members: dict[str, str]) -> list[dict]:
+def _manifest(members: dict[str, str]) -> list[dict[str, str]]:
     return list(csv.DictReader(io.StringIO(members.get(MANIFEST, ""))))
 
 
-def state() -> dict[str, dict]:
+def state() -> dict[str, dict[str, str]]:
     snaps = snapshots()
     if not snaps:
         return {}
@@ -104,14 +105,14 @@ def state() -> dict[str, dict]:
 _INDEX = "snapindex.json"
 
 
-def _read_json(path: Path, default):
+def _read_json(path: Path, default: Any) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return default
 
 
-def _write_json(path: Path, obj) -> None:
+def _write_json(path: Path, obj: object) -> None:
     TIDY.mkdir(parents=True, exist_ok=True)
     try:
         path.write_text(json.dumps(obj), encoding="utf-8")
@@ -119,10 +120,13 @@ def _write_json(path: Path, obj) -> None:
         pass
 
 
-def doc_keys():
+def doc_keys() -> list[tuple[str, dict[str, tuple[str, str]]]]:
     idx = _read_json(TIDY / _INDEX, {}).get("snaps", {})
-    out, carried, keys = [], {}, Sigs()
-    fresh, opened = {}, 0
+    out: list[tuple[str, dict[str, tuple[str, str]]]] = []
+    carried: dict[str, tuple[str, str]] = {}
+    keys = Sigs()
+    fresh: dict[str, dict[str, Any]] = {}
+    opened = 0
     for snap in snapshots():
         stamp = _stamp_of(snap)
         size = snap.stat().st_size
@@ -149,7 +153,7 @@ def doc_keys():
     return out
 
 
-def documents(need: dict[str, set]):
+def documents(need: dict[str, set[str]]) -> Iterator[tuple[str, str, str]]:
     for snap in snapshots():
         stamp = _stamp_of(snap)
         want = need.get(stamp)
@@ -163,7 +167,7 @@ def documents(need: dict[str, set]):
 TWICE_DAILY_HOURS = 6.0
 
 
-def page_sig(src, text: str) -> str | None:
+def page_sig(src: Source, text: str) -> str | None:
     try:
         rows = src.parse(text, "", src.key)
     except Exception:
@@ -176,7 +180,7 @@ def page_sig(src, text: str) -> str | None:
                         ).hexdigest()[:16]
 
 
-def due(src, prev: dict, now: str) -> bool:
+def due(src: Source, prev: dict[str, dict[str, str]], now: str) -> bool:
 
     if src.cadence == "once":
         return src.key not in prev
@@ -190,7 +194,8 @@ def due(src, prev: dict, now: str) -> bool:
     return not (seen[:10] == now[:10])
 
 
-def carry_matches(rows: list[dict], prev: dict) -> list[dict]:
+def carry_matches(rows: list[dict[str, str]], prev: dict[str, dict[str, str]]
+                  ) -> list[dict[str, str]]:
     have = {r["page"] for r in rows}
     return rows + [dict(r) for page, r in prev.items()
                    if MATCH_KEY_RE.match(page) and page not in have]
@@ -208,9 +213,9 @@ def fetch() -> Path:
 
     prev = state()
     store: dict[str, str] = {}
-    rows: list[dict] = []
+    rows: list[dict[str, str]] = []
     unchanged = skipped = rotted = 0
-    timing: list[tuple] = []
+    timing: list[tuple[float, str, object]] = []
     fails: dict[str, str] = {}
 
     bearer = None
@@ -344,7 +349,7 @@ def parse() -> None:
                           if source_for(page)}) for stamp, docs in todo[i:i + CHUNK]]
         cache = _read_cache({ck for _stamp, docs in chunk
                              for ck, _o in docs.values()})
-        need: dict[str, set] = {}
+        need: dict[str, set[str]] = {}
         for _stamp, docs in chunk:
             for page, (ck, origin) in docs.items():
                 used.add(ck)
@@ -357,7 +362,7 @@ def parse() -> None:
         with (TIDY / _CACHE).open("a", encoding="utf-8") as fh:
             for ck, rows in fresh.items():
                 fh.write(json.dumps({"k": ck, "r": rows}) + "\n")
-        pending: dict[str, list[dict]] = {}
+        pending: dict[str, list[Row]] = {}
         for stamp, docs in chunk:
             for page, (ck, _origin) in sorted(docs.items()):
                 route(pending, cache.get(ck, []), source(page).table, stamp)
@@ -382,8 +387,8 @@ _STATE = "parse_state.json"
 _CACHE = "parsed.jsonl"
 
 
-def _read_cache(keys: set) -> dict:
-    out: dict = {}
+def _read_cache(keys: set[str]) -> dict[str, list[Row]]:
+    out: dict[str, list[Row]] = {}
     try:
         fh = (TIDY / _CACHE).open(encoding="utf-8")
     except OSError:
@@ -396,7 +401,7 @@ def _read_cache(keys: set) -> dict:
     return out
 
 
-def _keep_cache(keys: set) -> None:
+def _keep_cache(keys: set[str]) -> None:
     path = TIDY / _CACHE
     if not path.exists():
         return
@@ -407,7 +412,7 @@ def _keep_cache(keys: set) -> None:
     tmp.replace(path)
 
 
-def _leaf(x) -> str:
+def _leaf(x: object) -> str:
     if isinstance(x, (set, frozenset)):
         return repr(sorted(map(repr, x)))
     if isinstance(x, types.ModuleType):
@@ -417,8 +422,9 @@ def _leaf(x) -> str:
 
 
 @functools.cache
-def fingerprint(fn) -> str:
-    seen, h = set(), hashlib.blake2b(digest_size=8)
+def fingerprint(fn: object) -> str:
+    seen: set[int] = set()
+    h = hashlib.blake2b(digest_size=8)
     todo: list[tuple[bool, object]] = [(True, fn)]
     while todo:
         is_obj, obj = todo.pop()
@@ -446,9 +452,9 @@ def _parsed_key(page: str, ck: str) -> str:
     return "%s:%s" % (ck, fingerprint(source(page).parse))
 
 
-def _parse_origin(task) -> dict:
+def _parse_origin(task: tuple[str, set[str]]) -> dict[str, list[Row]]:
     origin, want = task
-    out = {}
+    out: dict[str, list[Row]] = {}
     for stamp, page, html in documents({origin: want}):
         try:
             rows = source(page).parse(html, stamp, page)
@@ -459,13 +465,13 @@ def _parse_origin(task) -> dict:
     return out
 
 
-def _parse_all(need: dict[str, set]) -> dict:
+def _parse_all(need: dict[str, set[str]]) -> dict[str, list[Row]]:
     tasks = sorted(need.items())
     if sum(len(v) for v in need.values()) < 24:
         return {k: v for t in tasks for k, v in _parse_origin(t).items()}
     import concurrent.futures as cf
     import multiprocessing as mp
-    out: dict = {}
+    out: dict[str, list[Row]] = {}
     with cf.ProcessPoolExecutor(max(1, (os.cpu_count() or 2) // 2),
                                 mp_context=mp.get_context("fork")) as ex:
         for part in ex.map(_parse_origin, tasks):
@@ -476,7 +482,7 @@ def _parse_all(need: dict[str, set]) -> dict:
 class Sigs:
 
     def __init__(self) -> None:
-        self._at: dict[tuple, str] = {}
+        self._at: dict[tuple[str, int, int], str] = {}
 
     def of(self, page: str, html: str) -> str:
         k = (page, len(html), hash(html))
@@ -487,7 +493,7 @@ class Sigs:
         return ck
 
 
-def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
+def route(tables: dict[str, list[Row]], rows: list[Row], default: str, stamp: str) -> None:
     for r in rows:
         table = r.get(ROW_TABLE) or default
         d = dict(r)
@@ -496,16 +502,16 @@ def route(tables: dict, rows: list[dict], default: str, stamp: str) -> None:
         tables.setdefault(table, []).append(d)
 
 
-def _content(r: Mapping) -> tuple:
+def _content(r: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
     return tuple(sorted((k, str(v)) for k, v in r.items()
                         if k != "observed_at" and v not in ("", None)))
 
 
-def _store(path: Path, rows: list[dict], spec: Table) -> None:
+def _store(path: Path, rows: list[Row], spec: Table) -> None:
     fields = list(dict.fromkeys(f for r in rows for f in r))
     widen_csv(path, fields)
     if spec.store == "daily":
-        by_day: dict = {}
+        by_day: dict[object, Mapping[str, Any]] = {}
         for r in list(read_csv(path)) + rows:
             k = tuple((r.get(c) or "") for c in spec.key)
             by_day[(k, (r.get("observed_at") or "")[:10]) if all(k)
@@ -674,7 +680,7 @@ def _selftest() -> None:
             written = f.read_text(encoding="utf-8")
             assert written == want, (batches, written)
 
-    out: dict[str, list] = {}
+    out: dict[str, list[Row]] = {}
     route(out, [{"a": "1"}, {ROW_TABLE: "api_standings", "stat": "goals"}],
           "api_teams", "t1")
     assert set(out) == {"api_teams", "api_standings"}, list(out)
@@ -701,10 +707,10 @@ def _selftest() -> None:
                "2026-08-15T1600Z")
     assert due(twice, {}, "2026-08-15T0000Z")
 
-    got = [x.key for x in _by_host([
+    order = [x.key for x in _by_host([
         Source(k, "t", "https://%s/%s" % (k[0], k), lambda *_: [])
         for k in ("a1", "a2", "a3", "b1", "b2")])]
-    assert got == ["a1", "b1", "a2", "b2", "a3"], got
+    assert order == ["a1", "b1", "a2", "b2", "a3"], order
     assert not due(twice, {"m": {"seen": "2026-08-15T2340Z"}},
                    "2026-08-16T0005Z")
 
@@ -728,7 +734,7 @@ def _selftest() -> None:
         == _stamp_of(Path("data/raw/dt=2026-08-15T0940Z")) == "2026-08-15T0940Z"
 
     from ffcore.futbolfantasy import _FIXTURE
-    team = source_for("team_celta")
+    team = source("team_celta")
     base = page_sig(team, _FIXTURE)
     assert base and page_sig(team, "<html></html>") is None
     assert page_sig(team, _FIXTURE.replace(

@@ -18,11 +18,11 @@ from ffcore.source import Source
 __all__ = ["Source", "sources", "source", "source_for"]
 
 
-def _played_matches(calendar_html: str, _context: dict) -> list[Source]:
+def _played_matches(calendar_html: str, _context: dict[str, str]) -> list[Source]:
     return played_sources(calendar_html)
 
 
-def _league_pages(leagues_json: str, _context: dict) -> list[Source]:
+def _league_pages(leagues_json: str, _context: dict[str, str]) -> list[Source]:
     return league_sources(leagues_json)
 
 

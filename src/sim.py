@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Iterable, Sequence
+from datetime import datetime
+from typing import Any
 
 from assemble import universe
-from decide import CONFIDENCE, at_risk, board
+from decide import CONFIDENCE, Board, Move, Universe, at_risk, board
+from ffcore.market import Market
 from ffcore.league import app_fielded
 from ffcore.rules import POSITIONS
 from ffcore.clock import run_now
@@ -14,23 +18,24 @@ from ffcore.tidy import REPORTS
 __all__ = ["report"]
 
 ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
+Doc = dict[str, Any]  # a JSON object of decisions.json
 
 
-def xi_change(marked: list[str], best) -> dict:
-    best = list(best)
-    if len(marked) != len(best) or not marked:
-        return {"legal": False, "in": list(best), "out": []}
-    have, want = set(marked), set(best)
-    return {"legal": True, "in": [k for k in best if k not in have],
+def xi_change(marked: Sequence[str], best: Iterable[str]) -> Doc:
+    eleven = list(best)
+    if len(marked) != len(eleven) or not marked:
+        return {"legal": False, "in": eleven, "out": []}
+    have, want = set(marked), set(eleven)
+    return {"legal": True, "in": [k for k in eleven if k not in have],
             "out": [k for k in marked if k not in want]}
 
 
-def player(m, k) -> dict:
+def player(m: Market, k: str) -> dict[str, str]:
     return {"name": m.shown(k), "pos": m.pos.get(k, "")}
 
 
 def row(what: str, label: str, step: str | None, amount: float | None, done: bool,
-        gain: float | None, per: str, facts: list) -> dict:
+        gain: float | None, per: str, facts: list[tuple[str, Any, str]]) -> Doc:
     """One line of the board, every decision in it made here: the move
     (Action.label), the step it takes in the app and the amount that step
     names, whether it is done, its points (per: "season" or "next") and
@@ -39,7 +44,7 @@ def row(what: str, label: str, step: str | None, amount: float | None, done: boo
             "gain": gain, "per": per, "facts": [f for f in facts if f[1] is not None]}
 
 
-def buy_row(m, r, label: str) -> dict:
+def buy_row(m: Market, r: Move, label: str) -> Doc:
     a = r.action
     placed = m.my_bid.get(a.buy)
     return {**player(m, a.buy), **row(
@@ -49,7 +54,7 @@ def buy_row(m, r, label: str) -> dict:
          ("better off in", round(r.p_better, 3), "seasons"), ("", m.trend.get(a.buy), "trend")])}
 
 
-def sell_row(m, r, k, label: str) -> dict:
+def sell_row(m: Market, r: Move, k: str, label: str) -> Doc:
     """A sale in the plan, there to pay for its buys or a debt: take the
     offer standing on him tonight, or wait for what waiting is worth
     (Market.fetches), or list him; done once nothing is left to do tonight."""
@@ -63,7 +68,7 @@ def sell_row(m, r, k, label: str) -> dict:
          ("offer", None if take else offer, "money")])}
 
 
-def holding(u, b, k) -> dict:
+def holding(u: Universe, b: Board, k: str) -> Doc:
     """One of your players as the board shows him: how he plays, what he
     is worth, what he cost, the points his sale costs per million it
     raises, and the offer standing on him, if any."""
@@ -78,14 +83,12 @@ def holding(u, b, k) -> dict:
             "offer": m.offer.get(k)}
 
 
-def exposed(u) -> list[dict]:
-    m, o = u.market, u.outlook
-    return [{**player(m, k), "clause": m.clause[k],
-             "xi": k in o.xi.players, "season": o.season.get(k, 0.0)}
-            for k in at_risk(u)]
+def exposed(u: Universe) -> list[Doc]:
+    return [{**player(u.market, k), "clause": u.market.clause[k]} for k in at_risk(u)]
 
 
-def report(u, b, fielded: list[str], lock_at=None) -> dict:
+def report(u: Universe, b: Board, fielded: Sequence[str],
+           lock_at: datetime | None = None) -> Doc:
     """The board as the phone shows it; every choice in it is decide.board's.
     The line-up is the plan's: the best eleven once its moves are made,
     against the one fielded now."""
@@ -248,14 +251,14 @@ def _selftest() -> None:
     assert [(d["step"], d["done"]) for d in unlisted["do"] if d["what"] == "sell"] \
         == [("list", False)]
 
-    def sale(offer):
+    def sale(offer: float) -> tuple[Doc, str]:
         mk = replace(ub.market, offer={"dead": offer}, nights_left=2,
                      offer_ratios=(0.9, 1.0, 1.0, 1.1))
         doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead]), [])
         return (next(d for d in doc["do"] if d["what"] == "sell"),
                 doc["ping"].split("; ")[-1])
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
-    def facts(d):
+    def facts(d: Doc) -> dict[str, Any]:
         return {f[0]: f[1] for f in d["facts"]}
     assert (take["step"], take["amount"], take["done"]) == ("take offer", 1.1e6, False)
     assert facts(take)["raises"] == 1.1e6

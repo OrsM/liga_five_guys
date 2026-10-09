@@ -4,7 +4,7 @@ depends on now register a reset with on_reset; set_now calls them."""
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Callable
 
 from ffcore.parse import snapshot_stamp
@@ -12,7 +12,7 @@ from ffcore.parse import snapshot_stamp
 __all__ = ["MADRID", "run_now", "set_now", "on_reset", "shown"]
 
 
-def _madrid():
+def _madrid() -> tzinfo:
     try:
         from zoneinfo import ZoneInfo
         return ZoneInfo("Europe/Madrid")
@@ -23,7 +23,7 @@ def _madrid():
 MADRID = _madrid()
 
 
-_NOW: list = []
+_NOW: list[datetime] = []
 
 _RESETS: list[Callable[[], None]] = []
 
@@ -35,8 +35,10 @@ def on_reset(fn: Callable[[], None]) -> None:
 def run_now() -> datetime:
     if not _NOW:
         pinned = os.environ.get("LFG_NOW", "").strip()
-        _NOW.append(snapshot_stamp(pinned) if pinned
-                    else datetime.now(timezone.utc))
+        when = snapshot_stamp(pinned) if pinned else datetime.now(timezone.utc)
+        if when is None:
+            raise ValueError("LFG_NOW=%r is not a time (2026-10-07T0934Z)" % pinned)
+        _NOW.append(when)
     return _NOW[0]
 
 
@@ -46,7 +48,7 @@ def set_now(when: datetime | None) -> None:
         reset()
 
 
-def shown(t=None, fmt: str = "%Y-%m-%d %H:%M") -> str:
+def shown(t: datetime | None = None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     when = run_now() if t is None else t
     return when.astimezone(MADRID).strftime(fmt + " %Z")
 

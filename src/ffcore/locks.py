@@ -17,12 +17,12 @@ def lock_order(locks: dict[int, datetime]) -> list[int]:
 class JornadaClock:
 
     def __init__(self, matches: Rows):
-        latest: dict[tuple, tuple[int, datetime]] = {}
+        latest: dict[tuple[str, str], tuple[int, datetime]] = {}
         for m in sorted(matches, key=lambda r: r.get("observed_at", "")):
             when = kickoff_stamp(m.get("kickoff"))
             jor = m.get("jornada")
             if when is not None and jor is not None:
-                latest[(m.get("home"), m.get("away"))] = (jor, when)
+                latest[(m.get("home") or "", m.get("away") or "")] = (jor, when)
         self.team_locks: dict[tuple[int, str], datetime] = {}
         for (home, away), (jor, when) in latest.items():
             for team in (home, away):

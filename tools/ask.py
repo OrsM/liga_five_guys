@@ -12,13 +12,15 @@ it agrees with the board. Nothing here decides anything a second way.
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
+from typing import Any
 from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from assemble import scorer, universe  # noqa: E402
-from decide import (FUNNEL, Action, Move, Universe, blocked, board, joint,  # noqa: E402
+from decide import (FUNNEL, Action, Board, Move, Universe, blocked, board, joint,  # noqa: E402
                     plan, raised, verdict)
 from ffcore.names import Name  # noqa: E402
 from ffcore.text import resolve  # noqa: E402
@@ -29,9 +31,9 @@ from ffcore.forecast import expected_points  # noqa: E402
 from ffcore.tidy import LINEUP_SOURCE, current  # noqa: E402
 
 
-def find(u, words: list[str]) -> str | None:
-    """The player these words name, by text.resolve over his Name: exact,
-    then whole words, then every word; None, saying who matched, if not one."""
+def find(u: Universe, words: list[str]) -> str | None:
+    """The player these words name, by text.resolve over his Name; None,
+    saying who matched, if not one."""
     want = " ".join(words)
     rows = [{"name": n.raw, "key": k} for k, n in u.market.name.items() if n]
     row, hits = resolve(want, rows)
@@ -42,23 +44,23 @@ def find(u, words: list[str]) -> str | None:
     return None
 
 
-def step(fn, why: str) -> str:
+def step(fn: Callable[..., Any], why: str) -> str:
     return "%d/%d %s: %s" % (FUNNEL.index(fn) + 1, len(FUNNEL), fn.__name__, why)
 
 
-def show(u, mv) -> str:
+def show(u: Universe, mv: Move) -> str:
     names = u.market.names
     return "%s: %+.1f points (%+.2f a million), better off in %.0f%% of seasons" % (
         mv.action.label(names), mv.d_pts, mv.per_million, 100 * mv.p_better)
 
 
-def not_offered(u, k: str) -> str:
+def not_offered(u: Universe, k: str) -> str:
     """Why candidates() has no move for him, or "" if it has."""
     no = u.why_not(k)
     return step(Universe.candidates, no) if no else ""
 
 
-def fate(u, b, r) -> str:
+def fate(u: Universe, b: Board, r: Move) -> str:
     """Where a ranked move stopped: at verdict, or at plan and why. The plan
     last tried every move it left out against all of itself, paid for."""
     if r in b.plan:
@@ -77,7 +79,7 @@ def fate(u, b, r) -> str:
             total.d_pts, b.gain)))
 
 
-def why(u, k: str) -> None:
+def why(u: Universe, k: str) -> None:
     b = board(u)
     if k in u.mine:
         h, sale = holding(u, b, k), b.sale(k)
@@ -98,7 +100,7 @@ def why(u, k: str) -> None:
     print(fate(u, b, r))
 
 
-def whatif(u, words: list[str]) -> None:
+def whatif(u: Universe, words: list[str]) -> None:
     """buy X [sell Y ...] or sell Y: scored as rank scores any move."""
     m, cut = u.market, [i for i, w in enumerate(words) if w in ("buy", "sell")]
     parts = {words[i]: words[i + 1:j] for i, j in zip(cut, cut[1:] + [len(words)])}
@@ -113,10 +115,11 @@ def whatif(u, words: list[str]) -> None:
         k = find(u, parts["buy"])
         if k is None:
             return
-        if gone := not_offered(u, k):
-            print(gone)
+        bought = u.acquire(k)
+        if bought is None:
+            print(not_offered(u, k))
             return
-        a = u.acquire(k)
+        a = bought
     if sold:
         a = replace(a, sell=(sold, ), proceeds=m.fetches(sold))
     mv = u.rank([a]).rows[0]
@@ -127,7 +130,7 @@ def whatif(u, words: list[str]) -> None:
           if mv in picked else fate(u, b, mv))
 
 
-def forecast(u, k: str, ahead: int) -> None:
+def forecast(u: Universe, k: str, ahead: int) -> None:
     """His expected points as the model builds them, jornada by jornada:
     points per match x fixture x chance picked if fit x chance fit."""
     m = u.market
@@ -163,6 +166,7 @@ def forecast(u, k: str, ahead: int) -> None:
     print("fit: %s" % ("not flagged" if not status else "%s, prognosis %s" % (status, prog)))
 
     first = u.first_jornada_of.get(k)
+    assert first is not None, "forecast players all have a first jornada"
     dates = jornada_dates(current("matches"), u.state.jornadas)
     print("\n%-4s %-10s %6s %7s %7s %6s %6s %8s  %s" % (
         "J", "date", "pts", "fixture", "picked", "fit", "plays", "expected", "why fit"))

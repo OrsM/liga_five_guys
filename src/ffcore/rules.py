@@ -3,10 +3,13 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["POSITIONS", "slot", "MAX_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
+__all__ = ["Squad", "Squads", "POSITIONS", "slot", "MAX_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
            "MATCH_LEN", "minutes_played"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
+
+Squad = dict[str, str]     # player: position
+Squads = dict[str, Squad]  # manager: squad
 
 _SLOT = {
     "portero": "POR",
@@ -26,7 +29,7 @@ SHAPES = [dict(zip(POSITIONS, (1, d, m, f))) for d, m, f in FREE_FORMATIONS]
 MAX_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(max, zip(*FREE_FORMATIONS))))}
 
 
-def shortfall(squad: dict[str, str]) -> dict[str, int]:
+def shortfall(squad: Squad) -> dict[str, int]:
     """The players a squad (player: position) is short of the nearest
     formation, by position: empty when it can field one. On a tie, the
     first formation in FREE_FORMATIONS."""
@@ -37,7 +40,7 @@ def shortfall(squad: dict[str, str]) -> dict[str, int]:
                key=lambda short: sum(short.values()))
 
 
-def slot(raw) -> str:
+def slot(raw: str | None) -> str:
     """A position as the game writes it (portero, Centrocampista, MED...)
     as one of POSITIONS, or "" if it is none of them."""
     t = (raw or "").strip()

@@ -1,12 +1,14 @@
 
 from __future__ import annotations
 
-import csv
 import os
+from collections.abc import Iterable, Mapping
+from pathlib import Path
+from typing import Any
 from dataclasses import dataclass, field
 
 from ffcore.names import AppId, Name, PlayerKey
-from ffcore.tidy import write_csv
+from ffcore.tidy import read_csv, write_csv
 
 __all__ = ["Player", "Crosswalk", "PLAYER_COLS"]
 
@@ -14,24 +16,24 @@ PLAYER_COLS = ["player_id", "name", "club_id", "ff_slug", "app_id",
                "app_names"]
 
 
-def _join(vals) -> str:
+def _join(vals: Iterable[str]) -> str:
     return "|".join(sorted({v for v in vals if v}))
 
 
-def _split(cell) -> set:
+def _split(cell: str | None) -> set[str]:
     return {v for v in (cell or "").split("|") if v}
 
 
 @dataclass
 class Player:
-    player_id: str
+    player_id: PlayerKey
     name: str = ""
     club_id: str = ""
     ff_slug: str = ""
-    app_id: str = ""
-    app_names: set = field(default_factory=set)
+    app_id: AppId = AppId("")
+    app_names: set[str] = field(default_factory=set)
 
-    def row(self) -> dict:
+    def row(self) -> dict[str, str]:
         return {"player_id": self.player_id, "name": self.name,
                 "club_id": self.club_id,
                 "ff_slug": self.ff_slug, "app_id": self.app_id,
@@ -40,7 +42,7 @@ class Player:
 
 class Crosswalk:
 
-    def __init__(self, players=None):
+    def __init__(self, players: Mapping[str, Player] | None = None) -> None:
         self.players: dict[str, Player] = dict(players or {})
         self._reindex()
 
@@ -48,8 +50,8 @@ class Crosswalk:
     def _reindex(self) -> None:
         self._by_ff: dict[str, PlayerKey] = {}
         self._by_app: dict[str, PlayerKey] = {}
-        self._clash: dict[str, set] = {}
-        names: dict[str, set] = {}
+        self._clash: dict[str, set[str]] = {}
+        names: dict[str, set[str]] = {}
         for p in self.players.values():
             if p.name:
                 names.setdefault(Name(p.name).key, set()).add(p.player_id)
@@ -68,7 +70,7 @@ class Crosswalk:
         self._by_name = {n: PlayerKey(next(iter(ids))) for n, ids in names.items()
                          if len(ids) == 1}
 
-    def clashes(self) -> dict:
+    def clashes(self) -> dict[str, list[str]]:
         return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
 
     def player(self, *, name: str | None = None, ff_slug: str | None = None,
@@ -82,7 +84,7 @@ class Crosswalk:
             return PlayerKey(k)
         return self._by_name.get(k)
 
-    def key_of(self, r) -> PlayerKey | None:
+    def key_of(self, r: Mapping[str, Any]) -> PlayerKey | None:
         fid = (r.get("ff_id") or "").strip()
         if fid in self.players:
             return PlayerKey(fid)
@@ -91,43 +93,36 @@ class Crosswalk:
                            or r.get("player_name"))
 
 
-    def coverage(self) -> dict:
+    def coverage(self) -> dict[str, float]:
         n = len(self.players) or 1
         return {"players": len(self.players),
                 "ff": sum(1 for p in self.players.values() if p.ff_slug) / n,
                 "app": sum(1 for p in self.players.values() if p.app_id) / n}
 
     @classmethod
-    def read(cls, players_path) -> "Crosswalk":
+    def read(cls, players_path: str | Path) -> Crosswalk:
         players = {}
-        for r in _rows(players_path):
+        for r in read_csv(players_path):
             pid = r.get("player_id")
             if pid:
                 players[pid] = Player(
-                    pid, r.get("name", ""), r.get("club_id", ""),
-                    r.get("ff_slug", ""), r.get("app_id", ""),
+                    PlayerKey(pid), r.get("name", ""), r.get("club_id", ""),
+                    r.get("ff_slug", ""), AppId(r.get("app_id", "")),
                     _split(r.get("app_names")))
         return cls(players)
 
-    def write(self, players_path) -> None:
+    def write(self, players_path: str | Path) -> None:
         write_csv(players_path, [p.row() for p in sorted(
             self.players.values(), key=lambda p: p.player_id)], PLAYER_COLS)
-
-
-def _rows(path) -> list[dict]:
-    if not path or not os.path.exists(path):
-        return []
-    with open(path, newline="", encoding="utf-8") as fh:
-        return list(csv.DictReader(fh))
 
 
 def _selftest() -> None:
     xw = Crosswalk({
         "alvaro fernandez": Player(
-            "alvaro fernandez", "Alvaro Fernandez", "espanyol",
-            "alvaro-fernandez", "2101",
+            PlayerKey("alvaro fernandez"), "Alvaro Fernandez", "espanyol",
+            "alvaro-fernandez", AppId("2101"),
             app_names={"A. Ferllo"}),
-        "jonny castro": Player("jonny castro", "Jonny Castro", "alaves",
+        "jonny castro": Player(PlayerKey("jonny castro"), "Jonny Castro", "alaves",
                                ff_slug="jonny-castro",
                                app_names={"Jonny Otto"}),
     })
@@ -139,12 +134,12 @@ def _selftest() -> None:
     assert xw.player() is None
 
     clash = Crosswalk({
-        "carlos romero": Player("carlos romero", app_id="2614"),
-        "isaac romero": Player("isaac romero", app_id="2614")})
+        "carlos romero": Player(PlayerKey("carlos romero"), app_id=AppId("2614")),
+        "isaac romero": Player(PlayerKey("isaac romero"), app_id=AppId("2614"))})
     assert clash.player(app_id=AppId("2614")) is None
     assert clash.clashes() == {"app_id": ["2614"]}, clash.clashes()
-    solo = Crosswalk({"carlos romero": Player("carlos romero", app_id="2614"),
-                      "isaac romero": Player("isaac romero")})
+    solo = Crosswalk({"carlos romero": Player(PlayerKey("carlos romero"), app_id=AppId("2614")),
+                      "isaac romero": Player(PlayerKey("isaac romero"))})
     assert solo.player(app_id=AppId("2614")) == "carlos romero"
     assert solo.clashes() == {}
 
@@ -164,9 +159,9 @@ def _selftest() -> None:
     assert cov["ff"] == 1.0, cov
 
     named = Crosswalk({
-        "867": Player("867", "Álvaro García", ff_slug="alvaro-garcia"),
-        "12993": Player("12993", "Álvaro García"),
-        "132": Player("132", "Sergio Canales")})
+        "867": Player(PlayerKey("867"), "Álvaro García", ff_slug="alvaro-garcia"),
+        "12993": Player(PlayerKey("12993"), "Álvaro García"),
+        "132": Player(PlayerKey("132"), "Sergio Canales")})
     rows = [
         ({"player_slug": "alvaro-garcia", "player_name": "x"}, "867"),
         ({"player_slug": "gone", "player_name": "Álvaro García"}, None),

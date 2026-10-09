@@ -3,6 +3,9 @@ jornada a match belongs to, read from the matches table."""
 from __future__ import annotations
 
 
+from datetime import datetime
+from functools import cache
+
 from ffcore.clock import on_reset, run_now
 from ffcore.locks import JornadaClock
 from ffcore.tidy import current, history
@@ -10,53 +13,39 @@ from ffcore.tidy import current, history
 __all__ = ["clock", "clock_history", "jornada_of_match", "load_deadline"]
 
 
-_CLOCK: list = []
-
-
-_CLOCK_HISTORY: list = []
-
-
+@cache
 def clock() -> JornadaClock:
-    if not _CLOCK:
-        _CLOCK.append(JornadaClock(current("matches")))
-    return _CLOCK[0]
+    return JornadaClock(current("matches"))
 
 
+@cache
 def clock_history() -> JornadaClock:
-    if not _CLOCK_HISTORY:
-        rows = history("matches")
-        dated = {(r.get("home"), r.get("away")) for r in rows if r.get("kickoff")}
-        blind = {r["jornada"] for r in rows
-                 if r.get("score") and r.get("jornada") is not None
-                 and (r.get("home"), r.get("away")) not in dated}
-        full = JornadaClock(rows)
-        full.round_locks = {j: t for j, t in full.round_locks.items()
-                            if j not in blind}
-        _CLOCK_HISTORY.append(full)
-    return _CLOCK_HISTORY[0]
+    rows = history("matches")
+    dated = {(r.get("home"), r.get("away")) for r in rows if r.get("kickoff")}
+    blind = {r["jornada"] for r in rows
+             if r.get("score") and r.get("jornada") is not None
+             and (r.get("home"), r.get("away")) not in dated}
+    full = JornadaClock(rows)
+    full.round_locks = {j: t for j, t in full.round_locks.items() if j not in blind}
+    return full
 
 
-_JORNADA_OF_MATCH: list = []
-
-
+@cache
 def jornada_of_match() -> dict[str, int]:
-    if not _JORNADA_OF_MATCH:
-        out: dict[str, int] = {}
-        for m in current("matches"):
-            mid = (m.get("match_id") or "").strip()
-            if mid and mid not in out and m.get("jornada") is not None:
-                out[mid] = m["jornada"]
-        _JORNADA_OF_MATCH.append(out)
-    return _JORNADA_OF_MATCH[0]
+    out: dict[str, int] = {}
+    for m in current("matches"):
+        mid = (m.get("match_id") or "").strip()
+        if mid and mid not in out and m.get("jornada") is not None:
+            out[mid] = m["jornada"]
+    return out
 
 
-def load_deadline(with_source: bool = False):
-    when = clock().next_deadline(run_now())
-    return (when, "calendar" if when else "none") if with_source else when
+def load_deadline() -> datetime | None:
+    return clock().next_deadline(run_now())
 
 
-for _cache in (_CLOCK, _CLOCK_HISTORY, _JORNADA_OF_MATCH):
-    on_reset(_cache.clear)
+for _cached in (clock, clock_history, jornada_of_match):
+    on_reset(_cached.cache_clear)
 
 
 def _selftest() -> None:

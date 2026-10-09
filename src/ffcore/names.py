@@ -4,7 +4,8 @@ name. PlayerKey (our id, the crosswalk's) and AppId (the LaLiga app's)
 are distinct types, so mypy refuses one where the other belongs."""
 from __future__ import annotations
 
-from typing import NewType
+from collections.abc import Mapping
+from typing import Any, NewType
 
 from ffcore.parse import text
 from ffcore.text import norm
@@ -52,14 +53,14 @@ class Name:
         return "Name(%r)" % self.raw
 
 
-def row_key(row, cols: tuple[str, ...] = ("name",)) -> PlayerKey:
+def row_key(row: Mapping[str, Any], cols: tuple[str, ...] = ("name",)) -> PlayerKey:
     """The player a source's row is about: its own ff_id, else the key of
     the first of its name columns present; "" if neither."""
     fid = (row.get("ff_id") or "").strip()
     return PlayerKey(fid or next((n.key for c in cols if (n := Name(row.get(c)))), ""))
 
 
-def app_id(row) -> AppId:
+def app_id(row: Mapping[str, Any]) -> AppId:
     """The LaLiga app's id for the player an app row (api_teams, api_market,
     api_activity, api_lineup...) is about: its player_id column."""
     return AppId(text(row, "player_id"))

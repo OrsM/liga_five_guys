@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable, Sequence
+from typing import Any
+
+from ffcore.parse import Row
 
 from ffcore.source import Source, _once, _rebuild
 
@@ -42,23 +46,23 @@ ACT_KIND = {ACT_JOINED: "joined", ACT_BUY: "buy", ACT_SELL: "sell",
            ACT_TRANSFER: "transfer"}
 
 
-def _j(text: str):
+def _j(text: str) -> Any:
     try:
         return json.loads(text or "")
     except (ValueError, TypeError):
         return None
 
 
-def _j_dict(text: str) -> dict | None:
+def _j_dict(text: str) -> dict[str, Any] | None:
     d = _j(text)
     return d if isinstance(d, dict) else None
 
 
-def _pm(item: dict) -> dict:
+def _pm(item: dict[str, Any]) -> dict[str, Any]:
     return (item or {}).get("playerMaster") or {}
 
 
-def _player_identity(pm: dict) -> dict:
+def _player_identity(pm: dict[str, Any]) -> dict[str, str]:
     nick, name = pm.get("nickname") or "", pm.get("name") or ""
     return {
         "player_id": str(pm.get("id") or ""),
@@ -69,8 +73,9 @@ def _player_identity(pm: dict) -> dict:
     }
 
 
-def _parse_json_list(text: str, observed_at: str, row_fn, *args,
-                     if_empty=()) -> list[dict]:
+def _parse_json_list(text: str, observed_at: str,
+                     row_fn: Callable[..., list[Row]], *args: Any,
+                     if_empty: Sequence[Row] = ()) -> list[Row]:
     d = _j(text)
     if not isinstance(d, list):
         return []
@@ -79,7 +84,7 @@ def _parse_json_list(text: str, observed_at: str, row_fn, *args,
             for row in rows]
 
 
-def _league_row(lg) -> list[dict]:
+def _league_row(lg: dict[str, Any]) -> list[Row]:
     if not lg.get("id"):
         return []
     t = lg.get("team") or {}
@@ -93,11 +98,11 @@ def _league_row(lg) -> list[dict]:
 
 
 def parse_api_leagues(text: str, observed_at: str,
-                      key: str = "api_leagues") -> list[dict]:
+                      key: str = "api_leagues") -> list[Row]:
     return _parse_json_list(text, observed_at, _league_row)
 
 
-def _market_row(it) -> list[dict]:
+def _market_row(it: dict[str, Any]) -> list[Row]:
     pm = _pm(it)
     if not pm.get("id"):
         return []
@@ -122,14 +127,14 @@ def _market_row(it) -> list[dict]:
 
 
 def parse_api_market(text: str, observed_at: str,
-                     key: str = "api_market") -> list[dict]:
+                     key: str = "api_market") -> list[Row]:
     return _parse_json_list(text, observed_at, _market_row)
 
 
-def _activity_row(a) -> list[dict]:
+def _activity_row(a: dict[str, Any]) -> list[Row]:
     if not a.get("id"):
         return []
-    kind = ACT_KIND.get(a.get("activityTypeId")) \
+    kind = ACT_KIND.get(a.get("activityTypeId") or 0) \
         or ("unknown:%s" % a.get("activityTypeId"))
     return [{
         "activity_id": str(a["id"]),
@@ -144,11 +149,11 @@ def _activity_row(a) -> list[dict]:
 
 
 def parse_api_activity(text: str, observed_at: str,
-                       key: str = "api_activity") -> list[dict]:
+                       key: str = "api_activity") -> list[Row]:
     return _parse_json_list(text, observed_at, _activity_row)
 
 
-def _team_rows(t, observed_at: str) -> list[dict]:
+def _team_rows(t: dict[str, Any], observed_at: str) -> list[Row]:
     out = []
     m = t.get("manager") or {}
     if t.get("id"):
@@ -186,7 +191,7 @@ def _team_rows(t, observed_at: str) -> list[dict]:
 
 
 def parse_api_teams(text: str, observed_at: str,
-                    key: str = "api_teams") -> list[dict]:
+                    key: str = "api_teams") -> list[Row]:
     return _parse_json_list(text, observed_at, _team_rows, observed_at)
 
 
@@ -197,7 +202,7 @@ LINEUP_WEEK_RE = re.compile(r"api_lineup_(\d+)$")
 
 
 def parse_api_lineup(text: str, observed_at: str,
-                     key: str = "api_lineup_1") -> list[dict]:
+                     key: str = "api_lineup_1") -> list[Row]:
     d = _j_dict(text)
     if d is None:
         return []
@@ -229,7 +234,7 @@ def parse_api_lineup(text: str, observed_at: str,
 API_PLAYERS_ALL_URL = "{base}/v1/competition/1/players?x-lang=es"
 
 
-def _player_all_row(p) -> list[dict]:
+def _player_all_row(p: dict[str, Any]) -> list[Row]:
     if not p.get("id"):
         return []
     return [{"team_id": str(p.get("teamId") or ""), **_player_identity(p),
@@ -237,7 +242,7 @@ def _player_all_row(p) -> list[dict]:
 
 
 def parse_api_players_all(text: str, observed_at: str,
-                          key: str = "api_players_all") -> list[dict]:
+                          key: str = "api_players_all") -> list[Row]:
     return _parse_json_list(text, observed_at, _player_all_row)
 
 
@@ -246,7 +251,7 @@ API_OFFER_URL = ("{base}/v1/competition/1/league/{league}/playerTeam/{ptid}"
 API_OFFER_KEY_RE = re.compile(r"^api_offer_(\d+)$")
 
 
-def _offer_row(it, ptid: str) -> list[dict]:
+def _offer_row(it: dict[str, Any], ptid: str) -> list[Row]:
     if not it.get("id"):
         return []
     return [{
@@ -260,7 +265,7 @@ def _offer_row(it, ptid: str) -> list[dict]:
 
 
 def parse_api_offer(text: str, observed_at: str,
-                    key: str = "api_offer_0") -> list[dict]:
+                    key: str = "api_offer_0") -> list[Row]:
     m = API_OFFER_KEY_RE.match(key or "")
     ptid = m.group(1) if m else ""
     if not ptid:
@@ -308,8 +313,8 @@ def api_source(key: str) -> Source | None:
     return None
 
 
-def _offers_for(league: str):
-    def follow(teams_json: str, context: dict) -> list[Source]:
+def _offers_for(league: str) -> Callable[[str, dict[str, str]], list[Source]]:
+    def follow(teams_json: str, context: dict[str, str]) -> list[Source]:
         return offer_sources(teams_json, context["me"], league)
     return follow
 

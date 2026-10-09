@@ -6,15 +6,18 @@ import math
 import statistics
 import json
 import sys
+from collections.abc import Callable
+from typing import Any
 from pathlib import Path
 
 from ffcore.forecast import expected_points
 from ffcore.schedule import expectations
 from ffcore.jornadas import clock_history
 from ffcore.points import scored
+from ffcore.score import JornadaPoints, points_by_jornada
 
 from assemble import fixture_ratings, scorer, universe
-from decide import board, verdict
+from decide import Action, board, verdict
 from ffcore.clock import set_now
 from ffcore.pricing import Momentum, _ahead, grade, steps
 from ffcore.tidy import LINEUP_SOURCE, current, history
@@ -23,15 +26,8 @@ __all__ = ["backtest", "compare", "decisions", "persistence", "score_forecast"]
 TOP_N = 50
 
 
-def _jornada_points() -> dict[tuple, float]:
-    out: dict[tuple, float] = {}
-    for s in scored():
-        out[s.key, s.jornada] = out.get((s.key, s.jornada), 0.0) + s.pts
-    return out
-
-
-def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
-                   j: int) -> dict:
+def score_forecast(pred: dict[str, float], actual: JornadaPoints,
+                   j: int) -> dict[str, Any]:
     errs = [p - actual.get((k, j), 0.0) for k, p in pred.items()]
     top = sorted(pred, key=lambda k: pred[k], reverse=True)[:TOP_N]
     return {"n": len(errs),
@@ -41,12 +37,12 @@ def score_forecast(pred: dict[str, float], actual: dict[tuple, float],
                     if top else None)}
 
 
-def backtest(ahead: int = 0) -> list[dict]:
+def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     """Rebuild the forecast at each past lock and score it against what was
     scored: the jornada it locks and, with ahead, the next ones too. Each row
     also scores the players listed injured, doubtful or suspended then."""
     locks = clock_history().round_locks
-    actual = _jornada_points()
+    actual = points_by_jornada(scored())
     done = {j for _k, j in actual}
     out = []
     try:
@@ -70,7 +66,7 @@ def backtest(ahead: int = 0) -> list[dict]:
     return out
 
 
-def decisions() -> list[dict]:
+def decisions() -> list[dict[str, Any]]:
     """Rebuild each past lock's board with this code and set every ranked
     move against what its players then scored: the change in points it
     forecast (players got minus players sold) over the jornadas played
@@ -78,7 +74,7 @@ def decisions() -> list[dict]:
     to gain (bought) or lose (sold) over the price horizon, in millions,
     against what they did."""
     locks = clock_history().round_locks
-    actual = _jornada_points()
+    actual = points_by_jornada(scored())
     done = {j for _k, j in actual}
     prices = steps(history("market"))
     out = []
@@ -96,16 +92,16 @@ def decisions() -> list[dict]:
             h = Momentum(steps(history("market"))).horizon
             day = locks[i].strftime("%Y-%m-%d")
 
-            def rose(k) -> float:
+            def rose(k: str) -> float:
                 s = prices.get(k, [])
                 at = max((n for n, (d, _) in enumerate(s) if d <= day), default=None)
                 return 0.0 if at is None or at + h >= len(s) else _ahead(s, at, h)
 
-            def worth(a, pct) -> float:
+            def worth(a: Action, pct: Callable[[str], float]) -> float:
                 return (m.value.get(a.buy, 0.0) * pct(a.buy) - sum(
                     m.value.get(k, 0.0) * pct(k) for k in a.sell)) / 100e6
 
-            def change(a, pts) -> float:
+            def change(a: Action, pts: Callable[[str, int], float]) -> float:
                 return sum(pts(a.buy, j) for j in later) - sum(
                     pts(k, j) for k in a.sell for j in later)
             for r in b.rows:
@@ -127,7 +123,7 @@ def decisions() -> list[dict]:
 
 
 def persistence(preds: dict[int, dict[str, float]],
-                actual: dict[tuple, float]) -> float:
+                actual: JornadaPoints) -> float:
     by: dict[str, list[tuple[float, float]]] = {}
     for j, pred in preds.items():
         for k, e in pred.items():
@@ -141,11 +137,12 @@ def persistence(preds: dict[int, dict[str, float]],
     return math.sqrt(max(0.0, num) / den) if den else 0.0
 
 
-def compare(a: dict[str, dict], b: dict[str, dict]) -> list[dict]:
+def compare(a: dict[str, dict[str, float]], b: dict[str, dict[str, float]]
+            ) -> list[dict[str, Any]]:
     """Two backtests' next-jornada forecasts, jornada by jornada. Keys are
     'from>jornada' (or a bare jornada, from older files)."""
-    actual = _jornada_points()
-    def nxt(d):
+    actual = points_by_jornada(scored())
+    def nxt(d: dict[str, dict[str, float]]) -> dict[int, dict[str, float]]:
         return {int(k.split(">")[-1]): v for k, v in d.items()
                 if ">" not in k or len(set(k.split(">"))) == 1}
     na, nb = nxt(a), nxt(b)
@@ -190,7 +187,7 @@ if __name__ == "__main__":
             print("j%-2d n=%3d rmse %.3f bias %+.3f top%d %.2f"
                   % (r["jornada"], r["n"], r["rmse"], r["bias"], TOP_N, r["top"]))
         print("persistent share of a player's expectation: %.2f" % persistence(
-            {r["jornada"]: r["pred"] for r in first}, _jornada_points()))
+            {r["jornada"]: r["pred"] for r in first}, points_by_jornada(scored())))
         for d in range(h + 1):
             rows = [r for r in runs if r["jornada"] - r["from"] == d]
             f = [r["flagged"] for r in rows if r["flagged"]["n"]]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Mapping, NamedTuple
 
-from ffcore.forecast import Bootstrap, expected_points
+from ffcore.forecast import Bootstrap, Cell, expected_points
 from ffcore.season import LeagueState, best_xi
 
 __all__ = ["Outlook", "XI"]
@@ -31,7 +31,7 @@ class Outlook:
         self.first_jornada_of = first_jornada_of or {}
 
     @cached_property
-    def next_up(self) -> dict[str, tuple[float, float]]:
+    def next_up(self) -> dict[str, Cell]:
         per_j = self.forecaster.per_jornada
         if not self.first_jornada_of:
             j = next((j for j in self.state.jornadas

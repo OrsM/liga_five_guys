@@ -2,32 +2,34 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterable
 
 
-from ffcore.parse import text
+from ffcore.parse import Rows, text
 from ffcore.crosswalk import Crosswalk, Player
-from ffcore.names import AppId, Name, app_id, row_key
+from ffcore.names import AppId, Name, PlayerKey, app_id, row_key
 from ffcore.text import tokens
 from ffcore.tidy import current, history, TIDY
 
 PLAYERS = "players.csv"
 
 
-def group_by_name(players) -> dict[str, list]:
-    out: dict[str, list] = {}
+def group_by_name(players: Iterable[Player]) -> dict[str, list[Player]]:
+    out: dict[str, list[Player]] = {}
     for p in players:
         out.setdefault(Name(p.name).key, []).append(p)
     return out
 
 
-def _named(named: dict, name: str, club: str = ""):
+def _named(named: dict[str, list[Player]], name: str | None, club: str = "") -> Player | None:
     hits = named.get(Name(name).key) or []
     if len(hits) != 1 and club:
         hits = [p for p in hits if p.club_id == club]
     return hits[0] if len(hits) == 1 else None
 
 
-def build_players(registry: dict, market, lineups, api_rows) -> dict:
+def build_players(registry: dict[str, Player], market: Rows, lineups: Rows,
+                  api_rows: Rows) -> dict[str, Player]:
     out = dict(registry)
     for r in market:
         pid = row_key(r)
@@ -40,28 +42,27 @@ def build_players(registry: dict, market, lineups, api_rows) -> dict:
 
     for r in lineups:
         slug = text(r, "player_slug")
-        p = _named(named, r.get("player_name"), r.get("team_slug") or "")
-        if p is not None and slug and not p.ff_slug:
-            p.ff_slug = slug
+        hit = _named(named, r.get("player_name"), r.get("team_slug") or "")
+        if hit is not None and slug and not hit.ff_slug:
+            hit.ff_slug = slug
 
-    value = {row_key(r): r.get("value") for r in market}
+    value: dict[str, float | None] = {row_key(r): r.get("value") for r in market}
     app = {app_id(r): r for r in api_rows}
     words = {pid: set(tokens(p.name)) for pid, p in out.items()}
-    weak = set()
-    for pid, p in out.items():
-        r = app.get(p.app_id)
-        if r is None:
+    weak: set[str] = set()
+    for key, p in out.items():
+        row = app.get(p.app_id)
+        if row is None:
             continue
-        ratio = ((r.get("market_value") or 0) / value[pid]
-                 if value.get(pid) else 1.0)
-        related = {w[:4] for w in words[pid]} & {
-            w[:4] for w in tokens(r.get("player_name"))}
+        ratio = ((row.get("market_value") or 0) / v if (v := value.get(key)) else 1.0)
+        related = {w[:4] for w in words[key]} & {
+            w[:4] for w in tokens(row.get("player_name"))}
         if not (0.8 < ratio < 1.25 or (related and 0.5 < ratio < 2.0)):
             print("  app id %s (%s) dropped from %s: the app's name and value "
-                  "disagree" % (p.app_id, r.get("player_name"), p.name))
-            p.app_id = ""
+                  "disagree" % (p.app_id, row.get("player_name"), p.name))
+            p.app_id = AppId("")
         elif not related:
-            weak.add(pid)
+            weak.add(key)
 
     held = {p.app_id for p in out.values() if p.app_id}
     for aid, r in app.items():
@@ -140,8 +141,8 @@ def _selftest() -> None:
             "market_value": "5100000"},
            {"player_name": "Fornals", "player_id": "99",
             "market_value": "40000000"}])
-    got = build_players({"c": Player("c", app_id="2929"),
-                         "gone": Player("gone", "Left The League")},
+    got = build_players({"c": Player(PlayerKey("c"), app_id=AppId("2929")),
+                         "gone": Player(PlayerKey("gone"), "Left The League")},
                         twins, [], api)
     assert {k: p.app_id for k, p in got.items()} == \
         {"a": "12", "b": "", "c": "1715", "gone": ""}, got

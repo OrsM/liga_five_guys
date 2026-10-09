@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import configparser
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 import sys
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from ffcore.parse import money, text
+from ffcore.parse import Rows, money, text
 from ffcore.players import load_crosswalk
 from ffcore.tidy import current, history, input_path
 
@@ -34,22 +34,23 @@ def load_config(name: str = "league.ini") -> Config:
         budget=money(cp.get("league", "budget", fallback=str(base.budget))) or 0.0)
 
 
-def app_fielded(squad, names: dict[str, Name], rows=None, xw=None) -> list[str]:
+def app_fielded(squad: Iterable[str], names: Mapping[str, Name], rows: Rows | None = None,
+                xw: Crosswalk | None = None) -> list[str]:
     """Your eleven as the app has it, as our keys: by app id, else by name;
     [] if any of them is not in your squad."""
     rows = current("api_lineup") if rows is None else rows
-    xw = xw or load_crosswalk() or Crosswalk()
-    squad = set(squad)
-    by_name = {names.get(k) or Name(k): k for k in squad}
-    out = []
+    xw = xw or load_crosswalk()
+    mine = set(squad)
+    by_name = {names.get(k) or Name(k): k for k in mine}
+    out: list[str] = []
     for r in rows or []:
-        key = xw.player(app_id=app_id(r))
+        key: str | None = xw.player(app_id=app_id(r))
         if key is None:
             for field in ("player_name", "player_name_full"):
                 key = by_name.get(Name(r.get(field)))
                 if key:
                     break
-        if not key or key not in squad:
+        if not key or key not in mine:
             return []
         out.append(key)
     return out
@@ -63,7 +64,7 @@ class Entry(NamedTuple):
     kind: str
     who: str | None
     other: str | None
-    key: str | None
+    key: PlayerKey | None
     amount: float
 
     @property
@@ -78,8 +79,8 @@ class Entry(NamedTuple):
         return {"sell": self.who, "transfer": self.other}.get(self.kind)
 
 
-def ledger(activity, users: dict, key_of: Callable[[AppId], PlayerKey | None],
-           seen=()) -> list[Entry]:
+def ledger(activity: Rows, users: Mapping[str, str], key_of: Callable[[AppId], PlayerKey | None],
+           seen: Rows = ()) -> list[Entry]:
     """The activity feed read once, each event once, completed by the squads
     seen (api_teams history): the feed leaves out some exits, so those are
     sales at the player's last value (_unrecorded_exits). Oldest first."""
@@ -91,32 +92,32 @@ def ledger(activity, users: dict, key_of: Callable[[AppId], PlayerKey | None],
     return sorted(feed + _unrecorded_exits(feed, seen, key_of), key=lambda e: e.at)
 
 
-def _unrecorded_exits(feed: list[Entry], seen,
+def _unrecorded_exits(feed: list[Entry], seen: Rows,
                       key_of: Callable[[AppId], PlayerKey | None]) -> list[Entry]:
     """For each manager and player, the exits the squads show beyond those
     the feed records (a sale by him, a clause paid to him), as sales at the
     player's last value. Counted, not matched by time: the squads and the
     feed are stamped minutes apart."""
-    snaps: dict[str, dict] = {}
+    snaps: dict[str, dict[PlayerKey, tuple[str, float]]] = {}
     for r in seen:
         if (k := key_of(app_id(r))) and text(r, "manager"):
             snaps.setdefault(r["observed_at"], {})[k] = (text(r, "manager"),
                                                          r.get("market_value") or 0.0)
-    shown: dict[tuple, list] = {}
+    shown: dict[tuple[str, PlayerKey], list[Entry]] = {}
     stamps = sorted(snaps)
     for a, b in zip(stamps, stamps[1:]):
         managers = {who for who, _ in snaps[b].values()}
         for k, (who, value) in snaps[a].items():
             if who in managers and snaps[b].get(k, (None,))[0] != who:
                 shown.setdefault((who, k), []).append(Entry(b, "sell", who, None, k, value))
-    recorded: dict[tuple, int] = {}
+    recorded: dict[tuple[str, PlayerKey | None], int] = {}
     for e in feed:
         if e.seller:
             recorded[e.seller, e.key] = recorded.get((e.seller, e.key), 0) + 1
     return [x for wk, xs in shown.items() for x in xs[recorded.get(wk, 0):]]
 
 
-def estimate_cash(entries: list[Entry], managers, me: str, my_cash: float | None,
+def estimate_cash(entries: list[Entry], managers: Iterable[str], me: str, my_cash: float | None,
                   budget: float) -> dict[str, float]:
     feed = {m: budget for m in managers}
     for e in entries:
@@ -131,7 +132,7 @@ def estimate_cash(entries: list[Entry], managers, me: str, my_cash: float | None
             for m, v in feed.items()}
 
 
-def price_paid(entries: list[Entry], owner: dict) -> dict[str, float]:
+def price_paid(entries: list[Entry], owner: Mapping[PlayerKey, str]) -> dict[str, float]:
     """What each owned player's owner paid for him: his last buy or
     transfer to that manager. Players from the starting squad have none."""
     return {e.key: e.amount for e in entries
@@ -140,8 +141,8 @@ def price_paid(entries: list[Entry], owner: dict) -> dict[str, float]:
 
 class League:
 
-    def __init__(self, cfg: Config, xw: Crosswalk, api_teams=(), standings=(),
-                 activity=(), seen=()):
+    def __init__(self, cfg: Config, xw: Crosswalk, api_teams: Rows = (), standings: Rows = (),
+                 activity: Rows = (), seen: Rows = ()) -> None:
         self.cfg, self.xw, self.standings = cfg, xw, standings
         self.owner = {k: text(r, "manager") for r in api_teams
                       if (k := xw.player(app_id=app_id(r)))
@@ -221,7 +222,7 @@ def _selftest() -> None:
     assert estimate_cash(ledger(feed, users, key, away), users.values(), "me", None,
                          100.0)["riv"] == 85.0, "a snapshot without his squad shows no exit"
 
-    xw = Crosswalk({"p": Player("p", app_id="7")})
+    xw = Crosswalk({"p": Player(PlayerKey("p"), app_id=AppId("7"))})
     lg = League(Config(me="me", budget=100.0), xw,
                 api_teams=[{"manager": "riv", "player_id": "7"},
                            {"manager": "riv", "player_id": "404"}],
@@ -253,7 +254,7 @@ def _selftest() -> None:
             (squad, {}, lineup, {"1070": "ionut radu", "2464": "someone else"},
              []),
             ({}, {}, [], {}, [])]:
-        xw_f = Crosswalk({k: Player(k, app_id=a) for a, k in app_ids.items()})
+        xw_f = Crosswalk({k: Player(PlayerKey(k), app_id=AppId(a)) for a, k in app_ids.items()})
         assert app_fielded(sq, {k: Name(n) for k, n in names.items()}, rows, xw_f) == want, \
             (app_ids, want)
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import statistics
+from collections.abc import Iterable
 
-__all__ = ["Bootstrap", "expected_points", "SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE"]
+__all__ = ["Bootstrap", "Cell", "PerJornada", "expected_points", "SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE"]
 
 SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
              1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3,
@@ -14,7 +15,12 @@ MIN_POOL = 200
 PERSISTENT_SHARE = 0.08
 
 
-def expected_points(cell) -> float:
+# A player's forecast for a jornada: (points if he plays, chance he plays).
+Cell = tuple[float, float]
+PerJornada = dict[int, dict[str, Cell]]
+
+
+def expected_points(cell: Cell | None) -> float:
     """A forecast cell (points if he plays, chance he plays) as expected
     points; no cell is none."""
     return cell[0] * cell[1] if cell else 0.0
@@ -22,8 +28,8 @@ def expected_points(cell) -> float:
 
 class Bootstrap:
 
-    def __init__(self, per_jornada: dict[int, dict[str, tuple[float, float]]],
-                 pool=(), share: float = PERSISTENT_SHARE):
+    def __init__(self, per_jornada: PerJornada, pool: Iterable[float | None] = (),
+                 share: float = PERSISTENT_SHARE) -> None:
         self.per_jornada = per_jornada
         self.share = share
         self._order = {j: sorted(d) for j, d in per_jornada.items()}

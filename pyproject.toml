@@ -26,7 +26,14 @@ dependencies = [
 ]
 
 [tool.mypy]
+# Untyped code is unchecked code: an unannotated parameter or a bare dict
+# is Any, and Any turns checking off downstream (a .aid typo for .app_id
+# passed that way). So every function is annotated and every generic says
+# what it holds.
 check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
 # lxml ships no usable stubs: lxml-stubs types every XPath result as a
 # six-way union, which is noise, not safety.
 [[tool.mypy.overrides]]

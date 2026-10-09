@@ -4,7 +4,9 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 __all__ = ["TokenStore", "authorize_url", "TENANT",
            "CLIENT_ID", "SIGNIN_POLICY", "REDIRECT_URI", "API_BASE"]
@@ -16,6 +18,9 @@ SIGNIN_POLICY = "B2C_1A_5ULAIP_PARAMETRIZED_SIGNIN"
 REDIRECT_URI = "https://jwt.ms"
 
 API_BASE = "https://fantasy-api.llt-services.com/api"
+
+# How a token request is sent: (url, form) to the parsed JSON reply.
+Post = Callable[[str, dict[str, str]], dict[str, Any]]
 
 TOKEN_PATH = Path(
     os.environ.get("LFG_TOKEN",
@@ -29,7 +34,7 @@ class TokenStore:
     def __init__(self, path: Path = TOKEN_PATH):
         self.path = Path(path)
 
-    def load(self) -> dict:
+    def load(self) -> dict[str, Any]:
         if not self.path.exists():
             raise FileNotFoundError(
                 f"no token at {self.path}. Run `python -m ffcore.auth "
@@ -37,7 +42,7 @@ class TokenStore:
         with open(self.path) as fh:
             return json.load(fh)
 
-    def save(self, tokens: dict) -> None:
+    def save(self, tokens: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         os.chmod(self.path.parent, 0o700)
         tmp = self.path.with_suffix(".json.tmp")
@@ -53,7 +58,7 @@ class TokenStore:
         os.replace(tmp, self.path)
         os.chmod(self.path, 0o600)
 
-    def refresh(self, post=None) -> dict:
+    def refresh(self, post: Post | None = None) -> dict[str, Any]:
         cur = self.load()
         rt = cur.get("refresh_token")
         if not rt:
@@ -74,7 +79,7 @@ class TokenStore:
         self.save(res)
         return res
 
-    def bearer(self, post=None) -> str:
+    def bearer(self, post: Post | None = None) -> str:
         cur = self.load()
         tok = cur.get("access_token")
         got = int(cur.get("obtained_at") or 0)
@@ -96,7 +101,7 @@ class TokenStore:
         return (got + life - time.time()) / 86400.0
 
 
-def _post(url: str, form: dict) -> dict:
+def _post(url: str, form: dict[str, str]) -> dict[str, Any]:
     import httpx
     r = httpx.post(url, data=form, timeout=30,
                    headers={"Content-Type":
@@ -187,9 +192,9 @@ if __name__ == "__main__":
                 "obtained_at": int(time.time())})
         assert oct(p.stat().st_mode)[-3:] == "600", oct(p.stat().st_mode)
 
-        calls: list[tuple] = []
+        calls: list[dict[str, str]] = []
 
-        def never(url, form):
+        def never(url: str, form: dict[str, str]) -> dict[str, Any]:
             calls.append(form)
             raise AssertionError("should not have refreshed")
 
@@ -200,7 +205,7 @@ if __name__ == "__main__":
                 "expires_in": 3600, "refresh_token_expires_in": 7776000,
                 "obtained_at": int(time.time()) - 4000})
 
-        def rotate(url, form):
+        def rotate(url: str, form: dict[str, str]) -> dict[str, Any]:
             assert form["refresh_token"] == "R1", form
             assert form["client_id"] == CLIENT_ID, form
             assert CLIENT_ID in form["scope"], form
@@ -210,7 +215,7 @@ if __name__ == "__main__":
         assert s.bearer(post=rotate) == "A2"
         assert json.load(open(p))["refresh_token"] == "R2", "did not rotate"
 
-        def no_rt(url, form):
+        def no_rt(url: str, form: dict[str, str]) -> dict[str, Any]:
             return {"access_token": "A3", "expires_in": 3600}
 
         s.save({"refresh_token": "R2", "access_token": "A2",

@@ -66,12 +66,12 @@ classDiagram
     class Player {
         <<dataclass>>
         ffcore.crosswalk
-        +player_id: str
+        +player_id: PlayerKey
         +name: str
         +club_id: str
         +ff_slug: str
-        +app_id: str
-        +app_names: set
+        +app_id: AppId
+        +app_names: set~str~
         +row()
     }
     class Crosswalk {
@@ -90,9 +90,15 @@ classDiagram
         +atk_factor: float
         +def_factor: float
     }
+    class Ratings {
+        <<NamedTuple>>
+        ffcore.fixture
+        +diff: dict~str float~
+        +ad
+    }
     class Bootstrap {
         ffcore.forecast
-        +per_jornada
+        +per_jornada: PerJornada
         +share: float
         +pool
         +pool_mean
@@ -112,7 +118,7 @@ classDiagram
         +kind: str
         +who: str | None
         +other: str | None
-        +key: str | None
+        +key: PlayerKey | None
         +amount: float
         +buyer()
         +seller()
@@ -121,11 +127,11 @@ classDiagram
         ffcore.league
         +cfg: Config
         +xw: Crosswalk
+        +standings: Rows
         +owner
         +cash
         +paid
         +managers
-        +standings
         +load()
         +me()
         +key_of_app()
@@ -184,15 +190,6 @@ classDiagram
         +xi()
         +season()
     }
-    class Scored {
-        <<NamedTuple>>
-        ffcore.points
-        +key: str
-        +jornada: int
-        +pts: float
-        +games: float
-        +at: str
-    }
     class Momentum {
         ffcore.pricing
         +by_player
@@ -201,6 +198,15 @@ classDiagram
         +carry()
         +horizon()
         +trend()
+    }
+    class Scored {
+        <<NamedTuple>>
+        ffcore.score
+        +key: str
+        +jornada: int
+        +pts: float
+        +games: float
+        +at: str
     }
     class Rating {
         <<NamedTuple>>
@@ -224,10 +230,10 @@ classDiagram
         ffcore.score
         +market: Rows
         +starts: StartOdds
-        +last_season: dict | None
+        +last_season: Mapping~str Tally~ | None
         +shrink_k: float
         +promoted_discount: float
-        +current: dict | None
+        +current: Mapping~str Tally~ | None
         +lookup
         +promoted
         ...2 more fields
@@ -238,11 +244,11 @@ classDiagram
     class LeagueState {
         <<dataclass>>
         ffcore.season
-        +squads: dict~str dict~str str~~
+        +squads: Squads
         +jornadas: list~int~
         +me: str
         +carried: dict~str float~
-        +fielded
+        +fielded: dict~int Squads~
     }
     class Standings {
         <<dataclass>>
@@ -262,7 +268,7 @@ classDiagram
         +key: str
         +table: str
         +url: str
-        +parse: Callable
+        +parse: Callable~... Any~
         +cadence: str
         +enabled: bool
         +auth: bool
@@ -322,9 +328,9 @@ classDiagram
         <<NamedTuple>>
         ffcore.tidy
         +snapshot: bool
-        +key: tuple
+        +key: tuple~str ...~
         +store: str
-        +numbers: tuple
+        +numbers
     }
     class Sigs {
         ingest

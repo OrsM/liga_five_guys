@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import statistics
-from collections.abc import Mapping
-from typing import NamedTuple
+from collections.abc import Iterable, Mapping
+from datetime import date
+from typing import Any, NamedTuple
 
 from ffcore.parse import Rows, text
 from ffcore.startprob import NEUTRAL_START, StartOdds
@@ -11,8 +12,10 @@ from ffcore.names import Name, row_key
 from ffcore.rules import minutes_played, slot
 from stats import shrink
 
-__all__ = ["Rating", "Rates", "Scorer", "per_jornada_current", "totals",
-           "fit_promoted_discount"]
+from ffcore.crosswalk import Crosswalk
+
+__all__ = ["JornadaPoints", "Rating", "Rates", "Scored", "Scorer", "Tally",
+           "fit_promoted_discount", "per_jornada_current", "points_by_jornada", "totals"]
 
 
 SHRINK_K = 4.0
@@ -21,8 +24,32 @@ PROMOTED_DISCOUNT = 0.70
 
 PROMOTED_DISCOUNT_K = 50.0
 
+class Scored(NamedTuple):
+    """A player's points in a jornada as the points table first showed them."""
+    key: str
+    jornada: int
+    pts: float
+    games: float
+    at: str
 
-def position_priors(market: Rows, history: dict
+
+# What each player scored in each jornada: (key, jornada) to points.
+JornadaPoints = dict[tuple[str, int], float]
+
+
+def points_by_jornada(played: Iterable[Scored]) -> JornadaPoints:
+    """Each player's points in each jornada, summed once."""
+    out: JornadaPoints = {}
+    for s in played:
+        out[s.key, s.jornada] = out.get((s.key, s.jornada), 0.0) + s.pts
+    return out
+
+
+# A player's season so far, by key: {"pts": points, "pj": matches played}.
+Tally = dict[str, float]
+
+
+def position_priors(market: Rows, history: Mapping[str, Tally]
                     ) -> tuple[dict[str, float], float]:
     samples: dict[str, list[float]] = {}
     for r in market:
@@ -35,7 +62,7 @@ def position_priors(market: Rows, history: dict
     return priors, (statistics.median(flat) if flat else 0.0)
 
 
-def detect_promoted(market: Rows, history: dict) -> set[str]:
+def detect_promoted(market: Rows, history: Mapping[str, Tally]) -> set[str]:
     per_club: dict[str, list[int]] = {}
     for r in market:
         h = history.get(row_key(r))
@@ -45,11 +72,11 @@ def detect_promoted(market: Rows, history: dict) -> set[str]:
     return {c for c, (n, k) in per_club.items() if n >= 10 and k / n < 0.15}
 
 
-def fit_promoted_discount(market: Rows, history: dict,
-                          played: list) -> float:
+def fit_promoted_discount(market: Rows, history: Mapping[str, Tally],
+                          played: list[Scored]) -> float:
     promoted = detect_promoted(market, history)
     priors = position_priors(market, history)[0]
-    prior_of = {row_key(r): priors.get(slot(r.get("position")))
+    prior_of: dict[str, float | None] = {row_key(r): priors.get(slot(r.get("position")))
                 for r in market if r.get("club") in promoted}
     pts = expected = n = 0.0
     for s in played:
@@ -63,8 +90,9 @@ def fit_promoted_discount(market: Rows, history: dict,
     return shrink(PROMOTED_DISCOUNT, PROMOTED_DISCOUNT_K, n * pts / expected, n)
 
 
-def per_jornada_current(starters_rows, played, jornada_of_match, xw
-                         ) -> dict[str, dict[int, tuple[float, float]]]:
+def per_jornada_current(starters_rows: Rows, played: list[Scored],
+                        jornada_of_match: Mapping[str, int], xw: Crosswalk
+                        ) -> dict[str, dict[int, tuple[float, float]]]:
     minutes_by_jor: dict[str, dict[int, float]] = {}
     seen: set[tuple[str, str]] = set()
     for r in starters_rows:
@@ -81,19 +109,18 @@ def per_jornada_current(starters_rows, played, jornada_of_match, xw
             continue
         seen.add(dedup)
         by_j = minutes_by_jor.setdefault(key, {})
-        by_j[jor] = by_j.get(jor, 0.0) + minutes_played(r.get("role"),
+        by_j[jor] = by_j.get(jor, 0.0) + minutes_played(r.get("role") or "",
                                                          r.get("minute"))
 
     points_by_jor: dict[str, dict[int, float]] = {}
-    for s in played:
-        by_j = points_by_jor.setdefault(s.key, {})
-        by_j[s.jornada] = by_j.get(s.jornada, 0.0) + s.pts
+    for (k, j), pts in points_by_jornada(played).items():
+        points_by_jor.setdefault(k, {})[j] = pts
 
     out: dict[str, dict[int, tuple[float, float]]] = {}
-    for key, points_jd in points_by_jor.items():
-        minutes_jd = minutes_by_jor.get(key, {})
+    for pk, points_jd in points_by_jor.items():
+        minutes_jd = minutes_by_jor.get(pk, {})
         jors = set(points_jd) | set(minutes_jd)
-        out[key] = {j: (points_jd.get(j, 0.0), minutes_jd.get(j, 0.0))
+        out[pk] = {j: (points_jd.get(j, 0.0), minutes_jd.get(j, 0.0))
                    for j in jors}
     return out
 
@@ -130,22 +157,22 @@ class Scorer:
     matches; and, from StartOdds, his chance of starting."""
 
     def __init__(self, market: Rows, starts: StartOdds,
-                 last_season: dict | None = None, shrink_k: float = SHRINK_K,
-                 current: dict | None = None,
-                 promoted_discount: float = PROMOTED_DISCOUNT):
+                 last_season: Mapping[str, Tally] | None = None, shrink_k: float = SHRINK_K,
+                 current: Mapping[str, Tally] | None = None,
+                 promoted_discount: float = PROMOTED_DISCOUNT) -> None:
         self.market = market
         self.starts = starts
         self.last_season = last_season or {}
         self.shrink_k = shrink_k
         self.promoted_discount = promoted_discount
         self.current = current or {}
-        self.lookup: dict[str, Mapping] = {row_key(r): r for r in market
+        self.lookup: dict[str, Mapping[str, Any]] = {row_key(r): r for r in market
                                         if r.get("name")}
         self.promoted = detect_promoted(self.market, self.last_season)
         self.priors, self.global_prior = position_priors(self.market,
                                                           self.last_season)
 
-    def rate(self, rec: Mapping) -> Rating:
+    def rate(self, rec: Mapping[str, Any]) -> Rating:
         """Points per match: last season pulled toward his position's typical
         rate (or that rate, discounted for a promoted club); then this
         season pulled toward that."""
@@ -166,10 +193,10 @@ class Scorer:
         return Rating(shrink(base, k, c["pts"] if c and cur_pj else 0.0, cur_pj),
                       not prior_pj and cur_pj < k, cur_pj, prior_pj + cur_pj)
 
-    def fit(self, key: str, jornada: int, when, next_j: int) -> float:
+    def fit(self, key: str, jornada: int, when: date | None, next_j: int) -> float:
         return self.starts.fit(key, jornada, when, next_j)
 
-    def rates(self, rec: Mapping) -> Rates:
+    def rates(self, rec: Mapping[str, Any]) -> Rates:
         key = row_key(rec)
         return Rates(key, slot(rec.get("position")),
                      self.rate(rec).ppm, self.starts.picked(key, True),
@@ -177,8 +204,8 @@ class Scorer:
 
 
 def _selftest() -> None:
+    from ffcore.names import AppId, PlayerKey  # noqa: F401
     from ffcore.tidy import typed
-    from ffcore.points import Scored
 
     K = SHRINK_K
 
@@ -189,7 +216,7 @@ def _selftest() -> None:
 
     market = [dict(row, name=n) for n in
               ["p%d" % i for i in range(10)] + ["Sub", "Newbie"]]
-    xw = Crosswalk({Name(n).key: Player(Name(n).key, n)
+    xw = Crosswalk({Name(n).key: Player(PlayerKey(Name(n).key), n)
                     for n in [r["name"] for r in market] + ["Attacker"]})
     hist = {"p%d" % i: {"pts": 100.0 + i, "pj": 34.0} for i in range(10)}
     hist["sub"] = {"pts": 20.0, "pj": 4.0}
@@ -264,10 +291,10 @@ def _selftest() -> None:
     from ffcore.crosswalk import Crosswalk, Player
 
     xw2 = Crosswalk({
-        "antonio blanco": Player("antonio blanco", "Antonio Blanco",
-                                 ff_slug="blanco", app_id="1"),
-        "came on": Player("came on", "Came On", ff_slug="came-on"),
-        "unused sub": Player("unused sub", "Unused Sub", ff_slug="unused"),
+        "antonio blanco": Player(PlayerKey("antonio blanco"), "Antonio Blanco",
+                                 ff_slug="blanco", app_id=AppId("1")),
+        "came on": Player(PlayerKey("came on"), "Came On", ff_slug="came-on"),
+        "unused sub": Player(PlayerKey("unused sub"), "Unused Sub", ff_slug="unused"),
     })
     jornada_map = {"m1": 1, "m2": 2}
     starters_rows = typed("starters", [

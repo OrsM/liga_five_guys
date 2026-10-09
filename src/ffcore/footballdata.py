@@ -5,6 +5,7 @@ import csv
 import io
 import re
 from datetime import datetime, timezone
+from typing import Any
 
 from ffcore.futbolfantasy import club_slug
 from ffcore.source import Source
@@ -47,14 +48,14 @@ def fd_sources(now: datetime | None = None) -> list["Source"]:
     return out
 
 
-def _fd_rows(text: str) -> list[dict]:
+def _fd_rows(text: str) -> list[dict[str, str]]:
     if not text:
         return []
     return list(csv.DictReader(io.StringIO(text.lstrip("﻿"))))
 
 
 def parse_fd_results(text: str, observed_at: str,
-                     key: str = "fd_2526") -> list[dict]:
+                     key: str = "fd_2526") -> list[dict[str, Any]]:
     season = _season_suffix(key, "fd")
     rows = []
     for r in _fd_rows(text):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ffcore.parse import Rows
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 
 from ffcore.action import Action
@@ -83,7 +84,7 @@ class Market:
         """Whether a sale takes his standing offer tonight rather than wait."""
         return k in self.offer and self.fetches(k) == self.offer[k]
 
-    def left(self, acts=()) -> float:
+    def left(self, acts: Iterable[Action] = ()) -> float:
         """Your cash once these moves are made."""
         return self.cash - sum(a.net for a in acts)
 
@@ -103,7 +104,7 @@ def market_routes(mkt: Rows) -> tuple[dict[str, float], dict[str, str]]:
     return price, route
 
 
-def pending(rows, status_field: str, money_field: str) -> dict[str, float]:
+def pending(rows: Rows, status_field: str, money_field: str) -> dict[str, float]:
     out: dict[str, float] = {}
     for r in rows:
         if (r.get(status_field) or "") != "pending":

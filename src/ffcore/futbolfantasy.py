@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from typing import Any
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from lxml import html as lh
 
 from ffcore.names import Name
-from ffcore.text import match_one, norm
-from ffcore.parse import ratio, year_for
+from ffcore.text import norm, resolve
+from ffcore.parse import Row, ratio, year_for
+
 from ffcore.source import Source, _once, _rebuild
+
+# An lxml element: lxml ships no usable types (see [tool.mypy] in pyproject).
+Element = Any
 
 __all__ = ["BASE", "SOURCE", "MARKET_URL", "POINTS_URL", "TEAM_URL", "TEAMS",
            "CLUB_ALIASES", "club_slug", "parse_market", "SEVERITY",
@@ -44,10 +49,15 @@ CLUB_ALIASES = {
 }
 
 
-def club_slug(name) -> str:
+_TEAM_ROWS = [{"name": t} for t in TEAMS]
+
+
+def club_slug(name: str | None) -> str:
+    """The futbolfantasy slug of a club as a page names it, or ""."""
     if not name or "," in name:
         return ""
-    return match_one(name, TEAMS) or CLUB_ALIASES.get(norm(name), "")
+    row, _ = resolve(name, _TEAM_ROWS)
+    return row["name"] if row else CLUB_ALIASES.get(norm(name), "")
 
 
 TEAM_SELECT_RE = re.compile(r'<select[^>]*name="equipo"[^>]*>(.*?)</select>', re.S)
@@ -84,7 +94,7 @@ def _slug(chunk: str) -> str | None:
     return None
 
 
-def parse_market(html: str, observed_at: str, key: str = "market") -> list[dict]:
+def parse_market(html: str, observed_at: str, key: str = "market") -> list[Row]:
     doc = lh.fromstring(html)
     select = doc.xpath('(//select[@name="equipo"])[1]')
     teams = {o.get("value"): (o.text or "").strip()
@@ -127,7 +137,7 @@ XI_SELECTORS = ['[class*="jugadores-titulares"] .jugador.tipo_lista',
                 '[class*="jugadores-suplentes"] .jugador.tipo_lista']
 
 
-def _flagged_name(el) -> tuple[str, str]:
+def _flagged_name(el: Element) -> tuple[str, str]:
     a = _css(el, "a.jugador")
     if not a:
         return "", ""
@@ -135,13 +145,13 @@ def _flagged_name(el) -> tuple[str, str]:
     return a[0].text_content().strip(), (_slug('href="%s"' % href) or "")
 
 
-def _note(el) -> str:
+def _note(el: Element) -> str:
     parts = [" ".join(c.text_content().split())
              for c in _css(el, ".comentario")]
     return " · ".join(p for p in parts if p)[:200]
 
 
-def parse_fitness(doc) -> dict[str, dict]:
+def parse_fitness(doc: Element) -> dict[str, dict[str, str]]:
     flagged = [(el, FITNESS_ALT.get((icon[0].get("alt") or "").strip().lower()
                                     if icon else ""))
                for el in _css(doc, ".lesionados_wrapper section.mod.lesionados"
@@ -151,7 +161,7 @@ def parse_fitness(doc) -> dict[str, dict]:
                 for el in _css(sec, ".elemento")]
     flagged += [(el, "unavailable")
                 for el in _css(doc, "section.mod.nodisponibles .elemento")]
-    found: dict[str, dict] = {}
+    found: dict[str, dict[str, str]] = {}
     for el, status in flagged:
         if not status:
             continue
@@ -166,8 +176,9 @@ def parse_fitness(doc) -> dict[str, dict]:
     return found
 
 
-def _lineup_row(observed_at, source, team_slug, player_name, player_slug,
-                role, start_pct, status, note) -> dict:
+def _lineup_row(observed_at: str, source: str, team_slug: str, player_name: str,
+                player_slug: str | None, role: str, start_pct: int | None, status: str,
+                note: str) -> Row:
     return {
         "observed_at": observed_at,
         "source": source,
@@ -181,7 +192,7 @@ def _lineup_row(observed_at, source, team_slug, player_name, player_slug,
     }
 
 
-def _team_player(el) -> tuple:
+def _team_player(el: Element) -> tuple[str | None, int | None, str]:
     text = " ".join(el.text_content().split())
     m = NAME_RE.match(text)
     if m:
@@ -195,16 +206,16 @@ def _team_player(el) -> tuple:
     return name, pct, href
 
 
-def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[dict]:
+def parse_team(html: str, observed_at: str, key: str = "team_test") -> list[Row]:
     slug = key[5:] if key.startswith("team_") else key
     doc = lh.fromstring(html)
     fitness = parse_fitness(doc)
-    rows: list[dict] = []
+    rows: list[Row] = []
     seen: set[str] = set()
     for role, selector in zip(("starter", "sub"), XI_SELECTORS):
         for el in _css(doc, selector):
             name, pct, href = _team_player(el)
-            if not _once(seen, Name(name).key):
+            if name is None or not _once(seen, Name(name).key):
                 continue
             fit = fitness.get(Name(name).key)
             rows.append(_lineup_row(
@@ -228,10 +239,10 @@ WANT = {
 }
 
 
-_SELECTORS: dict[str, Callable] = {}
+_SELECTORS: dict[str, Callable[[Element], list[Element]]] = {}
 
 
-def _css(node, css: str):
+def _css(node: Element, css: str) -> list[Element]:
     sel = _SELECTORS.get(css)
     if sel is None:
         from lxml.cssselect import CSSSelector
@@ -239,7 +250,7 @@ def _css(node, css: str):
     return sel(node)
 
 
-def _cell_texts(el) -> list[str]:
+def _cell_texts(el: Element) -> list[str]:
     out = []
     for t in el.xpath(".//text()"):
         t = re.sub(r"\s+", " ", t).strip()
@@ -251,11 +262,11 @@ def _cell_texts(el) -> list[str]:
 _POINTS_ID_RE = re.compile(r"openPlayerPointsStats\(\s*(\d+)")
 
 
-def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[dict]:
+def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[Row]:
     from ffcore.parse import ratio
 
     doc = lh.fromstring(html)
-    best: list[dict] = []
+    best: list[Row] = []
 
     for table in doc.xpath("//table"):
         head = table.xpath(".//thead//tr")
@@ -322,7 +333,7 @@ def season_label(html: str) -> str:
 _WS = re.compile(r"\s+")
 
 
-def _suspension_sections(doc):
+def _suspension_sections(doc: Element) -> list[Element]:
     return [s for s in _css(doc, "section.mod.sancionados")
            if "mercado-box" not in " ".join(s.classes)]
 
@@ -368,7 +379,7 @@ def _match_sides(slug: str) -> tuple[str, str] | None:
     return None
 
 
-def _calendar_row(a, observed_at: str) -> dict | None:
+def _calendar_row(a: Element, observed_at: str) -> Row | None:
     m = MATCH_PATH_RE.search(a.get("href") or "")
     if not m:
         return None
@@ -394,8 +405,8 @@ def _calendar_row(a, observed_at: str) -> dict | None:
 
 
 def parse_calendar(html: str, observed_at: str,
-                   key: str = "calendario") -> list[dict]:
-    rows: list[dict] = []
+                   key: str = "calendario") -> list[Row]:
+    rows: list[Row] = []
     seen: set[str] = set()
     for el in _css(lh.fromstring(html), 'a[href*="/partidos/"]'):
         row = _calendar_row(el, observed_at)
@@ -405,7 +416,7 @@ def parse_calendar(html: str, observed_at: str,
 
 
 def parse_starters(html: str, observed_at: str,
-                   key: str = "match_1-alaves-getafe") -> list[dict]:
+                   key: str = "match_1-alaves-getafe") -> list[Row]:
     m = MATCH_KEY_RE.match(key)
     if not m:
         return []
@@ -449,7 +460,7 @@ def parse_starters(html: str, observed_at: str,
     return rows
 
 
-def _xi_rows(doc, side: str) -> list:
+def _xi_rows(doc: Element, side: str) -> list[Element]:
     tables = _css(doc, "%s table.tablestats" % side)
     return _css(tables[0], "tbody tr") if tables else []
 

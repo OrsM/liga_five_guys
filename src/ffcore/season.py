@@ -1,11 +1,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 
 import numpy as np
+import numpy.typing as npt
 
-from ffcore.rules import MAX_SLOT, SHAPES
+from ffcore.forecast import Bootstrap
+from ffcore.rules import MAX_SLOT, SHAPES, Squad, Squads
 from stats import percentile
 
 __all__ = ["LeagueState", "Standings", "simulate",
@@ -14,7 +17,7 @@ __all__ = ["LeagueState", "Standings", "simulate",
 XI_SIZE = 11
 
 
-def best_xi(squad: dict[str, str], value: dict[str, float]) -> list[str]:
+def best_xi(squad: Squad, value: dict[str, float]) -> list[str]:
     by_slot: dict[str, list[tuple[float, str]]] = {}
     for k, slot in squad.items():
         by_slot.setdefault(slot, []).append((value.get(k, 0.0), k))
@@ -35,11 +38,11 @@ class LeagueState:
     """The squads, the jornadas left and the points banked. A jornada under
     way is played by the squads that fielded it (fielded), whatever moves
     made since did to squads."""
-    squads: dict[str, dict[str, str]]
+    squads: Squads
     jornadas: list[int]
     me: str = ""
     carried: dict[str, float] = field(default_factory=dict)
-    fielded: dict[int, dict[str, dict[str, str]]] = field(default_factory=dict)
+    fielded: dict[int, Squads] = field(default_factory=dict)
 
 
 @dataclass
@@ -55,7 +58,7 @@ class Standings:
         v = self.totals.get(manager) or [0.0]
         return sum(v) / len(v)
 
-    def band(self, manager: str, lo=0.1, hi=0.9) -> tuple[float, float]:
+    def band(self, manager: str, lo: float = 0.1, hi: float = 0.9) -> tuple[float, float]:
         v = self.totals.get(manager) or [0.0]
         return percentile(v, lo * 100), percentile(v, hi * 100)
 
@@ -83,8 +86,8 @@ class Standings:
         return sum(k * p for k, p in self.position(manager).items())
 
 
-def simulate_many(states: list, forecaster, trials: int = 2000,
-                  seed: int = 0) -> list:
+def simulate_many(states: list[LeagueState], forecaster: Bootstrap, trials: int = 2000,
+                  seed: int = 0) -> list[Standings]:
     if not states:
         return []
     fast = _run_np(states, forecaster, trials, seed)
@@ -92,7 +95,8 @@ def simulate_many(states: list, forecaster, trials: int = 2000,
             for tot, st in zip(fast, states)]
 
 
-def draws(forecaster, jornadas, trials: int, seed: int):
+def draws(forecaster: Bootstrap, jornadas: Iterable[int], trials: int, seed: int
+          ) -> Iterator[tuple[int, list[str], npt.NDArray[np.float64]]]:
 
     pool = np.asarray(forecaster.pool, dtype=float)
     everyone = sorted({k for j in jornadas for k in forecaster.order(j)})
@@ -113,31 +117,33 @@ def draws(forecaster, jornadas, trials: int, seed: int):
             * (pts / forecaster.pool_mean) * rate[:, [col[k] for k in keys]], 0.0)
 
 
-def _elevens(states: list, forecaster):
+def _elevens(states: list[LeagueState], forecaster: Bootstrap
+             ) -> list[dict[int, dict[str, list[str]]]]:
     """Each state's eleven per manager and jornada: the best by expected
     points, as the manager would field them."""
     exp_by_j: dict[int, dict[str, float]] = {}
-    xi_memo: dict = {}
+    xi_memo: dict[tuple[int, tuple[tuple[str, str], ...]], list[str]] = {}
     xis = []
     for st in states:
-        per_state = {}
+        per_state: dict[int, dict[str, list[str]]] = {}
         for j in st.jornadas:
             if j not in exp_by_j:
                 exp_by_j[j] = forecaster.expected(j)
             row = {}
             for m, sq in st.squads.items():
-                sq = st.fielded.get(j, {}).get(m, sq)
-                k = (j, tuple(sorted(sq.items())))
+                eleven_of = st.fielded.get(j, {}).get(m, sq)
+                k = (j, tuple(sorted(eleven_of.items())))
                 got = xi_memo.get(k)
                 if got is None:
-                    got = xi_memo[k] = best_xi(sq, exp_by_j[j])
+                    got = xi_memo[k] = best_xi(eleven_of, exp_by_j[j])
                 row[m] = got
             per_state[j] = row
         xis.append(per_state)
     return xis
 
 
-def _run_np(states: list, forecaster, trials: int, seed: int):
+def _run_np(states: list[LeagueState], forecaster: Bootstrap, trials: int, seed: int
+            ) -> list[dict[str, list[float]]]:
 
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
@@ -153,7 +159,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     return [{m: v.tolist() for m, v in tot.items()} for tot in totals]
 
 
-def simulate(state: LeagueState, forecaster, trials: int = 2000,
+def simulate(state: LeagueState, forecaster: Bootstrap, trials: int = 2000,
              seed: int = 0) -> Standings:
     return simulate_many([state], forecaster, trials=trials, seed=seed)[0]
 
