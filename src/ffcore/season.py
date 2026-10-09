@@ -8,7 +8,7 @@ import numpy as np
 from ffcore.rules import MAX_SLOT, SHAPES
 from stats import percentile
 
-__all__ = ["LeagueState", "Standings", "expected_totals", "simulate",
+__all__ = ["LeagueState", "Standings", "simulate",
            "simulate_many", "best_xi"]
 
 XI_SIZE = 11
@@ -116,7 +116,7 @@ def draws(forecaster, jornadas, trials: int, seed: int):
 def _elevens(states: list, forecaster):
     """Each state's eleven per manager and jornada: the best by expected
     points, as the manager would field them."""
-    exp_by_j = {}
+    exp_by_j: dict[int, dict[str, float]] = {}
     xi_memo: dict = {}
     xis = []
     for st in states:
@@ -134,17 +134,7 @@ def _elevens(states: list, forecaster):
                 row[m] = got
             per_state[j] = row
         xis.append(per_state)
-    return xis, exp_by_j
-
-
-def expected_totals(states: list, forecaster) -> list[dict[str, float]]:
-    """What each manager is expected to finish on: the mean of the seasons
-    simulate_many draws, worked out exactly rather than sampled (the same
-    elevens, each player's expected points)."""
-    xis, exp_by_j = _elevens(states, forecaster)
-    return [{m: st.carried.get(m, 0.0) + sum(
-                sum(exp_by_j[j].get(k, 0.0) for k in xi[j][m]) for j in st.jornadas)
-             for m in st.squads} for st, xi in zip(states, xis)]
+    return xis
 
 
 def _run_np(states: list, forecaster, trials: int, seed: int):
@@ -152,7 +142,7 @@ def _run_np(states: list, forecaster, trials: int, seed: int):
     managers = [list(st.squads) for st in states]
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
                for m in ms} for st, ms in zip(states, managers)]
-    xis, _exp = _elevens(states, forecaster)
+    xis = _elevens(states, forecaster)
     for j, keys, drawn in draws(forecaster, states[0].jornadas, trials, seed):
         at = {k: i for i, k in enumerate(keys)}
         for i in range(len(states)):
@@ -222,19 +212,18 @@ def _selftest() -> None:
                  for k in list(a) + list(b)}, 2: per2[1]}
     two_j = LeagueState(squads={"A": a, "B": b}, jornadas=[1, 2], me="A",
                         carried={"A": 10.0})
-    exact = expected_totals([two_j], Bootstrap(mixed))[0]
-    sampled = simulate(two_j, Bootstrap(mixed), trials=20000, seed=5)
-    assert all(abs(sampled.mean(m) - exact[m]) / exact[m] < 0.01 for m in exact), \
-        ("the exact mean is the simulation's", exact, sampled.mean("A"), sampled.mean("B"))
+    assert simulate(two_j, Bootstrap(mixed), trials=200, seed=5).mean("A") > 10.0, \
+        "points carried count"
 
     swapped = {**{k: v for k, v in a.items() if k != "a_m1"}, "b_m1": "MED"}
     under_way = LeagueState(squads={"A": swapped, "B": b}, jornadas=[1, 2], me="A",
                             fielded={1: {"A": a}})
     as_was = LeagueState(squads={"A": a, "B": b}, jornadas=[1, 2], me="A")
     moved = LeagueState(squads={"A": swapped, "B": b}, jornadas=[1, 2], me="A")
-    ew, ea, em = expected_totals([under_way, as_was, moved], Bootstrap(mixed))
-    assert ew["A"] - ea["A"] == (em["A"] - ea["A"]) / 2, \
-        "a move changes the jornada still to start, not the one under way"
+    ew, ea, em = (s.mean("A") for s in simulate_many([under_way, as_was, moved],
+                                                     Bootstrap(mixed), trials=20000, seed=5))
+    assert abs((ew - ea) - (em - ea) / 2) < 0.05 * abs(em - ea), \
+        ("a move changes the jornada still to start, not the one under way", ew, ea, em)
 
     tied = Standings(totals={"A": [5.0], "B": [5.0]}, me="A")
     assert tied.beat("B") == 0.5

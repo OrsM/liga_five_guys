@@ -48,10 +48,8 @@ def step(fn, why: str) -> str:
 
 def show(u, mv) -> str:
     names = u.market.names
-    return ("%s: %+.1f points (%+.2f a million), better off in %.0f%% of seasons"
-            " (at a glance %+.1f points over whoever plays instead)") % (
-        mv.action.label(names), mv.d_pts, mv.per_million, 100 * mv.p_better,
-        u.points(mv.action))
+    return "%s: %+.1f points (%+.2f a million), better off in %.0f%% of seasons" % (
+        mv.action.label(names), mv.d_pts, mv.per_million, 100 * mv.p_better)
 
 
 def not_offered(u, k: str) -> str:

@@ -11,7 +11,7 @@ from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.rules import shortfall
 from ffcore.schedule import phantom_topup
-from ffcore.season import LeagueState, Standings, expected_totals, simulate_many
+from ffcore.season import LeagueState, Standings, simulate_many
 from stats import percentile
 
 __all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe", "at_risk",
@@ -68,7 +68,6 @@ class Universe:
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
-    _means: dict = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def me(self) -> str:
@@ -95,7 +94,7 @@ class Universe:
     def after(self, *acts: Action) -> Universe:
         """The league once these moves are made, your cash with it."""
         return replace(self, state=replace(self.state, squads=apply(self, *acts)),
-                       market=replace(self.market, cash=self.market.left(acts)), _means={})
+                       market=replace(self.market, cash=self.market.left(acts)))
 
     def squad_after(self, *acts: Action) -> dict[str, str]:
         sq = dict(self.mine)
@@ -106,32 +105,14 @@ class Universe:
                 sq[a.buy] = self.market.pos.get(a.buy, "MED")
         return sq
 
-    def expected(self, *acts: Action) -> float:
-        """Your season after these moves, as the simulated seasons average:
-        worked out exactly, so cheap enough to try many moves with."""
-        sq = apply(self, *acts)[self.me]
-        key = frozenset(sq.items())
-        if key not in self._means:
-            st = LeagueState({self.me: sq}, self.state.jornadas, self.me,
-                             fielded=fielded(self))
-            self._means[key] = expected_totals([st], self.forecaster)[0][self.me]
-        return self._means[key]
-
-    def points(self, a: Action) -> float:
-        """What a move adds to your expected season: a player's points over
-        whoever would play instead of him."""
-        return self.expected(a) - self.expected()
-
-
     def candidates(self) -> list[Action]:
-        """Every move worth a look: each spare sold, and each player you
-        could get, from your cash, if worth anything at a glance (worth).
-        What a buy needs beyond your cash, the plan raises by selling."""
+        """Every move to rank: each spare sold, and each player on the market
+        you could get. What a buy needs beyond your cash, the plan raises by
+        selling."""
         m = self.market
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s))
                for s in fieldable_spares(self)]
-        return out + [a for k in sorted(m.price)
-                      if self.why_not(k) is None and (a := self.acquire(k))]
+        return out + [a for k in sorted(m.price) if (a := self.acquire(k))]
 
     def why_not(self, k: str) -> str | None:
         """Why getting him is not a candidate, or None if it is."""
@@ -139,9 +120,6 @@ class Universe:
         if a is None:
             owner = self.market.owner.get(k)
             return "%s's player" % owner if owner else "nobody's, and not on the market now"
-        if self.points(a) <= 0:
-            return "worth nothing at a glance: %s %+.1f points over whoever plays instead" % (
-                a.label(), self.points(a))
         return None
 
     def rank(self, acts: list[Action], seed: int = 1) -> Ranking:
@@ -374,10 +352,9 @@ def _selftest() -> None:
 
     acts = u.candidates()
     names = {a.buy for a in acts}
-    assert "dud" not in names, names
-    assert "star" in names, names
-    assert u.why_not("star") is None
-    assert (u.why_not("dud") or "").startswith("worth nothing at a glance: buy dud "), u.why_not("dud")
+    assert {"dud", "star"} <= names, "every player on the market is ranked; no second measure filters first"
+    assert u.why_not("star") is None and u.why_not("dud") is None
+    assert "dud" not in {r.action.buy for r in board(u).plan}, "the simulated bar rejects him"
     assert u.why_not("nobody") == "nobody's, and not on the market now"
     assert u.why_not("th_m1") == "riv's player"
 
@@ -478,8 +455,8 @@ def _selftest() -> None:
         market=Market(cash=50e6, pos={**u.market.pos, "dud": "MED"},
                       price={"dud": 1e6}),
         part_played={1: {"somewhere"}})
-    assert not any(a.buy == "dud"
-                   for a in half.candidates())
+    assert "dud" not in {r.action.buy for r in board(half).plan}, \
+        "a jornada already under way is the squads as they stand: he adds nothing"
 
     ok_squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
                "d4": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",

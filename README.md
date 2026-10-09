@@ -67,10 +67,8 @@ Every forecast is the same product, for every player and jornada, and
 - **Uncertainty** (`ffcore/forecast.py`, `ffcore/season.py`): match-level
   points drawn from the pool of real single-match scores, and one
   persistent per-player error (`PERSISTENT_SHARE`, measured by the
-  backtest), drawn once per simulated season. Their average is also
-  worked out exactly (`season.expected_totals`, same elevens), cheap
-  enough to try many moves with; a jornada under way keeps the elevens
-  that fielded it.
+  backtest), drawn once per simulated season. A jornada under way keeps
+  the elevens that fielded it.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one, h being the longest
   horizon the data can fit (a rise was still carrying there), not the
@@ -94,10 +92,10 @@ Every forecast is the same product, for every player and jornada, and
   not shoot first). Every
   recommendation passes the same four steps, `decide.FUNNEL`, drawn in
   `docs/funnel.mmd`:
-  1. **candidates**: every sale of a spare, and every player you could
-     get, from your cash, if he adds points at a glance (`Universe.points`:
-     what he adds to the simulated seasons' average over whoever would
-     play instead).
+  1. **candidates**: every sale of a spare, and every player on the market
+     you could get. No quicker measure filters them first: the simulated
+     rank is the one judgement (a filter on expected points kept 4 of 11
+     buys on 2026-10-08, saved 0.1s, and dropped none that passed).
   2. **rank**: each move against doing nothing, in simulated seasons:
      the points it adds, and per million it spends or raises
      (`Move.per_million`).
