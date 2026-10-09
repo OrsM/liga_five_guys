@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-10-09T16:53Z",
- "lock_at": "2026-10-09T19:00:00+00:00",
+ "generated_at": "2026-10-09T19:50Z",
+ "lock_at": "2026-10-16T19:00:00+00:00",
  "cash": 10351947.0,
  "cash_locked": 0,
  "finish": 1.73,
@@ -17,93 +17,67 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 25171201.0,
-   "xi": true,
-   "season": 197.107076495075
+   "clause": 25171201.0
   },
   {
    "name": "Zaid Romero",
    "pos": "DEF",
-   "clause": 38962846.0,
-   "xi": true,
-   "season": 171.42366240665848
+   "clause": 38962846.0
   },
   {
    "name": "Georges Mikautadze",
    "pos": "DEL",
-   "clause": 42016585.0,
-   "xi": true,
-   "season": 163.58075997027467
+   "clause": 42016585.0
   },
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 60150703.0,
-   "xi": true,
-   "season": 162.90905978137667
+   "clause": 60150703.0
   },
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 17454408.0,
-   "xi": false,
-   "season": 145.15634582530225
+   "clause": 17454408.0
   },
   {
    "name": "Pablo Fornals",
    "pos": "MED",
-   "clause": 58220110.0,
-   "xi": true,
-   "season": 143.74183546940844
+   "clause": 58220110.0
   },
   {
    "name": "Marcos Alonso",
    "pos": "DEF",
-   "clause": 28589508.0,
-   "xi": true,
-   "season": 133.49131268721962
+   "clause": 28589508.0
   },
   {
    "name": "Iñigo Vicente",
    "pos": "DEL",
-   "clause": 31271675.0,
-   "xi": true,
-   "season": 127.92070866986015
+   "clause": 31271675.0
   },
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
-   "clause": 24501024.0,
-   "xi": false,
-   "season": 120.71912099306468
+   "clause": 24501024.0
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 13966262.0,
-   "xi": true,
-   "season": 119.98753330578161
+   "clause": 13966262.0
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 16407432.0,
-   "xi": true,
-   "season": 119.5994456576348
+   "clause": 16407432.0
   },
   {
    "name": "Lucien Agoume",
    "pos": "MED",
-   "clause": 17242075.0,
-   "xi": true,
-   "season": 119.48188591703483
+   "clause": 17242075.0
   },
   {
    "name": "Yeray Alvarez",
    "pos": "DEF",
-   "clause": 6931556.0,
-   "xi": true,
-   "season": 92.17571679417641
+   "clause": 6931556.0
   }
  ],
  "squad": [
@@ -130,7 +104,7 @@
    "value": 60157176.0,
    "trend": 9.080579279474014,
    "paid": 37492727.0,
-   "per_million": -1.1522626285609612,
+   "per_million": -1.0621511428050028,
    "offer": 60732805.0
   },
   {
@@ -156,7 +130,7 @@
    "value": 4788782.0,
    "trend": -6.2013461705206625,
    "paid": 6931556.0,
-   "per_million": -1.0279496355759459,
+   "per_million": -1.0234061250917672,
    "offer": 4993236.0
   },
   {
@@ -169,7 +143,7 @@
    "value": 38966879.0,
    "trend": 3.2263677041334637,
    "paid": 28662117.0,
-   "per_million": -2.0622201258782735,
+   "per_million": -1.873191099374963,
    "offer": 38006306.0
   },
   {
@@ -314,10 +288,10 @@
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 271.0,
-   "mean": 1584.1255424320611,
-   "lo": 1462.3234139635317,
-   "hi": 1703.1324419403195,
+   "now": 272.0,
+   "mean": 1585.1255424320611,
+   "lo": 1463.3234139635317,
+   "hi": 1704.1324419403195,
    "cash": 43593671.0,
    "estimated": true,
    "p_above": 0.0010000000000000009
