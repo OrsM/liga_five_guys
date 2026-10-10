@@ -1,22 +1,22 @@
 {
- "generated_at": "2026-10-10T19:46Z",
+ "generated_at": "2026-10-10T20:38Z",
  "lock_at": "2026-10-16T19:00:00+00:00",
- "cash": 10451947.0,
- "cash_locked": 535093.0,
- "finish": 1.78,
- "p_win": 0.237,
+ "cash": 9916854.0,
+ "cash_locked": 0,
+ "finish": 1.93,
+ "p_win": 0.211,
  "band": [
-  1872.4435098878998,
-  2174.9370445642944
+  1870.5913608791057,
+  2172.2841328397526
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Dakonam Djene",
+   "label": "field Andres Castrin, Dakonam Djene",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 0.6534812557088994,
+   "gain": 0.91626043262049,
    "per": "next",
    "facts": [
     [
@@ -25,11 +25,90 @@
      "names"
     ]
    ]
+  },
+  {
+   "name": "Andres Castrin",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Andres Castrin",
+   "step": "bid up to",
+   "amount": 11650712.69782412,
+   "done": false,
+   "gain": 27.14535156164868,
+   "per": "season",
+   "facts": [
+    [
+     "asking",
+     11430051.0,
+     "money"
+    ],
+    [
+     "",
+     2.3299305601037035,
+     "per_million"
+    ],
+    [
+     "better off in",
+     0.776,
+     "seasons"
+    ],
+    [
+     "",
+     0.0,
+     "trend"
+    ]
+   ]
+  },
+  {
+   "name": "Miguel Cubo",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Miguel Cubo",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "gain": 0.0,
+   "per": "season",
+   "facts": [
+    [
+     "raises",
+     535093.0,
+     "money"
+    ],
+    [
+     "",
+     0.0,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Yeray Alvarez",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Yeray Alvarez",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "gain": -5.058364550640135,
+   "per": "season",
+   "facts": [
+    [
+     "raises",
+     4760266.0,
+     "money"
+    ],
+    [
+     "",
+     -1.0626222464543233,
+     "per_million"
+    ]
+   ]
   }
  ],
- "plan_gain": 0.0,
- "cash_after": null,
- "ping": "field Dakonam Djene",
+ "plan_gain": 24.073156667964213,
+ "cash_after": 3561500.3021758795,
+ "ping": "field Andres Castrin, Dakonam Djene; buy Andres Castrin; sell Miguel Cubo; sell Yeray Alvarez",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -95,6 +174,11 @@
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "clause": 6931556.0
+  },
+  {
+   "name": "Miguel Cubo",
+   "pos": "DEL",
+   "clause": 1000000.0
   }
  ],
  "squad": [
@@ -109,7 +193,7 @@
    "trend": 0.0,
    "paid": 21511188.0,
    "per_million": null,
-   "offer": 23729278.0
+   "offer": null
   },
   {
    "name": "Natan",
@@ -121,8 +205,8 @@
    "value": 60658678.0,
    "trend": 0.0,
    "paid": 37492727.0,
-   "per_million": -1.0830270056557951,
-   "offer": 63421928.0
+   "per_million": -1.1544744855995341,
+   "offer": null
   },
   {
    "name": "Marcos Alonso",
@@ -134,8 +218,8 @@
    "value": 21804494.0,
    "trend": 0.0,
    "paid": 28589508.0,
-   "per_million": -1.7113018357171221,
-   "offer": 23797749.0
+   "per_million": -1.8308315667657626,
+   "offer": null
   },
   {
    "name": "Yeray Alvarez",
@@ -147,8 +231,8 @@
    "value": 4760266.0,
    "trend": 0.0,
    "paid": 6931556.0,
-   "per_million": -1.142575956552484,
-   "offer": 4372865.0
+   "per_million": -1.0626222464543233,
+   "offer": null
   },
   {
    "name": "Dakonam Djene",
@@ -160,8 +244,8 @@
    "value": 24543934.0,
    "trend": 0.0,
    "paid": 16059124.0,
-   "per_million": -1.1511129084634977,
-   "offer": 25013535.0
+   "per_million": -1.1909200335664838,
+   "offer": null
   },
   {
    "name": "Zaid Romero",
@@ -173,8 +257,8 @@
    "value": 38960110.0,
    "trend": 0.0,
    "paid": 28662117.0,
-   "per_million": -1.7835500467606697,
-   "offer": 42183144.0
+   "per_million": -1.8658156594404736,
+   "offer": null
   },
   {
    "name": "Pablo Fornals",
@@ -186,7 +270,7 @@
    "value": 39666034.0,
    "trend": 0.0,
    "paid": 58220110.0,
-   "per_million": -1.2975948100280674,
+   "per_million": -1.2462123336896873,
    "offer": null
   },
   {
@@ -199,7 +283,7 @@
    "value": 17459959.0,
    "trend": 0.0,
    "paid": 5891526.0,
-   "per_million": -1.594474066844221,
+   "per_million": -1.5845377629257447,
    "offer": null
   },
   {
@@ -212,7 +296,7 @@
    "value": 16685380.0,
    "trend": 0.0,
    "paid": null,
-   "per_million": -1.6672260081677868,
+   "per_million": -1.5769438632765929,
    "offer": null
   },
   {
@@ -225,7 +309,7 @@
    "value": 13985108.0,
    "trend": 0.0,
    "paid": 13966262.0,
-   "per_million": -2.043803215277603,
+   "per_million": -1.98080160945636,
    "offer": null
   },
   {
@@ -238,7 +322,7 @@
    "value": 17081527.0,
    "trend": 0.0,
    "paid": 5307217.0,
-   "per_million": -3.4244164551300322,
+   "per_million": -3.4107817608126836,
    "offer": null
   },
   {
@@ -251,7 +335,7 @@
    "value": 25983349.0,
    "trend": 0.0,
    "paid": null,
-   "per_million": -1.3729508853099937,
+   "per_million": -1.3235364532845089,
    "offer": null
   },
   {
@@ -264,8 +348,21 @@
    "value": 39821970.0,
    "trend": 0.0,
    "paid": 42016585.0,
-   "per_million": -1.663469277871052,
-   "offer": 37900804.0
+   "per_million": -1.6984927887683825,
+   "offer": null
+  },
+  {
+   "name": "Miguel Cubo",
+   "pos": "DEL",
+   "xi": false,
+   "start": 0.12425921379320908,
+   "next": 0.3412647576549116,
+   "season": 10.983633224896051,
+   "value": 535093.0,
+   "trend": 0.0,
+   "paid": 535093.0,
+   "per_million": 0.0,
+   "offer": null
   }
  ],
  "standings": [
@@ -273,21 +370,21 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 339.0,
-   "mean": 2147.09187598562,
-   "lo": 1977.7232578008718,
-   "hi": 2316.63131295977,
+   "mean": 2153.1938194097565,
+   "lo": 1988.4799720339468,
+   "hi": 2325.083169537182,
    "cash": 1112317.0,
    "estimated": true,
-   "p_above": 0.7623333333333333
+   "p_above": 0.7813333333333333
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 373.0,
-   "mean": 2022.2362374492104,
-   "lo": 1872.4435098878998,
-   "hi": 2174.9370445642944,
-   "cash": 10451947.0,
+   "mean": 2018.543591705918,
+   "lo": 1870.5913608791057,
+   "hi": 2172.2841328397526,
+   "cash": 9916854.0,
    "estimated": false,
    "p_above": null
   },
@@ -295,32 +392,32 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 282.0,
-   "mean": 1680.9596375029612,
-   "lo": 1548.7785773409182,
-   "hi": 1815.6805680641348,
-   "cash": 220961420.0,
+   "mean": 1847.593079788647,
+   "lo": 1703.0849243048701,
+   "hi": 1992.6840049752175,
+   "cash": 6822483.0,
    "estimated": true,
-   "p_above": 0.015666666666666718
+   "p_above": 0.14300000000000002
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 293.0,
-   "mean": 1602.0296850179511,
-   "lo": 1481.5205436698056,
-   "hi": 1720.445964697281,
+   "mean": 1603.9037042575903,
+   "lo": 1483.5944038751588,
+   "hi": 1722.0366502420009,
    "cash": 43693671.0,
    "estimated": true,
-   "p_above": 0.002666666666666706
+   "p_above": 0.0023333333333332984
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 217.0,
-   "mean": 1552.3805594288042,
-   "lo": 1431.4166252679952,
-   "hi": 1676.2812101482552,
-   "cash": 22240512.0,
+   "mean": 1583.9964239308356,
+   "lo": 1459.5833292613452,
+   "hi": 1706.9154698525153,
+   "cash": -15993043.0,
    "estimated": true,
    "p_above": 0.0003333333333332966
   }
