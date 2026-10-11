@@ -51,7 +51,7 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
             market = current("market")
             sc = scorer(market, current("lineups", LINEUP_SOURCE))
             per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
-                                 current("matches"))[0]
+                                 current("matches")).per_j
             flagged = {k for k in sc.lookup if sc.starts.status_of(k)}
             for j in range(i, i + ahead + 1):
                 if j not in done or j not in per_j:

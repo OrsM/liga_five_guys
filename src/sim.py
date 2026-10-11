@@ -13,10 +13,11 @@ from ffcore.league import app_fielded
 from ffcore.rules import POSITIONS
 from ffcore.clock import run_now
 from ffcore.db import record, this_run
+from ffcore.forecast import expected_points
 from ffcore.jornadas import load_deadline
 from ffcore.tidy import REPORTS
 
-__all__ = ["funnel", "report"]
+__all__ = ["forecast", "funnel", "report"]
 
 ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -283,6 +284,13 @@ def _selftest() -> None:
     sale_row = next(r for r in ranked if r["kind"] == "sell")
     assert sale_row["buy"] is None and sale_row["sell"], sale_row
 
+    from ffcore.schedule import Factors
+    star = Factors(6.0, 1.1, 0.9, 0.5)
+    fc = forecast(replace(ub, factors={3: {"star": star}}), 7)
+    assert fc == [{"run_id": 7, "jornada": 3, "player": "star", "ppm": 6.0, "fixture": 1.1,
+                   "picked": 0.9, "fit": 0.5, "points": star.cell[0], "plays": star.cell[1],
+                   "expected": expected_points(star.cell)}], fc
+
     print("sim self-test OK")
 
 
@@ -296,6 +304,15 @@ def funnel(u: Universe, b: Board, run: int) -> list[Doc]:
              "gain": m.d_pts, "p_better": m.p_better, "per_million": m.per_million,
              "verdict": verdict(m), "in_plan": int(m in b.plan)}
             for i, m in enumerate(b.rows)]
+
+
+def forecast(u: Universe, run: int) -> list[Doc]:
+    """Every forecast cell that has factors, factor by factor
+    (ffcore.schedule.Factors), with the expected points they make."""
+    return [{"run_id": run, "jornada": j, "player": k, "ppm": f.ppm, "fixture": f.fixture,
+             "picked": f.picked, "fit": f.fit, "points": f.cell[0], "plays": f.cell[1],
+             "expected": expected_points(f.cell)}
+            for j, layer in u.factors.items() for k, f in layer.items()]
 
 
 def main() -> None:
@@ -312,6 +329,7 @@ def main() -> None:
     print("wrote %s" % (REPORTS / "decisions.json"))
     if (run := this_run()) is not None:
         record(funnel(u, b, run), "funnel")
+        record(forecast(u, run), "forecast")
 
 
 if __name__ == "__main__":

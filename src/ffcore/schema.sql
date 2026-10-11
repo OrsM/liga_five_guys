@@ -41,3 +41,20 @@ CREATE TABLE IF NOT EXISTS funnel (
     in_plan     INTEGER NOT NULL,
     PRIMARY KEY (run_id, rank)
 );
+
+-- Every forecast cell with factors (ffcore.schedule.Factors): points =
+-- ppm x fixture, plays = picked x fit, expected from the two. Squads and
+-- the market only, ~2.8k rows a run.
+CREATE TABLE IF NOT EXISTS forecast (
+    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
+    jornada  INTEGER NOT NULL,
+    player   TEXT NOT NULL,
+    ppm      REAL NOT NULL,
+    fixture  REAL NOT NULL,
+    picked   REAL NOT NULL,
+    fit      REAL NOT NULL,
+    points   REAL NOT NULL,
+    plays    REAL NOT NULL,
+    expected REAL NOT NULL,
+    PRIMARY KEY (run_id, jornada, player)
+);

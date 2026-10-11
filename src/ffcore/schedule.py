@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from datetime import date, timedelta
+from typing import NamedTuple
 
 from ffcore.fixture import Match, Ratings, season_board
 from ffcore.forecast import Cell, PerJornada
@@ -36,13 +37,28 @@ def rounds_left(matches: Rows) -> tuple[list[int], dict[int, set[str]]]:
 UNSCORED_DEFAULT = (2.0, 0.5)
 
 
-def jornada_expectation(r: Rates, match: Match | None, first: bool, fit: float = 1.0
-                        ) -> Cell:
-    """(points if he plays, chance he plays): points per match times the
-    fixture, and the chance he is picked if fit times the chance he is fit."""
+class Factors(NamedTuple):
+    """A player's jornada as the model builds it: points per match, the
+    fixture, the chance he is picked if fit, the chance he is fit."""
+    ppm: float
+    fixture: float
+    picked: float
+    fit: float
+
+    @property
+    def cell(self) -> Cell:
+        """(points if he plays, chance he plays): their products."""
+        return max(0.0, self.ppm * self.fixture), self.picked * self.fit
+
+
+PerJornadaFactors = dict[int, dict[str, Factors]]
+
+
+def jornada_factors(r: Rates, match: Match | None, first: bool, fit: float = 1.0
+                    ) -> Factors:
     fix = 1.0 if match is None else (
         match.def_factor if r.slot in ("POR", "DEF") else match.atk_factor)
-    return max(0.0, r.ppm * fix), (r.p_now if first else r.p_rest) * fit
+    return Factors(r.ppm, fix, r.p_now if first else r.p_rest, fit)
 
 
 def jornada_dates(matches: Rows, rem: list[int]) -> dict[int, date]:
@@ -55,37 +71,51 @@ def jornada_dates(matches: Rows, rem: list[int]) -> dict[int, date]:
 
 def season(rates: dict[str, Rates | None], club: dict[str, str], rem: list[int],
            played: dict[int, set[str]], board: dict[int, dict[str, Match]],
-           fit: Fit | None = None) -> tuple[PerJornada, dict[str, int]]:
+           fit: Fit | None = None) -> tuple[PerJornada, dict[str, int], PerJornadaFactors]:
+    """Each player's cell per jornada left, his first jornada, and the
+    factors of every cell that has them (an unrated player has none)."""
     per_j: PerJornada = {}
     first_of: dict[str, int] = {}
+    factors: PerJornadaFactors = {}
     for j in rem:
-        layer = {}
+        layer, made = {}, {}
         for k, r in rates.items():
             if club.get(k) in played.get(j, ()):
                 continue
             first = k not in first_of
             if first:
                 first_of[k] = j
-            layer[k] = UNSCORED_DEFAULT if r is None else jornada_expectation(
-                r, board.get(j, {}).get(club.get(k, "")), first,
-                fit(k, j, first_of[k]) if fit else 1.0)
-        per_j[j] = layer
-    return per_j, first_of
+            if r is None:
+                layer[k] = UNSCORED_DEFAULT
+                continue
+            made[k] = jornada_factors(r, board.get(j, {}).get(club.get(k, "")), first,
+                                      fit(k, j, first_of[k]) if fit else 1.0)
+            layer[k] = made[k].cell
+        per_j[j], factors[j] = layer, made
+    return per_j, first_of, factors
+
+
+class Expectations(NamedTuple):
+    per_j: PerJornada
+    first_of: dict[str, int]
+    rates: dict[str, Rates | None]
+    rem: list[int]
+    played: dict[int, set[str]]
+    factors: PerJornadaFactors
 
 
 def expectations(sc: Scorer, ratings: Ratings, keys: Iterable[str], matches: Rows
-                 ) -> tuple[PerJornada, dict[str, int], dict[str, Rates | None], list[int],
-                            dict[int, set[str]]]:
+                 ) -> Expectations:
 
     rem, played = rounds_left(matches)
     rates = {k: sc.rates(sc.lookup[k]) if k in sc.lookup else None
              for k in keys}
     club = {k: c for k in keys if k in sc.lookup and (c := sc.lookup[k].get("club"))}
     dates = jornada_dates(matches, rem)
-    per_j, first_of = season(
+    per_j, first_of, factors = season(
         rates, club, rem, played, season_board(ratings, matches, rem),
         lambda k, j, first_j: sc.fit(k, j, dates.get(j), first_j))
-    return per_j, first_of, rates, rem, played
+    return Expectations(per_j, first_of, rates, rem, played, factors)
 
 
 def phantom_topup(sq: Squad) -> Squad:
@@ -133,10 +163,12 @@ def _selftest() -> None:
                    10: date(2026, 10, 25)}, got
     assert jornada_dates([], [8]) == {}
     hurt = R("k", "DEL", 4.0, 0.6, 0.8, 10.0)
-    assert jornada_expectation(hurt, None, True) == (4.0, 0.6), "fit unless told"
-    assert jornada_expectation(hurt, None, True, 0.5) == (4.0, 0.3), \
+    assert jornada_factors(hurt, None, True) == Factors(4.0, 1.0, 0.6, 1.0), "fit unless told"
+    assert jornada_factors(hurt, None, True, 0.5).cell == (4.0, 0.3), \
         "chance he plays = picked if fit x fit"
-    assert jornada_expectation(hurt, None, False, 0.5) == (4.0, 0.4)
+    assert jornada_factors(hurt, None, False, 0.5) == Factors(4.0, 1.0, 0.8, 0.5)
+    assert Factors(4.0, 1.1, 0.6, 1.0).cell == (4.0 * 1.1, 0.6), "points = rate x fixture"
+    assert Factors(-1.0, 1.0, 0.6, 1.0).cell[0] == 0.0, "never below zero"
 
     ms = typed("matches", [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
           {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
@@ -160,7 +192,7 @@ def _selftest() -> None:
             "ghost": "other"}
     board = {1: {"mine": easy}, 2: {"mine": hard}, 3: {}}
     hurt_now = {"susp": 0.0, "dbt": 0.5}
-    per_j, first_of = season(rates, club, [1, 2, 3], {}, board,
+    per_j, first_of, factors = season(rates, club, [1, 2, 3], {}, board,
                              lambda k, j, first: hurt_now[k] if k in hurt_now
                              and j == first else 1.0)
     assert per_j[1]["del"] == (8.0 * 1.2, 0.9), per_j[1]
@@ -172,11 +204,15 @@ def _selftest() -> None:
     assert per_j[1]["dbt"] == (5.0 * 1.2, 0.8 * 0.5), per_j[1]["dbt"]
     assert per_j[1]["ghost"] == per_j[2]["ghost"] == UNSCORED_DEFAULT
     assert first_of == dict.fromkeys(rates, 1), first_of
+    assert factors[1]["dbt"] == Factors(5.0, 1.2, 0.8, 0.5), factors[1]["dbt"]
+    assert all(f.cell == per_j[j][k] for j, layer in factors.items() for k, f in layer.items()), \
+        "the cell is its factors' product, from the one function"
+    assert "ghost" not in factors[1], "an unrated player has a default, no factors"
 
-    later, later_first = season(rates, club, [1, 2], {1: {"mine"}}, board)
+    later, later_first, _f = season(rates, club, [1, 2], {1: {"mine"}}, board)
     assert set(later[1]) == {"ghost"} and later[2]["del"] == (8.0 * 0.8, 0.9)
     assert later_first["del"] == 2 and later_first["ghost"] == 1
-    assert season(rates, club, [], {}, board) == ({}, {})
+    assert season(rates, club, [], {}, board) == ({}, {}, {})
 
     ph_sq = {"m": {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
                    "x3": "MED", "p1": "POR", "f1": "DEL"}}

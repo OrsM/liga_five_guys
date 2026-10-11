@@ -132,8 +132,8 @@ def universe() -> Universe:
            for k, rec in players.items()}
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
-    per_j, first_jornada_of, _rates, rem, played = expectations(
-        sc, fixture_ratings(mkt_rows), set(price).union(*squads.values()), m)
+    ex = expectations(sc, fixture_ratings(mkt_rows), set(price).union(*squads.values()), m)
+    per_j, first_jornada_of, rem, played = ex.per_j, ex.first_of, ex.rem, ex.played
     prices = Momentum(steps(history("market")))
     market = Market(
         cash=lg.cash[me], premium=_premium(me),
@@ -164,4 +164,4 @@ def universe() -> Universe:
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of)
+        part_played=played, first_jornada_of=first_jornada_of, factors=ex.factors)

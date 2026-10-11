@@ -13,6 +13,10 @@ deployed when green.
   renderer; its numbers link into Datasette (as `Band.jsx` does).
 - **One query, three readers**: each question is one saved query in
   `datasette.json`; Datasette, `ask.py` and the board run that text.
+- **SQL first**: Python computes once and writes rows; drift, comparisons
+  and "what changed" are saved queries, not Python machinery. Tables follow
+  broom: `runs` is glance (one row a run), `params` is tidy (one row a
+  parameter), `funnel` and `forecast` are augment (one row an observation).
 - **`lfg.db` is disposable**: every table is rebuildable from `data/raw`,
   git or a replay, except `runs`. No backup. Tables change by adding; a
   changed table is dropped and rebuilt.
@@ -54,12 +58,16 @@ deployed when green.
 
 **Phase 2: what the model concluded**
 - 2.1 (done) `funnel`, steps 1-3: 25 rows a run, sim time within noise.
-- 2.2 `forecast`, a column per factor; `ask.py forecast` reads it (same
-  output), its computation deleted.
-- 2.3 `board`; `decisions.json` exported from it (`golden.py check` same).
-- 2.4 `grading` writes backtest and replayed decisions as tables.
-- 2.5 board history imported from git.
-- 2.6 "why did it change": diff of the last two runs' funnel and forecast,
+- 2.2 (done) `forecast`: `schedule.Factors` built once, the cell its
+  product; `ask.py forecast` prints the same objects (output identical,
+  `golden.py check` 16 boards the same).
+- 2.3 `params`, write-only: every constant and fitted value a run used
+  (calibration, availability, fallbacks, promoted discount, premium, offer
+  ratios, momentum, fixture ratings), one list in `assemble`.
+- 2.4 `board`; `decisions.json` exported from it (`golden.py check` same).
+- 2.5 `grading` writes backtest and replayed decisions as tables.
+- 2.6 board history imported from git.
+- 2.7 "why did it change": diff of the last two runs' funnel and forecast,
   naming the factor that moved; the ping carries the line.
 
 **Phase 3: Datasette, and the run controls off the phone**
@@ -83,6 +91,9 @@ deployed when green.
 - 4.3 Delete the CSV machinery nothing uses.
 
 **Phase 5: experiments, each a module of its own; keep what gets used**
+- 5.0 Only if a question SQL cannot answer needs it: the model takes its
+  fits as one input, loadable from a run's `params`, one fit at a time.
+  Then data-vs-fit attribution (today's data, September's fits).
 - 5.1 Replay: the board, funnel and forecast at any past snapshot, today's
   code, clock pinned (~400 snapshots x ~8s sim, once; then one a run).
   Tagged by code version so replays and live runs sit side by side.

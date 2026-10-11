@@ -11,7 +11,7 @@ from ffcore.forecast import Bootstrap
 from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.rules import Squad, Squads, shortfall
-from ffcore.schedule import phantom_topup
+from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState, Standings, simulate_many
 from stats import percentile
 
@@ -69,6 +69,7 @@ class Universe:
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
+    factors: PerJornadaFactors = field(default_factory=dict)
 
     @property
     def me(self) -> str:

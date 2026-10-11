@@ -25,7 +25,7 @@ from decide import (FUNNEL, Action, Board, Move, Universe, blocked, board, joint
 from ffcore.names import Name  # noqa: E402
 from ffcore.text import resolve  # noqa: E402
 from sim import holding  # noqa: E402
-from ffcore.schedule import jornada_dates, jornada_expectation  # noqa: E402
+from ffcore.schedule import jornada_dates  # noqa: E402
 from ffcore.startprob import bucket  # noqa: E402
 from ffcore.forecast import expected_points  # noqa: E402
 from ffcore.tidy import LINEUP_SOURCE, current  # noqa: E402
@@ -172,15 +172,12 @@ def forecast(u: Universe, k: str, ahead: int) -> None:
         "J", "date", "pts", "fixture", "picked", "fit", "plays", "expected", "why fit"))
     shown = 0
     for j in u.state.jornadas:
-        cell = u.forecaster.per_jornada.get(j, {}).get(k)
-        if cell is None or shown >= ahead:
+        f = u.factors.get(j, {}).get(k)
+        if f is None or shown >= ahead:
             continue
-        pts, p = cell
-        picked = jornada_expectation(rates, None, j == first)[1]
-        fit = sc.fit(k, j, dates.get(j), first)
         print("%-4d %-10s %6.2f %7.2f %7.2f %6.2f %6.2f %8.2f  %s" % (
-            j, dates.get(j, ""), pts, pts / r.ppm if r.ppm else 0.0, picked,
-            fit, p, expected_points(cell), bucket(prog, j, dates.get(j), first) if prog else "-"))
+            j, dates.get(j, ""), f.cell[0], f.fixture, f.picked, f.fit, f.cell[1],
+            expected_points(f.cell), bucket(prog, j, dates.get(j), first) if prog else "-"))
         shown += 1
     where = ("in your best eleven" if k in u.outlook.xi.players else
              "on your bench" if k in u.mine else "not in your squad")
