@@ -94,12 +94,15 @@ data/raw tarballs
   runs' funnel, forecast and params; the ping carries the line.
 
 **Slices: SQL replaces Python, one data family at a time**
-- S0 `golden.py` freezes `data/raw` (+ the committed tidy state) and runs
+- S0 (done) `golden.py` freezes `data/raw` (+ the committed tidy state) and runs
   `parse sim`; floats compared with `math.isclose`.
-- S1 Datasette on `lfg.db` (loopback first), saved queries in the repo's
+- S1 (done; grading.py 324 -> 195 lines, SQL equal to the last bit) Datasette on `lfg.db` (loopback first), saved queries in the repo's
   `datasette.json`, `tools/q.py` runs them in a terminal, a `players`
   table for names; the grading reports become saved queries and their
   Python goes.
+  Learned: Datasette sends an empty box as '' (queries default with
+  `nullif(:p, '')`, and q.py sends '' too); a self-join on a CTE needs
+  `MATERIALIZED` (48s -> 0.02s; Datasette stops at 5s).
 - S2 Ledger: `api_activity` into SQL; ledger, rival cash, price paid as
   views; `league.py`'s versions go.
 - S3 Market history: `market`, `api_market`, `api_offers`; price steps,
