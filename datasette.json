@@ -13,7 +13,7 @@
         },
         "persistence": {
           "title": "Persistent share of a player's expectation (what PERSISTENT_SHARE is measured by)",
-          "sql": "WITH g AS (SELECT player, jornada, actual - predicted AS r, predicted AS e\n           FROM grade_forecast WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_forecast)) AND from_j = jornada),\n     b AS (SELECT avg(r) AS bias FROM g),\n     pairs AS (SELECT sum((x.r - b.bias) * (y.r - b.bias)) AS num, sum(x.e * y.e) AS den\n               FROM g x JOIN g y ON x.player = y.player AND x.jornada < y.jornada, b)\nSELECT CASE WHEN den > 0 THEN round(sqrt(max(0.0, num) / den), 3) ELSE 0.0 END\n       AS persistent_share FROM pairs"
+          "sql": "WITH g AS MATERIALIZED (SELECT player, jornada, actual - predicted AS r, predicted AS e\n           FROM grade_forecast WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_forecast)) AND from_j = jornada),\n     b AS (SELECT avg(r) AS bias FROM g),\n     pairs AS (SELECT sum((x.r - b.bias) * (y.r - b.bias)) AS num, sum(x.e * y.e) AS den\n               FROM g x JOIN g y ON x.player = y.player AND x.jornada < y.jornada, b)\nSELECT CASE WHEN den > 0 THEN round(sqrt(max(0.0, num) / den), 3) ELSE 0.0 END\n       AS persistent_share FROM pairs"
         },
         "decisions_graded": {
           "title": "Replayed boards: each funnel outcome's forecast against what happened",
