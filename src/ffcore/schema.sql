@@ -1,0 +1,2 @@
+-- data/lfg.db, applied on every connect (ffcore/db.py). Only adds: a
+-- changed table is dropped by hand and rebuilt (docs/plan-datasette.md).

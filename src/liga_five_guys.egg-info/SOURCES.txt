@@ -14,6 +14,7 @@ src/ffcore/action.py
 src/ffcore/auth.py
 src/ffcore/clock.py
 src/ffcore/crosswalk.py
+src/ffcore/db.py
 src/ffcore/fixture.py
 src/ffcore/fixtures.py
 src/ffcore/footballdata.py

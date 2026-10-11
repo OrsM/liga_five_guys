@@ -69,3 +69,8 @@ data/tidy/transactions.csv
 data/tidy/understat_players.csv
 data/tidy/snapindex.json
 data/tidy/parse_state.json
+
+# The run database (docs/plan-datasette.md): disposable, rebuilt from
+# data/raw, git and replays, so never committed.
+data/lfg.db
+data/lfg.db-*
