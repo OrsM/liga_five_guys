@@ -30,13 +30,18 @@ def params(sql: str) -> list[str]:
     return sorted(set(re.findall(r"(?<![:\w]):([A-Za-z_]\w*)", sql)))
 
 
+def run_params(sql: str, given: dict[str, str]) -> dict[str, str]:
+    """Every param of sql: as given, else '', which is what Datasette sends
+    for a box left empty (so a query defaults with nullif(:p, ''))."""
+    return {p: given.get(p, "") for p in params(sql)}
+
+
 def run(name: str, given: dict[str, str], path: Path = DB, meta: Path = META
         ) -> tuple[list[str], list[tuple[Any, ...]]]:
-    """A saved query's columns and rows; a param not given is NULL, as in
-    Datasette when its box is left empty."""
+    """A saved query's columns and rows, run as Datasette runs it."""
     sql = queries(meta)[name]["sql"]
     with closing(sqlite3.connect("file:%s?mode=ro" % path, uri=True)) as db:
-        cur = db.execute(sql, {p: given.get(p) or None for p in params(sql)})
+        cur = db.execute(sql, run_params(sql, given))
         return [d[0] for d in cur.description], cur.fetchall()
 
 
@@ -71,7 +76,7 @@ def _selftest() -> None:
         meta = Path(tmp) / "datasette.json"
         meta.write_text(json.dumps({"databases": {"lfg": {"queries": {
             "big": {"title": "runs over a size",
-                    "sql": "SELECT run_id FROM runs WHERE peak_mb > coalesce(:mb, 0)"
+                    "sql": "SELECT run_id FROM runs WHERE peak_mb > coalesce(nullif(:mb, ''), 0)"
                            " ORDER BY run_id"}}}}}))
         db = Path(tmp) / "lfg.db"
         with closing(connect(db)) as c, c:
@@ -79,11 +84,13 @@ def _selftest() -> None:
                           " VALUES ('t', 't', 'service', 'a', ?)", [(100.0,), (300.0,)])
         assert queries(meta) == {"big": queries(meta)["big"]} and "sql" in queries(meta)["big"]
         assert run("big", {"mb": "200"}, db, meta) == (["run_id"], [(2,)])
-        assert run("big", {}, db, meta) == (["run_id"], [(1,), (2,)]), "a missing param is NULL"
+        assert run("big", {}, db, meta) == (["run_id"], [(1,), (2,)])
+        empty = sqlite3.connect(":memory:").execute("SELECT :p", run_params("SELECT :p", {}))
+        assert empty.fetchone() == ("",), "a param not given is '', as Datasette sends it"
     with closing(connect(Path(tmp + "-empty.db"))) as c:
         for name, q in queries().items():
             try:
-                c.execute("EXPLAIN " + q["sql"], {p: None for p in params(q["sql"])})
+                c.execute("EXPLAIN " + q["sql"], run_params(q["sql"], {}))
             except Exception as e:
                 raise AssertionError("datasette.json query %s: %s" % (name, e)) from e
     Path(tmp + "-empty.db").unlink()

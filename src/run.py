@@ -51,10 +51,14 @@ def _utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _commit() -> str:
+def _commit(repo: Path = Path(".")) -> str:
+    """The last commit that changed the code: the report, data and input
+    commits every run makes do not count."""
     try:
-        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
-                              text=True, check=True).stdout.strip() or "?"
+        return subprocess.run(
+            ["git", "-C", str(repo), "log", "-1", "--format=%h", "--", ".",
+             ":!data", ":!reports", ":!inputs"],
+            capture_output=True, text=True, check=True).stdout.strip() or "?"
     except (OSError, subprocess.CalledProcessError):
         return "?"
 
@@ -154,6 +158,18 @@ def _selftest_runs() -> None:
     fake.quiet = lambda: {"run": this_run()}  # type: ignore[attr-defined]
     fake.boom = boom  # type: ignore[attr-defined]
     sys.modules["fake_stages"] = fake
+    with tempfile.TemporaryDirectory() as tmp:
+        git = ["git", "-C", tmp, "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run([*git[:3], "init", "-q"], check=True)
+        for f in ("src/a.py", "reports/b.json", "data/c.csv", "inputs/d.ini"):
+            (Path(tmp) / f).parent.mkdir(parents=True, exist_ok=True)
+            (Path(tmp) / f).write_text(f)
+            subprocess.run([*git, "add", f], check=True)
+            subprocess.run([*git, "commit", "-qm", f], check=True)
+            if f == "src/a.py":
+                code = _commit(Path(tmp))
+        assert code != "?" and _commit(Path(tmp)) == code, \
+            "the code's commit: a report, data or input commit does not change it"
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "lfg.db"
         assert main([], [("count", "fake_stages:counted"), ("quiet", "fake_stages:quiet")],

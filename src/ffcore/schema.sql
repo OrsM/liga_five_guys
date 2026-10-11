@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS runs (
     started    TEXT NOT NULL,     -- wall clock, UTC
     as_of      TEXT NOT NULL,     -- the clock the model read (LFG_NOW when pinned)
     trigger    TEXT NOT NULL,     -- LFG_TRIGGER: service, button
-    commit_sha TEXT NOT NULL,
+    commit_sha TEXT NOT NULL,     -- the last commit that changed the code
     finished   TEXT,
     ok         INTEGER,
     peak_mb    REAL

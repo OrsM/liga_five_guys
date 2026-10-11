@@ -5,23 +5,23 @@
       "queries": {
         "forecast_error": {
           "title": "Forecast error by lock and jornada (a graded run; latest by default)",
-          "sql": "SELECT from_j, jornada, ahead, n, round(rmse, 3) AS rmse, round(bias, 3) AS bias,\n       round(top50, 2) AS top50_scored, flagged_n, round(flagged_rmse, 3) AS flagged_rmse,\n       round(flagged_bias, 3) AS flagged_bias\nFROM grade_error WHERE run_id = coalesce(:run, (SELECT max(run_id) FROM grade_forecast)) AND (:ahead IS NULL OR ahead = :ahead)\nORDER BY from_j, jornada"
+          "sql": "SELECT from_j, jornada, ahead, n, round(rmse, 3) AS rmse, round(bias, 3) AS bias,\n       round(top50, 2) AS top50_scored, flagged_n, round(flagged_rmse, 3) AS flagged_rmse,\n       round(flagged_bias, 3) AS flagged_bias\nFROM grade_error WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_forecast)) AND (nullif(:ahead, '') IS NULL OR ahead = :ahead)\nORDER BY from_j, jornada"
         },
         "forecast_error_by_ahead": {
           "title": "Forecast error by how far ahead: mean of each jornada's error; flagged players pooled",
-          "sql": "SELECT ahead, count(*) AS forecasts, round(avg(rmse), 3) AS rmse,\n       sum(flagged_n) AS flagged_n,\n       round(sqrt(sum(flagged_rmse * flagged_rmse * flagged_n) / sum(flagged_n)), 3) AS flagged_rmse,\n       round(sum(flagged_bias * flagged_n) / sum(flagged_n), 3) AS flagged_bias\nFROM grade_error WHERE run_id = coalesce(:run, (SELECT max(run_id) FROM grade_forecast)) GROUP BY ahead ORDER BY ahead"
+          "sql": "SELECT ahead, count(*) AS forecasts, round(avg(rmse), 3) AS rmse,\n       sum(flagged_n) AS flagged_n,\n       round(sqrt(sum(flagged_rmse * flagged_rmse * flagged_n) / sum(flagged_n)), 3) AS flagged_rmse,\n       round(sum(flagged_bias * flagged_n) / sum(flagged_n), 3) AS flagged_bias\nFROM grade_error WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_forecast)) GROUP BY ahead ORDER BY ahead"
         },
         "persistence": {
           "title": "Persistent share of a player's expectation (what PERSISTENT_SHARE is measured by)",
-          "sql": "WITH g AS (SELECT player, jornada, actual - predicted AS r, predicted AS e\n           FROM grade_forecast WHERE run_id = coalesce(:run, (SELECT max(run_id) FROM grade_forecast)) AND from_j = jornada),\n     b AS (SELECT avg(r) AS bias FROM g),\n     pairs AS (SELECT sum((x.r - b.bias) * (y.r - b.bias)) AS num, sum(x.e * y.e) AS den\n               FROM g x JOIN g y ON x.player = y.player AND x.jornada < y.jornada, b)\nSELECT CASE WHEN den > 0 THEN round(sqrt(max(0.0, num) / den), 3) ELSE 0.0 END\n       AS persistent_share FROM pairs"
+          "sql": "WITH g AS (SELECT player, jornada, actual - predicted AS r, predicted AS e\n           FROM grade_forecast WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_forecast)) AND from_j = jornada),\n     b AS (SELECT avg(r) AS bias FROM g),\n     pairs AS (SELECT sum((x.r - b.bias) * (y.r - b.bias)) AS num, sum(x.e * y.e) AS den\n               FROM g x JOIN g y ON x.player = y.player AND x.jornada < y.jornada, b)\nSELECT CASE WHEN den > 0 THEN round(sqrt(max(0.0, num) / den), 3) ELSE 0.0 END\n       AS persistent_share FROM pairs"
         },
         "decisions_graded": {
           "title": "Replayed boards: each funnel outcome's forecast against what happened",
-          "sql": "SELECT reached, kind, count(*) AS n,\n       round(avg(CASE WHEN jornadas > 0 THEN pred / jornadas END), 2) AS forecast_per_jornada,\n       round(avg(CASE WHEN jornadas > 0 THEN real / jornadas END), 2) AS happened_per_jornada,\n       round(100 * avg(CASE WHEN jornadas > 0 THEN real > 0 END)) AS happened_up_pct,\n       round(100 * avg(chance)) AS forecast_chance_pct,\n       round(avg(value_pred), 2) AS value_forecast_m, round(avg(value_real), 2) AS value_happened_m\nFROM grade_decisions WHERE run_id = coalesce(:run, (SELECT max(run_id) FROM grade_decisions))\nGROUP BY reached, kind\nORDER BY CASE reached WHEN 'plan' THEN 0 WHEN 'cleared' THEN 1 ELSE 2 END, kind"
+          "sql": "SELECT reached, kind, count(*) AS n,\n       round(avg(CASE WHEN jornadas > 0 THEN pred / jornadas END), 2) AS forecast_per_jornada,\n       round(avg(CASE WHEN jornadas > 0 THEN real / jornadas END), 2) AS happened_per_jornada,\n       round(100 * avg(CASE WHEN jornadas > 0 THEN real > 0 END)) AS happened_up_pct,\n       round(100 * avg(chance)) AS forecast_chance_pct,\n       round(avg(value_pred), 2) AS value_forecast_m, round(avg(value_real), 2) AS value_happened_m\nFROM grade_decisions WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_decisions))\nGROUP BY reached, kind\nORDER BY CASE reached WHEN 'plan' THEN 0 WHEN 'cleared' THEN 1 ELSE 2 END, kind"
         },
         "plan_moves_graded": {
           "title": "Every move a replayed board planned, against what happened",
-          "sql": "SELECT lock, move, round(pred, 1) AS forecast, round(real, 1) AS happened, jornadas,\n       round(value_pred, 1) AS value_forecast_m, round(value_real, 1) AS value_happened_m\nFROM grade_decisions WHERE run_id = coalesce(:run, (SELECT max(run_id) FROM grade_decisions)) AND reached = 'plan' ORDER BY ord"
+          "sql": "SELECT lock, move, round(pred, 1) AS forecast, round(real, 1) AS happened, jornadas,\n       round(value_pred, 1) AS value_forecast_m, round(value_real, 1) AS value_happened_m\nFROM grade_decisions WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_decisions)) AND reached = 'plan' ORDER BY ord"
         },
         "compare_grades": {
           "title": "Two graded runs' next-jornada forecasts, on the players both forecast",
@@ -33,11 +33,11 @@
         },
         "funnel": {
           "title": "Every move the latest board ranked: gain, confidence, verdict, plan",
-          "sql": "SELECT rank, label, round(gain, 1) AS gain, round(100 * p_better) AS better_pct,\n       round(per_million, 2) AS per_million, round(cost / 1e6, 2) AS cost_m, verdict, in_plan\nFROM funnel WHERE run_id = coalesce(:run, (SELECT max(run_id) FROM funnel))\n  AND (:name IS NULL OR label LIKE '%' || :name || '%') ORDER BY rank"
+          "sql": "SELECT rank, label, round(gain, 1) AS gain, round(100 * p_better) AS better_pct,\n       round(per_million, 2) AS per_million, round(cost / 1e6, 2) AS cost_m, verdict, in_plan\nFROM funnel WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM funnel))\n  AND (nullif(:name, '') IS NULL OR label LIKE '%' || :name || '%') ORDER BY rank"
         },
         "forecast": {
           "title": "A player's forecast, factor by factor (latest run)",
-          "sql": "SELECT f.jornada, p.name, round(f.ppm, 2) AS ppm, round(f.fixture, 2) AS fixture,\n       round(f.picked, 2) AS picked, round(f.fit, 2) AS fit, round(f.points, 2) AS points,\n       round(f.plays, 2) AS plays, round(f.expected, 2) AS expected\nFROM forecast f JOIN players p USING (run_id, player)\nWHERE f.run_id = coalesce(:run, (SELECT max(run_id) FROM forecast))\n  AND p.name LIKE '%' || coalesce(:name, '') || '%' ORDER BY p.name, f.jornada"
+          "sql": "SELECT f.jornada, p.name, round(f.ppm, 2) AS ppm, round(f.fixture, 2) AS fixture,\n       round(f.picked, 2) AS picked, round(f.fit, 2) AS fit, round(f.points, 2) AS points,\n       round(f.plays, 2) AS plays, round(f.expected, 2) AS expected\nFROM forecast f JOIN players p USING (run_id, player)\nWHERE f.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM forecast))\n  AND p.name LIKE '%' || coalesce(:name, '') || '%' ORDER BY p.name, f.jornada"
         }
       }
     }
