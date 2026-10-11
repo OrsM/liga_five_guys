@@ -145,3 +145,34 @@ CREATE TABLE IF NOT EXISTS board_exposed (
     clause REAL,
     PRIMARY KEY (run_id, ord)
 );
+
+-- grading, when run.py grade finds something new: each past lock replayed
+-- with the run's code. A player forecast a row (backtest, GRADE_AHEAD
+-- jornadas past each lock); error and calibration are queries over it.
+CREATE TABLE IF NOT EXISTS grade_forecast (
+    run_id    INTEGER NOT NULL REFERENCES runs(run_id),
+    from_j    INTEGER NOT NULL,    -- the lock forecast from
+    jornada   INTEGER NOT NULL,
+    player    TEXT NOT NULL,
+    predicted REAL NOT NULL,
+    actual    REAL NOT NULL,       -- 0 if he scored nothing
+    flagged   INTEGER NOT NULL,    -- injured, doubtful or suspended then
+    PRIMARY KEY (run_id, from_j, jornada, player)
+);
+
+-- Every move each replayed board ranked, against what its players then did.
+CREATE TABLE IF NOT EXISTS grade_decisions (
+    run_id     INTEGER NOT NULL REFERENCES runs(run_id),
+    ord        INTEGER NOT NULL,
+    lock       INTEGER NOT NULL,   -- the jornada whose lock it was ranked at
+    move       TEXT NOT NULL,
+    reached    TEXT NOT NULL,      -- plan, cleared, rejected
+    kind       TEXT NOT NULL,      -- get, sell
+    chance     REAL,               -- share of seasons better off
+    jornadas   INTEGER,            -- jornadas played since
+    pred       REAL,               -- points change forecast over them
+    real       REAL,               -- points change that happened
+    value_pred REAL,               -- value change forecast, millions
+    value_real REAL,
+    PRIMARY KEY (run_id, ord)
+);

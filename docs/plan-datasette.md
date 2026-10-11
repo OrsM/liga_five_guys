@@ -67,7 +67,8 @@ deployed when green.
 - 2.4 (done) `boards` and `board_do`/`_squad`/`_standings`/`_exposed`, written
   from the same `report()` document as `decisions.json` (rebuilding the JSON
   from rows would gain nothing).
-- 2.5 `grading` writes backtest and replayed decisions as tables.
+- 2.5 (done) `grade_forecast`, `grade_decisions`: `run.py grade` after each
+  report, skipped unless the commit or the resolved jornadas changed.
 - 2.6 board history imported from git.
 - 2.7 "why did it change": diff of the last two runs' funnel and forecast,
   naming the factor that moved; the ping carries the line.

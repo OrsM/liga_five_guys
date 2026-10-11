@@ -24,6 +24,10 @@ STAGES: list[tuple[str, str]] = [
     ("crosswalk", "crosswalk:main"),
     ("sim", "sim:main"),
 ]
+# Run only when named (run.py grade): lfg-run calls it after the report is out.
+ON_REQUEST: list[tuple[str, str]] = [
+    ("grade", "grading:record_grades"),
+]
 
 
 def call(spec: str) -> Callable[[], object]:
@@ -99,7 +103,7 @@ def main(argv: list[str], every: Sequence[tuple[str, str]] = STAGES,
 def _stages(argv: list[str], every: Sequence[tuple[str, str]],
             db: sqlite3.Connection, run: int) -> int:
     want = [a for a in argv if not a.startswith("-")]
-    stages = [s for s in every if not want or s[0] in want]
+    stages = [s for s in [*every, *ON_REQUEST] if s[0] in want] if want else list(every)
     if want:
         stages = sorted(stages, key=lambda s: want.index(s[0]))
 
@@ -174,7 +178,7 @@ def _selftest_runs() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_runs()
-        for _name, _spec in STAGES:
+        for _name, _spec in STAGES + ON_REQUEST:
             assert callable(call(_spec)), _name
         assert [n for n, _ in STAGES] == sorted(
             {n for n, _ in STAGES}, key=[n for n, _ in STAGES].index), \

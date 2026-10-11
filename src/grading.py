@@ -5,6 +5,8 @@ import itertools
 import math
 import statistics
 import json
+import sqlite3
+from contextlib import closing
 import sys
 from collections.abc import Callable
 from typing import Any
@@ -19,11 +21,14 @@ from ffcore.score import JornadaPoints, points_by_jornada
 from assemble import built, fixture_ratings, scorer, universe
 from decide import Action, board, verdict
 from ffcore.clock import set_now
+from ffcore.db import connect, record, this_run
 from ffcore.pricing import Momentum, _ahead, grade, steps
 from ffcore.tidy import LINEUP_SOURCE, current, history
-__all__ = ["backtest", "compare", "decisions", "persistence", "score_forecast"]
+__all__ = ["backtest", "compare", "decision_rows", "decisions", "due", "forecast_rows",
+           "persistence", "record_grades", "score_forecast"]
 
 TOP_N = 50
+GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 
 
 def score_forecast(pred: dict[str, float], actual: JornadaPoints,
@@ -58,7 +63,7 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
                     continue
                 pred = {k: expected_points(cell) for k, cell in per_j[j].items()}
                 hurt = {k: v for k, v in pred.items() if k in flagged}
-                out.append({"jornada": j, "from": i, "pred": pred,
+                out.append({"jornada": j, "from": i, "pred": pred, "hurt": sorted(hurt),
                             **score_forecast(pred, actual, j),
                             "flagged": score_forecast(hurt, actual, j)})
     finally:
@@ -122,6 +127,51 @@ def decisions() -> list[dict[str, Any]]:
     return out
 
 
+def forecast_rows(runs: list[dict[str, Any]], actual: JornadaPoints) -> list[dict[str, Any]]:
+    """backtest's forecasts, one row a player: what was forecast at the
+    lock (from_j) for a jornada, and what he scored (0 if nothing)."""
+    return [{"from_j": r["from"], "jornada": r["jornada"], "player": k, "predicted": p,
+             "actual": actual.get((k, r["jornada"]), 0.0), "flagged": int(k in r["hurt"])}
+            for r in runs for k, p in r["pred"].items()]
+
+
+def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """decisions' moves as rows: group (a SQL word) becomes reached."""
+    return [{"ord": i, **{k: v for k, v in m.items() if k != "group"}, "reached": m["group"]}
+            for i, m in enumerate(moves)]
+
+
+def due(db: sqlite3.Connection, run: int, resolved: float) -> bool:
+    """Whether to grade: never graded, or the code (the run's commit) or the
+    jornadas resolved have changed since the last grade."""
+    now = db.execute("SELECT commit_sha FROM runs WHERE run_id = ?", (run,)).fetchone()
+    last = db.execute(
+        "SELECT r.commit_sha, m.value FROM runs r JOIN run_measures m USING (run_id)"
+        " WHERE m.stage = 'grade' AND m.measure = 'resolved' AND r.ok = 1"
+        " AND r.run_id < ? ORDER BY r.run_id DESC LIMIT 1", (run,)).fetchone()
+    return last is None or now is None or (now[0], resolved) != (last[0], last[1])
+
+
+def record_grades() -> dict[str, int]:
+    """The grade stage (run.py grade): replay each past lock with this code,
+    and keep every player forecast and every ranked move against what then
+    happened; skipped when nothing is new (due)."""
+    actual = points_by_jornada(scored())
+    resolved = len({j for _k, j in actual})
+    run = this_run()
+    if run is not None:
+        with closing(connect()) as db:
+            if not due(db, run, resolved):
+                print("  grade: same code, same %d jornadas: nothing new" % resolved)
+                return {"resolved": resolved, "skipped": 1}
+    fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
+    if run is not None:
+        record([{"run_id": run, **r} for r in fc], "grade_forecast")
+        record([{"run_id": run, **r} for r in moves], "grade_decisions")
+    print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
+    return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
+
+
 def persistence(preds: dict[int, dict[str, float]],
                 actual: JornadaPoints) -> float:
     by: dict[str, list[tuple[float, float]]] = {}
@@ -169,6 +219,34 @@ def _selftest() -> None:
     assert abs(got["rmse"] - math.sqrt(2.5)) < 1e-12, got
     assert got["top"] == 2.5, got
     assert score_forecast({}, {}, 1)["rmse"] is None
+
+    bt = [{"from": 7, "jornada": 8, "pred": {"a": 3.0, "b": 1.0}, "hurt": ["b"]}]
+    assert forecast_rows(bt, {("a", 8): 5.0}) == [
+        {"from_j": 7, "jornada": 8, "player": "a", "predicted": 3.0, "actual": 5.0, "flagged": 0},
+        {"from_j": 7, "jornada": 8, "player": "b", "predicted": 1.0, "actual": 0.0, "flagged": 1}], \
+        "one row a player forecast; no points scored is 0, as score_forecast has it"
+    moves = decision_rows([{"lock": 7, "move": "buy X", "group": "plan", "kind": "get"},
+                           {"lock": 7, "move": "sell Y", "group": "rejected", "kind": "sell"}])
+    assert [(m["ord"], m["reached"], "group" in m) for m in moves] \
+        == [(0, "plan", False), (1, "rejected", False)], moves
+
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
+        def run(commit: str, resolved: float | None) -> int:
+            with db:
+                cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
+                                 " VALUES ('t', 't', 'service', ?, 1)", (commit,))
+                if resolved is not None:
+                    db.execute("INSERT INTO run_measures VALUES (?, 'grade', 'resolved', ?)",
+                               (cur.lastrowid, resolved))
+            assert cur.lastrowid is not None
+            return cur.lastrowid
+        assert due(db, run("a", None), 7), "never graded: due"
+        run("a", 7)
+        assert not due(db, run("a", None), 7), "same code, same jornadas: nothing new"
+        assert due(db, run("a", None), 8), "a jornada resolved"
+        assert due(db, run("b", None), 7), "new code"
+        assert isinstance(db, sqlite3.Connection)
 
     print("grading self-test OK")
 
