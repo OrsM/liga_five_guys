@@ -10,7 +10,7 @@ from ffcore.action import Action
 from ffcore.forecast import Bootstrap
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.rules import Squad, Squads, shortfall
+from ffcore.rules import Squad, Squads, position, shortfall
 from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState, Standings, simulate_many
 from stats import percentile
@@ -104,7 +104,7 @@ class Universe:
             for k in a.sell:
                 sq.pop(k, None)
             if a.buy:
-                sq[a.buy] = self.market.pos.get(a.buy, "MED")
+                sq[a.buy] = position(self.market.pos.get(a.buy))
         return sq
 
     def candidates(self) -> list[Action]:

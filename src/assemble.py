@@ -5,7 +5,6 @@ themselves."""
 from __future__ import annotations
 
 from contextlib import closing
-from datetime import datetime
 from functools import cache
 from typing import Any, NamedTuple
 
@@ -18,14 +17,14 @@ from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
 from ffcore.names import Name, app_id
-from ffcore.parse import Rows
+from ffcore.parse import Rows, kickoff_stamp
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
 from ffcore.pricing import BID_BEATS, CLIP, PRICE_WINDOW
 from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import (PROMOTED_DISCOUNT_K, SHRINK_K, fit_promoted_discount,
                           per_jornada_current, Scorer, totals)
-from ffcore.rules import slot
+from ffcore.rules import position
 from ffcore.season import LeagueState
 from ffcore.startprob import (AVAIL_K, FALLBACK_K, PICK_K, Availability, Calibration,
                               StartOdds, calibrate, fit_availability, last_fit_listing,
@@ -94,15 +93,11 @@ def fixture_ratings(market: Rows) -> Ratings:
     return difficulty_ratings(market, current("results_history"))
 
 
-def _pos_of(raw: str) -> str:
-    return slot(raw) or "MED"
-
-
 def _nights_left(offers: Rows) -> int:
     """The game's nightly offers still to come before the lock: one as each
     standing offer expires, then one a day."""
-    ends = [datetime.fromisoformat(r["expires_at"]) for r in offers
-            if r.get("status") == "pending" and r.get("expires_at")]
+    ends = [when for r in offers if r.get("status") == "pending"
+            and (when := kickoff_stamp(r.get("expires_at")))]
     lock = load_deadline()
     if not ends or lock is None:
         return 0
@@ -217,7 +212,7 @@ def built() -> Built:
     received_offers = pending(
         [dict(r, key=pt_to_key.get(r.get("player_team_id") or ""))
          for r in offers], "status", "money")
-    pos = {k: _pos_of((rec.get("pos") or "").upper())
+    pos = {k: position((rec.get("pos") or "").upper())
            for k, rec in players.items()}
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}

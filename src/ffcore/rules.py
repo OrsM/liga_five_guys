@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "Squad", "Squads", "POSITIONS", "slot", "MAX_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
+__all__ = ["XI_SIZE", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
            "MATCH_LEN", "minutes_played"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -45,6 +45,12 @@ def slot(raw: str | None) -> str:
     as one of POSITIONS, or "" if it is none of them."""
     t = (raw or "").strip()
     return t if t in POSITIONS else _SLOT.get(t.lower(), "")
+
+
+def position(raw: str | None) -> str:
+    """slot(raw), or MED when there is none: where a player of unknown
+    position is counted."""
+    return slot(raw) or "MED"
 
 MATCH_LEN = 90.0
 XI_SIZE = 11  # players a side fields
