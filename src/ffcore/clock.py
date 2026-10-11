@@ -42,6 +42,11 @@ def run_now() -> datetime:
     return _NOW[0]
 
 
+def cut() -> str:
+    """Now as a snapshot stamp: what a table is read as of."""
+    return run_now().strftime("%Y-%m-%dT%H%MZ")
+
+
 def set_now(when: datetime | None) -> None:
     _NOW[:] = [when] if when is not None else []
     for reset in _RESETS:

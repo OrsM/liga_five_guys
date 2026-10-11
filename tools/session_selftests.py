@@ -19,4 +19,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--list"]:
+        print("\n".join(MODULES))
+        raise SystemExit(0)
     raise SystemExit(main())

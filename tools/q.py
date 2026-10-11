@@ -14,7 +14,9 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from ffcore.db import DB
+from ffcore import db as lfg
+from ffcore.db import connect
+from ffcore.clock import cut
 
 META = Path(__file__).resolve().parent.parent / "datasette.json"
 
@@ -36,11 +38,12 @@ def run_params(sql: str, given: dict[str, str]) -> dict[str, str]:
     return {p: given.get(p, "") for p in params(sql)}
 
 
-def run(name: str, given: dict[str, str], path: Path = DB, meta: Path = META
+def run(name: str, given: dict[str, str], path: Path | None = None, meta: Path = META
         ) -> tuple[list[str], list[tuple[Any, ...]]]:
     """A saved query's columns and rows, run as Datasette runs it."""
     sql = queries(meta)[name]["sql"]
-    with closing(sqlite3.connect("file:%s?mode=ro" % path, uri=True)) as db:
+    with closing(sqlite3.connect("file:%s?mode=ro" % (path or lfg.DB), uri=True)) as db:
+        db.create_function("cut", 0, cut)
         cur = db.execute(sql, run_params(sql, given))
         return [d[0] for d in cur.description], cur.fetchall()
 
@@ -65,12 +68,8 @@ def main(argv: list[str]) -> int:
 
 
 def _selftest() -> None:
-    import json
     import tempfile
-    from contextlib import closing
-    from pathlib import Path
-
-    from ffcore.db import SCHEMA, connect
+    from ffcore.tidy import store_sql, tables_in
 
     with tempfile.TemporaryDirectory() as tmp:
         meta = Path(tmp) / "datasette.json"
@@ -87,15 +86,24 @@ def _selftest() -> None:
         assert run("big", {}, db, meta) == (["run_id"], [(1,), (2,)])
         empty = sqlite3.connect(":memory:").execute("SELECT :p", run_params("SELECT :p", {}))
         assert empty.fetchone() == ("",), "a param not given is '', as Datasette sends it"
-    with closing(connect(Path(tmp + "-empty.db"))) as c:
+    with tempfile.TemporaryDirectory() as tmp2, tables_in(Path(tmp2)):
+        row = {"observed_at": "2026-01-01T0000Z"}
+        store_sql("api_activity", [dict(row, activity_id="1", at="", kind="", user_id="",
+                                        counterparty="", player_id="")])
+        store_sql("api_standings", [dict(row, user_id="", manager="")])
+        store_sql("api_teams", [dict(row, manager="", player_id="")])
+        _compiles(Path(tmp2) / "lfg.db")
+    print("q.py self-test OK")
+
+
+def _compiles(path: Path) -> None:
+    """Every saved query compiles against path (EXPLAIN), as Datasette runs it."""
+    with closing(connect(path)) as c:
         for name, q in queries().items():
             try:
                 c.execute("EXPLAIN " + q["sql"], run_params(q["sql"], {}))
             except Exception as e:
                 raise AssertionError("datasette.json query %s: %s" % (name, e)) from e
-    Path(tmp + "-empty.db").unlink()
-    assert SCHEMA.exists()
-    print("q.py self-test OK")
 
 
 if __name__ == "__main__":

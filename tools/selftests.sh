@@ -22,7 +22,8 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py ffcore/db.py
        ffcore/action.py ffcore/market.py ffcore/pricing.py ffcore/schedule.py
        "stats.py --selftest"
       )
-SESSION_TESTS=(src/decide.py src/sim.py tools/ask.py)
+# One list, in tools/session_selftests.py: the serial re-run below reads it.
+mapfile -t SESSION_TESTS < <("$UV" run --frozen python tools/session_selftests.py --list)
 
 session_ok=0
 "$UV" run --frozen python tools/session_selftests.py >/dev/null 2>&1 &

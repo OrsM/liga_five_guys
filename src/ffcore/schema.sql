@@ -206,3 +206,99 @@ SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
            AS flagged_rmse,
        avg(CASE WHEN flagged = 1 THEN predicted - actual END) AS flagged_bias
 FROM ranked GROUP BY run_id, from_j, jornada;
+
+-- The league's money, as SQL over the app's tables (current_/history_ views
+-- read as of cut()). League.load writes the two inputs no table holds: the
+-- crosswalk's app id -> player key (its clash rule applied) and the config.
+CREATE TABLE IF NOT EXISTS app_keys (
+    app_id TEXT PRIMARY KEY,
+    player TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS league_config (
+    me     TEXT NOT NULL,
+    budget REAL NOT NULL
+);
+
+DROP VIEW IF EXISTS users;
+CREATE VIEW users AS
+SELECT trim(user_id) AS user_id, trim(manager) AS manager FROM current_api_standings
+WHERE trim(user_id) <> '' AND trim(manager) <> '' GROUP BY trim(user_id);
+
+-- Who owns each player now.
+DROP VIEW IF EXISTS owners;
+CREATE VIEW owners AS
+SELECT k.player, trim(t.manager) AS manager
+FROM current_api_teams t JOIN app_keys k ON k.app_id = trim(t.player_id)
+WHERE trim(t.manager) <> '' GROUP BY k.player;
+
+-- The activity feed, each event once, with who paid (buyer: a buy's or a
+-- clause's manager) and who was paid (seller: a sale's manager, a clause's
+-- other); then the exits the squads show beyond those the feed records (a
+-- sale by him, a clause paid to him), as sales at the player's last value.
+-- Counted, not matched by time: squads and feed are stamped minutes apart.
+DROP VIEW IF EXISTS ledger;
+CREATE VIEW ledger AS
+WITH feed AS (
+    SELECT coalesce(a.at, '') AS at, coalesce(a.kind, '') AS kind,
+           u.manager AS who, c.manager AS other, k.player, coalesce(a.amount, 0.0) AS amount
+    FROM current_api_activity a
+    LEFT JOIN users u ON u.user_id = trim(a.user_id)
+    LEFT JOIN users c ON c.user_id = trim(a.counterparty)
+    LEFT JOIN app_keys k ON k.app_id = trim(a.player_id)),
+roles AS (
+    SELECT *, CASE WHEN kind IN ('buy', 'transfer') THEN who END AS buyer,
+              CASE kind WHEN 'sell' THEN who WHEN 'transfer' THEN other END AS seller
+    FROM feed),
+t AS MATERIALIZED (
+    SELECT h.observed_at, k.player, trim(h.manager) AS manager,
+           coalesce(h.market_value, 0.0) AS value
+    FROM history_api_teams h JOIN app_keys k ON k.app_id = trim(h.player_id)
+    WHERE trim(h.manager) <> ''),
+s AS (SELECT observed_at AS a, lead(observed_at) OVER (ORDER BY observed_at) AS b
+      FROM (SELECT DISTINCT observed_at FROM t)),
+shown AS (
+    SELECT ta.manager AS who, ta.player, s.b AS at, ta.value,
+           row_number() OVER (PARTITION BY ta.manager, ta.player ORDER BY s.b) AS n
+    FROM t ta JOIN s ON s.a = ta.observed_at AND s.b IS NOT NULL
+    WHERE EXISTS (SELECT 1 FROM t m WHERE m.observed_at = s.b AND m.manager = ta.manager)
+      AND NOT EXISTS (SELECT 1 FROM t tb WHERE tb.observed_at = s.b
+                      AND tb.player = ta.player AND tb.manager = ta.manager)),
+recorded AS (SELECT seller, player, count(*) AS n FROM roles
+             WHERE seller IS NOT NULL GROUP BY seller, player)
+SELECT at, kind, who, other, player, amount, buyer, seller, 0 AS inferred FROM roles
+UNION ALL
+SELECT shown.at, 'sell', shown.who, NULL, shown.player, shown.value, NULL, shown.who, 1
+FROM shown LEFT JOIN recorded r ON r.seller = shown.who AND r.player = shown.player
+WHERE shown.n > coalesce(r.n, 0);
+
+-- Each manager's cash: the budget, less buys and clauses paid, plus sales,
+-- clauses received and bonuses; plus, for everyone, the income the feed
+-- never records (your real balance less the same sum for you).
+DROP VIEW IF EXISTS cash;
+CREATE VIEW cash AS
+WITH cfg AS (SELECT me, budget FROM league_config),
+flow AS (
+    SELECT u.manager, cfg.budget
+           - coalesce((SELECT sum(amount) FROM ledger WHERE buyer = u.manager), 0.0)
+           + coalesce((SELECT sum(amount) FROM ledger WHERE seller = u.manager), 0.0)
+           + coalesce((SELECT sum(amount) FROM ledger WHERE who = u.manager AND kind = 'bonus'), 0.0)
+           AS feed
+    FROM (SELECT DISTINCT manager FROM users) u, cfg),
+mine AS (SELECT s.team_money AS money FROM current_api_standings s, cfg
+         WHERE trim(s.manager) = cfg.me AND s.team_money <> 0 LIMIT 1),
+gap AS (SELECT coalesce((SELECT (SELECT money FROM mine) - f.feed
+                          FROM flow f, cfg WHERE f.manager = cfg.me), 0.0) AS untracked)
+SELECT f.manager,
+       CASE WHEN f.manager = cfg.me AND (SELECT money FROM mine) IS NOT NULL
+            THEN (SELECT money FROM mine) ELSE f.feed + gap.untracked END AS cash
+FROM flow f, cfg, gap;
+
+-- What each owned player's owner paid for him: his last buy or clause to
+-- that manager. Players from the starting squad have none.
+DROP VIEW IF EXISTS price_paid;
+CREATE VIEW price_paid AS
+SELECT player, amount AS paid FROM (
+    SELECT l.player, l.amount,
+           row_number() OVER (PARTITION BY l.player ORDER BY l.at DESC) AS last
+    FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
+WHERE last = 1;

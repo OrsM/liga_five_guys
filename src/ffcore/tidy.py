@@ -3,24 +3,26 @@ from __future__ import annotations
 import csv
 import io
 import os
+import sqlite3
 import sys
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from types import MappingProxyType
 from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
 from typing import Any, NamedTuple, TypeVar
 
-from ffcore.clock import on_reset, run_now
+from ffcore import db as lfg
+from ffcore.clock import cut, on_reset, run_now
+from ffcore.db import ROOT
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "SEASON", "REPORTS", "TABLES", "Table",
            "current", "history", "typed", "age_hours", "table_path", "tables_in",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
-           "csv_string", "mtime_cached", "table_stats",
-           "LINEUP_SOURCE"]
+           "csv_string", "mtime_cached", "table_stats", "store_sql", "sql_tables",
+           "drop_sql", "LINEUP_SOURCE"]
 
-ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
 SEASON = ROOT / "season"
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
@@ -32,13 +34,14 @@ def table_path(name: str) -> Path:
 
 @contextmanager
 def tables_in(path: Path) -> Iterator[Path]:
+    """The tables, CSV and SQL (lfg.db), kept in path for a while."""
     global TIDY
-    real = TIDY
-    TIDY = Path(path)
+    real, real_db = TIDY, lfg.DB
+    TIDY, lfg.DB = Path(path), Path(path) / "lfg.db"
     try:
         yield TIDY
     finally:
-        TIDY = real
+        TIDY, lfg.DB = real, real_db
 
 
 def input_path(name: str) -> Path:
@@ -149,11 +152,13 @@ def append_csv(path: str | Path, rows: Sequence[Mapping[str, Any]],
 class Table(NamedTuple):
     """How a table is kept, and its numeric columns with the parser each
     is read by: current() and history() hand them out parsed, so no
-    reader parses a number."""
+    reader parses a number. sql: kept in lfg.db, numbers typed once as
+    they are stored, read through its current_ and history_ views."""
     snapshot: bool
     key: tuple[str, ...] = ()
     store: str = ""
     numbers: tuple[tuple[str, Callable[[object], Any]], ...] = ()
+    sql: bool = False
 
 
 def _cols(parse: Callable[[object], Any], *cols: str
@@ -168,10 +173,11 @@ TABLES: dict[str, Table] = {
                      _cols(pct100, "start_pct")),
     "matches": Table(False, ("match_id",), "once", _cols(count, "jornada")),
     "points": Table(False, ("season", "ff_id"), "once", _cols(ratio, "points", "games", "avg")),
-    "api_teams": Table(True, numbers=_cols(money, "market_value", "buyout") + _cols(ratio, "points")),
+    "api_teams": Table(True, numbers=_cols(money, "market_value", "buyout") + _cols(ratio, "points"),
+                       sql=True),
     "api_standings": Table(True, numbers=_cols(count, "position", "previous_position")
                            + _cols(ratio, "team_points", "fixture_points")
-                           + _cols(money, "team_value", "team_money")),
+                           + _cols(money, "team_value", "team_money"), sql=True),
     "api_market": Table(True, numbers=_cols(money, "market_value", "sale_price", "bid_money")
                         + _cols(count, "bids")),
     "api_offers": Table(True, numbers=_cols(money, "money")),
@@ -187,12 +193,119 @@ TABLES: dict[str, Table] = {
     "starters": Table(False, ("match_id", "team_slug", "player_slug"), "once",
                       _cols(ratio, "minute")),
     "api_activity": Table(False, ("activity_id",), "once",
-                          _cols(money, "amount") + _cols(count, "week")),
+                          _cols(money, "amount") + _cols(count, "week"), sql=True),
 }
 
 
-def _cut() -> str:
-    return run_now().strftime("%Y-%m-%dT%H%MZ")
+_cut = cut
+
+
+def _columns(db: sqlite3.Connection, name: str) -> list[str]:
+    return [r[1] for r in db.execute('PRAGMA table_info("%s")' % name)]
+
+
+def _views(name: str, cols: list[str], spec: Table) -> str:
+    """The table as of cut(), as CSV current() and history() read it:
+    history_ every row up to the cut, in the order stored; current_ for a
+    snapshot table the last stamp of each source, for a keyed one the last
+    row of each key (all of it non-empty), in the order keys appeared."""
+    q = ", ".join('"%s"' % c for c in cols)
+    hist = ('CREATE VIEW "history_{n}" AS SELECT {q} FROM "{n}"'
+            ' WHERE observed_at <= cut() ORDER BY rowid')
+    if spec.snapshot:
+        cur = ('CREATE VIEW "current_{n}" AS SELECT {tq} FROM "{n}" t JOIN'
+               ' (SELECT source AS s, max(observed_at) AS last FROM "{n}"'
+               '  WHERE observed_at <= cut() GROUP BY source) m'
+               ' ON t.source IS m.s AND t.observed_at = m.last'
+               ' ORDER BY t.observed_at, t.rowid')
+    else:
+        k = ", ".join('"%s"' % c for c in spec.key)
+        cur = ('CREATE VIEW "current_{n}" AS SELECT {q} FROM'
+               ' (SELECT *, row_number() OVER (PARTITION BY {k}'
+               '   ORDER BY observed_at DESC, rowid DESC) AS _last,'
+               '  first_value(observed_at) OVER (PARTITION BY {k}'
+               '   ORDER BY observed_at, rowid) AS _first_at,'
+               '  first_value(rowid) OVER (PARTITION BY {k}'
+               '   ORDER BY observed_at, rowid) AS _first_id'
+               '  FROM "{n}" WHERE observed_at <= cut())'
+               ' WHERE _last = 1 AND {nonempty} ORDER BY _first_at, _first_id')
+    return ";\n".join([
+        'DROP VIEW IF EXISTS "history_{n}"', 'DROP VIEW IF EXISTS "current_{n}"',
+        hist, cur]).format(n=name, q=q, k=k if not spec.snapshot else "",
+                           tq=", ".join('t."%s"' % c for c in cols),
+                           nonempty=" AND ".join("coalesce(\"%s\", '') <> ''" % c
+                                                 for c in spec.key) or "1") + ";"
+
+
+def _kind(parse: Callable[[object], Any]) -> str:
+    return "INTEGER" if parse is count else "REAL"
+
+
+def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
+    """Add rows to a table kept in lfg.db as ingest keeps it as CSV: a
+    snapshot table every row, a keyed ("once") one only rows whose content
+    differs from the key's last; new columns are added, numbers typed."""
+    spec = TABLES[name]
+    assert spec.sql and spec.store in ("", "once"), (name, spec)
+    nums = dict(spec.numbers)
+    fresh = list(rows)
+    with closing(lfg.connect()) as db, db:
+        db.execute('CREATE TABLE IF NOT EXISTS "%s" (observed_at TEXT NOT NULL,'
+                   " source TEXT NOT NULL DEFAULT '')" % name)
+        db.execute('CREATE INDEX IF NOT EXISTS "%s_at" ON "%s" (observed_at)' % (name, name))
+        have = _columns(db, name)
+        for c in dict.fromkeys([*nums, *(c for r in fresh for c in r)]):
+            if c not in have:
+                db.execute('ALTER TABLE "%s" ADD COLUMN "%s" %s' % (
+                    name, c, _kind(nums[c]) if c in nums else "TEXT NOT NULL DEFAULT ''"))
+                have.append(c)
+        db.executescript(_views(name, have, spec))
+        if spec.store == "once":
+            from_sql = db.execute('SELECT * FROM "%s" ORDER BY rowid' % name)
+            names = [d[0] for d in from_sql.description]
+            latest = {tuple(r.get(c) or "" for c in spec.key): _content(r)
+                      for r in (dict(zip(names, row)) for row in from_sql)}
+            kept = []
+            for r in typed(name, fresh):
+                k = tuple(r.get(c) or "" for c in spec.key)
+                if latest.get(k) != _content(r):
+                    latest[k] = _content(r)
+                    kept.append(r)
+        else:
+            kept = typed(name, fresh)
+        db.executemany(
+            'INSERT INTO "%s" (%s) VALUES (%s)' % (
+                name, ", ".join('"%s"' % c for c in have), ", ".join("?" * len(have))),
+            [[r.get(c) if c in nums else (r.get(c) or "") for c in have] for r in kept])
+
+
+def _content(r: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
+    """A row as it reads, but for when: what a keyed table keeps only when
+    it changes."""
+    return tuple(sorted((k, str(v)) for k, v in r.items()
+                        if k != "observed_at" and v not in ("", None)))
+
+
+def sql_tables() -> set[str]:
+    """The tables lfg.db holds."""
+    with closing(lfg.connect()) as db:
+        return {n for (n,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+
+
+def drop_sql(name: str) -> None:
+    with closing(lfg.connect()) as db, db:
+        db.executescript('DROP VIEW IF EXISTS "current_{n}"; DROP VIEW IF EXISTS "history_{n}";'
+                         ' DROP TABLE IF EXISTS "{n}";'.format(n=name))
+
+
+def _read_sql(view: str) -> list[dict[str, Any]]:
+    with closing(lfg.connect()) as db:
+        try:
+            cur = db.execute('SELECT * FROM "%s"' % view)
+        except sqlite3.OperationalError:
+            return []
+        names = [d[0] for d in cur.description]
+        return [dict(zip(names, row)) for row in cur]
 
 
 def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -211,6 +324,9 @@ def _rows(name: str) -> list[Mapping[str, Any]]:
 
 
 def history(name: str, source: str = "") -> list[Mapping[str, Any]]:
+    if name in TABLES and TABLES[name].sql:
+        return [MappingProxyType(r) for r in _read_sql("history_" + name)
+                if not source or r.get("source") == source]
     cut = _cut()
     return [r for r in _rows(name)
             if r.get("observed_at", "") <= cut
@@ -247,6 +363,9 @@ _CURRENT_CACHE: dict[tuple[str, str], tuple[Stamp, tuple[Mapping[str, Any], ...]
 
 
 def current(name: str, source: str = "") -> list[dict[str, Any]]:
+    if TABLES[name].sql:
+        return [r for r in _read_sql("current_" + name)
+                if not source or r.get("source") == source]
     cut = _cut()
     rows = mtime_cached(table_path(name), _CURRENT_CACHE, (name, cut),
                          _current_rows, name, cut) or ()
@@ -339,7 +458,7 @@ def _selftest_tables() -> None:
                 {"observed_at": a, "source": "analitica", "player_name": "Cai"},
                 {"observed_at": later, "source": "futbolfantasy",
                  "player_name": "Dan"}])
-            write_csv(tidy / "api_activity.csv", [
+            store_sql("api_activity", [
                 {"observed_at": a, "activity_id": "1", "value": "0"},
                 {"observed_at": b, "activity_id": "1", "value": "1"},
                 {"observed_at": a, "activity_id": "2", "value": "5"}])

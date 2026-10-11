@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ffcore.clock import run_now
-from ffcore.db import DB, RUN_ENV, connect, this_run
+from ffcore.db import RUN_ENV, connect, this_run
 
 
 STAGES: list[tuple[str, str]] = [
@@ -89,7 +89,7 @@ def _finish(db: sqlite3.Connection, run: int, ok: bool) -> None:
 
 
 def main(argv: list[str], every: Sequence[tuple[str, str]] = STAGES,
-         path: Path = DB) -> int:
+         path: Path | None = None) -> int:
     """Run the stages argv names (all by default), each recorded in runs
     and run_measures; 1 at the first that fails."""
     db = connect(path)

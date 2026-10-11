@@ -9,20 +9,25 @@ from collections.abc import Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
 
-from ffcore.tidy import ROOT
+from ffcore.clock import cut
 
-__all__ = ["DB", "RUN_ENV", "SCHEMA", "connect", "record", "this_run"]
+__all__ = ["DB", "ROOT", "RUN_ENV", "SCHEMA", "connect", "record", "this_run"]
 
-DB = ROOT / "lfg.db"
+ROOT = Path(os.environ.get("FF_ROOT", "./data"))
+DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
 SCHEMA = Path(__file__).with_name("schema.sql")
 RUN_ENV = "LFG_RUN"
 
 
-def connect(path: Path = DB, schema: Path = SCHEMA) -> sqlite3.Connection:
-    """The file at path in WAL mode, schema applied. The schema only adds
-    (CREATE ... IF NOT EXISTS), so applying it again changes nothing."""
+def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
+    """The file at path (DB by default) in WAL mode, schema applied, and
+    cut() the model's clock as a stamp, which the tables' as-of views read.
+    The schema only adds (CREATE ... IF NOT EXISTS), so applying it again
+    changes nothing."""
+    path = path or DB
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
+    db.create_function("cut", 0, cut)
     db.execute("PRAGMA journal_mode=WAL")
     db.executescript(schema.read_text(encoding="utf-8"))
     return db
@@ -35,7 +40,7 @@ def this_run() -> int | None:
 
 
 def record(rows: Sequence[Mapping[str, object]], table: str,
-           path: Path = DB, schema: Path = SCHEMA) -> None:
+           path: Path | None = None, schema: Path = SCHEMA) -> None:
     """Insert rows into table, each a mapping of column to value; a column
     a row lacks is NULL."""
     if not rows:

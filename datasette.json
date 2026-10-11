@@ -38,6 +38,18 @@
         "forecast": {
           "title": "A player's forecast, factor by factor (latest run)",
           "sql": "SELECT f.jornada, p.name, round(f.ppm, 2) AS ppm, round(f.fixture, 2) AS fixture,\n       round(f.picked, 2) AS picked, round(f.fit, 2) AS fit, round(f.points, 2) AS points,\n       round(f.plays, 2) AS plays, round(f.expected, 2) AS expected\nFROM forecast f JOIN players p USING (run_id, player)\nWHERE f.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM forecast))\n  AND p.name LIKE '%' || coalesce(:name, '') || '%' ORDER BY p.name, f.jornada"
+        },
+        "cash": {
+          "title": "Each manager's cash: yours from the app, rivals' from the ledger (as of now)",
+          "sql": "SELECT manager, round(cash / 1e6, 2) AS cash_m FROM cash ORDER BY cash DESC"
+        },
+        "ledger": {
+          "title": "The league's money moves, oldest first; inferred = an exit the feed never recorded",
+          "sql": "SELECT l.at, l.kind, l.who, l.other, coalesce(p.name, l.player) AS player,\n       round(l.amount / 1e6, 2) AS amount_m, l.buyer, l.seller, l.inferred\nFROM ledger l LEFT JOIN players p ON p.player = l.player\n  AND p.run_id = (SELECT max(run_id) FROM players)\nWHERE nullif(:manager, '') IS NULL OR :manager IN (l.who, l.other)\nORDER BY l.at"
+        },
+        "price_paid": {
+          "title": "What each owner paid for his players (last buy or clause to him)",
+          "sql": "SELECT o.manager, coalesce(p.name, o.player) AS player, round(pp.paid / 1e6, 2) AS paid_m\nFROM owners o LEFT JOIN price_paid pp USING (player)\nLEFT JOIN players p ON p.player = o.player AND p.run_id = (SELECT max(run_id) FROM players)\nORDER BY o.manager, pp.paid DESC"
         }
       }
     }

@@ -23,7 +23,8 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
-from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, append_csv,
+from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, _content, append_csv,
+                         drop_sql, sql_tables, store_sql,
                          csv_string, read_csv, table_stats, widen_csv,
                          write_csv)
 from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
@@ -338,11 +339,14 @@ def parse() -> dict[str, int]:
     state = _read_json(TIDY / _STATE, {})
     done = set(state.get("stamps") or ())
     tables = set(state.get("tables") or ())
+    in_sql = sql_tables()
     if (state.get("version") != version
             or not done <= {stamp for stamp, _docs in walk}
-            or not all((TIDY / f"{t}.csv").exists() for t in tables)):
+            or not all(t in in_sql if _spec(t).sql else (TIDY / f"{t}.csv").exists()
+                       for t in tables)):
         for t in tables:
             (TIDY / f"{t}.csv").unlink(missing_ok=True)
+            drop_sql(t)
         done, tables = set(), set()
     todo = [(stamp, docs) for stamp, docs in walk if stamp not in done]
     if not todo:
@@ -376,8 +380,10 @@ def parse() -> dict[str, int]:
             for page, (ck, _origin) in sorted(docs.items()):
                 route(pending, cache.get(ck, []), source(page).table, stamp)
         for table, rows in pending.items():
-            _store(TIDY / f"{table}.csv", rows,
-                   TABLES.get(table, Table(True)))
+            if _spec(table).sql:
+                store_sql(table, rows)
+            else:
+                _store(TIDY / f"{table}.csv", rows, _spec(table))
             rows_out += len(rows)
         tables |= set(pending)
         done |= {stamp for stamp, _docs in chunk}
@@ -512,9 +518,8 @@ def route(tables: dict[str, list[Row]], rows: list[Row], default: str, stamp: st
         tables.setdefault(table, []).append(d)
 
 
-def _content(r: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
-    return tuple(sorted((k, str(v)) for k, v in r.items()
-                        if k != "observed_at" and v not in ("", None)))
+def _spec(table: str) -> Table:
+    return TABLES.get(table, Table(True))
 
 
 def _store(path: Path, rows: list[Row], spec: Table) -> None:
@@ -760,7 +765,65 @@ def _selftest() -> None:
                           ("/jugadores/pedri", "/jugadores/pedri-gonzalez")]:
         assert page_sig(team, _FIXTURE.replace(before, after)) != base, after
 
+    _selftest_sql_store()
     print("ingest.py selftest OK")
+
+
+def _selftest_sql_store() -> None:
+    """A table kept in lfg.db reads exactly as the same table kept as CSV:
+    current and history, at every cut, for each way a table is kept."""
+    import tempfile
+    from ffcore.clock import set_now
+    from ffcore.parse import count, money
+    from ffcore.tidy import current, history, store_sql, tables_in
+
+    a, b, c = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
+    once = [{"observed_at": a, "source": "s", "k": "1", "v": "10", "j": "3", "who": "x"},
+            {"observed_at": a, "source": "s", "k": "2", "v": "5", "j": "", "who": "y"},
+            {"observed_at": b, "source": "s", "k": "1", "v": "12", "j": "3", "who": "x"},
+            {"observed_at": b, "source": "s", "k": "2", "v": "5", "j": "", "who": "y"},
+            {"observed_at": b, "source": "s", "k": "", "v": "7", "j": "1", "who": "z"},
+            {"observed_at": c, "source": "s", "k": "3", "v": "1", "j": "4", "who": "x",
+             "late": "new column"}]
+    snap = [{"observed_at": a, "source": "s", "who": "x", "v": "1"},
+            {"observed_at": a, "source": "t", "who": "y", "v": "2"},
+            {"observed_at": b, "source": "s", "who": "x", "v": "3"},
+            {"observed_at": b, "source": "s", "who": "z", "v": ""},
+            {"observed_at": c, "source": "t", "who": "y", "v": "4", "late": "q"}]
+    numbers = (("v", money), ("j", count))
+    try:
+        for name, spec, rows in [
+                ("t_once", Table(False, ("k",), "once", numbers), once),
+                ("t_snap", Table(True, (), "", numbers[:1]), snap)]:
+            seen = {}
+            for sql in (False, True):
+                TABLES[name] = spec._replace(sql=sql)
+                with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)) as tidy:
+                    for stamp in (a, b, c):
+                        batch = [r for r in rows if r["observed_at"] == stamp]
+                        if sql:
+                            store_sql(name, batch)
+                        else:
+                            _store(tidy / ("%s.csv" % name), batch, TABLES[name])
+                    for now in ("2026-08-01T1000Z", "2026-08-02T1000Z", "2026-08-04T0000Z"):
+                        set_now(snapshot_stamp(now))
+                        seen[sql, now] = [[{k: v for k, v in r.items() if v not in ("", None)}
+                                           for r in got] for got in (
+                            current(name), current(name, "t"), history(name), history(name, "s"))]
+            for now in ("2026-08-01T1000Z", "2026-08-02T1000Z", "2026-08-04T0000Z"):
+                assert seen[True, now] == seen[False, now], (name, now, seen[True, now],
+                                                             seen[False, now])
+            assert any(seen[True, n][0] for n in ("2026-08-04T0000Z",)), "not vacuous"
+            assert isinstance(seen[True, "2026-08-04T0000Z"][2][0]["v"], float), \
+                "numbers come back as numbers"
+            if name == "t_once":
+                js = [r.get("j") for r in seen[True, "2026-08-04T0000Z"][2]]
+                assert 3 in js and all(type(j) is int for j in js if j is not None), \
+                    "a count is an int, as count() parses it"
+    finally:
+        set_now(None)
+        TABLES.pop("t_once", None)
+        TABLES.pop("t_snap", None)
 
 
 if __name__ == "__main__":
