@@ -330,7 +330,9 @@ def _version() -> str:
                                            for n, t in TABLES.items()})
 
 
-def parse() -> None:
+def parse() -> dict[str, int]:
+    """Fold new snapshots into the tidy tables; how many snapshots,
+    documents parsed and rows routed."""
     version = _version()
     walk = doc_keys()
     state = _read_json(TIDY / _STATE, {})
@@ -346,7 +348,7 @@ def parse() -> None:
     if not todo:
         print("  nothing new to parse (%d snapshots already folded in)"
               % len(done))
-        return
+        return {"snapshots": 0, "documents": 0, "rows": 0}
 
     parsed = rows_out = 0
     used: set[str] = set()
@@ -385,6 +387,7 @@ def parse() -> None:
         _keep_cache(used)
     print("  %d snapshot(s): %d document(s) parsed, %d row(s) routed"
           % (len(todo), parsed, rows_out))
+    return {"snapshots": len(todo), "documents": parsed, "rows": rows_out}
     if not table_stats(TIDY / "market.csv")[0]:
         sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
 

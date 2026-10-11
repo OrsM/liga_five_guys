@@ -4,11 +4,19 @@ from __future__ import annotations
 import gc
 import collections
 import os
+import resource
+import sqlite3
+import subprocess
 import sys
 import threading
 import time
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
+from datetime import datetime, timezone
+from pathlib import Path
+
+from ffcore.clock import run_now
+from ffcore.db import DB, connect
 
 
 STAGES: list[tuple[str, str]] = [
@@ -35,9 +43,62 @@ def _sample(hits: collections.Counter[str], stop: threading.Event, tid: int) -> 
         hits[at] += 1
 
 
-def main(argv: list[str]) -> int:
+def _utc() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _commit() -> str:
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip() or "?"
+    except (OSError, subprocess.CalledProcessError):
+        return "?"
+
+
+def _start(db: sqlite3.Connection) -> int:
+    with db:
+        cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha)"
+                         " VALUES (?, ?, ?, ?)",
+                         (_utc(), run_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                          os.environ.get("LFG_TRIGGER", "service"), _commit()))
+    assert cur.lastrowid is not None
+    return cur.lastrowid
+
+
+def _measure(db: sqlite3.Connection, run: int, stage: str, seconds: float,
+             counts: object) -> None:
+    got = {**(counts if isinstance(counts, Mapping) else {}), "seconds": seconds}
+    with db:
+        db.executemany("INSERT INTO run_measures VALUES (?, ?, ?, ?)",
+                       [(run, stage, k, float(v)) for k, v in got.items()])
+
+
+def _finish(db: sqlite3.Connection, run: int, ok: bool) -> None:
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    with db:
+        db.execute("UPDATE runs SET finished = ?, ok = ?, peak_mb = ? WHERE run_id = ?",
+                   (_utc(), int(ok), peak, run))
+
+
+def main(argv: list[str], every: Sequence[tuple[str, str]] = STAGES,
+         path: Path = DB) -> int:
+    """Run the stages argv names (all by default), each recorded in runs
+    and run_measures; 1 at the first that fails."""
+    db = connect(path)
+    run = _start(db)
+    ok = False
+    try:
+        ok = _stages(argv, every, db, run) == 0
+    finally:
+        _finish(db, run, ok)
+        db.close()
+    return 0 if ok else 1
+
+
+def _stages(argv: list[str], every: Sequence[tuple[str, str]],
+            db: sqlite3.Connection, run: int) -> int:
     want = [a for a in argv if not a.startswith("-")]
-    stages = [s for s in STAGES if not want or s[0] in want]
+    stages = [s for s in every if not want or s[0] in want]
     if want:
         stages = sorted(stages, key=lambda s: want.index(s[0]))
 
@@ -49,8 +110,9 @@ def main(argv: list[str]) -> int:
         stop = threading.Event()
         threading.Thread(target=_sample, daemon=True, args=(
             hits, stop, threading.get_ident())).start()
+        counts: object = None
         try:
-            call(spec)()
+            counts = call(spec)()
         except SystemExit as e:
             if e.code:
                 print("  FAILED: %s exited %s" % (name, e.code))
@@ -62,6 +124,7 @@ def main(argv: list[str]) -> int:
         gc.collect()
         stop.set()
         times.append((time.time() - t0, name))
+        _measure(db, run, name, times[-1][0], counts)
         if times[-1][0] > float(os.environ.get("LFG_SLOW_S", 8)):
             print("  slow %s, where: %s" % (name, "  ".join(
                 "%d%% %s" % (100 * v // sum(hits.values()), k)
@@ -72,8 +135,43 @@ def main(argv: list[str]) -> int:
     return 0
 
 
+def _selftest_runs() -> None:
+    import sqlite3
+    import tempfile
+    import types
+    from pathlib import Path
+
+    fake = types.ModuleType("fake_stages")
+
+    def boom() -> None:
+        raise RuntimeError("stage broke")
+    fake.counted = lambda: {"rows": 7}  # type: ignore[attr-defined]
+    fake.quiet = lambda: None  # type: ignore[attr-defined]
+    fake.boom = boom  # type: ignore[attr-defined]
+    sys.modules["fake_stages"] = fake
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "lfg.db"
+        assert main([], [("count", "fake_stages:counted"), ("quiet", "fake_stages:quiet")],
+                    path) == 0
+        assert main([], [("count", "fake_stages:counted"), ("boom", "fake_stages:boom")],
+                    path) == 1
+        db = sqlite3.connect(path)
+        runs = db.execute("SELECT run_id, ok, finished IS NOT NULL, trigger, commit_sha,"
+                          " as_of, peak_mb > 0 FROM runs ORDER BY run_id").fetchall()
+        assert [r[:4] for r in runs] == [(1, 1, 1, "service"), (2, 0, 1, "service")], runs
+        assert all(r[4] and r[5] and r[6] for r in runs), "commit, clock and memory recorded"
+        got = {(r, s, m): v for r, s, m, v in db.execute("SELECT * FROM run_measures")}
+        assert got[(1, "count", "rows")] == 7, "a stage's returned counts are measures"
+        assert {k[1:] for k in got if k[0] == 1} == {
+            ("count", "rows"), ("count", "seconds"), ("quiet", "seconds")}, got
+        assert {k[1:] for k in got if k[0] == 2} == {("count", "rows"), ("count", "seconds")}, \
+            "a failed stage records nothing; the ones before it stay"
+        db.close()
+
+
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
+        _selftest_runs()
         for _name, _spec in STAGES:
             assert callable(call(_spec)), _name
         assert [n for n, _ in STAGES] == sorted(
