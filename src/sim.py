@@ -17,7 +17,7 @@ from ffcore.forecast import expected_points
 from ffcore.jornadas import load_deadline
 from ffcore.tidy import REPORTS
 
-__all__ = ["forecast", "funnel", "report"]
+__all__ = ["board_tables", "forecast", "funnel", "report"]
 
 ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -291,6 +291,27 @@ def _selftest() -> None:
                    "picked": 0.9, "fit": 0.5, "points": star.cell[0], "plays": star.cell[1],
                    "expected": expected_points(star.cell)}], fc
 
+    import tempfile
+    from contextlib import closing
+    from pathlib import Path
+
+    from ffcore.db import connect
+    with tempfile.TemporaryDirectory() as tmp:
+        tables = board_tables(doc, 7)
+        for name, entries in tables.items():
+            record(entries, name, Path(tmp) / "lfg.db")
+        with closing(connect(Path(tmp) / "lfg.db")) as db:
+            got = {n: db.execute('SELECT count(*) FROM "%s" WHERE run_id = 7' % n).fetchone()[0]
+                   for n in tables}
+            assert got == {"boards": 1, "board_do": len(doc["do"]),
+                           "board_squad": len(doc["squad"]),
+                           "board_standings": len(doc["standings"]),
+                           "board_exposed": len(doc["exposed"])}, got
+            assert db.execute("SELECT p_win, band_lo FROM boards").fetchone() \
+                == (doc["p_win"], doc["band"][0])
+            assert json.loads(db.execute("SELECT facts FROM board_do WHERE ord = 0")
+                              .fetchone()[0]) == [list(f) for f in doc["do"][0]["facts"]]
+
     print("sim self-test OK")
 
 
@@ -315,6 +336,20 @@ def forecast(u: Universe, run: int) -> list[Doc]:
             for j, layer in u.factors.items() for k, f in layer.items()]
 
 
+def board_tables(doc: Doc, run: int) -> dict[str, list[Doc]]:
+    """The board as decisions.json has it, as table rows: its headline in
+    boards, and each list (do, squad, standings, exposed) in board_<list>."""
+    lists = ("do", "squad", "standings", "exposed")
+    head = {k: v for k, v in doc.items() if k not in lists and k != "band"}
+    lo, hi = doc["band"]
+    return {"boards": [{"run_id": run, **head, "band_lo": lo, "band_hi": hi}],
+            "board_do": [{"run_id": run, "ord": i, **d,
+                          "facts": json.dumps(d["facts"], ensure_ascii=False)}
+                         for i, d in enumerate(doc["do"])],
+            **{"board_" + n: [{"run_id": run, "ord": i, **d} for i, d in enumerate(doc[n])]
+               for n in lists[1:]}}
+
+
 def main() -> None:
     u = universe()
     if len(u.state.squads) < 2 or not u.state.jornadas:
@@ -322,15 +357,17 @@ def main() -> None:
               % (len(u.state.squads), len(u.state.jornadas)))
         return
     b = board(u)
+    doc = report(u, b, app_fielded(u.mine, u.market.name), load_deadline())
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
-        report(u, b, app_fielded(u.mine, u.market.name), load_deadline()),
-        ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
     if (run := this_run()) is not None:
         record(funnel(u, b, run), "funnel")
         record(forecast(u, run), "forecast")
         record([{"run_id": run, **r} for r in built().params], "params")
+        for name, rows in board_tables(doc, run).items():
+            record(rows, name)
 
 
 if __name__ == "__main__":

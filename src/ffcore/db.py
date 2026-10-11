@@ -36,14 +36,15 @@ def this_run() -> int | None:
 
 def record(rows: Sequence[Mapping[str, object]], table: str,
            path: Path = DB, schema: Path = SCHEMA) -> None:
-    """Insert rows into table, each a mapping of column to value."""
+    """Insert rows into table, each a mapping of column to value; a column
+    a row lacks is NULL."""
     if not rows:
         return
-    cols = list(rows[0])
+    cols = list(dict.fromkeys(c for r in rows for c in r))
     sql = 'INSERT INTO "%s" (%s) VALUES (%s)' % (
         table, ", ".join('"%s"' % c for c in cols), ", ".join("?" * len(cols)))
     with closing(connect(path, schema)) as db, db:
-        db.executemany(sql, [[r[c] for c in cols] for r in rows])
+        db.executemany(sql, [[r.get(c) for c in cols] for r in rows])
 
 
 def _selftest() -> None:
@@ -77,6 +78,12 @@ def _selftest() -> None:
         with closing(connect(path, schema)) as db:
             assert [k for (k,) in db.execute("SELECT k FROM t ORDER BY k")] \
                 == ["a", "b", "c", "d"], "record inserts dict rows by column name"
+            db.execute("CREATE TABLE u (k TEXT, v TEXT)")
+            db.commit()
+        record([{"k": "e"}, {"k": "f", "v": "x"}], "u", path, schema)
+        with closing(connect(path, schema)) as db:
+            assert db.execute("SELECT * FROM u ORDER BY k").fetchall() \
+                == [("e", None), ("f", "x")], "a key a row lacks is NULL"
 
     import os
     for env, want in [("", None), ("12", 12)]:

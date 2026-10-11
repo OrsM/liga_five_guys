@@ -70,3 +70,78 @@ CREATE TABLE IF NOT EXISTS params (
     n         INTEGER,           -- observations behind it, where known
     PRIMARY KEY (run_id, component, term)
 );
+
+-- The board as decisions.json has it (sim.report), one run each: the
+-- headline in boards, each list a row an entry. Names, not keys: the
+-- board is what the phone shows.
+CREATE TABLE IF NOT EXISTS boards (
+    run_id       INTEGER PRIMARY KEY REFERENCES runs(run_id),
+    generated_at TEXT NOT NULL,
+    lock_at      TEXT,
+    cash         REAL,
+    cash_locked  REAL,
+    finish       REAL,             -- expected final position
+    p_win        REAL,
+    band_lo      REAL,             -- your season points, 10th and 90th percentile
+    band_hi      REAL,
+    plan_gain    REAL,
+    cash_after   REAL,
+    ping         TEXT
+);
+
+CREATE TABLE IF NOT EXISTS board_do (
+    run_id INTEGER NOT NULL REFERENCES runs(run_id),
+    ord    INTEGER NOT NULL,
+    what   TEXT NOT NULL,          -- field, buy, sell
+    label  TEXT NOT NULL,
+    name   TEXT,
+    pos    TEXT,
+    step   TEXT,                   -- what to do in the app
+    amount REAL,
+    done   INTEGER NOT NULL,
+    gain   REAL,
+    per    TEXT,
+    facts  TEXT NOT NULL,          -- JSON: [name, value, unit]
+    PRIMARY KEY (run_id, ord)
+);
+
+CREATE TABLE IF NOT EXISTS board_squad (
+    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
+    ord         INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    pos         TEXT,
+    xi          INTEGER,
+    start       REAL,
+    next        REAL,
+    season      REAL,
+    value       REAL,
+    trend       REAL,
+    paid        REAL,
+    per_million REAL,
+    offer       REAL,
+    PRIMARY KEY (run_id, ord)
+);
+
+CREATE TABLE IF NOT EXISTS board_standings (
+    run_id    INTEGER NOT NULL REFERENCES runs(run_id),
+    ord       INTEGER NOT NULL,
+    manager   TEXT NOT NULL,
+    me        INTEGER NOT NULL,
+    now       REAL,
+    mean      REAL,
+    lo        REAL,
+    hi        REAL,
+    cash      REAL,
+    estimated INTEGER,
+    p_above   REAL,
+    PRIMARY KEY (run_id, ord)
+);
+
+CREATE TABLE IF NOT EXISTS board_exposed (
+    run_id INTEGER NOT NULL REFERENCES runs(run_id),
+    ord    INTEGER NOT NULL,
+    name   TEXT NOT NULL,
+    pos    TEXT,
+    clause REAL,
+    PRIMARY KEY (run_id, ord)
+);

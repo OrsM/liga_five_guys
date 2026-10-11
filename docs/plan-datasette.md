@@ -64,7 +64,9 @@ deployed when green.
 - 2.3 (done) `params`, write-only: every constant and fitted value a run used
   (calibration, availability, fallbacks, promoted discount, premium, offer
   ratios, momentum, fixture ratings), one list in `assemble`.
-- 2.4 `board`; `decisions.json` exported from it (`golden.py check` same).
+- 2.4 (done) `boards` and `board_do`/`_squad`/`_standings`/`_exposed`, written
+  from the same `report()` document as `decisions.json` (rebuilding the JSON
+  from rows would gain nothing).
 - 2.5 `grading` writes backtest and replayed decisions as tables.
 - 2.6 board history imported from git.
 - 2.7 "why did it change": diff of the last two runs' funnel and forecast,
