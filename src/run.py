@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ffcore.clock import run_now
-from ffcore.db import DB, connect
+from ffcore.db import DB, RUN_ENV, connect, this_run
 
 
 STAGES: list[tuple[str, str]] = [
@@ -86,6 +86,7 @@ def main(argv: list[str], every: Sequence[tuple[str, str]] = STAGES,
     and run_measures; 1 at the first that fails."""
     db = connect(path)
     run = _start(db)
+    os.environ[RUN_ENV] = str(run)
     ok = False
     try:
         ok = _stages(argv, every, db, run) == 0
@@ -146,7 +147,7 @@ def _selftest_runs() -> None:
     def boom() -> None:
         raise RuntimeError("stage broke")
     fake.counted = lambda: {"rows": 7}  # type: ignore[attr-defined]
-    fake.quiet = lambda: None  # type: ignore[attr-defined]
+    fake.quiet = lambda: {"run": this_run()}  # type: ignore[attr-defined]
     fake.boom = boom  # type: ignore[attr-defined]
     sys.modules["fake_stages"] = fake
     with tempfile.TemporaryDirectory() as tmp:
@@ -163,7 +164,8 @@ def _selftest_runs() -> None:
         got = {(r, s, m): v for r, s, m, v in db.execute("SELECT * FROM run_measures")}
         assert got[(1, "count", "rows")] == 7, "a stage's returned counts are measures"
         assert {k[1:] for k in got if k[0] == 1} == {
-            ("count", "rows"), ("count", "seconds"), ("quiet", "seconds")}, got
+            ("count", "rows"), ("count", "seconds"), ("quiet", "run"), ("quiet", "seconds")}, got
+        assert got[(1, "quiet", "run")] == 1, "a stage knows its run (LFG_RUN)"
         assert {k[1:] for k in got if k[0] == 2} == {("count", "rows"), ("count", "seconds")}, \
             "a failed stage records nothing; the ones before it stay"
         db.close()

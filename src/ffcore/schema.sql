@@ -21,3 +21,23 @@ CREATE TABLE IF NOT EXISTS run_measures (
     value   REAL NOT NULL,
     PRIMARY KEY (run_id, stage, measure)
 );
+
+-- Every move the board ranked (decide.board's rows), in board order: the
+-- funnel's candidates, rank and verdict, and whether the plan took it.
+-- Why the plan left a move out costs a joint simulation: ask.py why.
+CREATE TABLE IF NOT EXISTS funnel (
+    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
+    rank        INTEGER NOT NULL,
+    kind        TEXT NOT NULL,     -- buy, sell, swap
+    buy         TEXT,              -- player key
+    sell        TEXT,              -- player keys, comma-separated
+    label       TEXT NOT NULL,     -- Action.label
+    cost        REAL NOT NULL,
+    proceeds    REAL NOT NULL,
+    gain        REAL NOT NULL,     -- median season points against doing nothing
+    p_better    REAL NOT NULL,     -- share of seasons better off
+    per_million REAL NOT NULL,
+    verdict     TEXT,              -- why it fails the bar; NULL if it clears it
+    in_plan     INTEGER NOT NULL,
+    PRIMARY KEY (run_id, rank)
+);

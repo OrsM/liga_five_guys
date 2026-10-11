@@ -7,15 +7,16 @@ from datetime import datetime
 from typing import Any
 
 from assemble import universe
-from decide import CONFIDENCE, Board, Move, Universe, at_risk, board
+from decide import CONFIDENCE, Board, Move, Universe, at_risk, board, verdict
 from ffcore.market import Market
 from ffcore.league import app_fielded
 from ffcore.rules import POSITIONS
 from ffcore.clock import run_now
+from ffcore.db import record, this_run
 from ffcore.jornadas import load_deadline
 from ffcore.tidy import REPORTS
 
-__all__ = ["report"]
+__all__ = ["funnel", "report"]
 
 ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -268,7 +269,33 @@ def _selftest() -> None:
     assert facts(wait)["offer"] == 0.9e6 and facts(wait)["raises"] == wait["amount"]
     assert "Dead" not in quiet, quiet
 
+    ranked = funnel(ub, b, 7)
+    assert [r["rank"] for r in ranked] == list(range(len(b.rows))) \
+        and {r["run_id"] for r in ranked} == {7}, "every ranked move, in board order"
+    assert [r["in_plan"] for r in ranked] == [int(m in b.plan) for m in b.rows]
+    assert [r["verdict"] for r in ranked] == [verdict(m) for m in b.rows], \
+        "why a move fails the bar, or NULL when it clears it"
+    mv = next(m for m in b.rows if m.action.buy == "cand")
+    got = next(r for r in ranked if r["buy"] == "cand")
+    assert (got["gain"], got["p_better"], got["per_million"], got["cost"], got["label"]) \
+        == (mv.d_pts, mv.p_better, mv.per_million, mv.action.cost,
+            mv.action.label(ub.market.names)), got
+    sale_row = next(r for r in ranked if r["kind"] == "sell")
+    assert sale_row["buy"] is None and sale_row["sell"], sale_row
+
     print("sim self-test OK")
+
+
+def funnel(u: Universe, b: Board, run: int) -> list[Doc]:
+    """Every ranked move, in board order: the funnel's first three steps
+    (candidates, rank, verdict) and whether the plan took it."""
+    return [{"run_id": run, "rank": i, "kind": m.action.kind,
+             "buy": m.action.buy or None, "sell": ",".join(m.action.sell) or None,
+             "label": m.action.label(u.market.names),
+             "cost": m.action.cost, "proceeds": m.action.proceeds,
+             "gain": m.d_pts, "p_better": m.p_better, "per_million": m.per_million,
+             "verdict": verdict(m), "in_plan": int(m in b.plan)}
+            for i, m in enumerate(b.rows)]
 
 
 def main() -> None:
@@ -283,6 +310,8 @@ def main() -> None:
         report(u, b, app_fielded(u.mine, u.market.name), load_deadline()),
         ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
+    if (run := this_run()) is not None:
+        record(funnel(u, b, run), "funnel")
 
 
 if __name__ == "__main__":

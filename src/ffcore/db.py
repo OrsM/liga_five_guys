@@ -3,15 +3,19 @@ Datasette and ask.py. Disposable: every table but runs is rebuilt from
 data/raw, git or a replay (docs/plan-datasette.md)."""
 from __future__ import annotations
 
+import os
 import sqlite3
+from collections.abc import Mapping, Sequence
+from contextlib import closing
 from pathlib import Path
 
 from ffcore.tidy import ROOT
 
-__all__ = ["DB", "SCHEMA", "connect"]
+__all__ = ["DB", "RUN_ENV", "SCHEMA", "connect", "record", "this_run"]
 
 DB = ROOT / "lfg.db"
 SCHEMA = Path(__file__).with_name("schema.sql")
+RUN_ENV = "LFG_RUN"
 
 
 def connect(path: Path = DB, schema: Path = SCHEMA) -> sqlite3.Connection:
@@ -24,9 +28,27 @@ def connect(path: Path = DB, schema: Path = SCHEMA) -> sqlite3.Connection:
     return db
 
 
+def this_run() -> int | None:
+    """The run src/run.py is recording (LFG_RUN), or None outside one."""
+    got = os.environ.get(RUN_ENV, "")
+    return int(got) if got else None
+
+
+def record(rows: Sequence[Mapping[str, object]], table: str,
+           path: Path = DB, schema: Path = SCHEMA) -> None:
+    """Insert rows into table, each a mapping of column to value."""
+    if not rows:
+        return
+    cols = list(rows[0])
+    sql = 'INSERT INTO "%s" (%s) VALUES (%s)' % (
+        table, ", ".join('"%s"' % c for c in cols), ", ".join("?" * len(cols)))
+    with closing(connect(path, schema)) as db, db:
+        db.executemany(sql, [[r[c] for c in cols] for r in rows])
+
+
 def _selftest() -> None:
     import tempfile
-    from pathlib import Path
+    from contextlib import closing
 
     with tempfile.TemporaryDirectory() as tmp:
         schema = Path(tmp) / "schema.sql"
@@ -49,6 +71,19 @@ def _selftest() -> None:
         writer.close()
         reader.close()
         connect(Path(tmp) / "real.db").close()
+
+        record([], "t", path, schema)
+        record([{"k": "c"}, {"k": "d"}], "t", path, schema)
+        with closing(connect(path, schema)) as db:
+            assert [k for (k,) in db.execute("SELECT k FROM t ORDER BY k")] \
+                == ["a", "b", "c", "d"], "record inserts dict rows by column name"
+
+    import os
+    for env, want in [("", None), ("12", 12)]:
+        os.environ[RUN_ENV] = env
+        assert this_run() == want, (env, this_run())
+    os.environ.pop(RUN_ENV)
+    assert this_run() is None, "outside run.py there is no run"
     print("ffcore.db self-test OK")
 
 
