@@ -82,6 +82,30 @@ deployed when green.
 - 4.2 The three side files become tables.
 - 4.3 Delete the CSV machinery nothing uses.
 
+**Phase 5: experiments, each a module of its own; keep what gets used**
+- 5.1 Replay: the board, funnel and forecast at any past snapshot, today's
+  code, clock pinned (~400 snapshots x ~8s sim, once; then one a run).
+  Tagged by code version so replays and live runs sit side by side.
+- 5.2 Phantom coach: a sixth manager that does what the board says, from
+  jornada 1, scored in the real standings. Assumes its bids win at the
+  model's price and rivals do not react to it: it grades the advice, not an
+  alternative season.
+- 5.3 Every manager's board: the same funnel with `me` set to each rival
+  (`me` is already a parameter end to end). Their cash is our estimate and
+  their pending bids are invisible. Then: what each rival should have done,
+  what they did, and their phantom beside them.
+- 5.4 Champion and challenger: a model change runs beside the live one,
+  both scored as jornadas resolve; it replaces the live one only on a win.
+- 5.5 Parser self-report: a page parsing to zero rows opens a session with
+  the raw page, the parser and its last good page, which proposes a fix.
+- 5.6 The game's price rule, fitted from every value and nightly offer
+  since August; judged by the backtest.
+- 5.7 Rivals who act in the season sim, fitted from the ledger. A model
+  change: whiteboard first.
+
+The scraped data is close to public (Miguel, 2026-10-11): sharing a
+league-facing view is not ruled out.
+
 ## Later, once the above is used
 
 Each commit's effect on the board and the backtest; constants tried side by
