@@ -85,7 +85,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 11793,alex lebarbier,real-sociedad,alex-lebarbier,2836,Lebarbier
 11807,pablo campos,levante,pablo-campos,2666,P. Campos
 11813,natan,betis,natan,2543,Natan
-11816,aitor fraga,real-sociedad,,2835,Fraga
+11816,aitor fraga,real-sociedad,aitor-fraga,2835,Fraga
 11830,dean huijsen,real-madrid,dean-huijsen,2530,Huijsen
 11857,matteo prati,racing,matteo-prati,3234,Matteo Prati
 11861,dani martinez,atletico,dani-martinez,2881,D. Martínez
@@ -189,7 +189,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 14016,mikel santos,athletic,mikel-santos,2809,M. Santos
 14017,peio canales,athletic,peio-canales,3023,Peio Canales
 14019,alexis ciria,real-madrid,alexis-ciria,3222,Alexis Ciria
-14020,arkaitz mariezkurrena,real-sociedad,,2875,Mariezkurrena
+14020,arkaitz mariezkurrena,real-sociedad,arkaitz-mariezkurrena,2875,Mariezkurrena
 14021,job ochieng,real-sociedad,job-ochieng,2955,Ochieng
 14022,alassane diatta,villarreal,alassane-diatta,2902,Diatta
 14024,javier hernandez,espanyol,javier-hernandez,3161,Javi Hernández
@@ -271,7 +271,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 16147,ivan alonso,rayo-vallecano,ivan-alonso,3180,Alonso
 16149,moha hamdoune,getafe,moha-hamdoune,3245,Moha
 16154,jose antonio morante,betis,jose-antonio-morante,3276,Morante
-16155,theo folgado,real-sociedad,,2792,Folgado
+16155,theo folgado,real-sociedad,theo-folgado,2792,Folgado
 16156,oscar marcos,celta,,2849,Óscar Marcos
 16158,mauro echegoyen,osasuna,mauro-echegoyen,2723,Mauro
 16166,mykyta aleksandrov,getafe,,,
@@ -286,7 +286,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 16235,alex costa,sevilla,alex-costa,2788,
 16236,miguel sierra,sevilla,miguel-sierra,2746,Miguel Sierra|Sierra
 16237,thiago pitarch,real-madrid,thiago-pitarch,2735,Thiago Pitarch
-16247,lander astiazaran,,,2899,Astiazaran
+16247,lander astiazaran,,lander-astiazaran,2899,Astiazaran
 16262,sergio martinez,real-madrid,sergio-martinez,3024,Sergio
 16263,santi franco,racing,,,
 16286,dani lorenzo,malaga,dani-lorenzo-1,3036,Dani Lorenzo
@@ -313,7 +313,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 16810,selton sanchez,athletic,selton-sanchez,2845,Selton
 16818,asier hierro,athletic,asier-hierro,2879,Asier Hierro
 16863,bil nsongo,deportivo,bil-nsongo,2973,Bil Nsongo
-16867,ibai aguirre,,,2900,Aguirre
+16867,ibai aguirre,,ibai-aguirre,2900,Aguirre
 16873,angel arcos,celta,,2884,A. Arcos
 16874,joel fontanet,valencia,,2901,Fontanet
 16917,jorge montes,getafe,,2890,Montes
