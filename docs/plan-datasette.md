@@ -128,8 +128,13 @@ data/raw tarballs
   move. Stays Python: the fuzzy app-id match (name tokens + value ratio),
   reading and writing the table. (Miguel, 2026-10-11: "on the IDs I feel we
   are regressing".)
-- S4 Points and line-ups: `scored`, start outcomes, availability counts.
-- S5 The last table moved: `tidy.py`'s storage and `current`/`history` go.
+- S4a+S5 (done; code lines 6277 -> 6128; golden same, points rebuilt from
+  raw alone) every parsed table in lfg.db; the CSV store and Python
+  current/history go; store_cases.json keeps the CSV store's behaviour as
+  the SQL store's test. Learned: removing an ignore list for files still
+  on disk let the report commit take them (fixed: data/tidy/*.csv ignored
+  but players.csv).
+- S4b (next) Points and line-ups: `scored`, start outcomes, availability counts.
 - S6 The board as a saved query; the phone's JSON its export.
 - Then the old phase 3 rest: tunnel route, `Fantasy.jsx` links, Run again
   and the live log on the box, alerts, more saved queries.
