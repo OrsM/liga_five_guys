@@ -21,7 +21,7 @@ deployed when green.
 
 | Question | Answer | Why |
 |---|---|---|
-| Forecast retention | latest two runs | ~22k rows a run x 4.5 runs a day; history comes from `grading` replays; two runs give "why did it change" |
+| Forecast retention | every run | measured 2026-10-11: 91 players x 32 jornadas = 2.8k rows a run (the forecaster covers squads and the market, not all 729), ~3M rows and ~200MB a season; no pruning code |
 | Funnel retention | every run | small |
 | Telegram ping | stays on the phone | it fires only after a successful publish and links to the phone page |
 | Report commits | keep | they are the board history and its backup (8KB, 2s a run) |
@@ -49,11 +49,11 @@ deployed when green.
 ## Steps
 
 **Phase 1: the file and the runs**
-- 1.1 `ffcore/db.py` opens `data/lfg.db` (WAL), applies `ffcore/schema.sql`.
-- 1.2 `runs`: stage times, rows parsed, peak memory, commit, trigger.
+- 1.1 (done) `ffcore/db.py` opens `data/lfg.db` (WAL), applies `ffcore/schema.sql`.
+- 1.2 (done) `runs`: stage times, rows parsed, peak memory, commit, trigger.
 
 **Phase 2: what the model concluded**
-- 2.1 `funnel`, steps 1-3. Measure rows and added time.
+- 2.1 (done) `funnel`, steps 1-3: 25 rows a run, sim time within noise.
 - 2.2 `forecast`, a column per factor; `ask.py forecast` reads it (same
   output), its computation deleted.
 - 2.3 `board`; `decisions.json` exported from it (`golden.py check` same).
