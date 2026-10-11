@@ -61,7 +61,7 @@ deployed when green.
 - 2.2 (done) `forecast`: `schedule.Factors` built once, the cell its
   product; `ask.py forecast` prints the same objects (output identical,
   `golden.py check` 16 boards the same).
-- 2.3 `params`, write-only: every constant and fitted value a run used
+- 2.3 (done) `params`, write-only: every constant and fitted value a run used
   (calibration, availability, fallbacks, promoted discount, premium, offer
   ratios, momentum, fixture ratings), one list in `assemble`.
 - 2.4 `board`; `decisions.json` exported from it (`golden.py check` same).

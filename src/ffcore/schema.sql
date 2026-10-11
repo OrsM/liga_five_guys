@@ -58,3 +58,15 @@ CREATE TABLE IF NOT EXISTS forecast (
     expected REAL NOT NULL,
     PRIMARY KEY (run_id, jornada, player)
 );
+
+-- Every constant and fitted value a run was built with (assemble.params),
+-- broom's tidy(): drift and "what changed" are queries over this.
+CREATE TABLE IF NOT EXISTS params (
+    run_id    INTEGER NOT NULL REFERENCES runs(run_id),
+    component TEXT NOT NULL,     -- module, or module.fit
+    term      TEXT NOT NULL,     -- '' for a single value
+    value     REAL NOT NULL,
+    kind      TEXT NOT NULL,     -- constant, fitted
+    n         INTEGER,           -- observations behind it, where known
+    PRIMARY KEY (run_id, component, term)
+);

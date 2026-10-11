@@ -6,11 +6,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from functools import cache
+from typing import Any, NamedTuple
 
-from decide import Universe, _fieldable
+from decide import CONFIDENCE, FINAL_TRIALS, Universe, _fieldable
 from ffcore.crosswalk import Crosswalk
-from ffcore.fixture import Ratings, difficulty_ratings
-from ffcore.forecast import Bootstrap
+from ffcore.fixture import FIX_BAND, MIN_AD_MATCHES, Ratings, difficulty_ratings
+from ffcore.forecast import MIN_POOL, PERSISTENT_SHARE, Bootstrap
 from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
@@ -18,20 +19,34 @@ from ffcore.names import Name, app_id
 from ffcore.parse import Rows, text
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
-from ffcore.pricing import (Momentum, auction_ratios, offer_ratios,
-                            premium_to_beat, steps)
+from ffcore.pricing import (BID_BEATS, CLIP, PRICE_WINDOW, Momentum, auction_ratios,
+                            offer_ratios, premium_to_beat, steps)
 from ffcore.schedule import expectations, phantom_fill
-from ffcore.score import fit_promoted_discount, per_jornada_current, Scorer, totals
+from ffcore.score import (PROMOTED_DISCOUNT_K, SHRINK_K, fit_promoted_discount,
+                          per_jornada_current, Scorer, totals)
 from ffcore.rules import slot
 from ffcore.season import LeagueState
-from ffcore.startprob import (StartOdds, calibrate, fit_availability,
-                              last_fit_listing, outcomes)
+from ffcore.startprob import (AVAIL_K, FALLBACK_K, PICK_K, Availability, Calibration,
+                              StartOdds, calibrate, fit_availability, last_fit_listing,
+                              outcomes)
 from ffcore.tidy import (LINEUP_SOURCE, SEASON, age_hours, current,
                          history, read_csv, typed)
+from stats import percentile
 
-__all__ = ["universe", "scorer", "fixture_ratings", "APP_FRESH_HOURS"]
+__all__ = ["universe", "built", "params", "scorer", "fixture_ratings", "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
+
+# The constants a run is built with, by module: what params records as such.
+CONSTANTS: dict[str, dict[str, float]] = {
+    "assemble": {"APP_FRESH_HOURS": APP_FRESH_HOURS},
+    "decide": {"CONFIDENCE": CONFIDENCE, "FINAL_TRIALS": FINAL_TRIALS},
+    "fixture": {"FIX_BAND": FIX_BAND, "MIN_AD_MATCHES": MIN_AD_MATCHES},
+    "forecast": {"MIN_POOL": MIN_POOL, "PERSISTENT_SHARE": PERSISTENT_SHARE},
+    "pricing": {"BID_BEATS": BID_BEATS, "CLIP": CLIP, "PRICE_WINDOW": PRICE_WINDOW},
+    "score": {"PROMOTED_DISCOUNT_K": PROMOTED_DISCOUNT_K, "SHRINK_K": SHRINK_K},
+    "startprob": {"AVAIL_K": AVAIL_K, "FALLBACK_K": FALLBACK_K, "PICK_K": PICK_K},
+}
 
 
 def scorer(market: Rows, xi_rows: Rows) -> Scorer:
@@ -104,8 +119,42 @@ def _premium(me: str) -> float:
         key=lambda a: a["at"])))
 
 
-@cache
+def params(cal: Calibration, avail: Availability, promoted: float, ratings: Ratings,
+           market: Market) -> list[dict[str, Any]]:
+    """Every constant and fitted value a run is built with, one row each:
+    (component, term, value, kind, n)."""
+    def row(component: str, term: str, value: float, kind: str = "fitted",
+            n: int | None = None) -> dict[str, Any]:
+        return {"component": component, "term": term, "value": float(value),
+                "kind": kind, "n": n}
+    ratios = list(market.offer_ratios)
+    return ([row(m, name, v, "constant") for m, names in CONSTANTS.items()
+             for name, v in names.items()]
+            + [row("startprob.calibration", t, getattr(cal, t))
+               for t in ("alpha", "beta", "neutral_start", "absent_start")]
+            + [row("startprob.availability", b, v) for b, v in sorted(avail.level.items())]
+            + [row("score.promoted_discount", "", promoted),
+               row("pricing.premium", "", market.premium)]
+            + [row("pricing.offer_ratios", t, percentile(ratios, p), n=len(ratios))
+               for t, p in (("p10", 10), ("median", 50), ("p90", 90)) if ratios]
+            + [row("pricing.carry", str(h), v) for h, v in enumerate(market.carry, 1)]
+            + [row("fixture.difficulty", c, v) for c, v in sorted(ratings.diff.items())]
+            + [row("fixture.%s" % t, c, ad[i]) for c, ad in sorted(ratings.ad.items())
+               for i, t in enumerate(("scored", "conceded"))])
+
+
+class Built(NamedTuple):
+    universe: Universe
+    params: list[dict[str, Any]]
+
+
 def universe() -> Universe:
+    return built().universe
+
+
+@cache
+def built() -> Built:
+    """The universe, and the parameters it was built with."""
     age = age_hours("api_teams")
     if age is None or age > APP_FRESH_HOURS:
         raise SystemExit("the app's squads are %s old; no board is built from "
@@ -132,7 +181,8 @@ def universe() -> Universe:
            for k, rec in players.items()}
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
-    ex = expectations(sc, fixture_ratings(mkt_rows), set(price).union(*squads.values()), m)
+    ratings = fixture_ratings(mkt_rows)
+    ex = expectations(sc, ratings, set(price).union(*squads.values()), m)
     per_j, first_jornada_of, rem, played = ex.per_j, ex.first_of, ex.rem, ex.played
     prices = Momentum(steps(history("market")))
     market = Market(
@@ -160,8 +210,42 @@ def universe() -> Universe:
 
     carried = {r["manager"]: r.get("team_points") or 0.0
                for r in lg.standings if r.get("manager")}
-    return Universe(
+    return Built(Universe(
         state=LeagueState(squads, rem, me, carried), forecaster=fc,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of, factors=ex.factors)
+        part_played=played, first_jornada_of=first_jornada_of, factors=ex.factors),
+        params(sc.starts.cal, sc.starts.avail, sc.promoted_discount, ratings, market))
+
+
+def _selftest() -> None:
+    from ffcore.startprob import Availability, Calibration
+
+    rows = params(Calibration(0.1, 0.9, 55.0, 12.0), Availability({"indefinite": 0.2}), 0.7,
+                  Ratings({"a": 1.1}, {"a": (1.2, 0.8)}),
+                  Market(premium=1.05, offer_ratios=(0.9, 1.0, 1.1), carry=(0.5, 1.0)))
+    got = {(r["component"], r["term"]): r for r in rows}
+    assert len(got) == len(rows), "one row a parameter"
+    assert {r["kind"] for r in rows} == {"fitted", "constant"}
+    for key, value in [(("startprob.calibration", "alpha"), 0.1),
+                       (("startprob.calibration", "absent_start"), 12.0),
+                       (("startprob.availability", "indefinite"), 0.2),
+                       (("startprob.availability", "doubt_for:at"), 0.5),
+                       (("score.promoted_discount", ""), 0.7),
+                       (("pricing.premium", ""), 1.05),
+                       (("pricing.offer_ratios", "median"), 1.0),
+                       (("pricing.carry", "2"), 1.0),
+                       (("fixture.difficulty", "a"), 1.1),
+                       (("fixture.scored", "a"), 1.2),
+                       (("fixture.conceded", "a"), 0.8),
+                       (("decide", "CONFIDENCE"), CONFIDENCE)]:
+        assert got[key]["value"] == value, (key, got.get(key))
+    assert got[("pricing.offer_ratios", "median")]["n"] == 3
+    assert got[("decide", "CONFIDENCE")]["kind"] == "constant"
+    assert got[("startprob.availability", "doubt_for:at")]["kind"] == "fitted", \
+        "a bucket with no data keeps its prior, and is still what the run used"
+    print("assemble self-test OK")
+
+
+if __name__ == "__main__":
+    _selftest()

@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime
 from typing import Any
 
-from assemble import universe
+from assemble import built, universe
 from decide import CONFIDENCE, Board, Move, Universe, at_risk, board, verdict
 from ffcore.market import Market
 from ffcore.league import app_fielded
@@ -330,6 +330,7 @@ def main() -> None:
     if (run := this_run()) is not None:
         record(funnel(u, b, run), "funnel")
         record(forecast(u, run), "forecast")
+        record([{"run_id": run, **r} for r in built().params], "params")
 
 
 if __name__ == "__main__":

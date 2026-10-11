@@ -16,7 +16,7 @@ from ffcore.jornadas import clock_history
 from ffcore.points import scored
 from ffcore.score import JornadaPoints, points_by_jornada
 
-from assemble import fixture_ratings, scorer, universe
+from assemble import built, fixture_ratings, scorer, universe
 from decide import Action, board, verdict
 from ffcore.clock import set_now
 from ffcore.pricing import Momentum, _ahead, grade, steps
@@ -81,7 +81,7 @@ def decisions() -> list[dict[str, Any]]:
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
             set_now(locks[i] - dt.timedelta(minutes=1))
-            universe.cache_clear()
+            built.cache_clear()
             try:
                 u = universe()
             except SystemExit as e:
@@ -118,7 +118,7 @@ def decisions() -> list[dict[str, Any]]:
                     "value_real": worth(a, rose)})
     finally:
         set_now(None)
-        universe.cache_clear()
+        built.cache_clear()
     return out
 
 
