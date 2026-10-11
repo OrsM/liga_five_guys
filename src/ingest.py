@@ -323,8 +323,15 @@ def fetch() -> Path:
     return dest
 
 
+def _version() -> str:
+    """What the stored tables depend on: the parsers and how each table is
+    kept. Not Table.numbers: those parse at read time, never stored."""
+    return fingerprint(source_for) + repr({n: t._replace(numbers=())
+                                           for n, t in TABLES.items()})
+
+
 def parse() -> None:
-    version = fingerprint(source_for) + repr(TABLES)
+    version = _version()
     walk = doc_keys()
     state = _read_json(TIDY / _STATE, {})
     done = set(state.get("stamps") or ())
@@ -582,6 +589,10 @@ def _selftest() -> None:
         at[where] = fingerprint(types.FunctionType(uses, {"mod": mod}))
     assert len(set(at.values())) == 1, \
         "a module is fingerprinted by name, not by where it is installed"
+    import subprocess
+    other = subprocess.run([sys.executable, "-c", "import ingest; print(ingest._version())"],
+                           capture_output=True, text=True, check=True).stdout.strip()
+    assert other == _version(), "the parse version is the same in every process"
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
