@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-10-11T06:51Z",
+ "generated_at": "2026-10-11T08:02Z",
  "lock_at": "2026-10-16T19:00:00+00:00",
- "cash": 9916854.0,
+ "cash": 10016854.0,
  "cash_locked": 11569267.0,
  "finish": 1.89,
  "p_win": 0.281,
@@ -12,19 +12,13 @@
  "do": [
   {
    "what": "field",
-   "label": "field Andres Castrin, Dakonam Djene",
+   "label": "field Andres Castrin",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 2.6343769680412272,
+   "gain": 0.38918072203226206,
    "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Zaid Romero",
-     "names"
-    ]
-   ]
+   "facts": []
   },
   {
    "name": "Andres Castrin",
@@ -64,9 +58,9 @@
    "pos": "DEL",
    "what": "sell",
    "label": "sell Miguel Cubo",
-   "step": "list",
+   "step": "listed",
    "amount": null,
-   "done": false,
+   "done": true,
    "gain": 0.0,
    "per": "season",
    "facts": [
@@ -87,9 +81,9 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Yeray Alvarez",
-   "step": "list",
+   "step": "listed",
    "amount": null,
-   "done": false,
+   "done": true,
    "gain": -7.038938506891441,
    "per": "season",
    "facts": [
@@ -107,8 +101,8 @@
   }
  ],
  "plan_gain": 24.11596081646246,
- "cash_after": 3502417.3021758795,
- "ping": "field Andres Castrin, Dakonam Djene; sell Miguel Cubo; sell Yeray Alvarez",
+ "cash_after": 3602417.3021758795,
+ "ping": "field Andres Castrin",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -373,7 +367,7 @@
    "mean": 2086.4754225435595,
    "lo": 1919.0282241124492,
    "hi": 2261.5419547694523,
-   "cash": 1112317.0,
+   "cash": 1212317.0,
    "estimated": true,
    "p_above": 0.7036666666666667
   },
@@ -384,7 +378,7 @@
    "mean": 1989.6010050062912,
    "lo": 1841.5028285052572,
    "hi": 2143.612907694858,
-   "cash": 9916854.0,
+   "cash": 10016854.0,
    "estimated": false,
    "p_above": null
   },
@@ -395,7 +389,7 @@
    "mean": 1838.2996131385673,
    "lo": 1688.0172175727487,
    "hi": 1990.920044777795,
-   "cash": 6822483.0,
+   "cash": 6922483.0,
    "estimated": true,
    "p_above": 0.17566666666666664
   },
@@ -406,7 +400,7 @@
    "mean": 1586.490312604078,
    "lo": 1463.639092267304,
    "hi": 1712.7333480606214,
-   "cash": 43693671.0,
+   "cash": 43793671.0,
    "estimated": true,
    "p_above": 0.0030000000000000027
   },
@@ -417,7 +411,7 @@
    "mean": 1581.0713475425812,
    "lo": 1461.2900593703737,
    "hi": 1706.9831010726289,
-   "cash": -15993043.0,
+   "cash": -15893043.0,
    "estimated": true,
    "p_above": 0.0030000000000000027
   }
