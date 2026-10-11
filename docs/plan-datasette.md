@@ -103,8 +103,11 @@ data/raw tarballs
   Learned: Datasette sends an empty box as '' (queries default with
   `nullif(:p, '')`, and q.py sends '' too); a self-join on a CTE needs
   `MATERIALIZED` (48s -> 0.02s; Datasette stops at 5s).
-- S2 Ledger: `api_activity` into SQL; ledger, rival cash, price paid as
+- S2 (done; code +55 lines until S5 removes the CSV path; golden same; cash and paid identical on the box) Ledger: `api_activity` into SQL; ledger, rival cash, price paid as
   views; `league.py`'s versions go.
+  Learned: as-of is one SQL function, cut(), registered per connection
+  (Python: the model's clock; Datasette: a plugin), so views stay plain
+  views; the parse cache makes a storage move a 30s re-parse, not 5 min.
 - S3 Market history: `market`, `api_market`, `api_offers`; price steps,
   momentum (slope through the origin per horizon), premium, offer ratios
   as views; `pricing.py`'s versions go.
