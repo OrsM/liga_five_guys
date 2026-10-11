@@ -111,6 +111,21 @@ data/raw tarballs
 - S3 Market history: `market`, `api_market`, `api_offers`; price steps,
   momentum (slope through the origin per horizon), premium, offer ratios
   as views; `pricing.py`'s versions go.
+- S-ID Identity: one rule per identity question. Found 2026-10-11: "which
+  player does this name mean" is answered four ways with three ambiguity
+  rules (Crosswalk._by_name: nobody; crosswalk.py _named: the club breaks
+  the tie; league.app_fielded and players._merge: the last one wins), and
+  row_key mixes ff_ids and names in one key column. (Before S4, which is
+  mostly slug and name resolution.) The
+  registry is a `crosswalk` table (`players.csv` its committed export, and
+  what a rebuilt lfg.db loads); app id -> player, slug -> player and name ->
+  player are views, each clash rule once; every fact view joins through
+  them. `name_key()` (text.norm) is a SQL function like `cut()`. Goes:
+  League's `app_keys`, the per-run `players` table, Crosswalk's indexes and
+  clash bookkeeping, the Python resolution at 31 call sites as their tables
+  move. Stays Python: the fuzzy app-id match (name tokens + value ratio),
+  reading and writing the table. (Miguel, 2026-10-11: "on the IDs I feel we
+  are regressing".)
 - S4 Points and line-ups: `scored`, start outcomes, availability counts.
 - S5 The last table moved: `tidy.py`'s storage and `current`/`history` go.
 - S6 The board as a saved query; the phone's JSON its export.

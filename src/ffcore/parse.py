@@ -113,6 +113,11 @@ def year_for(month: int, seen: date, start: int) -> int:
     return seen.year - (seen.month < start) + (month < start)
 
 
+def stamp(when: datetime) -> str:
+    """A time as the tables stamp it, in UTC: snapshot_stamp reads it back."""
+    return when.astimezone(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
+
+
 def snapshot_stamp(s: str) -> datetime | None:
     return _digits_to_dt(s, timezone.utc)
 

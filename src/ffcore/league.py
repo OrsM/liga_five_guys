@@ -71,10 +71,10 @@ class League:
                                [(a, k) for a in sorted(ids) if (k := xw.player(app_id=a))])
                 db.execute("DELETE FROM league_config")
                 db.execute("INSERT INTO league_config VALUES (?, ?)", (cfg.me, cfg.budget))
-            self.owner: dict[str, str] = dict(db.execute("SELECT player, manager FROM owners"))
-            users = [m for (m,) in db.execute("SELECT manager FROM users")]
-            self.cash: dict[str, float] = dict(db.execute("SELECT manager, cash FROM cash"))
-            self.paid: dict[str, float] = dict(db.execute("SELECT player, paid FROM price_paid"))
+        self.owner: dict[str, str] = dict(lfg.rows("SELECT player, manager FROM owners"))
+        users = [m for (m,) in lfg.rows("SELECT manager FROM users")]
+        self.cash: dict[str, float] = dict(lfg.rows("SELECT manager, cash FROM cash"))
+        self.paid: dict[str, float] = dict(lfg.rows("SELECT player, paid FROM price_paid"))
         self.standings = current("api_standings")
         self.managers = sorted({cfg.me} | set(self.owner.values()) | set(users))
 

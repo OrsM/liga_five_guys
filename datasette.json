@@ -45,11 +45,23 @@
         },
         "ledger": {
           "title": "The league's money moves, oldest first; inferred = an exit the feed never recorded",
-          "sql": "SELECT l.at, l.kind, l.who, l.other, coalesce(p.name, l.player) AS player,\n       round(l.amount / 1e6, 2) AS amount_m, l.buyer, l.seller, l.inferred\nFROM ledger l LEFT JOIN players p ON p.player = l.player\n  AND p.run_id = (SELECT max(run_id) FROM players)\nWHERE nullif(:manager, '') IS NULL OR :manager IN (l.who, l.other)\nORDER BY l.at"
+          "sql": "SELECT l.at, l.kind, l.who, l.other, coalesce(p.name, l.player) AS player,\n       round(l.amount / 1e6, 2) AS amount_m, l.buyer, l.seller, l.inferred\nFROM ledger l LEFT JOIN names p ON p.player = l.player\nWHERE nullif(:manager, '') IS NULL OR :manager IN (l.who, l.other)\nORDER BY l.at"
         },
         "price_paid": {
           "title": "What each owner paid for his players (last buy or clause to him)",
-          "sql": "SELECT o.manager, coalesce(p.name, o.player) AS player, round(pp.paid / 1e6, 2) AS paid_m\nFROM owners o LEFT JOIN price_paid pp USING (player)\nLEFT JOIN players p ON p.player = o.player AND p.run_id = (SELECT max(run_id) FROM players)\nORDER BY o.manager, pp.paid DESC"
+          "sql": "SELECT o.manager, coalesce(p.name, o.player) AS player, round(pp.paid / 1e6, 2) AS paid_m\nFROM owners o LEFT JOIN price_paid pp USING (player)\nLEFT JOIN names p ON p.player = o.player\nORDER BY o.manager, pp.paid DESC"
+        },
+        "price_forecast_error": {
+          "title": "Momentum's price forecasts, refitted each day on what was known then, against what happened (mean abs error, % of value; zero = 'no change')",
+          "sql": "WITH days AS (SELECT day, row_number() OVER (ORDER BY day) - 1 AS r, count(*) OVER () AS m\n              FROM (SELECT DISTINCT day FROM price_series WHERE observed_at <= (SELECT cut()))),\ndaily AS (SELECT h, end_day, sum(x * y) AS sxy, sum(x * x) AS sxx FROM momentum_pairs\n          GROUP BY h, end_day),\nfit AS (SELECT d.day, p.h, sum(p.sxy) / sum(p.sxx) AS slope\n        FROM days d JOIN daily p ON p.end_day <= d.day WHERE d.r >= d.m / 4\n        GROUP BY d.day, p.h HAVING sum(p.sxx) <> 0),\npred AS (SELECT f.h, f.slope * x.x AS p, x.change AS act\n         FROM fit f JOIN price_ahead x ON x.day = f.day AND x.h = f.h\n         WHERE f.h IN (1, 3, 5) AND x.end_at <= (SELECT cut()))\nSELECT h, count(*) AS n, round(avg(abs(p - act)), 2) AS mae, round(avg(abs(act)), 2) AS zero\nFROM pred GROUP BY h ORDER BY h"
+        },
+        "momentum": {
+          "title": "Price momentum: the slope per horizon and the share of a trend made after each update",
+          "sql": "SELECT m.h, round(m.slope, 4) AS slope, round(c.carry, 3) AS carry FROM momentum m LEFT JOIN price_carry c USING (h) ORDER BY m.h"
+        },
+        "price_trend": {
+          "title": "Each player's expected value change over the horizon, in %",
+          "sql": "SELECT coalesce(p.name, t.ff_id) AS player, round(t.trend, 1) AS trend_pct FROM price_trend t\nLEFT JOIN names p ON p.player = t.ff_id\nORDER BY t.trend DESC"
         }
       }
     }

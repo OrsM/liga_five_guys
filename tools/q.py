@@ -14,9 +14,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from ffcore import db as lfg
-from ffcore.db import connect
-from ffcore.clock import cut
+from ffcore.db import connect, query
 
 META = Path(__file__).resolve().parent.parent / "datasette.json"
 
@@ -42,10 +40,7 @@ def run(name: str, given: dict[str, str], path: Path | None = None, meta: Path =
         ) -> tuple[list[str], list[tuple[Any, ...]]]:
     """A saved query's columns and rows, run as Datasette runs it."""
     sql = queries(meta)[name]["sql"]
-    with closing(sqlite3.connect("file:%s?mode=ro" % (path or lfg.DB), uri=True)) as db:
-        db.create_function("cut", 0, cut)
-        cur = db.execute(sql, run_params(sql, given))
-        return [d[0] for d in cur.description], cur.fetchall()
+    return query(sql, run_params(sql, given), path)
 
 
 def _cell(v: Any) -> str:
@@ -91,7 +86,11 @@ def _selftest() -> None:
         store_sql("api_activity", [dict(row, activity_id="1", at="", kind="", user_id="",
                                         counterparty="", player_id="")])
         store_sql("api_standings", [dict(row, user_id="", manager="")])
-        store_sql("api_teams", [dict(row, manager="", player_id="")])
+        store_sql("api_teams", [dict(row, manager="", player_id="", player_team_id="")])
+        store_sql("market", [dict(row, ff_id="1", value="1")])
+        store_sql("api_market", [dict(row, seller="", player_id="", expires_at="")])
+        store_sql("api_offers", [dict(row, player_team_id="", offer_id="", created_at="",
+                                      from_market="")])
         _compiles(Path(tmp2) / "lfg.db")
     print("q.py self-test OK")
 

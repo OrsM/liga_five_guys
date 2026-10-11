@@ -11,7 +11,7 @@ from typing import Any, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-from ffcore.parse import Rows, snapshot_stamp, year_for
+from ffcore.parse import Rows, snapshot_stamp, stamp, year_for
 from ffcore.crosswalk import Crosswalk
 from ffcore.names import Name
 from ffcore.rules import minutes_played
@@ -360,7 +360,7 @@ def outcomes(lineups: Rows, starters: Rows, locks: Mapping[int, dt.datetime],
         j = jornada_of.get(match)
         if j is None or j not in locks:
             continue
-        cut = locks[j].strftime("%Y-%m-%dT%H%MZ")
+        cut = stamp(locks[j])
         before = {slug: row for slug, hist in wide.get(team, {}).items()
                   if (row := _last_before(hist, cut)) is not None}
         for slug in sorted(set(before) | set(squad)):

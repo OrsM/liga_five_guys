@@ -24,8 +24,8 @@ from urllib.parse import urlparse
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
 from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, _content, append_csv,
-                         drop_sql, sql_tables, store_sql,
-                         csv_string, read_csv, table_stats, widen_csv,
+                         drop_sql, sql_tables, store_sql, stored,
+                         csv_string, read_csv, widen_csv,
                          write_csv)
 from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
                                   season_label)
@@ -33,6 +33,7 @@ from ffcore.laliga_api import ROW_TABLE
 from sources import source, source_for, sources
 
 from ffcore.parse import Row, snapshot_stamp
+from ffcore.parse import stamp as to_stamp
 from ffcore.source import Source
 __all__ = ["snapshots", "state", "doc_keys", "documents", "due",
           "fetch", "parse", "baseline"]
@@ -206,7 +207,7 @@ def fetch() -> Path:
     import httpx
 
     now = datetime.now(timezone.utc)
-    stamp = now.strftime("%Y-%m-%dT%H%MZ")
+    stamp = to_stamp(now)
     dest = RAW / f"dt={stamp}.tar.xz"
     if dest.exists():
         print(f"{dest} already exists; nothing to do.")
@@ -393,9 +394,9 @@ def parse() -> dict[str, int]:
         _keep_cache(used)
     print("  %d snapshot(s): %d document(s) parsed, %d row(s) routed"
           % (len(todo), parsed, rows_out))
-    return {"snapshots": len(todo), "documents": parsed, "rows": rows_out}
-    if not table_stats(TIDY / "market.csv")[0]:
+    if not stored("market"):
         sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
+    return {"snapshots": len(todo), "documents": parsed, "rows": rows_out}
 
 
 CHUNK = 25
@@ -790,40 +791,53 @@ def _selftest_sql_store() -> None:
             {"observed_at": b, "source": "s", "who": "x", "v": "3"},
             {"observed_at": b, "source": "s", "who": "z", "v": ""},
             {"observed_at": c, "source": "t", "who": "y", "v": "4", "late": "q"}]
+    a1, a2 = "2026-08-01T2100Z", "2026-08-02T2300Z"
+    daily = [{"observed_at": a, "k": "1", "v": "1"}, {"observed_at": a, "k": "2", "v": "2"},
+             {"observed_at": a, "k": "", "v": "9"},
+             {"observed_at": a1, "k": "1", "v": "3"}, {"observed_at": a1, "k": "", "v": "8"},
+             {"observed_at": b, "k": "1", "v": "4"}, {"observed_at": b, "k": "3", "v": "5"},
+             {"observed_at": a2, "k": "3", "v": "6"}, {"observed_at": c, "k": "2", "v": "7"}]
     numbers = (("v", money), ("j", count))
+    cuts = ("2026-08-01T1000Z", "2026-08-01T2200Z", "2026-08-02T1000Z", "2026-08-02T2330Z",
+            "2026-08-04T0000Z")
     try:
         for name, spec, rows in [
                 ("t_once", Table(False, ("k",), "once", numbers), once),
-                ("t_snap", Table(True, (), "", numbers[:1]), snap)]:
+                ("t_snap", Table(True, (), "", numbers[:1]), snap),
+                ("t_daily", Table(True, ("k",), "daily", numbers[:1]), daily)]:
             seen = {}
-            for sql in (False, True):
+            stamps = sorted({r["observed_at"] for r in rows})
+            # by stamp, and all at once: parse stores 25 snapshots a batch
+            for sql, one_batch in ((False, False), (True, False), (True, True)):
                 TABLES[name] = spec._replace(sql=sql)
                 with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)) as tidy:
-                    for stamp in (a, b, c):
-                        batch = [r for r in rows if r["observed_at"] == stamp]
+                    for batch in ([rows] if one_batch else
+                                  [[r for r in rows if r["observed_at"] == st] for st in stamps]):
                         if sql:
                             store_sql(name, batch)
                         else:
                             _store(tidy / ("%s.csv" % name), batch, TABLES[name])
-                    for now in ("2026-08-01T1000Z", "2026-08-02T1000Z", "2026-08-04T0000Z"):
+                    for now in cuts:
                         set_now(snapshot_stamp(now))
-                        seen[sql, now] = [[{k: v for k, v in r.items() if v not in ("", None)}
+                        seen[(sql, one_batch), now] = [[{k: v for k, v in r.items() if v not in ("", None)}
                                            for r in got] for got in (
                             current(name), current(name, "t"), history(name), history(name, "s"))]
-            for now in ("2026-08-01T1000Z", "2026-08-02T1000Z", "2026-08-04T0000Z"):
-                assert seen[True, now] == seen[False, now], (name, now, seen[True, now],
-                                                             seen[False, now])
-            assert any(seen[True, n][0] for n in ("2026-08-04T0000Z",)), "not vacuous"
-            assert isinstance(seen[True, "2026-08-04T0000Z"][2][0]["v"], float), \
-                "numbers come back as numbers"
+            for now in cuts:
+                for batched in (False, True):
+                    assert seen[(True, batched), now] == seen[(False, False), now], (
+                        name, now, batched, seen[(True, batched), now], seen[(False, False), now])
+            last = seen[(True, False), "2026-08-04T0000Z"]
+            assert last[0], "not vacuous"
+            assert isinstance(last[2][0]["v"], float), "numbers come back as numbers"
             if name == "t_once":
-                js = [r.get("j") for r in seen[True, "2026-08-04T0000Z"][2]]
+                js = [r.get("j") for r in last[2]]
                 assert 3 in js and all(type(j) is int for j in js if j is not None), \
                     "a count is an int, as count() parses it"
     finally:
         set_now(None)
         TABLES.pop("t_once", None)
         TABLES.pop("t_snap", None)
+        TABLES.pop("t_daily", None)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ffcore.clock import run_now
+from ffcore.parse import stamp
 from ffcore.db import RUN_ENV, connect, this_run
 
 
@@ -67,7 +68,7 @@ def _start(db: sqlite3.Connection) -> int:
     with db:
         cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha)"
                          " VALUES (?, ?, ?, ?)",
-                         (_utc(), run_now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                         (_utc(), stamp(run_now()),
                           os.environ.get("LFG_TRIGGER", "service"), _commit()))
     assert cur.lastrowid is not None
     return cur.lastrowid

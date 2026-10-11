@@ -13,12 +13,11 @@ from ffcore.jornadas import clock_history
 from ffcore.points import scored
 from ffcore.score import JornadaPoints, points_by_jornada
 
-from assemble import built, fixture_ratings, scorer, universe
+from assemble import built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, board, verdict
 from ffcore.clock import set_now
 from ffcore.db import connect, record, this_run
-from ffcore.pricing import Momentum, _ahead, grade, steps
-from ffcore.tidy import LINEUP_SOURCE, current, history
+from ffcore.tidy import LINEUP_SOURCE, current
 __all__ = ["backtest", "decision_rows", "decisions", "due", "forecast_rows",
            "record_grades"]
 
@@ -62,7 +61,6 @@ def decisions() -> list[dict[str, Any]]:
     locks = clock_history().round_locks
     actual = points_by_jornada(scored())
     done = {j for _k, j in actual}
-    prices = steps(history("market"))
     out = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
@@ -75,13 +73,7 @@ def decisions() -> list[dict[str, Any]]:
                 continue
             b, per_j, m = board(u), u.forecaster.per_jornada, u.market
             later = sorted(j for j in done if j >= i and j in per_j)
-            h = Momentum(steps(history("market"))).horizon
-            day = locks[i].strftime("%Y-%m-%d")
-
-            def rose(k: str) -> float:
-                s = prices.get(k, [])
-                at = max((n for n, (d, _) in enumerate(s) if d <= day), default=None)
-                return 0.0 if at is None or at + h >= len(s) else _ahead(s, at, h)
+            rose = price_change(locks[i].strftime("%Y-%m-%d"), price_momentum().horizon)
 
             def worth(a: Action, pct: Callable[[str], float]) -> float:
                 return (m.value.get(a.buy, 0.0) * pct(a.buy) - sum(
@@ -101,7 +93,7 @@ def decisions() -> list[dict[str, Any]]:
                     "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
                     "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
                     "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
-                    "value_real": worth(a, rose)})
+                    "value_real": worth(a, lambda k: rose.get(k, 0.0))})
     finally:
         set_now(None)
         built.cache_clear()
@@ -189,7 +181,3 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
-    elif "--prices" in sys.argv:
-        for h, g in grade(steps(history("market"))).items():
-            print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "
-                  "'no change'" % (h, g["n"], g["mae"], g["zero"]))

@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Callable
 
-from ffcore.parse import snapshot_stamp
+from ffcore.parse import snapshot_stamp, stamp
 
 __all__ = ["MADRID", "run_now", "set_now", "on_reset", "shown"]
 
@@ -43,8 +43,8 @@ def run_now() -> datetime:
 
 
 def cut() -> str:
-    """Now as a snapshot stamp: what a table is read as of."""
-    return run_now().strftime("%Y-%m-%dT%H%MZ")
+    """Now as a stamp: what a table is read as of."""
+    return stamp(run_now())
 
 
 def set_now(when: datetime | None) -> None:

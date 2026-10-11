@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from lxml import html as lh
 
+from ffcore.rules import XI_SIZE
 from ffcore.names import Name
 from ffcore.text import norm, resolve
 from ffcore.parse import Row, ratio, year_for
@@ -366,7 +367,6 @@ MATCH_SIDES = (".stats-local", ".stats-visitante")
 MATCH_SUBS_HEADER = "Suplentes"
 MATCH_MINUTE_RE = re.compile(r"\s*\d+\s*'\s*$")
 MATCH_MINUTE_CAPTURE_RE = re.compile(r"(\d+)\s*'\s*$")
-XI_SIZE = 11
 
 
 def _match_sides(slug: str) -> tuple[str, str] | None:

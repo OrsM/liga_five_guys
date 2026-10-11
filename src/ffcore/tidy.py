@@ -20,7 +20,7 @@ from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 __all__ = ["ROOT", "TIDY", "SEASON", "REPORTS", "TABLES", "Table",
            "current", "history", "typed", "age_hours", "table_path", "tables_in",
            "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
-           "csv_string", "mtime_cached", "table_stats", "store_sql", "sql_tables",
+           "csv_string", "mtime_cached", "table_stats", "store_sql", "stored", "sql_tables",
            "drop_sql", "LINEUP_SOURCE"]
 
 TIDY = ROOT / "tidy"
@@ -168,7 +168,7 @@ def _cols(parse: Callable[[object], Any], *cols: str
 
 TABLES: dict[str, Table] = {
     "market": Table(True, ("ff_id",), "daily",
-                    _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d")),
+                    _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d"), sql=True),
     "lineups": Table(True, ("source", "team_slug", "player_slug"), "daily",
                      _cols(pct100, "start_pct")),
     "matches": Table(False, ("match_id",), "once", _cols(count, "jornada")),
@@ -179,8 +179,8 @@ TABLES: dict[str, Table] = {
                            + _cols(ratio, "team_points", "fixture_points")
                            + _cols(money, "team_value", "team_money"), sql=True),
     "api_market": Table(True, numbers=_cols(money, "market_value", "sale_price", "bid_money")
-                        + _cols(count, "bids")),
-    "api_offers": Table(True, numbers=_cols(money, "money")),
+                        + _cols(count, "bids"), sql=True),
+    "api_offers": Table(True, numbers=_cols(money, "money"), sql=True),
     "api_lineup": Table(True, numbers=_cols(count, "week") + _cols(money, "market_value")
                         + _cols(ratio, "points")),
     "api_leagues": Table(True, numbers=_cols(count, "managers") + _cols(money, "money", "team_value")
@@ -211,11 +211,17 @@ def _views(name: str, cols: list[str], spec: Table) -> str:
     row of each key (all of it non-empty), in the order keys appeared."""
     q = ", ".join('"%s"' % c for c in cols)
     hist = ('CREATE VIEW "history_{n}" AS SELECT {q} FROM "{n}"'
-            ' WHERE observed_at <= cut() ORDER BY rowid')
+            ' WHERE observed_at <= (SELECT cut()) ORDER BY rowid')
     if spec.snapshot:
+        # A daily table's day counts once it has closed: its last stamp
+        # (anywhere in the table) is not after the cut.
+        closed = ("" if spec.store != "daily" else
+                  ' JOIN (SELECT substr(observed_at, 1, 10) AS day, max(observed_at) AS ends'
+                  '  FROM "{n}" GROUP BY day) d ON d.day = substr(x.observed_at, 1, 10)'
+                  '  AND d.ends <= (SELECT cut())')
         cur = ('CREATE VIEW "current_{n}" AS SELECT {tq} FROM "{n}" t JOIN'
-               ' (SELECT source AS s, max(observed_at) AS last FROM "{n}"'
-               '  WHERE observed_at <= cut() GROUP BY source) m'
+               ' (SELECT x.source AS s, max(x.observed_at) AS last FROM "{n}" x' + closed +
+               '  WHERE x.observed_at <= (SELECT cut()) GROUP BY x.source) m'
                ' ON t.source IS m.s AND t.observed_at = m.last'
                ' ORDER BY t.observed_at, t.rowid')
     else:
@@ -227,7 +233,7 @@ def _views(name: str, cols: list[str], spec: Table) -> str:
                '   ORDER BY observed_at, rowid) AS _first_at,'
                '  first_value(rowid) OVER (PARTITION BY {k}'
                '   ORDER BY observed_at, rowid) AS _first_id'
-               '  FROM "{n}" WHERE observed_at <= cut())'
+               '  FROM "{n}" WHERE observed_at <= (SELECT cut()))'
                ' WHERE _last = 1 AND {nonempty} ORDER BY _first_at, _first_id')
     return ";\n".join([
         'DROP VIEW IF EXISTS "history_{n}"', 'DROP VIEW IF EXISTS "current_{n}"',
@@ -243,12 +249,14 @@ def _kind(parse: Callable[[object], Any]) -> str:
 
 def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
     """Add rows to a table kept in lfg.db as ingest keeps it as CSV: a
-    snapshot table every row, a keyed ("once") one only rows whose content
-    differs from the key's last; new columns are added, numbers typed."""
+    snapshot table every row, a "once" one only rows whose content differs
+    from the key's last, a "daily" one a row per key and day (a later one
+    replaces it in place); new columns are added, numbers typed, text
+    stripped (so no reader trims)."""
     spec = TABLES[name]
-    assert spec.sql and spec.store in ("", "once"), (name, spec)
+    assert spec.sql, (name, spec)
     nums = dict(spec.numbers)
-    fresh = list(rows)
+    fresh = [{k: v.strip() if isinstance(v, str) else v for k, v in r.items()} for r in rows]
     with closing(lfg.connect()) as db, db:
         db.execute('CREATE TABLE IF NOT EXISTS "%s" (observed_at TEXT NOT NULL,'
                    " source TEXT NOT NULL DEFAULT '')" % name)
@@ -271,6 +279,28 @@ def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
                 if latest.get(k) != _content(r):
                     latest[k] = _content(r)
                     kept.append(r)
+        elif spec.store == "daily":
+            if spec.key:
+                db.execute('CREATE INDEX IF NOT EXISTS "{n}_key" ON "{n}" ({k})'.format(
+                    n=name, k=", ".join('"%s"' % c for c in spec.key)))
+            kept = []
+            batch: dict[tuple[Any, ...], int] = {}
+            for r in typed(name, fresh):
+                key = [r.get(c) or "" for c in spec.key]
+                day = (*key, (r.get("observed_at") or "")[:10])
+                if all(key) and day in batch:
+                    kept[batch[day]] = r
+                    continue
+                vals = [r.get(c) if c in nums else (r.get(c) or "") for c in have]
+                if all(key) and db.execute(
+                        'UPDATE "{n}" SET {s} WHERE {w} AND substr(observed_at, 1, 10) = ?'.format(
+                            n=name, s=", ".join('"%s" = ?' % c for c in have),
+                            w=" AND ".join('"%s" = ?' % c for c in spec.key)),
+                        [*vals, *key, (r.get("observed_at") or "")[:10]]).rowcount:
+                    continue
+                if all(key):
+                    batch[day] = len(kept)
+                kept.append(r)
         else:
             kept = typed(name, fresh)
         db.executemany(
@@ -286,10 +316,20 @@ def _content(r: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
                         if k != "observed_at" and v not in ("", None)))
 
 
+def stored(name: str) -> int:
+    """How many rows a table keeps, wherever it is kept."""
+    if not TABLES[name].sql:
+        return table_stats(table_path(name))[0]
+    try:
+        got: int = lfg.rows('SELECT count(*) FROM "%s"' % name)[0][0]
+        return got
+    except sqlite3.OperationalError:
+        return 0
+
+
 def sql_tables() -> set[str]:
     """The tables lfg.db holds."""
-    with closing(lfg.connect()) as db:
-        return {n for (n,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    return {n for (n,) in lfg.rows("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
 
 def drop_sql(name: str) -> None:
@@ -299,13 +339,11 @@ def drop_sql(name: str) -> None:
 
 
 def _read_sql(view: str) -> list[dict[str, Any]]:
-    with closing(lfg.connect()) as db:
-        try:
-            cur = db.execute('SELECT * FROM "%s"' % view)
-        except sqlite3.OperationalError:
-            return []
-        names = [d[0] for d in cur.description]
-        return [dict(zip(names, row)) for row in cur]
+    try:
+        cols, got = lfg.query('SELECT * FROM "%s"' % view)
+        return [dict(zip(cols, r)) for r in got]
+    except sqlite3.OperationalError:
+        return []
 
 
 def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
@@ -477,7 +515,7 @@ def _selftest_tables() -> None:
             write_csv(tidy / "matches.csv", [
                 {"observed_at": a, "match_id": "m1", "jornada": "8", "home": "x", "score": "2-0"},
                 {"observed_at": a, "match_id": "m2", "jornada": "", "home": "y", "score": ""}])
-            write_csv(tidy / "api_market.csv", [
+            store_sql("api_market", [
                 {"observed_at": b, "source": "laliga", "player_id": "7",
                  "sale_price": "5000000", "bids": "2", "bid_money": ""}])
             ms = {r["match_id"]: r for r in current("matches")}

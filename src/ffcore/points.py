@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 
-from ffcore.parse import kickoff_stamp
+from ffcore.parse import kickoff_stamp, stamp
 from ffcore.names import row_key
 from ffcore.score import Scored, points_by_jornada
 from ffcore.tidy import current, history
@@ -20,7 +20,7 @@ def _club_matches() -> dict[str, list[tuple[str, int]]]:
             continue
         kick = kickoff_stamp(m.get("kickoff"))
         if kick is not None:
-            when[pair] = (kick.strftime("%Y-%m-%dT%H%MZ"), jor)
+            when[pair] = (stamp(kick), jor)
         elif m.get("score") and pair not in when:
             when[pair] = (m.get("observed_at", ""), jor)
     out: dict[str, list[tuple[str, int]]] = {}
@@ -68,13 +68,13 @@ def _selftest() -> None:
 
     from ffcore.clock import set_now
     from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import tables_in, write_csv
+    from ffcore.tidy import store_sql, tables_in, write_csv
 
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)) as tidy:
         try:
             set_now(snapshot_stamp("2026-08-04T0000Z"))
-            write_csv(tidy / "market.csv", [
+            store_sql("market", [
                 {"observed_at": a, "ff_id": "1", "club": "x"},
                 {"observed_at": a, "ff_id": "2", "club": "y"}])
             write_csv(tidy / "matches.csv", [

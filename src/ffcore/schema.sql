@@ -188,6 +188,11 @@ CREATE TABLE IF NOT EXISTS players (
 );
 
 -- Views are recreated on every connect: a changed one replaces the old.
+-- The names as the latest run had them.
+DROP VIEW IF EXISTS names;
+CREATE VIEW names AS
+SELECT player, name FROM players WHERE run_id = (SELECT max(run_id) FROM players);
+
 -- Each graded lock and jornada: forecast error over every player forecast,
 -- what the 50 forecast highest then scored, and the same for the players
 -- flagged then.
@@ -221,15 +226,15 @@ CREATE TABLE IF NOT EXISTS league_config (
 
 DROP VIEW IF EXISTS users;
 CREATE VIEW users AS
-SELECT trim(user_id) AS user_id, trim(manager) AS manager FROM current_api_standings
-WHERE trim(user_id) <> '' AND trim(manager) <> '' GROUP BY trim(user_id);
+SELECT user_id AS user_id, manager AS manager FROM current_api_standings
+WHERE user_id <> '' AND manager <> '' GROUP BY user_id;
 
 -- Who owns each player now.
 DROP VIEW IF EXISTS owners;
 CREATE VIEW owners AS
-SELECT k.player, trim(t.manager) AS manager
-FROM current_api_teams t JOIN app_keys k ON k.app_id = trim(t.player_id)
-WHERE trim(t.manager) <> '' GROUP BY k.player;
+SELECT k.player, t.manager AS manager
+FROM current_api_teams t JOIN app_keys k ON k.app_id = t.player_id
+WHERE t.manager <> '' GROUP BY k.player;
 
 -- The activity feed, each event once, with who paid (buyer: a buy's or a
 -- clause's manager) and who was paid (seller: a sale's manager, a clause's
@@ -242,18 +247,18 @@ WITH feed AS (
     SELECT coalesce(a.at, '') AS at, coalesce(a.kind, '') AS kind,
            u.manager AS who, c.manager AS other, k.player, coalesce(a.amount, 0.0) AS amount
     FROM current_api_activity a
-    LEFT JOIN users u ON u.user_id = trim(a.user_id)
-    LEFT JOIN users c ON c.user_id = trim(a.counterparty)
-    LEFT JOIN app_keys k ON k.app_id = trim(a.player_id)),
+    LEFT JOIN users u ON u.user_id = a.user_id
+    LEFT JOIN users c ON c.user_id = a.counterparty
+    LEFT JOIN app_keys k ON k.app_id = a.player_id),
 roles AS (
     SELECT *, CASE WHEN kind IN ('buy', 'transfer') THEN who END AS buyer,
               CASE kind WHEN 'sell' THEN who WHEN 'transfer' THEN other END AS seller
     FROM feed),
 t AS MATERIALIZED (
-    SELECT h.observed_at, k.player, trim(h.manager) AS manager,
+    SELECT h.observed_at, k.player, h.manager AS manager,
            coalesce(h.market_value, 0.0) AS value
-    FROM history_api_teams h JOIN app_keys k ON k.app_id = trim(h.player_id)
-    WHERE trim(h.manager) <> ''),
+    FROM history_api_teams h JOIN app_keys k ON k.app_id = h.player_id
+    WHERE h.manager <> ''),
 s AS (SELECT observed_at AS a, lead(observed_at) OVER (ORDER BY observed_at) AS b
       FROM (SELECT DISTINCT observed_at FROM t)),
 shown AS (
@@ -285,7 +290,7 @@ flow AS (
            AS feed
     FROM (SELECT DISTINCT manager FROM users) u, cfg),
 mine AS (SELECT s.team_money AS money FROM current_api_standings s, cfg
-         WHERE trim(s.manager) = cfg.me AND s.team_money <> 0 LIMIT 1),
+         WHERE s.manager = cfg.me AND s.team_money <> 0 LIMIT 1),
 gap AS (SELECT coalesce((SELECT (SELECT money FROM mine) - f.feed
                           FROM flow f, cfg WHERE f.manager = cfg.me), 0.0) AS untracked)
 SELECT f.manager,
@@ -302,3 +307,164 @@ SELECT player, amount AS paid FROM (
            row_number() OVER (PARTITION BY l.player ORDER BY l.at DESC) AS last
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
+
+-- Every valued market observation of each player, all time, with the
+-- change since his previous one in % (NULL for his first, or after a value
+-- of 0) and where he first appears. The views below cut it.
+DROP VIEW IF EXISTS price_obs;
+CREATE VIEW price_obs AS
+SELECT ff_id, observed_at, value, id, first_at, first_id,
+       CASE WHEN prev > 0 THEN 100 * (value / prev - 1) END AS step
+FROM (SELECT ff_id, observed_at, value, rowid AS id,
+             lag(value) OVER p AS prev,
+             first_value(observed_at) OVER p AS first_at,
+             first_value(rowid) OVER p AS first_id
+      FROM market WHERE coalesce(ff_id, '') <> '' AND value IS NOT NULL
+      WINDOW p AS (PARTITION BY ff_id ORDER BY observed_at, rowid));
+
+-- The constants a run is built with (assemble.CONSTANTS), for the views.
+CREATE TABLE IF NOT EXISTS constants (
+    name  TEXT PRIMARY KEY,
+    value REAL NOT NULL
+);
+
+-- The constants the views use, one row: each named once, here.
+DROP VIEW IF EXISTS k;
+CREATE VIEW k AS SELECT
+    (SELECT value FROM constants WHERE name = 'CLIP') AS clip,
+    (SELECT value FROM constants WHERE name = 'PRICE_WINDOW') AS price_window,
+    (SELECT value FROM constants WHERE name = 'BID_BEATS') AS bid_beats;
+
+-- Each player's changes, all time, numbered (i), clipped at CLIP (x: so a
+-- long rise is not cut short), with the value each ends at.
+DROP VIEW IF EXISTS price_series;
+CREATE VIEW price_series AS
+SELECT ff_id, observed_at, substr(observed_at, 1, 10) AS day, step,
+       max(-k.clip, min(k.clip, step)) AS x, i, value
+FROM (SELECT *, row_number() OVER (PARTITION BY ff_id ORDER BY observed_at) - 1 AS i
+      FROM price_obs WHERE step IS NOT NULL), k;
+
+-- The longest horizon momentum fits, as of cut(): a quarter of the median
+-- player's number of changes (players with none count), at least 1.
+DROP VIEW IF EXISTS price_hmax;
+CREATE VIEW price_hmax AS
+WITH lens AS (SELECT count(step) AS n FROM price_obs WHERE observed_at <= (SELECT cut()) GROUP BY ff_id),
+ranked AS (SELECT n, row_number() OVER (ORDER BY n) AS r, count(*) OVER () AS m FROM lens)
+SELECT coalesce((SELECT max(1, CAST(avg(n) AS INTEGER) / 4) FROM ranked
+                 WHERE r IN ((m + 1) / 2, (m + 2) / 2)), 1) AS hmax;
+
+-- A player's change in % over the h changes after his i-th (all time, h up
+-- to price_hmax): what momentum fits, the backtest scores and a replay
+-- looks back on. The changes compound to the ratio of the values (no value
+-- is ever 0: the game's floor is 300k).
+DROP VIEW IF EXISTS price_ahead;
+CREATE VIEW price_ahead AS
+WITH RECURSIVE
+s AS MATERIALIZED (SELECT * FROM price_series),
+hs(h) AS (SELECT 1 UNION ALL SELECT h + 1 FROM hs WHERE h < (SELECT hmax FROM price_hmax))
+SELECT a.ff_id, a.i, a.day, a.x, hs.h, b.observed_at AS end_at,
+       substr(b.observed_at, 1, 10) AS end_day, 100 * (b.value / a.value - 1) AS change
+FROM s a JOIN hs JOIN s b ON b.ff_id = a.ff_id AND b.i = a.i + hs.h;
+
+-- Momentum, as of cut(): how much of a price change carries into the next
+-- h (up to price_hmax), the move over h clipped at CLIP an update.
+DROP VIEW IF EXISTS momentum_pairs;
+CREATE VIEW momentum_pairs AS
+SELECT p.h, p.ff_id, p.i, p.end_day, p.x,
+       max(-k.clip * p.h, min(k.clip * p.h, p.change)) AS y
+FROM price_ahead p, k WHERE p.end_at <= (SELECT cut());
+
+-- One least-squares slope through the origin per horizon.
+DROP VIEW IF EXISTS momentum;
+CREATE VIEW momentum AS
+SELECT h, sum(x * y) / sum(x * x) AS slope FROM momentum_pairs
+GROUP BY h HAVING sum(x * x) <> 0;
+
+-- Momentum as fitted at a cut, kept: fitting costs seconds, and carry and
+-- trend read it (assemble.price_momentum fits at the model's cut; Datasette
+-- reads the last fit at or before its own).
+CREATE TABLE IF NOT EXISTS momentum_fit (
+    as_of TEXT NOT NULL,
+    h     INTEGER NOT NULL,
+    slope REAL NOT NULL,
+    PRIMARY KEY (as_of, h)
+);
+DROP VIEW IF EXISTS fitted;
+CREATE VIEW fitted AS
+SELECT h, slope FROM momentum_fit
+WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut()));
+
+-- The share of a trend (its move over the horizon, the longest h fitted)
+-- already made after each update.
+DROP VIEW IF EXISTS price_carry;
+CREATE VIEW price_carry AS
+SELECT m.h, m.slope / e.slope AS carry
+FROM fitted m, (SELECT slope FROM fitted ORDER BY h DESC LIMIT 1) e
+WHERE e.slope <> 0 ORDER BY m.h;
+
+-- Each player's value change in % over the horizon, for those whose last
+-- change is the newest day's: as long as you would hold him.
+DROP VIEW IF EXISTS price_trend;
+CREATE VIEW price_trend AS
+WITH s AS (SELECT coalesce((SELECT slope FROM fitted ORDER BY h DESC LIMIT 1), 0.0) AS slope),
+last AS (SELECT ff_id, day, x FROM (
+             SELECT ff_id, day, x, row_number() OVER (PARTITION BY ff_id ORDER BY i DESC) AS r
+             FROM price_series WHERE observed_at <= (SELECT cut()))
+         WHERE r = 1)
+SELECT last.ff_id, s.slope * last.x AS trend
+FROM last, s WHERE last.day = (SELECT max(day) FROM last);
+
+-- Your own winning bids over the asking price: each of your buys, oldest
+-- first, set against the league listing of that player that closed within
+-- ten minutes of it (its last sighting; the first such listing seen).
+DROP VIEW IF EXISTS auction_ratios;
+CREATE VIEW auction_ratios AS
+WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM current_api_standings s, league_config c
+              WHERE s.manager = c.me),
+buys AS (SELECT a.at, a.player_id AS pid, a.amount,
+                row_number() OVER (ORDER BY a.at) AS n
+         FROM current_api_activity a WHERE a.kind = 'buy' AND a.user_id IN (SELECT uid FROM mine)),
+ends AS (SELECT pid, close, sale_price, first_id FROM (
+             SELECT player_id AS pid, julianday(expires_at) AS close, sale_price,
+                    row_number() OVER k AS pick,
+                    min(rowid) OVER (PARTITION BY player_id, julianday(expires_at)) AS first_id
+             FROM api_market
+             WHERE observed_at <= (SELECT cut()) AND seller = 'marketPlayerLeague'
+               AND coalesce(expires_at, '') <> ''
+             WINDOW k AS (PARTITION BY player_id, julianday(expires_at)
+                          ORDER BY observed_at DESC, rowid))
+         WHERE pick = 1),
+matched AS (SELECT b.n, b.amount / e.sale_price AS ratio,
+                   row_number() OVER (PARTITION BY b.n ORDER BY e.first_id) AS k
+            FROM buys b JOIN ends e ON e.pid = b.pid
+             AND abs(julianday(b.at) - e.close) * 86400 < 600 AND coalesce(e.sale_price, 0) > 0)
+SELECT n, ratio FROM matched WHERE k = 1 ORDER BY n;
+
+-- The game's nightly offers for listed players, each once (its first
+-- sighting), over the player's value when it was made; by when made.
+DROP VIEW IF EXISTS offer_ratios;
+CREATE VIEW offer_ratios AS
+WITH v AS (SELECT observed_at, player_team_id, market_value FROM (
+               SELECT observed_at, player_team_id, coalesce(market_value, 0.0) AS market_value,
+                      row_number() OVER (PARTITION BY observed_at, player_team_id
+                                         ORDER BY rowid DESC) AS last
+               FROM api_teams WHERE observed_at <= (SELECT cut()))
+           WHERE last = 1),
+o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value AS ratio,
+             row_number() OVER (PARTITION BY o.offer_id ORDER BY o.rowid) AS first
+      FROM api_offers o JOIN v ON v.observed_at = o.observed_at
+       AND v.player_team_id IS o.player_team_id
+      WHERE o.observed_at <= (SELECT cut()) AND o.from_market = 'true' AND o.money <> 0
+        AND v.market_value <> 0 AND coalesce(o.offer_id, '') <> '')
+SELECT created_at, ratio FROM o WHERE first = 1 ORDER BY created_at, ratio;
+
+-- The bid over asking at or above BID_BEATS of your last PRICE_WINDOW
+-- winning bids (1.0 with none).
+DROP VIEW IF EXISTS premium;
+CREATE VIEW premium AS
+WITH recent AS (SELECT ratio FROM auction_ratios ORDER BY n DESC
+                LIMIT (SELECT CAST(price_window AS INTEGER) FROM k)),
+r AS (SELECT ratio, row_number() OVER (ORDER BY ratio) - 1 AS i, count(*) OVER () AS cnt
+      FROM recent)
+SELECT coalesce((SELECT ratio FROM r, k WHERE i = min(cnt - 1, CAST(k.bid_beats * cnt AS INTEGER))),
+                1.0) AS premium;

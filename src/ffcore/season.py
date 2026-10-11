@@ -8,13 +8,11 @@ import numpy as np
 import numpy.typing as npt
 
 from ffcore.forecast import Bootstrap
-from ffcore.rules import MAX_SLOT, SHAPES, Squad, Squads
+from ffcore.rules import MAX_SLOT, SHAPES, XI_SIZE, Squad, Squads
 from stats import percentile
 
 __all__ = ["LeagueState", "Standings", "simulate",
            "simulate_many", "best_xi"]
-
-XI_SIZE = 11
 
 
 def best_xi(squad: Squad, value: dict[str, float]) -> list[str]:

@@ -8,10 +8,11 @@ import sqlite3
 from collections.abc import Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
+from typing import Any
 
 from ffcore.clock import cut
 
-__all__ = ["DB", "ROOT", "RUN_ENV", "SCHEMA", "connect", "record", "this_run"]
+__all__ = ["DB", "ROOT", "RUN_ENV", "SCHEMA", "connect", "query", "record", "rows", "this_run"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
@@ -31,6 +32,19 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     db.execute("PRAGMA journal_mode=WAL")
     db.executescript(schema.read_text(encoding="utf-8"))
     return db
+
+
+def query(sql: str, params: Sequence[object] | Mapping[str, object] = (),
+          path: Path | None = None) -> tuple[list[str], list[Any]]:
+    """A read: its columns, and its rows as tuples."""
+    with closing(connect(path)) as db:
+        cur = db.execute(sql, params)
+        return [d[0] for d in cur.description or ()], cur.fetchall()
+
+
+def rows(sql: str, params: Sequence[object] | Mapping[str, object] = (),
+         path: Path | None = None) -> list[Any]:
+    return query(sql, params, path)[1]
 
 
 def this_run() -> int | None:
@@ -96,6 +110,12 @@ def _selftest() -> None:
         assert this_run() == want, (env, this_run())
     os.environ.pop(RUN_ENV)
     assert this_run() is None, "outside run.py there is no run"
+    import re
+    from collections import Counter
+    made = Counter(re.findall(r"CREATE (?:VIEW|TABLE IF NOT EXISTS) (\w+)",
+                              SCHEMA.read_text(encoding="utf-8")))
+    assert all(n == 1 for n in made.values()), \
+        "schema.sql defines each table and view once: %s" % [k for k, n in made.items() if n > 1]
     print("ffcore.db self-test OK")
 
 

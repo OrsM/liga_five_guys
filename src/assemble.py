@@ -4,23 +4,24 @@ state and the forecast — so the model modules never read a table
 themselves."""
 from __future__ import annotations
 
+from contextlib import closing
 from datetime import datetime
 from functools import cache
 from typing import Any, NamedTuple
 
 from decide import CONFIDENCE, FINAL_TRIALS, Universe, _fieldable
 from ffcore.crosswalk import Crosswalk
+from ffcore.db import connect, rows
 from ffcore.fixture import FIX_BAND, MIN_AD_MATCHES, Ratings, difficulty_ratings
 from ffcore.forecast import MIN_POOL, PERSISTENT_SHARE, Bootstrap
 from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
 from ffcore.names import Name, app_id
-from ffcore.parse import Rows, text
+from ffcore.parse import Rows
 from ffcore.players import load_crosswalk, load_players
 from ffcore.points import scored
-from ffcore.pricing import (BID_BEATS, CLIP, PRICE_WINDOW, Momentum, auction_ratios,
-                            offer_ratios, premium_to_beat, steps)
+from ffcore.pricing import BID_BEATS, CLIP, PRICE_WINDOW
 from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import (PROMOTED_DISCOUNT_K, SHRINK_K, fit_promoted_discount,
                           per_jornada_current, Scorer, totals)
@@ -33,7 +34,9 @@ from ffcore.tidy import (LINEUP_SOURCE, SEASON, age_hours, current,
                          history, read_csv, typed)
 from stats import percentile
 
-__all__ = ["universe", "built", "params", "scorer", "fixture_ratings", "APP_FRESH_HOURS"]
+__all__ = ["universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
+           "price_change", "premium", "write_constants", "market_offer_ratios",
+           "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
 
@@ -107,16 +110,53 @@ def _nights_left(offers: Rows) -> int:
     return max(0, int(days) + 1) if days > 0 else 0
 
 
-def _premium(me: str) -> float:
-    """The bid over asking that your own auctions were won at: rivals'
-    winning bids are mostly the boldest bidder's, 1.19x against your 1.00x
-    (2026-10-04)."""
-    mine = {text(r, "user_id") for r in current("api_standings")
-            if text(r, "manager") == me}
-    return premium_to_beat(auction_ratios(history("api_market"), sorted(
-        (a for a in current("api_activity")
-         if a["kind"] == "buy" and a["user_id"] in mine),
-        key=lambda a: a["at"])))
+def write_constants() -> None:
+    """CONSTANTS into lfg.db, for the views that use them."""
+    with closing(connect()) as db, db:
+        db.execute("DELETE FROM constants")
+        db.executemany("INSERT INTO constants VALUES (?, ?)",
+                       [(n, v) for names in CONSTANTS.values() for n, v in names.items()])
+
+
+class Prices(NamedTuple):
+    """Momentum as schema.sql fits it: a slope per horizon, the share of a
+    trend made after each update, each player's trend in %, the horizon."""
+    slope: dict[int, float]
+    carry: tuple[float, ...]
+    trend: dict[str, float]
+    horizon: int
+
+
+def price_momentum() -> Prices:
+    """Fitted at the model's cut and kept (momentum_fit), then read."""
+    with closing(connect()) as db, db:
+        db.execute("DELETE FROM momentum_fit WHERE as_of = cut()")
+        db.execute("INSERT INTO momentum_fit SELECT cut(), h, slope FROM momentum")
+    slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
+    return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
+                  dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
+
+
+def price_change(day: str, h: int) -> dict[str, float]:
+    """Each player's change in % over the h updates after his last one on or
+    before day, all time (0 where there are not h more): what a replay
+    looks back on."""
+    return dict(rows(
+        "SELECT a.ff_id, coalesce(x.change, 0.0) FROM (SELECT ff_id, max(i) AS i"
+        " FROM price_series WHERE day <= ? GROUP BY ff_id) a LEFT JOIN price_ahead x"
+        " ON x.ff_id = a.ff_id AND x.i = a.i AND x.h = ?", (day, h)))
+
+
+def premium() -> float:
+    """The bid over asking to win an auction: rivals' winning bids are mostly
+    the boldest bidder's, 1.19x against your 1.00x (2026-10-04)."""
+    got: float = rows("SELECT premium FROM premium")[0][0]
+    return got
+
+
+def market_offer_ratios() -> list[float]:
+    """The game's nightly offers over value, each once, by when made."""
+    return [r for (r,) in rows("SELECT ratio FROM offer_ratios")]
 
 
 def params(cal: Calibration, avail: Availability, promoted: float, ratings: Ratings,
@@ -184,9 +224,10 @@ def built() -> Built:
     ratings = fixture_ratings(mkt_rows)
     ex = expectations(sc, ratings, set(price).union(*squads.values()), m)
     per_j, first_jornada_of, rem, played = ex.per_j, ex.first_of, ex.rem, ex.played
-    prices = Momentum(steps(history("market")))
+    write_constants()
+    prices = price_momentum()
     market = Market(
-        cash=lg.cash[me], premium=_premium(me),
+        cash=lg.cash[me], premium=premium(),
         name={k: Name(rec.get("name") or k) for k, rec in players.items()},
         pos=pos,
         price={k: v for k, v in price.items() if k in players},
@@ -194,11 +235,11 @@ def built() -> Built:
         owner={k: v for k, v in lg.owner.items() if k in players},
         paid={k: v for k, v in lg.paid.items() if k in players},
         offer={k: v for k, v in received_offers.items() if k in lg.squad(me)},
-        offer_ratios=tuple(offer_ratios(history("api_offers"), history("api_teams"))),
+        offer_ratios=tuple(market_offer_ratios()),
         nights_left=_nights_left(offers),
         value={k: v for k, v in value.items() if k in players},
         my_bid=pending(mkt, "bid_status", "bid_money"),
-        trend=prices.trend(), carry=prices.carry,
+        trend=prices.trend, carry=prices.carry,
         clause={k: v for k, v in open_clauses(teams).items() if k in players})
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
@@ -244,7 +285,118 @@ def _selftest() -> None:
     assert got[("decide", "CONFIDENCE")]["kind"] == "constant"
     assert got[("startprob.availability", "doubt_for:at")]["kind"] == "fitted", \
         "a bucket with no data keeps its prior, and is still what the run used"
+    _selftest_market()
     print("assemble self-test OK")
+
+
+def _selftest_market() -> None:
+    """The market's SQL (schema.sql: price_obs, auction_ratios,
+    offer_ratios, momentum, premium; datasette.json: price_forecast_error)
+    as assemble reads it."""
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from ffcore.db import connect
+    from ffcore.tidy import store_sql, tables_in
+
+    days = ["2026-08-%02d" % d for d in range(10, 13)]
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        for n, d in enumerate(days):
+            store_sql("market", [{"observed_at": d + "T2359Z", "ff_id": k, "value": v}
+                                 for k, v in (("up", str(100 * 1.05 ** n)), ("flat", "100"),
+                                              ("once", "50" if n == 0 else ""))])
+        pts = [(k, at[:10], step) for k, at, step in rows(
+            "SELECT ff_id, observed_at, step FROM price_obs ORDER BY first_at, first_id, observed_at")]
+        assert {k for k, _d, _s in pts} == {"up", "flat", "once"} and \
+            [s for k, _d, s in pts if k == "once"] == [None], \
+            "a player seen once has no change, and still counts"
+        ups = [(d, s) for k, d, s in pts if k == "up" and s is not None]
+        assert ups[0][0] == "2026-08-11" and abs(ups[0][1] - 5.0) < 1e-9, ups
+        assert [(d, s) for k, d, s in pts if k == "flat"] == [
+            ("2026-08-10", None), ("2026-08-11", 0.0), ("2026-08-12", 0.0)]
+
+        close, a = "2026-09-02T22:24:00+02:00", "2026-09-02T1000Z"
+        store_sql("api_market", [
+            {"observed_at": a, "seller": "marketPlayerLeague", "player_id": "7",
+             "expires_at": close, "sale_price": "10000000"},
+            {"observed_at": a, "seller": "marketPlayerTeam", "player_id": "8",
+             "expires_at": close, "sale_price": "10000000"}])
+        store_sql("api_standings", [{"observed_at": a, "user_id": "1", "manager": "me"},
+                                    {"observed_at": a, "user_id": "2", "manager": "riv"}])
+        store_sql("api_activity", [
+            {"observed_at": a, "activity_id": i, "kind": "buy", "user_id": u, "player_id": p,
+             "at": at, "amount": amt, "counterparty": ""}
+            for i, u, p, at, amt in [("1", "1", "7", "2026-09-02T22:24:10+02:00", "10400000"),
+                                     ("2", "1", "8", "2026-09-02T22:24:10+02:00", "99"),
+                                     ("3", "1", "7", "2026-09-05T10:00:00+02:00", "1"),
+                                     ("4", "2", "7", "2026-09-02T22:24:20+02:00", "12000000")]])
+        with closing(connect()) as db, db:
+            db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
+        assert [r for (r,) in rows("SELECT ratio FROM auction_ratios ORDER BY n")] == [1.04], \
+            "your buys at the close of a league listing, over its price; not a rival's"
+
+        store_sql("api_teams", [{"observed_at": a, "player_team_id": "9", "market_value": "10",
+                                 "manager": "", "player_id": ""}])
+        offer = {"observed_at": a, "player_team_id": "9", "from_market": "true",
+                 "money": "11", "offer_id": "o", "created_at": "c"}
+        store_sql("api_offers", [offer, offer, dict(offer, from_market="false", money="12",
+                                                    offer_id="m")])
+        assert market_offer_ratios() == [1.1], "the game's offers, each once, over value"
+
+    def prices(series: dict[str, list[float]]) -> Prices:
+        """The momentum views over these values, one a day from 2026-08-10."""
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            write_constants()
+            for n in range(max(len(v) for v in series.values())):
+                store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": k,
+                                      "value": str(v[n])} for k, v in series.items() if n < len(v)])
+            return price_momentum()
+
+    by = {k + str(i): [100 * g ** n for n in range(20)]
+          for k, g in (("up", 1.05), ("down", 0.98), ("flat", 1.0)) for i in range(12)}
+    mo = prices(by)
+    assert set(mo.slope) == {1, 2, 3, 4}, "a quarter of the median series: 19 changes -> 4"
+    up = prices({k: v for k, v in by.items() if k.startswith("up")})
+    assert abs(up.slope[3] * 5.0 - (1.05 ** 3 - 1) * 100) < 1e-6, up.slope
+    assert mo.horizon == 4
+    assert mo.carry[-1] == 1.0 and 0 < mo.carry[0] < mo.carry[1], mo.carry
+    assert mo.trend["up0"] > 0 > mo.trend["down0"] and mo.trend["flat0"] == 0.0, mo.trend
+    assert prices({"once": [100.0]}).trend == {}
+    rise = prices({"r%d" % i: [100 * 1.15 ** n for n in range(13)] for i in range(3)})
+    assert abs(rise.slope[2] * 15.0 - (1.15 ** 2 - 1) * 100) < 1e-6, \
+        "a rise over several updates is not clipped as if it were one"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        write_constants()
+        for n in range(20):
+            store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": k,
+                                  "value": str(v[n])} for k, v in by.items()])
+        meta = Path(__file__).resolve().parent.parent / "datasette.json"
+        with closing(connect()) as db:
+            graded = {h: (n, mae, zero) for h, n, mae, zero in db.execute(
+                json.loads(meta.read_text())["databases"]["lfg"]["queries"]
+                ["price_forecast_error"]["sql"])}
+        assert graded[1][1] < graded[1][2] and graded[3][0] > 0, graded
+
+    for ratios, want in [([1.0] * 5 + [1.3] * 5, 1.3), ([1.0] * 9 + [1.3], 1.0), ([], 1.0)]:
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            write_constants()
+            at = "2026-09-0%dT1000Z"
+            store_sql("api_standings", [{"observed_at": at % 1, "user_id": "1", "manager": "me"}])
+            store_sql("api_market", [
+                {"observed_at": at % 1, "seller": "marketPlayerLeague", "player_id": str(i),
+                 "expires_at": "2026-09-02T22:%02d:00+02:00" % i, "sale_price": "100"}
+                for i in range(len(ratios))] or [{"observed_at": at % 1, "seller": "", "player_id": "",
+                                                  "expires_at": "", "sale_price": ""}])
+            store_sql("api_activity", [
+                {"observed_at": at % 1, "activity_id": str(i), "kind": "buy", "user_id": "1",
+                 "player_id": str(i), "at": "2026-09-02T22:%02d:00+02:00" % i,
+                 "amount": str(100 * r), "counterparty": ""} for i, r in enumerate(ratios)]
+                or [{"observed_at": at % 1, "activity_id": "x", "kind": "", "user_id": "",
+                     "player_id": "", "at": "", "counterparty": ""}])
+            with closing(connect()) as db, db:
+                db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
+            assert abs(premium() - want) < 1e-12, (ratios, premium())
 
 
 if __name__ == "__main__":
