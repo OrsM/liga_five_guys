@@ -13,14 +13,14 @@ from datetime import datetime
 from typing import Any, NamedTuple, TypeVar
 
 from ffcore import db as lfg
-from ffcore.clock import cut, on_reset, run_now
+from ffcore.clock import run_now
 from ffcore.db import ROOT
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "SEASON", "REPORTS", "TABLES", "Table",
            "current", "history", "typed", "age_hours", "table_path", "tables_in",
-           "input_path", "read_csv", "write_csv", "append_csv", "widen_csv",
-           "csv_string", "mtime_cached", "table_stats", "store_sql", "stored", "sql_tables",
+           "input_path", "read_csv", "write_csv",
+           "csv_string", "mtime_cached", "store_sql", "stored", "sql_tables",
            "drop_sql", "LINEUP_SOURCE"]
 
 TIDY = ROOT / "tidy"
@@ -51,13 +51,11 @@ def input_path(name: str) -> Path:
 
 Stamp = tuple[int, int]
 _READ_CACHE: dict[str, tuple[Stamp, list[dict[str, str]]]] = {}
-_TYPED_CACHE: dict[str, tuple[Stamp, list[Mapping[str, Any]]]] = {}
 T = TypeVar("T")
 
 
 def _forget(path: str | Path) -> None:
     _READ_CACHE.pop(str(Path(path)), None)
-    _TYPED_CACHE.pop(str(Path(path)), None)
 
 
 def mtime_cached(path: str | Path, cache: dict[Any, tuple[Stamp, T]], key: Hashable,
@@ -117,48 +115,15 @@ def write_csv(path: str | Path, rows: Sequence[Mapping[str, Any]],
         w.writerows(rows)
 
 
-def widen_csv(path: str | Path, fieldnames: Sequence[str]) -> bool:
-    path = Path(path)
-    if not path.exists():
-        return False
-    with path.open(encoding="utf-8") as fh:
-        r = csv.DictReader(fh)
-        have = list(r.fieldnames or [])
-        if not [c for c in fieldnames if c not in have]:
-            return False
-        rows = list(r)
-    cols = have + [c for c in fieldnames if c not in have]
-    write_csv(path, [{c: row.get(c, "") for c in cols} for row in rows], cols)
-    return True
-
-
-def append_csv(path: str | Path, rows: Sequence[Mapping[str, Any]],
-               fieldnames: Sequence[str] | None = None) -> None:
-    path = Path(path)
-    _forget(path)
-    if not rows:
-        return
-    fieldnames = fieldnames or list(rows[0])
-    fresh = not path.exists()
-    if not fresh:
-        with path.open(encoding="utf-8") as fh:
-            fieldnames = list(csv.DictReader(fh).fieldnames or fieldnames)
-    with _csv_dictwriter(path, fieldnames, "a", restval="") as w:
-        if fresh:
-            w.writeheader()
-        w.writerows(rows)
-
-
 class Table(NamedTuple):
     """How a table is kept, and its numeric columns with the parser each
     is read by: current() and history() hand them out parsed, so no
-    reader parses a number. sql: kept in lfg.db, numbers typed once as
-    they are stored, read through its current_ and history_ views."""
+    reader parses a number. Kept in lfg.db, numbers typed once as they are
+    stored, read through its current_ and history_ views."""
     snapshot: bool
     key: tuple[str, ...] = ()
     store: str = ""
     numbers: tuple[tuple[str, Callable[[object], Any]], ...] = ()
-    sql: bool = False
 
 
 def _cols(parse: Callable[[object], Any], *cols: str
@@ -168,19 +133,18 @@ def _cols(parse: Callable[[object], Any], *cols: str
 
 TABLES: dict[str, Table] = {
     "market": Table(True, ("ff_id",), "daily",
-                    _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d"), sql=True),
+                    _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d")),
     "lineups": Table(True, ("source", "team_slug", "player_slug"), "daily",
                      _cols(pct100, "start_pct")),
     "matches": Table(False, ("match_id",), "once", _cols(count, "jornada")),
     "points": Table(False, ("season", "ff_id"), "once", _cols(ratio, "points", "games", "avg")),
-    "api_teams": Table(True, numbers=_cols(money, "market_value", "buyout") + _cols(ratio, "points"),
-                       sql=True),
+    "api_teams": Table(True, numbers=_cols(money, "market_value", "buyout") + _cols(ratio, "points")),
     "api_standings": Table(True, numbers=_cols(count, "position", "previous_position")
                            + _cols(ratio, "team_points", "fixture_points")
-                           + _cols(money, "team_value", "team_money"), sql=True),
+                           + _cols(money, "team_value", "team_money")),
     "api_market": Table(True, numbers=_cols(money, "market_value", "sale_price", "bid_money")
-                        + _cols(count, "bids"), sql=True),
-    "api_offers": Table(True, numbers=_cols(money, "money"), sql=True),
+                        + _cols(count, "bids")),
+    "api_offers": Table(True, numbers=_cols(money, "money")),
     "api_lineup": Table(True, numbers=_cols(count, "week") + _cols(money, "market_value")
                         + _cols(ratio, "points")),
     "api_leagues": Table(True, numbers=_cols(count, "managers") + _cols(money, "money", "team_value")
@@ -193,11 +157,10 @@ TABLES: dict[str, Table] = {
     "starters": Table(False, ("match_id", "team_slug", "player_slug"), "once",
                       _cols(ratio, "minute")),
     "api_activity": Table(False, ("activity_id",), "once",
-                          _cols(money, "amount") + _cols(count, "week"), sql=True),
+                          _cols(money, "amount") + _cols(count, "week")),
 }
 
 
-_cut = cut
 
 
 def _columns(db: sqlite3.Connection, name: str) -> list[str]:
@@ -253,8 +216,7 @@ def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
     from the key's last, a "daily" one a row per key and day (a later one
     replaces it in place); new columns are added, numbers typed, text
     stripped (so no reader trims)."""
-    spec = TABLES[name]
-    assert spec.sql, (name, spec)
+    spec = spec_of(name)
     nums = dict(spec.numbers)
     fresh = [{k: v.strip() if isinstance(v, str) else v for k, v in r.items()} for r in rows]
     with closing(lfg.connect()) as db, db:
@@ -317,9 +279,7 @@ def _content(r: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
 
 
 def stored(name: str) -> int:
-    """How many rows a table keeps, wherever it is kept."""
-    if not TABLES[name].sql:
-        return table_stats(table_path(name))[0]
+    """How many rows a table keeps."""
     try:
         got: int = lfg.rows('SELECT count(*) FROM "%s"' % name)[0][0]
         return got
@@ -346,6 +306,11 @@ def _read_sql(view: str) -> list[dict[str, Any]]:
         return []
 
 
+def spec_of(name: str) -> Table:
+    """How a table is kept: TABLES says, else a plain snapshot table."""
+    return TABLES.get(name, Table(True))
+
+
 def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     """Rows of a table as it is written (text) with its numeric columns
     parsed (Table.numbers): what current() and history() hand out."""
@@ -354,60 +319,17 @@ def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any
             for r in rows]
 
 
-def _rows(name: str) -> list[Mapping[str, Any]]:
-    """Every row of a table, its numeric columns parsed (Table.numbers)."""
-    path = table_path(name)
-    return mtime_cached(path, _TYPED_CACHE, str(path),
-                        lambda: typed(name, read_csv(path))) or []
-
-
 def history(name: str, source: str = "") -> list[Mapping[str, Any]]:
-    if name in TABLES and TABLES[name].sql:
-        return [MappingProxyType(r) for r in _read_sql("history_" + name)
-                if not source or r.get("source") == source]
-    cut = _cut()
-    return [r for r in _rows(name)
-            if r.get("observed_at", "") <= cut
-            and (not source or r.get("source") == source)]
-
-
-def _closed_days(name: str) -> dict[str, str]:
-    out: dict[str, str] = {}
-    for r in read_csv(table_path(name)):
-        stamp = r.get("observed_at", "")
-        out[stamp[:10]] = max(out.get(stamp[:10], ""), stamp)
-    return out
-
-
-def _current_rows(name: str, cut: str) -> tuple[Mapping[str, Any], ...]:
-    spec = TABLES[name]
-    rows = sorted((r for r in _rows(name)
-                   if r.get("observed_at", "") <= cut),
-                  key=lambda r: r.get("observed_at", ""))
-    if spec.snapshot:
-        closed = _closed_days(name) if spec.store == "daily" else {}
-        last: dict[str, str] = {}
-        for r in rows:
-            stamp = r.get("observed_at", "")
-            if closed.get(stamp[:10], stamp) <= cut:
-                last[r.get("source", "")] = stamp
-        return tuple(r for r in rows
-                     if r.get("observed_at", "") == last.get(r.get("source", "")))
-    latest = {tuple(r.get(c, "") for c in spec.key): r for r in rows}
-    return tuple(r for k, r in latest.items() if all(k))
-
-
-_CURRENT_CACHE: dict[tuple[str, str], tuple[Stamp, tuple[Mapping[str, Any], ...]]] = {}
+    """Every row of a table up to cut(), in the order stored."""
+    return [MappingProxyType(r) for r in _read_sql("history_" + name)
+            if not source or r.get("source") == source]
 
 
 def current(name: str, source: str = "") -> list[dict[str, Any]]:
-    if TABLES[name].sql:
-        return [r for r in _read_sql("current_" + name)
-                if not source or r.get("source") == source]
-    cut = _cut()
-    rows = mtime_cached(table_path(name), _CURRENT_CACHE, (name, cut),
-                         _current_rows, name, cut) or ()
-    return [dict(r) for r in rows if not source or r.get("source") == source]
+    """A table as of cut(): a snapshot table's last stamp per source (a
+    daily one's last closed day), a keyed one's last row per key."""
+    return [r for r in _read_sql("current_" + name)
+            if not source or r.get("source") == source]
 
 
 def age_hours(name: str, now: datetime | None = None) -> float | None:
@@ -416,43 +338,7 @@ def age_hours(name: str, now: datetime | None = None) -> float | None:
     return None if when is None else ((now or run_now()) - when).total_seconds() / 3600
 
 
-def table_stats(path: str | Path, col: str = "observed_at") -> tuple[int, str]:
-    path = Path(path)
-    try:
-        st = path.stat()
-    except OSError:
-        return 0, ""
-    hit = _READ_CACHE.get(str(path))
-    if hit is not None and hit[0] == (st.st_mtime_ns, st.st_size):
-        rows = hit[1]
-        return len(rows), max((r.get(col, "") for r in rows), default="")
-    n, best = 0, ""
-    try:
-        with path.open(encoding="utf-8") as fh:
-            r = csv.reader(fh)
-            try:
-                fieldnames = next(r)
-            except StopIteration:
-                return 0, ""
-            try:
-                i = fieldnames.index(col)
-            except ValueError:
-                i = -1
-            for raw in r:
-                if not raw:
-                    continue
-                n += 1
-                if i >= 0 and i < len(raw) and raw[i] > best:
-                    best = raw[i]
-    except OSError:
-        return 0, ""
-    return n, best
-
-
 LINEUP_SOURCE = "futbolfantasy"
-
-
-on_reset(_CURRENT_CACHE.clear)
 
 
 def _selftest_cache() -> None:
@@ -475,9 +361,6 @@ def _selftest_cache() -> None:
         write_csv(p, [{"a": "7", "b": "q"}])
         assert [r["a"] for r in read_csv(p)] == ["7"], read_csv(p)
 
-        append_csv(p, [{"a": "8", "b": "r"}])
-        assert [r["a"] for r in read_csv(p)] == ["7", "8"], read_csv(p)
-
         assert read_csv(Path(tmp) / "nope.csv") == []
 
 
@@ -487,9 +370,9 @@ def _selftest_tables() -> None:
     from ffcore.clock import set_now
 
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)) as tidy:
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
-            write_csv(tidy / "lineups.csv", [
+            store_sql("lineups", [
                 {"observed_at": a, "source": "futbolfantasy", "player_name": "Ane"},
                 {"observed_at": b, "source": "analitica", "player_name": "Ane"},
                 {"observed_at": b, "source": "futbolfantasy", "player_name": "Bo"},
@@ -512,7 +395,7 @@ def _selftest_tables() -> None:
             stats = {(r["activity_id"], r["value"]) for r in current("api_activity")}
             assert stats == {("1", "1"), ("2", "5")}, stats
             assert current("market") == [] and history("market") == []
-            write_csv(tidy / "matches.csv", [
+            store_sql("matches", [
                 {"observed_at": a, "match_id": "m1", "jornada": "8", "home": "x", "score": "2-0"},
                 {"observed_at": a, "match_id": "m2", "jornada": "", "home": "y", "score": ""}])
             store_sql("api_market", [
@@ -543,27 +426,6 @@ def _selftest() -> None:
     _selftest_cache()
     _selftest_tables()
 
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        log = Path(tmp) / "log.csv"
-        append_csv(log, [{"a": "1", "b": "2"}], ["a", "b"])
-
-        append_csv(log, [{"a": "3", "b": "4"}], ["b", "a"])
-        assert read_csv(log)[1] == {"a": "3", "b": "4"}
-
-        append_csv(log, [{"a": "5", "b": "6", "c": "7"}], ["a", "b", "c"])
-        assert read_csv(log)[2] == {"a": "5", "b": "6"}
-
-        assert widen_csv(log, ["a", "b", "c"]) is True
-        rows = read_csv(log)
-        assert [r["c"] for r in rows] == ["", "", ""]
-        assert [r["a"] for r in rows] == ["1", "3", "5"]
-        assert widen_csv(log, ["a", "b", "c"]) is False
-        assert widen_csv(log, ["a"]) is False
-        assert "b" in read_csv(log)[0]
-        append_csv(log, [{"a": "8", "b": "9", "c": "10"}], ["a", "b", "c"])
-        assert read_csv(log)[3]["c"] == "10"
-        assert widen_csv(Path(tmp) / "nope.csv", ["a"]) is False
     print("ffcore.tidy self-test OK")
 
 

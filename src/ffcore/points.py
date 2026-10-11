@@ -68,21 +68,21 @@ def _selftest() -> None:
 
     from ffcore.clock import set_now
     from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import store_sql, tables_in, write_csv
+    from ffcore.tidy import store_sql, tables_in
 
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)) as tidy:
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
             set_now(snapshot_stamp("2026-08-04T0000Z"))
             store_sql("market", [
                 {"observed_at": a, "ff_id": "1", "club": "x"},
                 {"observed_at": a, "ff_id": "2", "club": "y"}])
-            write_csv(tidy / "matches.csv", [
+            store_sql("matches", [
                 {"observed_at": a, "match_id": "m1", "jornada": "1", "home": "x",
                  "away": "y", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"},
                 {"observed_at": later, "match_id": "m2", "jornada": "2",
                  "home": "x", "away": "z", "score": "1-0", "kickoff": ""}])
-            write_csv(tidy / "points.csv", [
+            store_sql("points", [
                 {"observed_at": a, "season": "2025-26", "ff_id": "1",
                  "points": "90", "games": "30"},
                 *({"observed_at": a, "season": "2026-27", "ff_id": k,

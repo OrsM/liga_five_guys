@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator
 import functools
 import hashlib
 import io
@@ -23,10 +23,8 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
-from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, _content, append_csv,
-                         drop_sql, sql_tables, store_sql, stored,
-                         csv_string, read_csv, widen_csv,
-                         write_csv)
+from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, drop_sql, sql_tables,
+                         store_sql, stored, csv_string, write_csv)
 from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
                                   season_label)
 from ffcore.laliga_api import ROW_TABLE
@@ -343,10 +341,8 @@ def parse() -> dict[str, int]:
     in_sql = sql_tables()
     if (state.get("version") != version
             or not done <= {stamp for stamp, _docs in walk}
-            or not all(t in in_sql if _spec(t).sql else (TIDY / f"{t}.csv").exists()
-                       for t in tables)):
+            or not tables <= in_sql):
         for t in tables:
-            (TIDY / f"{t}.csv").unlink(missing_ok=True)
             drop_sql(t)
         done, tables = set(), set()
     todo = [(stamp, docs) for stamp, docs in walk if stamp not in done]
@@ -381,10 +377,7 @@ def parse() -> dict[str, int]:
             for page, (ck, _origin) in sorted(docs.items()):
                 route(pending, cache.get(ck, []), source(page).table, stamp)
         for table, rows in pending.items():
-            if _spec(table).sql:
-                store_sql(table, rows)
-            else:
-                _store(TIDY / f"{table}.csv", rows, _spec(table))
+            store_sql(table, rows)
             rows_out += len(rows)
         tables |= set(pending)
         done |= {stamp for stamp, _docs in chunk}
@@ -519,35 +512,6 @@ def route(tables: dict[str, list[Row]], rows: list[Row], default: str, stamp: st
         tables.setdefault(table, []).append(d)
 
 
-def _spec(table: str) -> Table:
-    return TABLES.get(table, Table(True))
-
-
-def _store(path: Path, rows: list[Row], spec: Table) -> None:
-    fields = list(dict.fromkeys(f for r in rows for f in r))
-    widen_csv(path, fields)
-    if spec.store == "daily":
-        by_day: dict[object, Mapping[str, Any]] = {}
-        for r in list(read_csv(path)) + rows:
-            k = tuple((r.get(c) or "") for c in spec.key)
-            by_day[(k, (r.get("observed_at") or "")[:10]) if all(k)
-                   else len(by_day)] = r
-        write_csv(path, list(by_day.values()),
-                  list(dict.fromkeys(f for r in by_day.values() for f in r)))
-        return
-    if spec.store == "once":
-        latest = {tuple(r.get(c, "") for c in spec.key): _content(r)
-                  for r in read_csv(path)}
-        fresh = []
-        for r in rows:
-            k = tuple((r.get(c) or "") for c in spec.key)
-            if latest.get(k) != _content(r):
-                latest[k] = _content(r)
-                fresh.append(r)
-        rows = fresh
-    append_csv(path, rows, fields)
-
-
 def baseline(url: str = "", label: str = "") -> None:
     import httpx
 
@@ -663,43 +627,6 @@ def _selftest() -> None:
     assert _manifest({MANIFEST: csv_string(rows, MANIFEST_FIELDS)}) == rows
 
 
-    line = {"player_id": "1337", "week": "1", "stat": "goals",
-            "value": "1", "points": "4", "observed_at": "t1"}
-    m1 = {"observed_at": "2026-09-20T0900Z", "ff_id": "1", "value": "10"}
-    m3 = dict(m1, observed_at="2026-09-20T1800Z", value="11")
-    m4 = dict(m1, observed_at="2026-09-21T0900Z", value="11")
-    blank = dict(m1, ff_id="")
-    cases = [
-        ([[{"a": "1", "b": "x"}], [{"a": "2", "b": "y"}], [{"a": "3"}]],
-         Table(True), "a,b\n1,x\n2,y\n3,\n"),
-        ([[{"a": "1"}], [{"a": "2", "c": "new"}]], Table(True),
-         "a,c\n1,\n2,new\n"),
-        ([[line], [dict(line, observed_at="t2"),
-                   dict(line, points="6", observed_at="t3")],
-          [dict(line, observed_at="t4")]], TABLES["api_activity"],
-         "player_id,week,stat,value,points,observed_at\n"
-         "1337,1,goals,1,4,t1\n1337,1,goals,1,6,t3\n1337,1,goals,1,4,t4\n"),
-        ([[m1], [m3], [m4]], TABLES["market"],
-         "observed_at,ff_id,value\n"
-         "2026-09-20T1800Z,1,11\n2026-09-21T0900Z,1,11\n"),
-        ([[blank, dict(blank)]], TABLES["market"],
-         "observed_at,ff_id,value\n2026-09-20T0900Z,,10\n"
-         "2026-09-20T0900Z,,10\n"),
-    ]
-    k1 = {"observed_at": "t1", "match_id": "7", "kickoff": "a"}
-    cases.append(([[k1], [dict(k1, observed_at="t2", kickoff="b")],
-                   [dict(k1, observed_at="t3", kickoff="a")],
-                   [dict(k1, observed_at="t4", kickoff="a")]],
-                  TABLES["matches"],
-                  "observed_at,match_id,kickoff\nt1,7,a\nt2,7,b\nt3,7,a\n"))
-    for batches, spec, want in cases:
-        with tempfile.TemporaryDirectory() as tmp:
-            f = Path(tmp) / "t.csv"
-            for rows in batches:
-                _store(f, rows, spec)
-            written = f.read_text(encoding="utf-8")
-            assert written == want, (batches, written)
-
     out: dict[str, list[Row]] = {}
     route(out, [{"a": "1"}, {ROW_TABLE: "api_standings", "stat": "goals"}],
           "api_teams", "t1")
@@ -771,8 +698,9 @@ def _selftest() -> None:
 
 
 def _selftest_sql_store() -> None:
-    """A table kept in lfg.db reads exactly as the same table kept as CSV:
-    current and history, at every cut, for each way a table is kept."""
+    """How each way of keeping a table reads, at every cut, stored stamp by
+    stamp and all at once: store_cases.json holds what the CSV store read
+    for these rows (captured 2026-10-11, before it was deleted)."""
     import tempfile
     from ffcore.clock import set_now
     from ffcore.parse import count, money
@@ -798,46 +726,33 @@ def _selftest_sql_store() -> None:
              {"observed_at": b, "k": "1", "v": "4"}, {"observed_at": b, "k": "3", "v": "5"},
              {"observed_at": a2, "k": "3", "v": "6"}, {"observed_at": c, "k": "2", "v": "7"}]
     numbers = (("v", money), ("j", count))
-    cuts = ("2026-08-01T1000Z", "2026-08-01T2200Z", "2026-08-02T1000Z", "2026-08-02T2330Z",
-            "2026-08-04T0000Z")
+    want = json.loads(Path(__file__).with_name("ffcore").joinpath("store_cases.json").read_text())
     try:
         for name, spec, rows in [
                 ("t_once", Table(False, ("k",), "once", numbers), once),
                 ("t_snap", Table(True, (), "", numbers[:1]), snap),
                 ("t_daily", Table(True, ("k",), "daily", numbers[:1]), daily)]:
-            seen = {}
+            TABLES[name] = spec
             stamps = sorted({r["observed_at"] for r in rows})
-            # by stamp, and all at once: parse stores 25 snapshots a batch
-            for sql, one_batch in ((False, False), (True, False), (True, True)):
-                TABLES[name] = spec._replace(sql=sql)
-                with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)) as tidy:
+            for one_batch in (False, True):
+                with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
                     for batch in ([rows] if one_batch else
                                   [[r for r in rows if r["observed_at"] == st] for st in stamps]):
-                        if sql:
-                            store_sql(name, batch)
-                        else:
-                            _store(tidy / ("%s.csv" % name), batch, TABLES[name])
-                    for now in cuts:
+                        store_sql(name, batch)
+                    for now, expect in want[name].items():
                         set_now(snapshot_stamp(now))
-                        seen[(sql, one_batch), now] = [[{k: v for k, v in r.items() if v not in ("", None)}
-                                           for r in got] for got in (
-                            current(name), current(name, "t"), history(name), history(name, "s"))]
-            for now in cuts:
-                for batched in (False, True):
-                    assert seen[(True, batched), now] == seen[(False, False), now], (
-                        name, now, batched, seen[(True, batched), now], seen[(False, False), now])
-            last = seen[(True, False), "2026-08-04T0000Z"]
-            assert last[0], "not vacuous"
-            assert isinstance(last[2][0]["v"], float), "numbers come back as numbers"
-            if name == "t_once":
-                js = [r.get("j") for r in last[2]]
-                assert 3 in js and all(type(j) is int for j in js if j is not None), \
-                    "a count is an int, as count() parses it"
+                        got = [[{k: v for k, v in r.items() if v not in ("", None)} for r in g]
+                               for g in (current(name), current(name, "t"),
+                                         history(name), history(name, "s"))]
+                        assert got == expect, (name, now, one_batch, got, expect)
+                        if name == "t_once" and now == "2026-08-04T0000Z":
+                            assert all(type(r["j"]) is int for r in got[2] if "j" in r) and \
+                                all(type(r["v"]) is float for r in got[2]), \
+                                "a count is an int, money a float"
     finally:
         set_now(None)
-        TABLES.pop("t_once", None)
-        TABLES.pop("t_snap", None)
-        TABLES.pop("t_daily", None)
+        for name in ("t_once", "t_snap", "t_daily"):
+            TABLES.pop(name, None)
 
 
 if __name__ == "__main__":
