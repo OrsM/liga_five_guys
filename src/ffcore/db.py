@@ -18,19 +18,24 @@ ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
 SCHEMA = Path(__file__).with_name("schema.sql")
 RUN_ENV = "LFG_RUN"
+_APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
 
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
     cut() the model's clock as a stamp, which the tables' as-of views read.
-    The schema only adds (CREATE ... IF NOT EXISTS), so applying it again
+    The schema is applied once a file and process (it recreates every view,
+    0.17s); it only adds (CREATE ... IF NOT EXISTS), so applying it again
     changes nothing."""
     path = path or DB
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
     db.create_function("cut", 0, cut)
-    db.execute("PRAGMA journal_mode=WAL")
-    db.executescript(schema.read_text(encoding="utf-8"))
+    key = (path.resolve(), schema)
+    if key not in _APPLIED:
+        db.execute("PRAGMA journal_mode=WAL")
+        db.executescript(schema.read_text(encoding="utf-8"))
+        _APPLIED.add(key)
     return db
 
 
@@ -116,6 +121,15 @@ def _selftest() -> None:
                               SCHEMA.read_text(encoding="utf-8")))
     assert all(n == 1 for n in made.values()), \
         "schema.sql defines each table and view once: %s" % [k for k, n in made.items() if n > 1]
+    with tempfile.TemporaryDirectory() as tmp:
+        once = Path(tmp) / "schema.sql"
+        once.write_text("CREATE TABLE IF NOT EXISTS n (k INTEGER);"
+                        " INSERT INTO n VALUES (1);\n")
+        for _ in range(3):
+            connect(Path(tmp) / "x.db", once).close()
+        with closing(connect(Path(tmp) / "x.db", once)) as db:
+            assert db.execute("SELECT count(*) FROM n").fetchone()[0] == 1, \
+                "the schema is applied once a file and process, not every connect"
     print("ffcore.db self-test OK")
 
 
