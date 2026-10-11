@@ -176,3 +176,33 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
     value_real REAL,
     PRIMARY KEY (run_id, ord)
 );
+
+-- The names every other table's player key stands for, as of each run.
+CREATE TABLE IF NOT EXISTS players (
+    run_id INTEGER NOT NULL REFERENCES runs(run_id),
+    player TEXT NOT NULL,
+    name   TEXT NOT NULL,
+    pos    TEXT,
+    owner  TEXT,                 -- manager, or NULL
+    PRIMARY KEY (run_id, player)
+);
+
+-- Views are recreated on every connect: a changed one replaces the old.
+-- Each graded lock and jornada: forecast error over every player forecast,
+-- what the 50 forecast highest then scored, and the same for the players
+-- flagged then.
+DROP VIEW IF EXISTS grade_error;
+CREATE VIEW grade_error AS
+WITH ranked AS (
+    SELECT *, row_number() OVER (PARTITION BY run_id, from_j, jornada
+                                 ORDER BY predicted DESC, player) AS rk
+    FROM grade_forecast)
+SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
+       sqrt(avg((predicted - actual) * (predicted - actual))) AS rmse,
+       avg(predicted - actual) AS bias,
+       avg(CASE WHEN rk <= 50 THEN actual END) AS top50,
+       sum(flagged) AS flagged_n,
+       sqrt(avg(CASE WHEN flagged = 1 THEN (predicted - actual) * (predicted - actual) END))
+           AS flagged_rmse,
+       avg(CASE WHEN flagged = 1 THEN predicted - actual END) AS flagged_bias
+FROM ranked GROUP BY run_id, from_j, jornada;

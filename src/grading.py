@@ -1,16 +1,11 @@
 from __future__ import annotations
 
 import datetime as dt
-import itertools
-import math
-import statistics
-import json
 import sqlite3
-from contextlib import closing
 import sys
 from collections.abc import Callable
+from contextlib import closing
 from typing import Any
-from pathlib import Path
 
 from ffcore.forecast import expected_points
 from ffcore.schedule import expectations
@@ -24,28 +19,16 @@ from ffcore.clock import set_now
 from ffcore.db import connect, record, this_run
 from ffcore.pricing import Momentum, _ahead, grade, steps
 from ffcore.tidy import LINEUP_SOURCE, current, history
-__all__ = ["backtest", "compare", "decision_rows", "decisions", "due", "forecast_rows",
-           "persistence", "record_grades", "score_forecast"]
+__all__ = ["backtest", "decision_rows", "decisions", "due", "forecast_rows",
+           "record_grades"]
 
-TOP_N = 50
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 
 
-def score_forecast(pred: dict[str, float], actual: JornadaPoints,
-                   j: int) -> dict[str, Any]:
-    errs = [p - actual.get((k, j), 0.0) for k, p in pred.items()]
-    top = sorted(pred, key=lambda k: pred[k], reverse=True)[:TOP_N]
-    return {"n": len(errs),
-            "rmse": math.sqrt(sum(e * e for e in errs) / len(errs)) if errs else None,
-            "bias": sum(errs) / len(errs) if errs else None,
-            "top": (sum(actual.get((k, j), 0.0) for k in top) / len(top)
-                    if top else None)}
-
-
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
-    """Rebuild the forecast at each past lock and score it against what was
-    scored: the jornada it locks and, with ahead, the next ones too. Each row
-    also scores the players listed injured, doubtful or suspended then."""
+    """Rebuild the forecast at each past lock: every player's expected points
+    for the jornada it locks and, with ahead, the next ones too, and who was
+    listed injured, doubtful or suspended then. Scored in SQL (grade_error)."""
     locks = clock_history().round_locks
     actual = points_by_jornada(scored())
     done = {j for _k, j in actual}
@@ -62,10 +45,8 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
                 if j not in done or j not in per_j:
                     continue
                 pred = {k: expected_points(cell) for k, cell in per_j[j].items()}
-                hurt = {k: v for k, v in pred.items() if k in flagged}
-                out.append({"jornada": j, "from": i, "pred": pred, "hurt": sorted(hurt),
-                            **score_forecast(pred, actual, j),
-                            "flagged": score_forecast(hurt, actual, j)})
+                out.append({"jornada": j, "from": i, "pred": pred,
+                            "hurt": sorted(k for k in pred if k in flagged)})
     finally:
         set_now(None)
     return out
@@ -172,54 +153,7 @@ def record_grades() -> dict[str, int]:
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
 
 
-def persistence(preds: dict[int, dict[str, float]],
-                actual: JornadaPoints) -> float:
-    by: dict[str, list[tuple[float, float]]] = {}
-    for j, pred in preds.items():
-        for k, e in pred.items():
-            by.setdefault(k, []).append((actual.get((k, j), 0.0) - e, e))
-    bias = statistics.fmean(r for v in by.values() for r, _ in v) if by else 0.0
-    num = den = 0.0
-    for v in by.values():
-        for (ra, ea), (rb, eb) in itertools.combinations(v, 2):
-            num += (ra - bias) * (rb - bias)
-            den += ea * eb
-    return math.sqrt(max(0.0, num) / den) if den else 0.0
-
-
-def compare(a: dict[str, dict[str, float]], b: dict[str, dict[str, float]]
-            ) -> list[dict[str, Any]]:
-    """Two backtests' next-jornada forecasts, jornada by jornada. Keys are
-    'from>jornada' (or a bare jornada, from older files)."""
-    actual = points_by_jornada(scored())
-    def nxt(d: dict[str, dict[str, float]]) -> dict[int, dict[str, float]]:
-        return {int(k.split(">")[-1]): v for k, v in d.items()
-                if ">" not in k or len(set(k.split(">"))) == 1}
-    na, nb = nxt(a), nxt(b)
-    out = []
-    for j in sorted(set(na) & set(nb)):
-        keys = set(na[j]) & set(nb[j])
-        pa = {k: na[j][k] for k in keys}
-        pb = {k: nb[j][k] for k in keys}
-        sa, sb = score_forecast(pa, actual, j), score_forecast(pb, actual, j)
-        out.append({"jornada": j, "n": len(keys), "rmse": (sa["rmse"], sb["rmse"]),
-                    "top": (sa["top"], sb["top"])})
-    return out
-
-
 def _selftest() -> None:
-    same = {1: {"a": 2.0, "b": 2.0}, 2: {"a": 2.0, "b": 2.0}}
-    assert persistence(same, {("a", 1): 3.0, ("a", 2): 3.0, ("b", 1): 1.0,
-                              ("b", 2): 1.0}) == 0.5
-    assert persistence(same, {("a", 1): 3.0, ("a", 2): 1.0, ("b", 1): 2.0,
-                              ("b", 2): 2.0}) == 0.0
-
-    got = score_forecast({"a": 3.0, "b": 1.0}, {("a", 1): 5.0}, 1)
-    assert got["n"] == 2 and got["bias"] == -0.5, got
-    assert abs(got["rmse"] - math.sqrt(2.5)) < 1e-12, got
-    assert got["top"] == 2.5, got
-    assert score_forecast({}, {}, 1)["rmse"] is None
-
     bt = [{"from": 7, "jornada": 8, "pred": {"a": 3.0, "b": 1.0}, "hurt": ["b"]}]
     assert forecast_rows(bt, {("a", 8): 5.0}) == [
         {"from_j": 7, "jornada": 8, "player": "a", "predicted": 3.0, "actual": 5.0, "flagged": 0},
@@ -231,6 +165,7 @@ def _selftest() -> None:
         == [(0, "plan", False), (1, "rejected", False)], moves
 
     import tempfile
+    from pathlib import Path
     with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
         def run(commit: str, resolved: float | None) -> int:
             with db:
@@ -254,71 +189,7 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
-    elif "--backtest" in sys.argv:
-        args = sys.argv[sys.argv.index("--backtest") + 1:]
-        h = int(args[args.index("--ahead") + 1]) if "--ahead" in args else 0
-        out = [x for i, x in enumerate(args) if not x.startswith("--")
-               and not (i and args[i - 1] == "--ahead")]
-        runs = backtest(ahead=h)
-        first = [r for r in runs if r["jornada"] == r["from"]]
-        for r in first:
-            print("j%-2d n=%3d rmse %.3f bias %+.3f top%d %.2f"
-                  % (r["jornada"], r["n"], r["rmse"], r["bias"], TOP_N, r["top"]))
-        print("persistent share of a player's expectation: %.2f" % persistence(
-            {r["jornada"]: r["pred"] for r in first}, points_by_jornada(scored())))
-        for d in range(h + 1):
-            rows = [r for r in runs if r["jornada"] - r["from"] == d]
-            f = [r["flagged"] for r in rows if r["flagged"]["n"]]
-            n = max(1, sum(x["n"] for x in f))
-            print("%d ahead: %d forecasts, rmse %.3f; flagged players n=%d rmse %.3f bias %+.3f"
-                  % (d, len(rows), statistics.fmean(r["rmse"] for r in rows),
-                     sum(x["n"] for x in f),
-                     math.sqrt(sum(x["rmse"] ** 2 * x["n"] for x in f) / n),
-                     sum(x["bias"] * x["n"] for x in f) / n))
-        if out:
-            Path(out[0]).write_text(json.dumps(
-                {"%d>%d" % (r["from"], r["jornada"]): r["pred"] for r in runs}),
-                encoding="utf-8")
-    elif "--decisions" in sys.argv:
-        runs = decisions()
-        for group in ("plan", "cleared", "rejected"):
-            for kind in ("get", "sell"):
-                rows = [r for r in runs if r["group"] == group and r["kind"] == kind]
-                if not rows:
-                    continue
-                per = [(r["pred"] / r["jornadas"], r["real"] / r["jornadas"])
-                       for r in rows if r["jornadas"]]
-                print("%-8s %-4s n=%3d  per jornada: forecast %+.2f, happened %+.2f;"
-                      " happened > 0 in %.0f%% (forecast chance %.0f%%);"
-                      " value forecast %+.2fM, happened %+.2fM" % (
-                          group, kind, len(rows),
-                          statistics.fmean(f for f, _ in per), statistics.fmean(h for _, h in per),
-                          100 * statistics.fmean(h > 0 for _, h in per),
-                          100 * statistics.fmean(r["chance"] for r in rows),
-                          statistics.fmean(r["value_pred"] for r in rows),
-                          statistics.fmean(r["value_real"] for r in rows)))
-        for r in runs:
-            if r["group"] == "plan":
-                print("  j%-2d %-45s forecast %+6.1f happened %+6.1f over %d;"
-                      " value %+5.1fM happened %+5.1fM" % (
-                    r["lock"], r["move"][:45], r["pred"], r["real"], r["jornadas"],
-                    r["value_pred"], r["value_real"]))
     elif "--prices" in sys.argv:
         for h, g in grade(steps(history("market"))).items():
             print("%d update(s) ahead: n=%d  error %.2f%%  vs %.2f%% for "
                   "'no change'" % (h, g["n"], g["mae"], g["zero"]))
-    elif "--compare" in sys.argv:
-        i = sys.argv.index("--compare")
-        a, b = (json.loads(Path(p).read_text(encoding="utf-8"))
-                for p in sys.argv[i + 1:i + 3])
-        rows = compare(a, b)
-        for r in rows:
-            print("j%-2d n=%3d rmse %.3f -> %.3f (%+.3f)  top%d %.2f -> %.2f (%+.2f)"
-                  % (r["jornada"], r["n"], *r["rmse"], r["rmse"][1] - r["rmse"][0],
-                     TOP_N, *r["top"], r["top"][1] - r["top"][0]))
-        late = [r for r in rows if r["jornada"] > 1]
-        print("jornadas 2+: rmse better in %d/%d, mean %+.3f; top better in %d/%d, mean %+.2f"
-              % (sum(r["rmse"][1] < r["rmse"][0] for r in late), len(late),
-                 sum(r["rmse"][1] - r["rmse"][0] for r in late) / max(1, len(late)),
-                 sum(r["top"][1] > r["top"][0] for r in late), len(late),
-                 sum(r["top"][1] - r["top"][0] for r in late) / max(1, len(late))))
