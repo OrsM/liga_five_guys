@@ -37,7 +37,7 @@
         },
         "forecast": {
           "title": "A player's forecast, factor by factor (latest run)",
-          "sql": "SELECT f.jornada, p.name, round(f.ppm, 2) AS ppm, round(f.fixture, 2) AS fixture,\n       round(f.picked, 2) AS picked, round(f.fit, 2) AS fit, round(f.points, 2) AS points,\n       round(f.plays, 2) AS plays, round(f.expected, 2) AS expected\nFROM forecast f JOIN players p USING (run_id, player)\nWHERE f.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM forecast))\n  AND p.name LIKE '%' || coalesce(:name, '') || '%' ORDER BY p.name, f.jornada"
+          "sql": "SELECT f.jornada, p.name, round(f.ppm, 2) AS ppm, round(f.fixture, 2) AS fixture,\n       round(f.picked, 2) AS picked, round(f.fit, 2) AS fit, round(f.points, 2) AS points,\n       round(f.plays, 2) AS plays, round(f.expected, 2) AS expected\nFROM forecast f JOIN names p USING (player)\nWHERE f.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM forecast))\n  AND p.name LIKE '%' || coalesce(:name, '') || '%' ORDER BY p.name, f.jornada"
         },
         "cash": {
           "title": "Each manager's cash: yours from the app, rivals' from the ledger (as of now)",

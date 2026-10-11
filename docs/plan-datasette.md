@@ -111,10 +111,12 @@ data/raw tarballs
 - S3 Market history: `market`, `api_market`, `api_offers`; price steps,
   momentum (slope through the origin per horizon), premium, offer ratios
   as views; `pricing.py`'s versions go.
-- S-ID Identity: one rule per identity question. Found 2026-10-11: "which
-  player does this name mean" is answered four ways with three ambiguity
-  rules (Crosswalk._by_name: nobody; crosswalk.py _named: the club breaks
-  the tie; league.app_fielded and players._merge: the last one wins), and
+- S-ID (done; golden same; 0 of 1187 line-up rows resolve differently)
+  Identity: one rule per identity question. Found 2026-10-11: "which
+  player does this name mean" was answered three ways (Crosswalk._by_name:
+  nobody; crosswalk.py _named: the club breaks the tie; league.app_fielded,
+  within your squad: the last one wins; players._merge goes through
+  Crosswalk), and
   row_key mixes ff_ids and names in one key column. (Before S4, which is
   mostly slug and name resolution.) The
   registry is a `crosswalk` table (`players.csv` its committed export, and

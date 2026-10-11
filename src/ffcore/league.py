@@ -58,19 +58,14 @@ def app_fielded(squad: Iterable[str], names: Mapping[str, Name], rows: Rows | No
 
 class League:
     """The league as lfg.db has it (schema.sql: owners, users, cash,
-    price_paid over the app's tables, as of cut()). Writes the two inputs no
-    table holds: the crosswalk's app ids and the config."""
+    price_paid over the app's tables as of cut(), players by the registry
+    load_crosswalk mirrors). Writes the one input no table holds, the config."""
 
     def __init__(self, cfg: Config, xw: Crosswalk) -> None:
         self.cfg, self.xw = cfg, xw
-        ids = {p.app_id for p in xw.players.values() if p.app_id}
-        with closing(lfg.connect()) as db:
-            with db:
-                db.execute("DELETE FROM app_keys")
-                db.executemany("INSERT INTO app_keys VALUES (?, ?)",
-                               [(a, k) for a in sorted(ids) if (k := xw.player(app_id=a))])
-                db.execute("DELETE FROM league_config")
-                db.execute("INSERT INTO league_config VALUES (?, ?)", (cfg.me, cfg.budget))
+        with closing(lfg.connect()) as db, db:
+            db.execute("DELETE FROM league_config")
+            db.execute("INSERT INTO league_config VALUES (?, ?)", (cfg.me, cfg.budget))
         self.owner: dict[str, str] = dict(lfg.rows("SELECT player, manager FROM owners"))
         users = [m for (m,) in lfg.rows("SELECT manager FROM users")]
         self.cash: dict[str, float] = dict(lfg.rows("SELECT manager, cash FROM cash"))
@@ -129,6 +124,7 @@ def _selftest() -> None:
             for stamp in (a, b):
                 store_sql("api_teams", [r for r in teams if r["observed_at"] == stamp]
                           or [{"observed_at": stamp, "manager": "", "player_id": ""}])
+            xw.mirror()
             return League(Config(me="me", budget=100.0), xw)
 
     with_money = [dict(users[0], team_money="116")] + users[1:]

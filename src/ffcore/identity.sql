@@ -1,0 +1,48 @@
+-- Who each player is: the registry crosswalk.py builds (players.csv, its
+-- committed record, mirrored here by players.load_crosswalk), and one rule
+-- per identity question: an id or a name names a player only when it names
+-- exactly one. ffcore.crosswalk runs these same views on the players it
+-- holds, so the rule is here and only here.
+CREATE TABLE IF NOT EXISTS crosswalk (
+    player_id TEXT PRIMARY KEY,
+    name      TEXT NOT NULL DEFAULT '',
+    club_id   TEXT NOT NULL DEFAULT '',
+    ff_slug   TEXT NOT NULL DEFAULT '',
+    app_id    TEXT NOT NULL DEFAULT '',
+    app_names TEXT NOT NULL DEFAULT ''
+);
+
+DROP VIEW IF EXISTS app_player;
+CREATE VIEW app_player AS
+SELECT app_id, min(player_id) AS player FROM crosswalk
+WHERE app_id <> '' GROUP BY app_id HAVING count(*) = 1;
+
+DROP VIEW IF EXISTS slug_player;
+CREATE VIEW slug_player AS
+SELECT ff_slug, min(player_id) AS player FROM crosswalk
+WHERE ff_slug <> '' GROUP BY ff_slug HAVING count(*) = 1;
+
+-- A name (name_key: accents, case and punctuation never count) names a
+-- player when one has it; else, within a club, when one there has it.
+DROP VIEW IF EXISTS name_player;
+CREATE VIEW name_player AS
+SELECT name_key(name) AS name_key, min(player_id) AS player FROM crosswalk
+WHERE name_key(name) <> '' GROUP BY name_key(name) HAVING count(*) = 1;
+
+DROP VIEW IF EXISTS name_club_player;
+CREATE VIEW name_club_player AS
+SELECT name_key(name) AS name_key, club_id, min(player_id) AS player FROM crosswalk
+WHERE name_key(name) <> '' AND club_id <> ''
+GROUP BY name_key(name), club_id HAVING count(*) = 1;
+
+-- The ids two players claim: refused (above) until resolved.
+DROP VIEW IF EXISTS id_clashes;
+CREATE VIEW id_clashes AS
+SELECT 'ff_slug' AS id, ff_slug AS value FROM crosswalk
+WHERE ff_slug <> '' GROUP BY ff_slug HAVING count(*) > 1
+UNION ALL
+SELECT 'app_id', app_id FROM crosswalk WHERE app_id <> '' GROUP BY app_id HAVING count(*) > 1;
+
+-- The names as the board shows them.
+DROP VIEW IF EXISTS names;
+CREATE VIEW names AS SELECT player_id AS player, name_shown(name) AS name FROM crosswalk;

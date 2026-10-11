@@ -2,30 +2,15 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Iterable
 
 
 from ffcore.parse import Rows, text
 from ffcore.crosswalk import Crosswalk, Player
-from ffcore.names import AppId, Name, PlayerKey, app_id, row_key
+from ffcore.names import AppId, PlayerKey, app_id, row_key
 from ffcore.text import tokens
 from ffcore.tidy import current, history, TIDY
 
 PLAYERS = "players.csv"
-
-
-def group_by_name(players: Iterable[Player]) -> dict[str, list[Player]]:
-    out: dict[str, list[Player]] = {}
-    for p in players:
-        out.setdefault(Name(p.name).key, []).append(p)
-    return out
-
-
-def _named(named: dict[str, list[Player]], name: str | None, club: str = "") -> Player | None:
-    hits = named.get(Name(name).key) or []
-    if len(hits) != 1 and club:
-        hits = [p for p in hits if p.club_id == club]
-    return hits[0] if len(hits) == 1 else None
 
 
 def build_players(registry: dict[str, Player], market: Rows, lineups: Rows,
@@ -38,13 +23,13 @@ def build_players(registry: dict[str, Player], market: Rows, lineups: Rows,
         p = out.setdefault(pid, Player(pid))
         p.name = text(r, "name") or p.name
         p.club_id = r.get("club") or p.club_id
-    named = group_by_name(out.values())
+    named = Crosswalk(out)
 
     for r in lineups:
         slug = text(r, "player_slug")
-        hit = _named(named, r.get("player_name"), r.get("team_slug") or "")
-        if hit is not None and slug and not hit.ff_slug:
-            hit.ff_slug = slug
+        who = named.player(name=r.get("player_name"), club=r.get("team_slug") or None)
+        if who is not None and slug and not out[who].ff_slug:
+            out[who].ff_slug = slug
 
     value: dict[str, float | None] = {row_key(r): r.get("value") for r in market}
     app = {app_id(r): r for r in api_rows}

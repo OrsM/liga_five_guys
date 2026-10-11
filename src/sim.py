@@ -17,7 +17,7 @@ from ffcore.forecast import expected_points
 from ffcore.jornadas import load_deadline
 from ffcore.tidy import REPORTS
 
-__all__ = ["board_tables", "forecast", "funnel", "players", "report"]
+__all__ = ["board_tables", "forecast", "funnel", "report"]
 
 ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -312,12 +312,6 @@ def _selftest() -> None:
             assert json.loads(db.execute("SELECT facts FROM board_do WHERE ord = 0")
                               .fetchone()[0]) == [list(f) for f in doc["do"][0]["facts"]]
 
-    named = players(replace(ub, market=replace(ub.market, owner={"cand": "riv"})), 7)
-    assert {r["player"] for r in named} == set(ub.market.pos) and len(named) == len(ub.market.pos)
-    cand = next(r for r in named if r["player"] == "cand")
-    assert cand == {"run_id": 7, "player": "cand", "name": ub.market.shown("cand"),
-                    "pos": "MED", "owner": "riv"}, cand
-
     print("sim self-test OK")
 
 
@@ -340,13 +334,6 @@ def forecast(u: Universe, run: int) -> list[Doc]:
              "picked": f.picked, "fit": f.fit, "points": f.cell[0], "plays": f.cell[1],
              "expected": expected_points(f.cell)}
             for j, layer in u.factors.items() for k, f in layer.items()]
-
-
-def players(u: Universe, run: int) -> list[Doc]:
-    """Every player the market knows: the names the other tables' keys stand for."""
-    m = u.market
-    return [{"run_id": run, "player": k, "name": m.shown(k), "pos": m.pos[k],
-             "owner": m.owner.get(k)} for k in sorted(m.pos)]
 
 
 def board_tables(doc: Doc, run: int) -> dict[str, list[Doc]]:
@@ -376,7 +363,6 @@ def main() -> None:
         doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
     if (run := this_run()) is not None:
-        record(players(u, run), "players")
         record(funnel(u, b, run), "funnel")
         record(forecast(u, run), "forecast")
         record([{"run_id": run, **r} for r in built().params], "params")

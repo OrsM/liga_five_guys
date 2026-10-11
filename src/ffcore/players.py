@@ -3,6 +3,7 @@ per player, and the crosswalk of ids between the sources."""
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any
 
 from ffcore.parse import Rows
@@ -16,10 +17,18 @@ __all__ = ["load_crosswalk", "load_players", "MARKET_FIELDS", "XI_FIELDS"]
 _XW_CACHE: dict[str, tuple[Stamp, Crosswalk]] = {}
 
 
+def _read(path: Path) -> Crosswalk:
+    xw = Crosswalk.read(path)
+    xw.mirror()
+    return xw
+
+
 def load_crosswalk() -> Crosswalk:
-    """players.csv as a Crosswalk, empty if there is none yet."""
+    """players.csv as a Crosswalk, empty if there is none yet; each time it
+    is read anew it is mirrored into lfg.db, so a replay or a rebuilt file
+    joins the same registry."""
     path = table_path("players")
-    return mtime_cached(path, _XW_CACHE, str(path), Crosswalk.read, path) or Crosswalk()
+    return mtime_cached(path, _XW_CACHE, str(path), _read, path) or Crosswalk()
 
 
 MARKET_FIELDS = [("team", "team"), ("club", "club"), ("pos", "position"),
@@ -95,6 +104,9 @@ def _selftest() -> None:
                          [{"player_id": "a", "name": "A", "club_id": "c"}],
                          PLAYER_COLS)
                 xw1 = load_crosswalk()
+                from ffcore.db import rows
+                assert rows("SELECT count(*) FROM crosswalk")[0][0] == len(xw1.players), \
+                    "loading the registry mirrors it into lfg.db"
                 assert xw1.players["a"].name == "A", xw1.players
                 assert load_crosswalk() is xw1
 

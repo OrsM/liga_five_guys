@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import os
+import sqlite3
+from contextlib import closing
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 from dataclasses import dataclass, field
 
+from ffcore import db as lfg
+from ffcore.db import IDENTITY, functions
 from ffcore.names import AppId, Name, PlayerKey
 from ffcore.tidy import read_csv, write_csv
 
@@ -41,57 +45,54 @@ class Player:
 
 
 class Crosswalk:
+    """The registry and what it resolves. Each id and name maps to a player
+    by identity.sql's views (one rule per question), run on these players."""
 
     def __init__(self, players: Mapping[str, Player] | None = None) -> None:
         self.players: dict[str, Player] = dict(players or {})
-        self._reindex()
-
-
-    def _reindex(self) -> None:
-        self._by_ff: dict[str, PlayerKey] = {}
-        self._by_app: dict[str, PlayerKey] = {}
-        self._clash: dict[str, set[str]] = {}
-        names: dict[str, set[str]] = {}
-        for p in self.players.values():
-            if p.name:
-                names.setdefault(Name(p.name).key, set()).add(p.player_id)
-            for idx, key, label in (
-                    (self._by_ff, p.ff_slug, "ff_slug"),
-                    (self._by_app, p.app_id, "app_id")):
-                if not key:
-                    continue
-                if key in idx and idx[key] != p.player_id:
-                    self._clash.setdefault(label, set()).add(key)
-                idx[key] = PlayerKey(p.player_id)
-        for label, keys in self._clash.items():
-            idx = {"ff_slug": self._by_ff, "app_id": self._by_app}[label]
-            for k in keys:
-                idx.pop(k, None)
-        self._by_name = {n: PlayerKey(next(iter(ids))) for n, ids in names.items()
-                         if len(ids) == 1}
+        with closing(sqlite3.connect(":memory:")) as db:
+            functions(db)
+            db.executescript(IDENTITY.read_text(encoding="utf-8"))
+            db.executemany("INSERT INTO crosswalk VALUES (?, ?, ?, ?, ?, ?)",
+                           [tuple(p.row()[c] for c in PLAYER_COLS) for p in self.players.values()])
+            self._by_ff: dict[str, PlayerKey] = dict(db.execute("SELECT * FROM slug_player"))
+            self._by_app: dict[str, PlayerKey] = dict(db.execute("SELECT * FROM app_player"))
+            self._by_name: dict[str, PlayerKey] = dict(db.execute("SELECT * FROM name_player"))
+            self._by_club_name: dict[tuple[str, str], PlayerKey] = {
+                (n, c): k for n, c, k in db.execute("SELECT * FROM name_club_player")}
+            self._clash: dict[str, list[str]] = {}
+            for idx, value in db.execute("SELECT id, value FROM id_clashes ORDER BY id, value"):
+                self._clash.setdefault(idx, []).append(value)
 
     def clashes(self) -> dict[str, list[str]]:
-        return {k: sorted(v) for k, v in sorted(self._clash.items()) if v}
+        return self._clash
+
+    def mirror(self) -> None:
+        """These players into lfg.db's crosswalk, for the views that join it."""
+        with closing(lfg.connect()) as db, db:
+            db.execute("DELETE FROM crosswalk")
+            db.executemany("INSERT INTO crosswalk VALUES (?, ?, ?, ?, ?, ?)",
+                           [tuple(p.row()[c] for c in PLAYER_COLS) for p in self.players.values()])
 
     def player(self, *, name: str | None = None, ff_slug: str | None = None,
-               app_id: AppId | None = None) -> PlayerKey | None:
-        """Our key for a player, by futbolfantasy slug, app id or name."""
+               app_id: AppId | None = None, club: str | None = None) -> PlayerKey | None:
+        """Our key for a player, by futbolfantasy slug, app id or name (a
+        name two players share, by club)."""
         for key, idx in ((ff_slug, self._by_ff), (app_id, self._by_app)):
             if key and key in idx:
                 return idx[key]
         k = Name(name).key
         if k in self.players:
             return PlayerKey(k)
-        return self._by_name.get(k)
+        return self._by_name.get(k) or (self._by_club_name.get((k, club)) if club else None)
 
     def key_of(self, r: Mapping[str, Any]) -> PlayerKey | None:
         fid = (r.get("ff_id") or "").strip()
         if fid in self.players:
             return PlayerKey(fid)
         return self.player(ff_slug=(r.get("player_slug") or "").strip() or None,
-                           name=r.get("player_name_full")
-                           or r.get("player_name"))
-
+                           name=r.get("player_name_full") or r.get("player_name"),
+                           club=(r.get("team_slug") or "").strip() or None)
 
     def coverage(self) -> dict[str, float]:
         n = len(self.players) or 1
@@ -154,6 +155,13 @@ def _selftest() -> None:
         assert set(again.players) == set(xw.players)
         assert Crosswalk.read(os.path.join(d, "nope.csv")).players == {}
 
+    twins = Crosswalk({
+        "11": Player(PlayerKey("11"), "Álvaro García", "betis", app_id=AppId("5")),
+        "12": Player(PlayerKey("12"), "Alvaro Garcia", "rayo")})
+    assert twins.player(name="Álvaro García") is None, "a name two players share names nobody"
+    assert twins.player(name="Álvaro García", club="betis") == "11", "unless the club says which"
+    assert twins.key_of({"player_name": "Alvaro Garcia", "team_slug": "rayo"}) == "12"
+    assert twins.player(app_id=AppId("5")) == "11"
     cov = xw.coverage()
     assert cov["players"] == 2
     assert cov["ff"] == 1.0, cov

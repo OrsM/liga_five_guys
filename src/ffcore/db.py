@@ -5,20 +5,31 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
 from typing import Any
 
 from ffcore.clock import cut
+from ffcore.names import Name
 
-__all__ = ["DB", "ROOT", "RUN_ENV", "SCHEMA", "connect", "query", "record", "rows", "this_run"]
+__all__ = ["DB", "IDENTITY", "ROOT", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
+           "record", "rows", "this_run"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
 SCHEMA = Path(__file__).with_name("schema.sql")
+IDENTITY = Path(__file__).with_name("identity.sql")
 RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
+
+
+def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
+    """The functions the views call: cut() (now, as a stamp: the model's
+    clock unless told otherwise), name_key() and name_shown() (Name's)."""
+    db.create_function("cut", 0, now)
+    db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
+    db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
 
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
@@ -30,10 +41,11 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     path = path or DB
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
-    db.create_function("cut", 0, cut)
+    functions(db)
     key = (path.resolve(), schema)
     if key not in _APPLIED:
         db.execute("PRAGMA journal_mode=WAL")
+        db.executescript(IDENTITY.read_text(encoding="utf-8"))
         db.executescript(schema.read_text(encoding="utf-8"))
         _APPLIED.add(key)
     return db
@@ -115,6 +127,9 @@ def _selftest() -> None:
         assert this_run() == want, (env, this_run())
     os.environ.pop(RUN_ENV)
     assert this_run() is None, "outside run.py there is no run"
+    assert rows("SELECT name_key(' Iñigo  VICENTE '), name_shown('nico van gaal')",
+                path=Path(tempfile.mkdtemp()) / "f.db") == [("inigo vicente", "Nico van Gaal")], \
+        "names are compared and shown in SQL by the same rules as Name"
     import re
     from collections import Counter
     made = Counter(re.findall(r"CREATE (?:VIEW|TABLE IF NOT EXISTS) (\w+)",

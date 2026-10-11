@@ -177,21 +177,7 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
     PRIMARY KEY (run_id, ord)
 );
 
--- The names every other table's player key stands for, as of each run.
-CREATE TABLE IF NOT EXISTS players (
-    run_id INTEGER NOT NULL REFERENCES runs(run_id),
-    player TEXT NOT NULL,
-    name   TEXT NOT NULL,
-    pos    TEXT,
-    owner  TEXT,                 -- manager, or NULL
-    PRIMARY KEY (run_id, player)
-);
-
 -- Views are recreated on every connect: a changed one replaces the old.
--- The names as the latest run had them.
-DROP VIEW IF EXISTS names;
-CREATE VIEW names AS
-SELECT player, name FROM players WHERE run_id = (SELECT max(run_id) FROM players);
 
 -- Each graded lock and jornada: forecast error over every player forecast,
 -- what the 50 forecast highest then scored, and the same for the players
@@ -213,12 +199,8 @@ SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
 FROM ranked GROUP BY run_id, from_j, jornada;
 
 -- The league's money, as SQL over the app's tables (current_/history_ views
--- read as of cut()). League.load writes the two inputs no table holds: the
--- crosswalk's app id -> player key (its clash rule applied) and the config.
-CREATE TABLE IF NOT EXISTS app_keys (
-    app_id TEXT PRIMARY KEY,
-    player TEXT NOT NULL
-);
+-- read as of cut()), players resolved by app id through identity.sql's
+-- app_player. League writes the one input no table holds, the config.
 CREATE TABLE IF NOT EXISTS league_config (
     me     TEXT NOT NULL,
     budget REAL NOT NULL
@@ -233,7 +215,7 @@ WHERE user_id <> '' AND manager <> '' GROUP BY user_id;
 DROP VIEW IF EXISTS owners;
 CREATE VIEW owners AS
 SELECT k.player, t.manager AS manager
-FROM current_api_teams t JOIN app_keys k ON k.app_id = t.player_id
+FROM current_api_teams t JOIN app_player k ON k.app_id = t.player_id
 WHERE t.manager <> '' GROUP BY k.player;
 
 -- The activity feed, each event once, with who paid (buyer: a buy's or a
@@ -249,7 +231,7 @@ WITH feed AS (
     FROM current_api_activity a
     LEFT JOIN users u ON u.user_id = a.user_id
     LEFT JOIN users c ON c.user_id = a.counterparty
-    LEFT JOIN app_keys k ON k.app_id = a.player_id),
+    LEFT JOIN app_player k ON k.app_id = a.player_id),
 roles AS (
     SELECT *, CASE WHEN kind IN ('buy', 'transfer') THEN who END AS buyer,
               CASE kind WHEN 'sell' THEN who WHEN 'transfer' THEN other END AS seller
@@ -257,7 +239,7 @@ roles AS (
 t AS MATERIALIZED (
     SELECT h.observed_at, k.player, h.manager AS manager,
            coalesce(h.market_value, 0.0) AS value
-    FROM history_api_teams h JOIN app_keys k ON k.app_id = h.player_id
+    FROM history_api_teams h JOIN app_player k ON k.app_id = h.player_id
     WHERE h.manager <> ''),
 s AS (SELECT observed_at AS a, lead(observed_at) OVER (ORDER BY observed_at) AS b
       FROM (SELECT DISTINCT observed_at FROM t)),
