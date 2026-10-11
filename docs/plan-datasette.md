@@ -3,23 +3,43 @@
 Agreed 2026-10-11. Each step is one commit, red test first, pushed and
 deployed when green.
 
-## Shape
+## End state
 
-- **Box**: fetch, parse, sim; writes `data/lfg.db`. Datasette serves it at
-  `lfg.lemonworlds.com` (behind the `*.lemonworlds.com` Access wildcard).
-  Run again and the live log live here.
-- **Phone**: `lfg-publish` still pushes `decisions.json` every run, so the
-  last board survives the box being down. `Fantasy.jsx` stays the one
-  renderer; its numbers link into Datasette (as `Band.jsx` does).
-- **One query, three readers**: each question is one saved query in
-  `datasette.json`; Datasette, `ask.py` and the board run that text.
-- **SQL first**: Python computes once and writes rows; drift, comparisons
-  and "what changed" are saved queries, not Python machinery. Tables follow
-  broom: `runs` is glance (one row a run), `params` is tidy (one row a
-  parameter), `funnel` and `forecast` are augment (one row an observation).
-- **`lfg.db` is disposable**: every table is rebuildable from `data/raw`,
-  git or a replay, except `runs`. No backup. Tables change by adding; a
-  changed table is dropped and rebuilt.
+**SQL owns the facts and every calculation across many rows; Python owns
+only what SQL cannot do: parsing HTML, the season simulation and the plan
+search.** (Miguel, 2026-10-11, after "are we using SQL or papering over
+previous code?": the first tables only added a write path.)
+
+```
+data/raw tarballs
+   └─ Python parsers ──INSERT──▶ observation tables (append-only, observed_at)
+                                    │
+                     SQL views (a .sql file each, :cut for "as of"): current_*,
+                     ledger, cash, price_paid, offer stats, premium, momentum,
+                     points by jornada, start outcomes, availability counts
+                                    │
+   Python model ◀── reads views ── shrinkage, calibration grid, season sim, plan
+        └──INSERT──▶ funnel, forecast, params, boards, grade_*
+                                    │
+                     saved queries (the same .sql files): Datasette, ask.py,
+                     tools/q.py, the phone's board JSON, grading, drift, alerts
+```
+
+- **A slice ships only if it deletes Python**: move one data family into
+  SQL, its arithmetic into views, delete the Python, `golden.py check` the
+  same. Lines counted after every slice.
+- **Equality**: SQLite's SUM is compensated (Kahan-Babuska-Neumaier since
+  3.43; the box has 3.46.1), Python sums with `math.fsum`, money is whole
+  euros stored as INTEGER, and golden compares decisions exactly and floats
+  with `math.isclose`.
+- **Box and phone**: Datasette serves `lfg.db` at `lfg.lemonworlds.com`
+  (behind the Access wildcard); Run again and the live log move there.
+  `lfg-publish` still pushes the board JSON each run, so the last board
+  survives the box being down; `Fantasy.jsx` stays the one renderer and
+  links into Datasette (as `Band.jsx` does).
+- **broom**: `runs` is glance, `params` tidy, `funnel`/`forecast` augment.
+- **`lfg.db` is rebuilt from `data/raw`** plus the committed `players.csv`
+  and `points.csv`, git and replays; only `runs` history is not. No backup.
 
 ## Decisions
 
@@ -29,7 +49,7 @@ deployed when green.
 | Funnel retention | every run | small |
 | Telegram ping | stays on the phone | it fires only after a successful publish and links to the phone page |
 | Report commits | keep | they are the board history and its backup (8KB, 2s a run) |
-| Tidy storage to SQLite | last, only if the line count after phases 1-3 justifies it | parse is 1.4s since `2b39510`; only deletions argue for it |
+| Tidy storage to SQLite | first: the views need their inputs in SQL | the end state above; it was "optional, last" until 2026-10-11 |
 
 ## Assumptions that were wrong
 
@@ -43,7 +63,7 @@ deployed when green.
 - SQLite views take no parameters: `current`'s cut is a `:cut` saved query.
 - `players.csv` and `points.csv` are state no rebuild recovers; they stay
   committed files.
-- `golden.py` copies tidy and runs only `sim`; before phase 4 it must freeze
+- `golden.py` copies tidy and runs only `sim`; S0 makes it freeze
   `data/raw` and run `parse sim` (a cold parse is ~5 minutes).
 - The only `sqlite3` CLI on the box is Android's: bash steps log through a
   Python helper.
@@ -69,29 +89,27 @@ deployed when green.
   from rows would gain nothing).
 - 2.5 (done) `grade_forecast`, `grade_decisions`: `run.py grade` after each
   report, skipped unless the commit or the resolved jornadas changed.
-- 2.6 board history imported from git.
-- 2.7 "why did it change": diff of the last two runs' funnel and forecast,
-  naming the factor that moved; the ping carries the line.
+- 2.6 (after S1) board history imported from git.
+- 2.7 (after S1) "why did it change": a saved query over the last two
+  runs' funnel, forecast and params; the ping carries the line.
 
-**Phase 3: Datasette, and the run controls off the phone**
-- 3.1 `lfg-datasette.service`, tunnel route, first saved queries (timings,
-  why, forecast). Outside curl gives 302.
-- 3.2 `Fantasy.jsx` links into rows.
-- 3.3 Run again: a writable canned query; `lfg-watch` polls the file.
-  Deletes the ssh poll, `rerun.json`, `/api/fantasy-rerun`.
-- 3.4 Live log page. Deletes the `run.json` push loop, `/api/fantasy-run`,
-  the console in `Fantasy.jsx`.
-- 3.5 Alerts: a saved query flagged as an alert pings when it returns rows.
-  First: your app line-up is not the best XI hours before the lock.
-- 3.6 Saved queries, one a step: rival profiles, unmatched crosswalk,
-  constants as measured, README rules as checks, bench points lost,
-  row -> raw page.
-
-**Phase 4 (optional): tidy storage**
-- 4.0 `golden.py` freezes raw and runs `parse sim`.
-- 4.1 One table a step, `api_activity` first, the daily tables last.
-- 4.2 The three side files become tables.
-- 4.3 Delete the CSV machinery nothing uses.
+**Slices: SQL replaces Python, one data family at a time**
+- S0 `golden.py` freezes `data/raw` (+ the committed tidy state) and runs
+  `parse sim`; floats compared with `math.isclose`.
+- S1 Datasette on `lfg.db` (loopback first), saved queries in the repo's
+  `datasette.json`, `tools/q.py` runs them in a terminal, a `players`
+  table for names; the grading reports become saved queries and their
+  Python goes.
+- S2 Ledger: `api_activity` into SQL; ledger, rival cash, price paid as
+  views; `league.py`'s versions go.
+- S3 Market history: `market`, `api_market`, `api_offers`; price steps,
+  momentum (slope through the origin per horizon), premium, offer ratios
+  as views; `pricing.py`'s versions go.
+- S4 Points and line-ups: `scored`, start outcomes, availability counts.
+- S5 The last table moved: `tidy.py`'s storage and `current`/`history` go.
+- S6 The board as a saved query; the phone's JSON its export.
+- Then the old phase 3 rest: tunnel route, `Fantasy.jsx` links, Run again
+  and the live log on the box, alerts, more saved queries.
 
 **Phase 5: experiments, each a module of its own; keep what gets used**
 - 5.0 Only if a question SQL cannot answer needs it: the model takes its

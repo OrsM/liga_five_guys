@@ -1,22 +1,30 @@
 """The boards a refactor must not change.
 
-    python tools/golden.py freeze [N]   # copy data/, build N boards (default 16) with this tree's code
+    python tools/golden.py freeze [N]   # copy the raw data, build N boards (default 16) with this tree's code
     python tools/golden.py check        # rebuild them with this tree's code, compare
+
+Only what no rebuild recovers is copied: data/raw, data/season and the
+tidy files git tracks. Each freeze and each check parses it afresh with its
+own tree's code (a cold parse, ~5 minutes), so a change to how tables are
+stored or read is checked too, not only the model.
 
 Boards are built at N snapshot times spread over the season, with the
 clock pinned to each, so the check sees sells, line-up changes and swaps
-that any single day may not have. Freeze and check hash strings differently, so a board that depends
-on the order of a set shows up as a difference rather than by luck.
-Everything but generated_at must match exactly.
+that any single day may not have: the snapshots that stored the app's
+squads (api_teams). Freeze and check hash strings differently, so a board
+that depends on the order of a set shows up as a difference rather than by
+luck. Everything but generated_at must match: floats to math.isclose (a sum
+in SQL and in Python may differ in the last bits), the rest exactly.
 """
 from __future__ import annotations
 
-import csv
 import json
+import math
 import os
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 from typing import Any
 
@@ -24,17 +32,33 @@ HOME = Path(os.environ.get("LFG_GOLDEN", Path.home() / ".cache" / "lfg-golden"))
 
 
 def stamps(n: int) -> list[str]:
-    with open(HOME / "data" / "tidy" / "api_teams.csv", encoding="utf-8") as f:
-        seen = sorted({r["observed_at"] for r in csv.DictReader(f)})
+    seen = sorted(p.name.removeprefix("dt=").removesuffix(".tar.xz")
+                  for p in (HOME / "data" / "raw").glob("dt=*.tar.xz")
+                  if any(m.startswith("api_teams") for m in tarfile.open(p).getnames()))
     if len(seen) <= n:
         return seen
     return sorted({seen[round(i * (len(seen) - 1) / (n - 1))] for i in range(n)})
 
 
+def keep(src: Path, dst: Path) -> None:
+    """Copy what no rebuild recovers: raw, season and git-tracked tidy."""
+    tracked = subprocess.run(["git", "ls-files", "data/tidy"], capture_output=True,
+                             text=True, check=True).stdout.split()
+    for d in ("raw", "season"):
+        shutil.copytree(src / d, dst / d, symlinks=True)
+    (dst / "tidy").mkdir(parents=True)
+    for t in tracked:
+        shutil.copy2(src / "tidy" / Path(t).name, dst / "tidy")
+
+
 def build(now: str, hash_seed: str) -> dict[str, Any] | None:
+    """The board at now. The first build after a freeze or check parses."""
     scratch, out = HOME / "scratch", HOME / "out"
     if not scratch.exists():
         shutil.copytree(HOME / "data", scratch, symlinks=True)
+        subprocess.run([sys.executable, "src/run.py", "parse"], check=True,
+                       stdout=subprocess.DEVNULL,
+                       env=dict(os.environ, PYTHONPATH="src", FF_ROOT=str(scratch)))
     shutil.rmtree(out, ignore_errors=True)
     out.mkdir(parents=True)
     env = dict(os.environ, PYTHONPATH="src", FF_ROOT=str(scratch),
@@ -55,7 +79,11 @@ def diff(a: object, b: object, at: str = "") -> list[str]:
     if isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
         return [d for i, (x, y) in enumerate(zip(a, b))
                 for d in diff(x, y, "%s[%d]" % (at, i))]
-    return [] if a == b else ["%s: %r != %r" % (at or ".", a, b)]
+    if type(a) in (int, float) and type(b) in (int, float):
+        assert isinstance(a, (int, float)) and isinstance(b, (int, float))
+        return [] if math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-12) \
+            else ["%s: %r != %r" % (at or ".", a, b)]
+    return [] if type(a) is type(b) and a == b else ["%s: %r != %r" % (at or ".", a, b)]
 
 
 def kinds(board: dict[str, Any] | None) -> str:
@@ -68,8 +96,7 @@ def main(argv: list[str]) -> int:
     cmd = argv[0] if argv else ""
     if cmd == "freeze":
         shutil.rmtree(HOME, ignore_errors=True)
-        shutil.copytree(os.environ.get("FF_ROOT", "data"), HOME / "data",
-                        symlinks=True)
+        keep(Path(os.environ.get("FF_ROOT", "data")), HOME / "data")
         boards = {}
         for now in stamps(int(argv[1]) if len(argv) > 1 else 16):
             boards[now] = build(now, "0")
@@ -79,6 +106,7 @@ def main(argv: list[str]) -> int:
         return 0
     if cmd == "check":
         want = json.loads((HOME / "boards.json").read_text())
+        shutil.rmtree(HOME / "scratch", ignore_errors=True)
         bad = 0
         for now, board in want.items():
             got = build(now, "1")
@@ -95,5 +123,18 @@ def main(argv: list[str]) -> int:
     return 2
 
 
+def _selftest() -> None:
+    assert diff({"a": [1.0, "x"]}, {"a": [1.0 + 1e-13, "x"]}) == [], \
+        "floats equal to the last bits are the same (math.isclose)"
+    assert diff({"a": 1.0}, {"a": 1.001}) == [".a: 1.0 != 1.001"]
+    assert diff({"n": 5000000}, {"n": 5000000.0}) == [], "money as INTEGER or float: one number"
+    assert diff({"a": "x"}, {"a": "y"}) and diff([1, 2], [1, 2, 3]), "the rest is exact"
+    assert diff(True, 1.0) and diff(None, 0.0), "a bool or None is not a number"
+    print("golden self-test OK")
+
+
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--selftest"]:
+        _selftest()
+        raise SystemExit(0)
     raise SystemExit(main(sys.argv[1:]))
