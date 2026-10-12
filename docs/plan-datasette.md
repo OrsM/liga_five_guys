@@ -155,6 +155,13 @@ data/raw tarballs
   it that, or the next round, by accident) and on 08-30 the sale odds the
   deadline sets. Scorer fits identical on today's data. A universe 10.1 ->
   7.9s; code lines 9346 -> 8985.
+  Then (simplify): a squad is set against the club's last listing before
+  the lock, not each player's last; 21% of "listed" outcomes were players
+  the page had dropped (Nikola Maras, last listed 08-13, counted listed
+  fit at 0% in jornada 8). Backtest: forecast rmse 2.826 -> 2.822 next
+  jornada (better at every horizon), flagged players flat, the replayed
+  boards' moves identical. Listed-with-no-% now means 53% to start, not
+  15% (the ghosts had dragged it down).
 - S6 The board as a saved query; the phone's JSON its export.
 - Then the old phase 3 rest: tunnel route, `Fantasy.jsx` links, Run again
   and the live log on the box, alerts, more saved queries.

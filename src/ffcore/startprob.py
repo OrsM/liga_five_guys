@@ -344,7 +344,8 @@ def _selftest_views() -> None:
         [match("m1", 1, "t", "2026-08-15T21:30:00+02:00"), match("m9", 9, "t", "")],
         [listing(before, "t", "starter-man", "80"), listing(before, "t", "bench-man", "20"),
          listing(before, "t", "vague-man", ""), listing(after, "t", "starter-man", "99"),
-         listing(before, "other", "elsewhere", "90")],
+         listing(before, "other", "elsewhere", "90"),
+         listing("2026-08-10T1000Z", "t", "gone-man", "50")],
         [squad("m1", "t", "starter-man"), squad("m1", "t", "bench-man", "sub"),
          squad("m1", "t", "surprise-man", "starter", "45"), squad("m9", "t", "starter-man")],
         "SELECT player_slug, at, jornada, grp, player, listed, ff, status, mins FROM start_outcomes",
@@ -354,7 +355,7 @@ def _selftest_views() -> None:
         "bench-man": ("2026-08-15T1930Z", 1, "m1:t", "bench-man", 1, 0.2, "ok", 0.0),
         "vague-man": ("2026-08-15T1930Z", 1, "m1:t", "vague-man", 1, None, "ok", 0.0),
         "surprise-man": ("2026-08-15T1930Z", 1, "m1:t", "surprise-man", 0, None, "", 45.0),
-    }, outs
+    }, "gone-man: not in the club's last listing before the lock, so not listed"
     (neutral, absent), = cal
     assert abs(neutral - (8 * 60 + 1 * 0) / 9) < 1e-9, neutral
     assert abs(absent - (8 * 15 + 1 * 100) / 9) < 1e-9, absent

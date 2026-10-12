@@ -567,28 +567,23 @@ CREATE VIEW season_record AS
 SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
 FROM player_jornadas GROUP BY player;
 
--- Starts: each matchday squad (starters) against futbolfantasy's listing
--- of that club before the jornada locked. Each player in either, with
--- his last listing by then (start % as a share, status, note) and his
--- minutes: what selection and availability are fitted on.
+-- Starts: each matchday squad (starters) against the club's last
+-- futbolfantasy listing before the jornada locked. Each player in either,
+-- with his listing (start % as a share, status, note) and his minutes:
+-- what selection and availability are fitted on.
 DROP VIEW IF EXISTS start_outcomes;
 CREATE VIEW start_outcomes AS
 WITH games AS MATERIALIZED (
-    SELECT DISTINCT s.match_id, s.team_slug, s.jornada, r.lock
+    SELECT DISTINCT s.match_id, s.team_slug, s.jornada, r.lock,
+           (SELECT max(observed_at) FROM lineups l
+            WHERE l.team_slug = s.team_slug AND l.observed_at <= r.lock) AS listed_at
     FROM squad_minutes s JOIN round_locks r USING (jornada)),
-last AS MATERIALIZED (
-    SELECT g.match_id, g.team_slug,
-           (SELECT l.rowid FROM lineups l
-            WHERE l.team_slug = g.team_slug AND l.player_slug = c.player_slug
-              AND l.observed_at <= g.lock
-            ORDER BY l.observed_at DESC, l.rowid DESC LIMIT 1) AS row
-    FROM games g JOIN (SELECT DISTINCT team_slug, player_slug FROM lineups) c USING (team_slug)),
 listed AS MATERIALIZED (
-    SELECT last.match_id, l.team_slug, l.player_slug, l.start_pct, l.status, l.note, f.player
-    FROM last JOIN lineups l ON l.rowid = last.row
+    SELECT g.match_id, l.team_slug, l.player_slug, l.start_pct, l.status, l.note, f.player
+    FROM games g CROSS JOIN lineups l ON l.team_slug = g.team_slug AND l.observed_at = g.listed_at
     LEFT JOIN ff_identity f ON f.player_slug = l.player_slug AND f.player_name = l.player_name
          AND f.team_slug = l.team_slug),
-squad AS (SELECT * FROM squad_minutes WHERE match_id IN (SELECT match_id FROM games))
+squad AS MATERIALIZED (SELECT * FROM squad_minutes WHERE match_id IN (SELECT match_id FROM games))
 SELECT g.lock AS at, g.jornada, g.match_id || ':' || g.team_slug AS grp, k.player_slug,
        coalesce(li.player, sq.player) AS player, li.player_slug IS NOT NULL AS listed,
        li.start_pct / 100.0 AS ff,
