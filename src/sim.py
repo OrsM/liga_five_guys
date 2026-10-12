@@ -308,8 +308,9 @@ def _selftest() -> None:
         and {k for k, r in who.items() if r["plan_xi"]} == plan_xi
     assert who["star"]["next"] == ub.outlook.xi.expected["star"] \
         and who["star"]["season"] == ub.outlook.season["star"]
-    assert who["dead"]["raises"] == ub.market.fetches("dead") \
-        and who["dead"]["per_million"] == b.sale("dead").per_million, who["dead"]
+    dead = b.sale("dead")
+    assert dead is not None and who["dead"]["raises"] == ub.market.fetches("dead") \
+        and who["dead"]["per_million"] == dead.per_million, who["dead"]
     assert who[bought[0]]["raises"] is None, "a buy is not yours to sell"
     assert plan(ub, b, 7) == [{"run_id": 7, "ord": i, "rank": b.rows.index(m)}
                               for i, m in enumerate(b.plan)]
