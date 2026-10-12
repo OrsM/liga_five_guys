@@ -4,8 +4,7 @@ from __future__ import annotations
 
 
 
-from ffcore.parse import kickoff_stamp, stamp
-from ffcore.names import row_key
+from ffcore.parse import kickoff_stamp, stamp, text
 from ffcore.score import Scored, points_by_jornada
 from ffcore.tidy import current, history
 
@@ -44,7 +43,7 @@ def scored() -> list[Scored]:
     last: dict[str, tuple[float, float]] = {}
     out = []
     for r in rows:
-        key = row_key(r, ("player_name_full", "player_name"))
+        key = text(r, "ff_id")
         now = (r["points"], r["games"])
         before = last.get(key, (0.0, 0.0))
         if not key or now == before:

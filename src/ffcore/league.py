@@ -11,8 +11,7 @@ from ffcore.parse import Rows, money
 from ffcore.players import load_crosswalk
 from ffcore.tidy import current, input_path
 
-from ffcore.crosswalk import Crosswalk
-from ffcore.names import AppId, Name, PlayerKey, app_id
+from ffcore.names import AppId, Name, PlayerKey
 __all__ = ["Config", "load_config", "app_fielded", "League"]
 
 
@@ -34,17 +33,16 @@ def load_config(name: str = "league.ini") -> Config:
         budget=money(cp.get("league", "budget", fallback=str(base.budget))) or 0.0)
 
 
-def app_fielded(squad: Iterable[str], names: Mapping[str, Name], rows: Rows | None = None,
-                xw: Crosswalk | None = None) -> list[str]:
-    """Your eleven as the app has it, as our keys: by app id, else by name;
-    [] if any of them is not in your squad."""
+def app_fielded(squad: Iterable[str], names: Mapping[str, Name], rows: Rows | None = None
+                ) -> list[str]:
+    """Your eleven as the app has it, as our keys: its player, else by name
+    within your squad; [] if any of them is not in your squad."""
     rows = current("api_lineup") if rows is None else rows
-    xw = xw or load_crosswalk()
     mine = set(squad)
     by_name = {names.get(k) or Name(k): k for k in mine}
     out: list[str] = []
     for r in rows or []:
-        key: str | None = xw.player(app_id=app_id(r))
+        key: str | None = r.get("player")
         if key is None:
             for field in ("player_name", "player_name_full"):
                 key = by_name.get(Name(r.get(field)))
@@ -61,8 +59,8 @@ class League:
     price_paid over the app's tables as of cut(), players by the registry
     load_crosswalk mirrors). Writes the one input no table holds, the config."""
 
-    def __init__(self, cfg: Config, xw: Crosswalk) -> None:
-        self.cfg, self.xw = cfg, xw
+    def __init__(self, cfg: Config) -> None:
+        self.cfg = cfg
         with closing(lfg.connect()) as db, db:
             db.execute("DELETE FROM league_config")
             db.execute("INSERT INTO league_config VALUES (?, ?)", (cfg.me, cfg.budget))
@@ -75,14 +73,12 @@ class League:
 
     @classmethod
     def load(cls) -> "League":
-        return cls(load_config(), load_crosswalk())
+        load_crosswalk()  # mirrors the registry the views resolve players by
+        return cls(load_config())
 
     @property
     def me(self) -> str:
         return self.cfg.me
-
-    def key_of_app(self, app_id: AppId) -> PlayerKey | None:
-        return self.xw.player(app_id=app_id)
 
     def squad(self, handle: str) -> list[str]:
         return sorted(k for k, m in self.owner.items() if m == handle)
@@ -125,7 +121,7 @@ def _selftest() -> None:
                 store_sql("api_teams", [r for r in teams if r["observed_at"] == stamp]
                           or [{"observed_at": stamp, "manager": "", "player_id": ""}])
             xw.mirror()
-            return League(Config(me="me", budget=100.0), xw)
+            return League(Config(me="me", budget=100.0))
 
     with_money = [dict(users[0], team_money="116")] + users[1:]
     assert league(feed, with_money, []).cash == {"me": 116.0, "riv": 91.0, "quiet": 106.0}, \
@@ -176,8 +172,8 @@ def _selftest() -> None:
             (squad, {}, lineup, {"1070": "ionut radu", "2464": "someone else"},
              []),
             ({}, {}, [], {}, [])]:
-        xw_f = Crosswalk({k: Player(PlayerKey(k), app_id=AppId(a)) for a, k in app_ids.items()})
-        assert app_fielded(sq, {k: Name(n) for k, n in names.items()}, rows, xw_f) == want, \
+        resolved = [dict(r, player=app_ids.get(r["player_id"])) for r in rows]
+        assert app_fielded(sq, {k: Name(n) for k, n in names.items()}, resolved) == want, \
             (app_ids, want)
 
     print("ffcore.league self-test OK")

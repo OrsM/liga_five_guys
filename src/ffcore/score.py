@@ -8,11 +8,10 @@ from typing import Any, NamedTuple
 
 from ffcore.parse import Rows, text
 from ffcore.startprob import NEUTRAL_START, StartOdds
-from ffcore.names import Name, row_key
+from ffcore.names import Name
 from ffcore.rules import minutes_played, slot
 from stats import shrink
 
-from ffcore.crosswalk import Crosswalk
 
 __all__ = ["JornadaPoints", "Rating", "Rates", "Scored", "Scorer", "Tally",
            "fit_promoted_discount", "per_jornada_current", "points_by_jornada", "totals"]
@@ -53,7 +52,7 @@ def position_priors(market: Rows, history: Mapping[str, Tally]
                     ) -> tuple[dict[str, float], float]:
     samples: dict[str, list[float]] = {}
     for r in market:
-        h = history.get(row_key(r))
+        h = history.get(text(r, "ff_id"))
         pos = slot(r.get("position"))
         if h and pos and h["pj"] >= 10:
             samples.setdefault(pos, []).append(h["pts"] / h["pj"])
@@ -65,7 +64,7 @@ def position_priors(market: Rows, history: Mapping[str, Tally]
 def detect_promoted(market: Rows, history: Mapping[str, Tally]) -> set[str]:
     per_club: dict[str, list[int]] = {}
     for r in market:
-        h = history.get(row_key(r))
+        h = history.get(text(r, "ff_id"))
         tally = per_club.setdefault(r.get("club") or "?", [0, 0])
         tally[0] += 1
         tally[1] += 1 if h and h["pj"] > 0 else 0
@@ -76,7 +75,7 @@ def fit_promoted_discount(market: Rows, history: Mapping[str, Tally],
                           played: list[Scored]) -> float:
     promoted = detect_promoted(market, history)
     priors = position_priors(market, history)[0]
-    prior_of: dict[str, float | None] = {row_key(r): priors.get(slot(r.get("position")))
+    prior_of: dict[str, float | None] = {text(r, "ff_id"): priors.get(slot(r.get("position")))
                 for r in market if r.get("club") in promoted}
     pts = expected = n = 0.0
     for s in played:
@@ -91,7 +90,7 @@ def fit_promoted_discount(market: Rows, history: Mapping[str, Tally],
 
 
 def per_jornada_current(starters_rows: Rows, played: list[Scored],
-                        jornada_of_match: Mapping[str, int], xw: Crosswalk
+                        jornada_of_match: Mapping[str, int]
                         ) -> dict[str, dict[int, tuple[float, float]]]:
     minutes_by_jor: dict[str, dict[int, float]] = {}
     seen: set[tuple[str, str]] = set()
@@ -101,7 +100,7 @@ def per_jornada_current(starters_rows: Rows, played: list[Scored],
         jor = jornada_of_match.get(mid)
         if not slug or jor is None or r.get("role") not in ("starter", "sub"):
             continue
-        key = xw.key_of(r)
+        key = r.get("player")
         if not key:
             continue
         dedup = (mid, key)
@@ -166,7 +165,7 @@ class Scorer:
         self.shrink_k = shrink_k
         self.promoted_discount = promoted_discount
         self.current = current or {}
-        self.lookup: dict[str, Mapping[str, Any]] = {row_key(r): r for r in market
+        self.lookup: dict[str, Mapping[str, Any]] = {text(r, "ff_id"): r for r in market
                                         if r.get("name")}
         self.promoted = detect_promoted(self.market, self.last_season)
         self.priors, self.global_prior = position_priors(self.market,
@@ -176,7 +175,7 @@ class Scorer:
         """Points per match: last season pulled toward his position's typical
         rate (or that rate, discounted for a promoted club); then this
         season pulled toward that."""
-        key = row_key(rec)
+        key = text(rec, "ff_id")
         prior = self.priors.get(slot(rec.get("position")),
                                 self.global_prior)
         k = self.shrink_k
@@ -197,14 +196,13 @@ class Scorer:
         return self.starts.fit(key, jornada, when, next_j)
 
     def rates(self, rec: Mapping[str, Any]) -> Rates:
-        key = row_key(rec)
+        key = text(rec, "ff_id")
         return Rates(key, slot(rec.get("position")),
                      self.rate(rec).ppm, self.starts.picked(key, True),
                      self.starts.picked(key, False), self.rate(rec).pj)
 
 
 def _selftest() -> None:
-    from ffcore.names import AppId, PlayerKey  # noqa: F401
     from ffcore.tidy import typed
 
     K = SHRINK_K
@@ -212,30 +210,26 @@ def _selftest() -> None:
     row = dict(typed("market", [{"position": "defensa", "team": "Mid", "club": "Mid",
                                  "value": "10.00M"}])[0])
 
-    from ffcore.crosswalk import Crosswalk, Player
-
-    market = [dict(row, name=n) for n in
+    market = [dict(row, name=n, ff_id=Name(n).key) for n in
               ["p%d" % i for i in range(10)] + ["Sub", "Newbie"]]
-    xw = Crosswalk({Name(n).key: Player(PlayerKey(Name(n).key), n)
-                    for n in [r["name"] for r in market] + ["Attacker"]})
     hist = {"p%d" % i: {"pts": 100.0 + i, "pj": 34.0} for i in range(10)}
     hist["sub"] = {"pts": 20.0, "pj": 4.0}
-    xi = typed("lineups", [{"player_name": n, "start_pct": "100"}
+    xi = typed("lineups", [{"player": Name(n).key, "player_name": n, "start_pct": "100"}
           for n in [r["name"] for r in market]])
 
-    sc = Scorer(market, StartOdds(xi, xw), hist)
+    sc = Scorer(market, StartOdds(xi), hist)
     prior = sc.priors["DEF"]
     assert 3.0 < prior < 3.1, prior
 
-    thin = sc.rate(dict(row, name="Sub"))
+    thin = sc.rate(dict(row, name="Sub", ff_id="sub"))
     assert abs(thin.ppm - (20.0 + K * prior) / (4.0 + K)) < 1e-9
     assert not thin.assumed and thin.cur_pj == 0.0
-    assert sc.rate(dict(row, name="Newbie")).assumed
+    assert sc.rate(dict(row, name="Newbie", ff_id="newbie")).assumed
 
-    full = sc.rate(dict(row, name="p0"))
+    full = sc.rate(dict(row, name="p0", ff_id="p0"))
     cur = {"p0": {"pts": 30.0, "pj": 3.0}}
-    sc2 = Scorer(market, StartOdds(xi, xw), hist, current=cur)
-    blended = sc2.rate(dict(row, name="p0"))
+    sc2 = Scorer(market, StartOdds(xi), hist, current=cur)
+    blended = sc2.rate(dict(row, name="p0", ff_id="p0"))
     assert abs(blended.ppm - (30.0 + K * full.ppm) / (3.0 + K)) < 1e-9
     assert blended.cur_pj == 3.0
     assert full.ppm < blended.ppm < 10.0
@@ -248,12 +242,12 @@ def _selftest() -> None:
     accented = [dict(row, name="r%d" % i, team="Málaga", club="Málaga")
                 for i in range(10)]
     assert detect_promoted(accented, {}) == {"Málaga"}
-    sc3 = Scorer(promo_market, StartOdds([], xw), promo_hist)
+    sc3 = Scorer(promo_market, StartOdds([]), promo_hist)
     assert sc3.promoted == {"Rise"}
     newbie = sc3.rate(dict(row, name="q5", team="Rise", club="Rise"))
     assert newbie.assumed and abs(newbie.ppm - sc3.priors["DEF"]
                                   * PROMOTED_DISCOUNT) < 1e-9, newbie
-    lower = Scorer(promo_market, StartOdds([], xw), promo_hist, promoted_discount=0.5)
+    lower = Scorer(promo_market, StartOdds([]), promo_hist, promoted_discount=0.5)
     assert lower.rate(dict(row, name="q5", team="Rise", club="Rise")).ppm < newbie.ppm
 
     assert fit_promoted_discount(promo_market, promo_hist, []) \
@@ -267,62 +261,53 @@ def _selftest() -> None:
     assert fit_promoted_discount(promo_market, promo_hist, at_prior) \
         > PROMOTED_DISCOUNT + 0.15
 
-    assert Scorer(market, StartOdds(xi, xw), hist, current={}).rate(dict(row, name="p0")) == full
-    assert Scorer(market, StartOdds(xi, xw), hist,
-                  current={"p0": {"pts": 0.0, "pj": 0.0}}).rate(dict(row, name="p0")) \
+    assert Scorer(market, StartOdds(xi), hist, current={}).rate(dict(row, name="p0", ff_id="p0")) == full
+    assert Scorer(market, StartOdds(xi), hist,
+                  current={"p0": {"pts": 0.0, "pj": 0.0}}).rate(dict(row, name="p0", ff_id="p0")) \
         == full
 
-    dbt = typed("lineups", [{"player_name": "p0", "start_pct": "100", "status": "doubt"}])
-    r0 = Scorer(market, StartOdds(dbt, xw), hist).rates(dict(row, name="p0"))
+    dbt = typed("lineups", [{"player": "p0", "player_name": "p0", "start_pct": "100", "status": "doubt"}])
+    r0 = Scorer(market, StartOdds(dbt), hist).rates(dict(row, name="p0", ff_id="p0"))
     assert (r0.key, r0.slot, r0.p_now, r0.p_rest) == ("p0", "DEF", 0.15, 0.15), \
         "flagged, no record, never listed fit: his 100% is not a selection signal"
     assert abs(r0.ppm - full.ppm) < 1e-9 and r0.pj == full.pj
 
 
-    benched = Scorer(market, StartOdds(xi, xw, history={"p0": (0.0, 6.0)}), hist,
-                     current={"p0": {"pts": 30.0, "pj": 3.0}}).rates(dict(row, name="p0"))
+    benched = Scorer(market, StartOdds(xi, history={"p0": (0.0, 6.0)}), hist,
+                     current={"p0": {"pts": 30.0, "pj": 3.0}}).rates(dict(row, name="p0", ff_id="p0"))
     assert abs(benched.p_now - K / (K + 6)) < 1e-9, benched
-    susp = typed("lineups", [{"player_name": "p0", "start_pct": "0", "status": "suspended"}])
-    back = Scorer(market, StartOdds(susp, xw, history={"p0": (1.8, 2.0)}), hist,
-                  current={"p0": {"pts": 30.0, "pj": 2.0}}).rates(dict(row, name="p0"))
+    susp = typed("lineups", [{"player": "p0", "player_name": "p0", "start_pct": "0", "status": "suspended"}])
+    back = Scorer(market, StartOdds(susp, history={"p0": (1.8, 2.0)}), hist,
+                  current={"p0": {"pts": 30.0, "pj": 2.0}}).rates(dict(row, name="p0", ff_id="p0"))
     assert abs(back.p_rest - (K * NEUTRAL_START / 100 + 1.8) / (K + 2)) < 1e-9, back
     assert back.p_now == back.p_rest, "the suspension is the fit factor's, not selection's"
 
-    from ffcore.crosswalk import Crosswalk, Player
-
-    xw2 = Crosswalk({
-        "antonio blanco": Player(PlayerKey("antonio blanco"), "Antonio Blanco",
-                                 ff_slug="blanco", app_id=AppId("1")),
-        "came on": Player(PlayerKey("came on"), "Came On", ff_slug="came-on"),
-        "unused sub": Player(PlayerKey("unused sub"), "Unused Sub", ff_slug="unused"),
-    })
     jornada_map = {"m1": 1, "m2": 2}
     starters_rows = typed("starters", [
-        {"player_name": "Blanco", "player_slug": "blanco",
+        {"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
          "role": "starter", "minute": "", "match_id": "m1"},
-        {"player_name": "Came On", "player_slug": "came-on",
+        {"player_name": "Came On", "player_slug": "came-on", "player": "came on",
          "role": "sub", "minute": "70", "match_id": "m1"},
-        {"player_name": "Unused Sub", "player_slug": "unused",
+        {"player_name": "Unused Sub", "player_slug": "unused", "player": "unused sub",
          "role": "sub", "minute": "", "match_id": "m1"},
-        {"player_name": "Blanco", "player_slug": "blanco",
+        {"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
          "role": "starter", "minute": "45", "match_id": "m2"},
-        {"player_name": "Blanco", "player_slug": "blanco",
+        {"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
          "role": "coach", "minute": "", "match_id": "m3"},
         {"player_name": "Nobody", "player_slug": "", "role": "starter",
          "minute": "", "match_id": "m1"},
-        *({"player_name": "Blanco", "player_slug": "blanco",
+        *({"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
            "role": "starter", "minute": "", "match_id": "m1"}
           for _ in range(56)),
     ])
     played = [Scored("antonio blanco", 1, 8.0, 1.0, "t1"),
               Scored("antonio blanco", 2, 5.0, 1.0, "t2")]
-    by_key = per_jornada_current(starters_rows, played,
-                                  jornada_map, xw2)
+    by_key = per_jornada_current(starters_rows, played, jornada_map)
     assert by_key["antonio blanco"] == {1: (8.0, 90.0), 2: (5.0, 45.0)}, \
         by_key["antonio blanco"]
     assert "came on" not in by_key, by_key
     assert "unused sub" not in by_key, by_key
-    assert per_jornada_current([], [], {}, xw2) == {}
+    assert per_jornada_current([], [], {}) == {}
 
     assert totals(by_key["antonio blanco"]) == (13.0, 2.0, 2.0)
     assert totals({}) == (0.0, 0.0, 0.0)

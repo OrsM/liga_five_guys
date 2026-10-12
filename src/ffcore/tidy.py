@@ -10,18 +10,18 @@ from pathlib import Path
 from types import MappingProxyType
 from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, TypeVar
 
 from ffcore import db as lfg
 from ffcore.clock import run_now
 from ffcore.db import ROOT
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
-__all__ = ["ROOT", "TIDY", "SEASON", "REPORTS", "TABLES", "Table",
+__all__ = ["ROOT", "TIDY", "SEASON", "REPORTS",
            "current", "history", "typed", "age_hours", "table_path", "tables_in",
            "input_path", "read_csv", "write_csv",
            "csv_string", "mtime_cached", "store_sql", "stored", "sql_tables",
-           "drop_sql", "LINEUP_SOURCE"]
+           "clear_sql", "NUMBERS", "LINEUP_SOURCE"]
 
 TIDY = ROOT / "tidy"
 SEASON = ROOT / "season"
@@ -115,167 +115,59 @@ def write_csv(path: str | Path, rows: Sequence[Mapping[str, Any]],
         w.writerows(rows)
 
 
-class Table(NamedTuple):
-    """How a table is kept, and its numeric columns with the parser each
-    is read by: current() and history() hand them out parsed, so no
-    reader parses a number. Kept in lfg.db, numbers typed once as they are
-    stored, read through its current_ and history_ views."""
-    snapshot: bool
-    key: tuple[str, ...] = ()
-    store: str = ""
-    numbers: tuple[tuple[str, Callable[[object], Any]], ...] = ()
-
-
 def _cols(parse: Callable[[object], Any], *cols: str
           ) -> tuple[tuple[str, Callable[[object], Any]], ...]:
     return tuple((c, parse) for c in cols)
 
 
-TABLES: dict[str, Table] = {
-    "market": Table(True, ("ff_id",), "daily",
-                    _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d")),
-    "lineups": Table(True, ("source", "team_slug", "player_slug"), "daily",
-                     _cols(pct100, "start_pct")),
-    "matches": Table(False, ("match_id",), "once", _cols(count, "jornada")),
-    "points": Table(False, ("season", "ff_id"), "once", _cols(ratio, "points", "games", "avg")),
-    "api_teams": Table(True, numbers=_cols(money, "market_value", "buyout") + _cols(ratio, "points")),
-    "api_standings": Table(True, numbers=_cols(count, "position", "previous_position")
+# Each table's numeric columns and the parser each is read by: stored typed,
+# so no reader parses a number. The tables themselves are tables.sql's.
+NUMBERS: dict[str, tuple[tuple[str, Callable[[object], Any]], ...]] = {
+    "market": _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d"),
+    "lineups": _cols(pct100, "start_pct"),
+    "matches": _cols(count, "jornada"),
+    "points": _cols(ratio, "points", "games", "avg"),
+    "api_teams": _cols(money, "market_value", "buyout") + _cols(ratio, "points"),
+    "api_standings": _cols(count, "position", "previous_position")
                            + _cols(ratio, "team_points", "fixture_points")
-                           + _cols(money, "team_value", "team_money")),
-    "api_market": Table(True, numbers=_cols(money, "market_value", "sale_price", "bid_money")
-                        + _cols(count, "bids")),
-    "api_offers": Table(True, numbers=_cols(money, "money")),
-    "api_lineup": Table(True, numbers=_cols(count, "week") + _cols(money, "market_value")
-                        + _cols(ratio, "points")),
-    "api_leagues": Table(True, numbers=_cols(count, "managers") + _cols(money, "money", "team_value")
-                         + _cols(ratio, "team_points")),
-    "api_players_all": Table(False, ("player_id",), "daily", _cols(money, "market_value")),
-    "results_history": Table(False, ("season", "date", "home_name", "away_name"), "once",
-                             _cols(ratio, "home_goals", "away_goals", "home_xg", "away_xg",
+                           + _cols(money, "team_value", "team_money"),
+    "api_market": _cols(money, "market_value", "sale_price", "bid_money")
+                        + _cols(count, "bids"),
+    "api_offers": _cols(money, "money"),
+    "api_lineup": _cols(count, "week") + _cols(money, "market_value")
+                        + _cols(ratio, "points"),
+    "api_leagues": _cols(count, "managers") + _cols(money, "money", "team_value")
+                         + _cols(ratio, "team_points"),
+    "api_players_all": _cols(money, "market_value"),
+    "results_history": _cols(ratio, "home_goals", "away_goals", "home_xg", "away_xg",
                                    "home_shots", "away_shots", "home_shots_on_target",
-                                   "away_shots_on_target", "home_corners", "away_corners")),
-    "starters": Table(False, ("match_id", "team_slug", "player_slug"), "once",
-                      _cols(ratio, "minute")),
-    "api_activity": Table(False, ("activity_id",), "once",
-                          _cols(money, "amount") + _cols(count, "week")),
+                                   "away_shots_on_target", "home_corners", "away_corners"),
+    "starters": _cols(ratio, "minute"),
+    "api_activity": _cols(money, "amount") + _cols(count, "week"),
 }
-
-
 
 
 def _columns(db: sqlite3.Connection, name: str) -> list[str]:
     return [r[1] for r in db.execute('PRAGMA table_info("%s")' % name)]
 
 
-def _views(name: str, cols: list[str], spec: Table) -> str:
-    """The table as of cut(), as CSV current() and history() read it:
-    history_ every row up to the cut, in the order stored; current_ for a
-    snapshot table the last stamp of each source, for a keyed one the last
-    row of each key (all of it non-empty), in the order keys appeared."""
-    q = ", ".join('"%s"' % c for c in cols)
-    hist = ('CREATE VIEW "history_{n}" AS SELECT {q} FROM "{n}"'
-            ' WHERE observed_at <= (SELECT cut()) ORDER BY rowid')
-    if spec.snapshot:
-        # A daily table's day counts once it has closed: its last stamp
-        # (anywhere in the table) is not after the cut.
-        closed = ("" if spec.store != "daily" else
-                  ' JOIN (SELECT substr(observed_at, 1, 10) AS day, max(observed_at) AS ends'
-                  '  FROM "{n}" GROUP BY day) d ON d.day = substr(x.observed_at, 1, 10)'
-                  '  AND d.ends <= (SELECT cut())')
-        cur = ('CREATE VIEW "current_{n}" AS SELECT {tq} FROM "{n}" t JOIN'
-               ' (SELECT x.source AS s, max(x.observed_at) AS last FROM "{n}" x' + closed +
-               '  WHERE x.observed_at <= (SELECT cut()) GROUP BY x.source) m'
-               ' ON t.source IS m.s AND t.observed_at = m.last'
-               ' ORDER BY t.observed_at, t.rowid')
-    else:
-        k = ", ".join('"%s"' % c for c in spec.key)
-        cur = ('CREATE VIEW "current_{n}" AS SELECT {q} FROM'
-               ' (SELECT *, row_number() OVER (PARTITION BY {k}'
-               '   ORDER BY observed_at DESC, rowid DESC) AS _last,'
-               '  first_value(observed_at) OVER (PARTITION BY {k}'
-               '   ORDER BY observed_at, rowid) AS _first_at,'
-               '  first_value(rowid) OVER (PARTITION BY {k}'
-               '   ORDER BY observed_at, rowid) AS _first_id'
-               '  FROM "{n}" WHERE observed_at <= (SELECT cut()))'
-               ' WHERE _last = 1 AND {nonempty} ORDER BY _first_at, _first_id')
-    return ";\n".join([
-        'DROP VIEW IF EXISTS "history_{n}"', 'DROP VIEW IF EXISTS "current_{n}"',
-        hist, cur]).format(n=name, q=q, k=k if not spec.snapshot else "",
-                           tq=", ".join('t."%s"' % c for c in cols),
-                           nonempty=" AND ".join("coalesce(\"%s\", '') <> ''" % c
-                                                 for c in spec.key) or "1") + ";"
-
-
-def _kind(parse: Callable[[object], Any]) -> str:
-    return "INTEGER" if parse is count else "REAL"
-
-
 def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
-    """Add rows to a table kept in lfg.db as ingest keeps it as CSV: a
-    snapshot table every row, a "once" one only rows whose content differs
-    from the key's last, a "daily" one a row per key and day (a later one
-    replaces it in place); new columns are added, numbers typed, text
-    stripped (so no reader trims)."""
-    spec = spec_of(name)
-    nums = dict(spec.numbers)
-    fresh = [{k: v.strip() if isinstance(v, str) else v for k, v in r.items()} for r in rows]
+    """Add rows to a table tables.sql declares: numbers typed, text stripped
+    (so no reader trims). A keyed table's trigger skips a row its key's last
+    already says; a column the table does not declare is reported, not kept."""
+    nums = dict(NUMBERS.get(name, ()))
+    fresh = typed(name, [{k: v.strip() if isinstance(v, str) else v for k, v in r.items()}
+                         for r in rows])
     with closing(lfg.connect()) as db, db:
-        db.execute('CREATE TABLE IF NOT EXISTS "%s" (observed_at TEXT NOT NULL,'
-                   " source TEXT NOT NULL DEFAULT '')" % name)
-        db.execute('CREATE INDEX IF NOT EXISTS "%s_at" ON "%s" (observed_at)' % (name, name))
-        have = _columns(db, name)
-        for c in dict.fromkeys([*nums, *(c for r in fresh for c in r)]):
-            if c not in have:
-                db.execute('ALTER TABLE "%s" ADD COLUMN "%s" %s' % (
-                    name, c, _kind(nums[c]) if c in nums else "TEXT NOT NULL DEFAULT ''"))
-                have.append(c)
-        db.executescript(_views(name, have, spec))
-        if spec.store == "once":
-            from_sql = db.execute('SELECT * FROM "%s" ORDER BY rowid' % name)
-            names = [d[0] for d in from_sql.description]
-            latest = {tuple(r.get(c) or "" for c in spec.key): _content(r)
-                      for r in (dict(zip(names, row)) for row in from_sql)}
-            kept = []
-            for r in typed(name, fresh):
-                k = tuple(r.get(c) or "" for c in spec.key)
-                if latest.get(k) != _content(r):
-                    latest[k] = _content(r)
-                    kept.append(r)
-        elif spec.store == "daily":
-            if spec.key:
-                db.execute('CREATE INDEX IF NOT EXISTS "{n}_key" ON "{n}" ({k})'.format(
-                    n=name, k=", ".join('"%s"' % c for c in spec.key)))
-            kept = []
-            batch: dict[tuple[Any, ...], int] = {}
-            for r in typed(name, fresh):
-                key = [r.get(c) or "" for c in spec.key]
-                day = (*key, (r.get("observed_at") or "")[:10])
-                if all(key) and day in batch:
-                    kept[batch[day]] = r
-                    continue
-                vals = [r.get(c) if c in nums else (r.get(c) or "") for c in have]
-                if all(key) and db.execute(
-                        'UPDATE "{n}" SET {s} WHERE {w} AND substr(observed_at, 1, 10) = ?'.format(
-                            n=name, s=", ".join('"%s" = ?' % c for c in have),
-                            w=" AND ".join('"%s" = ?' % c for c in spec.key)),
-                        [*vals, *key, (r.get("observed_at") or "")[:10]]).rowcount:
-                    continue
-                if all(key):
-                    batch[day] = len(kept)
-                kept.append(r)
-        else:
-            kept = typed(name, fresh)
+        cols = _columns(db, name)
+        if not cols:
+            raise ValueError("%s is not a table in tables.sql" % name)
+        extra = sorted({c for r in fresh for c in r} - set(cols))
+        if extra:
+            print("  warn: %s: columns not in tables.sql, not kept: %s" % (name, ", ".join(extra)))
         db.executemany(
-            'INSERT INTO "%s" (%s) VALUES (%s)' % (
-                name, ", ".join('"%s"' % c for c in have), ", ".join("?" * len(have))),
-            [[r.get(c) if c in nums else (r.get(c) or "") for c in have] for r in kept])
-
-
-def _content(r: Mapping[str, Any]) -> tuple[tuple[str, str], ...]:
-    """A row as it reads, but for when: what a keyed table keeps only when
-    it changes."""
-    return tuple(sorted((k, str(v)) for k, v in r.items()
-                        if k != "observed_at" and v not in ("", None)))
+            "INSERT INTO %s (%s) VALUES (%s)" % (name, ", ".join(cols), ", ".join("?" * len(cols))),
+            [[r.get(c) if c in nums else (r.get(c) or "") for c in cols] for r in fresh])
 
 
 def stored(name: str) -> int:
@@ -292,29 +184,27 @@ def sql_tables() -> set[str]:
     return {n for (n,) in lfg.rows("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
 
-def drop_sql(name: str) -> None:
+def clear_sql(name: str) -> None:
+    """Empty a table, for a parse that starts over."""
     with closing(lfg.connect()) as db, db:
-        db.executescript('DROP VIEW IF EXISTS "current_{n}"; DROP VIEW IF EXISTS "history_{n}";'
-                         ' DROP TABLE IF EXISTS "{n}";'.format(n=name))
+        db.execute("DELETE FROM %s" % name)
 
 
 def _read_sql(view: str) -> list[dict[str, Any]]:
+    """A view's rows; none if its table has never been stored."""
     try:
         cols, got = lfg.query('SELECT * FROM "%s"' % view)
-        return [dict(zip(cols, r)) for r in got]
-    except sqlite3.OperationalError:
-        return []
-
-
-def spec_of(name: str) -> Table:
-    """How a table is kept: TABLES says, else a plain snapshot table."""
-    return TABLES.get(name, Table(True))
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            return []
+        raise
+    return [dict(zip(cols, r)) for r in got]
 
 
 def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
     """Rows of a table as it is written (text) with its numeric columns
-    parsed (Table.numbers): what current() and history() hand out."""
-    numbers = TABLES[name].numbers if name in TABLES else ()
+    parsed (NUMBERS): what is stored."""
+    numbers = NUMBERS.get(name, ())
     return [MappingProxyType({**r, **{c: parse(r.get(c)) for c, parse in numbers if c in r}})
             for r in rows]
 
@@ -380,9 +270,9 @@ def _selftest_tables() -> None:
                 {"observed_at": later, "source": "futbolfantasy",
                  "player_name": "Dan"}])
             store_sql("api_activity", [
-                {"observed_at": a, "activity_id": "1", "value": "0"},
-                {"observed_at": b, "activity_id": "1", "value": "1"},
-                {"observed_at": a, "activity_id": "2", "value": "5"}])
+                {"observed_at": a, "activity_id": "1", "kind": "0"},
+                {"observed_at": b, "activity_id": "1", "kind": "1"},
+                {"observed_at": a, "activity_id": "2", "kind": "5"}])
             set_now(snapshot_stamp("2026-08-02T1200Z"))
             for name, source, every, now in [
                     ("lineups", "", 4, ["Ane", "Bo"]),
@@ -392,7 +282,7 @@ def _selftest_tables() -> None:
                 assert len(history(name, source)) == every, source
                 assert sorted(r["player_name"] for r in current(name, source)) \
                     == now, source
-            stats = {(r["activity_id"], r["value"]) for r in current("api_activity")}
+            stats = {(r["activity_id"], r["kind"]) for r in current("api_activity")}
             assert stats == {("1", "1"), ("2", "5")}, stats
             assert current("market") == [] and history("market") == []
             store_sql("matches", [
@@ -413,11 +303,20 @@ def _selftest_tables() -> None:
             age = age_hours("lineups")
             assert age is not None and abs(age - 3.0) < 1e-9
             set_now(snapshot_stamp("2026-08-01T1000Z"))
-            assert stats != {(r["activity_id"], r["value"])
+            assert stats != {(r["activity_id"], r["kind"])
                              for r in current("api_activity")}
             set_now(snapshot_stamp("2026-08-04T0000Z"))
             assert [r["player_name"] for r in current("lineups", "futbolfantasy")] \
                 == ["Dan"]
+            store_sql("api_activity", [
+                {"observed_at": later, "activity_id": "1", "kind": "1"},
+                {"observed_at": later, "activity_id": "9", "kind": "2"}])
+            store_sql("api_activity", [
+                {"observed_at": "2026-08-03T1000Z", "activity_id": "9", "kind": "3"},
+                {"observed_at": "2026-08-03T1100Z", "activity_id": "9", "kind": "2"}])
+            assert [(r["activity_id"], r["kind"]) for r in history("api_activity")] == [
+                ("1", "0"), ("1", "1"), ("2", "5"), ("9", "2"), ("9", "3"), ("9", "2")], \
+                "a keyed row is kept once, and again only when it changes (back included)"
         finally:
             set_now(None)
 

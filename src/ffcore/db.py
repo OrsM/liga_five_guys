@@ -3,7 +3,9 @@ Datasette and ask.py. Disposable: every table but runs is rebuilt from
 data/raw, git or a replay (docs/plan-datasette.md)."""
 from __future__ import annotations
 
+import json
 import os
+import re
 import sqlite3
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import closing
@@ -13,13 +15,14 @@ from typing import Any
 from ffcore.clock import cut
 from ffcore.names import Name
 
-__all__ = ["DB", "IDENTITY", "ROOT", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
+__all__ = ["DB", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
            "record", "rows", "this_run"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
 SCHEMA = Path(__file__).with_name("schema.sql")
 IDENTITY = Path(__file__).with_name("identity.sql")
+TABLES_SQL = Path(__file__).with_name("tables.sql")
 RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
 
@@ -45,8 +48,8 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     key = (path.resolve(), schema)
     if key not in _APPLIED:
         db.execute("PRAGMA journal_mode=WAL")
-        db.executescript(IDENTITY.read_text(encoding="utf-8"))
-        db.executescript(schema.read_text(encoding="utf-8"))
+        for sql in (IDENTITY, TABLES_SQL, schema):
+            db.executescript(sql.read_text(encoding="utf-8"))
         _APPLIED.add(key)
     return db
 
@@ -57,6 +60,29 @@ def query(sql: str, params: Sequence[object] | Mapping[str, object] = (),
     with closing(connect(path)) as db:
         cur = db.execute(sql, params)
         return [d[0] for d in cur.description or ()], cur.fetchall()
+
+
+META = Path(__file__).resolve().parent.parent.parent / "datasette.json"
+
+
+def queries(meta: Path = META) -> dict[str, dict[str, str]]:
+    """The saved queries (datasette.json), by name: each its sql and title."""
+    got: dict[str, dict[str, str]] = json.loads(meta.read_text(encoding="utf-8"))[
+        "databases"]["lfg"]["queries"]
+    return got
+
+
+def params(sql: str) -> list[str]:
+    return sorted(set(re.findall(r"(?<![:\w]):([A-Za-z_]\w*)", sql)))
+
+
+def named(name: str, given: Mapping[str, object] | None = None, path: Path | None = None,
+          meta: Path = META) -> tuple[list[str], list[Any]]:
+    """A saved query run as Datasette runs it: a param not given is '' (an
+    empty box), every param text (so the query casts what it needs)."""
+    sql = queries(meta)[name]["sql"]
+    return query(sql, {p: "" if (given or {}).get(p) is None else str((given or {})[p])
+                       for p in params(sql)}, path)
 
 
 def rows(sql: str, params: Sequence[object] | Mapping[str, object] = (),

@@ -10,7 +10,7 @@ from typing import Any, NewType
 from ffcore.parse import text
 from ffcore.text import norm
 
-__all__ = ["AppId", "Name", "PlayerKey", "app_id", "row_key"]
+__all__ = ["AppId", "Name", "PlayerKey", "app_id"]
 
 PlayerKey = NewType("PlayerKey", str)
 AppId = NewType("AppId", str)
@@ -53,13 +53,6 @@ class Name:
         return "Name(%r)" % self.raw
 
 
-def row_key(row: Mapping[str, Any], cols: tuple[str, ...] = ("name",)) -> PlayerKey:
-    """The player a source's row is about: its own ff_id, else the key of
-    the first of its name columns present; "" if neither."""
-    fid = (row.get("ff_id") or "").strip()
-    return PlayerKey(fid or next((n.key for c in cols if (n := Name(row.get(c)))), ""))
-
-
 def app_id(row: Mapping[str, Any]) -> AppId:
     """The LaLiga app's id for the player an app row (api_teams, api_market,
     api_activity, api_lineup...) is about: its player_id column."""
@@ -79,11 +72,6 @@ def _selftest() -> None:
                        ("omar el hilali", "Omar El Hilali"), ("Iñigo Vicente", "Iñigo Vicente")]:
         assert Name(raw).shown == shown, (raw, Name(raw).shown)
         assert Name(Name(raw).shown).shown == Name(raw).shown, "showing twice changes nothing"
-    assert row_key({"ff_id": " 12 ", "name": "X"}) == "12", "a source's own id first"
-    assert row_key({"name": "Iñigo Vicente"}) == "inigo vicente"
-    assert row_key({"player_name_full": "", "player_name": "Pepelu"},
-                   ("player_name_full", "player_name")) == "pepelu", "the first name present"
-    assert row_key({}) == ""
     assert app_id({"player_id": " 2929 "}) == "2929" and app_id({}) == "", \
         "an app row's player_id is the app's id, never our key"
     print("ffcore.names self-test OK")

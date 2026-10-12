@@ -199,8 +199,8 @@ SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
 FROM ranked GROUP BY run_id, from_j, jornada;
 
 -- The league's money, as SQL over the app's tables (current_/history_ views
--- read as of cut()), players resolved by app id through identity.sql's
--- app_player. League writes the one input no table holds, the config.
+-- read as of cut(), each row with its player). League writes the one
+-- input no table holds, the config.
 CREATE TABLE IF NOT EXISTS league_config (
     me     TEXT NOT NULL,
     budget REAL NOT NULL
@@ -214,9 +214,8 @@ WHERE user_id <> '' AND manager <> '' GROUP BY user_id;
 -- Who owns each player now.
 DROP VIEW IF EXISTS owners;
 CREATE VIEW owners AS
-SELECT k.player, t.manager AS manager
-FROM current_api_teams t JOIN app_player k ON k.app_id = t.player_id
-WHERE t.manager <> '' GROUP BY k.player;
+SELECT player, manager FROM current_api_teams
+WHERE manager <> '' AND player IS NOT NULL GROUP BY player;
 
 -- The activity feed, each event once, with who paid (buyer: a buy's or a
 -- clause's manager) and who was paid (seller: a sale's manager, a clause's
@@ -227,20 +226,19 @@ DROP VIEW IF EXISTS ledger;
 CREATE VIEW ledger AS
 WITH feed AS (
     SELECT coalesce(a.at, '') AS at, coalesce(a.kind, '') AS kind,
-           u.manager AS who, c.manager AS other, k.player, coalesce(a.amount, 0.0) AS amount
+           u.manager AS who, c.manager AS other, a.player, coalesce(a.amount, 0.0) AS amount
     FROM current_api_activity a
     LEFT JOIN users u ON u.user_id = a.user_id
-    LEFT JOIN users c ON c.user_id = a.counterparty
-    LEFT JOIN app_player k ON k.app_id = a.player_id),
+    LEFT JOIN users c ON c.user_id = a.counterparty),
 roles AS (
     SELECT *, CASE WHEN kind IN ('buy', 'transfer') THEN who END AS buyer,
               CASE kind WHEN 'sell' THEN who WHEN 'transfer' THEN other END AS seller
     FROM feed),
 t AS MATERIALIZED (
-    SELECT h.observed_at, k.player, h.manager AS manager,
+    SELECT h.observed_at, h.player, h.manager AS manager,
            coalesce(h.market_value, 0.0) AS value
-    FROM history_api_teams h JOIN app_player k ON k.app_id = h.player_id
-    WHERE h.manager <> ''),
+    FROM history_api_teams h
+    WHERE h.manager <> '' AND h.player IS NOT NULL),
 s AS (SELECT observed_at AS a, lead(observed_at) OVER (ORDER BY observed_at) AS b
       FROM (SELECT DISTINCT observed_at FROM t)),
 shown AS (
@@ -290,19 +288,27 @@ SELECT player, amount AS paid FROM (
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
--- Every valued market observation of each player, all time, with the
+-- The market as it closed each day: the rows of each day's last snapshot
+-- (each snapshot holds the whole market). Values move once a day; the
+-- change from one day's to the next is a step.
+DROP VIEW IF EXISTS market_daily;
+CREATE VIEW market_daily AS
+SELECT *, rowid AS id FROM market
+WHERE observed_at IN (SELECT max(observed_at) FROM market GROUP BY substr(observed_at, 1, 10));
+
+-- Every valued day of each player's market value, all time, with the
 -- change since his previous one in % (NULL for his first, or after a value
 -- of 0) and where he first appears. The views below cut it.
 DROP VIEW IF EXISTS price_obs;
 CREATE VIEW price_obs AS
 SELECT ff_id, observed_at, value, id, first_at, first_id,
        CASE WHEN prev > 0 THEN 100 * (value / prev - 1) END AS step
-FROM (SELECT ff_id, observed_at, value, rowid AS id,
+FROM (SELECT ff_id, observed_at, value, id,
              lag(value) OVER p AS prev,
              first_value(observed_at) OVER p AS first_at,
-             first_value(rowid) OVER p AS first_id
-      FROM market WHERE coalesce(ff_id, '') <> '' AND value IS NOT NULL
-      WINDOW p AS (PARTITION BY ff_id ORDER BY observed_at, rowid));
+             first_value(id) OVER p AS first_id
+      FROM market_daily WHERE coalesce(ff_id, '') <> '' AND value IS NOT NULL
+      WINDOW p AS (PARTITION BY ff_id ORDER BY observed_at, id));
 
 -- The constants a run is built with (assemble.CONSTANTS), for the views.
 CREATE TABLE IF NOT EXISTS constants (

@@ -5,33 +5,27 @@ import sys
 
 
 from ffcore.parse import Rows, text
-from ffcore.crosswalk import Crosswalk, Player
-from ffcore.names import AppId, PlayerKey, app_id, row_key
+from ffcore.crosswalk import Crosswalk, Player, clashes
+from ffcore.names import AppId, PlayerKey, app_id
 from ffcore.text import tokens
 from ffcore.tidy import current, history, TIDY
 
 PLAYERS = "players.csv"
 
 
-def build_players(registry: dict[str, Player], market: Rows, lineups: Rows,
-                  api_rows: Rows) -> dict[str, Player]:
+def build_players(registry: dict[str, Player], market: Rows, api_rows: Rows
+                  ) -> dict[str, Player]:
+    """The registry with this market's players added and their app ids
+    checked and attached: by value and by the words of their names."""
     out = dict(registry)
     for r in market:
-        pid = row_key(r)
+        pid = PlayerKey(text(r, "ff_id"))
         if not pid:
             continue
         p = out.setdefault(pid, Player(pid))
         p.name = text(r, "name") or p.name
         p.club_id = r.get("club") or p.club_id
-    named = Crosswalk(out)
-
-    for r in lineups:
-        slug = text(r, "player_slug")
-        who = named.player(name=r.get("player_name"), club=r.get("team_slug") or None)
-        if who is not None and slug and not out[who].ff_slug:
-            out[who].ff_slug = slug
-
-    value: dict[str, float | None] = {row_key(r): r.get("value") for r in market}
+    value: dict[str, float | None] = {text(r, "ff_id"): r.get("value") for r in market}
     app = {app_id(r): r for r in api_rows}
     words = {pid: set(tokens(p.name)) for pid, p in out.items()}
     weak: set[str] = set()
@@ -73,15 +67,24 @@ def build_players(registry: dict[str, Player], market: Rows, lineups: Rows,
     return out
 
 
+def attach_slugs(players: dict[str, Player], rows: Rows) -> None:
+    """Each futbolfantasy slug to the player its rows resolve to (by name,
+    or name and club, while the slug names nobody), if he has none."""
+    for r in rows:
+        slug, who = text(r, "player_slug"), r.get("player")
+        if slug and who in players and not players[who].ff_slug:
+            players[who].ff_slug = slug
+
+
 def main() -> None:
-    market = current("market")
-    lineups = history("lineups") + current("starters")
     registry = Crosswalk.read(TIDY / PLAYERS)
-    players = build_players(
-        registry.players, market, lineups,
-        current("api_teams") + current("api_market")
-        + current("api_players_all"))
+    players = build_players(registry.players, current("market"),
+                            current("api_teams") + current("api_market")
+                            + current("api_players_all"))
     xw = Crosswalk(players)
+    xw.mirror()
+    attach_slugs(players, [*history("lineups"), *current("starters")])
+    xw.mirror()
     xw.write(TIDY / PLAYERS)
 
     c = xw.coverage()
@@ -90,29 +93,35 @@ def main() -> None:
           % (TIDY / PLAYERS, c["players"],
              len(players) - len(registry.players),
              100 * c["ff"], 100 * c["app"]))
-    for idx, ids in xw.clashes().items():
+    for idx, ids in clashes().items():
         print("  warn: %s claimed by two players, refused until resolved: %s"
               % (idx, ", ".join(ids)))
 
 
 def _selftest() -> None:
     from ffcore.tidy import typed
-    market = typed("market", [{"name": "Álvaro Fernández", "team": "Espanyol",
+    market = typed("market", [{"ff_id": "af", "name": "Álvaro Fernández", "team": "Espanyol",
                "club": "espanyol"},
-              {"name": "Jonny Castro", "team": "Alavés", "club": "alaves"}])
+              {"ff_id": "jc", "name": "Jonny Castro", "team": "Alavés", "club": "alaves"}])
     lineups = typed("lineups", [
         {"source": "futbolfantasy", "team_slug": "espanyol",
          "player_name": "Álvaro Fernández", "player_slug": "alvaro-fdez"},
     ])
     starters = typed("starters", [{"team_slug": "alaves", "player_name": "Jonny Castro",
                  "player_slug": "jonny-castro-ff", "role": "starter"}])
-    players = build_players({}, market, lineups + starters, [])
-    xw = Crosswalk(players)
-    assert xw.player(name="Alvaro Fernandez") == "alvaro fernandez"
-    assert xw.player(ff_slug="alvaro-fdez") == "alvaro fernandez"
-    assert xw.player(ff_slug="jonny-castro-ff") == "jonny castro"
-    assert xw.player(app_id=AppId("9999")) is None
-    assert players["alvaro fernandez"].club_id == "espanyol"
+    import tempfile
+    from pathlib import Path
+    from ffcore.tidy import store_sql, tables_in
+    players = build_players({}, market, [])
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        Crosswalk(players).mirror()
+        store_sql("lineups", [dict(r, observed_at="2026-08-01T0900Z") for r in lineups])
+        store_sql("starters", [dict(r, observed_at="2026-08-01T0900Z", match_id="m")
+                               for r in starters])
+        attach_slugs(players, [*history("lineups"), *current("starters")])
+    assert players["af"].ff_slug == "alvaro-fdez", players
+    assert players["jc"].ff_slug == "jonny-castro-ff", "by name within the club"
+    assert players["af"].club_id == "espanyol"
 
     twins = typed("market", [{"name": n, "club": c, "ff_id": i, "value": v} for n, c, i, v in [
         ("Pablo Fornals", "betis", "a", "5000000"),
@@ -128,7 +137,7 @@ def _selftest() -> None:
             "market_value": "40000000"}])
     got = build_players({"c": Player(PlayerKey("c"), app_id=AppId("2929")),
                          "gone": Player(PlayerKey("gone"), "Left The League")},
-                        twins, [], api)
+                        twins, api)
     assert {k: p.app_id for k, p in got.items()} == \
         {"a": "12", "b": "", "c": "1715", "gone": ""}, got
     assert got["c"].app_names == {"Fermín"}, got["c"]

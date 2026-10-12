@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import datetime as dt
-import sqlite3
 import sys
 from collections.abc import Callable
 from contextlib import closing
+from pathlib import Path
 from typing import Any
 
 from ffcore.forecast import expected_points
@@ -16,7 +16,7 @@ from ffcore.score import JornadaPoints, points_by_jornada
 from assemble import built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, board, verdict
 from ffcore.clock import set_now
-from ffcore.db import connect, record, this_run
+from ffcore.db import connect, named, record, this_run
 from ffcore.tidy import LINEUP_SOURCE, current
 __all__ = ["backtest", "decision_rows", "decisions", "due", "forecast_rows",
            "record_grades"]
@@ -114,15 +114,11 @@ def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
             for i, m in enumerate(moves)]
 
 
-def due(db: sqlite3.Connection, run: int, resolved: float) -> bool:
+def due(run: int, resolved: float, path: Path | None = None) -> bool:
     """Whether to grade: never graded, or the code (the run's commit) or the
-    jornadas resolved have changed since the last grade."""
-    now = db.execute("SELECT commit_sha FROM runs WHERE run_id = ?", (run,)).fetchone()
-    last = db.execute(
-        "SELECT r.commit_sha, m.value FROM runs r JOIN run_measures m USING (run_id)"
-        " WHERE m.stage = 'grade' AND m.measure = 'resolved' AND r.ok = 1"
-        " AND r.run_id < ? ORDER BY r.run_id DESC LIMIT 1", (run,)).fetchone()
-    return last is None or now is None or (now[0], resolved) != (last[0], last[1])
+    jornadas resolved have changed since the last grade (grade_due)."""
+    now, graded, then = named("grade_due", {"run": run}, path)[1][0]
+    return graded is None or now is None or (now, resolved) != (graded, then)
 
 
 def record_grades() -> dict[str, int]:
@@ -132,11 +128,9 @@ def record_grades() -> dict[str, int]:
     actual = points_by_jornada(scored())
     resolved = len({j for _k, j in actual})
     run = this_run()
-    if run is not None:
-        with closing(connect()) as db:
-            if not due(db, run, resolved):
-                print("  grade: same code, same %d jornadas: nothing new" % resolved)
-                return {"resolved": resolved, "skipped": 1}
+    if run is not None and not due(run, resolved):
+        print("  grade: same code, same %d jornadas: nothing new" % resolved)
+        return {"resolved": resolved, "skipped": 1}
     fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
     if run is not None:
         record([{"run_id": run, **r} for r in fc], "grade_forecast")
@@ -157,8 +151,8 @@ def _selftest() -> None:
         == [(0, "plan", False), (1, "rejected", False)], moves
 
     import tempfile
-    from pathlib import Path
     with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
+        path = Path(tmp) / "lfg.db"
         def run(commit: str, resolved: float | None) -> int:
             with db:
                 cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
@@ -168,12 +162,11 @@ def _selftest() -> None:
                                (cur.lastrowid, resolved))
             assert cur.lastrowid is not None
             return cur.lastrowid
-        assert due(db, run("a", None), 7), "never graded: due"
+        assert due(run("a", None), 7, path), "never graded: due"
         run("a", 7)
-        assert not due(db, run("a", None), 7), "same code, same jornadas: nothing new"
-        assert due(db, run("a", None), 8), "a jornada resolved"
-        assert due(db, run("b", None), 7), "new code"
-        assert isinstance(db, sqlite3.Connection)
+        assert not due(run("a", None), 7, path), "same code, same jornadas: nothing new"
+        assert due(run("a", None), 8, path), "a jornada resolved"
+        assert due(run("b", None), 7, path), "new code"
 
     print("grading self-test OK")
 

@@ -6,8 +6,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from ffcore.parse import Rows
-from ffcore.names import Name, row_key
+from ffcore.parse import Rows, text
 from ffcore.tidy import LINEUP_SOURCE, Stamp, current, mtime_cached, table_path
 
 from ffcore.crosswalk import Crosswalk
@@ -60,10 +59,8 @@ def load_players() -> dict[str, dict[str, Any]]:
     market, xi = current("market"), current("lineups", LINEUP_SOURCE)
     if not market and not xi:
         raise SystemExit("no rows in %s — run `ingest.py parse` first" % table_path("players").parent)
-    xw = load_crosswalk()
-    players = _merge({}, market, row_key, "name", MARKET_FIELDS)
-    return _merge(players, xi, xw.key_of,
-                  "player_name", XI_FIELDS)
+    players = _merge({}, market, lambda r: text(r, "ff_id"), "name", MARKET_FIELDS)
+    return _merge(players, xi, lambda r: r.get("player"), "player_name", XI_FIELDS)
 
 
 def _selftest() -> None:
@@ -74,26 +71,26 @@ def _selftest() -> None:
     from ffcore.tidy import tables_in, typed, write_csv
 
 
-    mkt = typed("market", [{"name": "Ane Aldea", "team": "Alavés", "position": "defensa",
+    mkt = typed("market", [{"ff_id": "ane", "name": "Ane Aldea", "team": "Alavés", "position": "defensa",
             "value": "2.050.000", "delta_1d": "-12.000"},
-           {"name": "Bo Bidal", "team": "Betis", "position": "delantero",
+           {"ff_id": "bo", "name": "Bo Bidal", "team": "Betis", "position": "delantero",
             "value": "", "delta_1d": "0"}])
-    xi = typed("lineups", [{"player_name": "Ane Aldea", "team_slug": "alaves",
+    xi = typed("lineups", [{"player": "ane", "player_name": "Ane Aldea", "team_slug": "alaves",
            "start_pct": "0.72", "status": "doubt"},
-          {"player_name": "Cai Coro", "team_slug": "celta",
+          {"player": "cai", "player_name": "Cai Coro", "team_slug": "celta",
            "start_pct": "85", "status": "ok"}])
-    p = _merge(_merge({}, mkt, row_key, "name", MARKET_FIELDS), xi,
-               lambda r: Name(r["player_name"]).key, "player_name", XI_FIELDS)
+    p = _merge(_merge({}, mkt, lambda r: text(r, "ff_id"), "name", MARKET_FIELDS), xi,
+               lambda r: r.get("player"), "player_name", XI_FIELDS)
 
-    a = p["ane aldea"]
+    a = p["ane"]
     assert a["value"] == 2050000.0 and a["delta_1d"] == -12000.0
     assert a["pos"] == "defensa" and a["start"] == 72.0 and a["status"] == "doubt"
     assert a["team"] == "Alavés" and a["name"] == "Ane Aldea"
 
-    assert "value" not in p["bo bidal"] and p["bo bidal"]["delta_1d"] == 0.0
-    assert "start" not in p["bo bidal"]
+    assert "value" not in p["bo"] and p["bo"]["delta_1d"] == 0.0
+    assert "start" not in p["bo"]
 
-    c = p["cai coro"]
+    c = p["cai"]
     assert c["name"] == "Cai Coro" and c["club"] == "celta" and c["start"] == 85.0
     assert "value" not in c
 

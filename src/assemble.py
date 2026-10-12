@@ -9,16 +9,15 @@ from functools import cache
 from typing import Any, NamedTuple
 
 from decide import CONFIDENCE, FINAL_TRIALS, Universe, _fieldable
-from ffcore.crosswalk import Crosswalk
-from ffcore.db import connect, rows
+from ffcore.db import connect, named, rows
 from ffcore.fixture import FIX_BAND, MIN_AD_MATCHES, Ratings, difficulty_ratings
 from ffcore.forecast import MIN_POOL, PERSISTENT_SHARE, Bootstrap
 from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
-from ffcore.names import Name, app_id
+from ffcore.names import Name
 from ffcore.parse import Rows, kickoff_stamp
-from ffcore.players import load_crosswalk, load_players
+from ffcore.players import load_players
 from ffcore.points import scored
 from ffcore.pricing import BID_BEATS, CLIP, PRICE_WINDOW
 from ffcore.schedule import expectations, phantom_fill
@@ -52,32 +51,30 @@ CONSTANTS: dict[str, dict[str, float]] = {
 
 
 def scorer(market: Rows, xi_rows: Rows) -> Scorer:
-    xw = load_crosswalk()
     files = sorted(SEASON.glob("points_*.csv"))
     last_season = {r["ff_id"]: {"pts": r.get("points") or 0.0,
                                 "pj": r.get("games") or 0.0}
                    for r in (typed("points", read_csv(files[-1])) if files else ())
                    if r.get("ff_id")}
     played = scored()
-    by_key = per_jornada_current(current("starters"), played,
-                                 jornada_of_match(), xw)
+    by_key = per_jornada_current(current("starters"), played, jornada_of_match())
     outs = outcomes(history("lineups", LINEUP_SOURCE), current("starters"),
-                    clock_history().round_locks, jornada_of_match(), xw)
+                    clock_history().round_locks, jornada_of_match())
     season = {k: totals(jd) for k, jd in by_key.items()}
     record = {k: (apps, squads) for k, (_pts, apps, squads) in season.items()}
     return Scorer(
-        market, StartOdds(xi_rows, xw, calibrate(outs),
+        market, StartOdds(xi_rows, calibrate(outs),
                           fit_availability(outs), record,
-                          last_fit_listing(outs), app_status(xw)),
+                          last_fit_listing(outs), app_status()),
         last_season,
         current={k: {"pts": pts, "pj": apps} for k, (pts, apps, _n) in season.items()},
         promoted_discount=fit_promoted_discount(market, last_season, played))
 
 
-def app_status(xw: Crosswalk) -> dict[str, str]:
+def app_status() -> dict[str, str]:
     """The LaLiga app's status for each player it lists."""
     return {k: r["player_status"] for r in current("api_players_all")
-            if (k := xw.player(app_id=app_id(r))) and r.get("player_status")}
+            if (k := r.get("player")) and r.get("player_status")}
 
 
 def open_clauses(teams: Rows) -> dict[str, float]:
@@ -136,10 +133,7 @@ def price_change(day: str, h: int) -> dict[str, float]:
     """Each player's change in % over the h updates after his last one on or
     before day, all time (0 where there are not h more): what a replay
     looks back on."""
-    return dict(rows(
-        "SELECT a.ff_id, coalesce(x.change, 0.0) FROM (SELECT ff_id, max(i) AS i"
-        " FROM price_series WHERE day <= ? GROUP BY ff_id) a LEFT JOIN price_ahead x"
-        " ON x.ff_id = a.ff_id AND x.i = a.i AND x.h = ?", (day, h)))
+    return dict(named("price_change", {"day": day, "h": h})[1])
 
 
 def premium() -> float:
@@ -201,7 +195,7 @@ def built() -> Built:
     players = load_players()
     m = current("matches")
 
-    teams, mkt = ([dict(r, key=lg.key_of_app(app_id(r)))
+    teams, mkt = ([dict(r, key=r.get("player"))
                    for r in current(name)] for name in ("api_teams", "api_market"))
     price, route = market_routes(mkt)
     pt_to_key = {r["player_team_id"]: r["key"] for r in teams

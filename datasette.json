@@ -62,6 +62,14 @@
         "price_trend": {
           "title": "Each player's expected value change over the horizon, in %",
           "sql": "SELECT coalesce(p.name, t.ff_id) AS player, round(t.trend, 1) AS trend_pct FROM price_trend t\nLEFT JOIN names p ON p.player = t.ff_id\nORDER BY t.trend DESC"
+        },
+        "price_change": {
+          "title": "Each player's value change in % over :h updates after his last one on or before :day (all time: what happened)",
+          "sql": "SELECT a.ff_id, coalesce(x.change, 0.0) AS change\nFROM (SELECT ff_id, max(i) AS i FROM price_series WHERE day <= :day GROUP BY ff_id) a\nLEFT JOIN price_ahead x ON x.ff_id = a.ff_id AND x.i = a.i AND x.h = CAST(:h AS INTEGER)"
+        },
+        "grade_due": {
+          "title": "The code a run is (its commit) and what the last grade before it was made with",
+          "sql": "SELECT (SELECT commit_sha FROM runs WHERE run_id = CAST(:run AS INTEGER)) AS commit_now,\n       r.commit_sha AS commit_graded, m.value AS resolved_graded\nFROM (SELECT 1) LEFT JOIN runs r ON r.run_id = (\n    SELECT max(g.run_id) FROM runs g JOIN run_measures gm USING (run_id)\n    WHERE gm.stage = 'grade' AND gm.measure = 'resolved' AND g.ok = 1\n      AND g.run_id < CAST(:run AS INTEGER))\nLEFT JOIN run_measures m ON m.run_id = r.run_id AND m.stage = 'grade' AND m.measure = 'resolved'"
         }
       }
     }

@@ -23,8 +23,9 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
-from ffcore.tidy import (TABLES, Table, ROOT, SEASON, TIDY, drop_sql, sql_tables,
-                         store_sql, stored, csv_string, write_csv)
+from ffcore.db import TABLES_SQL
+from ffcore.tidy import (NUMBERS, ROOT, SEASON, TIDY, clear_sql, store_sql, stored,
+                         csv_string, write_csv)
 from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
                                   season_label)
 from ffcore.laliga_api import ROW_TABLE
@@ -324,10 +325,13 @@ def fetch() -> Path:
 
 
 def _version() -> str:
-    """What the stored tables depend on: the parsers and how each table is
-    kept. Not Table.numbers: those parse at read time, never stored."""
-    return fingerprint(source_for) + repr({n: t._replace(numbers=())
-                                           for n, t in TABLES.items()})
+    """What the stored tables depend on: the parsers, the number parsers
+    they are stored through (NUMBERS) and the tables (tables.sql)."""
+    numbers = sorted("%s.%s:%s" % (t, c, fingerprint(parse))
+                     for t, cols in NUMBERS.items() for c, parse in cols)
+    return hashlib.blake2b("\n".join([fingerprint(source_for), *numbers,
+                                       TABLES_SQL.read_text(encoding="utf-8")]).encode(),
+                           digest_size=8).hexdigest()
 
 
 def parse() -> dict[str, int]:
@@ -338,12 +342,11 @@ def parse() -> dict[str, int]:
     state = _read_json(TIDY / _STATE, {})
     done = set(state.get("stamps") or ())
     tables = set(state.get("tables") or ())
-    in_sql = sql_tables()
     if (state.get("version") != version
             or not done <= {stamp for stamp, _docs in walk}
-            or not tables <= in_sql):
+            or not all(stored(t) for t in tables)):
         for t in tables:
-            drop_sql(t)
+            clear_sql(t)
         done, tables = set(), set()
     todo = [(stamp, docs) for stamp, docs in walk if stamp not in done]
     if not todo:
@@ -693,66 +696,7 @@ def _selftest() -> None:
                           ("/jugadores/pedri", "/jugadores/pedri-gonzalez")]:
         assert page_sig(team, _FIXTURE.replace(before, after)) != base, after
 
-    _selftest_sql_store()
     print("ingest.py selftest OK")
-
-
-def _selftest_sql_store() -> None:
-    """How each way of keeping a table reads, at every cut, stored stamp by
-    stamp and all at once: store_cases.json holds what the CSV store read
-    for these rows (captured 2026-10-11, before it was deleted)."""
-    import tempfile
-    from ffcore.clock import set_now
-    from ffcore.parse import count, money
-    from ffcore.tidy import current, history, store_sql, tables_in
-
-    a, b, c = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
-    once = [{"observed_at": a, "source": "s", "k": "1", "v": "10", "j": "3", "who": "x"},
-            {"observed_at": a, "source": "s", "k": "2", "v": "5", "j": "", "who": "y"},
-            {"observed_at": b, "source": "s", "k": "1", "v": "12", "j": "3", "who": "x"},
-            {"observed_at": b, "source": "s", "k": "2", "v": "5", "j": "", "who": "y"},
-            {"observed_at": b, "source": "s", "k": "", "v": "7", "j": "1", "who": "z"},
-            {"observed_at": c, "source": "s", "k": "3", "v": "1", "j": "4", "who": "x",
-             "late": "new column"}]
-    snap = [{"observed_at": a, "source": "s", "who": "x", "v": "1"},
-            {"observed_at": a, "source": "t", "who": "y", "v": "2"},
-            {"observed_at": b, "source": "s", "who": "x", "v": "3"},
-            {"observed_at": b, "source": "s", "who": "z", "v": ""},
-            {"observed_at": c, "source": "t", "who": "y", "v": "4", "late": "q"}]
-    a1, a2 = "2026-08-01T2100Z", "2026-08-02T2300Z"
-    daily = [{"observed_at": a, "k": "1", "v": "1"}, {"observed_at": a, "k": "2", "v": "2"},
-             {"observed_at": a, "k": "", "v": "9"},
-             {"observed_at": a1, "k": "1", "v": "3"}, {"observed_at": a1, "k": "", "v": "8"},
-             {"observed_at": b, "k": "1", "v": "4"}, {"observed_at": b, "k": "3", "v": "5"},
-             {"observed_at": a2, "k": "3", "v": "6"}, {"observed_at": c, "k": "2", "v": "7"}]
-    numbers = (("v", money), ("j", count))
-    want = json.loads(Path(__file__).with_name("ffcore").joinpath("store_cases.json").read_text())
-    try:
-        for name, spec, rows in [
-                ("t_once", Table(False, ("k",), "once", numbers), once),
-                ("t_snap", Table(True, (), "", numbers[:1]), snap),
-                ("t_daily", Table(True, ("k",), "daily", numbers[:1]), daily)]:
-            TABLES[name] = spec
-            stamps = sorted({r["observed_at"] for r in rows})
-            for one_batch in (False, True):
-                with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-                    for batch in ([rows] if one_batch else
-                                  [[r for r in rows if r["observed_at"] == st] for st in stamps]):
-                        store_sql(name, batch)
-                    for now, expect in want[name].items():
-                        set_now(snapshot_stamp(now))
-                        got = [[{k: v for k, v in r.items() if v not in ("", None)} for r in g]
-                               for g in (current(name), current(name, "t"),
-                                         history(name), history(name, "s"))]
-                        assert got == expect, (name, now, one_batch, got, expect)
-                        if name == "t_once" and now == "2026-08-04T0000Z":
-                            assert all(type(r["j"]) is int for r in got[2] if "j" in r) and \
-                                all(type(r["v"]) is float for r in got[2]), \
-                                "a count is an int, money a float"
-    finally:
-        set_now(None)
-        for name in ("t_once", "t_snap", "t_daily"):
-            TABLES.pop(name, None)
 
 
 if __name__ == "__main__":

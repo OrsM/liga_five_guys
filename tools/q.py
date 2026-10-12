@@ -7,40 +7,20 @@ Datasette serves.
 from __future__ import annotations
 
 import json
-import re
-import sqlite3
 import sys
 from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from ffcore.db import connect, query
+from ffcore.db import META, connect, named, params, queries
 
-META = Path(__file__).resolve().parent.parent / "datasette.json"
-
-
-def queries(meta: Path = META) -> dict[str, dict[str, str]]:
-    """The saved queries, by name: each has its sql and a title."""
-    got: dict[str, dict[str, str]] = json.loads(meta.read_text(encoding="utf-8"))[
-        "databases"]["lfg"]["queries"]
-    return got
-
-
-def params(sql: str) -> list[str]:
-    return sorted(set(re.findall(r"(?<![:\w]):([A-Za-z_]\w*)", sql)))
-
-
-def run_params(sql: str, given: dict[str, str]) -> dict[str, str]:
-    """Every param of sql: as given, else '', which is what Datasette sends
-    for a box left empty (so a query defaults with nullif(:p, ''))."""
-    return {p: given.get(p, "") for p in params(sql)}
 
 
 def run(name: str, given: dict[str, str], path: Path | None = None, meta: Path = META
         ) -> tuple[list[str], list[tuple[Any, ...]]]:
     """A saved query's columns and rows, run as Datasette runs it."""
-    sql = queries(meta)[name]["sql"]
-    return query(sql, run_params(sql, given), path)
+    cols, got = named(name, given, path, meta)
+    return cols, [tuple(r) for r in got]
 
 
 def _cell(v: Any) -> str:
@@ -79,8 +59,8 @@ def _selftest() -> None:
         assert queries(meta) == {"big": queries(meta)["big"]} and "sql" in queries(meta)["big"]
         assert run("big", {"mb": "200"}, db, meta) == (["run_id"], [(2,)])
         assert run("big", {}, db, meta) == (["run_id"], [(1,), (2,)])
-        empty = sqlite3.connect(":memory:").execute("SELECT :p", run_params("SELECT :p", {}))
-        assert empty.fetchone() == ("",), "a param not given is '', as Datasette sends it"
+        assert run("big", {"mb": ""}, db, meta) == (["run_id"], [(1,), (2,)]), \
+            "a param left empty is '', as Datasette sends it"
     with tempfile.TemporaryDirectory() as tmp2, tables_in(Path(tmp2)):
         row = {"observed_at": "2026-01-01T0000Z"}
         store_sql("api_activity", [dict(row, activity_id="1", at="", kind="", user_id="",
@@ -100,7 +80,7 @@ def _compiles(path: Path) -> None:
     with closing(connect(path)) as c:
         for name, q in queries().items():
             try:
-                c.execute("EXPLAIN " + q["sql"], run_params(q["sql"], {}))
+                c.execute("EXPLAIN " + q["sql"], {p: "" for p in params(q["sql"])})
             except Exception as e:
                 raise AssertionError("datasette.json query %s: %s" % (name, e)) from e
 

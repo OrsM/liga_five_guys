@@ -46,3 +46,18 @@ SELECT 'app_id', app_id FROM crosswalk WHERE app_id <> '' GROUP BY app_id HAVING
 -- The names as the board shows them.
 DROP VIEW IF EXISTS names;
 CREATE VIEW names AS SELECT player_id AS player, name_shown(name) AS name FROM crosswalk;
+
+-- Who each futbolfantasy row (line-ups, starters) is about: its slug, else
+-- a name one player has (or one keyed by that name), else a name one player
+-- of its club has. A row nothing resolves is about nobody.
+DROP VIEW IF EXISTS ff_identity;
+CREATE VIEW ff_identity AS
+SELECT d.player_slug, d.player_name, d.team_slug,
+       coalesce(s.player, c.player_id, nm.player, nc.player) AS player
+FROM (SELECT player_slug, player_name, team_slug FROM lineups
+      UNION SELECT player_slug, player_name, team_slug FROM starters) d
+LEFT JOIN slug_player s ON s.ff_slug = d.player_slug
+LEFT JOIN crosswalk c ON c.player_id = name_key(d.player_name)
+LEFT JOIN name_player nm ON nm.name_key = name_key(d.player_name)
+LEFT JOIN name_club_player nc ON nc.name_key = name_key(d.player_name)
+     AND nc.club_id = d.team_slug;
