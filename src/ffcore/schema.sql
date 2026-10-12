@@ -146,6 +146,57 @@ CREATE TABLE IF NOT EXISTS board_exposed (
     PRIMARY KEY (run_id, ord)
 );
 
+-- What the simulation and the plan search decided, a run each (sim.main):
+-- what the board views add the market's and the league's facts to.
+-- Each manager's season if you do nothing: mean points, 10th and 90th
+-- percentile, expected final position, the chance of first, and the
+-- chance he finishes above you (NULL for you).
+CREATE TABLE IF NOT EXISTS sim_standings (
+    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
+    manager  TEXT NOT NULL,
+    me       INTEGER NOT NULL,
+    now      REAL,                 -- points so far
+    mean     REAL,
+    lo       REAL,
+    hi       REAL,
+    finish   REAL,
+    p_first  REAL,
+    p_above  REAL,
+    PRIMARY KEY (run_id, manager)
+);
+
+-- Your squad and the plan's buys: the chance he plays next, expected
+-- points next and over the season, in the best eleven now (xi) and once
+-- the plan is made (plan_xi); if yours, what selling him raises, whether
+-- that takes tonight's offer, and the points his sale costs per million.
+CREATE TABLE IF NOT EXISTS sim_players (
+    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
+    player      TEXT NOT NULL,
+    start       REAL,
+    next        REAL,
+    season      REAL,
+    xi          INTEGER NOT NULL,
+    plan_xi     INTEGER NOT NULL,
+    raises      REAL,
+    takes       INTEGER,
+    per_million REAL,
+    PRIMARY KEY (run_id, player)
+);
+
+-- The plan's moves in order, each by its funnel rank.
+CREATE TABLE IF NOT EXISTS sim_plan (
+    run_id INTEGER NOT NULL REFERENCES runs(run_id),
+    ord    INTEGER NOT NULL,
+    rank   INTEGER NOT NULL,
+    PRIMARY KEY (run_id, ord)
+);
+
+-- What the plan gains, its moves made together.
+CREATE TABLE IF NOT EXISTS sim_runs (
+    run_id    INTEGER PRIMARY KEY REFERENCES runs(run_id),
+    plan_gain REAL
+);
+
 -- grading, when run.py grade finds something new: each past lock replayed
 -- with the run's code. A player forecast a row (backtest, GRADE_AHEAD
 -- jornadas past each lock); error and calibration are queries over it.

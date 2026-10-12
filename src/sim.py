@@ -17,7 +17,8 @@ from ffcore.forecast import expected_points
 from ffcore.jornadas import load_deadline
 from ffcore.tidy import REPORTS
 
-__all__ = ["board_tables", "forecast", "funnel", "report"]
+__all__ = ["board_tables", "forecast", "funnel", "plan", "plan_head", "players", "report",
+           "standings"]
 
 ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -291,13 +292,38 @@ def _selftest() -> None:
                    "picked": 0.9, "fit": 0.5, "points": star.cell[0], "plays": star.cell[1],
                    "expected": expected_points(star.cell)}], fc
 
+    sim = standings(ub, b, 7)
+    me_row = next(r for r in sim if r["me"])
+    assert len(sim) == 2 and me_row["p_above"] is None and me_row["manager"] == "me"
+    assert (me_row["finish"], me_row["p_first"]) == (
+        b.base.expected_position(), b.base.position().get(1, 0.0))
+    riv = next(r for r in sim if not r["me"])
+    assert riv["p_above"] == 1.0 - b.base.beat("riv") and riv["finish"] == \
+        b.base.expected_position("riv"), "every manager's finish, not only yours"
+    assert (riv["lo"], riv["hi"]) == b.base.band("riv") and riv["mean"] == b.base.mean("riv")
+    who = {r["player"]: r for r in players(ub, b, 7)}
+    plan_xi = ub.after(*(r.action for r in b.plan)).outlook.xi.players
+    assert set(who) == set(ub.mine) | set(bought), "your squad and the plan's buys"
+    assert sum(r["xi"] for r in who.values()) == 11 \
+        and {k for k, r in who.items() if r["plan_xi"]} == plan_xi
+    assert who["star"]["next"] == ub.outlook.xi.expected["star"] \
+        and who["star"]["season"] == ub.outlook.season["star"]
+    assert who["dead"]["raises"] == ub.market.fetches("dead") \
+        and who["dead"]["per_million"] == b.sale("dead").per_million, who["dead"]
+    assert who[bought[0]]["raises"] is None, "a buy is not yours to sell"
+    assert plan(ub, b, 7) == [{"run_id": 7, "ord": i, "rank": b.rows.index(m)}
+                              for i, m in enumerate(b.plan)]
+    assert plan_head(b, 7) == {"run_id": 7, "plan_gain": b.gain}
+
     import tempfile
     from contextlib import closing
     from pathlib import Path
 
     from ffcore.db import connect
     with tempfile.TemporaryDirectory() as tmp:
-        tables = board_tables(doc, 7)
+        tables = {**board_tables(doc, 7), "sim_standings": standings(ub, b, 7),
+                  "sim_players": players(ub, b, 7), "sim_plan": plan(ub, b, 7),
+                  "sim_runs": [plan_head(b, 7)]}
         for name, entries in tables.items():
             record(entries, name, Path(tmp) / "lfg.db")
         with closing(connect(Path(tmp) / "lfg.db")) as db:
@@ -306,7 +332,9 @@ def _selftest() -> None:
             assert got == {"boards": 1, "board_do": len(doc["do"]),
                            "board_squad": len(doc["squad"]),
                            "board_standings": len(doc["standings"]),
-                           "board_exposed": len(doc["exposed"])}, got
+                           "board_exposed": len(doc["exposed"]), "sim_standings": 2,
+                           "sim_players": len(tables["sim_players"]),
+                           "sim_plan": len(b.plan), "sim_runs": 1}, got
             assert db.execute("SELECT p_win, band_lo FROM boards").fetchone() \
                 == (doc["p_win"], doc["band"][0])
             assert json.loads(db.execute("SELECT facts FROM board_do WHERE ord = 0")
@@ -334,6 +362,48 @@ def forecast(u: Universe, run: int) -> list[Doc]:
              "picked": f.picked, "fit": f.fit, "points": f.cell[0], "plays": f.cell[1],
              "expected": expected_points(f.cell)}
             for j, layer in u.factors.items() for k, f in layer.items()]
+
+
+def standings(u: Universe, b: Board, run: int) -> list[Doc]:
+    """Each manager's simulated season if you do nothing (Board.base): mean
+    points and their 10th-90th percentile band, expected final position,
+    the chance of first, and the chance he finishes above you."""
+    base = b.base
+    return [{"run_id": run, "manager": mgr, "me": int(mgr == u.me),
+             "now": u.state.carried.get(mgr, 0.0), "mean": base.mean(mgr),
+             "lo": base.band(mgr)[0], "hi": base.band(mgr)[1],
+             "finish": base.expected_position(mgr), "p_first": base.position(mgr).get(1, 0.0),
+             "p_above": None if mgr == u.me else 1.0 - base.beat(mgr)}
+            for mgr in u.state.squads]
+
+
+def players(u: Universe, b: Board, run: int) -> list[Doc]:
+    """Your squad and the plan's buys as the model sees them: the chance he
+    plays next, his expected points next and over the season, whether he is
+    in the best eleven now and once the plan is made, and, if yours, what
+    selling him raises (Market.fetches), whether that takes tonight's offer,
+    and the points his sale costs per million."""
+    m, o = u.market, u.outlook
+    exp, xi = o.xi
+    plan_xi = u.after(*(r.action for r in b.plan)).outlook.xi.players
+    keys = list(u.mine) + [r.action.buy for r in b.plan if r.action.buy and r.action.buy not in u.mine]
+    return [{"run_id": run, "player": k, "start": o.next_up.get(k, (0.0, 0.0))[1],
+             "next": exp.get(k, 0.0), "season": o.season.get(k, 0.0),
+             "xi": int(k in xi), "plan_xi": int(k in plan_xi),
+             "raises": m.fetches(k) if k in u.mine else None,
+             "takes": int(m.takes(k)) if k in u.mine else None,
+             "per_million": (sale := b.sale(k)) and sale.per_million}
+            for k in keys]
+
+
+def plan(u: Universe, b: Board, run: int) -> list[Doc]:
+    """The plan's moves in order, each by its rank in the funnel."""
+    return [{"run_id": run, "ord": i, "rank": b.rows.index(m)} for i, m in enumerate(b.plan)]
+
+
+def plan_head(b: Board, run: int) -> Doc:
+    """What the plan gains, its moves made together."""
+    return {"run_id": run, "plan_gain": b.gain}
 
 
 def board_tables(doc: Doc, run: int) -> dict[str, list[Doc]]:
@@ -366,6 +436,10 @@ def main() -> None:
         record(funnel(u, b, run), "funnel")
         record(forecast(u, run), "forecast")
         record([{"run_id": run, **r} for r in built().params], "params")
+        record(standings(u, b, run), "sim_standings")
+        record(players(u, b, run), "sim_players")
+        record(plan(u, b, run), "sim_plan")
+        record([plan_head(b, run)], "sim_runs")
         for name, rows in board_tables(doc, run).items():
             record(rows, name)
 
