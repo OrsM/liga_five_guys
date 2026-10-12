@@ -25,6 +25,7 @@ from decide import (FUNNEL, Action, Board, Move, Universe, blocked, board, joint
 from ffcore.names import Name  # noqa: E402
 from ffcore.text import resolve  # noqa: E402
 from sim import holding  # noqa: E402
+from ffcore.jornadas import rounds_ahead  # noqa: E402
 from ffcore.schedule import jornada_dates  # noqa: E402
 from ffcore.startprob import bucket  # noqa: E402
 from ffcore.forecast import expected_points  # noqa: E402
@@ -167,7 +168,7 @@ def forecast(u: Universe, k: str, ahead: int) -> None:
 
     first = u.first_jornada_of.get(k)
     assert first is not None, "forecast players all have a first jornada"
-    dates = jornada_dates(current("matches"), u.state.jornadas)
+    dates = jornada_dates(rounds_ahead(), u.state.jornadas)
     print("\n%-4s %-10s %6s %7s %7s %6s %6s %8s  %s" % (
         "J", "date", "pts", "fixture", "picked", "fit", "plays", "expected", "why fit"))
     shown = 0

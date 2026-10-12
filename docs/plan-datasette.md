@@ -142,7 +142,19 @@ data/raw tarballs
   Crosswalk is the registry only; row_key gone; logic queries are named.
   Backtest: forecast error the same, flagged players 1.433 -> 1.168. Cost:
   lfg.db 33 -> 86MB, a universe 6.1 -> 9.7s. Code lines 6128 -> 5989.
-- S4b (next) Points and line-ups: `scored`, start outcomes, availability counts.
+- S4b (done) Points and line-ups as views (schema.sql): the calendar
+  (`kickoffs`, `round_locks`, `rounds_ahead`), `scored`, `squad_minutes`,
+  `season_record`, `start_outcomes`, `fit_rate`, `last_fit`,
+  `availability_tally`, `start_calibration` (the Platt grid search, held
+  out a squad at a time, in one pass instead of one per squad). Goes:
+  JornadaClock and its two clocks, outcomes, the Python fits, the
+  per-jornada points and minutes sums. Python keeps reading a note
+  (`prognosis_bucket`, `platt`: SQL functions). Golden: 11 of 16 boards the
+  same; 5 differ only by the deadline, now the next kickoff (each player
+  locks at his own match; before, a played match's kickoff vanishing made
+  it that, or the next round, by accident) and on 08-30 the sale odds the
+  deadline sets. Scorer fits identical on today's data. A universe 10.1 ->
+  7.9s; code lines 9346 -> 8985.
 - S6 The board as a saved query; the phone's JSON its export.
 - Then the old phase 3 rest: tunnel route, `Fantasy.jsx` links, Run again
   and the live log on the box, alerts, more saved queries.

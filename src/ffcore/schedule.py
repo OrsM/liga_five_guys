@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import NamedTuple
 
 from ffcore.fixture import Match, Ratings, season_board
 from ffcore.forecast import Cell, PerJornada
-from ffcore.locks import JornadaClock
 from ffcore.parse import Rows
 from ffcore.rules import MAX_SLOT, Squad, Squads, shortfall
 from ffcore.score import Rates, Scorer
@@ -16,13 +15,16 @@ from ffcore.score import Rates, Scorer
 Fit = Callable[[str, int, int], float]
 
 
-def rounds_left(matches: Rows) -> tuple[list[int], dict[int, set[str]]]:
+def rounds_left(matches: Rows, locks: dict[int, datetime]
+                ) -> tuple[list[int], dict[int, set[str]]]:
+    """The jornadas not finished, by when each next plays (rounds_ahead; none known last),
+    and the clubs that have played in each."""
 
     js = {r["jornada"] for r in matches if r.get("jornada") is not None}
     finished = {j for j in js
                 if all(r.get("score") for r in matches if r.get("jornada") == j)}
     open_j = js - finished
-    clock_order = [j for j in JornadaClock(matches).order if j in open_j]
+    clock_order = [j for j in sorted(locks, key=locks.__getitem__) if j in open_j]
     rem = clock_order + sorted(open_j - set(clock_order))
 
     played: dict[int, set[str]] = {}
@@ -61,9 +63,9 @@ def jornada_factors(r: Rates, match: Match | None, first: bool, fit: float = 1.0
     return Factors(r.ppm, fix, r.p_now if first else r.p_rest, fit)
 
 
-def jornada_dates(matches: Rows, rem: list[int]) -> dict[int, date]:
-    clock = JornadaClock(matches)
-    known = {j: when.date() for j in rem if (when := clock.round_lock(j))}
+def jornada_dates(locks: dict[int, datetime], rem: list[int]) -> dict[int, date]:
+    """Each jornada's date (rounds_ahead); one with none yet, its nearest's plus a week a jornada."""
+    known = {j: locks[j].date() for j in rem if j in locks}
     return {j: known[j] if j in known else known[near] + timedelta(weeks=j - near)
             for j in rem if known
             for near in [min(known, key=lambda k: abs(k - j))]}
@@ -104,14 +106,14 @@ class Expectations(NamedTuple):
     factors: PerJornadaFactors
 
 
-def expectations(sc: Scorer, ratings: Ratings, keys: Iterable[str], matches: Rows
-                 ) -> Expectations:
+def expectations(sc: Scorer, ratings: Ratings, keys: Iterable[str], matches: Rows,
+                 locks: dict[int, datetime]) -> Expectations:
 
-    rem, played = rounds_left(matches)
+    rem, played = rounds_left(matches, locks)
     rates = {k: sc.rates(sc.lookup[k]) if k in sc.lookup else None
              for k in keys}
     club = {k: c for k in keys if k in sc.lookup and (c := sc.lookup[k].get("club"))}
-    dates = jornada_dates(matches, rem)
+    dates = jornada_dates(locks, rem)
     per_j, first_of, factors = season(
         rates, club, rem, played, season_board(ratings, matches, rem),
         lambda k, j, first_j: sc.fit(k, j, dates.get(j), first_j))
@@ -155,13 +157,10 @@ def _selftest() -> None:
     from ffcore.score import Rates as R
     from ffcore.tidy import typed
 
-    fixt = typed("matches", [{"jornada": "8", "home": "a", "away": "b",
-             "kickoff": "2026-10-11T14:00:00+00:00", "score": ""},
-            {"jornada": "9", "home": "a", "away": "c", "kickoff": "", "score": ""}])
-    got = jornada_dates(fixt, [8, 9, 10])
+    got = jornada_dates({8: datetime(2026, 10, 11, 14, tzinfo=timezone.utc)}, [8, 9, 10])
     assert got == {8: date(2026, 10, 11), 9: date(2026, 10, 18),
                    10: date(2026, 10, 25)}, got
-    assert jornada_dates([], [8]) == {}
+    assert jornada_dates({}, [8]) == {}
     hurt = R("k", "DEL", 4.0, 0.6, 0.8, 10.0)
     assert jornada_factors(hurt, None, True) == Factors(4.0, 1.0, 0.6, 1.0), "fit unless told"
     assert jornada_factors(hurt, None, True, 0.5).cell == (4.0, 0.3), \
@@ -175,8 +174,11 @@ def _selftest() -> None:
           {"jornada": "2", "home": "alaves", "away": "celta", "score": ""},
           {"jornada": "3", "home": "alaves", "away": "getafe", "score": "1-1"},
           {"jornada": "", "home": "alaves", "away": "celta", "score": ""}])
-    rem, done = rounds_left(ms)
+    rem, done = rounds_left(ms, {})
     assert rem == [1, 2], rem
+    assert rounds_left(ms, {2: datetime(2026, 8, 20, tzinfo=timezone.utc),
+                            1: datetime(2026, 8, 22, tzinfo=timezone.utc)})[0] == [2, 1], \
+        "in lock order"
     assert done == {1: {"alaves", "getafe"}}, done
 
     from ffcore.fixture import Match

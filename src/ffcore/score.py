@@ -2,19 +2,18 @@
 from __future__ import annotations
 
 import statistics
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from datetime import date
 from typing import Any, NamedTuple
 
 from ffcore.parse import Rows, text
 from ffcore.startprob import NEUTRAL_START, StartOdds
 from ffcore.names import Name
-from ffcore.rules import minutes_played, slot
+from ffcore.rules import slot
 from stats import shrink
 
 
-__all__ = ["JornadaPoints", "Rating", "Rates", "Scored", "Scorer", "Tally",
-           "fit_promoted_discount", "per_jornada_current", "points_by_jornada", "totals"]
+__all__ = ["Rating", "Rates", "Scored", "Scorer", "Tally", "fit_promoted_discount"]
 
 
 SHRINK_K = 4.0
@@ -30,18 +29,6 @@ class Scored(NamedTuple):
     pts: float
     games: float
     at: str
-
-
-# What each player scored in each jornada: (key, jornada) to points.
-JornadaPoints = dict[tuple[str, int], float]
-
-
-def points_by_jornada(played: Iterable[Scored]) -> JornadaPoints:
-    """Each player's points in each jornada, summed once."""
-    out: JornadaPoints = {}
-    for s in played:
-        out[s.key, s.jornada] = out.get((s.key, s.jornada), 0.0) + s.pts
-    return out
 
 
 # A player's season so far, by key: {"pts": points, "pj": matches played}.
@@ -87,49 +74,6 @@ def fit_promoted_discount(market: Rows, history: Mapping[str, Tally],
     if expected <= 0:
         return PROMOTED_DISCOUNT
     return shrink(PROMOTED_DISCOUNT, PROMOTED_DISCOUNT_K, n * pts / expected, n)
-
-
-def per_jornada_current(starters_rows: Rows, played: list[Scored],
-                        jornada_of_match: Mapping[str, int]
-                        ) -> dict[str, dict[int, tuple[float, float]]]:
-    minutes_by_jor: dict[str, dict[int, float]] = {}
-    seen: set[tuple[str, str]] = set()
-    for r in starters_rows:
-        slug = text(r, "player_slug")
-        mid = text(r, "match_id")
-        jor = jornada_of_match.get(mid)
-        if not slug or jor is None or r.get("role") not in ("starter", "sub"):
-            continue
-        key = r.get("player")
-        if not key:
-            continue
-        dedup = (mid, key)
-        if dedup in seen:
-            continue
-        seen.add(dedup)
-        by_j = minutes_by_jor.setdefault(key, {})
-        by_j[jor] = by_j.get(jor, 0.0) + minutes_played(r.get("role") or "",
-                                                         r.get("minute"))
-
-    points_by_jor: dict[str, dict[int, float]] = {}
-    for (k, j), pts in points_by_jornada(played).items():
-        points_by_jor.setdefault(k, {})[j] = pts
-
-    out: dict[str, dict[int, tuple[float, float]]] = {}
-    for pk, points_jd in points_by_jor.items():
-        minutes_jd = minutes_by_jor.get(pk, {})
-        jors = set(points_jd) | set(minutes_jd)
-        out[pk] = {j: (points_jd.get(j, 0.0), minutes_jd.get(j, 0.0))
-                   for j in jors}
-    return out
-
-
-def totals(per_jornada: dict[int, tuple[float, float]]
-           ) -> tuple[float, float, float]:
-    """This season's points, appearances and matchday squads."""
-    return (sum(p for p, _m in per_jornada.values()),
-            float(sum(1 for _p, m in per_jornada.values() if m > 0)),
-            float(len(per_jornada)))
 
 
 class Rating(NamedTuple):
@@ -281,36 +225,6 @@ def _selftest() -> None:
                   current={"p0": {"pts": 30.0, "pj": 2.0}}).rates(dict(row, name="p0", ff_id="p0"))
     assert abs(back.p_rest - (K * NEUTRAL_START / 100 + 1.8) / (K + 2)) < 1e-9, back
     assert back.p_now == back.p_rest, "the suspension is the fit factor's, not selection's"
-
-    jornada_map = {"m1": 1, "m2": 2}
-    starters_rows = typed("starters", [
-        {"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
-         "role": "starter", "minute": "", "match_id": "m1"},
-        {"player_name": "Came On", "player_slug": "came-on", "player": "came on",
-         "role": "sub", "minute": "70", "match_id": "m1"},
-        {"player_name": "Unused Sub", "player_slug": "unused", "player": "unused sub",
-         "role": "sub", "minute": "", "match_id": "m1"},
-        {"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
-         "role": "starter", "minute": "45", "match_id": "m2"},
-        {"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
-         "role": "coach", "minute": "", "match_id": "m3"},
-        {"player_name": "Nobody", "player_slug": "", "role": "starter",
-         "minute": "", "match_id": "m1"},
-        *({"player_name": "Blanco", "player_slug": "blanco", "player": "antonio blanco",
-           "role": "starter", "minute": "", "match_id": "m1"}
-          for _ in range(56)),
-    ])
-    played = [Scored("antonio blanco", 1, 8.0, 1.0, "t1"),
-              Scored("antonio blanco", 2, 5.0, 1.0, "t2")]
-    by_key = per_jornada_current(starters_rows, played, jornada_map)
-    assert by_key["antonio blanco"] == {1: (8.0, 90.0), 2: (5.0, 45.0)}, \
-        by_key["antonio blanco"]
-    assert "came on" not in by_key, by_key
-    assert "unused sub" not in by_key, by_key
-    assert per_jornada_current([], [], {}) == {}
-
-    assert totals(by_key["antonio blanco"]) == (13.0, 2.0, 2.0)
-    assert totals({}) == (0.0, 0.0, 0.0)
 
     print("ffcore.score self-test OK")
 

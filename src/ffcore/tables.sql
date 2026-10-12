@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS lineups (
     note TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS lineups_at ON lineups (source, observed_at);
+-- Who each row is (ff_identity's distinct rows) and each player's listings in order.
+CREATE INDEX IF NOT EXISTS lineups_who ON lineups (player_slug, player_name, team_slug);
+CREATE INDEX IF NOT EXISTS lineups_listing ON lineups (team_slug, player_slug, observed_at);
 DROP VIEW IF EXISTS history_lineups;
 CREATE VIEW history_lineups AS
 SELECT t.observed_at, t.source, t.start_pct, t.player_slug, t.player_name, t.team_slug, t.role, t.status, t.note, f.player

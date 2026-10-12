@@ -200,7 +200,7 @@ rather than reaching through them; ruff flags reads of private members.
     src/ffcore/     tidy (paths, CSVs, current/history: rows with their numbers
                     parsed, per Table.numbers), clock (now, stamps),
                     jornadas (locks), points (points history), players,
-                    rules (positions, formations, shortfall, minutes),
+                    rules (positions, formations, shortfall),
                     names (Name, PlayerKey, AppId: who a player is),
                     source, futbolfantasy, footballdata, laliga_api, parse,
                     text, auth, crosswalk, league, score, startprob, fixture,

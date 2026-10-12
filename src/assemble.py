@@ -12,24 +12,21 @@ from decide import CONFIDENCE, FINAL_TRIALS, Universe, _fieldable
 from ffcore.db import connect, named, rows
 from ffcore.fixture import FIX_BAND, MIN_AD_MATCHES, Ratings, difficulty_ratings
 from ffcore.forecast import MIN_POOL, PERSISTENT_SHARE, Bootstrap
-from ffcore.jornadas import clock_history, jornada_of_match, load_deadline
+from ffcore.jornadas import load_deadline, rounds_ahead
 from ffcore.league import League
 from ffcore.market import Market, market_routes, pending
 from ffcore.names import Name
 from ffcore.parse import Rows, kickoff_stamp
 from ffcore.players import load_players
-from ffcore.points import scored
+from ffcore.points import scored, season_record
 from ffcore.pricing import BID_BEATS, CLIP, PRICE_WINDOW
 from ffcore.schedule import expectations, phantom_fill
-from ffcore.score import (PROMOTED_DISCOUNT_K, SHRINK_K, fit_promoted_discount,
-                          per_jornada_current, Scorer, totals)
-from ffcore.rules import position
+from ffcore.score import PROMOTED_DISCOUNT_K, SHRINK_K, fit_promoted_discount, Scorer
+from ffcore.rules import MATCH_LEN, position
 from ffcore.season import LeagueState
-from ffcore.startprob import (AVAIL_K, FALLBACK_K, PICK_K, Availability, Calibration,
-                              StartOdds, calibrate, fit_availability, last_fit_listing,
-                              outcomes)
-from ffcore.tidy import (LINEUP_SOURCE, SEASON, age_hours, current,
-                         history, read_csv, typed)
+from ffcore.startprob import (ABSENT_START, AVAIL_K, FALLBACK_K, NEUTRAL_START, PICK_K,
+                              Availability, Calibration, StartOdds, fit_availability)
+from ffcore.tidy import LINEUP_SOURCE, SEASON, age_hours, current, read_csv, typed
 from stats import percentile
 
 __all__ = ["universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
@@ -45,30 +42,32 @@ CONSTANTS: dict[str, dict[str, float]] = {
     "fixture": {"FIX_BAND": FIX_BAND, "MIN_AD_MATCHES": MIN_AD_MATCHES},
     "forecast": {"MIN_POOL": MIN_POOL, "PERSISTENT_SHARE": PERSISTENT_SHARE},
     "pricing": {"BID_BEATS": BID_BEATS, "CLIP": CLIP, "PRICE_WINDOW": PRICE_WINDOW},
+    "rules": {"MATCH_LEN": MATCH_LEN},
     "score": {"PROMOTED_DISCOUNT_K": PROMOTED_DISCOUNT_K, "SHRINK_K": SHRINK_K},
-    "startprob": {"AVAIL_K": AVAIL_K, "FALLBACK_K": FALLBACK_K, "PICK_K": PICK_K},
+    "startprob": {"ABSENT_START": ABSENT_START, "AVAIL_K": AVAIL_K, "FALLBACK_K": FALLBACK_K,
+                  "NEUTRAL_START": NEUTRAL_START, "PICK_K": PICK_K},
 }
 
 
 def scorer(market: Rows, xi_rows: Rows) -> Scorer:
+    """The scorer as of cut(), its fits read from the start and points views
+    (written constants first: the views read them)."""
     files = sorted(SEASON.glob("points_*.csv"))
     last_season = {r["ff_id"]: {"pts": r.get("points") or 0.0,
                                 "pj": r.get("games") or 0.0}
                    for r in (typed("points", read_csv(files[-1])) if files else ())
                    if r.get("ff_id")}
-    played = scored()
-    by_key = per_jornada_current(current("starters"), played, jornada_of_match())
-    outs = outcomes(history("lineups", LINEUP_SOURCE), current("starters"),
-                    clock_history().round_locks, jornada_of_match())
-    season = {k: totals(jd) for k, jd in by_key.items()}
-    record = {k: (apps, squads) for k, (_pts, apps, squads) in season.items()}
+    write_constants()
+    season = season_record()
+    cal, = rows("SELECT alpha, beta, neutral_start, absent_start FROM start_calibration")
     return Scorer(
-        market, StartOdds(xi_rows, calibrate(outs),
-                          fit_availability(outs), record,
-                          last_fit_listing(outs), app_status()),
+        market, StartOdds(xi_rows, Calibration(*cal),
+                          fit_availability(rows("SELECT * FROM availability_tally")),
+                          {k: (apps, squads) for k, (_pts, apps, squads) in season.items()},
+                          dict(rows("SELECT player, pct FROM last_fit")), app_status()),
         last_season,
         current={k: {"pts": pts, "pj": apps} for k, (pts, apps, _n) in season.items()},
-        promoted_discount=fit_promoted_discount(market, last_season, played))
+        promoted_discount=fit_promoted_discount(market, last_season, scored()))
 
 
 def app_status() -> dict[str, str]:
@@ -211,9 +210,8 @@ def built() -> Built:
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
     ratings = fixture_ratings(mkt_rows)
-    ex = expectations(sc, ratings, set(price).union(*squads.values()), m)
+    ex = expectations(sc, ratings, set(price).union(*squads.values()), m, rounds_ahead())
     per_j, first_jornada_of, rem, played = ex.per_j, ex.first_of, ex.rem, ex.played
-    write_constants()
     prices = price_momentum()
     market = Market(
         cash=lg.cash[me], premium=premium(),

@@ -1,72 +1,40 @@
-"""Points history: each change in a player's season total, given to the
-latest match his club had played, and minutes from a line-up role."""
+"""The points history, as schema.sql's views have it as of cut(): each
+change in a player's season total, by jornada, and his season so far."""
 from __future__ import annotations
 
 
 
-from ffcore.parse import kickoff_stamp, stamp, text
-from ffcore.score import Scored, points_by_jornada
-from ffcore.tidy import current, history
+from ffcore.db import rows
+from ffcore.score import Scored
 
-__all__ = ["scored"]
-
-
-def _club_matches() -> dict[str, list[tuple[str, int]]]:
-    when: dict[tuple[str, str], tuple[str, int]] = {}
-    for m in sorted(history("matches"), key=lambda r: r.get("observed_at", "")):
-        pair, jor = (m.get("home") or "", m.get("away") or ""), m.get("jornada")
-        if jor is None:
-            continue
-        kick = kickoff_stamp(m.get("kickoff"))
-        if kick is not None:
-            when[pair] = (stamp(kick), jor)
-        elif m.get("score") and pair not in when:
-            when[pair] = (m.get("observed_at", ""), jor)
-    out: dict[str, list[tuple[str, int]]] = {}
-    for pair, at in when.items():
-        for club in pair:
-            if club:
-                out.setdefault(club, []).append(at)
-    return {c: sorted(v) for c, v in out.items()}
+__all__ = ["jornada_points", "scored", "season_record"]
 
 
 def scored() -> list[Scored]:
-    rows = history("points")
-    season = max((r.get("season") or "" for r in rows), default="")
-    rows = sorted((r for r in rows if r.get("season") == season),
-                  key=lambda r: r.get("observed_at", ""))
-    club = {r["ff_id"]: r.get("club") for r in current("market")
-            if r.get("ff_id")}
-    games = _club_matches()
-    every = sorted(at for v in games.values() for at in v)
-    first = rows[0]["observed_at"] if rows else ""
-    last: dict[str, tuple[float, float]] = {}
-    out = []
-    for r in rows:
-        key = text(r, "ff_id")
-        now = (r["points"], r["games"])
-        before = last.get(key, (0.0, 0.0))
-        if not key or now == before:
-            continue
-        last[key] = now
-        at = r["observed_at"]
-        played = [j for t, j in games.get(club.get(key) or "", every) if t <= at]
-        if at != first and played:
-            out.append(Scored(key, played[-1], now[0] - before[0],
-                              now[1] - before[1], at))
-    return out
+    """The scored view: each change in a player's points total this season,
+    in the order stored (the forecast's bootstrap draws from it by position)."""
+    return [Scored(*r) for r in rows("SELECT player, jornada, pts, games, at FROM scored ORDER BY at, id")]
+
+
+def jornada_points() -> dict[tuple[str, int], float]:
+    """Each player's points in each jornada he scored in."""
+    return {(k, j): pts for k, j, pts in rows(
+        "SELECT player, jornada, sum(pts) FROM scored GROUP BY player, jornada")}
+
+
+def season_record() -> dict[str, tuple[float, float, float]]:
+    """Each scoring player's season so far: (points, appearances, matchday squads)."""
+    return {k: (pts, apps, n) for k, pts, apps, n in rows("SELECT player, pts, apps, squads FROM season_record")}
 
 
 def _selftest() -> None:
     import tempfile
     from pathlib import Path
 
-    two = [Scored("a", 1, 3.0, 1.0, "t1"), Scored("a", 1, 2.0, 1.0, "t2"), Scored("b", 2, 4.0, 1.0, "t1")]
-    assert points_by_jornada(two) == {("a", 1): 5.0, ("b", 2): 4.0}, \
-        "each player's points in each jornada, summed once"
-
     from ffcore.clock import set_now
+    from ffcore.db import record
     from ffcore.parse import snapshot_stamp
+    from ffcore.rules import MATCH_LEN
     from ffcore.tidy import store_sql, tables_in
 
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
@@ -95,6 +63,20 @@ def _selftest() -> None:
             assert set(scored()) == {Scored("1", 1, 5.0, 1.0, b),
                                      Scored("1", 2, 7.0, 1.0, later),
                                      Scored("2", 1, 3.0, 1.0, later)}, scored()
+            assert jornada_points() == {("1", 1): 5.0, ("1", 2): 7.0, ("2", 1): 3.0}
+
+            record([{"name": "MATCH_LEN", "value": MATCH_LEN}], "constants")
+            record([{"player_id": k, "ff_slug": slug} for k, slug in
+                    [("1", "uno"), ("2", "dos"), ("3", "tres")]], "crosswalk")
+            store_sql("starters", [
+                {"observed_at": a, "match_id": "m1", "team_slug": "x", "player_slug": p,
+                 "player_name": n, "role": r, "minute": m}
+                for p, n, r, m in [("uno", "1", "starter", ""), ("dos", "2", "sub", "70"),
+                                   ("tres", "3", "sub", ""), ("uno-coach", "1", "coach", "")]] + [
+                {"observed_at": later, "match_id": "m2", "team_slug": "x", "player_slug": "uno",
+                 "player_name": "1", "role": "starter", "minute": "45"}])
+            assert season_record() == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0)}, \
+                "a starter the match unless he came off, a sub from when he came on"
         finally:
             set_now(None)
 

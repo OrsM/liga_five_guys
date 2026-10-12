@@ -9,9 +9,8 @@ from typing import Any
 
 from ffcore.forecast import expected_points
 from ffcore.schedule import expectations
-from ffcore.jornadas import clock_history
-from ffcore.points import scored
-from ffcore.score import JornadaPoints, points_by_jornada
+from ffcore.jornadas import round_locks, rounds_ahead
+from ffcore.points import jornada_points
 
 from assemble import built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, board, verdict
@@ -28,8 +27,7 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     """Rebuild the forecast at each past lock: every player's expected points
     for the jornada it locks and, with ahead, the next ones too, and who was
     listed injured, doubtful or suspended then. Scored in SQL (grade_error)."""
-    locks = clock_history().round_locks
-    actual = points_by_jornada(scored())
+    locks, actual = round_locks(), jornada_points()
     done = {j for _k, j in actual}
     out = []
     try:
@@ -38,7 +36,7 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
             market = current("market")
             sc = scorer(market, current("lineups", LINEUP_SOURCE))
             per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
-                                 current("matches")).per_j
+                                 current("matches"), rounds_ahead()).per_j
             flagged = {k for k in sc.lookup if sc.starts.status_of(k)}
             for j in range(i, i + ahead + 1):
                 if j not in done or j not in per_j:
@@ -58,8 +56,7 @@ def decisions() -> list[dict[str, Any]]:
     since, and the change that happened; and the value its players were
     to gain (bought) or lose (sold) over the price horizon, in millions,
     against what they did."""
-    locks = clock_history().round_locks
-    actual = points_by_jornada(scored())
+    locks, actual = round_locks(), jornada_points()
     done = {j for _k, j in actual}
     out = []
     try:
@@ -100,7 +97,7 @@ def decisions() -> list[dict[str, Any]]:
     return out
 
 
-def forecast_rows(runs: list[dict[str, Any]], actual: JornadaPoints) -> list[dict[str, Any]]:
+def forecast_rows(runs: list[dict[str, Any]], actual: dict[tuple[str, int], float]) -> list[dict[str, Any]]:
     """backtest's forecasts, one row a player: what was forecast at the
     lock (from_j) for a jornada, and what he scored (0 if nothing)."""
     return [{"from_j": r["from"], "jornada": r["jornada"], "player": k, "predicted": p,
@@ -125,7 +122,7 @@ def record_grades() -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code,
     and keep every player forecast and every ranked move against what then
     happened; skipped when nothing is new (due)."""
-    actual = points_by_jornada(scored())
+    actual = jornada_points()
     resolved = len({j for _k, j in actual})
     run = this_run()
     if run is not None and not due(run, resolved):

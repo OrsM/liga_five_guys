@@ -4,7 +4,7 @@ import this."""
 from __future__ import annotations
 
 __all__ = ["XI_SIZE", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
-           "MATCH_LEN", "minutes_played"]
+           "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
 
@@ -56,25 +56,7 @@ MATCH_LEN = 90.0
 XI_SIZE = 11  # players a side fields
 
 
-def minutes_played(role: str, minute: float | None, match_len: float = MATCH_LEN) -> float:
-    """Minutes a starter or sub played, from the minute he came off or on
-    (None: the whole match for a starter, none for a sub)."""
-    if role == "starter":
-        mins = match_len if minute is None else minute
-    elif role == "sub":
-        mins = 0.0 if minute is None else match_len - minute
-    else:
-        return 0.0
-    return max(0.0, mins)
-
-
 def _selftest() -> None:
-    assert minutes_played("starter", None) == 90.0
-    assert minutes_played("starter", 64.0) == 64.0
-    assert minutes_played("sub", None) == 0.0
-    assert minutes_played("sub", 64.0) == 26.0
-    assert minutes_played("coach", None) == 0.0
-    assert minutes_played("starter", 0.0) == 0.0
     assert slot("Centrocampista") == slot("mediocampista") == slot("MED") == "MED"
     assert slot(None) == slot("") == slot("utillero") == "", "unknown is empty, never guessed"
     assert POSITIONS == ("POR", "DEF", "MED", "DEL")

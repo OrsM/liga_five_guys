@@ -1,29 +1,18 @@
 from __future__ import annotations
 
-import bisect
 import datetime as dt
 import math
 import re
-from dataclasses import dataclass, replace
-from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, NamedTuple
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any
 
-import numpy as np
-import numpy.typing as npt
-
-from ffcore.parse import Rows, snapshot_stamp, stamp, year_for
-from ffcore.names import Name
-from ffcore.rules import minutes_played
+from ffcore.parse import Rows, snapshot_stamp, year_for
 from stats import shrink
 
-__all__ = ["Obs", "Outcome", "Calibration", "StartOdds", "Availability",
-           "prognosis", "prognosis_of", "bucket", "fit_availability",
-           "last_fit_listing", "calibrate", "fit", "outcomes",
-           "observations", "fit_start_fallbacks", "NEUTRAL_START",
-           "ABSENT_START"]
-
-INTERCEPT = [round(-3.0 + 0.5 * i, 1) for i in range(13)]
-SLOPE = [round(0.2 + 0.4 * i, 1) for i in range(15)]
+__all__ = ["Calibration", "StartOdds", "Availability", "prognosis", "prognosis_of",
+           "bucket", "prognosis_bucket", "fit_availability", "platt",
+           "NEUTRAL_START", "ABSENT_START"]
 
 FLOOR, CEIL = 0.01, 0.97
 NEUTRAL_START = 60.0
@@ -31,13 +20,8 @@ ABSENT_START = 15.0
 FALLBACK_K = 8.0
 
 
-class Obs(NamedTuple):
-    ff: float | None
-    started: float
-    group: str = ""
-
-
-def _platt(p: float, alpha: float, beta: float) -> float:
+def platt(p: float, alpha: float, beta: float) -> float:
+    """A start % (as a share) through alpha + beta x its log-odds, kept in [FLOOR, CEIL]."""
     p = min(1.0 - 1e-6, max(1e-6, p))
     z = alpha + beta * math.log(p / (1.0 - p))
     q = 1.0 / (1.0 + math.exp(-max(-40.0, min(40.0, z))))
@@ -56,7 +40,7 @@ class Calibration:
             return 0.0
         if (self.alpha, self.beta) == (0.0, 1.0):
             return ff_pct / 100.0
-        return _platt(ff_pct / 100.0, self.alpha, self.beta)
+        return platt(ff_pct / 100.0, self.alpha, self.beta)
 
 
 MONTHS = {m: i + 1 for i, m in enumerate(
@@ -146,57 +130,19 @@ class Availability:
         return self.level[bucket(prog, jornada, when, next_j)]
 
 
-def _fit(o: Outcome) -> bool:
-    return o.status in ("", "ok")
+def fit_availability(tally: Iterable[tuple[str, float, float]], k: float = AVAIL_K
+                     ) -> Availability:
+    """Availability from availability_tally's rows (bucket, played,
+    expected): played over expected, shrunk toward the bucket's PRIOR."""
+    return Availability({b: min(1.0, shrink(PRIOR[b], k, got, fit)) for b, got, fit in tally})
 
 
-def last_fit_listing(outs: list[Outcome]) -> dict[str, float]:
-    """Each player's most recent start % while fit: what selection looked like
-    before a flag, when his current listing is about the injury."""
-    out: dict[str, float] = {}
-    for o in sorted(outs, key=lambda o: o.at):
-        if o.key and o.listed and o.status == "ok" and o.ff is not None:
-            out[o.key] = o.ff * 100.0
-    return out
-
-
-def fit_rate(outs: list[Outcome]) -> dict[str, float]:
-    """How often each player appears when listed fit. Only the reference for
-    the fit factor, which is a ratio of like with like (appearances under a
-    prognosis over appearances when fit); how often he is picked is a
-    different question, answered by his matchday-squad record."""
-    seen: dict[str, list[float]] = {}
-    for o in outs:
-        if o.key and o.listed and o.status == "ok":
-            seen.setdefault(o.key, []).append(_played(o))
-    return {key: sum(v) / len(v) for key, v in seen.items() if len(v) >= 3}
-
-
-def fit_availability(outs: list[Outcome], k: float = AVAIL_K) -> Availability:
-    """Pair each prognosis, as seen at one lock, with whether the player
-    played in that jornada and every later one: the question the forecast
-    asks of today's note."""
-    by_key: dict[str, dict[int, Outcome]] = {}
-    for o in outs:
-        if o.key:
-            by_key.setdefault(o.key, {})[o.jornada] = o
-    base = fit_rate(outs)
-    tally: dict[str, list[float]] = {}
-    for key, seen in by_key.items():
-        if key not in base:
-            continue
-        for i, oi in seen.items():
-            prog = prognosis_of(oi.status, oi.note, _day(oi.at))
-            if prog is None:
-                continue
-            for j, oj in seen.items():
-                if j >= i:
-                    t = tally.setdefault(bucket(prog, j, _day(oj.at), i),
-                                         [0.0, 0.0])
-                    t[0] += _played(oj)
-                    t[1] += base[key]
-    return Availability({b: min(1.0, shrink(PRIOR[b], k, got, fit))
-                         for b, (got, fit) in tally.items()})
+def prognosis_bucket(status: str, note: str, seen_at: str, jornada: int, at: str,
+                     next_j: int) -> str | None:
+    """bucket() for SQL: a listing (status, note) seen at one stamp against a
+    jornada at another, its next jornada next_j; None if he was fit."""
+    prog = prognosis_of(status, note, _day(seen_at))
+    return None if prog is None else bucket(prog, jornada, _day(at), next_j)
 
 
 def _day(stamp: str) -> dt.date:
@@ -283,137 +229,6 @@ class StartOdds:
         return self.avail.of(prog, jornada, when, next_j)
 
 
-def _grid_brier(obs: Sequence[Obs]) -> npt.NDArray[np.float64]:
-    ff = np.array([o.ff for o in obs])
-    y = np.array([o.started for o in obs])
-    al = np.array(INTERCEPT)[:, None, None]
-    be = np.array(SLOPE)[None, :, None]
-    p = np.clip(ff, 1e-6, 1.0 - 1e-6)
-    z = np.clip(al + be * np.log(p / (1.0 - p)), -40.0, 40.0)
-    pred = np.clip(1.0 / (1.0 + np.exp(-z)), FLOOR, CEIL)
-    pred = np.where((al == 0.0) & (be == 1.0), ff, pred)
-    return ((pred - y) ** 2).mean(axis=-1)
-
-
-def _best(obs: Sequence[Obs]) -> Calibration:
-    i, j = np.unravel_index(np.argmin(_grid_brier(obs)),
-                            (len(INTERCEPT), len(SLOPE)))
-    return Calibration(INTERCEPT[i], SLOPE[j])
-
-
-def _brier(c: Calibration, obs: Iterable[Obs]) -> float:
-    return sum((c.p(o.ff * 100.0) - o.started) ** 2 for o in obs if o.ff is not None)
-
-
-def fit(seen: Iterable[Obs]) -> Calibration:
-    obs = [o for o in seen if o.ff is not None]
-    raw = Calibration()
-    groups = sorted({o.group for o in obs})
-    if len(obs) < 3 or len(groups) < 2:
-        return raw
-    held_out = sum(_brier(_best([o for o in obs if o.group != g]),
-                          [o for o in obs if o.group == g]) for g in groups)
-    return _best(obs) if held_out < _brier(raw, obs) else raw
-
-
-class Outcome(NamedTuple):
-    at: str
-    jornada: int
-    group: str
-    who: str
-    key: str | None
-    listed: bool
-    ff: float | None
-    status: str
-    in_squad: bool
-    mins: float
-    note: str = ""
-
-
-def _last_before(hist: list[tuple[str, Mapping[str, Any]]], cut: str
-                 ) -> Mapping[str, Any] | None:
-    i = bisect.bisect_right(hist, cut, key=lambda t: t[0])
-    return hist[i - 1][1] if i else None
-
-
-def _pct(row: Mapping[str, Any]) -> float | None:
-    pct = row.get("start_pct")
-    return None if pct is None else pct / 100.0
-
-
-def outcomes(lineups: Rows, starters: Rows, locks: Mapping[int, dt.datetime],
-             jornada_of: Mapping[str, int]) -> list[Outcome]:
-    squads: dict[tuple[str, str], dict[str, Mapping[str, Any]]] = {}
-    for r in starters:
-        if r.get("role") in ("starter", "sub") and r.get("player_slug"):
-            squads.setdefault((r["match_id"], r["team_slug"]),
-                              {})[r["player_slug"]] = r
-    wide: dict[str, dict[str, list[tuple[str, Mapping[str, Any]]]]] = {}
-    for r in sorted(lineups, key=lambda r: r.get("observed_at", "")):
-        slug = r.get("player_slug") or Name(r.get("player_name")).key
-        wide.setdefault(r.get("team_slug") or "", {}).setdefault(
-            slug, []).append((r.get("observed_at", ""), r))
-
-    out = []
-    for (match, team), squad in sorted(squads.items()):
-        j = jornada_of.get(match)
-        if j is None or j not in locks:
-            continue
-        cut = stamp(locks[j])
-        before = {slug: row for slug, hist in wide.get(team, {}).items()
-                  if (row := _last_before(hist, cut)) is not None}
-        for slug in sorted(set(before) | set(squad)):
-            row, played = before.get(slug), squad.get(slug)
-            seen = row or played
-            assert seen is not None, "the slug came from one of them"
-            out.append(Outcome(
-                cut, j, "%s:%s" % (match, team), "%s:%s" % (team, slug),
-                seen.get("player"),
-                row is not None,
-                _pct(row) if row else None,
-                (row.get("status") or "ok") if row else "",
-                played is not None,
-                minutes_played(played["role"], played.get("minute"))
-                if played else 0.0,
-                (row.get("note") or "") if row else ""))
-    return sorted(out, key=lambda o: (o.at, o.group))
-
-
-def _played(o: Outcome) -> float:
-    return 1.0 if o.mins > 0 else 0.0
-
-
-def observations(outs: list[Outcome], neutral: float = NEUTRAL_START,
-                 absent: float = ABSENT_START) -> list[Obs]:
-    return [Obs(o.ff if o.ff is not None
-                else (neutral if o.listed else absent) / 100.0,
-                _played(o), o.group) for o in outs]
-
-
-def _shrunk(default_pct: float, shares: list[float]) -> float:
-    if not shares:
-        return default_pct
-    rate = sum(shares) / len(shares)
-    return shrink(default_pct / 100.0, FALLBACK_K, len(shares) * rate,
-                  len(shares)) * 100.0
-
-
-def fit_start_fallbacks(outs: list[Outcome]) -> tuple[float, float]:
-    return (_shrunk(NEUTRAL_START, [_played(o) for o in outs
-                                    if o.listed and o.ff is None]),
-            _shrunk(ABSENT_START, [_played(o) for o in outs if not o.listed]))
-
-
-def calibrate(outs: list[Outcome]) -> Calibration:
-    """What a listing means for selection, fitted on fit players only: for a
-    flagged player the listing is about the injury, which availability
-    already covers."""
-    fit_outs = [o for o in outs if _fit(o)]
-    neutral, absent = fit_start_fallbacks(fit_outs)
-    return replace(fit(observations(fit_outs, neutral, absent)),
-                   neutral_start=neutral, absent_start=absent)
-
-
 def _selftest() -> None:
     from ffcore.tidy import typed
 
@@ -461,114 +276,124 @@ def _selftest() -> None:
     assert bucket(("out_for", None), 9, sept, 8) == "out_for:after", \
         "a suspension is the next match, whichever jornada that is"
 
-    def out(at: str, j: int, status: str, mins: float, note: str = "") -> Outcome:
-        return Outcome(at, j, "m", "t:a", "a", True, 0.8, status, True, mins, note)
-    fit_days = ["2026-08-%02dT1800Z" % d for d in (1, 8, 15)]
-    history = [out(a, j + 1, "ok", 90.0) for j, a in enumerate(fit_days)]
-    history += [out("2026-08-22T1800Z", 4, "doubt", 0.0, "Duda para la jornada 4"),
-                out("2026-08-29T1800Z", 5, "ok", 90.0)]
-    fitted = fit_availability(history, k=0.0)
-    assert fitted.level["doubt_for:at"] == 0.0, "doubtful for 4, missed 4"
-    assert fitted.level["doubt_for:after"] == 1.0, "and was back for 5"
-    assert fit_availability([]).level == PRIOR
-    odds = StartOdds(typed("lineups", [{"player": "ana", "player_name": "Ana", "status": "doubt",
-                       "observed_at": "2026-09-28T0400Z",
-                       "note": "Duda para la jornada 8"}]), avail=fitted)
-    assert odds.fit("ana", 8, sept, 8) == 0.0
-    assert odds.fit("ana", 9, sept, 8) == 1.0
-    assert odds.fit("bo", 8, sept, 8) == 1.0, "not flagged, fit"
-    rec = StartOdds(typed("lineups", [{"player": "ana", "player_name": "Ana", "start_pct": "20", "status": "ok"},
-                     {"player": "bo", "player_name": "Bo", "start_pct": "0", "status": "injured",
-                      "note": "Duda para la jornada 8"}]),
-                    history={"ana": (9.0, 10.0)}, last_fit={"bo": 70.0})
-    assert rec.picked("ana", True) == shrink(0.2, PICK_K, 9.0, 10.0)
-    assert rec.picked("ana", False) == shrink(NEUTRAL_START / 100, PICK_K, 9.0, 10.0)
-    assert rec.picked("bo", True) == rec.picked("bo", False) == 0.7, \
-        "no record: his listing before the injury, not the 0% it caused"
-    assert StartOdds(typed("lineups", [{"player": "bo", "player_name": "Bo", "status": "injured"}])).picked(
-        "bo", False) == ABSENT_START / 100, "never listed fit: not in the squad"
-    assert last_fit_listing([
-        Outcome("2026-08-01T1800Z", 1, "m", "t:a", "a", True, 0.8, "ok", True, 90.0),
-        Outcome("2026-08-08T1800Z", 2, "m", "t:a", "a", True, 0.0, "injured", False, 0.0),
-    ]) == {"a": 80.0}
-
-    assert abs(_platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
-    assert abs(_platt(0.8, 0.0, 1.0) - 0.8) < 1e-6
-    assert _platt(0.8, 0.0, 3.0) > 0.8 and _platt(0.2, 0.0, 3.0) < 0.2
-    assert _platt(0.3, 1.5, 3.0) > _platt(0.3, 0.0, 3.0)
+    assert abs(platt(0.5, 0.0, 1.0) - 0.5) < 1e-6
+    assert abs(platt(0.8, 0.0, 1.0) - 0.8) < 1e-6
+    assert platt(0.8, 0.0, 3.0) > 0.8 and platt(0.2, 0.0, 3.0) < 0.2
+    assert platt(0.3, 1.5, 3.0) > platt(0.3, 0.0, 3.0)
     for p, al, be in [(0.999, 0.0, 5.8), (0.001, 0.0, 5.8), (1.0, 3.0, 5.8),
                       (0.0, -3.0, 0.2)]:
-        assert FLOOR <= _platt(p, al, be) <= CEIL
+        assert FLOOR <= platt(p, al, be) <= CEIL
 
     raw = Calibration()
     assert raw.p(80.0) == 0.8
     assert raw.p(100.0) == 1.0 and raw.p(0.0) == 0.0
     assert raw.p(None) == 0.0
+    assert fit_availability([]).level == PRIOR
+    assert fit_availability([("doubt_for:at", 0.0, 2.0)], k=0.0).level["doubt_for:at"] == 0.0
+    assert prognosis_bucket("doubt", "Duda para la jornada 4", "2026-08-22T1800Z", 5,
+                            "2026-08-29T1800Z", 4) == "doubt_for:after"
+    assert prognosis_bucket("ok", "", "2026-08-22T1800Z", 5, "2026-08-29T1800Z", 4) is None
 
-    sharp = [Obs(p, st, "sheet%d" % (i % 6))
-             for i, (p, st) in enumerate([(0.8, 1), (0.7, 1), (0.3, 0),
-                                          (0.2, 0)] * 12)]
-    cal = fit(sharp)
-    assert cal.beta > 1.0 and cal.p(80.0) > 0.8, cal
-    noise = [Obs(0.5, i % 2, "sheet%d" % (i % 5)) for i in range(20)]
-    for obs in (noise, [Obs(0.5, 1)],
-                [Obs(0.9, i < 11, "same") for i in range(22)]):
-        got = fit(obs)
-        assert (got.alpha, got.beta) == (0.0, 1.0), got
-
-    grid_obs = sharp + [Obs(0.4, 0, "sheet2")]
-    brier = _grid_brier(grid_obs)
-    for i, j in [(0, 0), (6, 2), (3, 9)]:
-        c = Calibration(INTERCEPT[i], SLOPE[j])
-        assert abs(brier[i, j] - _brier(c, grid_obs) / len(grid_obs)) < 1e-12
+    _selftest_views()
 
 
-    locks = {1: dt.datetime(2026, 8, 15, 19, 30, tzinfo=dt.timezone.utc)}
+def _selftest_views() -> None:
+    """schema.sql's start views: start_outcomes, fit_rate, last_fit,
+    availability_tally, start_calibration."""
+    import tempfile
+    from pathlib import Path
+
+    from ffcore.clock import set_now
+    from ffcore.db import record, rows
+    from ffcore.rules import MATCH_LEN
+    from ffcore.tidy import store_sql, tables_in
+
+    def views(matches: list[dict[str, str]], lineups: list[dict[str, str]],
+              starters: list[dict[str, str]], *queries: str) -> list[list[tuple[Any, ...]]]:
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            try:
+                set_now(dt.datetime(2026, 12, 1, tzinfo=dt.timezone.utc))
+                record([{"name": n, "value": v} for n, v in [
+                    ("MATCH_LEN", MATCH_LEN), ("NEUTRAL_START", NEUTRAL_START),
+                    ("ABSENT_START", ABSENT_START), ("FALLBACK_K", FALLBACK_K)]], "constants")
+                record([{"player_id": s, "ff_slug": s} for s in
+                        sorted({r["player_slug"] for r in lineups + starters})], "crosswalk")
+                store_sql("matches", matches)
+                store_sql("lineups", [{"source": "futbolfantasy", **r} for r in lineups])
+                store_sql("starters", [{"observed_at": "2026-11-30T0000Z", **r} for r in starters])
+                return [[tuple(r) for r in rows(q)] for q in queries]
+            finally:
+                set_now(None)
+
+    def match(mid: str, j: int, team: str, kickoff: str) -> dict[str, str]:
+        return {"observed_at": "2026-08-01T0000Z", "match_id": mid, "jornada": str(j),
+                "home": team, "away": "opp-" + mid, "kickoff": kickoff}
+
+    def listing(at: str, team: str, slug: str, pct: str, status: str = "ok",
+                note: str = "") -> dict[str, str]:
+        return {"observed_at": at, "team_slug": team, "player_slug": slug, "player_name": slug,
+                "start_pct": pct, "status": status, "note": note}
+
+    def squad(mid: str, team: str, slug: str, role: str = "starter", minute: str = ""
+              ) -> dict[str, str]:
+        return {"match_id": mid, "team_slug": team, "player_slug": slug, "player_name": slug,
+                "role": role, "minute": minute}
+
     before, after = "2026-08-14T1000Z", "2026-08-16T1000Z"
-    lineups = typed("lineups", [
-        {"observed_at": before, "source": "futbolfantasy", "team_slug": "t",
-         "player_slug": "starter-man", "player_name": "Starter Man",
-         "start_pct": "80", "role": "starter"},
-        {"observed_at": before, "source": "futbolfantasy", "team_slug": "t",
-         "player_slug": "bench-man", "player_name": "Bench Man",
-         "start_pct": "20", "role": "sub"},
-        {"observed_at": before, "source": "futbolfantasy", "team_slug": "t",
-         "player_slug": "vague-man", "player_name": "Vague Man",
-         "start_pct": "", "role": "sub"},
-        {"observed_at": after, "source": "futbolfantasy", "team_slug": "t",
-         "player_slug": "starter-man", "player_name": "Starter Man",
-         "start_pct": "99", "role": "starter"},
-        {"observed_at": before, "source": "futbolfantasy", "team_slug": "other",
-         "player_slug": "elsewhere", "player_name": "Elsewhere",
-         "start_pct": "90", "role": "starter"},
-    ])
-    starters = typed("starters", [
-        {"match_id": "m1", "team_slug": "t", "player_slug": "starter-man",
-         "player_name": "Starter Man", "role": "starter", "minute": ""},
-        {"match_id": "m1", "team_slug": "t", "player_slug": "bench-man",
-         "player_name": "Bench Man", "role": "sub", "minute": ""},
-        {"match_id": "m1", "team_slug": "t", "player_slug": "surprise-man",
-         "player_name": "Surprise Man", "role": "starter", "minute": "45"},
-        {"match_id": "m9", "team_slug": "t", "player_slug": "starter-man",
-         "player_name": "Starter Man", "role": "starter", "minute": ""},
-    ])
-    outs = outcomes(lineups, starters, locks, {"m1": 1, "m9": 9})
-    by = {o.who: o for o in outs}
-    assert set(by) == {"t:starter-man", "t:bench-man", "t:vague-man",
-                       "t:surprise-man"}, by
-    assert (by["t:starter-man"].ff, by["t:starter-man"].mins) == (0.8, 90.0)
-    assert by["t:bench-man"].mins == 0.0
-    assert by["t:vague-man"].listed and by["t:vague-man"].ff is None
-    assert not by["t:vague-man"].in_squad
-    assert not by["t:surprise-man"].listed and by["t:surprise-man"].mins == 45.0
-    assert outcomes(lineups, [], locks, {}) == []
+    outs, cal = views(
+        [match("m1", 1, "t", "2026-08-15T21:30:00+02:00"), match("m9", 9, "t", "")],
+        [listing(before, "t", "starter-man", "80"), listing(before, "t", "bench-man", "20"),
+         listing(before, "t", "vague-man", ""), listing(after, "t", "starter-man", "99"),
+         listing(before, "other", "elsewhere", "90")],
+        [squad("m1", "t", "starter-man"), squad("m1", "t", "bench-man", "sub"),
+         squad("m1", "t", "surprise-man", "starter", "45"), squad("m9", "t", "starter-man")],
+        "SELECT player_slug, at, jornada, grp, player, listed, ff, status, mins FROM start_outcomes",
+        "SELECT neutral_start, absent_start FROM start_calibration")
+    assert {o[0]: o[1:] for o in outs} == {
+        "starter-man": ("2026-08-15T1930Z", 1, "m1:t", "starter-man", 1, 0.8, "ok", 90.0),
+        "bench-man": ("2026-08-15T1930Z", 1, "m1:t", "bench-man", 1, 0.2, "ok", 0.0),
+        "vague-man": ("2026-08-15T1930Z", 1, "m1:t", "vague-man", 1, None, "ok", 0.0),
+        "surprise-man": ("2026-08-15T1930Z", 1, "m1:t", "surprise-man", 0, None, "", 45.0),
+    }, outs
+    (neutral, absent), = cal
+    assert abs(neutral - (8 * 60 + 1 * 0) / 9) < 1e-9, neutral
+    assert abs(absent - (8 * 15 + 1 * 100) / 9) < 1e-9, absent
 
-    started = {o.ff: o.started for o in observations(outs)}
-    assert started == {0.8: 1.0, 0.2: 0.0, 0.6: 0.0, 0.15: 1.0}, started
-    npct, apct = fit_start_fallbacks(outs)
-    assert abs(npct - (8 * 60 + 1 * 0) / 9) < 1e-9, npct
-    assert abs(apct - (8 * 15 + 1 * 100) / 9) < 1e-9, apct
-    assert fit_start_fallbacks([]) == (60.0, 15.0)
+    weeks = ["2026-08-%02dT18:00:00+00:00" % d for d in (1, 8, 15, 22, 29)]
+    tally, last, rate = views(
+        [match("m%d" % j, j, "t", w) for j, w in enumerate(weeks, 1)],
+        [listing("2026-08-%02dT1000Z" % d, "t", "a", pct, status, note) for d, pct, status, note in
+         [(1, "80", "ok", ""), (8, "80", "ok", ""), (15, "80", "ok", ""),
+          (22, "0", "doubt", "Duda para la jornada 4"), (29, "70", "ok", "")]],
+        [squad("m%d" % j, "t", "a") for j in (1, 2, 3, 5)] + [squad("m4", "t", "b")],
+        "SELECT bucket, played, expected FROM availability_tally",
+        "SELECT player, pct FROM last_fit", "SELECT player, rate FROM fit_rate")
+    assert sorted(tally) == [("doubt_for:after", 1, 1.0), ("doubt_for:at", 0, 1.0)], \
+        "doubtful for 4, missed 4, back for 5"
+    assert last == [("a", 70.0)] and rate == [("a", 1.0)], (last, rate)
+
+    teams = ["t%d" % g for g in range(6)]
+    sharp = [(t, "p%d%s" % (i, t), pct, pct >= 70)
+             for t in teams for i, pct in enumerate([80, 70, 30, 20] * 2)]
+    (got,), = views(
+        [match("m" + t, 1, t, "2026-08-15T19:30:00+00:00") for t in teams],
+        [listing(before, t, slug, str(pct)) for t, slug, pct, _ in sharp],
+        [squad("m" + t, t, slug) for t, slug, _, played in sharp if played],
+        "SELECT alpha, beta, neutral_start, absent_start FROM start_calibration")
+    fitted = Calibration(*got)
+    assert fitted.beta > 1.0 and fitted.p(80.0) > 0.8, fitted
+
+    teams = ["t%d" % g for g in range(5)]
+    noise = [(t, "p%d%s" % (i, t), i % 2) for t in teams for i in range(4)]
+    (got,), = views(
+        [match("m" + t, 1, t, "2026-08-15T19:30:00+00:00") for t in teams],
+        [listing(before, t, slug, "50") for t, slug, _ in noise],
+        [squad("m" + t, t, slug) for t, slug, played in noise if played],
+        "SELECT alpha, beta FROM start_calibration")
+    assert got == (0.0, 1.0), "noise: the raw %"
+
+    (got,), = views([], [], [], "SELECT * FROM start_calibration")
+    assert got == (0.0, 1.0, NEUTRAL_START, ABSENT_START), "no outcomes yet: the constants"
 
     print("ffcore.startprob self-test OK")
 

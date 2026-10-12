@@ -321,7 +321,11 @@ DROP VIEW IF EXISTS k;
 CREATE VIEW k AS SELECT
     (SELECT value FROM constants WHERE name = 'CLIP') AS clip,
     (SELECT value FROM constants WHERE name = 'PRICE_WINDOW') AS price_window,
-    (SELECT value FROM constants WHERE name = 'BID_BEATS') AS bid_beats;
+    (SELECT value FROM constants WHERE name = 'BID_BEATS') AS bid_beats,
+    (SELECT value FROM constants WHERE name = 'MATCH_LEN') AS match_len,
+    (SELECT value FROM constants WHERE name = 'NEUTRAL_START') AS neutral_start,
+    (SELECT value FROM constants WHERE name = 'ABSENT_START') AS absent_start,
+    (SELECT value FROM constants WHERE name = 'FALLBACK_K') AS fallback_k;
 
 -- Each player's changes, all time, numbered (i), clipped at CLIP (x: so a
 -- long rise is not cut short), with the value each ends at.
@@ -456,3 +460,225 @@ r AS (SELECT ratio, row_number() OVER (ORDER BY ratio) - 1 AS i, count(*) OVER (
       FROM recent)
 SELECT coalesce((SELECT ratio FROM r, k WHERE i = min(cnt - 1, CAST(k.bid_beats * cnt AS INTEGER))),
                 1.0) AS premium;
+
+-- The jornada calendar, as of cut(). Each fixture's kickoff as last seen
+-- (a played match's page drops it) and its jornada, as a UTC stamp (as
+-- observed_at is).
+DROP VIEW IF EXISTS kickoffs;
+CREATE VIEW kickoffs AS
+SELECT home, away, jornada, kick FROM (
+    SELECT home, away, jornada, strftime('%Y-%m-%dT%H%MZ', kickoff) AS kick,
+           row_number() OVER (PARTITION BY home, away ORDER BY observed_at DESC, rowid DESC) AS n
+    FROM matches
+    WHERE observed_at <= (SELECT cut()) AND jornada IS NOT NULL
+      AND strftime('%Y-%m-%dT%H%MZ', kickoff) IS NOT NULL)
+WHERE n = 1;
+
+-- Results seen for a fixture no kickoff was ever seen for (jornada 1's,
+-- scraped after it was played), with when each was first seen.
+DROP VIEW IF EXISTS blind_results;
+CREATE VIEW blind_results AS
+SELECT home, away, jornada, min(observed_at) AS seen FROM matches m
+WHERE observed_at <= (SELECT cut()) AND score <> '' AND jornada IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM kickoffs k WHERE k.home = m.home AND k.away = m.away)
+GROUP BY home, away;
+
+-- When each jornada locks: its first kickoff. None for a jornada with a
+-- blind result (its first kickoff is not known).
+DROP VIEW IF EXISTS round_locks;
+CREATE VIEW round_locks AS
+SELECT jornada, min(kick) AS lock FROM kickoffs
+WHERE jornada NOT IN (SELECT jornada FROM blind_results)
+GROUP BY jornada;
+
+-- When each jornada's next match still to play kicks off (a postponed
+-- match dates the rest of its jornada): what the season ahead is
+-- ordered and dated by.
+DROP VIEW IF EXISTS rounds_ahead;
+CREATE VIEW rounds_ahead AS
+SELECT k.jornada, min(k.kick) AS next FROM kickoffs k
+WHERE NOT EXISTS (SELECT 1 FROM current_matches m
+                  WHERE m.home = k.home AND m.away = k.away AND m.score <> '')
+GROUP BY k.jornada;
+
+DROP VIEW IF EXISTS match_jornada;
+CREATE VIEW match_jornada AS
+SELECT match_id, jornada FROM current_matches WHERE jornada IS NOT NULL;
+
+-- When each club's matches count as played, to credit points to: the
+-- kickoff, else when the result was first seen.
+DROP VIEW IF EXISTS club_games;
+CREATE VIEW club_games AS
+WITH g AS (SELECT home, away, jornada, kick AS at FROM kickoffs
+           UNION ALL SELECT home, away, jornada, seen FROM blind_results)
+SELECT home AS club, jornada, at FROM g WHERE home <> ''
+UNION ALL SELECT away, jornada, at FROM g WHERE away <> '';
+
+-- Points: each change in a player's points total this season, credited
+-- to the jornada of his club's last match by then (any club's, if his club
+-- is not known); not the first fetch's, which is the season so far. id
+-- is the points row's: the order they were stored.
+DROP VIEW IF EXISTS scored;
+CREATE VIEW scored AS
+WITH s AS (SELECT max(season) AS season, min(observed_at) AS first FROM points
+           WHERE observed_at <= (SELECT cut())
+             AND season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut()))),
+p AS (SELECT ff_id, observed_at AS at, points, games, points.rowid AS id,
+             lag(points, 1, 0.0) OVER w AS points0, lag(games, 1, 0.0) OVER w AS games0
+      FROM points, s
+      WHERE observed_at <= (SELECT cut()) AND points.season = s.season AND ff_id <> ''
+      WINDOW w AS (PARTITION BY ff_id ORDER BY observed_at, points.rowid)),
+c AS (SELECT ff_id, nullif(club, '') AS club FROM current_market WHERE ff_id <> '' GROUP BY ff_id),
+g AS MATERIALIZED (SELECT club, jornada, at FROM club_games
+                   UNION ALL SELECT '*', jornada, at FROM club_games),
+credited AS (
+    SELECT p.ff_id AS player, p.at, p.id, p.points - p.points0 AS pts, p.games - p.games0 AS games,
+           (SELECT g.jornada FROM g WHERE g.club = coalesce(c.club, '*') AND g.at <= p.at
+            ORDER BY g.at DESC, g.jornada DESC LIMIT 1) AS jornada
+    FROM p, s LEFT JOIN c ON c.ff_id = p.ff_id
+    WHERE p.at > s.first AND NOT (p.points IS p.points0 AND p.games IS p.games0))
+SELECT player, jornada, pts, games, at, id FROM credited WHERE jornada IS NOT NULL;
+
+-- Who was in each matchday squad (starters' starters and subs) and his
+-- minutes: a starter the whole match unless he came off, a sub none
+-- unless he came on.
+DROP VIEW IF EXISTS squad_minutes;
+CREATE VIEW squad_minutes AS
+SELECT s.match_id, s.team_slug, s.player_slug, s.player, mj.jornada,
+       max(0.0, CASE s.role WHEN 'starter' THEN coalesce(s.minute, k.match_len)
+                            ELSE coalesce(k.match_len - s.minute, 0.0) END) AS mins
+FROM current_starters s JOIN match_jornada mj USING (match_id), k
+WHERE s.role IN ('starter', 'sub') AND s.player_slug <> '';
+
+-- Each scoring player's jornadas: his points (scored) and minutes.
+DROP VIEW IF EXISTS player_jornadas;
+CREATE VIEW player_jornadas AS
+SELECT player, jornada, sum(pts) AS pts, sum(mins) AS mins FROM (
+    SELECT player, jornada, pts, 0.0 AS mins FROM scored
+    UNION ALL
+    SELECT player, jornada, 0.0, mins FROM squad_minutes
+    WHERE player IN (SELECT player FROM scored))
+GROUP BY player, jornada;
+
+-- His season so far: points, appearances, and matchday squads (jornadas
+-- he scored or was in the squad).
+DROP VIEW IF EXISTS season_record;
+CREATE VIEW season_record AS
+SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
+FROM player_jornadas GROUP BY player;
+
+-- Starts: each matchday squad (starters) against futbolfantasy's listing
+-- of that club before the jornada locked. Each player in either, with
+-- his last listing by then (start % as a share, status, note) and his
+-- minutes: what selection and availability are fitted on.
+DROP VIEW IF EXISTS start_outcomes;
+CREATE VIEW start_outcomes AS
+WITH games AS MATERIALIZED (
+    SELECT DISTINCT s.match_id, s.team_slug, s.jornada, r.lock
+    FROM squad_minutes s JOIN round_locks r USING (jornada)),
+last AS MATERIALIZED (
+    SELECT g.match_id, g.team_slug,
+           (SELECT l.rowid FROM lineups l
+            WHERE l.team_slug = g.team_slug AND l.player_slug = c.player_slug
+              AND l.observed_at <= g.lock
+            ORDER BY l.observed_at DESC, l.rowid DESC LIMIT 1) AS row
+    FROM games g JOIN (SELECT DISTINCT team_slug, player_slug FROM lineups) c USING (team_slug)),
+listed AS MATERIALIZED (
+    SELECT last.match_id, l.team_slug, l.player_slug, l.start_pct, l.status, l.note, f.player
+    FROM last JOIN lineups l ON l.rowid = last.row
+    LEFT JOIN ff_identity f ON f.player_slug = l.player_slug AND f.player_name = l.player_name
+         AND f.team_slug = l.team_slug),
+squad AS (SELECT * FROM squad_minutes WHERE match_id IN (SELECT match_id FROM games))
+SELECT g.lock AS at, g.jornada, g.match_id || ':' || g.team_slug AS grp, k.player_slug,
+       coalesce(li.player, sq.player) AS player, li.player_slug IS NOT NULL AS listed,
+       li.start_pct / 100.0 AS ff,
+       CASE WHEN li.player_slug IS NULL THEN '' ELSE coalesce(nullif(li.status, ''), 'ok') END AS status,
+       coalesce(li.note, '') AS note, coalesce(sq.mins, 0.0) AS mins
+FROM (SELECT match_id, team_slug, player_slug FROM listed
+      UNION SELECT match_id, team_slug, player_slug FROM squad) k
+JOIN games g USING (match_id, team_slug)
+LEFT JOIN listed li USING (match_id, team_slug, player_slug)
+LEFT JOIN squad sq USING (match_id, team_slug, player_slug);
+
+-- How often each player played when listed fit (3 such listings or more):
+-- what the chance he is fit under a prognosis is measured against.
+DROP VIEW IF EXISTS fit_rate;
+CREATE VIEW fit_rate AS
+SELECT player, avg(mins > 0) AS rate FROM start_outcomes
+WHERE player <> '' AND listed AND status = 'ok'
+GROUP BY player HAVING count(*) >= 3;
+
+-- Each player's last start % while listed fit: his selection before a flag.
+DROP VIEW IF EXISTS last_fit;
+CREATE VIEW last_fit AS
+SELECT player, pct FROM (
+    SELECT player, 100 * ff AS pct, row_number() OVER (PARTITION BY player ORDER BY at DESC, grp DESC) AS n
+    FROM start_outcomes WHERE player <> '' AND listed AND status = 'ok' AND ff IS NOT NULL)
+WHERE n = 1;
+
+-- Each prognosis, as listed at one lock, against whether the player played
+-- in that jornada and each later one, by where the later one falls against
+-- it (prognosis_bucket: startprob.bucket): played, and the plays his fit
+-- rate expects. Availability shrinks played / expected toward the bucket's
+-- literal reading.
+DROP VIEW IF EXISTS availability_tally;
+CREATE VIEW availability_tally AS
+WITH o AS MATERIALIZED (
+    SELECT player, jornada, at, status, note, mins > 0 AS played FROM (
+        SELECT *, row_number() OVER (PARTITION BY player, jornada ORDER BY at DESC, grp DESC) AS n
+        FROM start_outcomes WHERE player <> '')
+    WHERE n = 1),
+pairs AS (
+    SELECT prognosis_bucket(i.status, i.note, i.at, j.jornada, j.at, i.jornada) AS bucket,
+           j.played, f.rate
+    FROM o i JOIN fit_rate f USING (player) JOIN o j ON j.player = i.player AND j.jornada >= i.jornada
+    WHERE i.status NOT IN ('', 'ok'))
+SELECT bucket, sum(played) AS played, sum(rate) AS expected FROM pairs
+WHERE bucket IS NOT NULL GROUP BY bucket;
+
+-- What a start % means for selection: a Platt curve (alpha + beta x its
+-- log-odds), the grid point with least squared error on fit players'
+-- outcomes, kept only if it beats the raw % held out a squad at a time
+-- (fitted without that squad, scored on it); else the raw %. A player
+-- listed with no % counts as neutral_start, one not listed as absent_start:
+-- each the share of such players who played, shrunk toward the constant.
+DROP VIEW IF EXISTS start_calibration;
+CREATE VIEW start_calibration AS
+WITH RECURSIVE n(v) AS (SELECT 0 UNION ALL SELECT v + 1 FROM n WHERE v < 14),
+o AS MATERIALIZED (SELECT grp, listed, ff, mins > 0 AS y FROM start_outcomes
+                   WHERE status IN ('', 'ok')),
+fall AS MATERIALIZED (
+    SELECT 100 * (k.fallback_k * k.neutral_start / 100 + vague_played) / (k.fallback_k + vague) AS neutral,
+           100 * (k.fallback_k * k.absent_start / 100 + absent_played) / (k.fallback_k + absent) AS absent
+    FROM k, (SELECT count(*) FILTER (WHERE listed AND ff IS NULL) AS vague,
+                    coalesce(sum(y) FILTER (WHERE listed AND ff IS NULL), 0) AS vague_played,
+                    count(*) FILTER (WHERE NOT listed) AS absent,
+                    coalesce(sum(y) FILTER (WHERE NOT listed), 0) AS absent_played FROM o)),
+obs AS MATERIALIZED (
+    SELECT grp, coalesce(ff, CASE WHEN listed THEN neutral ELSE absent END / 100) AS x,
+           count(*) AS n, sum(y) AS ys
+    FROM o, fall GROUP BY grp, x),
+grid AS (SELECT a.v AS i, b.v AS j, round(-3.0 + 0.5 * a.v, 1) AS alpha,
+                round(0.2 + 0.4 * b.v, 1) AS beta
+         FROM n a, n b WHERE a.v <= 12),
+pred AS MATERIALIZED (
+    SELECT i, j, alpha, beta, x, CASE WHEN alpha = 0 AND beta = 1 THEN x ELSE platt(x, alpha, beta) END AS p
+    FROM grid, (SELECT DISTINCT x FROM obs)),
+sse AS MATERIALIZED (
+    SELECT i, j, grp, sum(n * p * p - 2 * p * ys + ys) AS e
+    FROM obs JOIN pred USING (x) GROUP BY i, j, grp),
+total AS MATERIALIZED (SELECT i, j, sum(e) AS e FROM sse GROUP BY i, j),
+held AS (
+    SELECT grp, e FROM (
+        SELECT s.grp, s.e, row_number() OVER (PARTITION BY s.grp ORDER BY t.e - s.e, s.i, s.j) AS n
+        FROM sse s JOIN total t USING (i, j))
+    WHERE n = 1),
+best AS (SELECT alpha, beta FROM total JOIN grid USING (i, j) ORDER BY e, i, j LIMIT 1),
+fits AS (
+    SELECT (SELECT sum(n) FROM obs) >= 3 AND (SELECT count(DISTINCT grp) FROM obs) >= 2
+           AND (SELECT sum(e) FROM held) < (SELECT e FROM total JOIN grid USING (i, j)
+                                            WHERE alpha = 0 AND beta = 1) AS better)
+SELECT CASE WHEN better THEN best.alpha ELSE 0.0 END AS alpha,
+       CASE WHEN better THEN best.beta ELSE 1.0 END AS beta,
+       fall.neutral AS neutral_start, fall.absent AS absent_start
+FROM fits, fall LEFT JOIN best;
