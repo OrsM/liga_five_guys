@@ -14,6 +14,7 @@ from typing import Any
 
 from ffcore.clock import cut
 from ffcore.names import Name
+from ffcore.rules import position
 from ffcore.startprob import platt, prognosis_bucket
 
 __all__ = ["DB", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
@@ -31,11 +32,12 @@ _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has appl
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (now, as a stamp: the model's
     clock unless told otherwise), name_key() and name_shown() (Name's),
-    platt() and prognosis_bucket() (startprob's)."""
+    platt() and prognosis_bucket() (startprob's), position() (rules')."""
     db.create_function("cut", 0, now)
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
     db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
     db.create_function("platt", 3, platt, deterministic=True)
+    db.create_function("position", 1, position, deterministic=True)
     db.create_function("prognosis_bucket", 6, prognosis_bucket, deterministic=True)
 
 

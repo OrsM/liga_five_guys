@@ -1,16 +1,12 @@
-"""The players table the decision reads: market and probable-XI rows merged
-per player, and the crosswalk of ids between the sources."""
+"""The crosswalk of ids between the sources (the registry, players.csv)."""
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
 
-from ffcore.parse import Rows, text
-from ffcore.tidy import LINEUP_SOURCE, Stamp, current, mtime_cached, table_path
+from ffcore.tidy import Stamp, mtime_cached, table_path
 
 from ffcore.crosswalk import Crosswalk
-__all__ = ["load_crosswalk", "load_players", "MARKET_FIELDS", "XI_FIELDS"]
+__all__ = ["load_crosswalk"]
 
 
 _XW_CACHE: dict[str, tuple[Stamp, Crosswalk]] = {}
@@ -30,69 +26,13 @@ def load_crosswalk() -> Crosswalk:
     return mtime_cached(path, _XW_CACHE, str(path), _read, path) or Crosswalk()
 
 
-MARKET_FIELDS = [("team", "team"), ("club", "club"), ("pos", "position"),
-                 ("value", "value"), ("delta_1d", "delta_1d")]
-
-
-XI_FIELDS = [("club", "team_slug"), ("start", "start_pct"), ("status", "status")]
-
-
-def _merge(players: dict[str, dict[str, Any]], rows: Rows,
-           key_of: Callable[[Mapping[str, Any]], str | None], name_col: str,
-           fields: list[tuple[str, str]]) -> dict[str, dict[str, Any]]:
-    for r in rows:
-        key = key_of(r)
-        if not key:
-            continue
-        rec = players.setdefault(key, {})
-        rec.setdefault("name", (r.get(name_col) or "").strip())
-        for field, col in fields:
-            val = r.get(col)
-            if isinstance(val, str):
-                val = val.strip()
-            if field not in rec and val not in (None, ""):
-                rec[field] = val
-    return players
-
-
-def load_players() -> dict[str, dict[str, Any]]:
-    market, xi = current("market"), current("lineups", LINEUP_SOURCE)
-    if not market and not xi:
-        raise SystemExit("no rows in %s — run `ingest.py parse` first" % table_path("players").parent)
-    players = _merge({}, market, lambda r: text(r, "ff_id"), "name", MARKET_FIELDS)
-    return _merge(players, xi, lambda r: r.get("player"), "player_name", XI_FIELDS)
-
-
 def _selftest() -> None:
     import tempfile
     from pathlib import Path
 
     from ffcore.crosswalk import PLAYER_COLS
-    from ffcore.tidy import tables_in, typed, write_csv
+    from ffcore.tidy import tables_in, write_csv
 
-
-    mkt = typed("market", [{"ff_id": "ane", "name": "Ane Aldea", "team": "Alavés", "position": "defensa",
-            "value": "2.050.000", "delta_1d": "-12.000"},
-           {"ff_id": "bo", "name": "Bo Bidal", "team": "Betis", "position": "delantero",
-            "value": "", "delta_1d": "0"}])
-    xi = typed("lineups", [{"player": "ane", "player_name": "Ane Aldea", "team_slug": "alaves",
-           "start_pct": "0.72", "status": "doubt"},
-          {"player": "cai", "player_name": "Cai Coro", "team_slug": "celta",
-           "start_pct": "85", "status": "ok"}])
-    p = _merge(_merge({}, mkt, lambda r: text(r, "ff_id"), "name", MARKET_FIELDS), xi,
-               lambda r: r.get("player"), "player_name", XI_FIELDS)
-
-    a = p["ane"]
-    assert a["value"] == 2050000.0 and a["delta_1d"] == -12000.0
-    assert a["pos"] == "defensa" and a["start"] == 72.0 and a["status"] == "doubt"
-    assert a["team"] == "Alavés" and a["name"] == "Ane Aldea"
-
-    assert "value" not in p["bo"] and p["bo"]["delta_1d"] == 0.0
-    assert "start" not in p["bo"]
-
-    c = p["cai"]
-    assert c["name"] == "Cai Coro" and c["club"] == "celta" and c["start"] == 85.0
-    assert "value" not in c
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:

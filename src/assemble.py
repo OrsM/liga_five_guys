@@ -9,20 +9,19 @@ from functools import cache
 from typing import Any, NamedTuple
 
 from decide import CONFIDENCE, FINAL_TRIALS, Universe, _fieldable
-from ffcore.db import connect, named, rows
+from ffcore.db import connect, named, query, rows
 from ffcore.fixture import FIX_BAND, MIN_AD_MATCHES, Ratings, difficulty_ratings
 from ffcore.forecast import MIN_POOL, PERSISTENT_SHARE, Bootstrap
 from ffcore.jornadas import load_deadline, rounds_ahead
 from ffcore.league import League
-from ffcore.market import Market, market_routes, pending
+from ffcore.market import Market
 from ffcore.names import Name
 from ffcore.parse import Rows, kickoff_stamp
-from ffcore.players import load_players
 from ffcore.points import scored, season_record
 from ffcore.pricing import BID_BEATS, CLIP, PRICE_WINDOW
 from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import PROMOTED_DISCOUNT_K, SHRINK_K, fit_promoted_discount, Scorer
-from ffcore.rules import MATCH_LEN, position
+from ffcore.rules import MATCH_LEN
 from ffcore.season import LeagueState
 from ffcore.startprob import (ABSENT_START, AVAIL_K, FALLBACK_K, NEUTRAL_START, PICK_K,
                               Availability, Calibration, StartOdds, fit_availability)
@@ -76,15 +75,6 @@ def app_status() -> dict[str, str]:
             if (k := r.get("player")) and r.get("player_status")}
 
 
-def open_clauses(teams: Rows) -> dict[str, float]:
-    """Each owned player's release clause: any can be paid now. Checked
-    against the league's own clause buys: each paid exactly the listed
-    clause, to the owner, and two came before the player's buyout_until
-    (Luismi Cruz, Yamal), so that date protects no one."""
-    return {r["key"]: amount for r in teams
-            if r.get("key") and (amount := r.get("buyout"))}
-
-
 def fixture_ratings(market: Rows) -> Ratings:
     return difficulty_ratings(market, current("results_history"))
 
@@ -133,6 +123,12 @@ def price_change(day: str, h: int) -> dict[str, float]:
     before day, all time (0 where there are not h more): what a replay
     looks back on."""
     return dict(named("price_change", {"day": day, "h": h})[1])
+
+
+def market_facts() -> dict[str, dict[str, Any]]:
+    """player_facts as of cut(), by player."""
+    cols, got = query("SELECT * FROM player_facts")
+    return {r[0]: dict(zip(cols[1:], r[1:])) for r in got}
 
 
 def premium() -> float:
@@ -191,22 +187,13 @@ def built() -> Built:
     mkt_rows = current("market")
     sc = scorer(mkt_rows, current("lineups", LINEUP_SOURCE))
     me = lg.me
-    players = load_players()
     m = current("matches")
+    facts = market_facts()
 
-    teams, mkt = ([dict(r, key=r.get("player"))
-                   for r in current(name)] for name in ("api_teams", "api_market"))
-    price, route = market_routes(mkt)
-    pt_to_key = {r["player_team_id"]: r["key"] for r in teams
-                 if r["key"] and r.get("player_team_id")}
-
-    value = {k: rec["value"] for k, rec in players.items() if rec.get("value")}
-    offers = current("api_offers")
-    received_offers = pending(
-        [dict(r, key=pt_to_key.get(r.get("player_team_id") or ""))
-         for r in offers], "status", "money")
-    pos = {k: position((rec.get("pos") or "").upper())
-           for k, rec in players.items()}
+    def column(c: str) -> dict[str, Any]:
+        return {k: f[c] for k, f in facts.items() if f[c] is not None}
+    pos = column("pos")
+    price = column("price")
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
     ratings = fixture_ratings(mkt_rows)
@@ -215,19 +202,13 @@ def built() -> Built:
     prices = price_momentum()
     market = Market(
         cash=lg.cash[me], premium=premium(),
-        name={k: Name(rec.get("name") or k) for k, rec in players.items()},
-        pos=pos,
-        price={k: v for k, v in price.items() if k in players},
-        route={k: v for k, v in route.items() if k in players},
-        owner={k: v for k, v in lg.owner.items() if k in players},
-        paid={k: v for k, v in lg.paid.items() if k in players},
-        offer={k: v for k, v in received_offers.items() if k in lg.squad(me)},
+        name={k: Name(f["name"]) for k, f in facts.items()},
+        pos=pos, price=price, route=column("route"), owner=column("owner"),
+        paid=column("paid"), offer=column("offer"),
         offer_ratios=tuple(market_offer_ratios()),
-        nights_left=_nights_left(offers),
-        value={k: v for k, v in value.items() if k in players},
-        my_bid=pending(mkt, "bid_status", "bid_money"),
-        trend=prices.trend, carry=prices.carry,
-        clause={k: v for k, v in open_clauses(teams).items() if k in players})
+        nights_left=_nights_left(current("api_offers")),
+        value=column("value"), my_bid=column("my_bid"),
+        trend=prices.trend, carry=prices.carry, clause=column("clause"))
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
     if rem:
@@ -273,7 +254,67 @@ def _selftest() -> None:
     assert got[("startprob.availability", "doubt_for:at")]["kind"] == "fitted", \
         "a bucket with no data keeps its prior, and is still what the run used"
     _selftest_market()
+    _selftest_facts()
     print("assemble self-test OK")
+
+
+def _selftest_facts() -> None:
+    """schema.sql's player_facts, as market_facts reads it."""
+    import tempfile
+    from pathlib import Path
+
+    from ffcore.clock import set_now
+    from ffcore.db import record
+    from ffcore.parse import snapshot_stamp
+    from ffcore.tidy import store_sql, tables_in
+
+    a = "2026-09-02T1000Z"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(snapshot_stamp("2026-09-03T0000Z"))
+            record([{"me": "me", "budget": 100e6}], "league_config")
+            record([{"player_id": k, "app_id": app, "ff_slug": slug} for k, app, slug in
+                    [("p1", "1", ""), ("p2", "2", ""), ("p3", "3", ""), ("p4", "", "cai"),
+                     ("p5", "5", "")]], "crosswalk")
+            store_sql("market", [{"observed_at": a, "ff_id": k, "name": n, "position": pos,
+                                  "value": v} for k, n, pos, v in
+                                 [("p1", "ana uno", "defensa", "5000000"),
+                                  ("p2", "Bo Dos", "delantero", "0"),
+                                  ("p3", "Cy Tres", "portero", "3000000"),
+                                  ("p5", "Di Cinco", "utillero", "1000000")]])
+            store_sql("lineups", [{"observed_at": a, "source": "futbolfantasy", "team_slug": "c",
+                                   "player_slug": "cai", "player_name": "Cai Cuatro"}])
+            store_sql("api_standings", [{"observed_at": a, "user_id": u, "manager": m}
+                                        for u, m in (("1", "me"), ("2", "riv"))])
+            store_sql("api_teams", [{"observed_at": a, "player_id": app, "manager": m,
+                                     "buyout": b, "player_team_id": pt} for app, m, b, pt in
+                                    [("1", "me", "9000000", "t1"), ("3", "riv", "", "t3")]])
+            store_sql("api_market", [{"observed_at": a, "player_id": app, "sale_price": price,
+                                      "seller": seller, "bid_status": st, "bid_money": bid}
+                                     for app, price, seller, st, bid in
+                                     [("2", "2000000", "marketPlayerTeam", "pending", "2500000"),
+                                      ("5", "1000000", "marketPlayerLeague", "", ""),
+                                      ("3", "", "marketPlayerLeague", "pending", "")]])
+            store_sql("api_offers", [{"observed_at": a, "player_team_id": pt, "status": st,
+                                      "money": m, "offer_id": i} for pt, st, m, i in
+                                     [("t1", "pending", "6000000", "o1"),
+                                      ("t1", "pending", "5000000", "o2"),
+                                      ("t1", "accepted", "9000000", "o3"),
+                                      ("t3", "pending", "4000000", "o4")]])
+            got = market_facts()
+        finally:
+            set_now(None)
+    assert set(got) == {"p1", "p2", "p3", "p4", "p5"}, "every player the market or a line-up names"
+    assert got["p1"] == {"name": "ana uno", "pos": "DEF", "value": 5e6, "owner": "me",
+                         "clause": 9e6, "price": None, "route": None, "my_bid": None,
+                         "offer": 6e6, "paid": None, "trend": None}, got["p1"]
+    assert (got["p2"]["value"], got["p2"]["price"], got["p2"]["route"], got["p2"]["my_bid"]) \
+        == (None, 2e6, "listed", 2.5e6), "a value of 0 is none; a manager's listing; your bid"
+    assert (got["p5"]["route"], got["p5"]["pos"]) == ("free", "MED"), \
+        "the game's own sale is free; a position the game does not field counts as MED"
+    assert got["p3"]["offer"] is None and got["p3"]["clause"] is None \
+        and got["p3"]["my_bid"] is None, "offers only on yours; no clause, no bid amount: none"
+    assert (got["p4"]["name"], got["p4"]["pos"]) == ("Cai Cuatro", "MED"), got["p4"]
 
 
 def _selftest_market() -> None:

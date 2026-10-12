@@ -339,6 +339,45 @@ SELECT player, amount AS paid FROM (
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
+-- Every player the market or a futbolfantasy line-up names, as of cut():
+-- his name and position, what he is worth (market value; 0 is none),
+-- whether he is on sale (price; route: listed by a manager, else free,
+-- the game's own), your pending bid, his owner and release clause (any can
+-- be paid now), the best offer standing on him if he is yours, what his
+-- owner paid, his price trend. What Market is built from (assemble) and
+-- the board shows.
+DROP VIEW IF EXISTS player_facts;
+CREATE VIEW player_facts AS
+WITH who AS (
+    SELECT ff_id AS player, trim(name) AS name, position, value FROM current_market
+    WHERE ff_id <> ''
+    UNION ALL
+    SELECT player, trim(player_name), '', NULL FROM current_lineups
+    WHERE source = 'futbolfantasy' AND player IS NOT NULL
+      AND player NOT IN (SELECT ff_id FROM current_market)),
+sale AS (SELECT player, sale_price AS price,
+                CASE seller WHEN 'marketPlayerTeam' THEN 'listed' ELSE 'free' END AS route
+         FROM current_api_market WHERE player IS NOT NULL AND sale_price <> 0),
+bid AS (SELECT player, max(bid_money) AS my_bid FROM current_api_market
+        WHERE player IS NOT NULL AND bid_status = 'pending' AND bid_money <> 0
+        GROUP BY player),
+offer AS (SELECT t.player, max(o.money) AS offer FROM current_api_offers o
+          JOIN current_api_teams t ON t.player_team_id = o.player_team_id
+          WHERE o.player_team_id <> '' AND o.status = 'pending' AND o.money <> 0
+            AND t.player IS NOT NULL
+          GROUP BY t.player),
+clause AS (SELECT player, buyout AS clause FROM current_api_teams
+           WHERE player IS NOT NULL AND buyout <> 0)
+SELECT w.player, coalesce(nullif(w.name, ''), w.player) AS name,
+       position(upper(w.position)) AS pos, nullif(w.value, 0) AS value,
+       o.manager AS owner, c.clause, s.price, s.route, b.my_bid,
+       CASE WHEN o.manager = (SELECT me FROM league_config) THEN f.offer END AS offer,
+       p.paid, t.trend
+FROM who w LEFT JOIN owners o USING (player) LEFT JOIN clause c USING (player)
+LEFT JOIN sale s USING (player) LEFT JOIN bid b USING (player)
+LEFT JOIN offer f USING (player) LEFT JOIN price_paid p USING (player)
+LEFT JOIN price_trend t ON t.ff_id = w.player;
+
 -- The market as it closed each day: the rows of each day's last snapshot
 -- (each snapshot holds the whole market). Values move once a day; the
 -- change from one day's to the next is a step.
