@@ -134,6 +134,14 @@ data/raw tarballs
   the SQL store's test. Learned: removing an ignore list for files still
   on disk let the report commit take them (fixed: data/tidy/*.csv ignored
   but players.csv).
+- Simplify (done, e70fbfc; Miguel: "you are just porting to SQL"): a slice
+  may change boards when each change is explained and the backtest is no
+  worse. Storage is two rules (snapshot: every fetch; keyed: a row again only
+  when it changes), declared in tables.sql with hand-written views and
+  triggers; rows carry their player (identity.sql: app_player, ff_identity);
+  Crosswalk is the registry only; row_key gone; logic queries are named.
+  Backtest: forecast error the same, flagged players 1.433 -> 1.168. Cost:
+  lfg.db 33 -> 86MB, a universe 6.1 -> 9.7s. Code lines 6128 -> 5989.
 - S4b (next) Points and line-ups: `scored`, start outcomes, availability counts.
 - S6 The board as a saved query; the phone's JSON its export.
 - Then the old phase 3 rest: tunnel route, `Fantasy.jsx` links, Run again
