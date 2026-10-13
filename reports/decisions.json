@@ -1,57 +1,24 @@
 {
- "generated_at": "2026-10-13T19:46Z",
+ "generated_at": "2026-10-13T20:38Z",
  "lock_at": "2026-10-16T19:00:00+00:00",
- "cash": 14216854.0,
- "cash_locked": 65568523.0,
- "finish": 2.02,
- "p_win": 0.191,
+ "cash": -51251669.0,
+ "cash_locked": 0,
+ "finish": 1.87,
+ "p_win": 0.261,
  "band": [
-  1817.486897433531,
-  2094.840777566943
+  1849.336498660213,
+  2128.014415754659
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Ante Budimir",
+   "label": "field German Valera",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 4.482226069282137,
+   "gain": 2.201820280643717,
    "per": "next",
    "facts": []
-  },
-  {
-   "name": "Ante Budimir",
-   "pos": "DEL",
-   "what": "buy",
-   "label": "buy Ante Budimir",
-   "step": "bid in",
-   "amount": 65568523.0,
-   "done": true,
-   "gain": 68.3747650800226,
-   "per": "season",
-   "facts": [
-    [
-     "asking",
-     66108583.0,
-     "money"
-    ],
-    [
-     "",
-     1.014690686469098,
-     "per_million"
-    ],
-    [
-     "better off in",
-     0.95,
-     "seasons"
-    ],
-    [
-     "",
-     -7.35665271107363,
-     "trend"
-    ]
-   ]
   },
   {
    "name": "Miguel Cubo",
@@ -59,14 +26,14 @@
    "what": "sell",
    "label": "sell Miguel Cubo",
    "step": "wait",
-   "amount": 574417.9796201648,
+   "amount": 563548.6834565047,
    "done": true,
    "gain": 0.0,
    "per": "season",
    "facts": [
     [
      "raises",
-     574417.9796201648,
+     563548.6834565047,
      "money"
     ],
     [
@@ -76,7 +43,7 @@
     ],
     [
      "offer",
-     524991.0,
+     562376.0,
      "money"
     ]
    ]
@@ -87,24 +54,24 @@
    "what": "sell",
    "label": "sell Lucien Agoume",
    "step": "wait",
-   "amount": 18812136.072421238,
+   "amount": 18450444.434886288,
    "done": true,
-   "gain": -15.71203002264781,
+   "gain": -7.64614319178429,
    "per": "season",
    "facts": [
     [
      "raises",
-     18812136.072421238,
+     18450444.434886288,
      "money"
     ],
     [
      "",
-     -0.8352071217304124,
+     -0.41441512256078156,
      "per_million"
     ],
     [
      "offer",
-     16138646.0,
+     16597833.0,
      "money"
     ]
    ]
@@ -114,38 +81,38 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Zaid Romero",
-   "step": "wait",
-   "amount": 36921118.06868073,
+   "step": "listed",
+   "amount": null,
    "done": true,
-   "gain": -34.878632129571656,
+   "gain": -27.14870754928927,
    "per": "season",
    "facts": [
     [
      "raises",
-     36921118.06868073,
+     36807995.0,
      "money"
     ],
     [
      "",
-     -0.9446797376149433,
+     -0.737576375711018,
      "per_million"
-    ],
-    [
-     "offer",
-     36156307.0,
-     "money"
     ]
    ]
   }
  ],
- "plan_gain": 28.379902291780695,
- "cash_after": 3139690.5330891665,
- "ping": "field Ante Budimir",
+ "plan_gain": 0.0,
+ "cash_after": 4570319.1183427945,
+ "ping": "field German Valera",
  "exposed": [
   {
    "name": "Mathew Ryan",
    "pos": "POR",
    "clause": 24121152.0
+  },
+  {
+   "name": "Ante Budimir",
+   "pos": "DEL",
+   "clause": 65568523.0
   },
   {
    "name": "Natan",
@@ -225,7 +192,7 @@
    "trend": -11.361224091932483,
    "paid": 21511188.0,
    "per_million": null,
-   "offer": 25453573.0
+   "offer": null
   },
   {
    "name": "Marcos Alonso",
@@ -237,8 +204,8 @@
    "value": 21542504.0,
    "trend": 6.206648296220618,
    "paid": 28589508.0,
-   "per_million": -2.0150767686898634,
-   "offer": 21463724.0
+   "per_million": -2.7806070390234825,
+   "offer": 21316809.0
   },
   {
    "name": "Dakonam Djene",
@@ -250,8 +217,8 @@
    "value": 24425020.0,
    "trend": -3.6490821047187807,
    "paid": 16059124.0,
-   "per_million": -0.9039784437671374,
-   "offer": 24320698.0
+   "per_million": -1.5543176289676062,
+   "offer": 24814244.0
   },
   {
    "name": "Yeray Alvarez",
@@ -263,8 +230,8 @@
    "value": 4576230.0,
    "trend": -11.134900262710987,
    "paid": 6931556.0,
-   "per_million": -1.0791365375075286,
-   "offer": 4352329.0
+   "per_million": -2.7179020833811016,
+   "offer": 4356422.0
   },
   {
    "name": "Zaid Romero",
@@ -276,21 +243,21 @@
    "value": 36807995.0,
    "trend": -24.354157525635145,
    "paid": 28662117.0,
-   "per_million": -0.9446797376149433,
-   "offer": 36156307.0
+   "per_million": -0.737576375711018,
+   "offer": null
   },
   {
    "name": "Natan",
    "pos": "DEF",
-   "xi": true,
+   "xi": false,
    "start": 0.8954028084310893,
    "next": 3.021741062998637,
    "season": 155.14171039830225,
    "value": 61116982.0,
    "trend": -4.726584788319135,
    "paid": 37492727.0,
-   "per_million": -1.0149207590079667,
-   "offer": 60833886.0
+   "per_million": -1.2465314373084528,
+   "offer": 63533193.0
   },
   {
    "name": "German Valera",
@@ -302,8 +269,8 @@
    "value": 13840577.0,
    "trend": -2.918269752344875,
    "paid": 13966262.0,
-   "per_million": -1.8054105736375352,
-   "offer": 14400439.0
+   "per_million": -2.9188185606920576,
+   "offer": 15051213.0
   },
   {
    "name": "Pablo Fornals",
@@ -315,8 +282,8 @@
    "value": 40710220.0,
    "trend": -0.9182972591136693,
    "paid": 58220110.0,
-   "per_million": -0.9386657868777846,
-   "offer": 40537484.0
+   "per_million": -1.4056891492191916,
+   "offer": 39694725.0
   },
   {
    "name": "Pepelu",
@@ -328,8 +295,8 @@
    "value": 17572871.0,
    "trend": 24.66198882420928,
    "paid": null,
-   "per_million": -1.6347586855019642,
-   "offer": 15711976.0
+   "per_million": -2.6591672141516107,
+   "offer": null
   },
   {
    "name": "Lucien Agoume",
@@ -341,8 +308,8 @@
    "value": 17966164.0,
    "trend": 5.733248396001565,
    "paid": 5891526.0,
-   "per_million": -0.8352071217304124,
-   "offer": 16138646.0
+   "per_million": -0.41441512256078156,
+   "offer": 16597833.0
   },
   {
    "name": "Miguel Roman",
@@ -354,8 +321,21 @@
    "value": 15975331.0,
    "trend": -21.199978988717344,
    "paid": 5307217.0,
-   "per_million": -2.88112019644885,
-   "offer": 17442740.0
+   "per_million": -3.7254945385549663,
+   "offer": 16828815.0
+  },
+  {
+   "name": "Ante Budimir",
+   "pos": "DEL",
+   "xi": true,
+   "start": 0.9899999999999999,
+   "next": 7.169271018070504,
+   "season": 173.13866769308495,
+   "value": 65568523.0,
+   "trend": -7.35665271107363,
+   "paid": 65568523.0,
+   "per_million": -1.4962492879588505,
+   "offer": null
   },
   {
    "name": "Georges Mikautadze",
@@ -367,8 +347,8 @@
    "value": 38672224.0,
    "trend": -10.93091943697004,
    "paid": 42016585.0,
-   "per_million": -1.445130076396494,
-   "offer": 42692600.0
+   "per_million": -2.0063012482995113,
+   "offer": 35277406.0
   },
   {
    "name": "Iñigo Vicente",
@@ -380,8 +360,8 @@
    "value": 25694049.0,
    "trend": 1.3851925770205156,
    "paid": null,
-   "per_million": -1.5639427907003889,
-   "offer": 24047616.0
+   "per_million": -2.233270993937812,
+   "offer": null
   },
   {
    "name": "Miguel Cubo",
@@ -394,7 +374,7 @@
    "trend": 4.7720881304453195,
    "paid": 535093.0,
    "per_million": 0.0,
-   "offer": 524991.0
+   "offer": 562376.0
   }
  ],
  "standings": [
@@ -402,21 +382,21 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 362.0,
-   "mean": 2099.933274674664,
-   "lo": 1939.8573560853274,
-   "hi": 2264.643198844134,
-   "cash": -14187785.0,
+   "mean": 2089.732742967152,
+   "lo": 1933.571143793482,
+   "hi": 2249.186668874336,
+   "cash": 10083908.0,
    "estimated": true,
-   "p_above": 0.8003333333333333
+   "p_above": 0.7313333333333334
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 412.0,
-   "mean": 1955.0570286422928,
-   "lo": 1817.486897433531,
-   "hi": 2094.840777566943,
-   "cash": 14216854.0,
+   "mean": 1990.3405740393964,
+   "lo": 1849.336498660213,
+   "hi": 2128.014415754659,
+   "cash": -51251669.0,
    "estimated": false,
    "p_above": null
   },
@@ -424,34 +404,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 298.0,
-   "mean": 1820.4195822865647,
-   "lo": 1680.5025914350076,
-   "hi": 1962.3584563907802,
-   "cash": 34252105.0,
+   "mean": 1816.452064420502,
+   "lo": 1674.148554646966,
+   "hi": 1958.391644091576,
+   "cash": 34352105.0,
    "estimated": true,
-   "p_above": 0.20066666666666666
+   "p_above": 0.1303333333333333
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 263.0,
-   "mean": 1635.7507527142704,
-   "lo": 1513.7502416181073,
-   "hi": 1751.915022697573,
-   "cash": -20030288.0,
+   "mean": 1609.8385772737854,
+   "lo": 1489.0902244514323,
+   "hi": 1729.73687012576,
+   "cash": 22651895.0,
    "estimated": true,
-   "p_above": 0.013666666666666716
+   "p_above": 0.005666666666666709
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 298.0,
-   "mean": 1537.2179570830817,
-   "lo": 1426.589010682948,
-   "hi": 1648.91563634827,
-   "cash": 46593671.0,
+   "mean": 1535.7668251875298,
+   "lo": 1420.9813380871544,
+   "hi": 1653.6571215991517,
+   "cash": 46693671.0,
    "estimated": true,
-   "p_above": 0.0016666666666667052
+   "p_above": 0.0013333333333332975
   }
  ]
 }
