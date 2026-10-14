@@ -71,80 +71,13 @@ CREATE TABLE IF NOT EXISTS params (
     PRIMARY KEY (run_id, component, term)
 );
 
--- The board as decisions.json has it (sim.report), one run each: the
--- headline in boards, each list a row an entry. Names, not keys: the
--- board is what the phone shows.
-CREATE TABLE IF NOT EXISTS boards (
-    run_id       INTEGER PRIMARY KEY REFERENCES runs(run_id),
-    generated_at TEXT NOT NULL,
-    lock_at      TEXT,
-    cash         REAL,
-    cash_locked  REAL,
-    finish       REAL,             -- expected final position
-    p_win        REAL,
-    band_lo      REAL,             -- your season points, 10th and 90th percentile
-    band_hi      REAL,
-    plan_gain    REAL,
-    cash_after   REAL,
-    ping         TEXT
-);
-
-CREATE TABLE IF NOT EXISTS board_do (
-    run_id INTEGER NOT NULL REFERENCES runs(run_id),
-    ord    INTEGER NOT NULL,
-    what   TEXT NOT NULL,          -- field, buy, sell
-    label  TEXT NOT NULL,
-    name   TEXT,
-    pos    TEXT,
-    step   TEXT,                   -- what to do in the app
-    amount REAL,
-    done   INTEGER NOT NULL,
-    gain   REAL,
-    per    TEXT,
-    facts  TEXT NOT NULL,          -- JSON: [name, value, unit]
-    PRIMARY KEY (run_id, ord)
-);
-
-CREATE TABLE IF NOT EXISTS board_squad (
-    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
-    ord         INTEGER NOT NULL,
-    name        TEXT NOT NULL,
-    pos         TEXT,
-    xi          INTEGER,
-    start       REAL,
-    next        REAL,
-    season      REAL,
-    value       REAL,
-    trend       REAL,
-    paid        REAL,
-    per_million REAL,
-    offer       REAL,
-    PRIMARY KEY (run_id, ord)
-);
-
-CREATE TABLE IF NOT EXISTS board_standings (
-    run_id    INTEGER NOT NULL REFERENCES runs(run_id),
-    ord       INTEGER NOT NULL,
-    manager   TEXT NOT NULL,
-    me        INTEGER NOT NULL,
-    now       REAL,
-    mean      REAL,
-    lo        REAL,
-    hi        REAL,
-    cash      REAL,
-    estimated INTEGER,
-    p_above   REAL,
-    PRIMARY KEY (run_id, ord)
-);
-
-CREATE TABLE IF NOT EXISTS board_exposed (
-    run_id INTEGER NOT NULL REFERENCES runs(run_id),
-    ord    INTEGER NOT NULL,
-    name   TEXT NOT NULL,
-    pos    TEXT,
-    clause REAL,
-    PRIMARY KEY (run_id, ord)
-);
+-- The board as a table each list was, before the board became views
+-- (S6b): gone, its runs in git (reports/decisions.json).
+DROP TABLE IF EXISTS boards;
+DROP TABLE IF EXISTS board_do;
+DROP TABLE IF EXISTS board_squad;
+DROP TABLE IF EXISTS board_standings;
+DROP TABLE IF EXISTS board_exposed;
 
 -- What the simulation and the plan search decided, a run each (sim.main):
 -- what the board views add the market's and the league's facts to.
@@ -165,7 +98,7 @@ CREATE TABLE IF NOT EXISTS sim_standings (
     PRIMARY KEY (run_id, manager)
 );
 
--- Your squad and the plan's buys: the chance he plays next, expected
+-- Your squad (mine) and the plan's buys: the chance he plays next, expected
 -- points next and over the season, in the best eleven now (xi) and once
 -- the plan is made (plan_xi); if yours, what selling him raises, whether
 -- that takes tonight's offer, and the points his sale costs per million.
@@ -175,6 +108,7 @@ CREATE TABLE IF NOT EXISTS sim_players (
     start       REAL,
     next        REAL,
     season      REAL,
+    mine        INTEGER NOT NULL,
     xi          INTEGER NOT NULL,
     plan_xi     INTEGER NOT NULL,
     raises      REAL,
@@ -767,3 +701,166 @@ SELECT CASE WHEN better THEN best.alpha ELSE 0.0 END AS alpha,
        CASE WHEN better THEN best.beta ELSE 1.0 END AS beta,
        fall.neutral AS neutral_start, fall.absent AS absent_start
 FROM fits, fall LEFT JOIN best;
+
+-- The board: the last run's decisions (sim_*, funnel) with the market's
+-- and the league's facts as of cut() (player_facts, cash, kickoffs).
+-- board_json is decisions.json, the phone's copy; sim.main writes it from
+-- here. Names, not keys: the board is what the phone shows.
+DROP VIEW IF EXISTS board_run;
+CREATE VIEW board_run AS SELECT max(run_id) AS run_id FROM sim_runs;
+
+-- Each player the last run decided about, with his facts and name as shown.
+DROP VIEW IF EXISTS board_players;
+CREATE VIEW board_players AS
+SELECT p.*, coalesce(name_shown(f.name), p.player) AS name, coalesce(f.pos, '') AS pos,
+       f.value, f.trend, f.paid, f.offer, f.clause, f.price, f.route, f.my_bid
+FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN player_facts f USING (player);
+
+-- Your squad: goalkeepers to forwards, then most expected next first.
+DROP VIEW IF EXISTS board_holdings;
+CREATE VIEW board_holdings AS
+SELECT row_number() OVER (ORDER BY CASE pos WHEN 'POR' THEN 0 WHEN 'DEF' THEN 1
+           WHEN 'MED' THEN 2 WHEN 'DEL' THEN 3 ELSE 9 END, -next, player) - 1 AS ord,
+       name, pos, xi, start, next, season, value, trend, paid, per_million, offer
+FROM board_players WHERE mine;
+
+-- Your players a rival can take now by paying their clause (any can: a sale
+-- to the game pays at once, so cash is no limit), most valuable first.
+DROP VIEW IF EXISTS board_clauses;
+CREATE VIEW board_clauses AS
+SELECT row_number() OVER (ORDER BY -season, player) - 1 AS ord, name, pos, clause
+FROM board_players WHERE mine AND clause IS NOT NULL;
+
+-- Every manager's season if you do nothing, most points first; a rival's
+-- cash is estimated from the feed.
+DROP VIEW IF EXISTS board_league;
+CREATE VIEW board_league AS
+SELECT row_number() OVER (ORDER BY -s.mean, s.manager) - 1 AS ord, s.manager, s.me, s.now,
+       s.mean, s.lo, s.hi, coalesce(c.cash, 0.0) AS cash, NOT s.me AS estimated, s.p_above,
+       s.finish, s.p_first
+FROM sim_standings s JOIN board_run USING (run_id) LEFT JOIN cash c USING (manager);
+
+-- The plan's moves, in its order, each as a line of the board: the step it
+-- takes in the app and the amount that step names, whether it is done, its
+-- points over the season and the numbers that made it (facts: [label,
+-- value, unit], none without a value). A buy: bid up to its cost, or your
+-- bid is in. A sale: take tonight's offer, or wait for what waiting is
+-- worth (sim_players.raises), or it is listed, or list it.
+DROP VIEW IF EXISTS board_plan;
+CREATE VIEW board_plan AS
+SELECT p.ord, f.label, f.gain, f.per_million, f.p_better, f.cost,
+       CASE WHEN f.buy IS NOT NULL THEN 'buy' ELSE 'sell' END AS what,
+       coalesce(f.buy, substr(f.sell || ',', 1, instr(f.sell || ',', ',') - 1)) AS player,
+       f.buy, f.sell, f.cost - f.proceeds AS net
+FROM sim_plan p JOIN board_run USING (run_id)
+JOIN funnel f ON f.run_id = p.run_id AND f.rank = p.rank;
+
+DROP VIEW IF EXISTS board_moves;
+CREATE VIEW board_moves AS
+WITH sold AS (SELECT b.player FROM board_players b JOIN board_plan p
+              ON instr(',' || p.sell || ',', ',' || b.player || ',') > 0),
+app AS (
+    SELECT t.rowid AS i, coalesce(a.player, (
+               SELECT b.player FROM board_players b WHERE b.mine
+               AND name_key(b.name) IN (name_key(t.player_name), name_key(t.player_name_full))
+               ORDER BY b.player LIMIT 1)) AS player
+    FROM api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
+    WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
+                                        WHERE observed_at <= (SELECT cut()) GROUP BY source)),
+fielded AS (SELECT i, player FROM app
+            WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN board_players b
+                              ON b.player = a.player AND b.mine WHERE b.player IS NULL)),
+eleven AS (SELECT player, name, next FROM board_players WHERE plan_xi),
+legal AS (SELECT (SELECT count(*) FROM fielded) > 0
+                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM eleven) AS ok),
+ins AS (SELECT e.* FROM eleven e, legal
+        WHERE NOT legal.ok OR e.player NOT IN (SELECT player FROM fielded)),
+outs AS (SELECT f.i, b.player, b.name, b.next FROM fielded f JOIN board_players b USING (player), legal
+         WHERE legal.ok AND f.player NOT IN (SELECT player FROM eleven)),
+field AS (
+    SELECT -1 AS ord, 'field' AS what,
+           'field ' || (SELECT group_concat(name, ', ' ORDER BY -next, player) FROM ins) AS label,
+           NULL AS name, NULL AS pos,
+           CASE WHEN legal.ok THEN NULL ELSE 'check line-up' END AS step, NULL AS amount,
+           0 AS done,
+           CASE WHEN legal.ok THEN (SELECT total(next) FROM ins) - (SELECT total(next) FROM outs) END AS gain,
+           'next' AS per,
+           (SELECT json_group_array(json_array('bench', bench, 'names')) FROM (
+                SELECT group_concat(name, ', ' ORDER BY i) AS bench FROM outs
+                WHERE player NOT IN (SELECT player FROM sold)) WHERE bench IS NOT NULL) AS facts
+    FROM legal
+    WHERE EXISTS (SELECT 1 FROM ins) OR EXISTS (SELECT 1 FROM outs)),
+moves AS (
+    SELECT p.ord, p.what, p.label, b.name, b.pos,
+           CASE WHEN p.what = 'buy' THEN CASE WHEN b.my_bid IS NULL THEN 'bid up to' ELSE 'bid in' END
+                WHEN b.takes THEN 'take offer' WHEN b.offer IS NOT NULL THEN 'wait'
+                WHEN b.route = 'listed' THEN 'listed' ELSE 'list' END AS step,
+           CASE WHEN p.what = 'buy' THEN coalesce(b.my_bid, p.cost)
+                WHEN b.offer IS NOT NULL THEN b.raises END AS amount,
+           CASE WHEN p.what = 'buy' THEN b.my_bid IS NOT NULL
+                ELSE b.route IS 'listed' AND NOT b.takes END AS done,
+           p.gain, 'season' AS per,
+           (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
+                SELECT 0 AS n, 'asking' AS l, coalesce(b.price, p.cost) AS v, 'money' AS u
+                WHERE p.what = 'buy'
+                UNION ALL SELECT 1, '', p.per_million, 'per_million' WHERE p.what = 'buy'
+                UNION ALL SELECT 2, 'better off in', round(p.p_better, 3), 'seasons' WHERE p.what = 'buy'
+                UNION ALL SELECT 3, '', b.trend, 'trend' WHERE p.what = 'buy'
+                UNION ALL SELECT 0, 'raises', b.raises, 'money' WHERE p.what = 'sell'
+                UNION ALL SELECT 1, '', p.per_million, 'per_million' WHERE p.what = 'sell'
+                UNION ALL SELECT 2, 'offer', CASE WHEN NOT b.takes THEN b.offer END, 'money'
+                WHERE p.what = 'sell')
+            WHERE v IS NOT NULL) AS facts
+    FROM board_plan p LEFT JOIN board_players b USING (player))
+SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name, pos, step, amount, done,
+       gain, per, facts
+FROM (SELECT * FROM field UNION ALL SELECT * FROM moves);
+
+-- The board's headline: when the next match locks, your money, where you
+-- are expected to finish and your chance of first, your season's points
+-- band, what the plan gains and leaves you, and its moves not yet done.
+DROP VIEW IF EXISTS board_head;
+CREATE VIEW board_head AS
+WITH me AS (SELECT * FROM board_league WHERE me),
+lock AS (SELECT min(kick) AS kick FROM kickoffs WHERE kick > (SELECT cut()))
+SELECT (SELECT run_id FROM board_run) AS run_id,
+       substr(cut(), 1, 13) || ':' || substr(cut(), 14) AS generated_at,
+       (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
+       me.cash, (SELECT total(my_bid) FROM player_facts) AS cash_locked,
+       round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
+       me.lo AS band_lo, me.hi AS band_hi,
+       (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
+       CASE WHEN EXISTS (SELECT 1 FROM board_plan)
+            THEN me.cash - (SELECT total(net) FROM board_plan) END AS cash_after,
+       (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_moves WHERE NOT done) AS ping
+FROM me;
+
+-- decisions.json: the board as one JSON document, the phone's copy.
+DROP VIEW IF EXISTS board_json;
+CREATE VIEW board_json AS
+SELECT json_object(
+    'generated_at', h.generated_at, 'lock_at', h.lock_at,
+    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,
+    'band', json_array(h.band_lo, h.band_hi),
+    'do', (SELECT json_group_array(json(CASE WHEN what = 'field'
+                                             THEN json_remove(o, '$.name', '$.pos') ELSE o END)
+                                   ORDER BY ord)
+           FROM (SELECT ord, what, json_object(
+                     'name', name, 'pos', pos, 'what', what, 'label', label, 'step', step,
+                     'amount', amount, 'done', json(CASE WHEN done THEN 'true' ELSE 'false' END),
+                     'gain', gain, 'per', per, 'facts', json(coalesce(facts, '[]'))) AS o
+                 FROM board_moves)),
+    'plan_gain', h.plan_gain, 'cash_after', h.cash_after, 'ping', coalesce(h.ping, ''),
+    'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
+                                        ORDER BY ord) FROM board_clauses),
+    'squad', (SELECT json_group_array(json_object(
+                  'name', name, 'pos', pos, 'xi', json(CASE WHEN xi THEN 'true' ELSE 'false' END),
+                  'start', start, 'next', next, 'season', season, 'value', value,
+                  'trend', trend, 'paid', paid, 'per_million', per_million, 'offer', offer)
+                  ORDER BY ord) FROM board_holdings),
+    'standings', (SELECT json_group_array(json_object(
+                      'manager', manager, 'me', json(CASE WHEN me THEN 'true' ELSE 'false' END),
+                      'now', now, 'mean', mean, 'lo', lo, 'hi', hi, 'cash', cash,
+                      'estimated', json(CASE WHEN estimated THEN 'true' ELSE 'false' END),
+                      'p_above', p_above) ORDER BY ord) FROM board_league)) AS json
+FROM board_head h;

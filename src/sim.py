@@ -1,159 +1,39 @@
+"""The simulation stage: rank and plan the moves (decide.board), record
+what they decided for the run (funnel, forecast, params, sim_*), and write
+decisions.json, the phone's copy of the board, from the board views
+(schema.sql: board_json)."""
 from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterable, Sequence
-from datetime import datetime
+from collections.abc import Sequence
 from typing import Any
 
 from assemble import built, universe
-from decide import CONFIDENCE, Board, Move, Universe, at_risk, board, verdict
-from ffcore.market import Market
-from ffcore.league import app_fielded
-from ffcore.rules import POSITIONS
-from ffcore.clock import run_now
-from ffcore.db import record, this_run
+from decide import CONFIDENCE, Board, Universe, board, verdict
+from ffcore.db import record, rows, this_run
 from ffcore.forecast import expected_points
-from ffcore.jornadas import load_deadline
 from ffcore.tidy import REPORTS
 
-__all__ = ["board_tables", "forecast", "funnel", "plan", "plan_head", "players", "report",
+__all__ = ["board_doc", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
            "standings"]
 
-ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
 Doc = dict[str, Any]  # a JSON object of decisions.json
-
-
-def xi_change(marked: Sequence[str], best: Iterable[str]) -> Doc:
-    eleven = list(best)
-    if len(marked) != len(eleven) or not marked:
-        return {"legal": False, "in": eleven, "out": []}
-    have, want = set(marked), set(eleven)
-    return {"legal": True, "in": [k for k in eleven if k not in have],
-            "out": [k for k in marked if k not in want]}
-
-
-def player(m: Market, k: str) -> dict[str, str]:
-    return {"name": m.shown(k), "pos": m.pos.get(k, "")}
-
-
-def row(what: str, label: str, step: str | None, amount: float | None, done: bool,
-        gain: float | None, per: str, facts: list[tuple[str, Any, str]]) -> Doc:
-    """One line of the board, every decision in it made here: the move
-    (Action.label), the step it takes in the app and the amount that step
-    names, whether it is done, its points (per: "season" or "next") and
-    the numbers that made it, as (label, value, unit)."""
-    return {"what": what, "label": label, "step": step, "amount": amount, "done": done,
-            "gain": gain, "per": per, "facts": [f for f in facts if f[1] is not None]}
-
-
-def buy_row(m: Market, r: Move, label: str) -> Doc:
-    a = r.action
-    placed = m.my_bid.get(a.buy)
-    return {**player(m, a.buy), **row(
-        "buy", label, "bid up to" if placed is None else "bid in",
-        a.cost if placed is None else placed, placed is not None, r.d_pts, "season",
-        [("asking", m.price.get(a.buy, a.cost), "money"), ("", r.per_million, "per_million"),
-         ("better off in", round(r.p_better, 3), "seasons"), ("", m.trend.get(a.buy), "trend")])}
-
-
-def sell_row(m: Market, r: Move, k: str, label: str) -> Doc:
-    """A sale in the plan, there to pay for its buys or a debt: take the
-    offer standing on him tonight, or wait for what waiting is worth
-    (Market.fetches), or list him; done once nothing is left to do tonight."""
-    take, listed, offer = m.takes(k), m.route.get(k) == "listed", m.offer.get(k)
-    step = ("take offer" if take else "wait" if offer is not None
-            else "listed" if listed else "list")
-    return {**player(m, k), **row(
-        "sell", label, step, m.fetches(k) if offer is not None else None,
-        listed and not take, r.d_pts, "season",
-        [("raises", m.fetches(k), "money"), ("", r.per_million, "per_million"),
-         ("offer", None if take else offer, "money")])}
-
-
-def holding(u: Universe, b: Board, k: str) -> Doc:
-    """One of your players as the board shows him: how he plays, what he
-    is worth, what he cost, the points his sale costs per million it
-    raises, and the offer standing on him, if any."""
-    m, o = u.market, u.outlook
-    exp, xi = o.xi
-    sale = b.sale(k)
-    return {**player(m, k), "xi": k in xi,
-            "start": o.next_up.get(k, (0.0, 0.0))[1], "next": exp.get(k, 0.0),
-            "season": o.season.get(k, 0.0), "value": m.value.get(k),
-            "trend": m.trend.get(k), "paid": m.paid.get(k),
-            "per_million": sale and sale.per_million,
-            "offer": m.offer.get(k)}
-
-
-def exposed(u: Universe) -> list[Doc]:
-    return [{**player(u.market, k), "clause": u.market.clause[k]} for k in at_risk(u)]
-
-
-def report(u: Universe, b: Board, fielded: Sequence[str],
-           lock_at: datetime | None = None) -> Doc:
-    """The board as the phone shows it; every choice in it is decide.board's.
-    The line-up is the plan's: the best eleven once its moves are made,
-    against the one fielded now."""
-    o, m, mine, base = u.outlook, u.market, u.mine, b.base
-    exp, xi = o.xi
-    plan_xi = u.after(*(r.action for r in b.plan)).outlook.xi
-    then = plan_xi.expected
-    chg = xi_change(fielded, plan_xi.ranked())
-    sold = {k for r in b.plan for k in r.action.sell}
-    todo = []
-    if chg["in"] or chg["out"]:
-        off = ", ".join(player(m, k)["name"] for k in chg["out"] if k not in sold)
-        todo.append(row(
-            "field", "field " + ", ".join(player(m, k)["name"] for k in chg["in"]),
-            None if chg["legal"] else "check line-up", None, False,
-            (sum(then.get(k, 0.0) for k in chg["in"])
-             - sum(exp.get(k, 0.0) for k in chg["out"])) if chg["legal"] else None,
-            "next", [("bench", off or None, "names")]))
-    names = m.names
-    todo += [buy_row(m, r, r.action.label(names)) if r.action.buy
-             else sell_row(m, r, r.action.sell[0], r.action.label(names))
-             for r in b.plan]
-    lo, hi = base.band(u.me)
-    return {
-        "generated_at": run_now().strftime("%Y-%m-%dT%H:%MZ"),
-        "lock_at": lock_at.isoformat() if lock_at else None,
-        "cash": m.cash, "cash_locked": m.locked_cash,
-        "finish": round(base.expected_position(), 2),
-        "p_win": round(base.position().get(1, 0.0), 3),
-        "band": [lo, hi],
-        "do": todo, "plan_gain": b.gain,
-        "cash_after": m.left([r.action for r in b.plan]) if b.plan else None,
-        "ping": "; ".join(d["label"] for d in todo if not d.get("done")),
-        "exposed": exposed(u),
-        "squad": [holding(u, b, k) for k in sorted(
-            mine, key=lambda k: (POSITIONS.index(mine[k]) if mine[k] in POSITIONS else 9, -exp.get(k, 0.0)))],
-        "standings": [
-            {"manager": mgr, "me": mgr == u.me,
-             "now": u.state.carried.get(mgr, 0.0), "mean": base.mean(mgr),
-             "lo": base.band(mgr)[0], "hi": base.band(mgr)[1],
-             "cash": m.cash if mgr == u.me else u.rival_cash.get(mgr, 0.0),
-             "estimated": mgr != u.me,
-             "p_above": None if mgr == u.me else 1.0 - base.beat(mgr)}
-            for mgr in sorted(u.state.squads, key=lambda g: -base.mean(g))],
-    }
 
 
 def _selftest() -> None:
     from dataclasses import replace
 
-    from decide import Action, Move, Universe
+    import tempfile
+    from contextlib import closing
+    from pathlib import Path
+
+    from decide import Action, Move
+    from ffcore.db import connect
     from ffcore.market import Market
+    from ffcore.tidy import store_sql, tables_in
     from ffcore.forecast import Bootstrap
     from ffcore.season import LeagueState
-
-    best = ["gk", "d1", "d2", "d3", "d4", "m1", "m2", "m3", "m4", "m5", "f1"]
-    for marked, legal, ins, outs in [
-            (list(best), True, [], []),
-            ([k for k in best if k != "m5"] + ["bench1"], True, ["m5"], ["bench1"]),
-            (best[:10], False, best, [])]:
-        got = xi_change(marked, best)
-        assert (got["legal"], got["in"], got["out"]) == (legal, ins, outs), got
 
     many_j = list(range(1, 11))
     sqb = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
@@ -182,22 +62,50 @@ def _selftest() -> None:
     assert len(sold) == len(set(sold)), sold
     assert b.gain >= max(r.d_pts for r in b.plan) - 5.0, (b.gain, b.plan)
 
-    doc = report(ub, b, [])
+    def report(u: Universe, bd: Board, fielded: Sequence[str] = ()) -> Doc:
+        """The board the views make of this universe's run, its market's
+        facts standing in for player_facts and cash (assemble tests those)."""
+        m = u.market
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            with closing(connect()) as db, db:
+                db.execute("DROP VIEW player_facts")
+                db.execute("CREATE TABLE player_facts (player, name, pos, value, owner, clause,"
+                           " price, route, my_bid, offer, paid, trend)")
+                db.executemany("INSERT INTO player_facts VALUES (%s)" % ", ".join("?" * 12), [
+                    (k, k, m.pos.get(k), m.value.get(k), m.owner.get(k), m.clause.get(k),
+                     m.price.get(k), m.route.get(k), m.my_bid.get(k), m.offer.get(k),
+                     m.paid.get(k), m.trend.get(k)) for k in set(m.pos) | set(u.mine)])
+                db.execute("DROP VIEW cash")
+                db.execute("CREATE TABLE cash (manager, cash)")
+                db.executemany("INSERT INTO cash VALUES (?, ?)",
+                               [(u.me, m.cash), *u.rival_cash.items()])
+                db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
+                               [(k, k) for k in fielded])
+            store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
+                                     for k in fielded])
+            record_run(u, bd, 7)
+            return board_doc()
+
+    ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
+    doc = report(ub, b)
     after = ub.after(*(r.action for r in b.plan))
     field = doc["do"][0]
     gone = {k for r in b.plan for k in r.action.sell}
     on = field["label"].removeprefix("field ").split(", ")
     benched = dict((f[0], f[1]) for f in field["facts"]).get("bench", "")
-    assert field["what"] == "field" and set(on) == {
-        player(ub.market, k)["name"] for k in after.outlook.xi.ranked()}, \
+    assert field["what"] == "field" and {n.lower() for n in on} == set(after.outlook.xi.ranked()) \
+        and on[0].lower() == after.outlook.xi.ranked()[0], \
         "the line-up is the plan's: the squad after its moves"
-    assert not {player(ub.market, k)["name"] for k in gone} & set(on + benched.split(", ")), \
+    assert not gone & {n.lower() for n in on + benched.split(", ")}, \
         "a sold player is neither fielded nor benched"
     assert (field["step"], field["gain"], field["per"]) == ("check line-up", None, "next"), \
         "a line-up the app has not given is a step to take, in the row"
-    xi = list(after.outlook.xi.ranked())
-    spare = next(k for k in after.mine if k not in xi)
-    known = report(ub, b, xi[:-1] + [spare])["do"][0]
+    now = list(ub.outlook.xi.ranked())
+    known = report(ub, b, now)["do"][0]
+    came = set(after.outlook.xi.players) - set(now)
+    left = set(now) - set(after.outlook.xi.players) - gone
+    assert {n.lower() for n in known["label"].removeprefix("field ").split(", ")} == came \
+        and {n.lower() for f in known["facts"] for n in f[1].split(", ")} == left, known
     assert known["step"] is None and known["gain"] is not None, known
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos"}, d
@@ -208,13 +116,14 @@ def _selftest() -> None:
     assert doc["cash_after"] == ub.market.left([r.action for r in b.plan])
     rich = replace(ub, rival_cash={"riv": 25e6},
                    market=replace(ub.market, clause={"star": 20e6, "dead": 30e6}))
-    assert [e["name"].lower() for e in exposed(rich)] == ["star", "dead"], \
+    exposed = report(rich, b)["exposed"]
+    assert [e["name"].lower() for e in exposed] == ["star", "dead"], \
         "exposed: every player with a clause, most valuable first"
-    assert all("by" not in e for e in exposed(rich)), \
+    assert all("by" not in e for e in exposed), \
         "no 'who can afford him': a rival's cash is no limit when sales to the game pay at once"
     assert all(CONFIDENCE <= v <= 1.0 for d in doc["do"] for _, v, unit in d["facts"]
                if unit == "seasons"), "only moves that clear the bar are shown"
-    assert report(ub, b._replace(plan=[]), [])["cash_after"] is None, \
+    assert report(ub, b._replace(plan=[]))["cash_after"] is None, \
         "no cash line when the plan moves no money"
     assert [r["estimated"] for r in doc["standings"] if r["me"]] == [False]
     riv_row = next(r for r in doc["standings"] if not r["me"])
@@ -235,7 +144,7 @@ def _selftest() -> None:
     ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: 4e6},
                                     route={"dead": "listed"}))
     sell_dead = Move(Action("sell", sell=("dead",), proceeds=1e6), 0.5, p_better=0.8)
-    doc = report(ub, b._replace(plan=b.plan + [sell_dead]), [])
+    doc = report(ub, b._replace(plan=b.plan + [sell_dead], rows=b.rows + [sell_dead]))
     buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
     assert buys[bought[0]]["done"] and (buys[bought[0]]["step"], buys[bought[0]]["amount"]) \
         == ("bid in", 4e6), buys
@@ -244,14 +153,14 @@ def _selftest() -> None:
     assert [(d["name"].lower(), d["done"], d["step"], d["amount"]) for d in doc["do"]
             if d["what"] == "sell"] == [("dead", True, "listed", None)], doc["do"]
     unlisted = report(replace(ub, market=replace(ub.market, route={})),
-                      b._replace(plan=[sell_dead]), [])
+                      b._replace(plan=[sell_dead], rows=b.rows + [sell_dead]))
     assert [(d["step"], d["done"]) for d in unlisted["do"] if d["what"] == "sell"] \
         == [("list", False)]
 
     def sale(offer: float) -> tuple[Doc, str]:
         mk = replace(ub.market, offer={"dead": offer}, nights_left=2,
                      offer_ratios=(0.9, 1.0, 1.0, 1.1))
-        doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead]), [])
+        doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead], rows=b.rows + [sell_dead]))
         return (next(d for d in doc["do"] if d["what"] == "sell"),
                 doc["ping"].split("; ")[-1])
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
@@ -310,31 +219,6 @@ def _selftest() -> None:
                               for i, m in enumerate(b.plan)]
     assert plan_head(b, 7) == {"run_id": 7, "plan_gain": b.gain}
 
-    import tempfile
-    from contextlib import closing
-    from pathlib import Path
-
-    from ffcore.db import connect
-    with tempfile.TemporaryDirectory() as tmp:
-        tables = {**board_tables(doc, 7), "sim_standings": standings(ub, b, 7),
-                  "sim_players": players(ub, b, 7), "sim_plan": plan(ub, b, 7),
-                  "sim_runs": [plan_head(b, 7)]}
-        for name, entries in tables.items():
-            record(entries, name, Path(tmp) / "lfg.db")
-        with closing(connect(Path(tmp) / "lfg.db")) as db:
-            got = {n: db.execute('SELECT count(*) FROM "%s" WHERE run_id = 7' % n).fetchone()[0]
-                   for n in tables}
-            assert got == {"boards": 1, "board_do": len(doc["do"]),
-                           "board_squad": len(doc["squad"]),
-                           "board_standings": len(doc["standings"]),
-                           "board_exposed": len(doc["exposed"]), "sim_standings": 2,
-                           "sim_players": len(tables["sim_players"]),
-                           "sim_plan": len(b.plan), "sim_runs": 1}, got
-            assert db.execute("SELECT p_win, band_lo FROM boards").fetchone() \
-                == (doc["p_win"], doc["band"][0])
-            assert json.loads(db.execute("SELECT facts FROM board_do WHERE ord = 0")
-                              .fetchone()[0]) == [list(f) for f in doc["do"][0]["facts"]]
-
     print("sim self-test OK")
 
 
@@ -384,7 +268,7 @@ def players(u: Universe, b: Board, run: int) -> list[Doc]:
     keys = list(u.mine) + [r.action.buy for r in b.plan if r.action.buy and r.action.buy not in u.mine]
     return [{"run_id": run, "player": k, "start": o.next_up.get(k, (0.0, 0.0))[1],
              "next": exp.get(k, 0.0), "season": o.season.get(k, 0.0),
-             "xi": int(k in xi), "plan_xi": int(k in plan_xi),
+             "mine": int(k in u.mine), "xi": int(k in xi), "plan_xi": int(k in plan_xi),
              "raises": m.fetches(k) if k in u.mine else None,
              "takes": int(m.takes(k)) if k in u.mine else None,
              "per_million": (sale := b.sale(k)) and sale.per_million}
@@ -401,18 +285,22 @@ def plan_head(b: Board, run: int) -> Doc:
     return {"run_id": run, "plan_gain": b.gain}
 
 
-def board_tables(doc: Doc, run: int) -> dict[str, list[Doc]]:
-    """The board as decisions.json has it, as table rows: its headline in
-    boards, and each list (do, squad, standings, exposed) in board_<list>."""
-    lists = ("do", "squad", "standings", "exposed")
-    head = {k: v for k, v in doc.items() if k not in lists and k != "band"}
-    lo, hi = doc["band"]
-    return {"boards": [{"run_id": run, **head, "band_lo": lo, "band_hi": hi}],
-            "board_do": [{"run_id": run, "ord": i, **d,
-                          "facts": json.dumps(d["facts"], ensure_ascii=False)}
-                         for i, d in enumerate(doc["do"])],
-            **{"board_" + n: [{"run_id": run, "ord": i, **d} for i, d in enumerate(doc[n])]
-               for n in lists[1:]}}
+def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> None:
+    """Everything the run decided, into its tables: the board views read them."""
+    record(funnel(u, b, run), "funnel")
+    record(forecast(u, run), "forecast")
+    record([{"run_id": run, **r} for r in params], "params")
+    record(standings(u, b, run), "sim_standings")
+    record(players(u, b, run), "sim_players")
+    record(plan(u, b, run), "sim_plan")
+    record([plan_head(b, run)], "sim_runs")
+
+
+def board_doc() -> Doc:
+    """decisions.json as board_json makes it, from the last run's rows."""
+    (doc,), = rows("SELECT json FROM board_json")
+    got: Doc = json.loads(doc)
+    return got
 
 
 def main() -> None:
@@ -421,22 +309,14 @@ def main() -> None:
         print("sim: nothing to simulate (%d squads, %d jornadas left)"
               % (len(u.state.squads), len(u.state.jornadas)))
         return
-    b = board(u)
-    doc = report(u, b, app_fielded(u.mine, u.market.name), load_deadline())
+    run = this_run()
+    if run is None:
+        raise SystemExit("sim: the board is the views over a run's rows; run it as run.py sim")
+    record_run(u, board(u), run, built().params)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
-        doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        board_doc(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
-    if (run := this_run()) is not None:
-        record(funnel(u, b, run), "funnel")
-        record(forecast(u, run), "forecast")
-        record([{"run_id": run, **r} for r in built().params], "params")
-        record(standings(u, b, run), "sim_standings")
-        record(players(u, b, run), "sim_players")
-        record(plan(u, b, run), "sim_plan")
-        record([plan_head(b, run)], "sim_runs")
-        for name, rows in board_tables(doc, run).items():
-            record(rows, name)
 
 
 if __name__ == "__main__":

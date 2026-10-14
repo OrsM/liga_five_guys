@@ -24,7 +24,6 @@ from decide import (FUNNEL, Action, Board, Move, Universe, blocked, board, joint
                     plan, raised, verdict)
 from ffcore.names import Name  # noqa: E402
 from ffcore.text import resolve  # noqa: E402
-from sim import holding  # noqa: E402
 from ffcore.jornadas import rounds_ahead  # noqa: E402
 from ffcore.schedule import jornada_dates  # noqa: E402
 from ffcore.startprob import bucket  # noqa: E402
@@ -83,13 +82,12 @@ def fate(u: Universe, b: Board, r: Move) -> str:
 def why(u: Universe, k: str) -> None:
     b = board(u)
     if k in u.mine:
-        h, sale = holding(u, b, k), b.sale(k)
-        shown = {f: "-" if h[f] is None else "%.1fM" % (h[f] / 1e6)
+        m, sale = u.market, b.sale(k)
+        shown = {f: "-" if (v := getattr(m, f).get(k)) is None else "%.1fM" % (v / 1e6)
                  for f in ("paid", "value")}
         print("yours: paid {paid}, worth {value}".format(**shown)
-              + ", %+.0f%% expected" % (h["trend"] or 0.0)
-              + (", selling him %+.2f pts/M" % h["per_million"]
-                 if h["per_million"] is not None else ""))
+              + ", %+.0f%% expected" % (m.trend.get(k) or 0.0)
+              + (", selling him %+.2f pts/M" % sale.per_million if sale else ""))
         print("Selling him alone: " + (show(u, sale) + "\n  " + fate(u, b, sale)
               if sale else "not ranked (your side cannot be fielded without him)"))
         return
