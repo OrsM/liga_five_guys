@@ -162,6 +162,18 @@ data/raw tarballs
   jornada (better at every horizon), flagged players flat, the replayed
   boards' moves identical. Listed-with-no-% now means 53% to start, not
   15% (the ghosts had dragged it down).
+- Saved queries that earn their place (done; each answers a question a
+  decision turns on, and a README-rules check was left out for not doing so):
+  `unmatched_players` (who the crosswalk cannot join: 29 players with
+  neither id, 86 with no line-up page), `constants_vs_measured`
+  (PERSISTENT_SHARE 0.08 set, 0.087 measured; CONFIDENCE 0.70 set, 0.719
+  measured over 32 moves), `bench_points` (what sat on the bench each
+  jornada: 10 points in jornadas 4 and 6), `rivals` (each manager's cash,
+  squad value, finish and last week's trades). The persistence measure is a
+  view (`persistence_by_run`) both it and `persistence` read; it was 0.000
+  before the listings fix (run 35) and is 0.087 since S6b. Tested against
+  rows worked out by hand; two queries broken on purpose to see the tests
+  fail.
 - S6 (done) The board as views; the phone's JSON its export. S6a: the run
   records what it decides (`sim_standings`, `sim_players`, `sim_plan`,
   `sim_runs`). S6b1: `player_facts` (every market fact per player, one

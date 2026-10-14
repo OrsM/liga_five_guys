@@ -993,3 +993,18 @@ SELECT CASE WHEN (SELECT max(legal) FROM g)
             ELSE 'Set your line-up: ' || ins.names END
        || ' — locks in ' || (left.minutes / 60) || 'h' || printf('%02d', left.minutes % 60) AS text
 FROM ins, outs, left WHERE EXISTS (SELECT 1 FROM g);
+
+-- How much of a player's miss (actual less forecast, the bias taken out)
+-- carries from one jornada to the next, over the squares of what was
+-- expected: what forecast.PERSISTENT_SHARE is checked against. One row a
+-- graded run; the next-jornada forecast of every player (from_j = jornada).
+DROP VIEW IF EXISTS persistence_by_run;
+CREATE VIEW persistence_by_run AS
+WITH g AS MATERIALIZED (SELECT run_id, player, jornada, actual - predicted AS r, predicted AS e
+                        FROM grade_forecast WHERE from_j = jornada),
+b AS (SELECT run_id, avg(r) AS bias FROM g GROUP BY run_id),
+pairs AS (SELECT x.run_id, sum((x.r - b.bias) * (y.r - b.bias)) AS num, sum(x.e * y.e) AS den
+          FROM g x JOIN g y ON y.run_id = x.run_id AND x.player = y.player AND x.jornada < y.jornada
+          JOIN b ON b.run_id = x.run_id GROUP BY x.run_id)
+SELECT run_id, CASE WHEN den > 0 THEN round(sqrt(max(0.0, num) / den), 3) ELSE 0.0 END AS persistent_share
+FROM pairs;
