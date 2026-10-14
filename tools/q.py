@@ -3,6 +3,7 @@ Datasette serves.
 
     python tools/q.py                     # the queries, with what each answers
     python tools/q.py NAME [param=value]  # one, as a table
+    python tools/q.py --time              # every query timed on the real database; fails past Datasette's limit
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from ffcore.db import META, connect, named, params, queries
+from ffcore.db import META, SLOW_S, connect, named, params, queries, timed
 
 
 
@@ -28,6 +29,12 @@ def _cell(v: Any) -> str:
 
 
 def main(argv: list[str]) -> int:
+    if argv == ["--time"]:
+        over = 0
+        for name, secs, ok in sorted(timed(), key=lambda t: -t[1]):
+            print("%-24s %6.2fs %s" % (name, secs, "" if ok else "  OVER %.0fs: close to Datasette's limit" % SLOW_S))
+            over += not ok
+        return 1 if over else 0
     if not argv:
         for name, q in queries().items():
             print("%-22s %s%s" % (name, q.get("title", ""), "".join(

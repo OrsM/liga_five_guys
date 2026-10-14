@@ -7,6 +7,8 @@ import json
 import os
 import re
 import sqlite3
+import time
+from datetime import datetime, timezone
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
@@ -91,6 +93,47 @@ def named(name: str, given: Mapping[str, object] | None = None, path: Path | Non
                        for p in params(sql)}, path)
 
 
+SLOW_S = 8.0   # Datasette's sql_time_limit_ms is 10000 (lfg-datasette.service): nearer than this and a busy day times it out
+
+
+def timed(path: Path | None = None, meta: Path = META, limit: float = SLOW_S
+          ) -> list[tuple[str, float, bool]]:
+    """Each saved query run with every parameter empty, as Datasette opens
+    it: (name, seconds, within limit). One over the limit is cut off at it,
+    not waited for."""
+    out = []
+    for name, q in queries(meta).items():
+        with closing(connect(path)) as db:
+            started = time.monotonic()
+            db.set_progress_handler(lambda: int(time.monotonic() - started > limit), 100_000)
+            try:
+                db.execute(q["sql"], {p: "" for p in params(q["sql"])}).fetchall()
+            except sqlite3.OperationalError as e:
+                if "interrupted" not in str(e):
+                    raise
+            took = time.monotonic() - started
+            out.append((name, took, took <= limit))
+    return out
+
+
+def time_queries(path: Path | None = None, meta: Path = META, limit: float = SLOW_S
+                 ) -> dict[str, float]:
+    """The run.py queries stage: each saved query timed on the real database
+    (timed), recorded with the stage as its seconds, and `over`, how many are
+    near Datasette's limit (named in the log). Once a day: not again within 20
+    hours of a run that timed them."""
+    last = rows("SELECT max(r.started) FROM run_measures m JOIN runs r USING (run_id)"
+                " WHERE m.stage = 'queries'", path=path)[0][0]
+    if last and (datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00"))
+                 ).total_seconds() < 20 * 3600:
+        return {"skipped": 1}
+    got = timed(path, meta, limit)
+    for name, secs, ok in got:
+        if not ok:
+            print("  SLOW saved query %s: %.1fs (Datasette cuts at 10s)" % (name, secs))
+    return {**{name: secs for name, secs, _ in got}, "over": sum(not ok for _, _, ok in got)}
+
+
 def rows(sql: str, params: Sequence[object] | Mapping[str, object] = (),
          path: Path | None = None) -> list[Any]:
     return query(sql, params, path)[1]
@@ -118,6 +161,28 @@ def record(rows: Sequence[Mapping[str, object]], table: str,
 def _selftest() -> None:
     import tempfile
     from contextlib import closing
+
+    with tempfile.TemporaryDirectory() as tmp:
+        meta, path = Path(tmp) / "datasette.json", Path(tmp) / "lfg.db"
+        meta.write_text(json.dumps({"databases": {"lfg": {"queries": {
+            "quick": {"sql": "SELECT 1"},
+            "slow": {"sql": "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n"
+                            " WHERE i < 100000000) SELECT count(*) FROM n"}}}}}))
+        got = {name: (ok, secs) for name, secs, ok in timed(path, meta, limit=0.3)}
+        assert got["quick"][0] and not got["slow"][0], got
+        assert got["slow"][1] < 3.0, "a query over the limit is cut off, not waited for"
+
+        first = time_queries(path, meta, limit=0.3)
+        assert set(first) == {"quick", "slow", "over"} and first["over"] == 1, first
+        with closing(connect(path)) as c, c:     # a run recorded those timings just now
+            c.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha)"
+                      " VALUES (1, ?, 't', 'service', 'c')",
+                      (datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),))
+            c.execute("INSERT INTO run_measures VALUES (1, 'queries', 'quick', 0.0)")
+        assert time_queries(path, meta, limit=0.3) == {"skipped": 1}, "once a day"
+        with closing(connect(path)) as c, c:
+            c.execute("UPDATE runs SET started = '2020-01-01T00:00:00Z'")
+        assert "quick" in time_queries(path, meta, limit=0.3), "and again the day after"
 
     with tempfile.TemporaryDirectory() as tmp:
         schema = Path(tmp) / "schema.sql"

@@ -1,8 +1,9 @@
 
 from __future__ import annotations
 
-import gc
 import collections
+import gc
+import importlib
 import os
 import resource
 import sqlite3
@@ -28,12 +29,13 @@ STAGES: list[tuple[str, str]] = [
 # Run only when named (run.py grade): lfg-run calls it after the report is out.
 ON_REQUEST: list[tuple[str, str]] = [
     ("grade", "grading:record_grades"),
+    ("queries", "ffcore.db:time_queries"),
 ]
 
 
 def call(spec: str) -> Callable[[], object]:
     mod, fn = spec.split(":")
-    return getattr(__import__(mod), fn)
+    return getattr(importlib.import_module(mod), fn)
 
 
 def _sample(hits: collections.Counter[str], stop: threading.Event, tid: int) -> None:

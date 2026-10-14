@@ -162,6 +162,15 @@ data/raw tarballs
   jornada (better at every horizon), flagged players flat, the replayed
   boards' moves identical. Listed-with-no-% now means 53% to start, not
   15% (the ghosts had dragged it down).
+- Query time guard (done; found 2026-10-14 when bench_points took 138s on the
+  real database, 1.2s once its snapshot lookups were narrowed, and
+  price_forecast_error was already 5.4s against Datasette's 5s): the
+  `queries` stage times every saved query once a day, records each beside
+  the stage seconds and names any within 20% of Datasette's limit (now 10s);
+  `q.py --time` does it by hand. Datasette applies the schema at start now
+  (a view added by a merge was missing there until the next run). Real fix
+  for price_forecast_error when the guard trips: keep price_ahead's rows
+  per day (534k rows to build, 1.3s, grows with the season).
 - Saved queries that earn their place (done; each answers a question a
   decision turns on, and a README-rules check was left out for not doing so):
   `unmatched_players` (who the crosswalk cannot join: 29 players with
