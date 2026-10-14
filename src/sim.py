@@ -219,6 +219,27 @@ def _selftest() -> None:
                               for i, m in enumerate(b.plan)]
     assert plan_head(b, 7) == {"run_id": 7, "plan_gain": b.gain}
 
+    debt = replace(ub, market=replace(ub.market, cash=-5e6,
+                                      value={**ub.market.value, "k": 4e6, "d1": 9e6, "m1": 1e6}))
+    owed = board(debt)
+    from ffcore.db import named
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        record_run(debt, owed, 8)
+        cols, why = named("why_sell")
+    assert cols == ["player", "debt_m", "raises_m", "season_points", "points_per_m",
+                    "raised_so_far_m", "debt_left_m", "covers_alone", "in_plan"], cols
+    per = [r[4] for r in why]
+    assert per == sorted(per, reverse=True), "cheapest points per million first"
+    taken = [r for r in why if r[8]]
+    assert taken and {r[0] for r in taken} == {
+        m.action.label(debt.market.names).removeprefix("sell ") for m in owed.plan
+        if m.action.kind == "sell"}, \
+        "in_plan is the plan's sales, no others"
+    assert all(r[1] == 5.0 for r in why), "the debt, in millions"
+    assert all(a[5] <= b[5] for a, b in zip(why, why[1:])), "raised so far only grows"
+    assert min(r[6] for r in taken) == 0.0, "the plan's sales clear the debt"
+    assert all(r[6] >= 0 for r in why)
+
     print("sim self-test OK")
 
 

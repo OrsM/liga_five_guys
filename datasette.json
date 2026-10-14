@@ -35,6 +35,10 @@
           "title": "Every move the latest board ranked: gain, confidence, verdict, plan",
           "sql": "SELECT rank, label, round(gain, 1) AS gain, round(100 * p_better) AS better_pct,\n       round(per_million, 2) AS per_million, round(cost / 1e6, 2) AS cost_m, verdict, in_plan\nFROM funnel WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM funnel))\n  AND (nullif(:name, '') IS NULL OR label LIKE '%' || :name || '%') ORDER BY rank"
         },
+        "why_sell": {
+          "title": "Why these sales: every sale of yours ranked by points lost per million raised; the plan takes the cheapest that clear the debt (a balance below zero at the lock scores nothing)",
+          "sql": "WITH r AS (SELECT coalesce(nullif(:run, ''), (SELECT max(run_id) FROM sim_runs)) AS run_id),\nme AS (SELECT max(0.0, -cash) AS debt FROM sim_standings JOIN r USING (run_id) WHERE me),\ns AS (SELECT f.rank, substr(f.label, 6) AS player, f.proceeds AS raises, f.gain, f.per_million, f.in_plan\n      FROM funnel f JOIN r USING (run_id) WHERE f.kind = 'sell')\nSELECT player, round((SELECT debt FROM me) / 1e6, 1) AS debt_m, round(raises / 1e6, 1) AS raises_m,\n       round(gain, 1) AS season_points, round(per_million, 2) AS points_per_m,\n       round(sum(raises) OVER w / 1e6, 1) AS raised_so_far_m,\n       round(max(0.0, (SELECT debt FROM me) - sum(raises) OVER w) / 1e6, 1) AS debt_left_m,\n       (SELECT debt FROM me) > 0 AND raises >= (SELECT debt FROM me) AS covers_alone, in_plan\nFROM s WINDOW w AS (ORDER BY per_million DESC, rank) ORDER BY per_million DESC, rank"
+        },
         "forecast": {
           "title": "A player's forecast, factor by factor (latest run)",
           "sql": "SELECT f.jornada, p.name, round(f.ppm, 2) AS ppm, round(f.fixture, 2) AS fixture,\n       round(f.picked, 2) AS picked, round(f.fit, 2) AS fit, round(f.points, 2) AS points,\n       round(f.plays, 2) AS plays, round(f.expected, 2) AS expected\nFROM forecast f JOIN names p USING (player)\nWHERE f.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM forecast))\n  AND p.name LIKE '%' || coalesce(:name, '') || '%' ORDER BY p.name, f.jornada"
