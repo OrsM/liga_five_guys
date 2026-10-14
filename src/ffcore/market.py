@@ -46,10 +46,6 @@ class Market:
         """Every player as shown, for Action.label."""
         return {k: n.shown for k, n in self.name.items()}
 
-    @property
-    def locked_cash(self) -> float:
-        return sum(self.my_bid.values())
-
     def fetches(self, k: str) -> float:
         """What selling him gets: with an offer standing, fetch; else his value."""
         return self.fetch[k] if k in self.fetch else self.value.get(k, 0.0)
@@ -83,8 +79,6 @@ def _selftest() -> None:
     assert named.shown("k") == "Iñigo Vicente" and named.shown("unknown") == "unknown", \
         "a player is shown by his Name, or his key when he has none"
     assert named.names == {"k": "Iñigo Vicente"}
-    assert Market(my_bid={"a": 1e6, "b": 2.5e6}).locked_cash == 3.5e6
-    assert Market().locked_cash == 0.0
     try:
         Market().prceeds  # type: ignore[attr-defined]  # noqa: B018  # the point: it must fail
     except AttributeError:

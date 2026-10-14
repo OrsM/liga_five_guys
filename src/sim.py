@@ -240,7 +240,59 @@ def _selftest() -> None:
     assert min(r[6] for r in taken) == 0.0, "the plan's sales clear the debt"
     assert all(r[6] >= 0 for r in why)
 
+    _selftest_lineup()
     print("sim self-test OK")
+
+
+def _selftest_lineup() -> None:
+    """schema.sql's lineup_gap: the app's line-up against your best eleven now
+    ('now') and once the plan is made ('plan'), as board_moves and the
+    reminder read it."""
+    import tempfile
+    from contextlib import closing
+    from pathlib import Path
+
+    from ffcore.db import connect
+    from ffcore.tidy import store_sql, tables_in
+
+    def gap(app: list[tuple[str, str]], ids: dict[str, str]) -> list[tuple[str, str, str, int]]:
+        """The app line-up as (app id, name) rows, with these players' app ids."""
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            with closing(connect()) as db, db:
+                db.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha)"
+                           " VALUES (1, 't', 't', 'test', 'c')")
+                db.execute("INSERT INTO sim_runs VALUES (1, 0.0)")
+                db.executemany("INSERT INTO sim_players (run_id, player, mine, xi, plan_xi, next)"
+                               " VALUES (1, ?, ?, ?, ?, ?)",
+                               [("ionut radu", 1, 1, 1, 3.0), ("pepelu", 1, 1, 0, 2.0),
+                                ("cai coro", 0, 0, 1, 5.0), ("bench boy", 1, 0, 0, 0.5)])
+                # best eleven now: ionut, pepelu; once the plan buys cai for pepelu: ionut, cai
+                db.executemany("INSERT INTO sim_facts (run_id, player, name, pos) VALUES (1, ?, ?, '')",
+                               [("ionut radu", "Ionut Radu"), ("pepelu", "Pepelu"),
+                                ("cai coro", "Cai Coro"), ("bench boy", "Bench Boy")])
+                db.executemany("INSERT INTO crosswalk (player_id, name, app_id) VALUES (?, ?, ?)",
+                               [(k, k, v) for k, v in ids.items()])
+            store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": i,
+                                      "player_name": n, "player_name_full": n} for i, n in app])
+            with closing(connect()) as db:
+                return [tuple(r) for r in db.execute(
+                    "SELECT basis, side, player, legal FROM lineup_gap ORDER BY basis, side, player")]
+
+    lineup = [("1070", "Ionut Radu"), ("2464", "Pepelu")]
+    got = gap(lineup, {"ionut radu": "1070"})
+    assert got == [("plan", "in", "cai coro", 1), ("plan", "out", "pepelu", 1)], \
+        "set as the best eleven now; the plan, which buys cai for pepelu, wants it changed"
+    assert gap(lineup + [("999", "Nobody")], {"ionut radu": "1070"}) == [
+        ("now", "in", "ionut radu", 0), ("now", "in", "pepelu", 0),
+        ("plan", "in", "cai coro", 0), ("plan", "in", "ionut radu", 0)], \
+        "a line-up naming a player you do not own is unknown: the whole eleven to set"
+    assert gap(lineup, {"ionut radu": "1070", "someone else": "2464"}) == [
+        ("now", "in", "ionut radu", 0), ("now", "in", "pepelu", 0),
+        ("plan", "in", "cai coro", 0), ("plan", "in", "ionut radu", 0)], \
+        "an app id that is another's player is the same"
+    assert gap([], {}) == [("now", "in", "ionut radu", 0), ("now", "in", "pepelu", 0),
+                           ("plan", "in", "cai coro", 0), ("plan", "in", "ionut radu", 0)], \
+        "no line-up given: the whole eleven"
 
 
 def funnel(u: Universe, b: Board, run: int) -> list[Doc]:

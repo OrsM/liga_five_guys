@@ -292,14 +292,19 @@ SELECT player, amount AS paid FROM (
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
+-- When the next match kicks off after cut(): each player locks at his own
+-- match's kickoff (NULL once none is left to play).
+DROP VIEW IF EXISTS next_kickoff;
+CREATE VIEW next_kickoff AS SELECT min(kick) AS kick FROM kickoffs WHERE kick > (SELECT cut());
+
 -- The game's nightly offers still to come before the next match locks: one
 -- as each standing offer expires, then one a day (0 with none standing).
 DROP VIEW IF EXISTS nights_left;
 CREATE VIEW nights_left AS
 WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_offers
            WHERE status = 'pending' AND expires_at <> ''),
-l AS (SELECT julianday(substr(min(kick), 1, 13) || ':' || substr(min(kick), 14, 2) || 'Z') AS lock
-      FROM kickoffs WHERE kick > (SELECT cut()))
+l AS (SELECT julianday(substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || 'Z') AS lock
+      FROM next_kickoff)
 SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights
 FROM e, l;
 
@@ -808,6 +813,40 @@ SELECT row_number() OVER (ORDER BY -s.mean, s.manager) - 1 AS ord, s.manager, s.
        s.finish, s.p_first
 FROM sim_standings s JOIN board_run USING (run_id);
 
+-- Your line-up in the app against the best eleven: of your squad now
+-- (basis 'now', sim_players.xi) and of the squad once the plan is made
+-- ('plan', plan_xi). The app's line-up is its players, each by its player
+-- else by name within your squad, and counts only if every one is yours
+-- and there are as many as the eleven; otherwise it is unknown (legal 0)
+-- and the whole eleven is to set. 'in' are the eleven's players not in it,
+-- 'out' (i, its order in the app) those in it that are not in the eleven.
+DROP VIEW IF EXISTS lineup_gap;
+CREATE VIEW lineup_gap AS
+WITH app AS (
+    SELECT t.rowid AS i, coalesce(a.player, (
+               SELECT b.player FROM board_players b WHERE b.mine
+               AND name_key(b.name) IN (name_key(t.player_name), name_key(t.player_name_full))
+               ORDER BY b.player LIMIT 1)) AS player
+    FROM api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
+    WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
+                                        WHERE observed_at <= (SELECT cut()) GROUP BY source)),
+fielded AS (SELECT i, player FROM app
+            WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN board_players b
+                              ON b.player = a.player AND b.mine WHERE b.player IS NULL)),
+bases(basis) AS (VALUES ('now'), ('plan')),
+eleven AS (SELECT b.basis, p.player, p.name, p.next FROM bases b
+           JOIN board_players p ON (b.basis = 'now' AND p.xi) OR (b.basis = 'plan' AND p.plan_xi)),
+legal AS (SELECT basis, (SELECT count(*) FROM fielded) > 0
+                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM eleven e WHERE e.basis = bases.basis)
+                 AS ok FROM bases)
+SELECT e.basis, 'in' AS side, NULL AS i, e.player, e.name, e.next, l.ok AS legal
+FROM eleven e JOIN legal l USING (basis)
+WHERE NOT l.ok OR e.player NOT IN (SELECT player FROM fielded)
+UNION ALL
+SELECT l.basis, 'out', f.i, b.player, b.name, b.next, l.ok
+FROM fielded f JOIN board_players b USING (player), legal l
+WHERE l.ok AND f.player NOT IN (SELECT player FROM eleven e WHERE e.basis = l.basis);
+
 -- The plan's moves, in its order, each as a line of the board: the step it
 -- takes in the app and the amount that step names, whether it is done, its
 -- points over the season and the numbers that made it (facts: [label,
@@ -827,24 +866,9 @@ DROP VIEW IF EXISTS board_moves;
 CREATE VIEW board_moves AS
 WITH sold AS (SELECT b.player FROM board_players b JOIN board_plan p
               ON instr(',' || p.sell || ',', ',' || b.player || ',') > 0),
-app AS (
-    SELECT t.rowid AS i, coalesce(a.player, (
-               SELECT b.player FROM board_players b WHERE b.mine
-               AND name_key(b.name) IN (name_key(t.player_name), name_key(t.player_name_full))
-               ORDER BY b.player LIMIT 1)) AS player
-    FROM api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
-    WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
-                                        WHERE observed_at <= (SELECT cut()) GROUP BY source)),
-fielded AS (SELECT i, player FROM app
-            WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN board_players b
-                              ON b.player = a.player AND b.mine WHERE b.player IS NULL)),
-eleven AS (SELECT player, name, next FROM board_players WHERE plan_xi),
-legal AS (SELECT (SELECT count(*) FROM fielded) > 0
-                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM eleven) AS ok),
-ins AS (SELECT e.* FROM eleven e, legal
-        WHERE NOT legal.ok OR e.player NOT IN (SELECT player FROM fielded)),
-outs AS (SELECT f.i, b.player, b.name, b.next FROM fielded f JOIN board_players b USING (player), legal
-         WHERE legal.ok AND f.player NOT IN (SELECT player FROM eleven)),
+ins AS (SELECT * FROM lineup_gap WHERE basis = 'plan' AND side = 'in'),
+outs AS (SELECT * FROM lineup_gap WHERE basis = 'plan' AND side = 'out'),
+legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap WHERE basis = 'plan'),
 field AS (
     SELECT -1 AS ord, 'field' AS what,
            'field ' || (SELECT group_concat(name, ', ' ORDER BY -next, player) FROM ins) AS label,
@@ -890,7 +914,7 @@ FROM (SELECT * FROM field UNION ALL SELECT * FROM moves);
 DROP VIEW IF EXISTS board_head;
 CREATE VIEW board_head AS
 WITH me AS (SELECT * FROM board_league WHERE me),
-lock AS (SELECT min(kick) AS kick FROM kickoffs WHERE kick > (SELECT cut()))
+lock AS (SELECT kick FROM next_kickoff)
 SELECT (SELECT run_id FROM board_run) AS run_id,
        substr(cut(), 1, 13) || ':' || substr(cut(), 14) AS generated_at,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,

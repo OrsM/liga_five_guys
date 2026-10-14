@@ -7,8 +7,7 @@ from typing import Any
 from datetime import date, datetime, timezone, tzinfo
 from functools import lru_cache
 
-__all__ = ["Row", "Rows", "money", "ratio", "pct100", "count", "text", "snapshot_stamp",
-           "kickoff_stamp"]
+__all__ = ["Row", "Rows", "money", "ratio", "pct100", "count", "text", "snapshot_stamp"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
 _CLEAN = str.maketrans({"\u00a0": "", " ": "", "\u202f": ""})
@@ -122,26 +121,7 @@ def snapshot_stamp(s: str) -> datetime | None:
     return _digits_to_dt(s, timezone.utc)
 
 
-def kickoff_stamp(s: str | None) -> datetime | None:
-    try:
-        when = datetime.fromisoformat((s or "").strip())
-    except ValueError:
-        return None
-    return (when.replace(tzinfo=timezone.utc) if when.tzinfo is None
-            else when.astimezone(timezone.utc))
-
-
 def _selftest() -> None:
-    from datetime import datetime, timezone
-
-    assert kickoff_stamp("2026-08-15T19:30:00+00:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("2026-08-15T21:30:00+02:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("2026-08-15T19:30:00") == datetime(
-        2026, 8, 15, 19, 30, tzinfo=timezone.utc)
-    assert kickoff_stamp("") is None and kickoff_stamp("soon") is None
-
     row = {"s": "  x ", "blank": " ", "num": 7}
     for col, default, out in [("s", "", "x"), ("blank", "d", "d"), ("missing", "", ""),
                               ("num", "", "7")]:

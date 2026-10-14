@@ -10,7 +10,7 @@ from ffcore.clock import on_reset
 from ffcore.db import rows
 from ffcore.parse import snapshot_stamp
 
-__all__ = ["round_locks", "rounds_ahead", "jornada_of_match", "load_deadline"]
+__all__ = ["round_locks", "rounds_ahead", "jornada_of_match"]
 
 
 @cache
@@ -30,12 +30,6 @@ def rounds_ahead() -> dict[int, datetime]:
 @cache
 def jornada_of_match() -> dict[str, int]:
     return dict(rows("SELECT match_id, jornada FROM match_jornada"))
-
-
-def load_deadline() -> datetime | None:
-    """The next kickoff after now: each player locks at his own match's."""
-    (at,), = rows("SELECT min(kick) FROM kickoffs WHERE kick > (SELECT cut())")
-    return snapshot_stamp(at) if at else None
 
 
 for _cached in (round_locks, rounds_ahead, jornada_of_match):
@@ -83,13 +77,14 @@ def _selftest() -> None:
             assert jornada_of_match() == {"b1": 1, "b2": 1, "m1": 2, "m2": 2, "m4": 4}
             assert rounds_ahead() == {1: utc(14, 19, 30), 2: utc(18, 17), 4: utc(30, 17)}, \
                 "jornada 2 by its match still to play"
-            assert load_deadline() == utc(30, 17)
+            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-30T1700Z",)]
             set_now(utc(17, 20))
-            assert load_deadline() == utc(18, 17), "the rest of a jornada under way"
+            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-18T1700Z",)], \
+                "the rest of a jornada under way"
             set_now(utc(22, 0))
             assert 3 in round_locks(), "set_now clears the cache"
             set_now(utc(31, 0))
-            assert load_deadline() is None
+            assert rows("SELECT kick FROM next_kickoff") == [(None,)], "none left to play"
         finally:
             set_now(None)
     print("ffcore.jornadas self-test OK")

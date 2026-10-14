@@ -65,11 +65,6 @@ TEAM_SELECT_RE = re.compile(r'<select[^>]*name="equipo"[^>]*>(.*?)</select>', re
 OPTION_RE = re.compile(r'<option[^>]*value="(\d+)"[^>]*>([^<]+)</option>')
 
 
-def _attr(chunk: str, name: str) -> str | None:
-    m = re.search(rf'data-{name}="([^"]*)"', chunk)
-    return m.group(1) if m else None
-
-
 HREF_RE = re.compile(r'href="[^"]*?/jugadores/([^"?#]+)"')
 PHOTO_RE = re.compile(r'/jugadores/ficha/(\d+)\.(?:png|jpg|jpeg|webp)')
 ASSET_RE = re.compile(r'\.(png|jpg|jpeg|webp|svg)$', re.I)

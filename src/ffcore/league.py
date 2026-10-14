@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import configparser
 import sys
-from collections.abc import Iterable, Mapping
 from contextlib import closing
 from dataclasses import dataclass
 
 from ffcore import db as lfg
-from ffcore.parse import Rows, money
+from ffcore.parse import money
 from ffcore.players import load_crosswalk
 from ffcore.tidy import current, input_path
 
-from ffcore.names import AppId, Name, PlayerKey
-__all__ = ["Config", "load_config", "app_fielded", "League"]
+from ffcore.names import AppId, PlayerKey
+__all__ = ["Config", "load_config", "League"]
 
 
 @dataclass
@@ -31,27 +30,6 @@ def load_config(name: str = "league.ini") -> Config:
     return Config(
         me=cp.get("league", "me", fallback=base.me),
         budget=money(cp.get("league", "budget", fallback=str(base.budget))) or 0.0)
-
-
-def app_fielded(squad: Iterable[str], names: Mapping[str, Name], rows: Rows | None = None
-                ) -> list[str]:
-    """Your eleven as the app has it, as our keys: its player, else by name
-    within your squad; [] if any of them is not in your squad."""
-    rows = current("api_lineup") if rows is None else rows
-    mine = set(squad)
-    by_name = {names.get(k) or Name(k): k for k in mine}
-    out: list[str] = []
-    for r in rows or []:
-        key: str | None = r.get("player")
-        if key is None:
-            for field in ("player_name", "player_name_full"):
-                key = by_name.get(Name(r.get(field)))
-                if key:
-                    break
-        if not key or key not in mine:
-            return []
-        out.append(key)
-    return out
 
 
 class League:
@@ -158,23 +136,6 @@ def _selftest() -> None:
                       "counterparty": "1", "amount": "12", "at": "2026-09-20"}],
                     users[:2], [{"observed_at": b, "manager": "riv", "player_id": "7"}], xw)
     assert bought.paid == {"p": 12.0}, ("what his owner paid, not the one before", bought.paid)
-
-    lineup = [{"player_id": "1070", "player_name": "Ionut Radu",
-               "player_name_full": "Ionut Andrei Radu"},
-              {"player_id": "2464", "player_name": "Pepelu",
-               "player_name_full": "José Luis García Vayá"}]
-    squad = {"ionut radu": 1, "pepelu": 1}
-    for sq, names, rows, app_ids, want in [
-            (squad, {"pepelu": "Pepelu"}, lineup, {"1070": "ionut radu"},
-             ["ionut radu", "pepelu"]),
-            (squad, {}, lineup + [{"player_id": "999", "player_name": "Nobody"}],
-             {}, []),
-            (squad, {}, lineup, {"1070": "ionut radu", "2464": "someone else"},
-             []),
-            ({}, {}, [], {}, [])]:
-        resolved = [dict(r, player=app_ids.get(r["player_id"])) for r in rows]
-        assert app_fielded(sq, {k: Name(n) for k, n in names.items()}, resolved) == want, \
-            (app_ids, want)
 
     print("ffcore.league self-test OK")
 
