@@ -7,11 +7,12 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Sequence
+from contextlib import closing
 from typing import Any
 
 from assemble import built, universe
 from decide import CONFIDENCE, Board, Universe, board, verdict
-from ffcore.db import record, rows, this_run
+from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
 
@@ -79,10 +80,6 @@ def _selftest() -> None:
                 db.execute("CREATE TABLE sale_odds (player, offer, waiting, fetches)")
                 db.executemany("INSERT INTO sale_odds VALUES (?, ?, NULL, ?)",
                                [(k, o, m.fetch[k]) for k, o in m.offer.items()])
-                db.execute("DROP VIEW cash")
-                db.execute("CREATE TABLE cash (manager, cash)")
-                db.executemany("INSERT INTO cash VALUES (?, ?)",
-                               [(u.me, m.cash), *u.rival_cash.items()])
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
                                [(k, k) for k in fielded])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
@@ -204,6 +201,8 @@ def _selftest() -> None:
     assert (me_row["finish"], me_row["p_first"]) == (
         b.base.expected_position(), b.base.position().get(1, 0.0))
     riv = next(r for r in sim if not r["me"])
+    assert (me_row["cash"], riv["cash"]) == (ub.market.cash, ub.rival_cash.get("riv", 0.0)), \
+        "yours from the app, a rival's as estimated"
     assert riv["p_above"] == 1.0 - b.base.beat("riv") and riv["finish"] == \
         b.base.expected_position("riv"), "every manager's finish, not only yours"
     assert (riv["lo"], riv["hi"]) == b.base.band("riv") and riv["mean"] == b.base.mean("riv")
@@ -247,12 +246,13 @@ def forecast(u: Universe, run: int) -> list[Doc]:
 def standings(u: Universe, b: Board, run: int) -> list[Doc]:
     """Each manager's simulated season if you do nothing (Board.base): mean
     points and their 10th-90th percentile band, expected final position,
-    the chance of first, and the chance he finishes above you."""
+    the chance of first, the chance he finishes above you, and his cash."""
     base = b.base
     return [{"run_id": run, "manager": mgr, "me": int(mgr == u.me),
              "now": u.state.carried.get(mgr, 0.0), "mean": base.mean(mgr),
              "lo": base.band(mgr)[0], "hi": base.band(mgr)[1],
              "finish": base.expected_position(mgr), "p_first": base.position(mgr).get(1, 0.0),
+             "cash": u.market.cash if mgr == u.me else u.rival_cash.get(mgr, 0.0),
              "p_above": None if mgr == u.me else 1.0 - base.beat(mgr)}
             for mgr in u.state.squads]
 
@@ -292,6 +292,8 @@ def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> N
     record(players(u, b, run), "sim_players")
     record(plan(u, b, run), "sim_plan")
     record([plan_head(b, run)], "sim_runs")
+    with closing(connect()) as db, db:
+        db.execute("INSERT INTO sim_facts SELECT ?, * FROM sim_facts_now", (run,))
 
 
 def board_doc() -> Doc:

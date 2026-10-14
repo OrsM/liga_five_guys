@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS sim_standings (
     finish   REAL,
     p_first  REAL,
     p_above  REAL,
+    cash     REAL,                 -- yours from the app, a rival's estimated from the feed
     PRIMARY KEY (run_id, manager)
 );
 
@@ -111,6 +112,27 @@ CREATE TABLE IF NOT EXISTS sim_players (
     xi          INTEGER NOT NULL,
     plan_xi     INTEGER NOT NULL,
     per_million REAL,
+    PRIMARY KEY (run_id, player)
+);
+
+-- The market's and the league's facts as the run saw them (player_facts and
+-- sale_odds as of its cut), every player: the board shows these, and a
+-- past run's board is these and its decisions. fetches is what a sale gets
+-- (NULL with no offer standing on him). sim_facts_now is what is inserted.
+CREATE TABLE IF NOT EXISTS sim_facts (
+    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
+    player  TEXT NOT NULL,
+    name    TEXT NOT NULL,
+    pos     TEXT NOT NULL,
+    value   REAL,
+    trend   REAL,
+    paid    REAL,
+    offer   REAL,
+    clause  REAL,
+    price   REAL,
+    route   TEXT,
+    my_bid  REAL,
+    fetches REAL,
     PRIMARY KEY (run_id, player)
 );
 
@@ -737,22 +759,30 @@ SELECT CASE WHEN better THEN best.alpha ELSE 0.0 END AS alpha,
        fall.neutral AS neutral_start, fall.absent AS absent_start
 FROM fits, fall LEFT JOIN best;
 
--- The board: the last run's decisions (sim_*, funnel) with the market's
--- and the league's facts as of cut() (player_facts, cash, kickoffs).
+-- What a run records of the facts (sim_facts): every player_facts column
+-- with his name as shown, and what a sale of him gets.
+DROP VIEW IF EXISTS sim_facts_now;
+CREATE VIEW sim_facts_now AS
+SELECT f.player, coalesce(name_shown(f.name), f.player) AS name, f.pos, f.value, f.trend, f.paid,
+       f.offer, f.clause, f.price, f.route, f.my_bid, o.fetches
+FROM player_facts f LEFT JOIN sale_odds o USING (player);
+
+-- The board: the last run's decisions and the facts it saw (sim_*, funnel),
+-- the app's line-up and the next kickoff as of cut().
 -- board_json is decisions.json, the phone's copy; sim.main writes it from
 -- here. Names, not keys: the board is what the phone shows.
 DROP VIEW IF EXISTS board_run;
 CREATE VIEW board_run AS SELECT max(run_id) AS run_id FROM sim_runs;
 
--- Each player the last run decided about, with his facts and name as shown.
+-- Each player the last run decided about, with his facts and name as shown;
+-- if yours, what selling him raises and whether that takes tonight's offer.
 DROP VIEW IF EXISTS board_players;
 CREATE VIEW board_players AS
-SELECT p.*, coalesce(name_shown(f.name), p.player) AS name, coalesce(f.pos, '') AS pos,
+SELECT p.*, coalesce(f.name, p.player) AS name, coalesce(f.pos, '') AS pos,
        f.value, f.trend, f.paid, f.offer, f.clause, f.price, f.route, f.my_bid,
-       CASE WHEN p.mine THEN coalesce(o.fetches, f.value, 0.0) END AS raises,
-       coalesce(o.fetches = f.offer, 0) AS takes
-FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN player_facts f USING (player)
-LEFT JOIN sale_odds o USING (player);
+       CASE WHEN p.mine THEN coalesce(f.fetches, f.value, 0.0) END AS raises,
+       coalesce(f.fetches = f.offer, 0) AS takes
+FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN sim_facts f USING (run_id, player);
 
 -- Your squad: goalkeepers to forwards, then most expected next first.
 DROP VIEW IF EXISTS board_holdings;
@@ -774,16 +804,16 @@ FROM board_players WHERE mine AND clause IS NOT NULL;
 DROP VIEW IF EXISTS board_league;
 CREATE VIEW board_league AS
 SELECT row_number() OVER (ORDER BY -s.mean, s.manager) - 1 AS ord, s.manager, s.me, s.now,
-       s.mean, s.lo, s.hi, coalesce(c.cash, 0.0) AS cash, NOT s.me AS estimated, s.p_above,
+       s.mean, s.lo, s.hi, coalesce(s.cash, 0.0) AS cash, NOT s.me AS estimated, s.p_above,
        s.finish, s.p_first
-FROM sim_standings s JOIN board_run USING (run_id) LEFT JOIN cash c USING (manager);
+FROM sim_standings s JOIN board_run USING (run_id);
 
 -- The plan's moves, in its order, each as a line of the board: the step it
 -- takes in the app and the amount that step names, whether it is done, its
 -- points over the season and the numbers that made it (facts: [label,
 -- value, unit], none without a value). A buy: bid up to its cost, or your
 -- bid is in. A sale: take tonight's offer, or wait for what waiting is
--- worth (sim_players.raises), or it is listed, or list it.
+-- worth (board_players.raises), or it is listed, or list it.
 DROP VIEW IF EXISTS board_plan;
 CREATE VIEW board_plan AS
 SELECT p.ord, f.label, f.gain, f.per_million, f.p_better, f.cost,
@@ -864,7 +894,7 @@ lock AS (SELECT min(kick) AS kick FROM kickoffs WHERE kick > (SELECT cut()))
 SELECT (SELECT run_id FROM board_run) AS run_id,
        substr(cut(), 1, 13) || ':' || substr(cut(), 14) AS generated_at,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
-       me.cash, (SELECT total(my_bid) FROM player_facts) AS cash_locked,
+       me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
        me.lo AS band_lo, me.hi AS band_hi,
        (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
