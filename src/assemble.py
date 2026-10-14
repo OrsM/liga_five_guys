@@ -6,17 +6,18 @@ from __future__ import annotations
 
 from contextlib import closing
 from functools import cache
+from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 from decide import CONFIDENCE, FINAL_TRIALS, Universe, _fieldable
 from ffcore.db import connect, named, query, rows
 from ffcore.fixture import FIX_BAND, MIN_AD_MATCHES, Ratings, difficulty_ratings
 from ffcore.forecast import MIN_POOL, PERSISTENT_SHARE, Bootstrap
-from ffcore.jornadas import load_deadline, rounds_ahead
+from ffcore.jornadas import rounds_ahead
 from ffcore.league import League
 from ffcore.market import Market
 from ffcore.names import Name
-from ffcore.parse import Rows, kickoff_stamp
+from ffcore.parse import Rows
 from ffcore.points import scored, season_record
 from ffcore.pricing import BID_BEATS, CLIP, PRICE_WINDOW
 from ffcore.schedule import expectations, phantom_fill
@@ -79,18 +80,6 @@ def fixture_ratings(market: Rows) -> Ratings:
     return difficulty_ratings(market, current("results_history"))
 
 
-def _nights_left(offers: Rows) -> int:
-    """The game's nightly offers still to come before the lock: one as each
-    standing offer expires, then one a day."""
-    ends = [when for r in offers if r.get("status") == "pending"
-            and (when := kickoff_stamp(r.get("expires_at")))]
-    lock = load_deadline()
-    if not ends or lock is None:
-        return 0
-    days = (lock - max(ends)).total_seconds() / 86400
-    return max(0, int(days) + 1) if days > 0 else 0
-
-
 def write_constants() -> None:
     """CONSTANTS into lfg.db, for the views that use them."""
     with closing(connect()) as db, db:
@@ -144,24 +133,23 @@ def market_offer_ratios() -> list[float]:
 
 
 def params(cal: Calibration, avail: Availability, promoted: float, ratings: Ratings,
-           market: Market) -> list[dict[str, Any]]:
+           premium: float, ratios: Sequence[float], carry: Sequence[float]) -> list[dict[str, Any]]:
     """Every constant and fitted value a run is built with, one row each:
     (component, term, value, kind, n)."""
     def row(component: str, term: str, value: float, kind: str = "fitted",
             n: int | None = None) -> dict[str, Any]:
         return {"component": component, "term": term, "value": float(value),
                 "kind": kind, "n": n}
-    ratios = list(market.offer_ratios)
     return ([row(m, name, v, "constant") for m, names in CONSTANTS.items()
              for name, v in names.items()]
             + [row("startprob.calibration", t, getattr(cal, t))
                for t in ("alpha", "beta", "neutral_start", "absent_start")]
             + [row("startprob.availability", b, v) for b, v in sorted(avail.level.items())]
             + [row("score.promoted_discount", "", promoted),
-               row("pricing.premium", "", market.premium)]
+               row("pricing.premium", "", premium)]
             + [row("pricing.offer_ratios", t, percentile(ratios, p), n=len(ratios))
                for t, p in (("p10", 10), ("median", 50), ("p90", 90)) if ratios]
-            + [row("pricing.carry", str(h), v) for h, v in enumerate(market.carry, 1)]
+            + [row("pricing.carry", str(h), v) for h, v in enumerate(carry, 1)]
             + [row("fixture.difficulty", c, v) for c, v in sorted(ratings.diff.items())]
             + [row("fixture.%s" % t, c, ad[i]) for c, ad in sorted(ratings.ad.items())
                for i, t in enumerate(("scored", "conceded"))])
@@ -205,10 +193,9 @@ def built() -> Built:
         name={k: Name(f["name"]) for k, f in facts.items()},
         pos=pos, price=price, route=column("route"), owner=column("owner"),
         paid=column("paid"), offer=column("offer"),
-        offer_ratios=tuple(market_offer_ratios()),
-        nights_left=_nights_left(current("api_offers")),
         value=column("value"), my_bid=column("my_bid"),
-        trend=prices.trend, carry=prices.carry, clause=column("clause"))
+        trend=prices.trend, clause=column("clause"),
+        fetch=dict(rows("SELECT player, fetches FROM sale_odds")))
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
     if rem:
@@ -224,7 +211,8 @@ def built() -> Built:
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
         part_played=played, first_jornada_of=first_jornada_of, factors=ex.factors),
-        params(sc.starts.cal, sc.starts.avail, sc.promoted_discount, ratings, market))
+        params(sc.starts.cal, sc.starts.avail, sc.promoted_discount, ratings, market.premium,
+               market_offer_ratios(), prices.carry))
 
 
 def _selftest() -> None:
@@ -232,7 +220,7 @@ def _selftest() -> None:
 
     rows = params(Calibration(0.1, 0.9, 55.0, 12.0), Availability({"indefinite": 0.2}), 0.7,
                   Ratings({"a": 1.1}, {"a": (1.2, 0.8)}),
-                  Market(premium=1.05, offer_ratios=(0.9, 1.0, 1.1), carry=(0.5, 1.0)))
+                  1.05, (0.9, 1.0, 1.1), (0.5, 1.0))
     got = {(r["component"], r["term"]): r for r in rows}
     assert len(got) == len(rows), "one row a parameter"
     assert {r["kind"] for r in rows} == {"fitted", "constant"}
@@ -255,7 +243,78 @@ def _selftest() -> None:
         "a bucket with no data keeps its prior, and is still what the run used"
     _selftest_market()
     _selftest_facts()
+    _selftest_sale()
     print("assemble self-test OK")
+
+
+def _selftest_sale() -> None:
+    """schema.sql's nights_left and sale_odds: what selling a player with an
+    offer standing on him gets, against the recursion they replace."""
+    import tempfile
+    from pathlib import Path
+
+    from ffcore.clock import set_now
+    from ffcore.db import record
+    from ffcore.parse import snapshot_stamp
+    from ffcore.tidy import store_sql, tables_in
+
+    def at(n: int) -> str:
+        return "2026-09-0%dT1000Z" % n
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(snapshot_stamp("2026-09-04T1200Z"))
+            record([{"me": "me", "budget": 100e6}], "league_config")
+            record([{"name": "PRICE_WINDOW", "value": 3.0}, {"name": "CLIP", "value": 20.0}], "constants")
+            record([{"player_id": "p1", "app_id": "1"}, {"player_id": "p2", "app_id": "2"}],
+                   "crosswalk")
+            store_sql("market", [{"observed_at": at(1), "ff_id": k, "name": k, "value": "10000000"}
+                                 for k in ("p1", "p2")])
+            store_sql("api_standings", [{"observed_at": at(1), "user_id": "1", "manager": "me"}])
+            store_sql("matches", [{"observed_at": at(1), "match_id": "m", "jornada": "1",
+                                   "home": "a", "away": "b", "kickoff": "2026-09-05T19:00:00+00:00"}])
+            # past nightly offers, 0.8 / 0.9 / 1.0 / 1.1 of value: the last three count
+            for n, money in enumerate(("8000000", "9000000", "10000000", "11000000"), 1):
+                store_sql("api_teams", [{"observed_at": at(n), "player_id": "1", "manager": "me",
+                                         "market_value": "10000000", "player_team_id": "t1"}])
+                store_sql("api_offers", [{"observed_at": at(n), "player_team_id": "t1",
+                                          "offer_id": "o%d" % n, "from_market": "true",
+                                          "money": money, "status": "accepted",
+                                          "created_at": "2026-09-0%dT09:00:00+02:00" % n}])
+            store_sql("api_teams", [{"observed_at": at(3), "player_id": "2", "manager": "riv",
+                                     "market_value": "10000000", "player_team_id": "t2"}])
+            def sale(offer: str, expires: str = "2026-09-04T20:00:00+02:00"
+                     ) -> dict[str, tuple[Any, ...]]:
+                store_sql("api_offers", [{"observed_at": at(4), "player_team_id": "t1",
+                                          "offer_id": "now", "status": "pending", "money": offer,
+                                          "expires_at": expires}])
+                return {r[0]: r for r in rows("SELECT player, offer, waiting, fetches FROM sale_odds")}
+            assert rows("SELECT nights FROM nights_left") == [(0,)], "no offer standing: no nights"
+            got = sale("10500000")
+            assert rows("SELECT nights FROM nights_left") == [(2,)], \
+                "the offer ends 09-04 18:00 UTC, the match locks 09-05 19:00: a day and an hour, 2 nights"
+            assert set(got) == {"p1"}, "offers are only on your players"
+            last = sum((0.9, 1.0, 1.1)) / 3 * 10e6     # the last 3 offers: the last night's is taken
+            night_before = sum(max(x * 10e6, last) for x in (0.9, 1.0, 1.1)) / 3
+            assert abs(got["p1"][2] - night_before) < 1e-6, got
+            assert got["p1"][3] == max(10.5e6, night_before)
+
+            # a rising player, momentum fitted: the offers to come are on the value he will have
+            store_sql("market", [{"observed_at": at(n), "ff_id": k, "name": k, "value": v}
+                                 for n, v in ((2, "10500000"), (3, "11025000")) for k in ("p1", "p2")])
+            record([{"as_of": at(3), "h": 1, "slope": 2.0}, {"as_of": at(3), "h": 2, "slope": 8.0}],
+                   "momentum_fit")
+            facts = dict(rows("SELECT ff_id, trend FROM price_trend"))
+            carry = [c for (c,) in rows("SELECT carry FROM price_carry ORDER BY h")]
+            assert facts["p1"] > 0 and carry == [0.25, 1.0], (facts, carry)
+            value, trend, later = 11025000.0, facts["p1"], 0.0
+            for night in (2, 1):
+                then = value * (1 + trend / 100 * carry[min(night, len(carry)) - 1])
+                later = sum(max(x * then, later) for x in (0.9, 1.0, 1.1)) / 3
+            (waiting, fetches), = rows("SELECT waiting, fetches FROM sale_odds")
+            assert abs(waiting - later) < 1e-6 and fetches == max(10.5e6, later), (waiting, later)
+        finally:
+            set_now(None)
 
 
 def _selftest_facts() -> None:

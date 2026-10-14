@@ -15,7 +15,7 @@ from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState, Standings, simulate_many
 from stats import percentile
 
-__all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe", "at_risk",
+__all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe",
            "board", "plan", "verdict"]
 
 FINAL_TRIALS = 3000
@@ -269,15 +269,6 @@ def board(u: Universe) -> Board:
         rows, base = u.rank(u.candidates())
     picked, gain = plan(u, rows, base)
     return Board(forced + picked, gain, forced + rows, base)
-
-
-def at_risk(u: Universe) -> list[str]:
-    """Your players a rival can take now by paying their clause, most
-    valuable to you first. Any rival can: a sale to the game pays at once
-    (Laporta sold Raphinha for 192.6M the minute he paid 189.5M for Yamal),
-    so cash is no limit."""
-    season = u.outlook.season
-    return sorted((k for k in u.mine if k in u.market.clause), key=lambda k: -season.get(k, 0.0))
 
 
 def _fieldable(squad: Squad) -> bool:

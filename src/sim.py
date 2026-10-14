@@ -75,6 +75,10 @@ def _selftest() -> None:
                     (k, k, m.pos.get(k), m.value.get(k), m.owner.get(k), m.clause.get(k),
                      m.price.get(k), m.route.get(k), m.my_bid.get(k), m.offer.get(k),
                      m.paid.get(k), m.trend.get(k)) for k in set(m.pos) | set(u.mine)])
+                db.execute("DROP VIEW sale_odds")
+                db.execute("CREATE TABLE sale_odds (player, offer, waiting, fetches)")
+                db.executemany("INSERT INTO sale_odds VALUES (?, ?, NULL, ?)",
+                               [(k, o, m.fetch[k]) for k, o in m.offer.items()])
                 db.execute("DROP VIEW cash")
                 db.execute("CREATE TABLE cash (manager, cash)")
                 db.executemany("INSERT INTO cash VALUES (?, ?)",
@@ -158,8 +162,7 @@ def _selftest() -> None:
         == [("list", False)]
 
     def sale(offer: float) -> tuple[Doc, str]:
-        mk = replace(ub.market, offer={"dead": offer}, nights_left=2,
-                     offer_ratios=(0.9, 1.0, 1.0, 1.1))
+        mk = replace(ub.market, offer={"dead": offer}, fetch={"dead": max(offer, 1.0e6)})
         doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead], rows=b.rows + [sell_dead]))
         return (next(d for d in doc["do"] if d["what"] == "sell"),
                 doc["ping"].split("; ")[-1])
@@ -169,7 +172,7 @@ def _selftest() -> None:
     assert (take["step"], take["amount"], take["done"]) == ("take offer", 1.1e6, False)
     assert facts(take)["raises"] == 1.1e6
     assert said == "sell dead", said
-    assert wait["step"] == "wait" and wait["done"] and wait["amount"] > 0.9e6, \
+    assert wait["step"] == "wait" and wait["done"] and wait["amount"] == 1.0e6, \
         "waiting: done for tonight, and the sale raises what waiting is worth"
     assert facts(wait)["offer"] == 0.9e6 and facts(wait)["raises"] == wait["amount"]
     assert "Dead" not in quiet, quiet
@@ -212,9 +215,7 @@ def _selftest() -> None:
     assert who["star"]["next"] == ub.outlook.xi.expected["star"] \
         and who["star"]["season"] == ub.outlook.season["star"]
     dead = b.sale("dead")
-    assert dead is not None and who["dead"]["raises"] == ub.market.fetches("dead") \
-        and who["dead"]["per_million"] == dead.per_million, who["dead"]
-    assert who[bought[0]]["raises"] is None, "a buy is not yours to sell"
+    assert dead is not None and who["dead"]["per_million"] == dead.per_million, who["dead"]
     assert plan(ub, b, 7) == [{"run_id": 7, "ord": i, "rank": b.rows.index(m)}
                               for i, m in enumerate(b.plan)]
     assert plan_head(b, 7) == {"run_id": 7, "plan_gain": b.gain}
@@ -259,18 +260,15 @@ def standings(u: Universe, b: Board, run: int) -> list[Doc]:
 def players(u: Universe, b: Board, run: int) -> list[Doc]:
     """Your squad and the plan's buys as the model sees them: the chance he
     plays next, his expected points next and over the season, whether he is
-    in the best eleven now and once the plan is made, and, if yours, what
-    selling him raises (Market.fetches), whether that takes tonight's offer,
-    and the points his sale costs per million."""
-    m, o = u.market, u.outlook
+    in the best eleven now and once the plan is made, and, if yours, the
+    points his sale costs per million."""
+    o = u.outlook
     exp, xi = o.xi
     plan_xi = u.after(*(r.action for r in b.plan)).outlook.xi.players
     keys = list(u.mine) + [r.action.buy for r in b.plan if r.action.buy and r.action.buy not in u.mine]
     return [{"run_id": run, "player": k, "start": o.next_up.get(k, (0.0, 0.0))[1],
              "next": exp.get(k, 0.0), "season": o.season.get(k, 0.0),
              "mine": int(k in u.mine), "xi": int(k in xi), "plan_xi": int(k in plan_xi),
-             "raises": m.fetches(k) if k in u.mine else None,
-             "takes": int(m.takes(k)) if k in u.mine else None,
              "per_million": (sale := b.sale(k)) and sale.per_million}
             for k in keys]
 

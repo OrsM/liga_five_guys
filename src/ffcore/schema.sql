@@ -100,8 +100,7 @@ CREATE TABLE IF NOT EXISTS sim_standings (
 
 -- Your squad (mine) and the plan's buys: the chance he plays next, expected
 -- points next and over the season, in the best eleven now (xi) and once
--- the plan is made (plan_xi); if yours, what selling him raises, whether
--- that takes tonight's offer, and the points his sale costs per million.
+-- the plan is made (plan_xi); if yours, the points his sale costs per million.
 CREATE TABLE IF NOT EXISTS sim_players (
     run_id      INTEGER NOT NULL REFERENCES runs(run_id),
     player      TEXT NOT NULL,
@@ -111,8 +110,6 @@ CREATE TABLE IF NOT EXISTS sim_players (
     mine        INTEGER NOT NULL,
     xi          INTEGER NOT NULL,
     plan_xi     INTEGER NOT NULL,
-    raises      REAL,
-    takes       INTEGER,
     per_million REAL,
     PRIMARY KEY (run_id, player)
 );
@@ -272,6 +269,44 @@ SELECT player, amount AS paid FROM (
            row_number() OVER (PARTITION BY l.player ORDER BY l.at DESC) AS last
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
+
+-- The game's nightly offers still to come before the next match locks: one
+-- as each standing offer expires, then one a day (0 with none standing).
+DROP VIEW IF EXISTS nights_left;
+CREATE VIEW nights_left AS
+WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_offers
+           WHERE status = 'pending' AND expires_at <> ''),
+l AS (SELECT julianday(substr(min(kick), 1, 13) || ':' || substr(min(kick), 14, 2) || 'Z') AS lock
+      FROM kickoffs WHERE kick > (SELECT cut()))
+SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights
+FROM e, l;
+
+-- What selling a player with an offer standing on him gets: the offer, or
+-- what turning it down is worth if each night's offer to come is then
+-- taken only when it beats waiting on (the last before the lock always),
+-- whichever is more. An offer to come is a past one's share of value
+-- (offer_ratios, the last PRICE_WINDOW) of the value he will have that
+-- night: his value moved by his trend, the share carry says is made by
+-- then (price_carry). Waiting is NULL without a value or past offers.
+DROP VIEW IF EXISTS sale_odds;
+CREATE VIEW sale_odds AS
+WITH RECURSIVE
+r AS MATERIALIZED (SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
+                   LIMIT (SELECT CAST(price_window AS INTEGER) FROM k)),
+c AS MATERIALIZED (SELECT h, carry FROM price_carry),
+s AS MATERIALIZED (SELECT player, offer, value, coalesce(trend, 0.0) AS trend
+                   FROM player_facts WHERE offer IS NOT NULL),
+w(player, night, later) AS (
+    SELECT player, (SELECT nights FROM nights_left), 0.0 FROM s
+    WHERE value IS NOT NULL AND EXISTS (SELECT 1 FROM r)
+  UNION ALL
+    SELECT w.player, w.night - 1,
+           (SELECT avg(max(r.ratio * s.value * (1 + s.trend / 100 * coalesce(
+                    (SELECT carry FROM c WHERE h = min(w.night, (SELECT max(h) FROM c))), 1.0)),
+                    w.later)) FROM r)
+    FROM w JOIN s USING (player) WHERE w.night > 0)
+SELECT s.player, s.offer, w.later AS waiting, max(s.offer, coalesce(w.later, 0.0)) AS fetches
+FROM s LEFT JOIN w ON w.player = s.player AND w.night = 0;
 
 -- Every player the market or a futbolfantasy line-up names, as of cut():
 -- his name and position, what he is worth (market value; 0 is none),
@@ -713,8 +748,11 @@ CREATE VIEW board_run AS SELECT max(run_id) AS run_id FROM sim_runs;
 DROP VIEW IF EXISTS board_players;
 CREATE VIEW board_players AS
 SELECT p.*, coalesce(name_shown(f.name), p.player) AS name, coalesce(f.pos, '') AS pos,
-       f.value, f.trend, f.paid, f.offer, f.clause, f.price, f.route, f.my_bid
-FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN player_facts f USING (player);
+       f.value, f.trend, f.paid, f.offer, f.clause, f.price, f.route, f.my_bid,
+       CASE WHEN p.mine THEN coalesce(o.fetches, f.value, 0.0) END AS raises,
+       coalesce(o.fetches = f.offer, 0) AS takes
+FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN player_facts f USING (player)
+LEFT JOIN sale_odds o USING (player);
 
 -- Your squad: goalkeepers to forwards, then most expected next first.
 DROP VIEW IF EXISTS board_holdings;

@@ -5,7 +5,6 @@ from dataclasses import dataclass, field, replace
 
 from ffcore.action import Action
 from ffcore.names import Name
-from ffcore.pricing import PRICE_WINDOW
 
 __all__ = ["Market"]
 
@@ -18,10 +17,8 @@ class Market:
     only for owned players whose release clause can be paid now (it moves
     the player at once, the money going to his owner), paid only for
     players their owner bought, offer only for yours with an offer standing
-    (fetches: what a sale gets). offer_ratios are the game's
-    past nightly offers over value, nights_left the offers still to come
-    before the lock, carry the share of a trend made after each update
-    (night). premium is what an
+    and fetch for those: what a sale gets (schema.sql's sale_odds: the offer
+    or what waiting is worth, whichever is more). premium is what an
     auction bid must be, over the asking price, to win.
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
@@ -37,9 +34,7 @@ class Market:
     clause: dict[str, float] = field(default_factory=dict)
     paid: dict[str, float] = field(default_factory=dict)
     offer: dict[str, float] = field(default_factory=dict)
-    offer_ratios: tuple[float, ...] = ()
-    nights_left: int = 0
-    carry: tuple[float, ...] = ()
+    fetch: dict[str, float] = field(default_factory=dict)
 
     def shown(self, k: str) -> str:
         """How the board writes him: his Name, or his key without one."""
@@ -56,28 +51,8 @@ class Market:
         return sum(self.my_bid.values())
 
     def fetches(self, k: str) -> float:
-        """What selling him gets: the offer standing on him or what waiting
-        for a later one is worth, whichever is more; with no offer yet, his
-        value."""
-        return max(self.offer[k], self.waiting(k) or 0.0) if k in self.offer \
-            else self.value.get(k, 0.0)
-
-    def _value_on(self, k: str, night: int) -> float:
-        done = self.carry[min(night, len(self.carry)) - 1] if self.carry else 1.0
-        return self.value[k] * (1 + self.trend.get(k, 0.0) / 100 * done)
-
-    def waiting(self, k: str) -> float | None:
-        """What turning down his standing offer is worth on average, if each
-        night's offer to come is then taken only when it beats waiting on,
-        and the last one before the lock always: None without an offer."""
-        recent = self.offer_ratios[-PRICE_WINDOW:]
-        if not self.offer.get(k) or not self.value.get(k) or not recent:
-            return None
-        later = 0.0
-        for night in range(self.nights_left, 0, -1):
-            then = self._value_on(k, night)
-            later = sum(max(x * then, later) for x in recent) / len(recent)
-        return later
+        """What selling him gets: with an offer standing, fetch; else his value."""
+        return self.fetch[k] if k in self.fetch else self.value.get(k, 0.0)
 
     def takes(self, k: str) -> bool:
         """Whether a sale takes his standing offer tonight rather than wait."""
@@ -89,22 +64,14 @@ class Market:
 
 
 def _selftest() -> None:
-    odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, nights_left=2,
-                  offer_ratios=(0.9, 1.0, 1.0, 1.1))
-    rising = replace(odds, trend={"s": 20.0}, carry=(0.5, 1.0))
-    up, flat = rising.waiting("s"), odds.waiting("s")
-    assert up is not None and flat is not None
-    assert up > flat, "a rising value makes the offers to come dearer"
-    assert abs(flat - (1.0 + 1.0 + 1.0 + 1.1) / 4 * 10e6) < 1, \
-        "the last night's offer is taken; the night before's only above it"
-    low = replace(odds, offer={"s": 10.1e6})
-    assert odds.takes("s") and not low.takes("s"), (odds.waiting("s"), low.offer)
-    assert replace(low, nights_left=1).takes("s"), "one night left, worth 10M on average"
-    assert replace(low, nights_left=0).takes("s"), "no night left: take it"
-    assert odds.waiting("nobody") is None and not odds.takes("nobody")
-    assert odds.fetches("s") == 10.5e6 and low.fetches("s") == low.waiting("s"), \
+    odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, fetch={"s": 10.5e6})
+    low = replace(odds, offer={"s": 10.1e6}, fetch={"s": 10.2e6})
+    assert odds.takes("s") and not low.takes("s"), "waiting is worth more than this offer"
+    assert not odds.takes("nobody")
+    assert odds.fetches("s") == 10.5e6 and low.fetches("s") == 10.2e6, \
         "a sale gets tonight's offer or what waiting is worth, whichever is more"
     assert Market(value={"s": 4e6}).fetches("s") == 4e6, "no offer yet: his value"
+    assert Market().fetches("s") == 0.0
 
     debt = Market(cash=-5e6)
     sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)
