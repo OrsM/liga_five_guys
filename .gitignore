@@ -52,3 +52,4 @@ data/tidy/parse_state.json
 # data/raw, git and replays, so never committed.
 data/lfg.db
 data/lfg.db-*
+data/*.schema.lock
