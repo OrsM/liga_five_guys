@@ -216,6 +216,71 @@ data/raw tarballs
 - 5.1 Replay: the board, funnel and forecast at any past snapshot, today's
   code, clock pinned (~400 snapshots x ~8s sim, once; then one a run).
   Tagged by code version so replays and live runs sit side by side.
+  Superseded in scope by 5.1a below, which is what we measured first.
+
+### 5.1a The backtest, planned from measurements (2026-10-14)
+
+What was assumed, and what measuring said:
+
+- *"Replaying at all ~400 snapshots gives ~56x the evidence."* It does not.
+  The evidence is the **outcomes**: a player's points in a jornada. Next-
+  jornada forecasts have **4,655 of them over 7 jornadas** (601 flagged
+  ones), +~700 a week. The 434 line-up snapshots re-forecast the *same*
+  outcomes under different information. They cannot say whether a model is
+  better; they can say how forecasts respond to news and how early they are
+  good.
+- *"Differences of 0.01 rmse are real."* They are not resolvable. Paired,
+  over 4,636 outcomes, the 95% interval on a mean squared-error gain is
+  about +-0.18 (rmse about 0.03). Run 7 (before the SQL work) against run 61:
+  gain +0.149, interval -0.041..+0.322 (includes 0), so **the next-jornada
+  improvement overall is not established**; the **flagged-player gain is**
+  (+0.289, +0.078..+0.574, n=601). Every other delta quoted in this plan
+  (2.838 -> 2.826, the slips at longer horizons) is inside noise. Likewise
+  CONFIDENCE 0.70 against 0.719 over 32 moves, and PERSISTENT_SHARE 0.08
+  against 0.087 (no interval yet): "matches" is all they support.
+- *"Porting the model inputs (ratings, rates, cells) to SQL would speed up
+  replay."* One replayed moment costs: market rows 1.2s, scorer fits 2.1s
+  (already SQL views), momentum fit 3.0s (already SQL), **fixture ratings
+  0.02s, forecast cells 0.09s** (the Python), whole universe 10s. The
+  Python tier is not where the time is; do not port it for speed. A
+  forecast-only replay needs the scorer and cells, ~3.5s a moment.
+
+So the backtest is built for the questions the data *can* answer:
+
+1. **Paired comparison with an interval (first; small).** `compare_grades`
+   gives rmse by jornada and no interval. Add the paired mean squared-error
+   difference of two runs (or variants) with its standard error, all, flagged
+   and not flagged. Every later claim is made with this or not made.
+2. **Leakage test (gate for 3).** A forecast at a cut must be identical
+   computed on the full database and on one truncated after the cut. Views
+   are "as of cut()" by design; nothing has proved it end to end.
+3. **Forecast-only replay at every snapshot.** The scorer and cells at each
+   snapshot, ~3.5s a moment: ~23 min a variant once, a few minutes with
+   three workers; fits kept per snapshot (as momentum_fit is) if that is
+   still too slow. Stored as `replay_forecast(variant, as_of, jornada,
+   player, predicted)`, graded against the same outcomes. What it answers:
+   error against hours-to-lock (how early is the line-up decision good
+   enough), and how the news handling (availability buckets, start %) does
+   across the many news events, not only at 7 locks.
+4. **Variants as data.** `constants(variant, name, value)` and a
+   `variant()` SQL function beside `cut()`: a challenger is a second set
+   (AVAIL_K 4 -> 2, PICK_K ...), the views and Python read the same row, and
+   champion against challenger is one query through (1). Model setups with
+   timestamps, as asked on day one. Judged on the same outcomes; small
+   tweaks will need weeks of outcomes to resolve, and the interval will say
+   so.
+5. **Only if (3) is too slow:** per-snapshot caches for the scorer fits and
+   per-day for `price_ahead` (also the fix for `price_forecast_error`).
+
+Not planned, with the reason: replaying the plan search at every snapshot
+(18s each, ~2h a variant, and decisions have only 7 locks of outcomes
+anyway; price outcomes already have a daily series in `price_forecast_error`);
+porting ratings, rates and cells to SQL (measured: nothing to gain).
+
+Gates: (2) must pass before any replay result is believed; (3) is judged
+by whether the error-against-lead-time curve exists and (1) puts an
+interval on any variant gap; stop at (1)+(2) if nothing in (3) would change
+a decision.
 - 5.2 Phantom coach: a sixth manager that does what the board says, from
   jornada 1, scored in the real standings. Assumes its bids win at the
   model's price and rivals do not react to it: it grades the advice, not an
