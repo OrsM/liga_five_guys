@@ -81,6 +81,7 @@ def _selftest() -> None:
         _compiles(Path(tmp2) / "lfg.db")
     _selftest_queries()
     _selftest_changes()
+    _selftest_paired()
     print("q.py self-test OK")
 
 
@@ -159,6 +160,43 @@ def _selftest_changes() -> None:
             assert (got["nearly"]["debt_m"], got["nearly"]["fewest_sales"]) == (1.0, 1)
         finally:
             set_now(None)
+
+
+def _selftest_paired() -> None:
+    """paired_gain against outcomes whose differences are worked out by hand."""
+    import tempfile
+
+    from ffcore.db import record
+    from ffcore.tidy import tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        record([{"run_id": i, "started": "t", "as_of": "t", "trigger": "service", "commit_sha": "c"}
+                for i in (1, 2)], "runs")
+
+        def row(run: int, j: int, k: str, pred: float, actual: float, flagged: int) -> dict[str, Any]:
+            return {"run_id": run, "from_j": 8, "jornada": j, "player": k, "predicted": pred,
+                    "actual": actual, "flagged": flagged}
+        # squared error old -> new: p1 4 -> 1, p2 4 -> 1, p3 (flagged) 0 -> 4
+        record([row(1, 9, "p1", 1, 3, 0), row(2, 9, "p1", 2, 3, 0),
+                row(1, 9, "p2", 2, 0, 0), row(2, 9, "p2", 1, 0, 0),
+                row(1, 9, "p3", 5, 5, 1), row(2, 9, "p3", 3, 5, 1),
+                row(1, 9, "p4", 1, 1, 0),                       # only in the old run: not paired
+                row(1, 10, "p5", 0, 9, 0), row(2, 10, "p5", 9, 9, 0)], "grade_forecast")
+        got = {r[0]: dict(zip(("scope", "n", "gain", "se", "lo", "hi", "verdict"), r))
+               for r in named("paired_gain", {"old": 1, "new": 2, "ahead": 1})[1]}
+        assert set(got) == {"all", "flagged", "not flagged"}, got
+        a = got["all"]
+        se = (((3 - 2 / 3) ** 2 * 2 + (-4 - 2 / 3) ** 2) / 2 / 3) ** 0.5
+        assert a["n"] == 3, "the player missing from one run, and the other horizon, are not paired"
+        assert abs(a["gain"] - 2 / 3) < 1e-4 and abs(a["se"] - se) < 1e-4, a
+        assert abs(a["lo"] - (2 / 3 - 1.96 * se)) < 1e-4 and abs(a["hi"] - (2 / 3 + 1.96 * se)) < 1e-4
+        assert a["verdict"] == "not established", "the interval straddles zero"
+        assert (got["not flagged"]["n"], got["not flagged"]["gain"], got["not flagged"]["verdict"]) \
+            == (2, 3.0, "new better")
+        assert (got["flagged"]["n"], got["flagged"]["gain"], got["flagged"]["se"], got["flagged"]["verdict"]) \
+            == (1, -4.0, None, "too few"), "one outcome has no spread"
+        far = {r[0]: r for r in named("paired_gain", {"old": 1, "new": 2, "ahead": 2})[1]}
+        assert far["all"][1] == 1 and far["all"][2] == 81.0, "ahead picks the horizon: 81 -> 0 is a gain of +81"
 
 
 def _selftest_queries() -> None:
