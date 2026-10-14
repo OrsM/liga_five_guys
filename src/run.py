@@ -171,25 +171,35 @@ def _selftest_runs() -> None:
                 code = _commit(Path(tmp))
         assert code != "?" and _commit(Path(tmp)) == code, \
             "the code's commit: a report, data or input commit does not change it"
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "lfg.db"
-        assert main([], [("count", "fake_stages:counted"), ("quiet", "fake_stages:quiet")],
-                    path) == 0
-        assert main([], [("count", "fake_stages:counted"), ("boom", "fake_stages:boom")],
-                    path) == 1
-        db = sqlite3.connect(path)
-        runs = db.execute("SELECT run_id, ok, finished IS NOT NULL, trigger, commit_sha,"
-                          " as_of, peak_mb > 0 FROM runs ORDER BY run_id").fetchall()
-        assert [r[:4] for r in runs] == [(1, 1, 1, "service"), (2, 0, 1, "service")], runs
-        assert all(r[4] and r[5] and r[6] for r in runs), "commit, clock and memory recorded"
-        got = {(r, s, m): v for r, s, m, v in db.execute("SELECT * FROM run_measures")}
-        assert got[(1, "count", "rows")] == 7, "a stage's returned counts are measures"
-        assert {k[1:] for k in got if k[0] == 1} == {
-            ("count", "rows"), ("count", "seconds"), ("quiet", "run"), ("quiet", "seconds")}, got
-        assert got[(1, "quiet", "run")] == 1, "a stage knows its run (LFG_RUN)"
-        assert {k[1:] for k in got if k[0] == 2} == {("count", "rows"), ("count", "seconds")}, \
-            "a failed stage records nothing; the ones before it stay"
-        db.close()
+    asked = os.environ.pop("LFG_TRIGGER", None)  # the phone's button sets it: say what we want
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "lfg.db"
+            assert main([], [("count", "fake_stages:counted"), ("quiet", "fake_stages:quiet")],
+                        path) == 0
+            assert main([], [("count", "fake_stages:counted"), ("boom", "fake_stages:boom")],
+                        path) == 1
+            os.environ["LFG_TRIGGER"] = "button"
+            assert main([], [("quiet", "fake_stages:quiet")], path) == 0
+            db = sqlite3.connect(path)
+            runs = db.execute("SELECT run_id, ok, finished IS NOT NULL, trigger, commit_sha,"
+                              " as_of, peak_mb > 0 FROM runs ORDER BY run_id").fetchall()
+            assert [r[:4] for r in runs] == [(1, 1, 1, "service"), (2, 0, 1, "service"),
+                                             (3, 1, 1, "button")], \
+                "the trigger is how the run was asked for: LFG_TRIGGER, else the service"
+            assert all(r[4] and r[5] and r[6] for r in runs), "commit, clock and memory recorded"
+            got = {(r, s, m): v for r, s, m, v in db.execute("SELECT * FROM run_measures")}
+            assert got[(1, "count", "rows")] == 7, "a stage's returned counts are measures"
+            assert {k[1:] for k in got if k[0] == 1} == {
+                ("count", "rows"), ("count", "seconds"), ("quiet", "run"), ("quiet", "seconds")}, got
+            assert got[(1, "quiet", "run")] == 1, "a stage knows its run (LFG_RUN)"
+            assert {k[1:] for k in got if k[0] == 2} == {("count", "rows"), ("count", "seconds")}, \
+                "a failed stage records nothing; the ones before it stay"
+            db.close()
+    finally:
+        os.environ.pop("LFG_TRIGGER", None)
+        if asked is not None:
+            os.environ["LFG_TRIGGER"] = asked
 
 
 if __name__ == "__main__":
