@@ -405,6 +405,19 @@ def _selftest_market() -> None:
         assert [(d, s) for k, d, s in pts if k == "flat"] == [
             ("2026-08-10", None), ("2026-08-11", 0.0), ("2026-08-12", 0.0)]
 
+        from datetime import datetime, timezone
+
+        from ffcore.clock import set_now
+        try:
+            set_now(datetime(2026, 8, 12, 12, tzinfo=timezone.utc))
+            store_sql("market", [{"observed_at": at, "ff_id": "mid", "value": "100"}
+                                 for at in ("2026-08-12T1000Z", "2026-08-12T1800Z")])
+            assert [at for (at,) in rows("SELECT observed_at FROM price_obs WHERE ff_id = 'mid'")] \
+                == ["2026-08-12T1000Z"], \
+                "a day's value at the cut is the last snapshot up to it, not one taken after"
+        finally:
+            set_now(None)
+
         close, a = "2026-09-02T22:24:00+02:00", "2026-09-02T1000Z"
         store_sql("api_market", [
             {"observed_at": a, "seller": "marketPlayerLeague", "player_id": "7",

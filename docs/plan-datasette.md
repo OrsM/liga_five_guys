@@ -247,13 +247,20 @@ What was assumed, and what measuring said:
 
 So the backtest is built for the questions the data *can* answer:
 
-1. **Paired comparison with an interval (first; small).** `compare_grades`
+1. **Paired comparison with an interval (done: `paired_gain`; next jornada = `ahead` 0).** `compare_grades`
    gives rmse by jornada and no interval. Add the paired mean squared-error
    difference of two runs (or variants) with its standard error, all, flagged
    and not flagged. Every later claim is made with this or not made.
-2. **Leakage test (gate for 3).** A forecast at a cut must be identical
-   computed on the full database and on one truncated after the cut. Views
-   are "as of cut()" by design; nothing has proved it end to end.
+2. **Leakage test (gate for 3). Done 2026-10-14.** `tools/golden.py leak`
+   builds each frozen board again on a copy of the data with every row
+   observed (or fitted) after its time deleted, and compares. First run: 12
+   of 16 boards differed (mostly `trend`, in two cases the plan itself: a
+   sale step, cash_after). Cause: `market_daily` took each day's last
+   snapshot over all time, so at a cut part-way through a day the
+   replay used a snapshot taken after it and lost that day's own, which the
+   live run at that moment had. Fixed (as of `cut()`); 16 of 16 now the same
+   (2m36s). Run it after any change to a view; a new table with a time
+   column must carry `observed_at` or `as_of` to be cut.
 3. **Forecast-only replay at every snapshot.** The scorer and cells at each
    snapshot, ~3.5s a moment: ~23 min a variant once, a few minutes with
    three workers; fits kept per snapshot (as momentum_fit is) if that is

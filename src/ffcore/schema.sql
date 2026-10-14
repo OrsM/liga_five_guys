@@ -376,11 +376,13 @@ LEFT JOIN price_trend t ON t.ff_id = w.player;
 
 -- The market as it closed each day: the rows of each day's last snapshot
 -- (each snapshot holds the whole market). Values move once a day; the
--- change from one day's to the next is a step.
+-- change from one day's to the next is a step. As of cut(): today's row is
+-- the last snapshot up to it, as the run at that moment saw it.
 DROP VIEW IF EXISTS market_daily;
 CREATE VIEW market_daily AS
 SELECT *, rowid AS id FROM market
-WHERE observed_at IN (SELECT max(observed_at) FROM market GROUP BY substr(observed_at, 1, 10));
+WHERE observed_at IN (SELECT max(observed_at) FROM market WHERE observed_at <= (SELECT cut())
+                      GROUP BY substr(observed_at, 1, 10));
 
 -- Every valued day of each player's market value, all time, with the
 -- change since his previous one in % (NULL for his first, or after a value

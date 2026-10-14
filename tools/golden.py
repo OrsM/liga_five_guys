@@ -2,6 +2,7 @@
 
     python tools/golden.py freeze [N]   # copy the raw data, build N boards (default 16) with this tree's code
     python tools/golden.py check        # rebuild them with this tree's code, compare
+    python tools/golden.py leak [K]     # the same, on data cut off at each board's time (every Kth board)
 
 Only what no rebuild recovers is copied: data/raw, data/season and the
 tidy files git tracks. They are parsed with the tree's own code, so a change
@@ -98,12 +99,25 @@ def in_order(items: Sequence[T], fn: Callable[[T], R], jobs: int = JOBS) -> list
         return list(pool.map(fn, items))
 
 
-def build(now: str, hash_seed: str, base: Path) -> dict[str, Any] | None:
+def truncate(db: Path, stamp: str) -> None:
+    """The database as if it ended at stamp: every row observed (or fitted)
+    after it deleted."""
+    with closing(sqlite3.connect(db)) as c, c:
+        for (t,) in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall():
+            for col in ("observed_at", "as_of"):
+                if col in [r[1] for r in c.execute("PRAGMA table_info(%s)" % t)]:
+                    c.execute("DELETE FROM %s WHERE %s > ?" % (t, col), (stamp,))
+
+
+def build(now: str, hash_seed: str, base: Path, ended: bool = False) -> dict[str, Any] | None:
     """The board at now, built in its own copy of the parsed data (the raw
-    snapshots, which a sim does not read, are left out)."""
+    snapshots, which a sim does not read, are left out). With ended, the copy
+    holds nothing observed after now."""
     work = HOME / "work" / now
     shutil.rmtree(work, ignore_errors=True)
     shutil.copytree(base, work, symlinks=True, ignore=shutil.ignore_patterns("raw"))
+    if ended:
+        truncate(work / "lfg.db", now)
     out = work / "reports"
     out.mkdir()
     env = dict(os.environ, PYTHONPATH="src", FF_ROOT=str(work),
@@ -167,6 +181,15 @@ def main(argv: list[str]) -> int:
         print("golden: %s" % ("%d of %d boards differ" % (bad, len(want))
                               if bad else "%d boards the same" % len(want)))
         return 1 if bad else 0
+    if cmd == "leak":
+        want = json.loads((HOME / "boards.json").read_text())
+        base, stamps_ = parsed(), list(want)[:: max(1, int(argv[1]) if len(argv) > 1 else 1)]
+        results = in_order(stamps_, lambda now: diff(want[now], build(now, "1", base, ended=True)))
+        for now, lines in zip(stamps_, results):
+            print("  %s  %s" % (now, "same" if not lines else "LEAKS: %d differences" % len(lines)))
+            for line in lines[:10]:
+                print("      " + line)
+        return 1 if any(results) else 0
     print(__doc__)
     return 2
 
@@ -189,6 +212,22 @@ def _selftest() -> None:
         mark.write_text("v1")
         assert fresh(cache, mark, "v1"), "the parse made with this version is reused"
         assert not fresh(cache, mark, "v2"), "a different parser or table layout parses again"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Path(tmp) / "lfg.db"
+        with closing(sqlite3.connect(db)) as c, c:
+            c.execute("CREATE TABLE seen (observed_at TEXT, v INT)")
+            c.execute("CREATE TABLE fits (as_of TEXT, v INT)")
+            c.execute("CREATE TABLE plain (v INT)")
+            for t in ("seen", "fits"):
+                c.executemany("INSERT INTO %s VALUES (?, 1)" % t, [("2026-10-01T0800Z",), ("2026-10-02T0800Z",), ("2026-10-03T0800Z",)])
+            c.execute("INSERT INTO plain VALUES (1)")
+        truncate(db, "2026-10-02T0800Z")
+        with closing(sqlite3.connect(db)) as c:
+            assert [r[0] for r in c.execute("SELECT observed_at FROM seen ORDER BY 1")] \
+                == ["2026-10-01T0800Z", "2026-10-02T0800Z"], "what was seen after the cut is gone, at the cut stays"
+            assert c.execute("SELECT count(*) FROM fits").fetchone()[0] == 2, "fits stamped as_of too"
+            assert c.execute("SELECT count(*) FROM plain").fetchone()[0] == 1, "no time column: left alone"
 
     lag = {"a": 0.3, "b": 0.0, "c": 0.1, "d": 0.0}
 
