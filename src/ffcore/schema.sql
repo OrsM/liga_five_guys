@@ -164,6 +164,23 @@ CREATE TABLE IF NOT EXISTS grade_forecast (
     PRIMARY KEY (run_id, from_j, jornada, player)
 );
 
+-- The forecast of the next jornada replayed at every line-up snapshot
+-- (grading.replay), for one variant of the model: how far from the lock the
+-- error is acceptable. The same outcomes as grade_forecast, forecast again
+-- under the information of each moment, so it says how early a forecast is
+-- good, not which model is (paired_gain).
+CREATE TABLE IF NOT EXISTS replay_forecast (
+    variant   TEXT NOT NULL,
+    as_of     TEXT NOT NULL,       -- the snapshot replayed
+    jornada   INTEGER NOT NULL,    -- the next one then
+    player    TEXT NOT NULL,
+    predicted REAL NOT NULL,
+    actual    REAL NOT NULL,       -- 0 if he scored nothing
+    flagged   INTEGER NOT NULL,    -- injured, doubtful or suspended then
+    lead_h    REAL NOT NULL,       -- hours from the snapshot to the lock
+    PRIMARY KEY (variant, as_of, jornada, player)
+) WITHOUT ROWID;
+
 -- Every move each replayed board ranked, against what its players then did.
 CREATE TABLE IF NOT EXISTS grade_decisions (
     run_id     INTEGER NOT NULL REFERENCES runs(run_id),
@@ -201,6 +218,63 @@ SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
            AS flagged_rmse,
        avg(CASE WHEN flagged = 1 THEN predicted - actual END) AS flagged_bias
 FROM ranked GROUP BY run_id, from_j, jornada;
+
+-- The moments to replay at: each line-up snapshot (one a time) belongs to
+-- the jornada that was next then, from the previous lock to its own.
+DROP VIEW IF EXISTS replay_moments;
+CREATE VIEW replay_moments AS
+WITH snaps AS MATERIALIZED (SELECT DISTINCT observed_at AS at FROM lineups
+                            WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut())),
+w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS opens FROM round_locks)
+SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens AND s.at < w.lock
+ORDER BY w.lock, s.at;
+
+-- How far from the lock a replayed forecast was made, in buckets.
+DROP VIEW IF EXISTS lead_buckets;
+CREATE VIEW lead_buckets AS
+SELECT 0 AS from_h, 3 AS to_h, '0-3h' AS lead UNION ALL SELECT 3, 12, '3-12h'
+UNION ALL SELECT 12, 24, '12-24h' UNION ALL SELECT 24, 48, '24-48h'
+UNION ALL SELECT 48, 96, '48-96h' UNION ALL SELECT 96, 1e9, '96h+';
+
+-- Replayed error against how far from the lock: per variant and lead
+-- bucket, the outcomes, the moments, rmse and the flagged players' rmse.
+-- Buckets hold different jornadas, so compare them with replay_gap.
+DROP VIEW IF EXISTS replay_lead;
+CREATE VIEW replay_lead AS
+SELECT variant, b.from_h, b.lead,
+       count(*) AS n, count(DISTINCT as_of) AS moments,
+       sqrt(avg((predicted - actual) * (predicted - actual))) AS rmse,
+       avg(predicted - actual) AS bias,
+       sqrt(avg(CASE WHEN flagged = 1 THEN (predicted - actual) * (predicted - actual) END)) AS flagged_rmse
+FROM replay_forecast f JOIN lead_buckets b ON f.lead_h >= b.from_h AND f.lead_h < b.to_h
+GROUP BY variant, b.from_h, b.lead;
+
+-- What forecasting earlier costs: the same player-jornadas forecast at each
+-- lead and at the jornada's last replayed moment; the mean squared error
+-- earlier minus last (positive: earlier is worse) with its interval (claim).
+DROP VIEW IF EXISTS replay_gap;
+CREATE VIEW replay_gap AS
+WITH fin AS (SELECT variant, jornada, max(as_of) AS at FROM replay_forecast GROUP BY variant, jornada),
+d AS (SELECT f.variant, b.from_h, b.lead, f.flagged,
+             (f.predicted - f.actual) * (f.predicted - f.actual)
+           - (g.predicted - g.actual) * (g.predicted - g.actual) AS d
+      FROM replay_forecast f JOIN fin ON fin.variant = f.variant AND fin.jornada = f.jornada
+      JOIN replay_forecast g ON g.variant = f.variant AND g.jornada = f.jornada
+                            AND g.as_of = fin.at AND g.player = f.player
+      JOIN lead_buckets b ON f.lead_h >= b.from_h AND f.lead_h < b.to_h
+      WHERE f.as_of < fin.at),
+s AS (SELECT variant, from_h, lead, 'all' AS scope, count(*) AS n, avg(d) AS m,
+             (sum(d * d) - count(*) * avg(d) * avg(d)) / (count(*) - 1) AS var
+      FROM d GROUP BY variant, from_h, lead
+      UNION ALL
+      SELECT variant, from_h, lead, 'flagged', count(*), avg(d),
+             (sum(d * d) - count(*) * avg(d) * avg(d)) / (count(*) - 1)
+      FROM d WHERE flagged = 1 GROUP BY variant, from_h, lead),
+t AS (SELECT *, sqrt(max(var, 0) / n) AS se FROM s)
+SELECT variant, from_h, lead, scope, n, m AS extra_mse, se,
+       lo95(m, se) AS lo, hi95(m, se) AS hi, claim(m, se) AS claim
+FROM t;
+
 
 -- The league's money, as SQL over the app's tables (current_/history_ views
 -- read as of cut(), each row with its player). League writes the one

@@ -3,6 +3,7 @@ Datasette and ask.py. Disposable: every table but runs is rebuilt from
 data/raw, git or a replay (docs/plan-datasette.md)."""
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
@@ -31,13 +32,37 @@ RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
 
 
+Z95 = 1.96   # standard errors either side of an estimate: the 95% interval
+
+
+def lo95(gain: float | None, se: float | None) -> float | None:
+    return None if gain is None or se is None else gain - Z95 * se
+
+
+def hi95(gain: float | None, se: float | None) -> float | None:
+    return None if gain is None or se is None else gain + Z95 * se
+
+
+def claim(gain: float | None, se: float | None) -> str:
+    """What an estimate with its standard error establishes: positive or
+    negative when the 95% interval excludes zero, else not established; too
+    few when there is no spread to judge it by."""
+    lo, hi = lo95(gain, se), hi95(gain, se)
+    if lo is None or hi is None:
+        return "too few"
+    return "positive" if lo > 0 else "negative" if hi < 0 else "not established"
+
+
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (now, as a stamp: the model's
     clock unless told otherwise), name_key() and name_shown() (Name's),
-    platt() and prognosis_bucket() (startprob's), position() (rules')."""
+    platt() and prognosis_bucket() (startprob's), position() (rules'),
+    lo95(), hi95() and claim() (an estimate and its standard error)."""
     db.create_function("cut", 0, now)
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
     db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
+    for fn in (lo95, hi95, claim):
+        db.create_function(fn.__name__, 2, fn, deterministic=True)
     db.create_function("platt", 3, platt, deterministic=True)
     db.create_function("position", 1, position, deterministic=True)
     db.create_function("prognosis_bucket", 6, prognosis_bucket, deterministic=True)
@@ -55,9 +80,11 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     functions(db)
     key = (path.resolve(), schema)
     if key not in _APPLIED:
-        db.execute("PRAGMA journal_mode=WAL")
-        for sql in (IDENTITY, TABLES_SQL, schema):
-            db.executescript(sql.read_text(encoding="utf-8"))
+        with open(path.with_name(path.name + ".schema.lock"), "w") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
+            db.execute("PRAGMA journal_mode=WAL")
+            for sql in (IDENTITY, TABLES_SQL, schema):
+                db.executescript(sql.read_text(encoding="utf-8"))
         _APPLIED.add(key)
     return db
 
@@ -162,6 +189,13 @@ def _selftest() -> None:
     import tempfile
     from contextlib import closing
 
+    mem = sqlite3.connect(":memory:")
+    functions(mem)
+    assert mem.execute("SELECT lo95(1.0, 0.5), hi95(1.0, 0.5), claim(1.0, 0.5), claim(1.0, 0.6),"
+                       " claim(-1.0, 0.5), claim(0.0, 1.0), claim(1.0, NULL), lo95(NULL, 1)").fetchone() \
+        == (1.0 - 0.98, 1.0 + 0.98, "positive", "not established", "negative",
+            "not established", "too few", None), \
+        "1.96 standard errors: 1.0 +- 0.98 excludes 0; +- 1.176 does not; no spread, no claim"
     with tempfile.TemporaryDirectory() as tmp:
         meta, path = Path(tmp) / "datasette.json", Path(tmp) / "lfg.db"
         meta.write_text(json.dumps({"databases": {"lfg": {"queries": {

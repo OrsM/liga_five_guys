@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import sqlite3
 import sys
+import time
 from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
@@ -14,12 +16,13 @@ from ffcore.points import jornada_points
 
 from assemble import built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, board, verdict
-from ffcore.clock import set_now
+from ffcore.clock import set_now, snapshot_stamp
 from ffcore.db import connect, named, record, this_run
 from ffcore.tidy import LINEUP_SOURCE, current
-__all__ = ["backtest", "decision_rows", "decisions", "due", "forecast_rows",
+__all__ = ["backtest", "replay", "replay_rows", "decision_rows", "decisions", "due", "forecast_rows",
            "record_grades"]
 
+REPLAY_VARIANT = "live"
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 
 
@@ -47,6 +50,58 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     finally:
         set_now(None)
     return out
+
+
+def replay_rows(variant: str, as_of: str, jornada: int, lead_h: float, pred: dict[str, float],
+                hurt: set[str], actual: dict[tuple[str, int], float]) -> list[dict[str, Any]]:
+    """One moment's forecast of a jornada, a row a player, with what he scored."""
+    return [{"variant": variant, "as_of": as_of, "jornada": jornada, "player": k, "predicted": p,
+             "actual": actual.get((k, jornada), 0.0), "flagged": int(k in hurt), "lead_h": lead_h}
+            for k, p in pred.items()]
+
+
+def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> int:
+    """Forecast the next jornada at every line-up snapshot before a played
+    jornada's lock (replay_moments) with this code, and keep it
+    (replay_forecast) against what then happened. Resumes: a moment already
+    kept for the variant is skipped. shard (i, n) takes every nth moment."""
+    locks, actual = round_locks(), jornada_points()
+    played = {j for _k, j in actual}
+    with closing(connect()) as db:
+        have = {a for (a,) in db.execute("SELECT DISTINCT as_of FROM replay_forecast WHERE variant = ?", (variant,))}
+        todo = [(j, a) for j, a, _l in db.execute("SELECT jornada, as_of, lock FROM replay_moments")
+                if j in played and a not in have][shard[0]::shard[1]]
+    kept = 0
+
+    def moment_rows(j: int, at: str) -> list[dict[str, Any]]:
+        moment = snapshot_stamp(at)
+        assert moment is not None
+        set_now(moment)
+        market = current("market")
+        sc = scorer(market, current("lineups", LINEUP_SOURCE))
+        per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
+                             current("matches"), rounds_ahead()).per_j
+        if j not in per_j:
+            return []
+        hurt = {k for k in sc.lookup if sc.starts.status_of(k)}
+        pred = {k: expected_points(cell) for k, cell in per_j[j].items()}
+        return replay_rows(variant, at, j, (locks[j] - moment).total_seconds() / 3600, pred, hurt, actual)
+    try:
+        for j, at in todo:
+            for attempt in range(5):
+                try:    # another shard connecting re-creates the views under this one
+                    out = moment_rows(j, at)
+                    break
+                except sqlite3.OperationalError as e:
+                    if "schema has changed" not in str(e) or attempt == 4:
+                        raise
+                    time.sleep(1 + attempt)
+            record(out, "replay_forecast")
+            kept += bool(out)
+            print("  replay %s j%d %s: %d players" % (at, j, variant, len(out)), flush=True)
+    finally:
+        set_now(None)
+    return kept
 
 
 def decisions() -> list[dict[str, Any]]:
@@ -148,6 +203,7 @@ def _selftest() -> None:
         == [(0, "plan", False), (1, "rejected", False)], moves
 
     import tempfile
+    from ffcore.tidy import store_sql, tables_in
     with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
         path = Path(tmp) / "lfg.db"
         def run(commit: str, resolved: float | None) -> int:
@@ -165,9 +221,86 @@ def _selftest() -> None:
         assert due(run("a", None), 8, path), "a jornada resolved"
         assert due(run("b", None), 7, path), "new code"
 
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(dt.datetime(2026, 8, 30, tzinfo=dt.timezone.utc))
+            store_sql("matches", [
+                {"observed_at": "2026-08-01T0900Z", "match_id": "m%d" % j, "jornada": str(j),
+                 "home": "h%d" % j, "away": "a%d" % j, "kickoff": k}
+                for j, k in ((2, "2026-08-16T19:00:00+00:00"), (3, "2026-08-23T19:00:00+00:00"))])
+            store_sql("lineups", [{"observed_at": at, "source": src, "team_slug": "h2", "player_slug": "p"}
+                                  for at, src in (("2026-08-10T0800Z", "futbolfantasy"),
+                                                  ("2026-08-10T0800Z", "futbolfantasy"),
+                                                  ("2026-08-10T0800Z", "analitica"),
+                                                  ("2026-08-16T1900Z", "futbolfantasy"),
+                                                  ("2026-08-18T0800Z", "futbolfantasy"),
+                                                  ("2026-08-23T1859Z", "futbolfantasy"),
+                                                  ("2026-08-23T1900Z", "futbolfantasy"),
+                                                  ("2026-08-29T0800Z", "futbolfantasy"))])
+            got = [tuple(r) for r in connect().execute("SELECT jornada, as_of FROM replay_moments")]
+            assert got == [(2, "2026-08-10T0800Z"), (3, "2026-08-16T1900Z"), (3, "2026-08-18T0800Z"),
+                           (3, "2026-08-23T1859Z")], \
+                "each snapshot (one a time, one source) belongs to the jornada next then: from the previous lock, before its own"
+        finally:
+            set_now(None)
+
+    rr = replay_rows("v", "2026-08-10T0800Z", 2, 57.0, {"a": 3.0, "b": 1.0}, {"b"}, {("a", 2): 5.0})
+    assert rr == [
+        {"variant": "v", "as_of": "2026-08-10T0800Z", "jornada": 2, "player": "a", "predicted": 3.0,
+         "actual": 5.0, "flagged": 0, "lead_h": 57.0},
+        {"variant": "v", "as_of": "2026-08-10T0800Z", "jornada": 2, "player": "b", "predicted": 1.0,
+         "actual": 0.0, "flagged": 1, "lead_h": 57.0}], "one row a player; no points is 0"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        # squared errors: 1h out 1, 4; 2h out 9, 0; 30h out 16
+        record([{"variant": "v", "as_of": "t%d" % (i // 2), "jornada": 2, "player": k, "predicted": pr,
+                 "actual": ac, "flagged": fl, "lead_h": h}
+                for i, (k, pr, ac, fl, h) in enumerate([("a", 1, 0, 0, 1.0), ("b", 0, 2, 1, 1.0),
+                                                        ("a", 3, 0, 0, 2.0), ("b", 2, 2, 0, 2.0),
+                                                        ("a", 4, 0, 0, 30.0)])], "replay_forecast")
+        lead = {r[0]: r for r in connect().execute(
+            "SELECT lead, n, moments, rmse, flagged_rmse FROM replay_lead WHERE variant = 'v'")}
+        assert lead["0-3h"][1:4] == (4, 2, (14 / 4) ** 0.5), lead
+        assert lead["0-3h"][4] == 2.0, "the flagged one: (0 - 2)^2 = 4, rmse 2"
+        assert lead["24-48h"][1:3] == (1, 1) and lead["24-48h"][3] == 4.0, lead
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        # jornada 2, forecast 30h out (early) and 1h out (last); squared errors early / last:
+        # a 4 / 0, b (flagged) 9 / 0, c 1 / 4; another jornada's only moment has nothing to be set against
+        record([{"variant": "v", "as_of": at, "jornada": j, "player": k, "predicted": pr, "actual": ac,
+                 "flagged": fl, "lead_h": h}
+                for at, j, k, pr, ac, fl, h in [
+                    ("e", 2, "a", 2, 0, 0, 30.0), ("l", 2, "a", 0, 0, 0, 1.0),
+                    ("e", 2, "b", 4, 1, 1, 30.0), ("l", 2, "b", 1, 1, 1, 1.0),
+                    ("e", 2, "c", 1, 0, 0, 30.0), ("l", 2, "c", 2, 0, 0, 1.0),
+                    ("x", 3, "a", 9, 0, 0, 30.0)]], "replay_forecast")
+        gap = {(r[0], r[1]): r for r in connect().execute(
+            "SELECT lead, scope, n, extra_mse, se, claim FROM replay_gap")}
+        assert set(gap) == {("24-48h", "all"), ("24-48h", "flagged")}, \
+            "the last moment is not set against itself, a jornada with one moment has no gap"
+        se = (((4 - 10 / 3) ** 2 + (9 - 10 / 3) ** 2 + (-3 - 10 / 3) ** 2) / 2 / 3) ** 0.5
+        assert gap["24-48h", "all"][2] == 3 and abs(gap["24-48h", "all"][3] - 10 / 3) < 1e-9 \
+            and abs(gap["24-48h", "all"][4] - se) < 1e-9 and gap["24-48h", "all"][5] == "not established", gap
+        assert gap["24-48h", "flagged"][2:4] == (1, 9.0) and gap["24-48h", "flagged"][5] == "too few"
+
     print("grading self-test OK")
 
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
+        raise SystemExit(0)
+    if sys.argv[1:2] == ["replay"]:
+        # replay [JOBS] [SHARD/OF]: JOBS processes side by side, each its share of the moments
+        import subprocess
+        jobs = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+        if len(sys.argv) > 3:
+            i, n = map(int, sys.argv[3].split("/"))
+            print("replayed %d moments" % replay(shard=(i, n)))
+        else:
+            procs = [subprocess.Popen([sys.executable, __file__, "replay", str(jobs), "%d/%d" % (i, jobs)])
+                     for i in range(jobs)]
+            raise SystemExit(max(p.wait() for p in procs))
+        raise SystemExit(0)
+    print("grading.py --selftest | replay [JOBS]")
+    raise SystemExit(2)

@@ -261,14 +261,23 @@ So the backtest is built for the questions the data *can* answer:
    live run at that moment had. Fixed (as of `cut()`); 16 of 16 now the same
    (2m36s). Run it after any change to a view; a new table with a time
    column must carry `observed_at` or `as_of` to be cut.
-3. **Forecast-only replay at every snapshot.** The scorer and cells at each
-   snapshot, ~3.5s a moment: ~23 min a variant once, a few minutes with
-   three workers; fits kept per snapshot (as momentum_fit is) if that is
-   still too slow. Stored as `replay_forecast(variant, as_of, jornada,
-   player, predicted)`, graded against the same outcomes. What it answers:
-   error against hours-to-lock (how early is the line-up decision good
-   enough), and how the news handling (availability buckets, start %) does
-   across the many news events, not only at 7 locks.
+3. **Forecast-only replay at every snapshot. Done 2026-10-15.**
+   `python src/grading.py replay [JOBS]` forecasts the next jornada at
+   every line-up snapshot before a played jornada's lock (view
+   `replay_moments`: 302 moments over jornadas 2-8) and keeps it in
+   `replay_forecast` (resumable; 3 jobs, ~8 minutes cold; variant label
+   `live` until step 4). Views `replay_lead` (error by lead) and
+   `replay_gap` (what forecasting earlier costs against the jornada's last
+   moment, with an interval), saved queries `replay_by_lead` and
+   `replay_gap`. First result, mean squared error earlier minus last
+   (rmse^2 is about 8): 3-12h +0.15, 12-24h +0.18, 24-48h +0.20, 48-96h
+   +0.26, 96h+ +0.57. Most of what the last four days add is in the first
+   of them. The intervals count a player's repeats across moments as
+   independent, so they are narrower than the truth: read the pattern, not
+   an edge. Raw rmse by lead is flat (2.79-2.85) because buckets hold
+   different jornadas; only the paired gap says anything. Also found:
+   concurrent processes recreating the views on a fresh file raced
+   (`connect()` now takes a file lock while it applies the schema).
 4. **Variants as data.** `constants(variant, name, value)` and a
    `variant()` SQL function beside `cut()`: a challenger is a second set
    (AVAIL_K 4 -> 2, PICK_K ...), the views and Python read the same row, and
