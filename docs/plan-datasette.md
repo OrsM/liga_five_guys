@@ -162,6 +162,19 @@ data/raw tarballs
   jornada (better at every horizon), flagged players flat, the replayed
   boards' moves identical. Listed-with-no-% now means 53% to start, not
   15% (the ghosts had dragged it down).
+- `what_changed` and `cash_cliffs` (done): the first answers "why did the board
+  move" between any two runs, one jornada, as expected points split exactly
+  into points-when-he-plays, selection and fitness (plan 2.7; last night to
+  now the next jornada changed for one player: Berenguer, back fit, +4.79).
+  The second began as "which players will a manager in debt sell", ranked
+  by season points per million, and failed against the one squad whose
+  answer is known (mine): it picked Natan, 155 points, where the plan's
+  sales cost 35, because a player on the bench next week can start later
+  and no SQL proxy reproduces the simulation's replacement effects. It now
+  says only what the data supports: each manager's debt, his squad's
+  value, and the fewest sales that could clear it. Which players go needs
+  rivals acting in the simulation (Phase 5). Mutation-tested: two tests
+  had to be strengthened before the deliberately broken queries failed.
 - Query time guard (done; found 2026-10-14 when bench_points took 138s on the
   real database, 1.2s once its snapshot lookups were narrowed, and
   price_forecast_error was already 5.4s against Datasette's 5s): the

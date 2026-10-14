@@ -80,7 +80,85 @@ def _selftest() -> None:
                                       from_market="")])
         _compiles(Path(tmp2) / "lfg.db")
     _selftest_queries()
+    _selftest_changes()
     print("q.py self-test OK")
+
+
+def _selftest_changes() -> None:
+    """what_changed and cash_cliffs, against rows whose answers are worked out
+    by hand."""
+    import tempfile
+    from datetime import datetime, timezone
+
+    from ffcore.clock import set_now
+    from ffcore.db import record
+    from ffcore.tidy import store_sql, tables_in
+
+    def asked(name: str, given: dict[str, object] | None = None) -> list[dict[str, Any]]:
+        cols, got = named(name, given or {})
+        return [dict(zip(cols, r)) for r in got]
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
+            record([{"run_id": i, "started": s, "as_of": "t", "trigger": "service", "commit_sha": "c"}
+                    for i, s in ((1, "2026-10-13T08:00:00Z"), (2, "2026-10-14T08:00:00Z"),
+                                 (3, "2026-10-14T11:00:00Z"))], "runs")
+            record([{"player_id": k, "name": k.upper()} for k in "abcdef"], "crosswalk")
+
+            def cell(run: int, j: int, k: str, ppm: float, picked: float, fit: float) -> dict[str, Any]:
+                return {"run_id": run, "jornada": j, "player": k, "ppm": ppm, "fixture": 1.0,
+                        "picked": picked, "fit": fit, "points": ppm, "plays": picked * fit,
+                        "expected": ppm * picked * fit}
+            record([cell(1, 9, "a", 4, .5, 1), cell(1, 9, "b", 4, .5, 1), cell(1, 9, "c", 4, 1.0, 1),
+                    cell(1, 9, "e", 3, 1.0, 1), cell(1, 10, "a", 9, 1, 1),
+                    cell(3, 9, "a", 5, .5, 1), cell(3, 9, "b", 4, 1.0, 1), cell(3, 9, "c", 4, 1.0, .5),
+                    cell(3, 9, "d", 2, 1.0, 1), cell(3, 10, "a", 1, 1, 1),
+                    cell(1, 9, "f", 4, .5, 1.0), cell(3, 9, "f", 4, 1.0, .8)], "forecast")
+            # run 3 against the latest run at least 12 hours before it (run 1): the next jornada, 9
+            got = {r["name"]: r for r in asked("what_changed")}
+            assert set(got) == {"A", "B", "C", "D", "E", "F"}, got.keys()
+            assert (got["A"]["was"], got["A"]["now"], got["A"]["change"]) == (2.0, 2.5, 0.5)
+            assert (got["A"]["from_points"], got["A"]["from_selection"], got["A"]["from_fitness"]) \
+                == (0.5, 0.0, 0.0), "he scores more when he plays: 5 against 4, at half a chance"
+            assert (got["B"]["from_points"], got["B"]["from_selection"], got["B"]["from_fitness"]) \
+                == (0.0, 2.0, 0.0), "picked half as often again: 4 points, +0.5 chance"
+            assert (got["C"]["from_points"], got["C"]["from_selection"], got["C"]["from_fitness"]) \
+                == (0.0, 0.0, -2.0), "half as likely to be fit: 4 points x half a chance lost"
+            assert (got["F"]["from_points"], got["F"]["from_selection"], got["F"]["from_fitness"]) \
+                == (0.0, 2.0, -0.8), "both move: picked more (4 x +0.5 x the old fitness 1) and less fit (4 x 1 x -0.2)"
+            assert all(abs(g["change"] - (g["from_points"] + g["from_selection"] + g["from_fitness"])) < 1e-9
+                       for n, g in got.items() if n in "ABCF"), "the three parts add up to the change"
+            assert (got["D"]["was"], got["D"]["now"], got["D"]["scope"]) == (None, 2.0, "new in the forecast")
+            assert (got["E"]["was"], got["E"]["now"], got["E"]["scope"]) == (3.0, None, "gone from the forecast")
+            explicit = asked("what_changed", {"old": 1, "new": 3, "jornada": 10})
+            assert [(r["name"], r["was"], r["now"]) for r in explicit] == [("A", 9.0, 1.0)], \
+                "any two runs, any jornada"
+        finally:
+            set_now(None)
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
+            record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "service", "commit_sha": "c"}], "runs")
+            record([{"run_id": 1, "plan_gain": 0.0}], "sim_runs")
+            record([{"run_id": 1, "manager": m, "me": 0, "now": 0.0, "mean": 0.0, "cash": c}
+                    for m, c in (("debtor", -5e6), ("fine", 4e6), ("nearly", -1e6))], "sim_standings")
+            store_sql("api_teams", [{"observed_at": "2026-10-14T1000Z", "player_id": a, "manager": m,
+                                     "player_team_id": "t" + a}
+                                    for a, m in (("1", "debtor"), ("2", "debtor"), ("3", "debtor"),
+                                                 ("4", "fine"), ("5", "nearly"))])
+            record([{"player_id": k, "name": "P" + k, "app_id": k} for k in "12345"], "crosswalk")
+            record([{"run_id": 1, "player": k, "name": "P" + k, "pos": "", "value": v}
+                    for k, v in (("1", 1e6), ("2", 1e6), ("3", 6e6), ("4", 9e6), ("5", 1e6))], "sim_facts")
+            got = {r["manager"]: r for r in asked("cash_cliffs")}
+            assert set(got) == {"debtor", "nearly"}, "nobody in credit"
+            assert (got["debtor"]["debt_m"], got["debtor"]["squad_value_m"], got["debtor"]["players"],
+                    got["debtor"]["fewest_sales"]) == (5.0, 8.0, 3, 1), \
+                "5M to raise from players worth 6, 1 and 1: the 6M one alone does it (the cheap ones first would need all three)"
+            assert (got["nearly"]["debt_m"], got["nearly"]["fewest_sales"]) == (1.0, 1)
+        finally:
+            set_now(None)
 
 
 def _selftest_queries() -> None:
