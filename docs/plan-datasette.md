@@ -162,7 +162,16 @@ data/raw tarballs
   jornada (better at every horizon), flagged players flat, the replayed
   boards' moves identical. Listed-with-no-% now means 53% to start, not
   15% (the ghosts had dragged it down).
-- S6 The board as a saved query; the phone's JSON its export.
+- S6 (done) The board as views; the phone's JSON its export. S6a: the run
+  records what it decides (`sim_standings`, `sim_players`, `sim_plan`,
+  `sim_runs`). S6b1: `player_facts` (every market fact per player, one
+  view; Market is built from it; load_players, market_routes, pending,
+  open_clauses gone). S6b2: `board_*` views and `board_json`; sim.main
+  writes decisions.json from it; report() and the five board tables gone.
+  Golden: 16 of 16 the same (S6b1 moved two boards: a player the app
+  lists for sale but futbolfantasy does not know is no longer forecast,
+  which shifts the simulation's draws). Left for S6c: sale odds
+  (`Market.fetches`) and `at_risk` still decide in Python.
 - Then the old phase 3 rest: tunnel route, `Fantasy.jsx` links, Run again
   and the live log on the box, alerts, more saved queries.
 
