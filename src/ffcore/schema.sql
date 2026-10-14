@@ -411,7 +411,8 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM constants WHERE name = 'MATCH_LEN') AS match_len,
     (SELECT value FROM constants WHERE name = 'NEUTRAL_START') AS neutral_start,
     (SELECT value FROM constants WHERE name = 'ABSENT_START') AS absent_start,
-    (SELECT value FROM constants WHERE name = 'FALLBACK_K') AS fallback_k;
+    (SELECT value FROM constants WHERE name = 'FALLBACK_K') AS fallback_k,
+    (SELECT value FROM constants WHERE name = 'REMIND_HOURS') AS remind_hours;
 
 -- Each player's changes, all time, numbered (i), clipped at CLIP (x: so a
 -- long rise is not cut short), with the value each ends at.
@@ -956,3 +957,39 @@ SELECT json_object(
                       'estimated', json(CASE WHEN estimated THEN 'true' ELSE 'false' END),
                       'p_above', p_above) ORDER BY ord) FROM board_league)) AS json
 FROM board_head h;
+
+-- The next jornada to lock after cut(): its first kickoff (round_locks).
+DROP VIEW IF EXISTS next_round_lock;
+CREATE VIEW next_round_lock AS SELECT min(lock) AS lock FROM round_locks WHERE lock > (SELECT cut());
+
+-- A run to remind you of your line-up is due once the next jornada's lock is
+-- within REMIND_HOURS, and only once: not if a run was asked for it
+-- (trigger 'reminder', as_of the window's opening or later).
+DROP VIEW IF EXISTS lock_due;
+CREATE VIEW lock_due AS
+WITH w AS (
+    SELECT lock, strftime('%Y-%m-%dT%H%MZ', datetime(
+               substr(lock, 1, 10) || ' ' || substr(lock, 12, 2) || ':' || substr(lock, 14, 2),
+               '-' || (SELECT remind_hours FROM k) || ' hours')) AS opens
+    FROM next_round_lock WHERE lock IS NOT NULL)
+SELECT lock FROM w
+WHERE opens <= (SELECT cut())
+  AND NOT EXISTS (SELECT 1 FROM runs WHERE trigger = 'reminder' AND as_of >= w.opens);
+
+-- What to tell you about your line-up before the next lock, from the last
+-- run: set it, if the app's is not one I can match, or change it to your
+-- best eleven. No row when the line-up set is that eleven.
+DROP VIEW IF EXISTS lineup_alert;
+CREATE VIEW lineup_alert AS
+WITH g AS (SELECT * FROM lineup_gap WHERE basis = 'now'),
+ins AS (SELECT group_concat(name, ', ' ORDER BY -next, player) AS names FROM g WHERE side = 'in'),
+outs AS (SELECT group_concat(name, ', ' ORDER BY i) AS names FROM g WHERE side = 'out'),
+left AS (SELECT CAST(round((
+             julianday(substr(lock, 1, 10) || 'T' || substr(lock, 12, 2) || ':' || substr(lock, 14, 2) || 'Z')
+             - julianday(substr(cut(), 1, 10) || 'T' || substr(cut(), 12, 2) || ':' || substr(cut(), 14, 2) || 'Z')
+         ) * 1440) AS INTEGER) AS minutes FROM next_round_lock)
+SELECT CASE WHEN (SELECT max(legal) FROM g)
+            THEN 'Change your line-up: field ' || ins.names || ' for ' || outs.names
+            ELSE 'Set your line-up: ' || ins.names END
+       || ' — locks in ' || (left.minutes / 60) || 'h' || printf('%02d', left.minutes % 60) AS text
+FROM ins, outs, left WHERE EXISTS (SELECT 1 FROM g);

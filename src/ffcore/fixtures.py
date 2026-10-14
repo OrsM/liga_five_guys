@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 __all__ = ["tiny_state", "tiny_bootstrap", "tiny_universe",
-          "tiny_market_universe"]
+          "tiny_market_universe", "lineup_board"]
 
 
 DEFAULT_SQUAD: dict[str, str] = {
@@ -151,3 +151,31 @@ def _selftest() -> None:
 
 if __name__ == "__main__":
     _selftest()
+
+
+def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
+    """Into the current tables (tidy.tables_in), the rows the board views
+    read: one run whose best eleven now is ionut radu and pepelu, and, once
+    its plan buys cai coro for pepelu, ionut radu and cai coro (bench boy
+    is yours and in neither); and the app's line-up as (app id, name) rows,
+    with these players' app ids."""
+    from contextlib import closing
+
+    from ffcore.db import connect
+    from ffcore.tidy import store_sql
+
+    with closing(connect()) as db, db:
+        db.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha)"
+                   " VALUES (1, 't', 't', 'test', 'c')")
+        db.execute("INSERT INTO sim_runs VALUES (1, 0.0)")
+        db.executemany("INSERT INTO sim_players (run_id, player, mine, xi, plan_xi, next)"
+                       " VALUES (1, ?, ?, ?, ?, ?)",
+                       [("ionut radu", 1, 1, 1, 3.0), ("pepelu", 1, 1, 0, 2.0),
+                        ("cai coro", 0, 0, 1, 5.0), ("bench boy", 1, 0, 0, 0.5)])
+        db.executemany("INSERT INTO sim_facts (run_id, player, name, pos) VALUES (1, ?, ?, '')",
+                       [("ionut radu", "Ionut Radu"), ("pepelu", "Pepelu"),
+                        ("cai coro", "Cai Coro"), ("bench boy", "Bench Boy")])
+        db.executemany("INSERT INTO crosswalk (player_id, name, app_id) VALUES (?, ?, ?)",
+                       [(k, k, v) for k, v in ids.items()])
+    store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": i,
+                              "player_name": n, "player_name_full": n} for i, n in app])

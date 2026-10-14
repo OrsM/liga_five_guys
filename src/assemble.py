@@ -27,6 +27,7 @@ from ffcore.season import LeagueState
 from ffcore.startprob import (ABSENT_START, AVAIL_K, FALLBACK_K, NEUTRAL_START, PICK_K,
                               Availability, Calibration, StartOdds, fit_availability)
 from ffcore.tidy import LINEUP_SOURCE, SEASON, age_hours, current, read_csv, typed
+from remind import REMIND_HOURS
 from stats import percentile
 
 __all__ = ["universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
@@ -42,6 +43,7 @@ CONSTANTS: dict[str, dict[str, float]] = {
     "fixture": {"FIX_BAND": FIX_BAND, "MIN_AD_MATCHES": MIN_AD_MATCHES},
     "forecast": {"MIN_POOL": MIN_POOL, "PERSISTENT_SHARE": PERSISTENT_SHARE},
     "pricing": {"BID_BEATS": BID_BEATS, "CLIP": CLIP, "PRICE_WINDOW": PRICE_WINDOW},
+    "remind": {"REMIND_HOURS": REMIND_HOURS},
     "rules": {"MATCH_LEN": MATCH_LEN},
     "score": {"PROMOTED_DISCOUNT_K": PROMOTED_DISCOUNT_K, "SHRINK_K": SHRINK_K},
     "startprob": {"ABSENT_START": ABSENT_START, "AVAIL_K": AVAIL_K, "FALLBACK_K": FALLBACK_K,
