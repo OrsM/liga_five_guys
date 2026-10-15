@@ -424,3 +424,10 @@ Each commit's effect on the board and the backtest; constants tried side by
 side as tagged backtest variants; a never-recommend list; a decision
 journal; a weekly league recap of public facts; rival bid prediction (check
 the 314 ledger rows carry signal first).
+
+- 6.2 (done, 2026-10-15) `SHRINK_K` 4 -> 8. Replayed over 4 jornadas (2, 3, 6, 8) it forecast better in each:
+  `variant_gap` +0.071 squared error (95%: +0.009..+0.132; the interval ignores that a jornada's players
+  are correlated, so the four-of-four signs are the sturdier evidence); 2 is clearly worse, 16 not
+  established. It moves p_win with the plan unchanged (latest board 0.25 -> 0.37, finish 1.89 -> 1.74), as shrinking every
+  player toward his position's mean narrows the gap between squads; p_win itself is not validated (calibration of
+  differences holds over 4 jornadas, too few to tell). Plans identical on 9 of 16 frozen boards, the rest differ in small moves.

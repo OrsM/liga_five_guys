@@ -7,7 +7,7 @@ from datetime import date
 from typing import Any, NamedTuple
 
 from ffcore.parse import Rows, text
-from ffcore.startprob import NEUTRAL_START, StartOdds
+from ffcore.startprob import NEUTRAL_START, PICK_K, StartOdds
 from ffcore.names import Name
 from ffcore.rules import slot
 from stats import shrink
@@ -16,7 +16,7 @@ from stats import shrink
 __all__ = ["Rating", "Rates", "Scored", "Scorer", "Tally", "fit_promoted_discount"]
 
 
-SHRINK_K = 4.0
+SHRINK_K = 8.0    # was 4: replayed over 4 jornadas it forecast better in each (variant_gap: +0.071 +-0.06 in squared error); 2 is clearly worse, 16 not established
 
 PROMOTED_DISCOUNT = 0.70
 
@@ -219,11 +219,11 @@ def _selftest() -> None:
 
     benched = Scorer(market, StartOdds(xi, history={"p0": (0.0, 6.0)}), hist,
                      current={"p0": {"pts": 30.0, "pj": 3.0}}).rates(dict(row, name="p0", ff_id="p0"))
-    assert abs(benched.p_now - K / (K + 6)) < 1e-9, benched
+    assert abs(benched.p_now - PICK_K / (PICK_K + 6)) < 1e-9, benched
     susp = typed("lineups", [{"player": "p0", "player_name": "p0", "start_pct": "0", "status": "suspended"}])
     back = Scorer(market, StartOdds(susp, history={"p0": (1.8, 2.0)}), hist,
                   current={"p0": {"pts": 30.0, "pj": 2.0}}).rates(dict(row, name="p0", ff_id="p0"))
-    assert abs(back.p_rest - (K * NEUTRAL_START / 100 + 1.8) / (K + 2)) < 1e-9, back
+    assert abs(back.p_rest - (PICK_K * NEUTRAL_START / 100 + 1.8) / (PICK_K + 2)) < 1e-9, back
     assert back.p_now == back.p_rest, "the suspension is the fit factor's, not selection's"
 
     print("ffcore.score self-test OK")

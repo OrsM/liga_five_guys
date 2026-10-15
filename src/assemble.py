@@ -322,6 +322,7 @@ def _selftest_variants() -> None:
             ("slow", "AVAIL_K", 2.0), ("slow", "SHRINK_K", 9.0), ("slow", "PERSISTENT_SHARE", 0.5),
             ("slow", "NEUTRAL_START", 33.0), ("typo", "AVIAL_K", 1.0))], "variants")
         tally = [("indefinite", 3.0, 4.0)]
+        live_shrink = score.SHRINK_K
         live = startprob.fit_availability(tally).level["indefinite"]
         write_constants()
         assert rows("SELECT neutral_start FROM k") == [(60.0,)]
@@ -336,7 +337,7 @@ def _selftest_variants() -> None:
             assert rows("SELECT neutral_start FROM k") == [(33.0,)], "the views read the variant's row"
             assert rows("SELECT count(*) FROM model_constants WHERE variant = 'slow'") == [(len(
                 [n for names in constants().values() for n in names]),)]
-        assert startprob.AVAIL_K == 4.0 and score.SHRINK_K == 4.0 and forecast.PERSISTENT_SHARE == 0.08, \
+        assert startprob.AVAIL_K == 4.0 and score.SHRINK_K == live_shrink and forecast.PERSISTENT_SHARE == 0.08, \
             "restored on leaving"
         assert rows("SELECT neutral_start FROM k") == [(60.0,)], "the live rows were never touched"
         assert startprob.fit_availability(tally).level["indefinite"] == live
