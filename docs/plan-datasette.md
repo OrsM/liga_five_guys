@@ -332,8 +332,20 @@ a decision.
   both scored as jornadas resolve; it replaces the live one only on a win.
 - 5.5 Parser self-report: a page parsing to zero rows opens a session with
   the raw page, the parser and its last good page, which proposes a fix.
-- 5.6 The game's price rule, fitted from every value and nightly offer
-  since August; judged by the backtest.
+- 5.6 (done 2026-10-15) The game's price rule, fitted from every daily value
+  change. Measured on 34k player-days, fit on the first 70% of days and
+  scored on the last 30%, mean absolute error of the next day's change in %
+  (zero = "no change": 1.19): the last change alone 0.53, the last two 0.42,
+  the last three 0.40, more lags nothing (4..6: 0.40). Ownership, points in
+  the last jornadas and value level add nothing (MSE 0.644 -> 0.641..0.650).
+  Paired, three lags against one: -0.122 abs error (+-0.007, n=9,946). So
+  the rule is a smoothed trend of the last three updates, not the last one.
+  Momentum now fits on x = .4/.4/.2 of the last three clipped changes
+  (`PRICE_W0..2`, constants, so a variant can try others) instead of the
+  last alone: price_forecast_error MAE h=1 0.73 -> 0.58, h=3 2.08 -> 1.74,
+  h=5 3.60 -> 3.02, same pairs. Boards: the 16 golden boards change only in
+  trend, per_million and sale-wait amounts, never in which moves are made
+  (frozen again). Equal weights over 2..5 lags were worse (0.60..0.63).
 - 5.7 Rivals who act in the season sim, fitted from the ledger. A model
   change: whiteboard first.
 

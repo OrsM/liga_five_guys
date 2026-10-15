@@ -518,20 +518,27 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'CLIP' AND variant = (SELECT variant())) AS clip,
     (SELECT value FROM model_constants WHERE name = 'PRICE_WINDOW' AND variant = (SELECT variant())) AS price_window,
     (SELECT value FROM model_constants WHERE name = 'BID_BEATS' AND variant = (SELECT variant())) AS bid_beats,
+    (SELECT value FROM model_constants WHERE name = 'PRICE_W0' AND variant = (SELECT variant())) AS price_w0,
+    (SELECT value FROM model_constants WHERE name = 'PRICE_W1' AND variant = (SELECT variant())) AS price_w1,
+    (SELECT value FROM model_constants WHERE name = 'PRICE_W2' AND variant = (SELECT variant())) AS price_w2,
     (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
     (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
     (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
     (SELECT value FROM model_constants WHERE name = 'FALLBACK_K' AND variant = (SELECT variant())) AS fallback_k,
     (SELECT value FROM model_constants WHERE name = 'REMIND_HOURS' AND variant = (SELECT variant())) AS remind_hours;
 
--- Each player's changes, all time, numbered (i), clipped at CLIP (x: so a
--- long rise is not cut short), with the value each ends at.
+-- Each player's changes, all time, numbered (i), each clipped at CLIP; x is
+-- the signal momentum fits on: his last three clipped changes weighted
+-- PRICE_W0..2 (a missing one counts as the oldest he has), with the value each ends at.
 DROP VIEW IF EXISTS price_series;
 CREATE VIEW price_series AS
 SELECT ff_id, observed_at, substr(observed_at, 1, 10) AS day, step,
-       max(-k.clip, min(k.clip, step)) AS x, i, value
-FROM (SELECT *, row_number() OVER (PARTITION BY ff_id ORDER BY observed_at) - 1 AS i
-      FROM price_obs WHERE step IS NOT NULL), k;
+       price_w0 * c + price_w1 * coalesce(lag(c, 1) OVER p, c)
+                    + price_w2 * coalesce(lag(c, 2) OVER p, coalesce(lag(c, 1) OVER p, c)) AS x, i, value
+FROM (SELECT *, max(-k.clip, min(k.clip, step)) AS c,
+             row_number() OVER (PARTITION BY ff_id ORDER BY observed_at) - 1 AS i
+      FROM price_obs, k WHERE step IS NOT NULL)
+WINDOW p AS (PARTITION BY ff_id ORDER BY observed_at);
 
 -- The longest horizon momentum fits, as of cut(): a quarter of the median
 -- player's number of changes (players with none count), at least 1.

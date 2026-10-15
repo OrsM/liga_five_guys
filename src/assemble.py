@@ -44,7 +44,7 @@ NAMES: dict[str, tuple[str, ...]] = {
     "decide": ("CONFIDENCE", "FINAL_TRIALS"),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
-    "pricing": ("BID_BEATS", "CLIP", "PRICE_WINDOW"),
+    "pricing": ("BID_BEATS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "remind": ("REMIND_HOURS",),
     "rules": ("MATCH_LEN",),
     "score": ("PROMOTED_DISCOUNT_K", "SHRINK_K"),
@@ -339,7 +339,9 @@ def _selftest_sale() -> None:
         try:
             set_now(snapshot_stamp("2026-09-04T1200Z"))
             record([{"me": "me", "budget": 100e6}], "league_config")
-            record([{"name": "PRICE_WINDOW", "value": 3.0}, {"name": "CLIP", "value": 20.0}], "model_constants")
+            record([{"name": "PRICE_WINDOW", "value": 3.0}, {"name": "CLIP", "value": 20.0},
+                    {"name": "PRICE_W0", "value": 1.0}, {"name": "PRICE_W1", "value": 0.0},
+                    {"name": "PRICE_W2", "value": 0.0}], "model_constants")
             record([{"player_id": "p1", "app_id": "1"}, {"player_id": "p2", "app_id": "2"}],
                    "crosswalk")
             store_sql("market", [{"observed_at": at(1), "ff_id": k, "name": k, "value": "10000000"}
@@ -517,6 +519,15 @@ def _selftest_market() -> None:
         store_sql("api_offers", [offer, offer, dict(offer, from_market="false", money="12",
                                                     offer_id="m")])
         assert market_offer_ratios() == [1.1], "the game's offers, each once, over value"
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        write_constants()
+        for n, v in enumerate((100, 110, 110, 110)):
+            store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": "x", "value": str(v)}])
+        assert [round(x, 6) for (x,) in rows("SELECT x FROM price_series WHERE ff_id = 'x' ORDER BY i")] \
+            == [10.0, 6.0, 2.0], \
+            "a +10% step then two flat days: the signal is the last three steps, weighted .4 .4 .2 " \
+            "(a missing one counts as the oldest he has: 0 + .4 * 10 + .2 * 10); a rise is felt for three updates"
 
     def prices(series: dict[str, list[float]]) -> Prices:
         """The momentum views over these values, one a day from 2026-08-10."""
