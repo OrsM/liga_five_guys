@@ -89,7 +89,11 @@ data/raw tarballs
   from rows would gain nothing).
 - 2.5 (done) `grade_forecast`, `grade_decisions`: `run.py grade` after each
   report, skipped unless the commit or the resolved jornadas changed.
-- 2.6 (after S1) board history imported from git.
+- 2.6 (done 2026-10-15) board history imported from git: `tools/board_history.py`
+  keeps the 121 boards of the "do" shape (since 2026-09-27; the 359 earlier
+  commits are four other shapes that say different things, so they stay in
+  git) as `board_history` / `board_history_moves`; saved query `board_history`
+  (how long each move stayed on the board). Boards since S6 are already rows.
 - 2.7 (after S1) "why did it change": a saved query over the last two
   runs' funnel, forecast and params; the ping carries the line.
 

@@ -84,6 +84,7 @@ def _selftest() -> None:
     _selftest_paired()
     _selftest_variant_gap()
     _selftest_phantom()
+    _selftest_board_history()
     print("q.py self-test OK")
 
 
@@ -257,6 +258,27 @@ def _selftest_phantom() -> None:
             "jornada order, a running total, the named run's rows only"
         assert rows_[1]["moves"] == "buy A"
         assert [r[0] for r in named("phantom_coach", {})[1]] == [2, "total"], "no run named: the latest that has rows"
+
+
+def _selftest_board_history() -> None:
+    """board_history: how long a move stayed on the published board."""
+    import tempfile
+
+    from ffcore.db import record
+    from ffcore.tidy import tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        record([{"generated_at": at, "commit_sha": "c"} for at in ("a1", "a2", "a3")], "board_history")
+        record([{"generated_at": at, "ord": i, "what": w, "name": n, "gain": g}
+                for at, i, w, n, g in (("a1", 0, "buy", "X", 10.0), ("a2", 0, "buy", "X", 20.0),
+                                       ("a3", 0, "buy", "X", 30.0), ("a1", 1, "sell", "Y", -4.0),
+                                       ("a2", 1, "sell", "Y", -6.0), ("a3", 1, "field", None, 1.0),
+                                       ("a1", 2, "buy", "Z", 5.0), ("a3", 2, "buy", "W", 1.0))], "board_history_moves")
+        cols, got = named("board_history", {})
+        rows_ = [dict(zip(cols, r)) for r in got]
+        assert [(r["what"], r["name"], r["boards"], r["first_seen"], r["last_seen"], r["avg_gain"], r["on_latest"])
+                for r in rows_] == [("buy", "X", 3, "a1", "a3", 20.0, 1), ("sell", "Y", 2, "a1", "a2", -5.0, 0),
+                                    ("buy", "W", 1, "a3", "a3", 1.0, 1), ("buy", "Z", 1, "a1", "a1", 5.0, 0)], rows_
 
 
 def _selftest_queries() -> None:

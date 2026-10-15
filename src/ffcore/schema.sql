@@ -193,6 +193,24 @@ CREATE TABLE IF NOT EXISTS phantom_jornadas (
     PRIMARY KEY (run_id, jornada)
 );
 
+-- The boards published before the board was kept as rows, from git
+-- (tools/board_history.py): head and moves, one board a generated_at.
+CREATE TABLE IF NOT EXISTS board_history (
+    generated_at TEXT PRIMARY KEY,
+    commit_sha   TEXT NOT NULL,
+    plan_gain    REAL,
+    finish       REAL,
+    p_win        REAL
+);
+CREATE TABLE IF NOT EXISTS board_history_moves (
+    generated_at TEXT NOT NULL REFERENCES board_history(generated_at),
+    ord          INTEGER NOT NULL,
+    what         TEXT NOT NULL,    -- field, buy, sell
+    name         TEXT,
+    gain         REAL,
+    PRIMARY KEY (generated_at, ord)
+);
+
 -- Each rival's board for a run (sim.rivals): the funnel with him as "me".
 -- His cash is our estimate and his pending bids are invisible to us.
 CREATE TABLE IF NOT EXISTS rival_boards (

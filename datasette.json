@@ -122,6 +122,10 @@
         "rival_boards": {
           "title": "What each rival's board would do for him (:run, default the latest that has them): the same funnel with him as the manager, his cash our estimate and his pending bids invisible to us. His cash, what his plan gains over the season in points, and his planned moves in order",
           "sql": "WITH r AS (SELECT coalesce(nullif(:run, ''), (SELECT max(run_id) FROM rival_boards)) AS run_id)\nSELECT b.manager, round(b.cash / 1e6, 1) AS cash_m, round(b.plan_gain, 1) AS plan_gain,\n       (SELECT group_concat(label, '; ') FROM (SELECT label FROM rival_moves m\n                                               WHERE m.run_id = b.run_id AND m.manager = b.manager ORDER BY ord)) AS moves\nFROM rival_boards b, r WHERE b.run_id = r.run_id ORDER BY b.plan_gain DESC"
+        },
+        "board_history": {
+          "title": "How long each move stayed on the published board (boards since 2026-09-27, from git; earlier shapes stay in git): the boards it was on, first and last seen, its average points gain, and whether it is on the latest board",
+          "sql": "SELECT m.what, m.name, count(*) AS boards, min(m.generated_at) AS first_seen, max(m.generated_at) AS last_seen,\n       round(avg(m.gain), 1) AS avg_gain,\n       max(m.generated_at) = (SELECT max(generated_at) FROM board_history) AS on_latest\nFROM board_history_moves m WHERE m.name IS NOT NULL\nGROUP BY m.what, m.name ORDER BY boards DESC, m.name"
         }
       }
     }
