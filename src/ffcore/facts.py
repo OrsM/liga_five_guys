@@ -59,10 +59,41 @@ def ensure(db: sqlite3.Connection, now: Callable[[], str] | None = None) -> None
     needs it pinned (momentum_day)."""
     if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'facts_meta'").fetchone() is None:
         return                                  # a schema without them (a test's own)
+    identity(db)
     latest = db.execute("SELECT substr(max(observed_at), 1, 10) FROM market").fetchone()[0] or ""
     _price_step(db, latest)
     if now is not None:
         _momentum_day(db, latest, now)
+
+
+def identity(db: sqlite3.Connection) -> None:
+    """ff_identity up to the registry and the rows it is read for: refilled
+    when either changed (the crosswalk mirror calls it too)."""
+    if db.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('ff_identity_kept', 'facts_meta')"
+                  ).fetchone()[0] < 2:
+        return
+    rows = db.execute("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk ORDER BY 1").fetchall()
+    through = "%08x:%d:%d" % (
+        zlib.crc32(repr(rows).encode()),
+        db.execute("SELECT coalesce(max(rowid), 0) FROM lineups").fetchone()[0],
+        db.execute("SELECT coalesce(max(rowid), 0) FROM starters").fetchone()[0])
+    version = "%08x" % zlib.crc32(db.execute(
+        "SELECT sql FROM sqlite_master WHERE name = 'ff_identity_now'").fetchone()[0].encode())
+    if db.execute("SELECT version, through FROM facts_meta WHERE name = 'ff_identity'").fetchone() == (version, through):
+        return
+    own = not db.in_transaction                 # else the caller's transaction holds it
+    if own:
+        db.execute("BEGIN IMMEDIATE")
+    try:
+        db.execute("DELETE FROM ff_identity_kept")
+        db.execute("INSERT INTO ff_identity_kept SELECT * FROM ff_identity_now")
+        db.execute("INSERT OR REPLACE INTO facts_meta VALUES ('ff_identity', ?, ?)", (version, through))
+        if own:
+            db.execute("COMMIT")
+    except BaseException:
+        if own:
+            db.execute("ROLLBACK")
+        raise
 
 
 def _momentum_day(db: sqlite3.Connection, latest: str, now: Callable[[], str]) -> None:
@@ -145,6 +176,20 @@ def _selftest() -> None:
             db.execute("DELETE FROM price_step")
         with closing(connect()) as db:
             assert db.execute("SELECT count(*) FROM price_step").fetchone()[0] == before, "rebuilt when the record is gone"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        def who() -> list[tuple[object, ...]]:
+            with closing(connect()) as db:
+                return db.execute("SELECT player_slug, player FROM ff_identity ORDER BY 1").fetchall()
+        assert who() == []
+        store_sql("lineups", [{"observed_at": "2026-08-10T0800Z", "source": "futbolfantasy",
+                               "player_slug": "x", "player_name": "X", "team_slug": "t"}])
+        with closing(connect()) as db, db:
+            db.execute("INSERT INTO crosswalk VALUES ('p1', 'X', 't', 'x', '', '')")
+        assert who() == [("x", "p1")], "a new line-up row and a new registry are named at the next connect"
+        with closing(connect()) as db, db:
+            db.execute("UPDATE crosswalk SET ff_slug = 'y', name = 'Z'")
+            identity(db)
+        assert who() == [("x", None)], "a changed registry refills it in the caller's transaction"
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         from ffcore.db import record, rows
         record([{"name": n, "value": v} for n, v in (("CLIP", 20.0), ("PRICE_W0", .4), ("PRICE_W1", .4), ("PRICE_W2", .2))],

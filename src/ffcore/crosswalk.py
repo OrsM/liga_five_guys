@@ -8,6 +8,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 from ffcore import db as lfg
+from ffcore.facts import identity
 from ffcore.names import AppId, PlayerKey
 from ffcore.tidy import read_csv, write_csv
 
@@ -55,6 +56,7 @@ class Crosswalk:
             db.execute("DELETE FROM crosswalk")
             db.executemany("INSERT INTO crosswalk VALUES (?, ?, ?, ?, ?, ?)",
                            [tuple(p.row()[c] for c in PLAYER_COLS) for p in self.players.values()])
+            identity(db)
 
     def coverage(self) -> dict[str, float]:
         n = len(self.players) or 1

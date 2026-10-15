@@ -140,6 +140,9 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
     functions(db)
+    db.execute("PRAGMA temp_store = MEMORY")
+    db.execute("PRAGMA cache_size = -262144")
+    db.execute("PRAGMA mmap_size = 536870912")
     key = (path.resolve(), schema)
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
