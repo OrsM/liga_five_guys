@@ -320,15 +320,18 @@ a decision.
   jornada 1, scored in the real standings. Assumes its bids win at the
   model's price and rivals do not react to it: it grades the advice, not an
   alternative season.
-- 5.3 (first cut done 2026-10-15: `sim.rival_universe` / `rival_rows`, stage
-  `run.py rivals` (~25s, run by lfg-run after the queries), tables
-  `rival_boards` / `rival_moves`, saved query `rival_boards`. First look: every
-  rival's plan wants the same targets (Koski, Revivo), which is what 5.7 has to
-  model. Still to do: what each rival did against what his board said, and his
-  phantom beside ours.) 5.3 Every manager's board: the same funnel with `me` set to each rival
-  (`me` is already a parameter end to end). Their cash is our estimate and
-  their pending bids are invisible. Then: what each rival should have done,
-  what they did, and their phantom beside them.
+- 5.3 (done 2026-10-15) Every manager's board: `sim.rival_universe` /
+  `rival_rows`, stage `run.py rivals` (~25s; lfg-run runs it after the
+  queries), tables `rival_boards` / `rival_moves`, saved query `rival_boards`.
+  `grading.decisions` also replays each past lock's rival plans
+  (`grade_rival_moves`), so `phantom_coach` now gives every manager: his
+  points, and his points plus the points of the moves his own board planned
+  that his ledger does not show made (7 of mine made, 14 not: +119; the
+  rivals' phantoms run +160 to +272). Read it as advice graded, not as a
+  table that would have happened: every plan wants the same targets (Koski,
+  Revivo), so they cannot all win those bids; that is 5.7. A rival's cash is
+  our estimate. The grade stage went from ~2 to ~3 minutes (skipped unless
+  the code or the jornadas changed).
 - 5.4 Champion and challenger: a model change runs beside the live one,
   both scored as jornadas resolve; it replaces the live one only on a win.
 - 5.5 Parser self-report: a page parsing to zero rows opens a session with

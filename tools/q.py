@@ -238,7 +238,7 @@ def _selftest_variant_gap() -> None:
 
 
 def _selftest_phantom() -> None:
-    """phantom_coach: the points of the planned moves not made, each once."""
+    """phantom_coach: each manager's points and the points of his planned moves he did not make, each once."""
     import tempfile
     from datetime import datetime, timezone
 
@@ -269,19 +269,24 @@ def _selftest_phantom() -> None:
                     ("sell", "2", "appB", "2026-09-02T10:00:00+02:00"),   # a rival selling B is not me selling B
                     ("buy", "1", "appB", "2026-09-02T10:00:00+02:00"),    # my buying B is not selling B
                     ("sell", "1", "appA", "2026-09-02T10:00:00+02:00")], 1)])  # my selling A is not selling B
-            # buy A planned at lock 3 (+10) and again at lock 4 (+6: counted once); sell B planned at 4 (+8,
-            # not made); a rejected move (+50) is not advice
+            # my plan: buy A at lock 3 (+10) and again at 4 (+6: counted once); sell B at 4 (+8, not made);
+            # a rejected move (+50) is not advice. The rival's plan: buy A at lock 3 (+5): I bought A, not him
             record([{"run_id": 1, "ord": i, "lock": lk, "move": m, "reached": r, "kind": k, "real": v}
                     for i, (lk, m, r, k, v) in enumerate([(3, "buy Player A", "plan", "get", 10.0),
                                                           (4, "buy Player A", "plan", "get", 6.0),
                                                           (4, "sell Player B", "plan", "sell", 8.0),
                                                           (4, "buy Player C", "rejected", "get", 50.0)])],
                    "grade_decisions")
+            record([{"run_id": 1, "lock": 3, "manager": "rival", "ord": 0, "move": "buy Player A",
+                     "kind": "get", "real": 5.0}], "grade_rival_moves")
             cols, rows_ = named("phantom_coach", {})
-            got = [dict(zip(cols, r)) for r in rows_]
-            assert [(g["place"], g["manager"], g["points"]) for g in got] == [
-                (1, "board if followed", 108.0), (2, "rival", 105.0), (3, "me", 100.0), (4, "low", 90.0)], got
-            assert "1 made" in got[0]["note"] and "1 unmade" in got[0]["note"], got[0]["note"]
+            got = {g["manager"]: g for g in (dict(zip(cols, r)) for r in rows_)}
+            assert [g["place"] for g in got.values()] == [1, 2, 3] and list(got) == ["rival", "me", "low"], got
+            assert (got["rival"]["points"], got["rival"]["phantom"], got["rival"]["made"], got["rival"]["unmade"]) \
+                == (105.0, 110.0, 0, 1), "his unmade move counts for him; my buying A is not his"
+            assert (got["me"]["phantom"], got["me"]["planned"], got["me"]["made"], got["me"]["unmade"],
+                    got["me"]["unmade_pts"]) == (108.0, 2, 1, 1, 8.0), got["me"]
+            assert (got["low"]["phantom"], got["low"]["planned"]) == (90.0, 0), "no plan: his points"
         finally:
             set_now(None)
 

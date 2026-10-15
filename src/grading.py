@@ -17,6 +17,7 @@ from ffcore.points import jornada_points
 
 from assemble import applied, built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, board, verdict
+from sim import rival_universe
 from ffcore.clock import set_now, snapshot_stamp
 from ffcore.db import connect, named, record, this_run
 from ffcore.tidy import LINEUP_SOURCE, current
@@ -109,16 +110,18 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
     return kept
 
 
-def decisions() -> list[dict[str, Any]]:
+def decisions() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Rebuild each past lock's board with this code and set every ranked
     move against what its players then scored: the change in points it
     forecast (players got minus players sold) over the jornadas played
     since, and the change that happened; and the value its players were
     to gain (bought) or lose (sold) over the price horizon, in millions,
-    against what they did."""
+    against what they did. Also each rival's plan at that lock (his board:
+    sim.rival_universe), its moves set against the points they changed."""
     locks, actual = round_locks(), jornada_points()
     done = {j for _k, j in actual}
-    out = []
+    out: list[dict[str, Any]] = []
+    rival_out: list[dict[str, Any]] = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
             set_now(locks[i] - dt.timedelta(minutes=1))
@@ -151,10 +154,20 @@ def decisions() -> list[dict[str, Any]]:
                     "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
                     "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
                     "value_real": worth(a, lambda k: rose.get(k, 0.0))})
+            for mgr in u.state.squads:
+                if mgr == u.me:
+                    continue
+                ru = rival_universe(u, mgr)
+                rival_out += [{
+                    "lock": i, "manager": mgr, "ord": n, "move": r.action.label(ru.market.names),
+                    "kind": "sell" if not r.action.buy else "get",
+                    "pred": change(r.action, lambda k, j: expected_points(per_j[j].get(k))),
+                    "real": change(r.action, lambda k, j: actual.get((k, j), 0.0))}
+                    for n, r in enumerate(board(ru).plan)]
     finally:
         set_now(None)
         built.cache_clear()
-    return out
+    return out, rival_out
 
 
 def forecast_rows(runs: list[dict[str, Any]], actual: dict[tuple[str, int], float]) -> list[dict[str, Any]]:
@@ -188,10 +201,12 @@ def record_grades() -> dict[str, int]:
     if run is not None and not due(run, resolved):
         print("  grade: same code, same %d jornadas: nothing new" % resolved)
         return {"resolved": resolved, "skipped": 1}
-    fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
+    mine, rivals = decisions()
+    fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(mine)
     if run is not None:
         record([{"run_id": run, **r} for r in fc], "grade_forecast")
         record([{"run_id": run, **r} for r in moves], "grade_decisions")
+        record([{"run_id": run, **r} for r in rivals], "grade_rival_moves")
     print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
 
