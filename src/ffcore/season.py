@@ -93,7 +93,23 @@ def simulate_many(states: list[LeagueState], forecaster: Bootstrap, trials: int 
             for tot, st in zip(fast, states)]
 
 
+_DRAWN: list[tuple[Bootstrap, tuple[int, ...], int, int,
+                   list[tuple[int, list[str], npt.NDArray[np.float64]]]]] = []
+
+
 def draws(forecaster: Bootstrap, jornadas: Iterable[int], trials: int, seed: int
+          ) -> list[tuple[int, list[str], npt.NDArray[np.float64]]]:
+    """The simulated points of every player and jornada. Same inputs, same
+    draws, so the last set is kept: a board asks for it eight times."""
+    key = (tuple(jornadas), trials, seed)
+    if _DRAWN and _DRAWN[0][0] is forecaster and _DRAWN[0][1:4] == key:
+        return _DRAWN[0][4]
+    out = list(_draw(forecaster, key[0], trials, seed))
+    _DRAWN[:] = [(forecaster, *key, out)]
+    return out
+
+
+def _draw(forecaster: Bootstrap, jornadas: Iterable[int], trials: int, seed: int
           ) -> Iterator[tuple[int, list[str], npt.NDArray[np.float64]]]:
 
     pool = np.asarray(forecaster.pool, dtype=float)
@@ -149,11 +165,14 @@ def _run_np(states: list[LeagueState], forecaster: Bootstrap, trials: int, seed:
     xis = _elevens(states, forecaster)
     for j, keys, drawn in draws(forecaster, states[0].jornadas, trials, seed):
         at = {k: i for i, k in enumerate(keys)}
+        summed: dict[tuple[int, ...], npt.NDArray[np.float64]] = {}
         for i in range(len(states)):
             for m in managers[i]:
-                idx = [at[k] for k in xis[i][j][m] if k in at]
+                idx = tuple(at[k] for k in xis[i][j][m] if k in at)
                 if idx:
-                    totals[i][m] += drawn[:, idx].sum(axis=1)
+                    if idx not in summed:
+                        summed[idx] = drawn[:, list(idx)].sum(axis=1)
+                    totals[i][m] += summed[idx]
     return [{m: v.tolist() for m, v in tot.items()} for tot in totals]
 
 

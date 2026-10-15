@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ffcore.clock import cut, variant
+from ffcore.facts import ensure
 from ffcore.names import Name
 from ffcore.rules import position
 from ffcore.startprob import platt, prognosis_bucket
@@ -116,6 +117,7 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     the aggregates median(), quantile(x, p) and corr(x, y)."""
     db.create_function("cut", 0, now)
     db.create_function("variant", 0, variant)
+    db.create_function("hpad", 0, lambda: 0)
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
     db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
     db.create_aggregate("median", 1, _Median)  # type: ignore[arg-type]  # the stubs only allow int results
@@ -150,6 +152,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
                     db.executescript(sql)
                 db.execute("PRAGMA user_version = %d" % version)
         _APPLIED.add(key)
+    ensure(db, cut)
     return db
 
 
