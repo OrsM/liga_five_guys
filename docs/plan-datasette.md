@@ -343,8 +343,16 @@ a decision.
   (`phantom_coach`, 5.2). What the rivals' boards are for is 5.7.
 - 5.4 Champion and challenger: a model change runs beside the live one,
   both scored as jornadas resolve; it replaces the live one only on a win.
-- 5.5 Parser self-report: a page parsing to zero rows opens a session with
-  the raw page, the parser and its last good page, which proposes a fix.
+- 5.5 (done 2026-10-15) Parser self-report: view `parser_health` (per source
+  that stores a whole snapshot each fetch: the newest against the 20 before it;
+  stale when later than three usual gaps and 6h, thin under half the usual
+  rows; a page that parses to nothing stores no snapshot, so it shows as
+  stale), `src/health.py text`, and lfg-run's `health` step: one Telegram
+  message per trouble with the last good snapshot's raw file to start from,
+  repeated only when the trouble changes. Today all six sources are ok (4.4h
+  since the last, usual gap 3.5h). The "opens a session with the page, the
+  parser and its last good page" part is not built: a message carrying the
+  raw file's path is what a session starts from.
 - 5.6 (done 2026-10-15) The game's price rule, fitted from every daily value
   change. Measured on 34k player-days, fit on the first 70% of days and
   scored on the last 30%, mean absolute error of the next day's change in %

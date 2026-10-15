@@ -181,6 +181,32 @@ CREATE TABLE IF NOT EXISTS replay_forecast (
     PRIMARY KEY (variant, as_of, jornada, player)
 ) WITHOUT ROWID;
 
+-- Is each source still arriving, and whole? Per source that stores a whole
+-- snapshot each fetch (not the keyed tables, which keep only changes) (a page that parsed to nothing stores no snapshot at all),
+-- its newest snapshot against the 20 before it: stale when it is later than
+-- three of the usual gaps (and 6 hours), thin when under half the usual
+-- rows. last_good is the newest snapshot of the usual size: where to start
+-- looking (src/health.py tells you).
+DROP VIEW IF EXISTS parser_health;
+CREATE VIEW parser_health AS
+WITH snaps AS (
+  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM lineups WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM api_standings WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
+r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, julianday(substr(at, 1, 10) || 'T' || substr(at, 12, 2) || ':' || substr(at, 14, 2) || 'Z') AS jd FROM snaps),
+usual AS (SELECT src, avg(n) AS usual_rows, (max(jd) - min(jd)) * 24 / (count(*) - 1) AS gap_h
+          FROM r WHERE k BETWEEN 2 AND 21 GROUP BY src HAVING count(*) >= 5),
+now AS (SELECT julianday(substr((SELECT cut()), 1, 10) || 'T' || substr((SELECT cut()), 12, 2) || ':' || substr((SELECT cut()), 14, 2) || 'Z') AS jd)
+SELECT l.src, l.at AS last_at, l.n AS rows, round(u.usual_rows, 1) AS usual_rows,
+       round((now.jd - l.jd) * 24, 1) AS hours_since, round(u.gap_h, 1) AS usual_gap_h,
+       CASE WHEN (now.jd - l.jd) * 24 > max(6.0, 3 * u.gap_h) THEN 'stale'
+            WHEN l.n < 0.5 * u.usual_rows THEN 'thin' ELSE 'ok' END AS status,
+       (SELECT max(g.at) FROM r g WHERE g.src = l.src AND g.n >= 0.5 * u.usual_rows) AS last_good
+FROM r l JOIN usual u USING (src), now WHERE l.k = 1;
+
 -- The phantom manager (grading.phantom_season): the points of his eleven
 -- each jornada, beside the same squad never moved, and what he did.
 CREATE TABLE IF NOT EXISTS phantom_jornadas (

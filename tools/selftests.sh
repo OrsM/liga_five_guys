@@ -18,7 +18,7 @@ TESTS=(ffcore/parse.py ffcore/text.py ffcore/tidy.py ffcore/db.py
        "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
        ffcore/score.py
        "grading.py --selftest"
-       "crosswalk.py --selftest" "run.py --selftest" "remind.py --selftest" assemble.py
+       "crosswalk.py --selftest" "run.py --selftest" "remind.py --selftest" "health.py --selftest" assemble.py
        ffcore/action.py ffcore/market.py ffcore/pricing.py ffcore/schedule.py
        "stats.py --selftest"
       )
