@@ -83,6 +83,7 @@ def _selftest() -> None:
     _selftest_changes()
     _selftest_paired()
     _selftest_variant_gap()
+    _selftest_phantom()
     print("q.py self-test OK")
 
 
@@ -234,6 +235,40 @@ def _selftest_variant_gap() -> None:
         assert far["all"][1] == 3 and abs(far["all"][2] - 13 / 3) < 1e-3, "the last moment of each jornada: 4, 9 and 0"
         assert named("variant_gap", {"old": "live", "new": "slow", "hours": 60})[1] == [], \
             "no moment that early: nothing to compare"
+
+
+def _selftest_phantom() -> None:
+    """phantom_coach: the points of making every planned move, each once."""
+    import tempfile
+    from datetime import datetime, timezone
+
+    from ffcore.clock import set_now
+    from ffcore.db import record
+    from ffcore.tidy import store_sql, tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
+            record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
+            with closing(connect()) as db, db:
+                db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
+            store_sql("api_standings", [{"observed_at": "2026-10-14T1000Z", "user_id": u, "manager": m,
+                                         "team_points": str(p)}
+                                        for u, m, p in (("1", "me", 100), ("2", "rival", 105), ("3", "low", 90))])
+            # buy A planned at lock 3 (+10) and again at lock 4 (+6: the same unmade move, counted once);
+            # sell B planned at 4 (-3); a rejected move (+50) is not advice
+            record([{"run_id": 1, "ord": i, "lock": lk, "move": m, "reached": r, "kind": k, "real": v}
+                    for i, (lk, m, r, k, v) in enumerate([(3, "buy A", "plan", "get", 10.0),
+                                                          (4, "buy A", "plan", "get", 6.0),
+                                                          (4, "sell B", "plan", "sell", -3.0),
+                                                          (4, "buy C", "rejected", "get", 50.0)])],
+                   "grade_decisions")
+            cols, rows_ = named("phantom_coach", {})
+            got = [dict(zip(cols, r)) for r in rows_]
+            assert [(g["place"], g["manager"], g["points"]) for g in got] == [
+                (1, "board if followed", 107.0), (2, "rival", 105.0), (3, "me", 100.0), (4, "low", 90.0)], got
+        finally:
+            set_now(None)
 
 
 def _selftest_queries() -> None:
