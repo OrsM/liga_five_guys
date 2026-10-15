@@ -16,6 +16,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from ffcore import kept
 from ffcore.clock import cut, variant
 from ffcore.facts import ensure
 from ffcore.names import Name
@@ -161,10 +162,17 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
 
 def query(sql: str, params: Sequence[object] | Mapping[str, object] = (),
           path: Path | None = None) -> tuple[list[str], list[Any]]:
-    """A read: its columns, and its rows as tuples."""
+    """A read: its columns, and its rows as tuples; in a kept scope (kept.py)
+    the answer of the same read at the same cut, if there is one."""
+    kept_here = path is None
+    if kept_here and (hit := kept.get(DB, sql, params if isinstance(params, Sequence) else sorted(params.items()))) is not None:
+        return hit      # type: ignore[no-any-return]
     with closing(connect(path)) as db:
         cur = db.execute(sql, params)
-        return [d[0] for d in cur.description or ()], cur.fetchall()
+        got = [d[0] for d in cur.description or ()], cur.fetchall()
+    if kept_here:
+        kept.put(DB, sql, params if isinstance(params, Sequence) else sorted(params.items()), got)
+    return got
 
 
 META = Path(__file__).resolve().parent.parent.parent / "datasette.json"

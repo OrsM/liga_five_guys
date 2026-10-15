@@ -15,6 +15,7 @@ import remind
 from decide import CONFIDENCE, Universe, _fieldable
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import set_variant
+from ffcore import db as lfgdb, kept
 from ffcore.db import connect, named, query, record, rows
 from ffcore.fixture import Ratings, difficulty_ratings
 from ffcore.forecast import Bootstrap
@@ -138,13 +139,24 @@ def record_trend() -> None:
         db.execute("INSERT INTO price_trend_fit SELECT cut(), ff_id, trend FROM price_trend_now")
 
 
+def fits_in_place() -> bool:
+    """Do both fit tables hold the cut's rows (read past the kept answers:
+    the file they were kept for may be another copy of the data)."""
+    with closing(connect()) as db:
+        return bool(db.execute(
+            "SELECT (SELECT count(*) FROM momentum_fit WHERE as_of = cut()) > 0"
+            " AND (SELECT count(*) FROM price_trend_fit WHERE as_of = cut()) > 0").fetchone()[0])
+
+
 def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
-    with closing(connect()) as db, db:
-        db.execute("DELETE FROM momentum_fit WHERE as_of = cut()")
-        db.execute("INSERT INTO momentum_fit SELECT cut(), h, slope FROM momentum")
-    record_trend()
+    if not (kept.written(lfgdb.DB, "fits") and fits_in_place()):
+        with closing(connect()) as db, db:
+            db.execute("DELETE FROM momentum_fit WHERE as_of = cut()")
+            db.execute("INSERT INTO momentum_fit SELECT cut(), h, slope FROM momentum")
+        record_trend()
+        kept.mark(lfgdb.DB, "fits")
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
                   dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
@@ -210,6 +222,11 @@ def universe() -> Universe:
 @cache
 def built() -> Built:
     """The universe, and the parameters it was built with."""
+    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(constants())):
+        return _built()
+
+
+def _built() -> Built:
     age = age_hours("api_teams")
     if age is None or age > APP_FRESH_HOURS:
         raise SystemExit("the app's squads are %s old; no board is built from "

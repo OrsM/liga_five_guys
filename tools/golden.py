@@ -140,7 +140,8 @@ def build(now: str, hash_seed: str, base: Path, ended: bool = False) -> dict[str
     out = work / "reports"
     out.mkdir()
     env = dict(os.environ, PYTHONPATH="src", FF_ROOT=str(work),
-               LFG_REPORTS=str(out), LFG_NOW=now, PYTHONHASHSEED=hash_seed)
+               LFG_REPORTS=str(out), LFG_NOW=now, PYTHONHASHSEED=hash_seed,
+               LFG_KEPT="off" if ended else str(HOME / "kept"))     # a leak check reads no answer of its own
     try:
         subprocess.run([sys.executable, "src/run.py", "sim"], env=env, check=True,
                        stdout=subprocess.DEVNULL)

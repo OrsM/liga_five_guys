@@ -24,6 +24,7 @@ MADRID = _madrid()
 
 
 _NOW: list[datetime] = []
+_SET: list[bool] = [False]      # set_now was given a time (a replay)
 
 _RESETS: list[Callable[[], None]] = []
 
@@ -62,8 +63,14 @@ def set_variant(name: str) -> None:
         reset()
 
 
+def pinned() -> bool:
+    """Is the clock at a time somebody gave (a replay, LFG_NOW), not the live now?"""
+    return _SET[0] or bool(os.environ.get("LFG_NOW", "").strip())
+
+
 def set_now(when: datetime | None) -> None:
     _NOW[:] = [when] if when is not None else []
+    _SET[0] = when is not None
     for reset in _RESETS:
         reset()
 
