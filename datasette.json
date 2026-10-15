@@ -126,6 +126,10 @@
         "board_history": {
           "title": "How long each move stayed on the published board (boards since 2026-09-27, from git; earlier shapes stay in git): the boards it was on, first and last seen, its average points gain, and whether it is on the latest board",
           "sql": "SELECT m.what, m.name, count(*) AS boards, min(m.generated_at) AS first_seen, max(m.generated_at) AS last_seen,\n       round(avg(m.gain), 1) AS avg_gain,\n       max(m.generated_at) = (SELECT max(generated_at) FROM board_history) AS on_latest\nFROM board_history_moves m WHERE m.name IS NOT NULL\nGROUP BY m.what, m.name ORDER BY boards DESC, m.name"
+        },
+        "sim_calibration": {
+          "title": "Is the season simulation's spread right? Each manager's points in a clean jornada against the simulation's draws of it at the lock (:run, default the latest graded): outcomes, how many fell inside the 10-90 and 25-75 bands (want 80% and 50%), and the mean and spread of z = (actual - model mean) / model sd (want 0 and 1). 'totals' are single managers' points, which a league-wide jornada shock moves together; 'you minus him' is the difference, what who-finishes-above rests on. Outcomes within a jornada are correlated, so read a dozen jornadas, not the first few",
+          "sql": "WITH r AS (SELECT coalesce(nullif(:run, ''), (SELECT max(run_id) FROM sim_calibration)) AS run_id),\nx AS (SELECT 'totals' AS scope, jornada, pit, (actual - mean) / sd AS z FROM sim_calibration, r WHERE sim_calibration.run_id = r.run_id AND sd > 0\n      UNION ALL\n      SELECT 'you minus him', jornada, diff_pit, (diff_actual - diff_mean) / diff_sd FROM sim_calibration, r\n      WHERE sim_calibration.run_id = r.run_id AND diff_sd > 0)\nSELECT scope, count(*) AS n, count(DISTINCT jornada) AS jornadas,\n       round(avg(pit > 0.1 AND pit < 0.9), 2) AS in_10_90, round(avg(pit > 0.25 AND pit < 0.75), 2) AS in_25_75,\n       round(avg(z), 2) AS z_mean,\n       round(sqrt((sum(z * z) - count(*) * avg(z) * avg(z)) / (count(*) - 1)), 2) AS z_sd\nFROM x GROUP BY scope ORDER BY scope DESC"
         }
       }
     }

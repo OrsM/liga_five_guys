@@ -85,6 +85,7 @@ def _selftest() -> None:
     _selftest_variant_gap()
     _selftest_phantom()
     _selftest_board_history()
+    _selftest_sim_calibration()
     print("q.py self-test OK")
 
 
@@ -279,6 +280,36 @@ def _selftest_board_history() -> None:
         assert [(r["what"], r["name"], r["boards"], r["first_seen"], r["last_seen"], r["avg_gain"], r["on_latest"])
                 for r in rows_] == [("buy", "X", 3, "a1", "a3", 20.0, 1), ("sell", "Y", 2, "a1", "a2", -5.0, 0),
                                     ("buy", "W", 1, "a3", "a3", 1.0, 1), ("buy", "Z", 1, "a1", "a1", 5.0, 0)], rows_
+
+
+def _selftest_sim_calibration() -> None:
+    """sim_calibration: coverage and z of the simulation's draws."""
+    import tempfile
+
+    from ffcore.db import record
+    from ffcore.tidy import tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        record([{"run_id": i, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"} for i in (1, 2)], "runs")
+
+        def row(run: int, j: int, m: str, actual: float, mean: float, sd: float, pit: float,
+                d: tuple[float, float, float, float] | None = None) -> dict[str, Any]:
+            r = {"run_id": run, "jornada": j, "manager": m, "actual": actual, "mean": mean, "sd": sd, "pit": pit}
+            if d:
+                r.update(diff_actual=d[0], diff_mean=d[1], diff_sd=d[2], diff_pit=d[3])
+            return r
+        # totals: z = +1, -2, 0.5, and one with no spread (dropped); pit in the 10-90 band for 2 of 3
+        record([row(1, 2, "a", 60, 50, 10, 0.84, (20, 10, 10, 0.84)), row(1, 2, "b", 30, 50, 10, 0.02, (-10, 10, 5, 0.02)),
+                row(1, 3, "a", 55, 50, 10, 0.72), row(1, 3, "c", 9, 9, 0, 0.5),
+                row(2, 2, "z", 1, 1, 1, 0.5)], "sim_calibration")
+        cols, got = named("sim_calibration", {"run": 1})
+        rows_ = {r[0]: dict(zip(cols, r)) for r in got}
+        t = rows_["totals"]
+        assert (t["n"], t["jornadas"], t["in_10_90"], t["in_25_75"]) == (3, 2, 0.67, 0.33), t
+        assert t["z_mean"] == -0.17 and t["z_sd"] == 1.61, t      # z = 1, -2, .5: mean -.1667, sd sqrt(5.1667 / 2) = 1.607
+        dd = rows_["you minus him"]
+        assert (dd["n"], dd["in_10_90"], dd["z_mean"], dd["z_sd"]) == (2, 0.5, -1.5, 3.54), dd   # diff z = 1, -4: mean -1.5, sd 3.54
+        assert [r[0] for r in named("sim_calibration", {})[1]] == ["totals"], "no run named: the latest, run 2"
 
 
 def _selftest_queries() -> None:

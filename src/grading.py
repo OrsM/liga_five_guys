@@ -21,7 +21,7 @@ from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
 from ffcore.db import connect, named, record, this_run
 from ffcore.tidy import LINEUP_SOURCE, current
-__all__ = ["backtest", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "due", "forecast_rows",
+__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "due", "forecast_rows",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -196,6 +196,93 @@ def phantom_season() -> list[dict[str, Any]]:
     return out
 
 
+def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datetime]]
+                  ) -> dict[int, tuple[dt.datetime, dt.datetime]]:
+    """The span in which each jornada's points were scored, lock to the next
+    lock: only where it is clean, that is every kickoff in it is this
+    jornada's and all of this jornada's are in it (a jornada that plays on
+    past another's lock, or the one still to play, has none)."""
+    ordered = sorted(locks.values())
+    out = {}
+    for j, start in locks.items():
+        later = [t for t in ordered if t > start]
+        if not later:
+            continue
+        end = later[0]
+        inside = [k for k in kicks if start <= k[1] < end]
+        if all(kj == j for kj, _t in inside) and all(start <= t < end for kj, t in kicks if kj == j):
+            out[j] = (start, end)
+    return out
+
+
+def calibration_rows(jornada: int, draws: dict[str, "np.ndarray[Any, Any]"], actual: dict[str, float],
+                     me: str) -> list[dict[str, Any]]:
+    """Where what happened falls in the simulation's draws of one jornada,
+    for each manager, and for you minus him (the draws share their trials, so
+    what the league as a whole does cancels, as it does in who finishes above)."""
+    import numpy as np
+
+    def pit(v: "np.ndarray[Any, Any]", x: float) -> float:
+        return float((v < x).mean() + 0.5 * (v == x).mean())
+    out = []
+    for m, v in draws.items():
+        if m not in actual:
+            continue
+        row: dict[str, Any] = {"jornada": jornada, "manager": m, "actual": actual[m],
+                               "mean": float(v.mean()), "sd": float(v.std(ddof=1)), "pit": pit(v, actual[m]),
+                               "diff_actual": None, "diff_mean": None, "diff_sd": None, "diff_pit": None}
+        if m != me and me in draws and me in actual:
+            d = draws[me] - v
+            row.update(diff_actual=actual[me] - actual[m], diff_mean=float(d.mean()),
+                       diff_sd=float(d.std(ddof=1)), diff_pit=pit(d, actual[me] - actual[m]))
+        out.append(row)
+    return out
+
+
+def sim_calibration() -> list[dict[str, Any]]:
+    """The season simulation held to account one jornada at a time: at each
+    clean lock, every manager's points that jornada drawn from the squads
+    then (his best eleven, the forecast then) against what he scored (his
+    team_points over the window)."""
+    import numpy as np
+    from dataclasses import replace as _replace
+
+    from ffcore.season import simulate
+
+    locks = round_locks()
+    with closing(connect()) as db:
+        kicks = [(j, snapshot_stamp(k) or dt.datetime.min.replace(tzinfo=dt.timezone.utc))
+                 for j, k in db.execute("SELECT jornada, kick FROM kickoffs")]
+
+        def points(m: str, t: dt.datetime) -> float | None:
+            got = db.execute("SELECT team_points FROM api_standings WHERE manager = ? AND observed_at <= ?"
+                             " ORDER BY observed_at DESC LIMIT 1", (m, t.strftime("%Y-%m-%dT%H%MZ"))).fetchone()
+            return None if got is None else float(got[0])
+        out: list[dict[str, Any]] = []
+        try:
+            for j, (start, end) in sorted(clean_windows(locks, kicks).items()):
+                set_now(start - dt.timedelta(minutes=1))
+                built.cache_clear()
+                try:
+                    u = universe()
+                except SystemExit as e:
+                    print("j%d: no board (%s)" % (j, e), file=sys.stderr)
+                    continue
+                st = _replace(u.state, jornadas=[j], carried={}, fielded={})
+                totals = simulate(st, u.forecaster, trials=4000, seed=1).totals
+                actual = {}
+                for m in totals:
+                    a0, a1 = points(m, start), points(m, end)
+                    if a0 is not None and a1 is not None:
+                        actual[m] = a1 - a0
+                out += calibration_rows(j, {m: np.array(v) for m, v in totals.items()
+                                            if not m.startswith("__")}, actual, u.me)
+        finally:
+            set_now(None)
+            built.cache_clear()
+    return out
+
+
 def forecast_rows(runs: list[dict[str, Any]], actual: dict[tuple[str, int], float]) -> list[dict[str, Any]]:
     """backtest's forecasts, one row a player: what was forecast at the
     lock (from_j) for a jornada, and what he scored (0 if nothing)."""
@@ -232,6 +319,7 @@ def record_grades() -> dict[str, int]:
         record([{"run_id": run, **r} for r in fc], "grade_forecast")
         record([{"run_id": run, **r} for r in moves], "grade_decisions")
         record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
+        record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
     print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
 
@@ -327,6 +415,30 @@ def _selftest() -> None:
         assert gap["24-48h", "all"][2] == 3 and abs(gap["24-48h", "all"][3] - 10 / 3) < 1e-9 \
             and abs(gap["24-48h", "all"][4] - se) < 1e-9 and gap["24-48h", "all"][5] == "not established", gap
         assert gap["24-48h", "flagged"][2:4] == (1, 9.0) and gap["24-48h", "flagged"][5] == "too few"
+
+    t0 = dt.datetime(2026, 8, 20, 19, tzinfo=dt.timezone.utc)
+
+    def day(n: int) -> dt.datetime:
+        return t0 + dt.timedelta(days=n)
+    # jornada 2 locks day 0, 3 locks day 8, 6 locks day 14 and plays on; 4 locks day 15 with a j6 match inside
+    locks = {2: day(0), 3: day(8), 6: day(14), 4: day(15), 5: day(22)}
+    kicks = [(2, day(0)), (2, day(2)), (3, day(8)), (3, day(10)), (6, day(14)), (4, day(15)),
+             (6, day(17)), (4, day(18)), (5, day(22))]
+    assert clean_windows(locks, kicks) == {2: (day(0), day(8)), 3: (day(8), day(14))}, \
+        "a jornada's points window runs to the next lock; 6 plays on inside 4's and 4 and 6 share theirs; 5 is last"
+
+    assert clean_windows({1: day(0), 2: day(5)}, [(1, day(0)), (9, day(0)), (2, day(5))]) == {}, \
+        "another jornada's match at the very kickoff of the lock is in the window too"
+    import numpy as np
+    draws = {"me": np.array([40.0, 50.0, 60.0, 70.0]), "riv": np.array([30.0, 40.0, 50.0, 60.0])}
+    got = {r["manager"]: r for r in calibration_rows(7, draws, {"me": 55.0, "riv": 100.0}, "me")}
+    assert (got["me"]["mean"], got["me"]["pit"], got["me"]["diff_pit"]) == (55.0, 0.5, None), got["me"]
+    assert got["riv"]["pit"] == 1.0 and got["riv"]["actual"] == 100.0, "above every draw"
+    assert (got["riv"]["diff_actual"], got["riv"]["diff_mean"], got["riv"]["diff_sd"]) == (-45.0, 10.0, 0.0), \
+        "me minus him: the draws share trials, so a constant 10 apart has no spread"
+    assert got["riv"]["diff_pit"] == 0.0, "-45 is below every draw of +10"
+    assert calibration_rows(7, draws, {"me": 50.0}, "me")[0]["pit"] == 0.375, "a draw equal to it counts half"
+    assert abs(got["me"]["sd"] - float(np.std([40, 50, 60, 70], ddof=1))) < 1e-9
 
     print("grading self-test OK")
 

@@ -207,6 +207,25 @@ SELECT l.src, l.at AS last_at, l.n AS rows, round(u.usual_rows, 1) AS usual_rows
        (SELECT max(g.at) FROM r g WHERE g.src = l.src AND g.n >= 0.5 * u.usual_rows) AS last_good
 FROM r l JOIN usual u USING (src), now WHERE l.k = 1;
 
+-- The season simulation held to account (grading.sim_calibration): each
+-- manager's points in a clean jornada against the simulation's draws of it
+-- at the lock (pit: where he fell, 0..1; calibrated is uniform), and you
+-- minus him the same way (diff_*), which is what who-finishes-above uses.
+CREATE TABLE IF NOT EXISTS sim_calibration (
+    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
+    jornada     INTEGER NOT NULL,
+    manager     TEXT NOT NULL,
+    actual      REAL NOT NULL,
+    mean        REAL NOT NULL,
+    sd          REAL NOT NULL,
+    pit         REAL NOT NULL,
+    diff_actual REAL,
+    diff_mean   REAL,
+    diff_sd     REAL,
+    diff_pit    REAL,
+    PRIMARY KEY (run_id, jornada, manager)
+);
+
 -- The phantom manager (grading.phantom_season): the points of his eleven
 -- each jornada, beside the same squad never moved, and what he did.
 CREATE TABLE IF NOT EXISTS phantom_jornadas (

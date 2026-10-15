@@ -367,6 +367,19 @@ a decision.
   h=5 3.60 -> 3.02, same pairs. Boards: the 16 golden boards change only in
   trend, per_million and sale-wait amounts, never in which moves are made
   (frozen again). Equal weights over 2..5 lags were worse (0.60..0.63).
+- 6.1 (done 2026-10-15) The season simulation held to account, one jornada at a
+  time: `grading.sim_calibration` (clean windows only: a jornada that plays on
+  past another's lock has none), table `sim_calibration`, saved query
+  `sim_calibration`, run by the grade stage. First result (4 clean jornadas,
+  20 manager-jornadas): single totals are over-dispersed (z sd 1.29, 70% in
+  the 10-90 band) because a jornada has a league-wide shock (league mean
+  actual minus model: +9, +4, +7, +34, -8, -14 over six jornadas) that moves
+  every squad together; the difference between you and a rival, which is what
+  who-finishes-above rests on, is calibrated (z sd 0.94, 88% in the 10-90
+  band, 56% in 25-75, n=16). The model's mean is low by about 5 points a
+  jornada for everyone (team_points include what the model does not, e.g.
+  captain), which cancels in differences. So nothing here says p_win is
+  overconfident per jornada; season-long skill persistence is untested.
 - 5.7 (measured 2026-10-15, not built) Rivals who act in the season sim,
   fitted from the ledger. Two numbers decided it. (1) Do rivals buy what
   the model likes? Yes: 117 purchases, the bought player's forecast sits at
