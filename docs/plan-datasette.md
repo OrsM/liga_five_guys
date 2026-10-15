@@ -367,8 +367,20 @@ a decision.
   h=5 3.60 -> 3.02, same pairs. Boards: the 16 golden boards change only in
   trend, per_million and sale-wait amounts, never in which moves are made
   (frozen again). Equal weights over 2..5 lags were worse (0.60..0.63).
-- 5.7 Rivals who act in the season sim, fitted from the ledger. A model
-  change: whiteboard first.
+- 5.7 (measured 2026-10-15, not built) Rivals who act in the season sim,
+  fitted from the ledger. Two numbers decided it. (1) Do rivals buy what
+  the model likes? Yes: 117 purchases, the bought player's forecast sits at
+  the 0.80 percentile of all players' (median 0.85; Suso 0.88, Burton 0.82,
+  Laporta 0.76, you 0.73): informed, and every rival's plan wants the same
+  targets. (2) Does that make them outscore their static squads, which is
+  what the sim assumes and what would make p_win too sure? Their points a
+  jornada against the best eleven of their squad at the lock, forecast
+  then (6 jornadas each): +2.0, +1.1, -1.7, -11.8 (you +6.7); the rivals
+  average -2.6, with noise of several points a jornada. No sign they gain
+  on their squads, so no drift to fit, and the competition for targets is
+  already in the premium rule (winning bids over asking, BID_BEATS).
+  Revisit with a dozen more jornadas (squads from api_teams at each lock,
+  best_xi on the replayed forecast, team_points between locks).
 
 The scraped data is close to public (Miguel, 2026-10-11): sharing a
 league-facing view is not ruled out.
