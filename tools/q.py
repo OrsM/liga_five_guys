@@ -11,6 +11,7 @@ import json
 import sys
 from contextlib import closing
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any
 
 from ffcore.db import META, SLOW_S, connect, named, params, queries, timed
@@ -28,6 +29,13 @@ def _cell(v: Any) -> str:
     return "" if v is None else "%.3f" % v if isinstance(v, float) else str(v)
 
 
+def table(cols: list[str], rows: Sequence[Sequence[Any]]) -> str:
+    """Columns and rows as aligned text."""
+    cells = [cols] + [[_cell(v) for v in r] for r in rows]
+    width = [max(len(r[i]) for r in cells) for i in range(len(cols))]
+    return "\n".join("  ".join(c.rjust(w) for c, w in zip(r, width)) for r in cells)
+
+
 def main(argv: list[str]) -> int:
     if argv == ["--time"]:
         over = 0
@@ -42,10 +50,7 @@ def main(argv: list[str]) -> int:
         return 0
     name, given = argv[0], dict(a.split("=", 1) for a in argv[1:])
     cols, rows = run(name, given)
-    cells = [cols] + [[_cell(v) for v in r] for r in rows]
-    width = [max(len(r[i]) for r in cells) for i in range(len(cols))]
-    for r in cells:
-        print("  ".join(c.rjust(w) for c, w in zip(r, width)))
+    print(table(cols, rows))
     return 0
 
 

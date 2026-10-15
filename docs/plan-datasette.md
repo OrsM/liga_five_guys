@@ -356,10 +356,11 @@ a decision.
 - 5.6 (done 2026-10-15) The game's price rule, fitted from every daily value
   change. Measured on 34k player-days, fit on the first 70% of days and
   scored on the last 30%, mean absolute error of the next day's change in %
-  (zero = "no change": 1.19): the last change alone 0.53, the last two 0.42,
+  (zero = "no change": 1.14): the last change alone 0.53, the last two 0.42,
   the last three 0.40, more lags nothing (4..6: 0.40). Ownership, points in
   the last jornadas and value level add nothing (MSE 0.644 -> 0.641..0.650).
-  Paired, three lags against one: -0.122 abs error (+-0.007, n=9,946). So
+  Paired, three lags against one: -0.122 abs error (+-0.007, n=9,946);
+  `tools/analyses/price_rule.py` reproduces all of it. So
   the rule is a smoothed trend of the last three updates, not the last one.
   Momentum now fits on x = .4/.4/.2 of the last three clipped changes
   (`PRICE_W0..2`, constants, so a variant can try others) instead of the
@@ -385,28 +386,32 @@ a decision.
 - 6.1 (done 2026-10-15) The season simulation held to account, one jornada at a
   time: `grading.sim_calibration` (clean windows only: a jornada that plays on
   past another's lock has none), table `sim_calibration`, saved query
-  `sim_calibration`, run by the grade stage. First result (4 clean jornadas,
-  20 manager-jornadas): single totals are over-dispersed (z sd 1.29, 70% in
-  the 10-90 band) because a jornada has a league-wide shock (league mean
-  actual minus model: +9, +4, +7, +34, -8, -14 over six jornadas) that moves
-  every squad together; the difference between you and a rival, which is what
-  who-finishes-above rests on, is calibrated (z sd 0.94, 88% in the 10-90
-  band, 56% in 25-75, n=16). The model's mean is low by about 5 points a
-  jornada for everyone (team_points include what the model does not, e.g.
-  captain), which cancels in differences. So nothing here says p_win is
-  overconfident per jornada; season-long skill persistence is untested.
+  `sim_calibration`, run by the grade stage. First result on the 4 clean
+  jornadas (3, 4, 7, 8; 20 manager-jornadas): single totals are over-dispersed
+  (z sd 1.29, 70% in the 10-90 band): a jornada moves every squad together (the
+  league's mean of actual minus model: +3.7, +6.5, -8.4, -13.8); the difference
+  between you and a rival, which is what who-finishes-above rests on, is
+  calibrated (z sd 0.94, 88% in the 10-90 band, 56% in 25-75, n=16). Mean bias
+  of the model over the four: -3.0 a jornada for the league, you -0.8. An
+  earlier read of six jornadas (+5 a jornada, a +34 shock in jornada 5) used
+  windows that mixed jornadas 5 and 6 and is withdrawn. Nothing here says
+  p_win is overconfident per jornada; season-long skill persistence is
+  untested, and n is small.
 - 5.7 (measured 2026-10-15, not built) Rivals who act in the season sim,
   fitted from the ledger. Two numbers decided it. (1) Do rivals buy what
   the model likes? Yes: 117 purchases, the bought player's forecast sits at
   the 0.80 percentile of all players' (median 0.85; Suso 0.88, Burton 0.82,
-  Laporta 0.76, you 0.73): informed, and every rival's plan wants the same
+  Laporta 0.76, you 0.73; `tools/analyses/rival_signal.py`): informed, and every rival's plan wants the same
   targets. (2) Does that make them outscore their static squads, which is
   what the sim assumes and what would make p_win too sure? Their points a
-  jornada against the best eleven of their squad at the lock, forecast
-  then (6 jornadas each): +2.0, +1.1, -1.7, -11.8 (you +6.7); the rivals
-  average -2.6, with noise of several points a jornada. No sign they gain
-  on their squads, so no drift to fit, and the competition for targets is
-  already in the premium rule (winning bids over asking, BID_BEATS).
+  jornada against the simulation's mean for the best eleven of their squad
+  at the lock (clean jornadas 3, 4, 7, 8; see 6.1): Suso -13.2, Magic Mike
+  -2.6, Burton -0.6, Laporta +2.1 (you -0.8), several points of noise a
+  jornada and Suso's jornada 7 was 0 points (an unset line-up). The rivals
+  average -3.6: no sign they gain on their squads, so no drift to fit, and the
+  competition for targets is already in the premium rule (winning bids over
+  asking, BID_BEATS). (An earlier read, +2.0 +1.1 -1.7 -11.8, used windows that
+  mixed jornadas; same conclusion.)
   Revisit with a dozen more jornadas (squads from api_teams at each lock,
   best_xi on the replayed forecast, team_points between locks).
 
