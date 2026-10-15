@@ -313,10 +313,10 @@ Gates: (2) must pass before any replay result is believed; (3) is judged
 by whether the error-against-lead-time curve exists and (1) puts an
 interval on any variant gap; stop at (1)+(2) if nothing in (3) would change
 a decision.
-- 5.2 (first cut done 2026-10-15: saved query `phantom_coach`, from the graded
-  plan moves, each once; your points already include moves you made, so its
-  +109 points / 21 moves is an upper bound; "made" is not yet matched to the
-  ledger by player) Phantom coach: a sixth manager that does what the board says, from
+- 5.2 (done 2026-10-15: saved query `phantom_coach`, the graded plan moves each
+  once, those your ledger shows made (same buy/sell of the player at or after
+  the lock) set aside: 7 made, 14 unmade, +119 points; still an upper bound,
+  as moves interact and bids may not win) Phantom coach: a sixth manager that does what the board says, from
   jornada 1, scored in the real standings. Assumes its bids win at the
   model's price and rivals do not react to it: it grades the advice, not an
   alternative season.

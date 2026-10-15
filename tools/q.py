@@ -238,7 +238,7 @@ def _selftest_variant_gap() -> None:
 
 
 def _selftest_phantom() -> None:
-    """phantom_coach: the points of making every planned move, each once."""
+    """phantom_coach: the points of the planned moves not made, each once."""
     import tempfile
     from datetime import datetime, timezone
 
@@ -255,18 +255,33 @@ def _selftest_phantom() -> None:
             store_sql("api_standings", [{"observed_at": "2026-10-14T1000Z", "user_id": u, "manager": m,
                                          "team_points": str(p)}
                                         for u, m, p in (("1", "me", 100), ("2", "rival", 105), ("3", "low", 90))])
-            # buy A planned at lock 3 (+10) and again at lock 4 (+6: the same unmade move, counted once);
-            # sell B planned at 4 (-3); a rejected move (+50) is not advice
+            store_sql("matches", [{"observed_at": "2026-08-01T0900Z", "match_id": "m%d" % j, "jornada": str(j),
+                                   "home": "h%d" % j, "away": "a%d" % j, "kickoff": k}
+                                  for j, k in ((3, "2026-08-23T19:00:00+00:00"), (4, "2026-08-30T17:00:00+00:00"))])
+            record([{"player_id": k, "name": "Player " + k, "app_id": "app" + k} for k in "AB"], "crosswalk")
+            store_sql("api_activity", [
+                {"observed_at": "2026-10-14T1000Z", "activity_id": i, "kind": kind, "user_id": u, "player_id": p,
+                 "at": at, "amount": "1", "counterparty": ""}
+                for i, (kind, u, p, at) in enumerate([
+                    ("buy", "1", "appA", "2026-08-25T10:00:00+02:00"),    # after lock 3: A's buy was made
+                    ("sell", "1", "appB", "2026-08-29T10:00:00+02:00"),   # before lock 4: not B's sell
+                    ("buy", "2", "appB", "2026-09-01T10:00:00+02:00"),    # a rival's: not mine
+                    ("sell", "2", "appB", "2026-09-02T10:00:00+02:00"),   # a rival selling B is not me selling B
+                    ("buy", "1", "appB", "2026-09-02T10:00:00+02:00"),    # my buying B is not selling B
+                    ("sell", "1", "appA", "2026-09-02T10:00:00+02:00")], 1)])  # my selling A is not selling B
+            # buy A planned at lock 3 (+10) and again at lock 4 (+6: counted once); sell B planned at 4 (+8,
+            # not made); a rejected move (+50) is not advice
             record([{"run_id": 1, "ord": i, "lock": lk, "move": m, "reached": r, "kind": k, "real": v}
-                    for i, (lk, m, r, k, v) in enumerate([(3, "buy A", "plan", "get", 10.0),
-                                                          (4, "buy A", "plan", "get", 6.0),
-                                                          (4, "sell B", "plan", "sell", -3.0),
-                                                          (4, "buy C", "rejected", "get", 50.0)])],
+                    for i, (lk, m, r, k, v) in enumerate([(3, "buy Player A", "plan", "get", 10.0),
+                                                          (4, "buy Player A", "plan", "get", 6.0),
+                                                          (4, "sell Player B", "plan", "sell", 8.0),
+                                                          (4, "buy Player C", "rejected", "get", 50.0)])],
                    "grade_decisions")
             cols, rows_ = named("phantom_coach", {})
             got = [dict(zip(cols, r)) for r in rows_]
             assert [(g["place"], g["manager"], g["points"]) for g in got] == [
-                (1, "board if followed", 107.0), (2, "rival", 105.0), (3, "me", 100.0), (4, "low", 90.0)], got
+                (1, "board if followed", 108.0), (2, "rival", 105.0), (3, "me", 100.0), (4, "low", 90.0)], got
+            assert "1 made" in got[0]["note"] and "1 unmade" in got[0]["note"], got[0]["note"]
         finally:
             set_now(None)
 
