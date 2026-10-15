@@ -32,7 +32,7 @@ from ffcore.tidy import LINEUP_SOURCE, SEASON, age_hours, current, read_csv, typ
 from stats import percentile
 
 __all__ = ["applied", "constants", "universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
-           "price_change", "premium", "write_constants", "market_offer_ratios",
+           "price_change", "premium", "write_constants", "record_trend", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
@@ -130,11 +130,21 @@ class Prices(NamedTuple):
     horizon: int
 
 
+def record_trend() -> None:
+    """Each player's price trend as of the model's cut, kept (price_trend_fit)
+    for the views that read it; the momentum it rests on kept first."""
+    with closing(connect()) as db, db:
+        db.execute("DELETE FROM price_trend_fit WHERE as_of = cut()")
+        db.execute("INSERT INTO price_trend_fit SELECT cut(), ff_id, trend FROM price_trend_now")
+
+
 def price_momentum() -> Prices:
-    """Fitted at the model's cut and kept (momentum_fit), then read."""
+    """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
+    then read."""
     with closing(connect()) as db, db:
         db.execute("DELETE FROM momentum_fit WHERE as_of = cut()")
         db.execute("INSERT INTO momentum_fit SELECT cut(), h, slope FROM momentum")
+    record_trend()
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
                   dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
@@ -209,6 +219,7 @@ def built() -> Built:
     sc = scorer(mkt_rows, current("lineups", LINEUP_SOURCE))
     me = lg.me
     m = current("matches")
+    prices = price_momentum()          # first: it keeps the trend that market_facts and sale_odds read
     facts = market_facts()
 
     def column(c: str) -> dict[str, Any]:
@@ -220,7 +231,6 @@ def built() -> Built:
     ratings = fixture_ratings(mkt_rows)
     ex = expectations(sc, ratings, set(price).union(*squads.values()), m, rounds_ahead())
     per_j, first_jornada_of, rem, played = ex.per_j, ex.first_of, ex.rem, ex.played
-    prices = price_momentum()
     market = Market(
         cash=lg.cash[me], premium=premium(),
         name={k: Name(f["name"]) for k, f in facts.items()},
@@ -380,6 +390,10 @@ def _selftest_sale() -> None:
                                  for n, v in ((2, "10500000"), (3, "11025000")) for k in ("p1", "p2")])
             record([{"as_of": at(3), "h": 1, "slope": 2.0}, {"as_of": at(3), "h": 2, "slope": 8.0}],
                    "momentum_fit")
+            assert rows("SELECT count(*) FROM price_trend") == [(0,)], "nothing kept until a run keeps it"
+            record_trend()
+            assert dict(rows("SELECT ff_id, trend FROM price_trend")) == dict(rows(
+                "SELECT ff_id, trend FROM price_trend_now")), "kept as the view works it out"
             facts = dict(rows("SELECT ff_id, trend FROM price_trend"))
             carry = [c for (c,) in rows("SELECT carry FROM price_carry ORDER BY h")]
             assert facts["p1"] > 0 and carry == [0.25, 1.0], (facts, carry)

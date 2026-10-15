@@ -1,8 +1,8 @@
 """The boards a refactor must not change.
 
     python tools/golden.py freeze [N]   # copy the raw data, build N boards (default 16) with this tree's code
-    python tools/golden.py check        # rebuild them with this tree's code, compare
-    python tools/golden.py leak [K]     # the same, on data cut off at each board's time (every Kth board)
+    python tools/golden.py check [N|all] # rebuild N of them (default 6: one of each kind, the rest spread) with this tree's code, compare
+    python tools/golden.py leak [N|all]  # the same, on data cut off at each board's time
 
 Only what no rebuild recovers is copied: data/raw, data/season and the
 tidy files git tracks. They are parsed with the tree's own code, so a change
@@ -12,6 +12,9 @@ parse version (ingest._version: the parsers, the number parsers and
 tables.sql) is not the one it was made with, so a change to the model or the
 views checks in the time of the boards alone. Each board is built in its own
 copy of it, three at a time (LFG_GOLDEN_JOBS), and shown as it is done.
+
+check and leak take N boards (default 6: one of each kind of board, the rest
+spread over the season; `all` for every one, ~2 minutes).
 
 Boards are built at N snapshot times spread over the season, with the
 clock pinned to each, so the check sees sells, line-up changes and swaps
@@ -50,6 +53,22 @@ def stamps(n: int) -> list[str]:
     if len(seen) <= n:
         return seen
     return sorted({seen[round(i * (len(seen) - 1) / (n - 1))] for i in range(n)})
+
+
+def subset(kinds_of: dict[str, str], n: int) -> list[str]:
+    """n of the frozen boards (in time order): the earliest of each distinct
+    kind of board first, so what a refactor could change is all covered, the
+    rest spread evenly over the season."""
+    stamps = list(kinds_of)
+    if n >= len(stamps):
+        return stamps
+    chosen = [min(s for s in stamps if kinds_of[s] == k) for k in dict.fromkeys(kinds_of.values())][:n]
+    rest = [s for s in stamps if s not in chosen]
+    free = n - len(chosen)
+    if free > 0 and rest:
+        chosen += [rest[round(i * (len(rest) - 1) / max(free - 1, 1))] if free > 1 else rest[len(rest) // 2]
+                   for i in range(free)]
+    return sorted(set(chosen), key=stamps.index)
 
 
 def keep(src: Path, dst: Path) -> None:
@@ -168,7 +187,10 @@ def main(argv: list[str]) -> int:
         print("froze %d boards in %s" % (len(boards), HOME))
         return 0
     if cmd == "check":
-        want = json.loads((HOME / "boards.json").read_text())
+        frozen = json.loads((HOME / "boards.json").read_text())
+        arg = argv[1] if len(argv) > 1 else "6"
+        want = {k: frozen[k] for k in subset({k: kinds(v) for k, v in frozen.items()},
+                                             len(frozen) if arg == "all" else int(arg))}
         base = parsed()
         results = in_order(list(want), lambda now: diff(want[now], build(now, "1", base)))
         bad = 0
@@ -183,7 +205,9 @@ def main(argv: list[str]) -> int:
         return 1 if bad else 0
     if cmd == "leak":
         want = json.loads((HOME / "boards.json").read_text())
-        base, stamps_ = parsed(), list(want)[:: max(1, int(argv[1]) if len(argv) > 1 else 1)]
+        arg = argv[1] if len(argv) > 1 else "6"
+        base, stamps_ = parsed(), subset({k: kinds(v) for k, v in want.items()},
+                                         len(want) if arg == "all" else int(arg))
         results = in_order(stamps_, lambda now: diff(want[now], build(now, "1", base, ended=True)))
         for now, lines in zip(stamps_, results):
             print("  %s  %s" % (now, "same" if not lines else "LEAKS: %d differences" % len(lines)))
@@ -228,6 +252,15 @@ def _selftest() -> None:
                 == ["2026-10-01T0800Z", "2026-10-02T0800Z"], "what was seen after the cut is gone, at the cut stays"
             assert c.execute("SELECT count(*) FROM fits").fetchone()[0] == 2, "fits stamped as_of too"
             assert c.execute("SELECT count(*) FROM plain").fetchone()[0] == 1, "no time column: left alone"
+
+    kinds_of = {"a": "buy field sell", "b": "buy field sell", "c": "field", "d": "buy field sell", "e": "field",
+                "f": "buy sell", "g": "field", "h": "buy field sell", "i": "no board"}
+    assert subset(kinds_of, 4) == ["a", "c", "f", "i"], \
+        "one board of each kind of board first (the earliest), however many that is under the limit"
+    assert subset(kinds_of, 6) == ["a", "b", "c", "f", "h", "i"], \
+        "the rest spread evenly over the season"
+    assert subset(kinds_of, 3) == ["a", "c", "f", "i"][:3] and subset(kinds_of, 99) == list(kinds_of)
+    assert subset({}, 5) == []
 
     lag = {"a": 0.3, "b": 0.0, "c": 0.1, "d": 0.0}
 

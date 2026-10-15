@@ -545,6 +545,9 @@ LEFT JOIN sale s USING (player) LEFT JOIN bid b USING (player)
 LEFT JOIN offer f USING (player) LEFT JOIN price_paid p USING (player)
 LEFT JOIN price_trend t ON t.ff_id = w.player;
 
+-- market_daily picks a few snapshots out of all of them by time alone.
+CREATE INDEX IF NOT EXISTS market_observed ON market (observed_at);
+
 -- The market as it closed each day: the rows of each day's last snapshot
 -- (each snapshot holds the whole market). Values move once a day; the
 -- change from one day's to the next is a step. As of cut(): today's row is
@@ -674,9 +677,12 @@ FROM fitted m, (SELECT slope FROM fitted ORDER BY h DESC LIMIT 1) e
 WHERE e.slope <> 0 ORDER BY m.h;
 
 -- Each player's value change in % over the horizon, for those whose last
--- change is the newest day's: as long as you would hold him.
-DROP VIEW IF EXISTS price_trend;
-CREATE VIEW price_trend AS
+-- change is the newest day's: as long as you would hold him. Working it out
+-- walks every player's whole price history (~1s), and four things read it a
+-- run, so a run works it out once and keeps it (assemble.record_trend); what
+-- reads it gets the last one kept at or before cut(), as momentum_fit does.
+DROP VIEW IF EXISTS price_trend_now;
+CREATE VIEW price_trend_now AS
 WITH s AS (SELECT coalesce((SELECT slope FROM fitted ORDER BY h DESC LIMIT 1), 0.0) AS slope),
 last AS (SELECT ff_id, day, x FROM (
              SELECT ff_id, day, x, row_number() OVER (PARTITION BY ff_id ORDER BY i DESC) AS r
@@ -684,6 +690,17 @@ last AS (SELECT ff_id, day, x FROM (
          WHERE r = 1)
 SELECT last.ff_id, s.slope * last.x AS trend
 FROM last, s WHERE last.day = (SELECT max(day) FROM last);
+
+CREATE TABLE IF NOT EXISTS price_trend_fit (
+    as_of TEXT NOT NULL,
+    ff_id TEXT NOT NULL,
+    trend REAL NOT NULL,
+    PRIMARY KEY (as_of, ff_id)
+) WITHOUT ROWID;
+DROP VIEW IF EXISTS price_trend;
+CREATE VIEW price_trend AS
+SELECT ff_id, trend FROM price_trend_fit
+WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut()));
 
 -- Your own winning bids over the asking price: each of your buys, oldest
 -- first, set against the league listing of that player that closed within

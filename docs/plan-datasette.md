@@ -367,6 +367,21 @@ a decision.
   h=5 3.60 -> 3.02, same pairs. Boards: the 16 golden boards change only in
   trend, per_million and sale-wait amounts, never in which moves are made
   (frozen again). Equal weights over 2..5 lags were worse (0.60..0.63).
+- 6.0 (done 2026-10-15) Speed. Measured first: the unit suite is 9s; the waits
+  are the sim checks. A universe build was 12.8s (momentum fit 4.1s,
+  price_trend worked out three times at ~1.9s each by three queries,
+  sale_odds 2.5s, player_facts 2.3s) and a board 3.6s. The trend is now kept
+  once a run (`price_trend_fit`, as momentum_fit is; `price_trend` reads the
+  last kept at or before cut()), so a universe is 9.5s with identical boards;
+  the grade stage builds each lock's universe once for decisions, the phantom
+  and the calibration (3m30 -> 1m59, results identical); golden check and leak
+  take N boards (default 6: one of each kind of board, the rest spread;
+  `all` for the 16): 2m35 -> 45s. Tried and dropped: a lead()-window momentum
+  (slower, and different), a temp table shadowing a view (a view in main does
+  not see it), one more index (no gain). Left: momentum 2.3s and trend 1.9s
+  both walk the price history (~0.9s each to build price_series); persisting
+  per-day momentum statistics would save about 0.8s and is not worth its
+  invalidation rules yet.
 - 6.1 (done 2026-10-15) The season simulation held to account, one jornada at a
   time: `grading.sim_calibration` (clean windows only: a jornada that plays on
   past another's lock has none), table `sim_calibration`, saved query

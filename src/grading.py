@@ -20,7 +20,7 @@ from ffcore.jornadas import round_locks, rounds_ahead
 from ffcore.points import jornada_points
 
 from assemble import applied, built, fixture_ratings, price_change, price_momentum, scorer, universe
-from decide import Action, board, verdict
+from decide import Action, Universe, board, verdict
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
 from ffcore.db import connect, named, record, this_run
@@ -30,6 +30,25 @@ __all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "
 
 REPLAY_VARIANT = "live"
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
+
+
+_AT: dict[int, Universe | None] = {}
+
+
+def universe_at(jornada: int, locks: dict[int, dt.datetime]) -> Universe | None:
+    """The universe a minute before this jornada locked (None if no board
+    could be built then), with the clock set to it. Built once however many
+    of the replays ask: decisions, phantom_season and sim_calibration all
+    stand at the same locks, and a universe costs ~10s."""
+    set_now(locks[jornada] - dt.timedelta(minutes=1))
+    if jornada not in _AT:
+        built.cache_clear()
+        try:
+            _AT[jornada] = universe()
+        except SystemExit as e:
+            print("j%d: no board (%s)" % (jornada, e), file=sys.stderr)
+            _AT[jornada] = None
+    return _AT[jornada]
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
@@ -126,12 +145,8 @@ def decisions() -> list[dict[str, Any]]:
     out = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
-            set_now(locks[i] - dt.timedelta(minutes=1))
-            built.cache_clear()
-            try:
-                u = universe()
-            except SystemExit as e:
-                print("j%d: no board (%s)" % (i, e), file=sys.stderr)
+            u = universe_at(i, locks)
+            if u is None:
                 continue
             b, per_j, m = board(u), u.forecaster.per_jornada, u.market
             later = sorted(j for j in done if j >= i and j in per_j)
@@ -176,12 +191,8 @@ def phantom_season() -> list[dict[str, Any]]:
     out = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
-            set_now(locks[i] - dt.timedelta(minutes=1))
-            built.cache_clear()
-            try:
-                u = universe()
-            except SystemExit as e:
-                print("j%d: no board (%s)" % (i, e), file=sys.stderr)
+            u = universe_at(i, locks)
+            if u is None:
                 continue
             if squad is None:
                 squad, hold, cash = dict(u.mine), dict(u.mine), u.market.cash
@@ -258,12 +269,8 @@ def sim_calibration() -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         try:
             for j, (start, end) in sorted(clean_windows(locks, kicks).items()):
-                set_now(start - dt.timedelta(minutes=1))
-                built.cache_clear()
-                try:
-                    u = universe()
-                except SystemExit as e:
-                    print("j%d: no board (%s)" % (j, e), file=sys.stderr)
+                u = universe_at(j, locks)
+                if u is None:
                     continue
                 st = replace(u.state, jornadas=[j], carried={}, fielded={})
                 totals = simulate(st, u.forecaster, trials=4000, seed=1).totals
@@ -311,12 +318,16 @@ def record_grades() -> dict[str, int]:
     if run is not None and not due(run, resolved):
         print("  grade: same code, same %d jornadas: nothing new" % resolved)
         return {"resolved": resolved, "skipped": 1}
-    fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
-    if run is not None:
-        record([{"run_id": run, **r} for r in fc], "grade_forecast")
-        record([{"run_id": run, **r} for r in moves], "grade_decisions")
-        record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
-        record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
+    _AT.clear()
+    try:
+        fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
+        if run is not None:
+            record([{"run_id": run, **r} for r in fc], "grade_forecast")
+            record([{"run_id": run, **r} for r in moves], "grade_decisions")
+            record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
+            record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
+    finally:
+        _AT.clear()
     print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
 
