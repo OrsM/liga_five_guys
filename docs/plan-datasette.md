@@ -431,3 +431,9 @@ the 314 ledger rows carry signal first).
   established. It moves p_win with the plan unchanged (latest board 0.25 -> 0.37, finish 1.89 -> 1.74), as shrinking every
   player toward his position's mean narrows the gap between squads; p_win itself is not validated (calibration of
   differences holds over 4 jornadas, too few to tell). Plans identical on 9 of 16 frozen boards, the rest differ in small moves.
+
+- 6.3 (measured, nothing changed, 2026-10-15) availability constants, replayed (177 moments x 2 shards each)
+  against `shrink-8` (the live code): `AVAIL_K` 2 and 8: -0.002 and +0.000 squared error, not established
+  (flagged players, the only ones it touches, are 548 of 3,980 player-jornadas; 8 moves only jornada 8).
+  `FALLBACK_K` 4: +0.004 (+0.003..+0.006, "better" on not-flagged players); 16: -0.008 (worse). The 4 gain is
+  a tenth of one percent of the squared error and is not worth a change; 16 and above is the wrong way. Left at 4 / 8.
