@@ -238,52 +238,25 @@ def _selftest_variant_gap() -> None:
 
 
 def _selftest_phantom() -> None:
-    """phantom_coach: the points of the planned moves not made, each once."""
+    """phantom_coach: the phantom's eleven each jornada beside the same squad
+    never moved, with a running total."""
     import tempfile
-    from datetime import datetime, timezone
 
-    from ffcore.clock import set_now
     from ffcore.db import record
-    from ffcore.tidy import store_sql, tables_in
+    from ffcore.tidy import tables_in
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
-            record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-            with closing(connect()) as db, db:
-                db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
-            store_sql("api_standings", [{"observed_at": "2026-10-14T1000Z", "user_id": u, "manager": m,
-                                         "team_points": str(p)}
-                                        for u, m, p in (("1", "me", 100), ("2", "rival", 105), ("3", "low", 90))])
-            store_sql("matches", [{"observed_at": "2026-08-01T0900Z", "match_id": "m%d" % j, "jornada": str(j),
-                                   "home": "h%d" % j, "away": "a%d" % j, "kickoff": k}
-                                  for j, k in ((3, "2026-08-23T19:00:00+00:00"), (4, "2026-08-30T17:00:00+00:00"))])
-            record([{"player_id": k, "name": "Player " + k, "app_id": "app" + k} for k in "AB"], "crosswalk")
-            store_sql("api_activity", [
-                {"observed_at": "2026-10-14T1000Z", "activity_id": i, "kind": kind, "user_id": u, "player_id": p,
-                 "at": at, "amount": "1", "counterparty": ""}
-                for i, (kind, u, p, at) in enumerate([
-                    ("buy", "1", "appA", "2026-08-25T10:00:00+02:00"),    # after lock 3: A's buy was made
-                    ("sell", "1", "appB", "2026-08-29T10:00:00+02:00"),   # before lock 4: not B's sell
-                    ("buy", "2", "appB", "2026-09-01T10:00:00+02:00"),    # a rival's: not mine
-                    ("sell", "2", "appB", "2026-09-02T10:00:00+02:00"),   # a rival selling B is not me selling B
-                    ("buy", "1", "appB", "2026-09-02T10:00:00+02:00"),    # my buying B is not selling B
-                    ("sell", "1", "appA", "2026-09-02T10:00:00+02:00")], 1)])  # my selling A is not selling B
-            # buy A planned at lock 3 (+10) and again at lock 4 (+6: counted once); sell B planned at 4 (+8,
-            # not made); a rejected move (+50) is not advice
-            record([{"run_id": 1, "ord": i, "lock": lk, "move": m, "reached": r, "kind": k, "real": v}
-                    for i, (lk, m, r, k, v) in enumerate([(3, "buy Player A", "plan", "get", 10.0),
-                                                          (4, "buy Player A", "plan", "get", 6.0),
-                                                          (4, "sell Player B", "plan", "sell", 8.0),
-                                                          (4, "buy Player C", "rejected", "get", 50.0)])],
-                   "grade_decisions")
-            cols, rows_ = named("phantom_coach", {})
-            got = [dict(zip(cols, r)) for r in rows_]
-            assert [(g["place"], g["manager"], g["points"]) for g in got] == [
-                (1, "board if followed", 108.0), (2, "rival", 105.0), (3, "me", 100.0), (4, "low", 90.0)], got
-            assert "1 made" in got[0]["note"] and "1 unmade" in got[0]["note"], got[0]["note"]
-        finally:
-            set_now(None)
+        record([{"run_id": i, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"} for i in (1, 2)], "runs")
+        record([{"run_id": r, "jornada": j, "phantom": ph, "standpat": sp, "moves": m, "cash": 0.0}
+                for r, j, ph, sp, m in ((1, 3, 50.0, 40.0, "buy A"), (1, 2, 30.0, 35.0, ""),
+                                        (2, 2, 99.0, 0.0, "later run"))], "phantom_jornadas")
+        cols, got = named("phantom_coach", {"run": 1})
+        rows_ = [dict(zip(cols, r)) for r in got]
+        assert [(r["jornada"], r["phantom"], r["standpat"], r["gain"], r["total_gain"]) for r in rows_] == [
+            (2, 30.0, 35.0, -5.0, -5.0), (3, 50.0, 40.0, 10.0, 5.0), ("total", 80.0, 75.0, 5.0, 5.0)], \
+            "jornada order, a running total, the named run's rows only"
+        assert rows_[1]["moves"] == "buy A"
+        assert [r[0] for r in named("phantom_coach", {})[1]] == [2, "total"], "no run named: the latest that has rows"
 
 
 def _selftest_queries() -> None:

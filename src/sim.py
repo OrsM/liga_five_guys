@@ -17,7 +17,7 @@ from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
 
-__all__ = ["rival_rows", "rival_universe", "board_doc", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
+__all__ = ["with_squad", "rival_rows", "rival_universe", "board_doc", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
            "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -77,6 +77,11 @@ def _selftest() -> None:
     assert ru.market.cash == 7e6 and ru.rival_cash == {"me": 10e6}, "his cash the estimate; yours now a rival's"
     assert not (ru.market.my_bid or ru.market.offer or ru.market.fetch), \
         "your bids and the offers on your players are not his"
+    held = with_squad(uv, {"star": "MED"}, 1e6)
+    assert held.mine == {"star": "MED"} and held.market.cash == 1e6 and held.me == "me" \
+        and held.state.squads["riv"] == riv11, "your squad and cash swapped, the rest as it was"
+    assert not (held.market.my_bid or held.market.offer or held.market.fetch)
+    assert uv.mine == sqb and uv.market.cash == 10e6, "the original is untouched"
     heads, moves = rival_rows(uv, 7)
     assert [(h["manager"], h["cash"]) for h in heads] == [("riv", 7e6)], heads
     want = board(ru)
@@ -375,6 +380,13 @@ def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> N
     record([plan_head(b, run)], "sim_runs")
     with closing(connect()) as db, db:
         db.execute("INSERT INTO sim_facts SELECT ?, * FROM sim_facts_now", (run,))
+
+
+def with_squad(u: Universe, squad: dict[str, str], cash: float) -> Universe:
+    """The league with this squad and cash as yours, and none of your bids
+    or the offers on your players (they are not these players')."""
+    return replace(u, state=replace(u.state, squads={**u.state.squads, u.me: dict(squad)}),
+                   market=replace(u.market, cash=cash, my_bid={}, offer={}, fetch={}))
 
 
 def rival_universe(u: Universe, mgr: str) -> Universe:

@@ -17,10 +17,11 @@ from ffcore.points import jornada_points
 
 from assemble import applied, built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, board, verdict
+from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
 from ffcore.db import connect, named, record, this_run
 from ffcore.tidy import LINEUP_SOURCE, current
-__all__ = ["backtest", "replay", "replay_rows", "decision_rows", "decisions", "due", "forecast_rows",
+__all__ = ["backtest", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "due", "forecast_rows",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -157,6 +158,44 @@ def decisions() -> list[dict[str, Any]]:
     return out
 
 
+def phantom_season() -> list[dict[str, Any]]:
+    """The league's sixth manager: your squad at the first lock, then at each
+    lock the plan this code makes for the squad and cash he has (bids win at
+    the model's price, rivals do not react), his eleven picked from that
+    lock's forecast and scored on what they got; beside a manager who never
+    moves, picked the same way. One row a played jornada."""
+    locks, actual = round_locks(), jornada_points()
+    done = {j for _k, j in actual}
+    squad: dict[str, str] | None = None
+    hold: dict[str, str] = {}
+    cash = 0.0
+    out = []
+    try:
+        for i in sorted(done & set(locks), key=lambda j: locks[j]):
+            set_now(locks[i] - dt.timedelta(minutes=1))
+            built.cache_clear()
+            try:
+                u = universe()
+            except SystemExit as e:
+                print("j%d: no board (%s)" % (i, e), file=sys.stderr)
+                continue
+            if squad is None:
+                squad, hold, cash = dict(u.mine), dict(u.mine), u.market.cash
+            up = with_squad(u, squad, cash)
+            acts = [r.action for r in board(up).plan]
+            fielded = up.after(*acts).outlook.xi.players
+            still = with_squad(u, hold, cash).outlook.xi.players
+            out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in fielded),
+                        "standpat": sum(actual.get((k, i), 0.0) for k in still),
+                        "moves": "; ".join(a.label(up.market.names) for a in acts),
+                        "cash": up.market.left(acts)})
+            squad, cash = up.squad_after(*acts), up.market.left(acts)
+    finally:
+        set_now(None)
+        built.cache_clear()
+    return out
+
+
 def forecast_rows(runs: list[dict[str, Any]], actual: dict[tuple[str, int], float]) -> list[dict[str, Any]]:
     """backtest's forecasts, one row a player: what was forecast at the
     lock (from_j) for a jornada, and what he scored (0 if nothing)."""
@@ -192,6 +231,7 @@ def record_grades() -> dict[str, int]:
     if run is not None:
         record([{"run_id": run, **r} for r in fc], "grade_forecast")
         record([{"run_id": run, **r} for r in moves], "grade_decisions")
+        record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
     print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
 

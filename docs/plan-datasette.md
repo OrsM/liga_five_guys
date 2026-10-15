@@ -313,13 +313,22 @@ Gates: (2) must pass before any replay result is believed; (3) is judged
 by whether the error-against-lead-time curve exists and (1) puts an
 interval on any variant gap; stop at (1)+(2) if nothing in (3) would change
 a decision.
-- 5.2 (done 2026-10-15: saved query `phantom_coach`, the graded plan moves each
-  once, those your ledger shows made (same buy/sell of the player at or after
-  the lock) set aside: 7 made, 14 unmade, +119 points; still an upper bound,
-  as moves interact and bids may not win) Phantom coach: a sixth manager that does what the board says, from
-  jornada 1, scored in the real standings. Assumes its bids win at the
-  model's price and rivals do not react to it: it grades the advice, not an
-  alternative season.
+- 5.2 (redone 2026-10-15) Phantom coach: a sixth manager that does what the
+  board says, from your squad at the first lock. The first cut summed every
+  planned move's points from all seven replayed plans (+119 over 14 unmade
+  moves); that was wrong three ways: gross points of the players bought, not
+  the gain over the players they displace; seven plans each spending the same
+  cash and roster slots; and union of plans. (The advice itself has no
+  future in it: each plan is built at lock-1min on data cut at that time,
+  and the leak test passes on those boards.) Now `grading.phantom_season`
+  keeps a squad and cash: at each lock the plan this code makes for them is
+  applied, his eleven picked from that lock's forecast and scored on what
+  they got (`phantom_jornadas`, saved query `phantom_coach`), beside the same
+  squad never moved, picked the same way. Result over jornadas 2-8: phantom
+  329, never moved 338 (-9): per jornada 0, +1, +7, +2, -28, 0, +9, i.e. no
+  difference the data can resolve, one bad jornada (6) deciding the total.
+  Assumes bids win at the model's price and rivals do not react, and the
+  code was written knowing these weeks, so a gain would be an upper bound.
 - 5.3 (done 2026-10-15) Every manager's board: `sim.rival_universe` /
   `rival_rows`, stage `run.py rivals` (~25s; lfg-run runs it after the
   queries), tables `rival_boards` / `rival_moves`, saved query `rival_boards`.

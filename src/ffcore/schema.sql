@@ -181,6 +181,18 @@ CREATE TABLE IF NOT EXISTS replay_forecast (
     PRIMARY KEY (variant, as_of, jornada, player)
 ) WITHOUT ROWID;
 
+-- The phantom manager (grading.phantom_season): the points of his eleven
+-- each jornada, beside the same squad never moved, and what he did.
+CREATE TABLE IF NOT EXISTS phantom_jornadas (
+    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
+    jornada  INTEGER NOT NULL,
+    phantom  REAL NOT NULL,
+    standpat REAL NOT NULL,
+    moves    TEXT NOT NULL,
+    cash     REAL NOT NULL,
+    PRIMARY KEY (run_id, jornada)
+);
+
 -- Each rival's board for a run (sim.rivals): the funnel with him as "me".
 -- His cash is our estimate and his pending bids are invisible to us.
 CREATE TABLE IF NOT EXISTS rival_boards (
