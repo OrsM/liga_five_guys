@@ -30,6 +30,7 @@ STAGES: list[tuple[str, str]] = [
 ON_REQUEST: list[tuple[str, str]] = [
     ("grade", "grading:record_grades"),
     ("queries", "ffcore.db:time_queries"),
+    ("rivals", "sim:rivals"),
 ]
 
 

@@ -320,7 +320,12 @@ a decision.
   jornada 1, scored in the real standings. Assumes its bids win at the
   model's price and rivals do not react to it: it grades the advice, not an
   alternative season.
-- 5.3 Every manager's board: the same funnel with `me` set to each rival
+- 5.3 (first cut done 2026-10-15: `sim.rival_universe` / `rival_rows`, stage
+  `run.py rivals` (~25s, run by lfg-run after the queries), tables
+  `rival_boards` / `rival_moves`, saved query `rival_boards`. First look: every
+  rival's plan wants the same targets (Koski, Revivo), which is what 5.7 has to
+  model. Still to do: what each rival did against what his board said, and his
+  phantom beside ours.) 5.3 Every manager's board: the same funnel with `me` set to each rival
   (`me` is already a parameter end to end). Their cash is our estimate and
   their pending bids are invisible. Then: what each rival should have done,
   what they did, and their phantom beside them.

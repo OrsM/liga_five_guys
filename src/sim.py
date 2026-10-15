@@ -8,6 +8,7 @@ import json
 import sys
 from collections.abc import Sequence
 from contextlib import closing
+from dataclasses import replace
 from typing import Any
 
 from assemble import built, universe
@@ -16,15 +17,13 @@ from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
 
-__all__ = ["board_doc", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
+__all__ = ["rival_rows", "rival_universe", "board_doc", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
            "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
 
 
 def _selftest() -> None:
-    from dataclasses import replace
-
     import tempfile
     from contextlib import closing
     from pathlib import Path
@@ -62,6 +61,29 @@ def _selftest() -> None:
     sold = [k for p in b.plan for k in p.action.sell]
     assert len(sold) == len(set(sold)), sold
     assert b.gain >= max(r.d_pts for r in b.plan) - 5.0, (b.gain, b.plan)
+
+    # every rival's board: the same funnel with him as "me", his cash our estimate, no bids or offers of yours
+    riv11 = {**riv, "rf2": "DEL"}
+    perv = {j: {**layer, "rf2": (3.0, 0.9)} for j, layer in perb.items()}
+    uv = Universe(state=LeagueState({"me": dict(sqb), "riv": dict(riv11)}, many_j, "me"),
+                  forecaster=Bootstrap(perv),
+                  market=Market(cash=10e6, pos={**sqb, **riv11, "cand": "MED", "twin": "MED"},
+                                price={"cand": 5e6, "twin": 5e6}, value={"dead": 1e6, "star": 20e6},
+                                owner={"star": "me", "rk": "riv"}, my_bid={"cand": 5e6},
+                                offer={"star": 9e6}, fetch={"star": 9e6}),
+                  rival_cash={"riv": 7e6})
+    ru = rival_universe(uv, "riv")
+    assert ru.me == "riv" and ru.mine == riv11, "his squad is the one decided for"
+    assert ru.market.cash == 7e6 and ru.rival_cash == {"me": 10e6}, "his cash the estimate; yours now a rival's"
+    assert not (ru.market.my_bid or ru.market.offer or ru.market.fetch), \
+        "your bids and the offers on your players are not his"
+    heads, moves = rival_rows(uv, 7)
+    assert [(h["manager"], h["cash"]) for h in heads] == [("riv", 7e6)], heads
+    want = board(ru)
+    assert heads[0]["plan_gain"] == want.gain and [m["label"] for m in moves] == [
+        r.action.label(ru.market.names) for r in want.plan], "the board of the universe he is"
+    assert {m["manager"] for m in moves} <= {"riv"} and [m["ord"] for m in moves] == list(range(len(moves)))
+    assert not {m["label"] for m in moves} & {"buy star"}, "never a player you own: the owner stays"
 
     def report(u: Universe, bd: Board, fielded: Sequence[str] = ()) -> Doc:
         """The board the views make of this universe's run, its market's
@@ -353,6 +375,43 @@ def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> N
     record([plan_head(b, run)], "sim_runs")
     with closing(connect()) as db, db:
         db.execute("INSERT INTO sim_facts SELECT ?, * FROM sim_facts_now", (run,))
+
+
+def rival_universe(u: Universe, mgr: str) -> Universe:
+    """The league as mgr decides in it: his squad, his cash (our estimate),
+    you a rival, and none of your bids or the offers on your players."""
+    cash = {**u.rival_cash, u.me: u.market.cash}
+    return replace(u, state=replace(u.state, me=mgr),
+                   market=replace(u.market, cash=cash[mgr], my_bid={}, offer={}, fetch={}),
+                   rival_cash={m: c for m, c in cash.items() if m != mgr})
+
+
+def rival_rows(u: Universe, run: int) -> tuple[list[Doc], list[Doc]]:
+    """Every rival's board (the same funnel, him as "me"): per rival his
+    cash and what his plan gains, and his plan's moves in order."""
+    heads, moves = [], []
+    for mgr in u.state.squads:
+        if mgr == u.me:
+            continue
+        ru = rival_universe(u, mgr)
+        b = board(ru)
+        heads.append({"run_id": run, "manager": mgr, "cash": ru.market.cash, "plan_gain": b.gain})
+        moves += [{"run_id": run, "manager": mgr, "ord": i, "label": m.action.label(ru.market.names),
+                   "kind": m.action.kind, "gain": m.d_pts, "p_better": m.p_better,
+                   "cost": m.action.cost, "proceeds": m.action.proceeds}
+                  for i, m in enumerate(b.plan)]
+    return heads, moves
+
+
+def rivals() -> None:
+    """The rivals stage (run.py rivals): each rival's board for this run."""
+    run = this_run()
+    if run is None:
+        raise SystemExit("rivals: a board is kept for a run; run it as run.py rivals")
+    heads, moves = rival_rows(universe(), run)
+    record(heads, "rival_boards")
+    record(moves, "rival_moves")
+    print("  rivals: %d boards, %d planned moves" % (len(heads), len(moves)))
 
 
 def board_doc() -> Doc:
