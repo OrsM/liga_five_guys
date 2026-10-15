@@ -278,13 +278,29 @@ So the backtest is built for the questions the data *can* answer:
    different jornadas; only the paired gap says anything. Also found:
    concurrent processes recreating the views on a fresh file raced
    (`connect()` now takes a file lock while it applies the schema).
-4. **Variants as data.** `constants(variant, name, value)` and a
-   `variant()` SQL function beside `cut()`: a challenger is a second set
-   (AVAIL_K 4 -> 2, PICK_K ...), the views and Python read the same row, and
-   champion against challenger is one query through (1). Model setups with
-   timestamps, as asked on day one. Judged on the same outcomes; small
-   tweaks will need weeks of outcomes to resolve, and the interval will say
-   so.
+4. **Variants as data. Done 2026-10-15.** `variants(variant, name, value)`
+   holds a challenger's constants (`python src/grading.py variant NAME
+   CONST=VALUE ...`); `model_constants(variant, name, value)` holds the
+   constants a run was built with, and the views read the row of
+   `variant()` (the clock's, beside `cut()`), so a challenger replays beside
+   the live run without touching its rows. `assemble.applied(name)` puts a
+   variant's values on the modules that own them (a name that is no constant
+   raises) and restores them; three defaults that bound a constant at import
+   (fit_availability, Scorer, Bootstrap) now read it at call time. Replay a
+   challenger with `LFG_VARIANT=name python src/grading.py replay 3`
+   (~5 minutes), judge it with the saved query `variant_gap` (one moment a
+   jornada, `hours` before the lock, so outcomes are not repeated).
+   Results at 24h before the lock, mean squared-error gain over live (positive:
+   better): AVAIL_K 2 -0.002 (nothing, and exactly 0 for unflagged players:
+   it touches only flagged ones, so the variant applies where it should);
+   PICK_K 1 -0.013, n.s.; SHRINK_K 2 -0.172 (worse), 8 +0.071 (+0.009..+0.132),
+   16 +0.059 (n.s.). The direction is consistent (more shrinkage toward the
+   prior helps up to about 8) but the best gain is ~1% of the squared error
+   and the one interval that excludes 0 is one of four tried: a candidate to
+   watch over more jornadas, not a change. Also: `connect()` applies the
+   schema only when the file does not carry its version (a crc in
+   `user_version`), so processes starting together no longer recreate views
+   under each other.
 5. **Only if (3) is too slow:** per-snapshot caches for the scorer fits and
    per-day for `price_ahead` (also the fix for `price_forecast_error`).
 

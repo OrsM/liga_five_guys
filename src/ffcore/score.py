@@ -100,13 +100,13 @@ class Scorer:
     matches; and, from StartOdds, his chance of starting."""
 
     def __init__(self, market: Rows, starts: StartOdds,
-                 last_season: Mapping[str, Tally] | None = None, shrink_k: float = SHRINK_K,
+                 last_season: Mapping[str, Tally] | None = None, shrink_k: float | None = None,
                  current: Mapping[str, Tally] | None = None,
                  promoted_discount: float = PROMOTED_DISCOUNT) -> None:
         self.market = market
         self.starts = starts
         self.last_season = last_season or {}
-        self.shrink_k = shrink_k
+        self.shrink_k = SHRINK_K if shrink_k is None else shrink_k
         self.promoted_discount = promoted_discount
         self.current = current or {}
         self.lookup: dict[str, Mapping[str, Any]] = {text(r, "ff_id"): r for r in market

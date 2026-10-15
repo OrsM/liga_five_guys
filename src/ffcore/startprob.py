@@ -130,10 +130,11 @@ class Availability:
         return self.level[bucket(prog, jornada, when, next_j)]
 
 
-def fit_availability(tally: Iterable[tuple[str, float, float]], k: float = AVAIL_K
+def fit_availability(tally: Iterable[tuple[str, float, float]], k: float | None = None
                      ) -> Availability:
     """Availability from availability_tally's rows (bucket, played,
     expected): played over expected, shrunk toward the bucket's PRIOR."""
+    k = AVAIL_K if k is None else k
     return Availability({b: min(1.0, shrink(PRIOR[b], k, got, fit)) for b, got, fit in tally})
 
 
@@ -315,7 +316,7 @@ def _selftest_views() -> None:
                 set_now(dt.datetime(2026, 12, 1, tzinfo=dt.timezone.utc))
                 record([{"name": n, "value": v} for n, v in [
                     ("MATCH_LEN", MATCH_LEN), ("NEUTRAL_START", NEUTRAL_START),
-                    ("ABSENT_START", ABSENT_START), ("FALLBACK_K", FALLBACK_K)]], "constants")
+                    ("ABSENT_START", ABSENT_START), ("FALLBACK_K", FALLBACK_K)]], "model_constants")
                 record([{"player_id": s, "ff_slug": s} for s in
                         sorted({r["player_slug"] for r in lineups + starters})], "crosswalk")
                 store_sql("matches", matches)

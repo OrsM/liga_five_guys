@@ -29,9 +29,9 @@ def expected_points(cell: Cell | None) -> float:
 class Bootstrap:
 
     def __init__(self, per_jornada: PerJornada, pool: Iterable[float | None] = (),
-                 share: float = PERSISTENT_SHARE) -> None:
+                 share: float | None = None) -> None:
         self.per_jornada = per_jornada
-        self.share = share
+        self.share = PERSISTENT_SHARE if share is None else share
         self._order = {j: sorted(d) for j, d in per_jornada.items()}
         real = [p for p in pool if p is not None]
         self.pool = tuple(real) if len(real) >= MIN_POOL else SEED_POOL

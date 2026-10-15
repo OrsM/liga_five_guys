@@ -9,7 +9,7 @@ from typing import Callable
 
 from ffcore.parse import snapshot_stamp, stamp
 
-__all__ = ["MADRID", "run_now", "set_now", "on_reset", "shown"]
+__all__ = ["MADRID", "run_now", "set_now", "on_reset", "shown", "variant", "set_variant"]
 
 
 def _madrid() -> tzinfo:
@@ -45,6 +45,21 @@ def run_now() -> datetime:
 def cut() -> str:
     """Now as a stamp: what a table is read as of."""
     return stamp(run_now())
+
+
+_VARIANT: list[str] = ["live"]
+
+
+def variant() -> str:
+    """The set of model constants in force (variants): live unless a replay
+    of a challenger says otherwise."""
+    return _VARIANT[0]
+
+
+def set_variant(name: str) -> None:
+    _VARIANT[:] = [name]
+    for reset in _RESETS:
+        reset()
 
 
 def set_now(when: datetime | None) -> None:

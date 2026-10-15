@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import sqlite3
 import sys
 import time
@@ -14,7 +15,7 @@ from ffcore.schedule import expectations
 from ffcore.jornadas import round_locks, rounds_ahead
 from ffcore.points import jornada_points
 
-from assemble import built, fixture_ratings, price_change, price_momentum, scorer, universe
+from assemble import applied, built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, board, verdict
 from ffcore.clock import set_now, snapshot_stamp
 from ffcore.db import connect, named, record, this_run
@@ -63,8 +64,9 @@ def replay_rows(variant: str, as_of: str, jornada: int, lead_h: float, pred: dic
 def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> int:
     """Forecast the next jornada at every line-up snapshot before a played
     jornada's lock (replay_moments) with this code, and keep it
-    (replay_forecast) against what then happened. Resumes: a moment already
-    kept for the variant is skipped. shard (i, n) takes every nth moment."""
+    (replay_forecast) against what then happened, under the variant's
+    constants (assemble.applied). Resumes: a moment already kept for the
+    variant is skipped. shard (i, n) takes every nth moment."""
     locks, actual = round_locks(), jornada_points()
     played = {j for _k, j in actual}
     with closing(connect()) as db:
@@ -72,6 +74,8 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
         todo = [(j, a) for j, a, _l in db.execute("SELECT jornada, as_of, lock FROM replay_moments")
                 if j in played and a not in have][shard[0]::shard[1]]
     kept = 0
+    held = applied(variant)
+    held.__enter__()
 
     def moment_rows(j: int, at: str) -> list[dict[str, Any]]:
         moment = snapshot_stamp(at)
@@ -101,6 +105,7 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
             print("  replay %s j%d %s: %d players" % (at, j, variant, len(out)), flush=True)
     finally:
         set_now(None)
+        held.__exit__(None, None, None)
     return kept
 
 
@@ -290,17 +295,24 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
         raise SystemExit(0)
+    if sys.argv[1:2] == ["variant"]:
+        # variant NAME CONSTANT=VALUE ...: define (or redefine) a challenger
+        name, sets = sys.argv[2], [a.split("=", 1) for a in sys.argv[3:]]
+        with closing(connect()) as db, db:
+            db.execute("DELETE FROM variants WHERE variant = ?", (name,))
+            db.executemany("INSERT INTO variants VALUES (?, ?, ?)", [(name, k, float(v)) for k, v in sets])
+        raise SystemExit(0)
     if sys.argv[1:2] == ["replay"]:
-        # replay [JOBS] [SHARD/OF]: JOBS processes side by side, each its share of the moments
+        # replay [JOBS] [SHARD/OF] (LFG_VARIANT=name): JOBS processes side by side, each its share of the moments
         import subprocess
         jobs = int(sys.argv[2]) if len(sys.argv) > 2 else 1
         if len(sys.argv) > 3:
             i, n = map(int, sys.argv[3].split("/"))
-            print("replayed %d moments" % replay(shard=(i, n)))
+            print("replayed %d moments" % replay(os.environ.get("LFG_VARIANT", REPLAY_VARIANT), (i, n)))
         else:
             procs = [subprocess.Popen([sys.executable, __file__, "replay", str(jobs), "%d/%d" % (i, jobs)])
                      for i in range(jobs)]
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
-    print("grading.py --selftest | replay [JOBS]")
+    print("grading.py --selftest | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

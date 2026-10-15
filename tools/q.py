@@ -82,6 +82,7 @@ def _selftest() -> None:
     _selftest_queries()
     _selftest_changes()
     _selftest_paired()
+    _selftest_variant_gap()
     print("q.py self-test OK")
 
 
@@ -199,6 +200,42 @@ def _selftest_paired() -> None:
         assert far["all"][1] == 1 and far["all"][2] == 81.0, "ahead picks the horizon: 81 -> 0 is a gain of +81"
 
 
+def _selftest_variant_gap() -> None:
+    """variant_gap: two variants' replays of one jornada, at the last moment
+    at least :hours before its lock, set against each other."""
+    import tempfile
+
+    from ffcore.db import record
+    from ffcore.tidy import tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        def row(v: str, at: str, j: int, k: str, pred: float, fl: int, h: float) -> dict[str, Any]:
+            return {"variant": v, "as_of": at, "jornada": j, "player": k, "predicted": pred,
+                    "actual": 3.0, "flagged": fl, "lead_h": h}
+        # actual 3 throughout. Jornada 2: moments 50h, 30h, 10h out; with hours=24 the 30h one counts.
+        # live errors^2 at 30h: a 4, b 1, c 0; challenger: a 1, b 4, c 0 (and different at the others)
+        record([row("live", "m1", 2, "a", 1, 0, 50), row("slow", "m1", 2, "a", 3, 0, 50),
+                row("live", "m2", 2, "a", 1, 0, 30), row("slow", "m2", 2, "a", 2, 0, 30),
+                row("live", "m2", 2, "b", 4, 1, 30), row("slow", "m2", 2, "b", 5, 1, 30),
+                row("live", "m2", 2, "c", 3, 0, 30), row("slow", "m2", 2, "c", 3, 0, 30),
+                row("live", "m3", 2, "a", 1, 0, 10), row("slow", "m3", 2, "a", 3, 0, 10),
+                # jornada 3: only a moment inside the window: nothing to compare
+                row("live", "m4", 3, "a", 0, 0, 5), row("slow", "m4", 3, "a", 3, 0, 5),
+                # jornada 4: a moment exactly :hours out counts (same error either way)
+                row("live", "m5", 4, "z", 1, 0, 24), row("slow", "m5", 4, "z", 1, 0, 24)], "replay_forecast")
+        got = {r[0]: r for r in named("variant_gap", {"old": "live", "new": "slow", "hours": 24})[1]}
+        assert set(got) == {"all", "flagged", "not flagged"}, got
+        # old - new squared error: a 4 - 1 = 3, b 1 - 4 = -3, c 0 - 0 = 0
+        assert got["all"][1] == 4 and abs(got["all"][2]) < 1e-9, got["all"]
+        assert got["not flagged"][1] == 3 and got["not flagged"][2] == 1.0, got["not flagged"]
+        assert got["flagged"][1] == 1 and got["flagged"][2] == -3.0 and got["flagged"][6] == "too few"
+        assert got["all"][6] == "not established"
+        far = {r[0]: r for r in named("variant_gap", {"old": "live", "new": "slow", "hours": 0})[1]}
+        assert far["all"][1] == 3 and abs(far["all"][2] - 13 / 3) < 1e-3, "the last moment of each jornada: 4, 9 and 0"
+        assert named("variant_gap", {"old": "live", "new": "slow", "hours": 60})[1] == [], \
+            "no moment that early: nothing to compare"
+
+
 def _selftest_queries() -> None:
     """The saved queries that answer a question, against rows whose answers
     can be worked out by hand: unmatched_players, constants_vs_measured (and
@@ -235,7 +272,7 @@ def _selftest_queries() -> None:
                     for i, (m, r, v) in enumerate([("x", "plan", 3.0), ("y", "cleared", -1.0),
                                                    ("z", "rejected", 5.0)])], "grade_decisions")
             record([{"name": "PERSISTENT_SHARE", "value": 0.08}, {"name": "CONFIDENCE", "value": 0.7}],
-                   "constants")
+                   "model_constants")
             assert asked("persistence") == [(0.5,)], "misses of +1 and -1 repeat: sqrt(2 / 8)"
             assert asked("constants_vs_measured") == [
                 ("PERSISTENT_SHARE", 0.08, 0.5, 2, "share of a player's miss that repeats the next jornada"),

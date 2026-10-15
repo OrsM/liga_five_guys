@@ -9,13 +9,14 @@ import os
 import re
 import sqlite3
 import time
+import zlib
 from datetime import datetime, timezone
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from ffcore.clock import cut
+from ffcore.clock import cut, variant
 from ffcore.names import Name
 from ffcore.rules import position
 from ffcore.startprob import platt, prognosis_bucket
@@ -55,10 +56,11 @@ def claim(gain: float | None, se: float | None) -> str:
 
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (now, as a stamp: the model's
-    clock unless told otherwise), name_key() and name_shown() (Name's),
+    clock unless told otherwise), variant() (the constants in force), name_key() and name_shown() (Name's),
     platt() and prognosis_bucket() (startprob's), position() (rules'),
     lo95(), hi95() and claim() (an estimate and its standard error)."""
     db.create_function("cut", 0, now)
+    db.create_function("variant", 0, variant)
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
     db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
     for fn in (lo95, hi95, claim):
@@ -71,9 +73,9 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
     cut() the model's clock as a stamp, which the tables' as-of views read.
-    The schema is applied once a file and process (it recreates every view,
-    0.17s); it only adds (CREATE ... IF NOT EXISTS), so applying it again
-    changes nothing."""
+    The schema is applied when the file does not carry its version (it
+    recreates every view, 0.17s), one process at a time: a process that finds
+    it applied leaves the views other processes are using alone."""
     path = path or DB
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
@@ -82,9 +84,13 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
-            db.execute("PRAGMA journal_mode=WAL")
-            for sql in (IDENTITY, TABLES_SQL, schema):
-                db.executescript(sql.read_text(encoding="utf-8"))
+            texts = [sql.read_text(encoding="utf-8") for sql in (IDENTITY, TABLES_SQL, schema)]
+            version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
+            if db.execute("PRAGMA user_version").fetchone()[0] != version:   # else it is applied: leave the views
+                db.execute("PRAGMA journal_mode=WAL")                       # other processes are using
+                for sql in texts:
+                    db.executescript(sql)
+                db.execute("PRAGMA user_version = %d" % version)
         _APPLIED.add(key)
     return db
 
@@ -188,6 +194,24 @@ def record(rows: Sequence[Mapping[str, object]], table: str,
 def _selftest() -> None:
     import tempfile
     from contextlib import closing
+
+    with tempfile.TemporaryDirectory() as tmp:
+        schema, path = Path(tmp) / "s.sql", Path(tmp) / "x.db"
+        schema.write_text("CREATE VIEW IF NOT EXISTS one AS SELECT 1 AS n;")
+        connect(path, schema).close()
+        with closing(sqlite3.connect(path)) as raw:
+            raw.execute("CREATE VIEW marker AS SELECT 1")     # a view another process is using
+        _APPLIED.clear()
+        connect(path, schema).close()
+        with closing(sqlite3.connect(path)) as raw:
+            assert raw.execute("SELECT count(*) FROM sqlite_master WHERE name = 'marker'").fetchone()[0] == 1, \
+                "a file already at this schema version is left as it is"
+        schema.write_text("CREATE VIEW IF NOT EXISTS one AS SELECT 2 AS n; DROP VIEW IF EXISTS marker;")
+        _APPLIED.clear()
+        connect(path, schema).close()
+        with closing(sqlite3.connect(path)) as raw:
+            assert raw.execute("SELECT count(*) FROM sqlite_master WHERE name = 'marker'").fetchone()[0] == 0, \
+                "a changed schema is applied"
 
     mem = sqlite3.connect(":memory:")
     functions(mem)

@@ -65,7 +65,7 @@ def _selftest() -> None:
                                      Scored("2", 1, 3.0, 1.0, later)}, scored()
             assert jornada_points() == {("1", 1): 5.0, ("1", 2): 7.0, ("2", 1): 3.0}
 
-            record([{"name": "MATCH_LEN", "value": MATCH_LEN}], "constants")
+            record([{"name": "MATCH_LEN", "value": MATCH_LEN}], "model_constants")
             record([{"player_id": k, "ff_slug": slug} for k, slug in
                     [("1", "uno"), ("2", "dos"), ("3", "tres")]], "crosswalk")
             store_sql("starters", [

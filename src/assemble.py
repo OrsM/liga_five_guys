@@ -4,51 +4,82 @@ state and the forecast — so the model modules never read a table
 themselves."""
 from __future__ import annotations
 
-from contextlib import closing
+import sys
+from contextlib import closing, contextmanager
 from functools import cache
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any, NamedTuple
 
-from decide import CONFIDENCE, FINAL_TRIALS, Universe, _fieldable
-from ffcore.db import connect, named, query, rows
-from ffcore.fixture import FIX_BAND, MIN_AD_MATCHES, Ratings, difficulty_ratings
-from ffcore.forecast import MIN_POOL, PERSISTENT_SHARE, Bootstrap
+import decide
+import remind
+from decide import CONFIDENCE, Universe, _fieldable
+from ffcore import fixture, forecast, pricing, rules, score, startprob
+from ffcore.clock import set_variant
+from ffcore.db import connect, named, query, record, rows
+from ffcore.fixture import Ratings, difficulty_ratings
+from ffcore.forecast import Bootstrap
 from ffcore.jornadas import rounds_ahead
 from ffcore.league import League
 from ffcore.market import Market
 from ffcore.names import Name
 from ffcore.parse import Rows
 from ffcore.points import scored, season_record
-from ffcore.pricing import BID_BEATS, CLIP, PRICE_WINDOW
 from ffcore.schedule import expectations, phantom_fill
-from ffcore.score import PROMOTED_DISCOUNT_K, SHRINK_K, fit_promoted_discount, Scorer
-from ffcore.rules import MATCH_LEN
+from ffcore.score import fit_promoted_discount, Scorer
 from ffcore.season import LeagueState
-from ffcore.startprob import (ABSENT_START, AVAIL_K, FALLBACK_K, NEUTRAL_START, PICK_K,
-                              Availability, Calibration, StartOdds, fit_availability)
+from ffcore.startprob import Availability, Calibration, StartOdds, fit_availability
 from ffcore.tidy import LINEUP_SOURCE, SEASON, age_hours, current, read_csv, typed
-from remind import REMIND_HOURS
 from stats import percentile
 
-__all__ = ["universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
+__all__ = ["applied", "constants", "universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
            "price_change", "premium", "write_constants", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
 
-# The constants a run is built with, by module: what params records as such.
-CONSTANTS: dict[str, dict[str, float]] = {
-    "assemble": {"APP_FRESH_HOURS": APP_FRESH_HOURS},
-    "decide": {"CONFIDENCE": CONFIDENCE, "FINAL_TRIALS": FINAL_TRIALS},
-    "fixture": {"FIX_BAND": FIX_BAND, "MIN_AD_MATCHES": MIN_AD_MATCHES},
-    "forecast": {"MIN_POOL": MIN_POOL, "PERSISTENT_SHARE": PERSISTENT_SHARE},
-    "pricing": {"BID_BEATS": BID_BEATS, "CLIP": CLIP, "PRICE_WINDOW": PRICE_WINDOW},
-    "remind": {"REMIND_HOURS": REMIND_HOURS},
-    "rules": {"MATCH_LEN": MATCH_LEN},
-    "score": {"PROMOTED_DISCOUNT_K": PROMOTED_DISCOUNT_K, "SHRINK_K": SHRINK_K},
-    "startprob": {"ABSENT_START": ABSENT_START, "AVAIL_K": AVAIL_K, "FALLBACK_K": FALLBACK_K,
-                  "NEUTRAL_START": NEUTRAL_START, "PICK_K": PICK_K},
+# The constants a run is built with, by module: what params records as such,
+# and what a variant may set (variants).
+NAMES: dict[str, tuple[str, ...]] = {
+    "assemble": ("APP_FRESH_HOURS",),
+    "decide": ("CONFIDENCE", "FINAL_TRIALS"),
+    "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
+    "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
+    "pricing": ("BID_BEATS", "CLIP", "PRICE_WINDOW"),
+    "remind": ("REMIND_HOURS",),
+    "rules": ("MATCH_LEN",),
+    "score": ("PROMOTED_DISCOUNT_K", "SHRINK_K"),
+    "startprob": ("ABSENT_START", "AVAIL_K", "FALLBACK_K", "NEUTRAL_START", "PICK_K"),
 }
+MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "decide": decide, "fixture": fixture,
+                           "forecast": forecast, "pricing": pricing, "remind": remind,
+                           "rules": rules, "score": score, "startprob": startprob}
+
+
+def constants() -> dict[str, dict[str, float]]:
+    """The constants in force now, by module (a variant applies its own)."""
+    return {m: {n: getattr(MODULES[m], n) for n in names} for m, names in NAMES.items()}
+
+
+@contextmanager
+def applied(variant: str) -> Iterator[None]:
+    """The model as a variant sets it (variants): its constants on the
+    modules that own them, the clock's variant for the views, all put back on
+    leaving. A name that is no constant raises."""
+    owner = {n: m for m, names in NAMES.items() for n in names}
+    over = rows("SELECT name, value FROM variants WHERE variant = ? ORDER BY name", (variant,))
+    unknown = [n for n, _v in over if n not in owner]
+    if unknown:
+        raise ValueError("variant %s sets %s, which no module has as a constant" % (variant, unknown))
+    was = {n: getattr(MODULES[owner[n]], n) for n, _v in over}
+    try:
+        for n, v in over:
+            setattr(MODULES[owner[n]], n, v)
+        set_variant(variant)
+        yield
+    finally:
+        for n, v in was.items():
+            setattr(MODULES[owner[n]], n, v)
+        set_variant("live")
 
 
 def scorer(market: Rows, xi_rows: Rows) -> Scorer:
@@ -83,11 +114,11 @@ def fixture_ratings(market: Rows) -> Ratings:
 
 
 def write_constants() -> None:
-    """CONSTANTS into lfg.db, for the views that use them."""
+    """constants() into lfg.db under the variant in force, for the views."""
     with closing(connect()) as db, db:
-        db.execute("DELETE FROM constants")
-        db.executemany("INSERT INTO constants VALUES (?, ?)",
-                       [(n, v) for names in CONSTANTS.values() for n, v in names.items()])
+        db.execute("DELETE FROM model_constants WHERE variant = variant()")
+        db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)",
+                       [(n, v) for names in constants().values() for n, v in names.items()])
 
 
 class Prices(NamedTuple):
@@ -142,7 +173,7 @@ def params(cal: Calibration, avail: Availability, promoted: float, ratings: Rati
             n: int | None = None) -> dict[str, Any]:
         return {"component": component, "term": term, "value": float(value),
                 "kind": kind, "n": n}
-    return ([row(m, name, v, "constant") for m, names in CONSTANTS.items()
+    return ([row(m, name, v, "constant") for m, names in constants().items()
              for name, v in names.items()]
             + [row("startprob.calibration", t, getattr(cal, t))
                for t in ("alpha", "beta", "neutral_start", "absent_start")]
@@ -246,7 +277,48 @@ def _selftest() -> None:
     _selftest_market()
     _selftest_facts()
     _selftest_sale()
+    _selftest_variants()
     print("assemble self-test OK")
+
+
+def _selftest_variants() -> None:
+    """A variant is a second set of constants, applied to the modules that
+    own them and to the views, beside the live one."""
+    import tempfile
+    from pathlib import Path
+
+    from ffcore import forecast, score, startprob
+    from ffcore.tidy import tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        record([{"variant": v, "name": n, "value": x} for v, n, x in (
+            ("slow", "AVAIL_K", 2.0), ("slow", "SHRINK_K", 9.0), ("slow", "PERSISTENT_SHARE", 0.5),
+            ("slow", "NEUTRAL_START", 33.0), ("typo", "AVIAL_K", 1.0))], "variants")
+        tally = [("indefinite", 3.0, 4.0)]
+        live = startprob.fit_availability(tally).level["indefinite"]
+        write_constants()
+        assert rows("SELECT neutral_start FROM k") == [(60.0,)]
+        with applied("slow"):
+            assert constants()["startprob"]["AVAIL_K"] == 2.0 and constants()["score"]["SHRINK_K"] == 9.0
+            assert startprob.fit_availability(tally).level["indefinite"] != live, \
+                "the shrinkage a function defaults to follows the variant"
+            assert forecast.Bootstrap({}).share == 0.5
+            assert score.Scorer([], startprob.StartOdds([], startprob.Calibration(0, 1, 60, 15), startprob.Availability({}), {}, {}, {})
+                                ).shrink_k == 9.0
+            write_constants()
+            assert rows("SELECT neutral_start FROM k") == [(33.0,)], "the views read the variant's row"
+            assert rows("SELECT count(*) FROM model_constants WHERE variant = 'slow'") == [(len(
+                [n for names in constants().values() for n in names]),)]
+        assert startprob.AVAIL_K == 4.0 and score.SHRINK_K == 4.0 and forecast.PERSISTENT_SHARE == 0.08, \
+            "restored on leaving"
+        assert rows("SELECT neutral_start FROM k") == [(60.0,)], "the live rows were never touched"
+        assert startprob.fit_availability(tally).level["indefinite"] == live
+        try:
+            with applied("typo"):
+                raise AssertionError("a name that is no constant must not apply quietly")
+        except ValueError as e:
+            assert "AVIAL_K" in str(e)
+        assert startprob.AVAIL_K == 4.0
 
 
 def _selftest_sale() -> None:
@@ -267,7 +339,7 @@ def _selftest_sale() -> None:
         try:
             set_now(snapshot_stamp("2026-09-04T1200Z"))
             record([{"me": "me", "budget": 100e6}], "league_config")
-            record([{"name": "PRICE_WINDOW", "value": 3.0}, {"name": "CLIP", "value": 20.0}], "constants")
+            record([{"name": "PRICE_WINDOW", "value": 3.0}, {"name": "CLIP", "value": 20.0}], "model_constants")
             record([{"player_id": "p1", "app_id": "1"}, {"player_id": "p2", "app_id": "2"}],
                    "crosswalk")
             store_sql("market", [{"observed_at": at(1), "ff_id": k, "name": k, "value": "10000000"}

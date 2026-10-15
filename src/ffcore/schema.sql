@@ -472,23 +472,35 @@ FROM (SELECT ff_id, observed_at, value, id,
       FROM market_daily WHERE coalesce(ff_id, '') <> '' AND value IS NOT NULL
       WINDOW p AS (PARTITION BY ff_id ORDER BY observed_at, id));
 
--- The constants a run is built with (assemble.CONSTANTS), for the views.
-CREATE TABLE IF NOT EXISTS constants (
-    name  TEXT PRIMARY KEY,
-    value REAL NOT NULL
+-- The constants a run is built with (assemble.constants), for the views,
+-- per variant: live, or a challenger's (variants) while it is replayed.
+DROP TABLE IF EXISTS constants;
+CREATE TABLE IF NOT EXISTS model_constants (
+    variant TEXT NOT NULL DEFAULT 'live',
+    name    TEXT NOT NULL,
+    value   REAL NOT NULL,
+    PRIMARY KEY (variant, name)
+);
+
+-- A challenger: the constants it sets differently from live's.
+CREATE TABLE IF NOT EXISTS variants (
+    variant TEXT NOT NULL,
+    name    TEXT NOT NULL,
+    value   REAL NOT NULL,
+    PRIMARY KEY (variant, name)
 );
 
 -- The constants the views use, one row: each named once, here.
 DROP VIEW IF EXISTS k;
 CREATE VIEW k AS SELECT
-    (SELECT value FROM constants WHERE name = 'CLIP') AS clip,
-    (SELECT value FROM constants WHERE name = 'PRICE_WINDOW') AS price_window,
-    (SELECT value FROM constants WHERE name = 'BID_BEATS') AS bid_beats,
-    (SELECT value FROM constants WHERE name = 'MATCH_LEN') AS match_len,
-    (SELECT value FROM constants WHERE name = 'NEUTRAL_START') AS neutral_start,
-    (SELECT value FROM constants WHERE name = 'ABSENT_START') AS absent_start,
-    (SELECT value FROM constants WHERE name = 'FALLBACK_K') AS fallback_k,
-    (SELECT value FROM constants WHERE name = 'REMIND_HOURS') AS remind_hours;
+    (SELECT value FROM model_constants WHERE name = 'CLIP' AND variant = (SELECT variant())) AS clip,
+    (SELECT value FROM model_constants WHERE name = 'PRICE_WINDOW' AND variant = (SELECT variant())) AS price_window,
+    (SELECT value FROM model_constants WHERE name = 'BID_BEATS' AND variant = (SELECT variant())) AS bid_beats,
+    (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
+    (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
+    (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
+    (SELECT value FROM model_constants WHERE name = 'FALLBACK_K' AND variant = (SELECT variant())) AS fallback_k,
+    (SELECT value FROM model_constants WHERE name = 'REMIND_HOURS' AND variant = (SELECT variant())) AS remind_hours;
 
 -- Each player's changes, all time, numbered (i), clipped at CLIP (x: so a
 -- long rise is not cut short), with the value each ends at.
