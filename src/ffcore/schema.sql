@@ -181,20 +181,6 @@ CREATE TABLE IF NOT EXISTS replay_forecast (
     PRIMARY KEY (variant, as_of, jornada, player)
 ) WITHOUT ROWID;
 
--- Each rival's plan at every past lock (grading.decisions), set against the
--- points its moves changed over the jornadas since: what his board said.
-CREATE TABLE IF NOT EXISTS grade_rival_moves (
-    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
-    lock    INTEGER NOT NULL,
-    manager TEXT NOT NULL,
-    ord     INTEGER NOT NULL,
-    move    TEXT NOT NULL,
-    kind    TEXT NOT NULL,         -- get, sell
-    pred    REAL,
-    real    REAL,
-    PRIMARY KEY (run_id, lock, manager, ord)
-);
-
 -- Each rival's board for a run (sim.rivals): the funnel with him as "me".
 -- His cash is our estimate and his pending bids are invisible to us.
 CREATE TABLE IF NOT EXISTS rival_boards (

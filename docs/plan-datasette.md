@@ -323,15 +323,11 @@ a decision.
 - 5.3 (done 2026-10-15) Every manager's board: `sim.rival_universe` /
   `rival_rows`, stage `run.py rivals` (~25s; lfg-run runs it after the
   queries), tables `rival_boards` / `rival_moves`, saved query `rival_boards`.
-  `grading.decisions` also replays each past lock's rival plans
-  (`grade_rival_moves`), so `phantom_coach` now gives every manager: his
-  points, and his points plus the points of the moves his own board planned
-  that his ledger does not show made (7 of mine made, 14 not: +119; the
-  rivals' phantoms run +160 to +272). Read it as advice graded, not as a
-  table that would have happened: every plan wants the same targets (Koski,
-  Revivo), so they cannot all win those bids; that is 5.7. A rival's cash is
-  our estimate. The grade stage went from ~2 to ~3 minutes (skipped unless
-  the code or the jornadas changed).
+  First look: every rival's plan wants the same targets (Koski, Revivo).
+  Tried and deleted: a phantom for every manager (their plans replayed at each
+  past lock, +160..+272 points each). They cannot all win the same bids, so
+  those numbers mean nothing; the phantom is one, the league's sixth manager
+  (`phantom_coach`, 5.2). What the rivals' boards are for is 5.7.
 - 5.4 Champion and challenger: a model change runs beside the live one,
   both scored as jornadas resolve; it replaces the live one only on a win.
 - 5.5 Parser self-report: a page parsing to zero rows opens a session with
