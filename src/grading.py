@@ -6,12 +6,16 @@ import sqlite3
 import sys
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from ffcore.forecast import expected_points
 from ffcore.schedule import expectations
+from ffcore.season import simulate
 from ffcore.jornadas import round_locks, rounds_ahead
 from ffcore.points import jornada_points
 
@@ -215,14 +219,12 @@ def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datet
     return out
 
 
-def calibration_rows(jornada: int, draws: dict[str, "np.ndarray[Any, Any]"], actual: dict[str, float],
+def calibration_rows(jornada: int, draws: dict[str, np.ndarray[Any, Any]], actual: dict[str, float],
                      me: str) -> list[dict[str, Any]]:
     """Where what happened falls in the simulation's draws of one jornada,
     for each manager, and for you minus him (the draws share their trials, so
     what the league as a whole does cancels, as it does in who finishes above)."""
-    import numpy as np
-
-    def pit(v: "np.ndarray[Any, Any]", x: float) -> float:
+    def pit(v: np.ndarray[Any, Any], x: float) -> float:
         return float((v < x).mean() + 0.5 * (v == x).mean())
     out = []
     for m, v in draws.items():
@@ -244,11 +246,6 @@ def sim_calibration() -> list[dict[str, Any]]:
     clean lock, every manager's points that jornada drawn from the squads
     then (his best eleven, the forecast then) against what he scored (his
     team_points over the window)."""
-    import numpy as np
-    from dataclasses import replace as _replace
-
-    from ffcore.season import simulate
-
     locks = round_locks()
     with closing(connect()) as db:
         kicks = [(j, snapshot_stamp(k) or dt.datetime.min.replace(tzinfo=dt.timezone.utc))
@@ -268,7 +265,7 @@ def sim_calibration() -> list[dict[str, Any]]:
                 except SystemExit as e:
                     print("j%d: no board (%s)" % (j, e), file=sys.stderr)
                     continue
-                st = _replace(u.state, jornadas=[j], carried={}, fielded={})
+                st = replace(u.state, jornadas=[j], carried={}, fielded={})
                 totals = simulate(st, u.forecaster, trials=4000, seed=1).totals
                 actual = {}
                 for m in totals:
@@ -429,16 +426,15 @@ def _selftest() -> None:
 
     assert clean_windows({1: day(0), 2: day(5)}, [(1, day(0)), (9, day(0)), (2, day(5))]) == {}, \
         "another jornada's match at the very kickoff of the lock is in the window too"
-    import numpy as np
     draws = {"me": np.array([40.0, 50.0, 60.0, 70.0]), "riv": np.array([30.0, 40.0, 50.0, 60.0])}
-    got = {r["manager"]: r for r in calibration_rows(7, draws, {"me": 55.0, "riv": 100.0}, "me")}
-    assert (got["me"]["mean"], got["me"]["pit"], got["me"]["diff_pit"]) == (55.0, 0.5, None), got["me"]
-    assert got["riv"]["pit"] == 1.0 and got["riv"]["actual"] == 100.0, "above every draw"
-    assert (got["riv"]["diff_actual"], got["riv"]["diff_mean"], got["riv"]["diff_sd"]) == (-45.0, 10.0, 0.0), \
+    cal = {r["manager"]: r for r in calibration_rows(7, draws, {"me": 55.0, "riv": 100.0}, "me")}
+    assert (cal["me"]["mean"], cal["me"]["pit"], cal["me"]["diff_pit"]) == (55.0, 0.5, None), cal["me"]
+    assert cal["riv"]["pit"] == 1.0 and cal["riv"]["actual"] == 100.0, "above every draw"
+    assert (cal["riv"]["diff_actual"], cal["riv"]["diff_mean"], cal["riv"]["diff_sd"]) == (-45.0, 10.0, 0.0), \
         "me minus him: the draws share trials, so a constant 10 apart has no spread"
-    assert got["riv"]["diff_pit"] == 0.0, "-45 is below every draw of +10"
+    assert cal["riv"]["diff_pit"] == 0.0, "-45 is below every draw of +10"
     assert calibration_rows(7, draws, {"me": 50.0}, "me")[0]["pit"] == 0.375, "a draw equal to it counts half"
-    assert abs(got["me"]["sd"] - float(np.std([40, 50, 60, 70], ddof=1))) < 1e-9
+    assert abs(cal["me"]["sd"] - float(np.std([40, 50, 60, 70], ddof=1))) < 1e-9
 
     print("grading self-test OK")
 
