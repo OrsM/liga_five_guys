@@ -21,8 +21,9 @@ from typing import Any
 
 from ffcore import clock
 
-KEEP = 6000                     # entries; the oldest used go beyond it
+KEEP = 6000                     # entries; the oldest made go beyond it
 _BASE: list[str] = []           # the key of the scope in force
+_CON: list[sqlite3.Connection] = []     # its store, open for the scope
 _RAW = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+)")
 
 
@@ -34,7 +35,7 @@ def _store(db: Path) -> Path:
 
 def _open(db: Path) -> sqlite3.Connection:
     con = sqlite3.connect(_store(db))
-    con.execute("CREATE TABLE IF NOT EXISTS kept (key TEXT PRIMARY KEY, used REAL, val BLOB) WITHOUT ROWID")
+    con.execute("CREATE TABLE IF NOT EXISTS kept (key TEXT PRIMARY KEY, made REAL, val BLOB) WITHOUT ROWID")
     return con
 
 
@@ -62,10 +63,12 @@ def scope(db: Path, raw_sql: Path, constants: str) -> Iterator[None]:
                   if any(c[1] == "observed_at" for c in lfg.execute('PRAGMA table_info("%s")' % t))]
         _BASE[:] = ["|".join((cut, clock.variant(), str(lfg.execute("PRAGMA user_version").fetchone()[0]),
                               hashlib.sha1(constants.encode()).hexdigest(), _fingerprint(lfg, tables, cut)))]
+    _CON[:] = [_open(db)]
     try:
         yield
     finally:
         _BASE.clear()
+        _CON.pop().close()
 
 
 def _key(name: str, params: object = ()) -> str:
@@ -75,22 +78,18 @@ def _key(name: str, params: object = ()) -> str:
 def get(db: Path, sql: str, params: object) -> Any:
     if not _BASE:
         return None
-    with closing(_open(db)) as con, con:
-        got = con.execute("SELECT val FROM kept WHERE key = ?", (_key(sql, params),)).fetchone()
-        if got is None:
-            return None
-        con.execute("UPDATE kept SET used = ? WHERE key = ?", (time.time(), _key(sql, params)))
-        return pickle.loads(got[0])
+    got = _CON[0].execute("SELECT val FROM kept WHERE key = ?", (_key(sql, params),)).fetchone()
+    return None if got is None else pickle.loads(got[0])
 
 
 def put(db: Path, sql: str, params: object, value: Any) -> None:
     if not _BASE:
         return
-    with closing(_open(db)) as con, con:
+    with _CON[0] as con:
         con.execute("INSERT OR REPLACE INTO kept VALUES (?, ?, ?)",
                     (_key(sql, params), time.time(), pickle.dumps(value)))
         if con.execute("SELECT count(*) FROM kept").fetchone()[0] > KEEP:
-            con.execute("DELETE FROM kept WHERE key IN (SELECT key FROM kept ORDER BY used LIMIT ?)", (KEEP // 6,))
+            con.execute("DELETE FROM kept WHERE key IN (SELECT key FROM kept ORDER BY made LIMIT ?)", (KEEP // 6,))
 
 
 def written(db: Path, name: str) -> bool:
@@ -100,14 +99,13 @@ def written(db: Path, name: str) -> bool:
 
 
 def _latest(db: Path, name: str) -> str | None:
-    with closing(_open(db)) as con:
-        got = con.execute("SELECT val FROM kept WHERE key = ?", ("write|%s|%s" % (name, clock.cut()),)).fetchone()
+    got = _CON[0].execute("SELECT val FROM kept WHERE key = ?", ("write|%s|%s" % (name, clock.cut()),)).fetchone()
     return pickle.loads(got[0]) if got else None
 
 
 def mark(db: Path, name: str) -> None:
     if _BASE:
-        with closing(_open(db)) as con, con:
+        with _CON[0] as con:
             con.execute("INSERT OR REPLACE INTO kept VALUES (?, ?, ?)",
                         ("write|%s|%s" % (name, clock.cut()), time.time(), pickle.dumps(_BASE[0])))
 

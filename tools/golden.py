@@ -154,6 +154,58 @@ def build(now: str, hash_seed: str, base: Path, ended: bool = False) -> dict[str
         shutil.rmtree(work, ignore_errors=True)
 
 
+def builds(nows: Sequence[str], hash_seed: str, base: Path) -> list[dict[str, Any] | None]:
+    """The boards at these times, JOBS processes each taking a share of them
+    in turn on its own copy of the parsed data: a process starts (imports,
+    schema) once, not once a board."""
+    shares = [list(nows[i::JOBS]) for i in range(JOBS) if nows[i::JOBS]]
+
+    def one(share: list[str]) -> dict[str, dict[str, Any] | None]:
+        work = HOME / "work" / share[0]
+        shutil.rmtree(work, ignore_errors=True)
+        shutil.copytree(base, work, symlinks=True, ignore=shutil.ignore_patterns("raw"))
+        out = work / "reports"
+        out.mkdir()
+        env = dict(os.environ, PYTHONPATH="src", FF_ROOT=str(work), LFG_REPORTS=str(out),
+                   PYTHONHASHSEED=hash_seed, LFG_KEPT=str(HOME / "kept"),
+                   OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
+        try:
+            subprocess.run([sys.executable, __file__, "--worker", *share], env=env, check=True,
+                           stdout=subprocess.DEVNULL)
+            return {n: (json.loads((out / (n + ".json")).read_text(encoding="utf-8"))
+                        if (out / (n + ".json")).exists() else None) for n in share}
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+    got: dict[str, dict[str, Any] | None] = {}
+    for part in in_order(shares, one):
+        got.update(part)
+    boards = []
+    for n in nows:
+        board = got[n]
+        if board is not None:
+            board.pop("generated_at", None)
+        boards.append(board)
+    return boards
+
+
+def _worker(nows: Sequence[str]) -> None:
+    """Build the board at each time, in this process, as run.py sim does."""
+    import assemble
+    import grading
+    import run
+    from ffcore import clock
+    out = Path(os.environ["LFG_REPORTS"])
+    for now in nows:
+        os.environ["LFG_NOW"] = now
+        clock.set_now(None)
+        assemble.built.cache_clear()
+        grading._AT.clear()
+        (out / "decisions.json").unlink(missing_ok=True)
+        run.main(["sim"])
+        if (out / "decisions.json").exists():
+            shutil.copy(out / "decisions.json", out / (now + ".json"))
+
+
 def diff(a: object, b: object, at: str = "") -> list[str]:
     if isinstance(a, dict) and isinstance(b, dict):
         return [d for k in sorted(set(a) | set(b), key=str)
@@ -181,7 +233,7 @@ def main(argv: list[str]) -> int:
         keep(Path(os.environ.get("FF_ROOT", "data")), HOME / "data")
         base, boards = parsed(), {}
         for now, board in zip(stamps_ := stamps(int(argv[1]) if len(argv) > 1 else 16),
-                              in_order(stamps_, lambda now: build(now, "0", base))):
+                              builds(stamps_, "0", base)):
             boards[now] = board
             print("  %s  %s" % (now, kinds(board)), flush=True)
         (HOME / "boards.json").write_text(json.dumps(boards))
@@ -193,7 +245,7 @@ def main(argv: list[str]) -> int:
         want = {k: frozen[k] for k in subset({k: kinds(v) for k, v in frozen.items()},
                                              len(frozen) if arg == "all" else int(arg))}
         base = parsed()
-        results = in_order(list(want), lambda now: diff(want[now], build(now, "1", base)))
+        results = [diff(want[now], board) for now, board in zip(want, builds(list(want), "1", base))]
         bad = 0
         for now, lines in zip(want, results):
             bad += bool(lines)
@@ -276,6 +328,9 @@ def _selftest() -> None:
 
 
 if __name__ == "__main__":
+    if sys.argv[1:2] == ["--worker"]:
+        _worker(sys.argv[2:])
+        raise SystemExit(0)
     if sys.argv[1:] == ["--selftest"]:
         _selftest()
         raise SystemExit(0)
