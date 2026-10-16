@@ -1086,13 +1086,36 @@ SELECT p.*, coalesce(f.name, p.player) AS name, coalesce(f.pos, '') AS pos,
        coalesce(f.fetches = f.offer, 0) AS takes
 FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN sim_facts f USING (run_id, player);
 
--- Your squad: goalkeepers to forwards, then most expected next first.
+-- The game's offers for your players, the best price first: each against
+-- his value, the share of its last price_window offers (offer_ratios) it
+-- beats, what selling him does to your season (the funnel's sale) and
+-- whether the plan sells him.
 DROP VIEW IF EXISTS board_holdings;
-CREATE VIEW board_holdings AS
-SELECT row_number() OVER (ORDER BY CASE pos WHEN 'POR' THEN 0 WHEN 'DEF' THEN 1
-           WHEN 'MED' THEN 2 WHEN 'DEL' THEN 3 ELSE 9 END, -next, player) - 1 AS ord,
-       name, pos, xi, start, next, season, value, trend, paid, per_million, offer
-FROM board_players WHERE mine;
+DROP VIEW IF EXISTS board_offers;
+CREATE VIEW board_offers AS
+WITH r AS (SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
+           LIMIT coalesce((SELECT CAST(price_window AS INTEGER) FROM k), -1)),
+o AS (SELECT b.player, b.name, b.pos, b.offer, b.value,
+             (SELECT avg(r.ratio < b.offer / b.value) FROM r) AS beats,
+             f.gain AS season, coalesce(f.in_plan, 0) AS sell
+      FROM board_players b JOIN board_run USING (run_id)
+      LEFT JOIN funnel f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.sell = b.player
+      WHERE b.mine AND b.offer IS NOT NULL AND b.value > 0)
+SELECT row_number() OVER (ORDER BY offer / value DESC, player) - 1 AS ord,
+       name, pos, offer, value, beats, season, sell
+FROM o;
+
+-- The market as the funnel ranked it: each buy that gains you season
+-- points, in its order, with its verdict (NULL: it clears the bar) and
+-- whether the plan buys him.
+DROP VIEW IF EXISTS board_market;
+CREATE VIEW board_market AS
+SELECT row_number() OVER (ORDER BY f.rank) - 1 AS ord, coalesce(s.name, f.buy) AS name,
+       coalesce(s.pos, '') AS pos, coalesce(s.price, f.cost) AS asking, f.cost AS bid,
+       f.gain, f.p_better AS better, f.verdict, f.in_plan AS plan, s.trend
+FROM funnel f JOIN board_run USING (run_id)
+LEFT JOIN sim_facts s ON s.run_id = f.run_id AND s.player = f.buy
+WHERE f.kind = 'buy' AND f.gain > 0;
 
 -- Your players a rival can take now by paying their clause (any can: a sale
 -- to the game pays at once, so cash is no limit), most valuable first.
@@ -1242,11 +1265,15 @@ SELECT json_object(
     'plan_gain', h.plan_gain, 'cash_after', h.cash_after, 'ping', coalesce(h.ping, ''),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
-    'squad', (SELECT json_group_array(json_object(
-                  'name', name, 'pos', pos, 'xi', json(CASE WHEN xi THEN 'true' ELSE 'false' END),
-                  'start', start, 'next', next, 'season', season, 'value', value,
-                  'trend', trend, 'paid', paid, 'per_million', per_million, 'offer', offer)
-                  ORDER BY ord) FROM board_holdings),
+    'offers', (SELECT json_group_array(json_object(
+                   'name', name, 'pos', pos, 'offer', offer, 'value', value, 'beats', beats,
+                   'season', season, 'sell', json(CASE WHEN sell THEN 'true' ELSE 'false' END))
+                   ORDER BY ord) FROM board_offers),
+    'market', (SELECT json_group_array(json_object(
+                   'name', name, 'pos', pos, 'asking', asking, 'bid', bid, 'gain', gain,
+                   'better', better, 'verdict', verdict, 'trend', trend,
+                   'plan', json(CASE WHEN plan THEN 'true' ELSE 'false' END))
+                   ORDER BY ord) FROM board_market),
     'standings', (SELECT json_group_array(json_object(
                       'manager', manager, 'me', json(CASE WHEN me THEN 'true' ELSE 'false' END),
                       'now', now, 'mean', mean, 'lo', lo, 'hi', hi, 'cash', cash,

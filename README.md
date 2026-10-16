@@ -123,9 +123,11 @@ Every forecast is the same product, for every player and jornada, and
 - **The ledger** (`ffcore/league.py`, `ledger`): the activity feed read
   once, each event keyed like every other table. Rival cash and the price
   paid (each owned player's last buy or transfer to his owner) are both
-  read from it. The
-  board's squad shows it beside his value and the points his sale costs
-  per million it raises.
+  read from it (`price_paid` on the box).
+- **The board's offers and market** (`board_offers`, `board_market`): each
+  offer the game made for your players against his value, the share of
+  its recent offers it beats and the points his sale costs; each player on
+  sale whose purchase gains, with the funnel's verdict.
 - **Rival cash**: budget plus their sales, bonuses and
   transfer income, less buys and transfer payments, plus the income the feed
   never records (your real balance minus the same sum for you).

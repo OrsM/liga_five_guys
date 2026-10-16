@@ -90,9 +90,11 @@ def _selftest() -> None:
     assert {m["manager"] for m in moves} <= {"riv"} and [m["ord"] for m in moves] == list(range(len(moves)))
     assert not {m["label"] for m in moves} & {"buy star"}, "never a player you own: the owner stays"
 
-    def report(u: Universe, bd: Board, fielded: Sequence[str] = ()) -> Doc:
+    def report(u: Universe, bd: Board, fielded: Sequence[str] = (),
+               ratios: Sequence[float] = ()) -> Doc:
         """The board the views make of this universe's run, its market's
-        facts standing in for player_facts and cash (assemble tests those)."""
+        facts standing in for player_facts and cash, ratios for the game's
+        past offers (assemble tests those)."""
         m = u.market
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             with closing(connect()) as db, db:
@@ -107,6 +109,9 @@ def _selftest() -> None:
                 db.execute("CREATE TABLE sale_odds (player, offer, waiting, fetches)")
                 db.executemany("INSERT INTO sale_odds VALUES (?, ?, NULL, ?)",
                                [(k, o, m.fetch[k]) for k, o in m.offer.items()])
+                db.execute("DROP VIEW offer_ratios")
+                db.execute("CREATE TABLE offer_ratios (created_at, ratio)")
+                db.executemany("INSERT INTO offer_ratios VALUES ('', ?)", [(r,) for r in ratios])
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
                                [(k, k) for k in fielded])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
@@ -159,8 +164,14 @@ def _selftest() -> None:
         "above you: the chance he finishes above you, not that you beat him"
     assert all(r["estimated"] for r in doc["standings"] if not r["me"]), \
         "rival cash is estimated from the feed"
-    assert [s["pos"] for s in doc["squad"]][0] == "POR", doc["squad"]
-    assert sum(s["xi"] for s in doc["squad"]) == 11
+    assert "squad" not in doc, "no squad table: offers and the market are what to act on"
+    market = [(m.action.buy, m.action.cost, round(m.d_pts, 6), round(m.p_better, 6), verdict(m), m in b.plan)
+              for m in b.rows if m.action.kind == "buy" and m.d_pts > 0]
+    assert market and [(r["name"].lower(), r["bid"], round(r["gain"], 6), round(r["better"], 6),
+                        r["verdict"], r["plan"])
+                       for r in doc["market"]] == market, \
+        ("the market: every buy the funnel ranked that gains, in its order, with its verdict", doc["market"])
+    assert doc["market"][0]["asking"] == ub.market.price[market[0][0]]
     assert [r["manager"] for r in doc["standings"]][0] in ("me", "riv")
     assert doc["standings"][[r["me"] for r in doc["standings"]].index(True)][
         "p_above"] is None
@@ -200,6 +211,18 @@ def _selftest() -> None:
         "waiting: done for tonight, and the sale raises what waiting is worth"
     assert facts(wait)["offer"] == 0.9e6 and facts(wait)["raises"] == wait["amount"]
     assert "Dead" not in quiet, quiet
+
+    offered = replace(ub, market=replace(ub.market, offer={"dead": 1.1e6, "star": 19e6},
+                                         fetch={"dead": 1.1e6, "star": 19e6}))
+    told = report(offered, b, ratios=[0.9, 0.95, 1.0, 1.05, 1.2])
+    assert [(o["name"].lower(), o["offer"], o["value"], o["beats"], o["sell"]) for o in told["offers"]] == [
+        ("dead", 1.1e6, 1e6, 0.8, False), ("star", 19e6, 20e6, 0.2, False)], told["offers"]
+    sales = {m.action.sell[0]: m for m in b.rows if m.action.kind == "sell"}
+    assert [round(o["season"], 6) for o in told["offers"]] == [
+        round(sales[k].d_pts, 6) for k in ("dead", "star")], "what selling him does to your season: the funnel's"
+    assert report(offered, b._replace(plan=[sales["dead"]]))["offers"][0]["sell"] is True, \
+        "sell: the plan sells him"
+    assert report(offered, b)["offers"][0]["beats"] is None, "no past offers, no rank among them"
 
     ranked = funnel(ub, b, 7)
     assert [r["rank"] for r in ranked] == list(range(len(b.rows))) \
