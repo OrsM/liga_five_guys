@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-16T08:01Z",
+ "generated_at": "2026-10-16T16:05Z",
  "lock_at": "2026-10-16T19:00:00+00:00",
  "cash": 3995680.0,
  "cash_locked": 0.0,
@@ -7,7 +7,7 @@
  "p_win": 0.373,
  "band": [
   1819.31912888611,
-  2096.86583562022
+  2096.50835799979
  ],
  "do": [],
  "plan_gain": 0.0,
@@ -17,7 +17,7 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 23230999.0
+   "clause": 23231254.0
   },
   {
    "name": "Ante Budimir",
@@ -32,7 +32,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 58160465.0
+   "clause": 58161050.0
   },
   {
    "name": "Pablo Fornals",
@@ -47,7 +47,7 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 14858423.0
+   "clause": 14858531.0
   },
   {
    "name": "Iñigo Vicente",
@@ -62,12 +62,12 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 19656230.0
+   "clause": 19656596.0
   },
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
-   "clause": 24367736.0
+   "clause": 24368183.0
   },
   {
    "name": "Yeray Alvarez",
@@ -93,13 +93,13 @@
    "name": "Marcos Alonso",
    "pos": "DEF",
    "xi": true,
-   "start": 0.868261474757105,
-   "next": 6.38467597029912,
-   "season": 134.408814114823,
+   "start": 0.842754354979507,
+   "next": 6.1971118557435,
+   "season": 134.221250000267,
    "value": 22596648.0,
    "trend": 17.7646713153039,
    "paid": 28589508.0,
-   "per_million": -2.64534456998057,
+   "per_million": -2.63494531089663,
    "offer": 21949003.0
   },
   {
@@ -243,15 +243,15 @@
    "hi": 2151.38647202436,
    "cash": 10383908.0,
    "estimated": true,
-   "p_above": 0.611666666666667
+   "p_above": 0.612
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 412.0,
-   "mean": 1955.48155314581,
+   "mean": 1955.31419730484,
    "lo": 1819.31912888611,
-   "hi": 2096.86583562022,
+   "hi": 2096.50835799979,
    "cash": 3995680.0,
    "estimated": false,
    "p_above": null
@@ -271,9 +271,9 @@
    "manager": "SusoGattuso",
    "me": false,
    "now": 263.0,
-   "mean": 1646.7558099054,
-   "lo": 1529.83403927879,
-   "hi": 1765.95451579073,
+   "mean": 1646.51591633115,
+   "lo": 1529.57039682255,
+   "hi": 1765.84464431964,
    "cash": 8315705.0,
    "estimated": true,
    "p_above": 0.0133333333333333
