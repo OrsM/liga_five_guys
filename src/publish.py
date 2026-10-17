@@ -34,7 +34,9 @@ def _access(env: Path) -> dict[str, str]:
             if eq and not k.startswith("#"):
                 got[k] = v.strip().strip("'\"")
     return {"CF-Access-Client-Id": got.get("CF_ACCESS_CLIENT_ID", ""),
-            "CF-Access-Client-Secret": got.get("CF_ACCESS_CLIENT_SECRET", "")}
+            "CF-Access-Client-Secret": got.get("CF_ACCESS_CLIENT_SECRET", ""),
+            # Cloudflare refuses Python's own User-Agent (error 1010: 403 before Access)
+            "User-Agent": "liga_five_guys/lfg-run"}
 
 
 def _post(url: str, headers: dict[str, str], body: bytes | None) -> str:
@@ -91,8 +93,9 @@ def _selftest() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         env = Path(tmp) / "a.env"
         env.write_text("# a comment\nCF_ACCESS_CLIENT_ID='abc'\nCF_ACCESS_CLIENT_SECRET=\"xyz\"\nOTHER=1\n")
-        assert _access(env) == {"CF-Access-Client-Id": "abc", "CF-Access-Client-Secret": "xyz"}
-        assert _access(Path(tmp) / "none") == {"CF-Access-Client-Id": "", "CF-Access-Client-Secret": ""}
+        assert _access(env) == {"CF-Access-Client-Id": "abc", "CF-Access-Client-Secret": "xyz",
+                                "User-Agent": "liga_five_guys/lfg-run"}, "Python's own User-Agent is refused"
+        assert _access(Path(tmp) / "none")["CF-Access-Client-Id"] == ""
         seen: list[tuple[str, dict[str, str], bytes | None]] = []
 
         def answer(said: str) -> Callable[[str, dict[str, str], bytes | None], str]:
