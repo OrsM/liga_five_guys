@@ -33,6 +33,13 @@ def tokens(s: object) -> list[str]:
     return [t for t in norm(s).split() if len(t) > 1]
 
 
+def stems_meet(app_name: object, app_full: object, ff_name: object) -> int:
+    """How many first-four-letter stems the app's names and futbolfantasy's
+    share ("Jonny Otto" and "Jonny Castro": 1)."""
+    theirs = {w[:4] for w in tokens(app_name)} | {w[:4] for w in tokens(app_full)}
+    return len(theirs & {w[:4] for w in tokens(ff_name)})
+
+
 def index_by(rows: Iterable[Mapping[str, Any]], key: str = "name"
              ) -> dict[str, Mapping[str, Any]]:
     return {norm(r.get(key)): r for r in rows if norm(r.get(key))}

@@ -6,65 +6,17 @@ import sys
 
 from ffcore.parse import Rows, text
 from ffcore.crosswalk import Crosswalk, Player, clashes
-from ffcore.players import load_crosswalk
-from ffcore.names import AppId, PlayerKey, app_id
-from ffcore.text import tokens
-from ffcore.tidy import current, history, table_path
+from ffcore.names import AppId, PlayerKey
+from ffcore.db import rows
+from ffcore.tidy import current, history
 
 
 
-def build_players(registry: dict[str, Player], market: Rows, api_rows: Rows
-                  ) -> dict[str, Player]:
-    """The registry with this market's players added and their app ids
-    checked and attached: by value and by the words of their names."""
-    out = dict(registry)
-    for r in market:
-        pid = PlayerKey(text(r, "ff_id"))
-        if not pid:
-            continue
-        p = out.setdefault(pid, Player(pid))
-        p.name = text(r, "name") or p.name
-        p.club_id = r.get("club") or p.club_id
-    value: dict[str, float | None] = {text(r, "ff_id"): r.get("value") for r in market}
-    app = {app_id(r): r for r in api_rows}
-    words = {pid: set(tokens(p.name)) for pid, p in out.items()}
-    weak: set[str] = set()
-    for key, p in out.items():
-        row = app.get(p.app_id)
-        if row is None:
-            continue
-        ratio = ((row.get("market_value") or 0) / v if (v := value.get(key)) else 1.0)
-        related = {w[:4] for w in words[key]} & {
-            w[:4] for w in tokens(row.get("player_name"))}
-        if not (0.8 < ratio < 1.25 or (related and 0.5 < ratio < 2.0)):
-            print("  app id %s (%s) dropped from %s: the app's name and value "
-                  "disagree" % (p.app_id, row.get("player_name"), p.name))
-            p.app_id = AppId("")
-        elif not related:
-            weak.add(key)
-
-    held = {p.app_id for p in out.values() if p.app_id}
-    for aid, r in app.items():
-        theirs = r.get("market_value")
-        if not aid or aid in held or not theirs:
-            continue
-        theirs_words = [set(tokens(n)) for n in (r.get("player_name"),
-                                                 r.get("player_name_full"))
-                        if n]
-        hits = [pid for pid in value
-                if (not out[pid].app_id or pid in weak) and value[pid]
-                and 0.8 < theirs / value[pid] < 1.25
-                and any(w and (w <= words[pid] or words[pid] <= w)
-                        for w in theirs_words)]
-        if len(hits) == 1:
-            print("  app id %s (%s) attached to %s"
-                  % (aid, r.get("player_name"), out[hits[0]].name))
-            weak.discard(hits[0])
-            held.discard(out[hits[0]].app_id)
-            out[hits[0]].app_id = aid
-            out[hits[0]].app_names.add(text(r, "player_name"))
-            held.add(aid)
-    return out
+def registry() -> dict[str, Player]:
+    """Every player as the data has it (schema.sql registry): name, club
+    and app id, no slugs yet."""
+    return {pid: Player(PlayerKey(pid), name, club, app_id=AppId(aid))
+            for pid, name, club, aid in rows("SELECT player_id, name, club_id, app_id FROM registry")}
 
 
 def attach_slugs(players: dict[str, Player], rows: Rows) -> None:
@@ -77,21 +29,15 @@ def attach_slugs(players: dict[str, Player], rows: Rows) -> None:
 
 
 def main() -> None:
-    registry = load_crosswalk()
-    players = build_players(registry.players, current("market"),
-                            current("api_teams") + current("api_market")
-                            + current("api_players_all"))
+    players = registry()
     xw = Crosswalk(players)
     xw.mirror()
     attach_slugs(players, [*history("lineups"), *current("starters")])
-    xw.save(table_path("players"))
+    xw.mirror()
 
     c = xw.coverage()
-    print("wrote %s: %d players (%d new) — %.0f%% carry a "
-          "probable-XI slug, %.0f%% an app id"
-          % (table_path("players"), c["players"],
-             len(players) - len(registry.players),
-             100 * c["ff"], 100 * c["app"]))
+    print("registry: %d players — %.0f%% carry a probable-XI slug, %.0f%% an app id"
+          % (c["players"], 100 * c["ff"], 100 * c["app"]))
     for idx, ids in clashes().items():
         print("  warn: %s claimed by two players, refused until resolved: %s"
               % (idx, ", ".join(ids)))
@@ -111,7 +57,8 @@ def _selftest() -> None:
     import tempfile
     from pathlib import Path
     from ffcore.tidy import store_sql, tables_in
-    players = build_players({}, market, [])
+    players = {k: Player(PlayerKey(k), text(r, "name"), r.get("club") or "")
+               for r in market for k in [text(r, "ff_id")]}
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         Crosswalk(players).mirror()
         store_sql("lineups", [dict(r, observed_at="2026-08-01T0900Z") for r in lineups])
@@ -122,25 +69,32 @@ def _selftest() -> None:
     assert players["jc"].ff_slug == "jonny-castro-ff", "by name within the club"
     assert players["af"].club_id == "espanyol"
 
-    twins = typed("market", [{"name": n, "club": c, "ff_id": i, "value": v} for n, c, i, v in [
-        ("Pablo Fornals", "betis", "a", "5000000"),
-        ("Pablo Fornals", "villarreal", "b", "9000000"),
-        ("Fermin Lopez", "barcelona", "c", "100000000")]])
-    api = typed("api_teams", [{"player_name": "Fermín", "player_id": "1715",
-            "market_value": "108000000"},
-           {"player_name": "Fer López", "player_id": "2929",
-            "market_value": "15000000"},
-           {"player_name": "Pablo Fornals", "player_id": "12",
-            "market_value": "5100000"},
-           {"player_name": "Fornals", "player_id": "99",
-            "market_value": "40000000"}])
-    got = build_players({"c": Player(PlayerKey("c"), app_id=AppId("2929")),
-                         "gone": Player(PlayerKey("gone"), "Left The League")},
-                        twins, api)
-    assert {k: p.app_id for k, p in got.items()} == \
-        {"a": "12", "b": "", "c": "1715", "gone": ""}, got
-    assert got["c"].app_names == {"Fermín"}, got["c"]
-    assert got["b"].name == "Pablo Fornals" and got["b"].club_id == "villarreal"
+    a, b = "2026-08-01T0900Z", "2026-08-02T0900Z"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        store_sql("market", [{"observed_at": at, "ff_id": i, "name": n, "club": c, "value": v}
+                             for at, i, n, c, v in [
+            (a, "jc", "Jonny Castro", "celta", "19798425"), (b, "jc", "Jonny Castro", "alaves", "19798425"),
+            (a, "lz", "Sergio Jose Lozano", "eibar", "560396"), (a, "ja", "Jose Angel Lopez", "espanyol", "560396"),
+            (a, "pf", "Pablo Fornals", "betis", "5000000"), (a, "gone", "Left Early", "x", "1000000")]])
+        store_sql("api_teams", [{"observed_at": at, "player_id": i, "player_name": n, "market_value": v,
+                                 "manager": "m"} for at, i, n, v in [
+            (a, "2552", "Jonny Otto", "19798425"), (b, "2552", "Jonny Otto", "19798425"),
+            (a, "3178", "Lozano", "560396"), (a, "3172", "Jose Angel", "560396"),
+            (a, "99", "Fornals", "40000000")]])
+        c = "2026-08-03T0900Z"
+        store_sql("market", [{"observed_at": at, "ff_id": "bo", "name": "Cesar Bonafe", "club": "elche",
+                              "value": "1057681"} for at in (a, b, c)]
+                  + [{"observed_at": at, "ff_id": "bn", "name": "Bono Bonafe", "club": "x", "value": "1057681"}
+                     for at in (a,)])
+        store_sql("api_players_all", [{"observed_at": a, "player_id": "3279", "player_name": "Bonafé",
+                                       "market_value": "1057681"}])
+        got = registry()
+    assert {k: p.app_id for k, p in got.items()} == {
+        "jc": "2552", "lz": "3178", "ja": "3172", "pf": "", "gone": "", "bo": "3279", "bn": ""}, \
+        ("same value, names sharing a stem; at one value, the most stems shared wins; an all-players"
+         " row holds until his next, so it meets every market snapshot in between", got)
+    assert (got["jc"].name, got["jc"].club_id) == ("Jonny Castro", "alaves"), \
+        "his latest market row; one who left keeps his"
 
     print("crosswalk self-test OK")
 

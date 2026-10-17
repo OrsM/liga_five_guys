@@ -24,7 +24,6 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
-from ffcore.players import load_crosswalk
 from ffcore.db import TABLES_SQL, connect
 from ffcore.tidy import (NUMBERS, ROOT, TIDY, clear_sql, store_sql, stored,
                          csv_string)
@@ -369,10 +368,8 @@ def load_season(archives: Iterable[Path] | None = None) -> int:
 
 def parse() -> dict[str, int]:
     """Fold new snapshots into the tidy tables (an empty lfg.db first gets
-    the registry and last season's points from their exports:
-    load_crosswalk, load_season); how many snapshots, documents parsed and
-    rows routed."""
-    load_crosswalk()
+    last season's points from the raw archive: load_season); how many
+    snapshots, documents parsed and rows routed."""
     load_season()
     version = _version()
     walk = doc_keys()

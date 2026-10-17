@@ -1,5 +1,5 @@
--- Who each player is: the registry crosswalk.py builds (players.csv, its
--- committed record, mirrored here by players.load_crosswalk), and one rule
+-- Who each player is: the registry the crosswalk stage rebuilds from the
+-- data each run (schema.sql registry, app_links), and one rule
 -- per identity question: an id or a name names a player only when it names
 -- exactly one. ffcore.crosswalk runs these same views on the players it
 -- holds, so the rule is here and only here.
@@ -8,8 +8,7 @@ CREATE TABLE IF NOT EXISTS crosswalk (
     name      TEXT NOT NULL DEFAULT '',
     club_id   TEXT NOT NULL DEFAULT '',
     ff_slug   TEXT NOT NULL DEFAULT '',
-    app_id    TEXT NOT NULL DEFAULT '',
-    app_names TEXT NOT NULL DEFAULT ''
+    app_id    TEXT NOT NULL DEFAULT ''
 );
 
 DROP VIEW IF EXISTS app_player;

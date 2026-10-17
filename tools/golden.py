@@ -4,8 +4,7 @@
     python tools/golden.py check [N|all] # rebuild N of them (default 6: one of each kind, the rest spread) with this tree's code, compare
     python tools/golden.py leak [N|all]  # the same, on data cut off at each board's time
 
-Only what no rebuild recovers is copied: data/raw and the tidy files git
-tracks. They are parsed with the tree's own code, so a change
+Only what no rebuild recovers is copied: data/raw. They are parsed with the tree's own code, so a change
 to how tables are stored or read is checked too, not only the model. The
 parse (~6 minutes cold) is kept in parsed/ and made again only when the
 parse version (ingest._version: the parsers, the number parsers and
@@ -72,13 +71,9 @@ def subset(kinds_of: dict[str, str], n: int) -> list[str]:
 
 
 def keep(src: Path, dst: Path) -> None:
-    """Copy what no rebuild recovers: raw and git-tracked tidy."""
-    tracked = subprocess.run(["git", "ls-files", "data/tidy"], capture_output=True,
-                             text=True, check=True).stdout.split()
+    """Copy what no rebuild recovers: raw."""
     shutil.copytree(src / "raw", dst / "raw", symlinks=True)
     (dst / "tidy").mkdir(parents=True)
-    for t in tracked:
-        shutil.copy2(src / "tidy" / Path(t).name, dst / "tidy")
 
 
 def fresh(cache: Path, mark: Path, version: str) -> bool:
@@ -102,7 +97,7 @@ def parsed() -> Path:
     shutil.rmtree(cache, ignore_errors=True)
     mark.unlink(missing_ok=True)
     shutil.copytree(HOME / "data", cache, symlinks=True)
-    subprocess.run([sys.executable, "src/run.py", "parse"], check=True,
+    subprocess.run([sys.executable, "src/run.py", "parse", "crosswalk"], check=True,
                    stdout=subprocess.DEVNULL,
                    env=dict(os.environ, PYTHONPATH="src", FF_ROOT=str(cache)))
     with closing(sqlite3.connect(cache / "lfg.db")) as db:

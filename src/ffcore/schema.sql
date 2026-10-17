@@ -953,6 +953,55 @@ CREATE VIEW season_record AS
 SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
 FROM player_jornadas GROUP BY player;
 
+-- Each app id's player: the futbolfantasy player whose value it equalled
+-- at the most market snapshots (both feeds are fetched together, and
+-- futbolfantasy mirrors the app's values; an all-players row, kept only
+-- when it changes, holds until the player's next), their names sharing a stem, then the most
+-- stems (stems_meet): each app id's unique best, then of those naming the
+-- same player, the unique best. Over every row, not as of cut():
+-- the registry is what all the data says, as players.csv was.
+CREATE INDEX IF NOT EXISTS market_by_value ON market (value);
+DROP VIEW IF EXISTS app_links;
+CREATE VIEW app_links AS
+WITH snap AS (SELECT observed_at, player_id AS aid, market_value AS v, player_name AS n1, player_name_full AS n2
+              FROM api_teams WHERE market_value > 0
+              UNION ALL SELECT observed_at, player_id, market_value, player_name, player_name_full
+              FROM api_market WHERE market_value > 0),
+held AS (SELECT * FROM (SELECT player_id AS aid, market_value AS v, player_name AS n1, player_name_full AS n2,
+                               observed_at AS since,
+                               coalesce(lead(observed_at) OVER (PARTITION BY player_id ORDER BY observed_at, rowid),
+                                        '9999') AS until
+                        FROM api_players_all) WHERE v > 0),
+ff AS (SELECT observed_at, ff_id, value AS v, name FROM market WHERE ff_id <> '' AND value > 0),
+met AS MATERIALIZED (SELECT a.aid, f.ff_id, f.observed_at AS at, a.n1, a.n2, f.name
+        FROM snap a JOIN ff f ON f.observed_at = a.observed_at AND f.v = a.v
+        UNION ALL
+        SELECT h.aid, f.ff_id, f.observed_at, h.n1, h.n2, f.name
+        FROM held h JOIN ff f ON f.v = h.v AND f.observed_at >= h.since AND f.observed_at < h.until),
+pairs AS (SELECT m.aid, m.ff_id, count(DISTINCT m.at) AS eq, n.named
+          FROM met m JOIN (SELECT aid, ff_id, max(stems_meet(n1, n2, name)) AS named
+                           FROM (SELECT DISTINCT aid, ff_id, n1, n2, name FROM met) GROUP BY aid, ff_id) n
+            USING (aid, ff_id)
+          GROUP BY m.aid, m.ff_id),
+a AS (SELECT *, rank() OVER (PARTITION BY aid ORDER BY eq DESC, named DESC) AS ra,
+             count(*) OVER (PARTITION BY aid, eq, named) AS tie
+      FROM pairs WHERE named > 0),
+f AS (SELECT aid, ff_id, rank() OVER (PARTITION BY ff_id ORDER BY eq DESC, named DESC) AS rf,
+             count(*) OVER (PARTITION BY ff_id, eq, named) AS tie
+      FROM a WHERE ra = 1 AND tie = 1)
+SELECT aid AS app_id, ff_id AS player FROM f WHERE rf = 1 AND tie = 1;
+
+-- The registry as the data has it: every futbolfantasy player ever in the
+-- market, by his latest row's name and club, with his app id (app_links).
+-- The crosswalk stage writes it into crosswalk and adds the slugs.
+DROP VIEW IF EXISTS registry;
+CREATE VIEW registry AS
+WITH last AS (SELECT ff_id, trim(name) AS name, club,
+                     row_number() OVER (PARTITION BY ff_id ORDER BY observed_at DESC, rowid DESC) AS n
+              FROM market WHERE ff_id <> '')
+SELECT l.ff_id AS player_id, l.name, l.club AS club_id, coalesce(a.app_id, '') AS app_id
+FROM last l LEFT JOIN app_links a ON a.player = l.ff_id WHERE l.n = 1;
+
 -- The jornadas every match of which has a score: what a forecast is
 -- graded on (one under way, or with a match postponed, is not).
 DROP VIEW IF EXISTS jornadas_done;

@@ -184,7 +184,7 @@ def _selftest() -> None:
         store_sql("lineups", [{"observed_at": "2026-08-10T0800Z", "source": "futbolfantasy",
                                "player_slug": "x", "player_name": "X", "team_slug": "t"}])
         with closing(connect()) as db, db:
-            db.execute("INSERT INTO crosswalk VALUES ('p1', 'X', 't', 'x', '', '')")
+            db.execute("INSERT INTO crosswalk (player_id, name, club_id, ff_slug, app_id) VALUES ('p1', 'X', 't', 'x', '')")
         assert who() == [("x", "p1")], "a new line-up row and a new registry are named at the next connect"
         with closing(connect()) as db, db:
             db.execute("UPDATE crosswalk SET ff_slug = 'y', name = 'Z'")

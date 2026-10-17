@@ -11,7 +11,7 @@ export FF_ROOT=./data
 TESTS=(ffcore/kept.py ffcore/facts.py ffcore/parse.py ffcore/text.py ffcore/tidy.py ffcore/db.py
        ffcore/fixtures.py ffcore/auth.py
        ffcore/forecast.py ffcore/season.py ffcore/outlook.py ffcore/names.py
-       ffcore/clock.py ffcore/jornadas.py ffcore/points.py ffcore/players.py
+       ffcore/clock.py ffcore/jornadas.py ffcore/points.py
        ffcore/rules.py
        ffcore/startprob.py ffcore/crosswalk.py sources.py ffcore/source.py
        ffcore/futbolfantasy.py ffcore/footballdata.py ffcore/laliga_api.py

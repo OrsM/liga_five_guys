@@ -21,8 +21,7 @@ from typing import Any
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent.parent / "src"
-DATA = {"ffcore.tidy", "ffcore.db", "ffcore.clock", "ffcore.jornadas", "ffcore.points",
-        "ffcore.players"}
+DATA = {"ffcore.tidy", "ffcore.db", "ffcore.clock", "ffcore.jornadas", "ffcore.points"}
 MODEL = {"ffcore.score", "ffcore.startprob", "ffcore.schedule",
          "ffcore.fixture", "ffcore.forecast", "ffcore.season",
          "ffcore.outlook", "ffcore.market", "ffcore.pricing", "ffcore.action",

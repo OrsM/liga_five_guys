@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from ffcore import db as lfg
 from ffcore.parse import money
-from ffcore.players import load_crosswalk
 from ffcore.tidy import current, input_path
 
 from ffcore.names import AppId, PlayerKey
@@ -35,7 +34,7 @@ def load_config(name: str = "league.ini") -> Config:
 class League:
     """The league as lfg.db has it (schema.sql: owners, users, cash,
     price_paid over the app's tables as of cut(), players by the registry
-    load_crosswalk mirrors). Writes the one input no table holds, the config."""
+    the crosswalk stage writes). Writes the one input no table holds, the config."""
 
     def __init__(self, cfg: Config) -> None:
         self.cfg = cfg
@@ -51,7 +50,6 @@ class League:
 
     @classmethod
     def load(cls) -> "League":
-        load_crosswalk()  # mirrors the registry the views resolve players by
         return cls(load_config())
 
     @property
