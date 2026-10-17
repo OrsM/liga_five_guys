@@ -94,7 +94,8 @@ data/raw tarballs
   from the same `report()` document as `decisions.json` (rebuilding the JSON
   from rows would gain nothing).
 - 2.5 (done) `grade_forecast`, `grade_decisions`: `run.py grade` after each
-  report, skipped unless the commit or the resolved jornadas changed.
+  report. Since 2026-10-17 every run grades (no skip) and a code version
+  keeps one set, its latest (`grading.superseded`).
 - 2.6 (done 2026-10-15) board history imported from git: `tools/board_history.py`
   keeps the 121 boards of the "do" shape (since 2026-09-27; the 359 earlier
   commits are four other shapes that say different things, so they stay in
@@ -188,7 +189,7 @@ data/raw tarballs
 - Query time guard (done; found 2026-10-14 when bench_points took 138s on the
   real database, 1.2s once its snapshot lookups were narrowed, and
   price_forecast_error was already 5.4s against Datasette's 5s): the
-  `queries` stage times every saved query once a day, records each beside
+  `queries` stage times every saved query (every run since 2026-10-17), records each beside
   the stage seconds and names any within 20% of Datasette's limit (now 10s);
   `q.py --time` does it by hand. Datasette applies the schema at start now
   (a view added by a merge was missing there until the next run). Real fix

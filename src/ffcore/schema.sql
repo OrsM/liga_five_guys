@@ -308,22 +308,21 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
 
 -- Each graded lock and jornada: forecast error over every player forecast,
 -- what the 50 forecast highest then scored, and the same for the players
--- flagged then.
+-- flagged then. No window over the table: a run asked for (WHERE run_id)
+-- reads only its rows.
 DROP VIEW IF EXISTS grade_error;
 CREATE VIEW grade_error AS
-WITH ranked AS (
-    SELECT *, row_number() OVER (PARTITION BY run_id, from_j, jornada
-                                 ORDER BY predicted DESC, player) AS rk
-    FROM grade_forecast)
 SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
        sqrt(avg((predicted - actual) * (predicted - actual))) AS rmse,
        avg(predicted - actual) AS bias,
-       avg(CASE WHEN rk <= 50 THEN actual END) AS top50,
+       (SELECT avg(actual) FROM (SELECT x.actual FROM grade_forecast x
+                                 WHERE x.run_id = g.run_id AND x.from_j = g.from_j AND x.jornada = g.jornada
+                                 ORDER BY x.predicted DESC, x.player LIMIT 50)) AS top50,
        sum(flagged) AS flagged_n,
        sqrt(avg(CASE WHEN flagged = 1 THEN (predicted - actual) * (predicted - actual) END))
            AS flagged_rmse,
        avg(CASE WHEN flagged = 1 THEN predicted - actual END) AS flagged_bias
-FROM ranked GROUP BY run_id, from_j, jornada;
+FROM grade_forecast g GROUP BY run_id, from_j, jornada;
 
 -- The moments to replay at: each line-up snapshot (one a time) belongs to
 -- the jornada that was next then, from the previous lock to its own.

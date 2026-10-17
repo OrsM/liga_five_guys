@@ -83,10 +83,6 @@
           "title": "Each player's value change in % over :h updates after his last one on or before :day (all time: what happened)",
           "sql": "SELECT a.ff_id, coalesce(x.change, 0.0) AS change\nFROM (SELECT ff_id, max(i) AS i FROM price_series WHERE day <= :day GROUP BY ff_id) a\nLEFT JOIN price_ahead x ON x.ff_id = a.ff_id AND x.i = a.i AND x.h = CAST(:h AS INTEGER)"
         },
-        "grade_due": {
-          "title": "The code a run is (its commit) and what the last grade before it was made with",
-          "sql": "SELECT (SELECT commit_sha FROM runs WHERE run_id = CAST(:run AS INTEGER)) AS commit_now,\n       r.commit_sha AS commit_graded, m.value AS resolved_graded\nFROM (SELECT 1) LEFT JOIN runs r ON r.run_id = (\n    SELECT max(g.run_id) FROM runs g JOIN run_measures gm USING (run_id)\n    WHERE gm.stage = 'grade' AND gm.measure = 'resolved' AND g.ok = 1\n      AND g.run_id < CAST(:run AS INTEGER))\nLEFT JOIN run_measures m ON m.run_id = r.run_id AND m.stage = 'grade' AND m.measure = 'resolved'"
-        },
         "unmatched_players": {
           "title": "Players the crosswalk cannot join, the dearest first: with no app id he is never seen as owned, priced or bid on; with no line-up page he has no start odds",
           "sql": "SELECT c.name, f.owner, round(f.value / 1e6, 2) AS value_m,\n       CASE WHEN c.app_id = '' AND c.ff_slug = '' THEN 'neither'\n            WHEN c.app_id = '' THEN 'no app id' ELSE 'no line-up page' END AS missing\nFROM crosswalk c LEFT JOIN player_facts f ON f.player = c.player_id\nWHERE c.app_id = '' OR c.ff_slug = ''\nORDER BY f.value IS NULL, f.value DESC, c.name"

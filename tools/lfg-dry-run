@@ -52,6 +52,7 @@ export LFG_REPORTS="$SCRATCH/reports"
 export LFG_PARTS="$SCRATCH/.runtime/parts"
 export LFG_ALERTS="$SCRATCH/.runtime/alerts.md"
 export LFG_WARNINGS="$SCRATCH/.runtime/warnings.json"
+export LFG_NO_PUBLISH=1    # nothing to the phone, no ping: src/publish.py
 
 echo "lfg-dry-run: scratch=$SCRATCH (tracked repo untouched)"
 

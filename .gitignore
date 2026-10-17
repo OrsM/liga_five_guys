@@ -47,8 +47,7 @@ data/tidy/snapindex.json
 data/tidy/parse_state.json
 
 # The run database (docs/plan-datasette.md) and its kept answers (kept.py):
-# disposable, rebuilt from
-# data/raw, git and replays, so never committed.
+# disposable, rebuilt from data/raw, git and replays, so never committed.
 data/lfg.db
 data/lfg.db-*
 data/lfg.db.kept

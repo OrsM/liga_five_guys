@@ -25,14 +25,14 @@ from ffcore.market import Market
 from ffcore.names import Name
 from ffcore.parse import Rows
 from ffcore.points import scored, season_record
-from ffcore.schedule import expectations, phantom_fill
+from ffcore.schedule import PerJornada, expectations, phantom_fill
 from ffcore.score import fit_promoted_discount, Scorer
 from ffcore.season import LeagueState
 from ffcore.startprob import Availability, Calibration, StartOdds, fit_availability
 from ffcore.tidy import LINEUP_SOURCE, age_hours, current
 from stats import percentile
 
-__all__ = ["applied", "constants", "universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
+__all__ = ["applied", "constants", "universe", "built", "forecast_cells", "params", "scorer", "fixture_ratings", "price_momentum",
            "price_change", "premium", "write_constants", "record_trend", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
@@ -65,9 +65,12 @@ def constants() -> dict[str, dict[str, float]]:
 def applied(variant: str) -> Iterator[None]:
     """The model as a variant sets it (variants): its constants on the
     modules that own them, the clock's variant for the views, all put back on
-    leaving. A name that is no constant raises."""
+    leaving. A variant with no rows (but live) or a name that is no constant
+    raises."""
     owner = {n: m for m, names in NAMES.items() for n in names}
     over = rows("SELECT name, value FROM variants WHERE variant = ? ORDER BY name", (variant,))
+    if not over and variant != "live":
+        raise ValueError("no variant %s (grading.py variant %s CONSTANT=VALUE)" % (variant, variant))
     unknown = [n for n, _v in over if n not in owner]
     if unknown:
         raise ValueError("variant %s sets %s, which no module has as a constant" % (variant, unknown))
@@ -214,6 +217,17 @@ class Built(NamedTuple):
     params: list[dict[str, Any]]
 
 
+def forecast_cells() -> tuple[PerJornada, set[str]]:
+    """Every player's forecast cell by jornada as of cut(), and who is listed
+    injured, doubtful or suspended then; a past cut's answers kept (kept.py)."""
+    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(constants())):
+        market = current("market")
+        sc = scorer(market, current("lineups", LINEUP_SOURCE))
+        per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
+                             current("matches"), rounds_ahead()).per_j
+        return per_j, {k for k in sc.lookup if sc.starts.status_of(k)}
+
+
 def universe() -> Universe:
     return built().universe
 
@@ -346,6 +360,13 @@ def _selftest_variants() -> None:
         except ValueError as e:
             assert "AVIAL_K" in str(e)
         assert startprob.AVAIL_K == 4.0
+        try:
+            with applied("slwo"):
+                raise AssertionError("a misspelt variant must not run as live")
+        except ValueError as e:
+            assert "no variant slwo" in str(e)
+        with applied("live"):
+            assert startprob.AVAIL_K == 4.0, "live has no rows and is the model as it stands"
 
 
 def _selftest_sale() -> None:

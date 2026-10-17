@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# liga_five_guys, end to end, on this box.
+#
+# This replaced the GitHub Actions workflow on 2026-08-18. The move was not
+# about cost or speed: the league's own API needs a refresh token that ROTATES
+# ON EVERY USE, and persisting a rotating secret back into repo secrets means a
+# PAT, an API call, and a write that fails closed. Here it is a file this
+# script's own process rewrites in place. See src/ffcore/auth.py.
+#
+# The Actions workflow still exists and its test job still runs on every push;
+# only the schedule is off. It is the way back if this box dies.
+#
+# Ordering is a dependency chain, not a preference:
+#   self-tests -> every module's self-test (run alongside the fetch)
+#   fetch      -> the sweep, public pages + the league API
+#   run        -> src/run.py: every stage, the report published as soon as it
+#                 is made, then the grading and checks that follow it
+#   commit     -> the report into the repo
+#
+# Exit codes: 0 all good, 1 a step failed. The timer's OnFailure is what makes
+# a failure visible rather than a report that quietly stopped changing.
+
+set -euo pipefail
+
+REPO="${LFG_REPO:-$HOME/claude_projects/liga_five_guys}"
+UV="$HOME/.local/bin/uv"
+cd "$REPO"
+
+# ONE RUN AT A TIME, whoever asks: the timer, the phone's button (lfg-watch)
+# and the line-up reminder (lfg-lock) all end here, and two runs would parse
+# into the same database at once. A later one waits (up to ten minutes) for
+# the one in flight rather than being dropped: the 21:45 run is the one to act
+# on before the market closes.
+mkdir -p "$HOME/.local/state/lfg"
+exec 9>"$HOME/.local/state/lfg/run.lock"
+if ! flock -w 600 9; then
+    echo "another run held the lock for ten minutes — giving up" >&2
+    exit 1
+fi
+
+export PYTHONPATH=src
+export FF_ROOT=./data
+
+# The console clock reads Madrid, because a person reads it. The commit
+# stamp below stays UTC on purpose: it pairs with the dt= snapshot names,
+# and a key that moves with the clocks can collide or reorder in October.
+log() { printf '%s  %s\n' "$(TZ=Europe/Madrid date +'%H:%M:%S %Z')" "$*"; }
+
+# STAGE TIMING. Added 2026-09-24 because the only duration this run ever
+# produced was the systemd journal's start/finish timestamps -- no way to
+# tell whether a slow run was fetch (network + the deliberate per-page
+# delay), the self-tests, generate (score.build()'s forecasting fit), or
+# publish (ssh to a phone that may be asleep) without re-running under
+# `time` by hand and guessing from stdout. mark() logs elapsed seconds
+# since the previous mark, so a run's own log says where the time went.
+RUN_T0=$(date +%s)
+STAGE_T0=$RUN_T0
+mark() { local now; now=$(date +%s)
+        log "  (${1}: $(( now - STAGE_T0 ))s)"; STAGE_T0=$now; }
+
+run() {
+    local name="$1"; shift
+    if ! "$UV" run --frozen python "$@"; then
+        log "FAILED: $name"
+        return 1
+    fi
+}
+
+# --frozen so a run never tries to re-resolve dependencies: without it a boot
+# with no network hangs here, and the whole point is that this is unattended.
+# The self-tests, first, because nothing below is worth running if the scorer
+# is broken. They took the place of the GitHub Actions test job, deleted with
+# the rest of the workflow on 2026-08-18: with the schedule off and nothing
+# pushing, that job only ran when somebody happened to push, which is not a
+# schedule. Here they run before every report, take about twenty seconds, and
+# a failure stops the run rather than publishing a report built by code that
+# does not pass its own checks.
+log "self-tests"
+# ONE LIST, IN THE REPO. This block used to carry its own copy of the suite
+# names, and the two drifted: tools/selftests.sh had 32 entries while this
+# had 30, so ffcore/schema.py and ffcore/fixtures.py were never run on the
+# live path at all -- a module could break and only the repo's own gate
+# would notice, hours later. The script in the repo is the source of truth;
+# it is versioned with the code it tests, which this file is not.
+# STARTED HERE, CONFIRMED AFTER THE FETCH (2026-09-24). The fetch is mostly
+# sleeping (paced per host) and the suite is ~13s of CPU on a box with idle
+# cores, so running them back to back threw the smaller of the two away.
+# Nothing the fetch does can make the scorer wrong, and nothing from
+# `generate` on runs until the tests are confirmed. A failure is re-run ALONE
+# before it counts: both touch the data directory, and a race between them
+# must never be able to cost a report.
+# INDENT IN BASH, NOT SED. journald tags a line with its unit by looking up
+# the process that wrote it; a sed that has already exited gets no unit, so
+# `journalctl -u lfg.service` never showed the self-tests' pass line even
+# though it was logged. printf here runs in this script's own process.
+indent() { while IFS= read -r line; do printf '  %s\n' "$line"; done; }
+
+ST_OUT="$(mktemp)"
+trap 'rm -f "$ST_OUT"' EXIT
+bash "$REPO/tools/selftests.sh" >"$ST_OUT" 2>&1 &
+ST_PID=$!
+
+log "fetch"
+if [ "${LFG_NO_FETCH:-}" != "1" ]; then
+    run fetch src/ingest.py fetch
+else
+    log "  (skipped: LFG_NO_FETCH=1)"
+fi
+mark fetch
+
+if wait "$ST_PID"; then
+    indent < "$ST_OUT"
+else
+    log "  self-tests failed alongside the fetch -- re-running alone to confirm"
+    if ! bash "$REPO/tools/selftests.sh" 2>&1 | indent; then
+        log "self-tests failed — refusing to build a report"
+        exit 1
+    fi
+fi
+mark self-tests
+
+# EVERY STAGE, ONE INTERPRETER, ONE RUN: src/run.py STAGES holds the order
+# and why -- parse, crosswalk, sim (the report), publish (and its ping),
+# rivals, grade, queries, health. A stage after the report never stops the
+# run; one before it fails the run here. Each is still runnable on its own
+# (run.py grade), which is how a failure gets bisected.
+log "run"
+run run src/run.py
+mark run
+
+log "commit"
+if [ -n "$(git status --porcelain data reports inputs)" ]; then
+    if [ "${LFG_NO_COMMIT:-}" = "1" ]; then
+        log "  (LFG_NO_COMMIT=1 — left uncommitted)"
+    else
+        git add -A data reports inputs
+        git -c user.name='report-bot' \
+            -c user.email='report-bot@users.noreply.github.com' \
+            commit -q -m "report: $(date -u +%Y-%m-%dT%H%MZ)"
+        log "  committed"
+        # PUSHING IS OPT-IN. Committing locally is reversible and stays on
+        # this box; pushing publishes the league's data to GitHub on a timer,
+        # unattended, with nobody looking. That is a decision for the owner of
+        # the repo, not a default for a job that runs at 00:40. Set LFG_PUSH=1
+        # in the service unit when you want it.
+        if [ "${LFG_PUSH:-}" = "1" ]; then
+            # Rebase before pushing. Nothing else writes to this repo now that
+            # Actions is gone — but "nothing else writes to it" is exactly the
+            # assumption that broke: the last scheduled workflow run pushed a
+            # report after the box had started producing its own, and the next
+            # push was rejected with no way for the job to recover on its own.
+            #
+            # -X theirs means the commit being replayed, i.e. OURS. Everything
+            # under reports/ is regenerated from scratch every run, so on a
+            # collision this run's copy is the right one to keep.
+            if ! git pull --rebase --autostash -X theirs -q 2>/dev/null; then
+                git rebase --abort 2>/dev/null || true
+                log "  pull --rebase failed — a real conflict, needs a human"
+            fi
+            git push -q 2>/dev/null \
+                || log "  push failed (commit is local, will go next run)"
+        else
+            log "  not pushed (set LFG_PUSH=1 to enable)"
+        fi
+    fi
+else
+    log "  nothing changed"
+fi
+
+mark commit
+log "done ($(( $(date +%s) - RUN_T0 ))s total)"

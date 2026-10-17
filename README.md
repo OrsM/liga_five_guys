@@ -6,9 +6,11 @@ redistribute the scraped data.
 
 ## Where it runs
 
-On the Asus box under systemd. `~/.local/bin/lfg-run` runs the self-tests,
-fetches, runs `src/run.py` and publishes `reports/decisions.json` to the
-phone (notes.lemonworlds.com/fantasy). The phone's "Run again" button leaves
+On the Asus box under systemd. `tools/lfg-run` (linked from
+`~/.local/bin/lfg-run`) runs the self-tests and the fetch, then `src/run.py`,
+then commits. Every run, whoever asks for it (timer, phone button, line-up
+reminder), runs every stage of `src/run.py` in one process; the report is
+published to the phone (notes.lemonworlds.com/fantasy) as soon as it is made. The phone's "Run again" button leaves
 a request that `lfg-watch.timer` picks up within a minute.
 
     systemctl --user list-timers | grep lfg     # lfg, lfg-flip, lfg-watch, lfg-gc
@@ -28,7 +30,7 @@ Everything else comes from the app's API and public pages.
 ## The pipeline (`src/run.py`)
 
 1. **parse** (`sources.py`, `ingest.py`): every fetched page is archived in
-   `data/raw/`; parsers turn it into `data/tidy/*.csv`. `sources.py` says
+   `data/raw/`; parsers turn it into tables in `data/lfg.db`. `sources.py` says
    what to fetch; the parsers live with their provider (`ffcore/futbolfantasy`,
    `ffcore/footballdata`, `ffcore/laliga_api`). Each cached page is keyed by a
    fingerprint of its parser's code, so editing one parser re-parses only its
@@ -36,6 +38,15 @@ Everything else comes from the app's API and public pages.
 2. **crosswalk** (`crosswalk.py`): the registry, lfg.db's `crosswalk` table,
    one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
 3. **sim** (`sim.py`, `decide.py`): builds the board the phone draws.
+4. **publish** (`publish.py`): the board to the phone, and its ping.
+5. **rivals**, **grade** (`grading.py`: each past lock replayed with this
+   code, one set kept a code version), **queries** (every saved query
+   timed), **health** (`health.py`). A failure from here on is noted and the
+   run goes on; before it, the run stops.
+
+Past cuts read their view answers back (`ffcore/kept.py`), so the live
+grade, variant backtests (`tools/analyses/variant_ahead.py`), replays and
+golden boards all share one cache keyed on what the answer depends on.
 
 ## The model
 

@@ -10,7 +10,6 @@ import re
 import sqlite3
 import time
 import zlib
-from datetime import datetime, timezone
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
@@ -227,13 +226,7 @@ def time_queries(path: Path | None = None, meta: Path = META, limit: float = SLO
                  ) -> dict[str, float]:
     """The run.py queries stage: each saved query timed on the real database
     (timed), recorded with the stage as its seconds, and `over`, how many are
-    near Datasette's limit (named in the log). Once a day: not again within 20
-    hours of a run that timed them."""
-    last = rows("SELECT max(r.started) FROM run_measures m JOIN runs r USING (run_id)"
-                " WHERE m.stage = 'queries'", path=path)[0][0]
-    if last and (datetime.now(timezone.utc) - datetime.fromisoformat(last.replace("Z", "+00:00"))
-                 ).total_seconds() < 20 * 3600:
-        return {"skipped": 1}
+    near Datasette's limit (named in the log)."""
     got = timed(path, meta, limit)
     for name, secs, ok in got:
         if not ok:
@@ -317,15 +310,6 @@ def _selftest() -> None:
 
         first = time_queries(path, meta, limit=0.3)
         assert set(first) == {"quick", "slow", "over"} and first["over"] == 1, first
-        with closing(connect(path)) as c, c:     # a run recorded those timings just now
-            c.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha)"
-                      " VALUES (1, ?, 't', 'service', 'c')",
-                      (datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),))
-            c.execute("INSERT INTO run_measures VALUES (1, 'queries', 'quick', 0.0)")
-        assert time_queries(path, meta, limit=0.3) == {"skipped": 1}, "once a day"
-        with closing(connect(path)) as c, c:
-            c.execute("UPDATE runs SET started = '2020-01-01T00:00:00Z'")
-        assert "quick" in time_queries(path, meta, limit=0.3), "and again the day after"
 
     with tempfile.TemporaryDirectory() as tmp:
         schema = Path(tmp) / "schema.sql"

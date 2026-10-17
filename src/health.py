@@ -1,16 +1,21 @@
 """Parser self-report: a source whose newest snapshot is late or thin is
-told to you, with the last good one to start from. The view decides
-(schema.sql: parser_health); this reads it for the shell (lfg-run).
+told to you, with the last good one to start from: once, again only when
+the trouble changes, forgotten when it is gone. The view decides
+(schema.sql: parser_health); main is the run's health stage.
 
     python src/health.py text    # what to tell you, empty if every source is fine
 """
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from ffcore.db import rows
+from publish import notify
 
-__all__ = ["text"]
+__all__ = ["main", "text"]
+
+SENT = Path.home() / ".local/state/lfg/health.sent"
 
 
 def text() -> str:
@@ -24,6 +29,19 @@ def text() -> str:
         lines.append("%s: %s; last good snapshot %s (data/raw/dt=%s.tar.xz)"
                      % (src, what, good, good))
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
+
+
+def main(sent: Path = SENT) -> dict[str, int]:
+    """The health stage: tell text() if it is new (sent holds what was
+    told last), forget it when there is nothing to say."""
+    said = text()
+    if not said:
+        sent.unlink(missing_ok=True)
+    elif not sent.is_file() or sent.read_text(encoding="utf-8") != said:
+        if notify(said):
+            sent.parent.mkdir(parents=True, exist_ok=True)
+            sent.write_text(said, encoding="utf-8")
+    return {"trouble": int(bool(said))}
 
 
 def _selftest() -> None:

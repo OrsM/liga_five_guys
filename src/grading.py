@@ -14,18 +14,16 @@ from typing import Any
 import numpy as np
 
 from ffcore.forecast import expected_points
-from ffcore.schedule import expectations
 from ffcore.season import simulate
-from ffcore.jornadas import round_locks, rounds_ahead
+from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
 
-from assemble import applied, built, fixture_ratings, price_change, price_momentum, scorer, universe
+from assemble import applied, built, forecast_cells, price_change, price_momentum, universe
 from decide import Action, Universe, board, verdict
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
-from ffcore.db import connect, named, record, this_run
-from ffcore.tidy import LINEUP_SOURCE, current
-__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "due", "forecast_rows",
+from ffcore.db import connect, record, this_run
+__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "forecast_rows", "superseded",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -62,11 +60,7 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
             set_now(locks[i] - dt.timedelta(minutes=1))
-            market = current("market")
-            sc = scorer(market, current("lineups", LINEUP_SOURCE))
-            per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
-                                 current("matches"), rounds_ahead()).per_j
-            flagged = {k for k in sc.lookup if sc.starts.status_of(k)}
+            per_j, flagged = forecast_cells()
             for j in range(i, i + ahead + 1):
                 if j not in done or j not in per_j:
                     continue
@@ -113,13 +107,9 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
         moment = snapshot_stamp(at)
         assert moment is not None
         set_now(moment)
-        market = current("market")
-        sc = scorer(market, current("lineups", LINEUP_SOURCE))
-        per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
-                             current("matches"), rounds_ahead()).per_j
+        per_j, hurt = forecast_cells()
         if j not in per_j:
             return []
-        hurt = {k for k in sc.lookup if sc.starts.status_of(k)}
         pred = {k: expected_points(cell) for k, cell in per_j[j].items()}
         return replay_rows(variant, at, j, (locks[j] - moment).total_seconds() / 3600, pred, hurt, actual)
     try:
@@ -312,24 +302,28 @@ def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
             for i, m in enumerate(moves)]
 
 
-def due(run: int, resolved: float, path: Path | None = None) -> bool:
-    """Whether to grade: never graded, or the code (the run's commit) or the
-    jornadas resolved have changed since the last grade (grade_due)."""
-    now, graded, then = named("grade_due", {"run": run}, path)[1][0]
-    return graded is None or now is None or (now, resolved) != (graded, then)
+# What the grade stage keeps, a set a run.
+GRADED = ("grade_forecast", "grade_decisions", "phantom_jornadas", "sim_calibration")
+
+
+def superseded(run: int, path: Path | None = None) -> None:
+    """Drop the grades of earlier runs of the same code (runs.commit_sha):
+    this run's, on as much data or more, stand for that code."""
+    with closing(connect(path)) as db, db:
+        for t in GRADED:
+            db.execute("DELETE FROM %s WHERE run_id IN (SELECT e.run_id FROM runs e, runs r"
+                       " WHERE r.run_id = ? AND e.commit_sha = r.commit_sha AND e.run_id < r.run_id)"
+                       % t, (run,))
 
 
 def record_grades() -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code,
     and keep every player forecast and every ranked move against what then
-    happened, and the live replay's moments it still owes (replay);
-    skipped when nothing is new (due)."""
+    happened (one set a code: superseded), and the live replay's moments it
+    still owes (replay)."""
     actual = jornada_points()
     resolved = len(done_jornadas())
     run = this_run()
-    if run is not None and not due(run, resolved):
-        print("  grade: same code, same %d jornadas: nothing new" % resolved)
-        return {"resolved": resolved, "skipped": 1}
     _AT.clear()
     try:
         fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
@@ -338,6 +332,7 @@ def record_grades() -> dict[str, int]:
             record([{"run_id": run, **r} for r in moves], "grade_decisions")
             record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
             record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
+            superseded(run)
     finally:
         _AT.clear()
     replayed = replay(REPLAY_VARIANT)
@@ -377,20 +372,22 @@ def _selftest() -> None:
     from ffcore.tidy import store_sql, tables_in
     with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
         path = Path(tmp) / "lfg.db"
-        def run(commit: str, resolved: float | None) -> int:
+        def run(commit: str) -> int:
             with db:
                 cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
                                  " VALUES ('t', 't', 'service', ?, 1)", (commit,))
-                if resolved is not None:
-                    db.execute("INSERT INTO run_measures VALUES (?, 'grade', 'resolved', ?)",
-                               (cur.lastrowid, resolved))
             assert cur.lastrowid is not None
             return cur.lastrowid
-        assert due(run("a", None), 7, path), "never graded: due"
-        run("a", 7)
-        assert not due(run("a", None), 7, path), "same code, same jornadas: nothing new"
-        assert due(run("a", None), 8, path), "a jornada resolved"
-        assert due(run("b", None), 7, path), "new code"
+        old, other, now = run("a"), run("b"), run("a")
+        for r in (old, other, now):
+            record([{"run_id": r, "from_j": 7, "jornada": 7, "player": "p", "predicted": 1.0, "actual": 0.0,
+                     "flagged": 0}], "grade_forecast", path)
+            record([{"run_id": r, "ord": 0, "lock": 7, "move": "m", "reached": "plan", "kind": "get"}],
+                   "grade_decisions", path)
+        superseded(now, path)
+        for t in GRADED:
+            assert [r for r, in db.execute("SELECT run_id FROM %s ORDER BY run_id" % t)] in (
+                [other, now], []), "the same code's earlier grade goes; another code's stays"
 
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
