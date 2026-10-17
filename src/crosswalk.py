@@ -6,11 +6,11 @@ import sys
 
 from ffcore.parse import Rows, text
 from ffcore.crosswalk import Crosswalk, Player, clashes
+from ffcore.players import load_crosswalk
 from ffcore.names import AppId, PlayerKey, app_id
 from ffcore.text import tokens
-from ffcore.tidy import current, history, TIDY
+from ffcore.tidy import current, history, table_path
 
-PLAYERS = "players.csv"
 
 
 def build_players(registry: dict[str, Player], market: Rows, api_rows: Rows
@@ -77,20 +77,19 @@ def attach_slugs(players: dict[str, Player], rows: Rows) -> None:
 
 
 def main() -> None:
-    registry = Crosswalk.read(TIDY / PLAYERS)
+    registry = load_crosswalk()
     players = build_players(registry.players, current("market"),
                             current("api_teams") + current("api_market")
                             + current("api_players_all"))
     xw = Crosswalk(players)
     xw.mirror()
     attach_slugs(players, [*history("lineups"), *current("starters")])
-    xw.mirror()
-    xw.write(TIDY / PLAYERS)
+    xw.save(table_path("players"))
 
     c = xw.coverage()
     print("wrote %s: %d players (%d new) — %.0f%% carry a "
           "probable-XI slug, %.0f%% an app id"
-          % (TIDY / PLAYERS, c["players"],
+          % (table_path("players"), c["players"],
              len(players) - len(registry.players),
              100 * c["ff"], 100 * c["app"]))
     for idx, ids in clashes().items():

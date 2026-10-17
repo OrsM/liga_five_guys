@@ -33,8 +33,8 @@ Everything else comes from the app's API and public pages.
    `ffcore/footballdata`, `ffcore/laliga_api`). Each cached page is keyed by a
    fingerprint of its parser's code, so editing one parser re-parses only its
    pages.
-2. **crosswalk** (`crosswalk.py`): `data/tidy/players.csv`, one id per
-   player (FF's `ff_id`) with the app's and FF's slugs attached.
+2. **crosswalk** (`crosswalk.py`): the registry, lfg.db's `crosswalk` table,
+   one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
 3. **sim** (`sim.py`, `decide.py`): builds the board the phone draws.
 
 ## The model
@@ -210,5 +210,7 @@ rather than reaching through them; ruff flags reads of private members.
                     action, fixtures (test data)
     inputs/         league.ini
     data/raw/       archived pages, append-only
-    data/tidy/      tables rebuilt from raw; players.csv is tracked
+    data/tidy/      parse caches; players.csv, the registry's committed export
+    data/season/    points_<season>.csv, last season's committed export
+                    (lfg.db owns both; an empty lfg.db is restored from them)
     reports/        decisions.json, what the phone draws

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from contextlib import closing
 import functools
 import hashlib
@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
+from ffcore.players import load_crosswalk
 from ffcore.db import TABLES_SQL, connect
 from ffcore.tidy import (NUMBERS, ROOT, SEASON, TIDY, clear_sql, store_sql, stored,
                          csv_string, read_csv, write_csv)
@@ -335,22 +336,32 @@ def _version() -> str:
                            digest_size=8).hexdigest()
 
 
-def load_season(files: Iterable[Path] | None = None) -> int:
-    """season_points refilled from the season CSVs (baseline writes them);
-    how many rows."""
+def season_rows(rows: Iterable[Mapping[str, Any]]) -> int:
+    """These rows (parse_points') into season_points, replacing their
+    season's; how many."""
     got = [{"season": r["season"], "ff_id": r["ff_id"], "points": float(r["points"] or 0),
-            "games": float(r["games"] or 0)}
-           for f in (sorted(SEASON.glob("points_*.csv")) if files is None else files)
-           for r in read_csv(f) if r.get("ff_id")]
+            "games": float(r["games"] or 0)} for r in rows if r.get("ff_id")]
     with closing(connect()) as db, db:
-        db.execute("DELETE FROM season_points")
+        db.executemany("DELETE FROM season_points WHERE season = ?", {(r["season"],) for r in got})
         db.executemany("INSERT OR REPLACE INTO season_points VALUES (:season, :ff_id, :points, :games)", got)
     return len(got)
 
 
+def load_season(files: Iterable[Path] | None = None) -> int:
+    """An empty season_points (a rebuilt lfg.db) restored from the season
+    exports baseline writes; how many rows, 0 when it held some."""
+    if stored("season_points"):
+        return 0
+    return season_rows(r for f in (sorted(SEASON.glob("points_*.csv")) if files is None else files)
+                       for r in read_csv(f))
+
+
 def parse() -> dict[str, int]:
-    """Fold new snapshots into the tidy tables, and last season's points
-    (load_season); how many snapshots, documents parsed and rows routed."""
+    """Fold new snapshots into the tidy tables (an empty lfg.db first gets
+    the registry and last season's points from their exports:
+    load_crosswalk, load_season); how many snapshots, documents parsed and
+    rows routed."""
+    load_crosswalk()
     load_season()
     version = _version()
     walk = doc_keys()
@@ -557,8 +568,9 @@ def baseline(url: str = "", label: str = "") -> None:
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
     out = SEASON / f"points_{label}.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
+    season_rows([dict(r, season=label) for r in rows])
     write_csv(out, [dict(r, season=label, observed_at=stamp, source_url=url)
-                    for r in rows], POINTS_FIELDS)
+                    for r in rows], POINTS_FIELDS)        # the export a rebuilt lfg.db is restored from
 
     played = sum(1 for r in rows if (r["games"] or "0") != "0")
     print(f"wrote {out} — {len(rows)} players, "
@@ -580,9 +592,12 @@ def _selftest_season() -> None:
         write_csv(f, [{"ff_id": "1", "points": "150", "games": "30", "season": "2025-26"},
                       {"ff_id": "", "points": "9", "games": "9", "season": "2025-26"},
                       {"ff_id": "2", "points": "", "games": "", "season": "2025-26"}], POINTS_FIELDS)
-        assert load_season([f]) == 2 and load_season([f]) == 2, "refilled, not added to"
+        assert load_season([f]) == 2, "an empty table restored from the export"
         assert rows("SELECT ff_id, pts, pj FROM last_season ORDER BY ff_id") == [
             ("1", 150.0, 30.0), ("2", 0.0, 0.0)], "no id, no row; no points, none"
+        assert load_season([f]) == 0, "the table owns it: the export is not read again"
+        assert season_rows([{"season": "2025-26", "ff_id": "3", "points": "8", "games": "2"}]) == 1
+        assert rows("SELECT ff_id FROM last_season") == [("3",)], "a fetch replaces its season"
 
 
 def _selftest() -> None:

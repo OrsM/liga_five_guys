@@ -1,11 +1,11 @@
 
 from __future__ import annotations
 
-import os
 from contextlib import closing
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from dataclasses import dataclass, field
+from typing import Any
 
 from ffcore import db as lfg
 from ffcore.facts import identity
@@ -43,9 +43,9 @@ class Player:
 
 
 class Crosswalk:
-    """The registry: who each player is (players.csv). What an id or a name
-    resolves to is identity.sql's, on the registry mirrored into lfg.db:
-    each table's rows read with their player."""
+    """The registry: who each player is (lfg.db's crosswalk). What an id or
+    a name resolves to is identity.sql's: each table's rows read with their
+    player."""
 
     def __init__(self, players: Mapping[str, Player] | None = None) -> None:
         self.players: dict[str, Player] = dict(players or {})
@@ -65,19 +65,29 @@ class Crosswalk:
                 "app": sum(1 for p in self.players.values() if p.app_id) / n}
 
     @classmethod
-    def read(cls, players_path: str | Path) -> Crosswalk:
-        players = {}
-        for r in read_csv(players_path):
-            pid = r.get("player_id")
-            if pid:
-                players[pid] = Player(
-                    PlayerKey(pid), r.get("name", ""), r.get("club_id", ""),
-                    r.get("ff_slug", ""), AppId(r.get("app_id", "")),
-                    _split(r.get("app_names")))
-        return cls(players)
+    def load(cls, export: Path) -> Crosswalk:
+        """The registry from lfg.db's crosswalk; an empty table (a rebuilt
+        lfg.db) is restored from the export first."""
+        got = [dict(zip(PLAYER_COLS, r)) for r in lfg.rows(
+            "SELECT %s FROM crosswalk ORDER BY player_id" % ", ".join(PLAYER_COLS))]
+        if not got and export.exists():
+            xw = cls._of(read_csv(export))
+            xw.mirror()
+            return xw
+        return cls._of(got)
 
-    def write(self, players_path: str | Path) -> None:
-        write_csv(players_path, [p.row() for p in sorted(
+    @classmethod
+    def _of(cls, rows: Iterable[Mapping[str, Any]]) -> Crosswalk:
+        return cls({pid: Player(PlayerKey(pid), r.get("name") or "", r.get("club_id") or "",
+                                r.get("ff_slug") or "", AppId(r.get("app_id") or ""),
+                                _split(r.get("app_names")))
+                    for r in rows if (pid := r.get("player_id"))})
+
+    def save(self, export: Path) -> None:
+        """Into lfg.db's crosswalk, and its committed export (the backup a
+        rebuilt lfg.db is restored from; nothing else reads it)."""
+        self.mirror()
+        write_csv(export, [p.row() for p in sorted(
             self.players.values(), key=lambda p: p.player_id)], PLAYER_COLS)
 
 
@@ -117,12 +127,10 @@ def _selftest() -> None:
             "an app id two players claim names nobody"
         assert clashes() == {"app_id": ["2614"]}, clashes()
 
-        pp = os.path.join(d, "p.csv")
-        xw.write(pp)
-        again = Crosswalk.read(pp)
-        assert again.players["af"].app_names == {"A. Ferllo"}
-        assert set(again.players) == set(xw.players)
-        assert Crosswalk.read(os.path.join(d, "nope.csv")).players == {}
+        xw.save(Path(d) / "p.csv")
+        again = Crosswalk.load(Path(d) / "nope.csv")
+        assert again.players["af"].app_names == {"A. Ferllo"} and set(again.players) == set(xw.players), \
+            "saved and loaded back from the table, the export not needed"
     cov = xw.coverage()
     assert cov["players"] == 6 and abs(cov["ff"] - 2 / 6) < 1e-12, cov
 
