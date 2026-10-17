@@ -17,7 +17,7 @@ __all__ = ["Rating", "Rates", "Scored", "Scorer", "Tally", "fit_promoted_discoun
 
 SHRINK_K = 8.0    # was 4: replayed over 4 jornadas it forecast better in each (variant_gap: +0.071 +-0.06 in squared error); 2 is clearly worse, 16 not established
 
-PPM_BANDS = 0.0  # ppm_prior: 0 his position's median; n his position's in his nth of value
+PPM_BANDS = 4.0  # ppm_prior: his position's median in his quarter of value (was 0, position only: variant_ahead, better at 0-4 jornadas ahead, every interval above 0)
 
 PROMOTED_DISCOUNT = 0.70
 
