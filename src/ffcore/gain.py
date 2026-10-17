@@ -1,7 +1,7 @@
 """Season points worked out in SQL, not simulated: each forecast cell's
 mean and spread (the Bootstrap's draw: plays with chance p, then a real
 single-match score scaled to his points, times his persistent rate), the
-best eleven of each squad each jornada as best_xi picks it, and the sum
+best eleven of each squad each jornada (ELEVEN, the one rule), and the sum
 with its spread. gains: a squad of yours against another, and the chance it
 scores more. standings: every manager's final points, and who ends where.
 
@@ -20,7 +20,7 @@ from statistics import NormalDist
 from ffcore.forecast import Bootstrap
 from ffcore.rules import SHAPES, Squad, Squads
 
-__all__ = ["Standings", "gains", "standings"]
+__all__ = ["Standings", "eleven", "gains", "standings"]
 
 SCHEMA = """
 CREATE TABLE cell (jornada INTEGER, player TEXT, e REAL, m REAL, v REAL,
@@ -28,29 +28,41 @@ CREATE TABLE cell (jornada INTEGER, player TEXT, e REAL, m REAL, v REAL,
 CREATE TABLE shape (shape INTEGER, slot TEXT, n INTEGER);
 CREATE TABLE scored (jornada INTEGER PRIMARY KEY);
 CREATE TABLE squad (id INTEGER, ord INTEGER, player TEXT, slot TEXT);
+CREATE TABLE valued (player TEXT PRIMARY KEY, e REAL) WITHOUT ROWID;
 """
 
-# Each squad's eleven a jornada (best_xi: the formation whose top n a slot
-# by expected points sum most, the first on a tie; a formation fits when
-# every slot has its nth player), then each squad but 0
-# against squad 0: its mean change, and its variance (each player's match
-# noise, and his persistent rate, which moves all his jornadas together).
-GAIN = """
-WITH ranked AS MATERIALIZED (
-    SELECT s.id, j.jornada, s.player, s.slot, row_number() OVER w AS r,
-           sum(coalesce(c.e, 0.0)) OVER (w ROWS UNBOUNDED PRECEDING) AS top
-    FROM squad s CROSS JOIN scored j LEFT JOIN cell c ON c.jornada = j.jornada AND c.player = s.player
-    WINDOW w AS (PARTITION BY s.id, j.jornada, s.slot ORDER BY coalesce(c.e, 0.0) DESC, s.ord)),
+# THE eleven rule, the only one: of each squad's players a jornada (pick:
+# id, jornada, player, slot, ord, e), the formation whose top n a slot by
+# expected points (e) sum most, the first on a tie; a formation fits when
+# every slot has its nth player (equal to 1e-9 is a tie: how the sums were
+# added must not decide); equal points within a slot, the squad's order.
+ELEVEN = """
+ranked AS MATERIALIZED (
+    SELECT id, jornada, player, slot, row_number() OVER w AS r,
+           sum(e) OVER (w ROWS UNBOUNDED PRECEDING) AS top
+    FROM pick WINDOW w AS (PARTITION BY id, jornada, slot ORDER BY e DESC, ord)),
 totals AS (
     SELECT x.id, x.jornada, sh.shape, sum(x.top) AS total
     FROM shape sh JOIN ranked x ON x.slot = sh.slot AND x.r = sh.n
     GROUP BY x.id, x.jornada, sh.shape
     HAVING count(*) = (SELECT count(*) FROM shape t WHERE t.shape = sh.shape)),
 best AS MATERIALIZED (SELECT id, jornada, shape FROM (
-             SELECT *, row_number() OVER (PARTITION BY id, jornada ORDER BY total DESC, shape) AS b
+             SELECT *, row_number() OVER (PARTITION BY id, jornada ORDER BY round(total, 9) DESC, shape) AS b
              FROM totals) WHERE b = 1),
 xi AS MATERIALIZED (SELECT x.id, x.jornada, x.player FROM best b JOIN shape sh ON sh.shape = b.shape
-       JOIN ranked x ON x.id = b.id AND x.jornada = b.jornada AND x.slot = sh.slot AND x.r <= sh.n),
+       JOIN ranked x ON x.id = b.id AND x.jornada = b.jornada AND x.slot = sh.slot AND x.r <= sh.n)"""
+
+# One squad's eleven by the points given it (valued).
+XI = "WITH pick AS (SELECT 1 AS id, 0 AS jornada, s.player, s.slot, s.ord, coalesce(v.e, 0.0) AS e" \
+     " FROM squad s LEFT JOIN valued v USING (player))," + ELEVEN + "\nSELECT player FROM xi"
+
+# Each squad's eleven each jornada scored, then each squad but 0 against
+# squad 0: its mean change, and its variance (each player's match noise,
+# and his persistent rate, which moves all his jornadas together).
+GAIN = """
+WITH pick AS (
+    SELECT s.id, j.jornada, s.player, s.slot, s.ord, coalesce(c.e, 0.0) AS e
+    FROM squad s CROSS JOIN scored j LEFT JOIN cell c ON c.jornada = j.jornada AND c.player = s.player),""" + ELEVEN + """,
 d AS (SELECT id, jornada, player, sum(w) AS w FROM (
           SELECT id, jornada, player, 1 AS w FROM xi WHERE id > 0
           UNION ALL
@@ -65,31 +77,54 @@ SELECT o.id, coalesce(g.mean, 0.0), coalesce(g.var, 0.0),
 FROM (SELECT DISTINCT id FROM squad WHERE id > 0) o LEFT JOIN g USING (id) ORDER BY o.id
 """
 
-_DB: list[tuple[Bootstrap, sqlite3.Connection]] = []
+_CON: list[sqlite3.Connection] = []
+_CELLS: list[Bootstrap] = []      # whose cells are loaded
 
 
 def normal_above(mean: float, var: float) -> float:
     """P(X > 0) for X normal; no spread, 1 if the mean is above 0, else 0."""
     if var <= 1e-12:
         return 1.0 if mean > 1e-9 else 0.0
-    return 0.5 * (1.0 + math.erf(mean / math.sqrt(2.0 * var)))
+    return 1.0 - NormalDist(mean, math.sqrt(var)).cdf(0.0)
+
+
+def _con() -> sqlite3.Connection:
+    if not _CON:
+        db = sqlite3.connect(":memory:")
+        db.create_function("normal_above", 2, normal_above, deterministic=True)
+        db.executescript(SCHEMA)
+        db.executemany("INSERT INTO shape VALUES (?, ?, ?)",
+                       [(i, slot, n) for i, s in enumerate(SHAPES) for slot, n in s.items()])
+        _CON.append(db)
+    return _CON[0]
 
 
 def _db(fc: Bootstrap) -> sqlite3.Connection:
-    """The forecaster's cells as SQL, kept for it (a board asks hundreds of times)."""
-    if _DB and _DB[0][0] is fc:
-        return _DB[0][1]
-    db = sqlite3.connect(":memory:")
-    db.create_function("normal_above", 2, normal_above, deterministic=True)
-    db.executescript(SCHEMA)
-    m2 = statistics.fmean(x * x for x in fc.pool) / fc.pool_mean ** 2
-    db.executemany("INSERT INTO cell VALUES (?, ?, ?, ?, ?)",
-                   ((j, k, pts * p, pts * p, p * pts * pts * m2 - (p * pts) ** 2)
-                    for j, cells in fc.per_jornada.items() for k, (pts, p) in cells.items()))
-    db.executemany("INSERT INTO shape VALUES (?, ?, ?)",
-                   [(i, slot, n) for i, s in enumerate(SHAPES) for slot, n in s.items()])
-    _DB[:] = [(fc, db)]
+    """The connection with this forecaster's cells, loaded once for it (a
+    board asks hundreds of times)."""
+    db = _con()
+    if not _CELLS or _CELLS[0] is not fc:
+        m2 = statistics.fmean(x * x for x in fc.pool) / fc.pool_mean ** 2
+        with db:
+            db.execute("DELETE FROM cell")
+            db.executemany("INSERT INTO cell VALUES (?, ?, ?, ?, ?)",
+                           ((j, k, pts * p, pts * p, p * pts * pts * m2 - (p * pts) ** 2)
+                            for j, cells in fc.per_jornada.items() for k, (pts, p) in cells.items()))
+        _CELLS[:] = [fc]
     return db
+
+
+def eleven(squad: Squad, value: dict[str, float]) -> list[str]:
+    """The eleven of squad (player: slot) that makes the most of value (a
+    player missing is worth 0), by ELEVEN; none if no formation fits."""
+    db = _con()
+    with db:
+        db.execute("DELETE FROM squad")
+        db.execute("DELETE FROM valued")
+        db.executemany("INSERT INTO squad VALUES (1, ?, ?, ?)",
+                       [(o, k, slot) for o, (k, slot) in enumerate(squad.items())])
+        db.executemany("INSERT INTO valued VALUES (?, ?)", [(k, value[k]) for k in squad if k in value])
+        return [k for k, in db.execute(XI)]
 
 
 def gains(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
@@ -181,7 +216,24 @@ def standings(fc: Bootstrap, squads: Squads, jornadas: list[int], carried: dict[
 
 
 def _selftest() -> None:
-    from ffcore.season import best_xi
+    from ffcore.rules import XI_SIZE
+
+    squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF",
+             "d5": "DEF", "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED",
+             "m5": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL"}
+    val = {k: 1.0 for k in squad}
+    val.update({"f1": 9.0, "f2": 9.0, "f3": 9.0})
+    got = eleven(squad, val)
+    assert len(got) == XI_SIZE and {"f1", "f2", "f3"} <= set(got), got
+    assert eleven({"d1": "DEF"}, {"d1": 1.0}) == [], "no formation fits: no eleven"
+    # 5-4-1 (DEF4 at 2.0) and 4-5-1 (MED3 at 2.0) sum the same, added in
+    # different orders: found by checking against the old best_xi
+    tv = {"DEF4": 2.0, "DEF0": 8.491227695871778, "MED0": 2.5, "MED2": 7.411348877403508, "MED5": 0.0,
+          "POR0": 2.5, "DEF2": 2.0, "POR1": 2.5, "DEF6": 1.0, "DEL0": 3.0, "MED4": 3.0, "DEF5": 2.5,
+          "MED1": 2.0, "DEF1": 2.5, "MED3": 2.0, "DEF3": 2.10641317928871}
+    tie = {k: k[:3] for k in tv}
+    assert "DEF4" in eleven(tie, tv) and "MED3" not in eleven(tie, tv), \
+        "a tie between formations is the first (5-4-1), whatever the rounding"
 
     xi = {"k": "POR", **{"d%d" % i: "DEF" for i in range(4)}, **{"m%d" % i: "MED" for i in range(4)},
           "f0": "DEL", "f1": "DEL"}
@@ -195,8 +247,8 @@ def _selftest() -> None:
     (g_star, p_star), (g_bench, p_bench) = gains(fc, [1, 2, 3], base, [buy_star, sell_bench])
     assert abs(g_star - 3 * (9.0 * 0.8 - 3.0 * 0.9)) < 1e-9, "the star takes f1's place three times"
     assert (g_bench, p_bench) == (0.0, 0.0), "a bench player's sale changes no eleven: no gain, never better"
-    picked = best_xi(buy_star, {k: c[0] * c[1] for k, c in per[1].items()})
-    assert "star" in picked and "f1" not in picked, "as best_xi picks"
+    picked = eleven(buy_star, {k: c[0] * c[1] for k, c in per[1].items()})
+    assert "star" in picked and "f1" not in picked, "the eleven gains scores is eleven's"
     # the star for f1 in three jornadas: match noise of both, and each one's rate across the three
     m2 = statistics.fmean(x * x for x in fc.pool) / fc.pool_mean ** 2
     def noise(pts: float, p: float) -> float:

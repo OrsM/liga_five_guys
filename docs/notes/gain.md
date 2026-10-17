@@ -13,7 +13,7 @@ the Bootstrap draws it has mean `p*pts` and match variance
 `share`) multiplies all of a player's jornadas together. A move changes
 some (player, jornada) cells of your eleven by +-1, so its gain has mean
 `sum a_k` and variance `(1+share^2)*sum v + share^2*sum a_k^2`, `a_k` a
-player's summed mean change. `ffcore/gain.py` does the elevens (best_xi's
+player's summed mean change. `ffcore/gain.py` does the elevens (the one
 rule) and these sums in one query; the chance is the normal's.
 
 Checked before switching, on all 140 moves ranked at past locks:
@@ -38,7 +38,7 @@ simulated seasons: means within 3 points, spreads within 2%, each "above
 you" within 0.011, p_win 0.233 against 0.240, expected finish 1.903 against
 1.889: the simulation's own noise. The golden boards' standings moved by
 the same amounts; no plan or verdict changed. `ffcore/season.py` keeps only
-the league state and best_xi.
+the league state; the eleven rule is gain.ELEVEN alone (the phone's line-up uses it too).
 
 Both ways share the same assumptions (players independent, one persistent
 error each), so neither corrects p_win's suspected overconfidence; the

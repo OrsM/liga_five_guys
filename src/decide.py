@@ -292,7 +292,7 @@ def apply(u: Universe, *acts: Action) -> Squads:
 def _selftest() -> None:
 
     from ffcore.forecast import Bootstrap as B
-    from ffcore.season import best_xi
+    from ffcore.gain import eleven
 
     sq = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
           **{f"m{i}": "MED" for i in range(1, 6)}, "f1": "DEL", "bench": "MED"}
@@ -411,12 +411,12 @@ def _selftest() -> None:
     bexp = {"me_k": 3.0, "me_d1": 3.0, "me_d2": 3.0, "me_d3": 3.0,
             "me_d4": 3.0, "me_d5": 1.0, "me_m1": 4.0, "me_m2": 4.0,
             "me_m3": 4.0, "me_m4": 4.0, "me_f1": 3.0, "cand": 2.0}
-    bxi = set(best_xi(bsq, bexp))
+    bxi = set(eleven(bsq, bexp))
     assert bxi == set(bsq), bxi
     assert min(bexp[k] for k in bxi) == 1.0
     assert min(bexp[k] for k in bxi if bsq[k] == "MED") == 4.0
     bsq2 = {**bsq, "cand": "MED"}
-    bxi2 = set(best_xi(bsq2, bexp))
+    bxi2 = set(eleven(bsq2, bexp))
     assert "cand" in bxi2 and "me_d5" not in bxi2, bxi2
     assert sum(1 for k in bxi2 if bsq2[k] == "DEF") == 4, bxi2
     assert sum(bexp[k] for k in bxi2) - sum(bexp[k] for k in bxi) == 1.0

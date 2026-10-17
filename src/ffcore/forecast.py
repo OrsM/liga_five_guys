@@ -32,14 +32,10 @@ class Bootstrap:
                  share: float | None = None) -> None:
         self.per_jornada = per_jornada
         self.share = PERSISTENT_SHARE if share is None else share
-        self._order = {j: sorted(d) for j, d in per_jornada.items()}
         real = [p for p in pool if p is not None]
         self.pool = tuple(real) if len(real) >= MIN_POOL else SEED_POOL
         mean = statistics.mean(self.pool)
         self.pool_mean = mean if abs(mean) > 1e-9 else 1.0
-
-    def order(self, jornada: int) -> list[str]:
-        return self._order.get(jornada, [])
 
     def expected(self, jornada: int) -> dict[str, float]:
         return {k: expected_points(cell)

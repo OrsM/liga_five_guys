@@ -27,7 +27,7 @@ MODEL = {"ffcore.score", "ffcore.startprob", "ffcore.schedule",
          "ffcore.outlook", "ffcore.market", "ffcore.pricing", "ffcore.action",
          "ffcore.rules"}
 REACH = re.compile(r'\bu\.state\.squads\.get\(u\.me|\.view\("|'
-                   r'\bself\.state\.squads\.get\(self\.me|\._order\b|'
+                   r'\bself\.state\.squads\.get\(self\.me|'
                    r'\._pool_mean\b|\[3\]\) \+ bands|lg\.cfg\.me|lg\.xw\.')
 
 
