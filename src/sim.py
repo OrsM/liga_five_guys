@@ -52,7 +52,7 @@ def _selftest() -> None:
                                 price={"cand": 5e6, "twin": 5e6},
                                 value={"dead": 1e6, "star": 20e6}))
     b = board(ub)
-    rows = {r.action.buy or r.action.sell: r for r in ub.rank(ub.candidates()).rows}
+    rows = {r.action.buy or r.action.sell: r for r in ub.rank(ub.candidates())}
     assert rows[("star",)].d_pts < -20 and -5 < rows[("dead",)].d_pts < 5, \
         "a sale is scored like any move"
     bought = [p.action.buy for p in b.plan if p.action.buy]

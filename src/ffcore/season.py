@@ -132,18 +132,12 @@ def _draw(forecaster: Bootstrap, jornadas: Iterable[int], trials: int, seed: int
             * (pts / forecaster.pool_mean) * rate[:, [col[k] for k in keys]], 0.0)
 
 
-_XI: list[tuple[Bootstrap, dict[int, dict[str, float]],
-                dict[tuple[int, tuple[tuple[str, str], ...]], list[str]]]] = []
-
-
 def _elevens(states: list[LeagueState], forecaster: Bootstrap
              ) -> list[dict[int, dict[str, list[str]]]]:
     """Each state's eleven per manager and jornada: the best by expected
-    points, as the manager would field them. Kept for the forecaster: a
-    board's candidates change one squad at a time."""
-    if not _XI or _XI[0][0] is not forecaster:
-        _XI[:] = [(forecaster, {}, {})]
-    _f, exp_by_j, xi_memo = _XI[0]
+    points, as the manager would field them."""
+    exp_by_j: dict[int, dict[str, float]] = {}
+    xi_memo: dict[tuple[int, tuple[tuple[str, str], ...]], list[str]] = {}
     xis = []
     for st in states:
         per_state: dict[int, dict[str, list[str]]] = {}

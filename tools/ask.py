@@ -72,7 +72,7 @@ def fate(u: Universe, b: Board, r: Move) -> str:
     funded = raised(u, [*b.plan, r], b.rows)
     assert funded is not None, "blocked said it can be raised"
     paid = [m.action.label(u.market.names) for m in funded[len(b.plan) + 1:]]
-    total = joint(u, funded, b.base)
+    total = joint(u, funded)
     return step(plan, "clears the bar alone, left out%s: %s" % (
         " (paid for by %s)" % ", ".join(paid) if paid else "",
         verdict(total) or "together %+.1f, no more than the plan's %+.1f" % (
@@ -121,10 +121,10 @@ def whatif(u: Universe, words: list[str]) -> None:
         a = bought
     if sold:
         a = replace(a, sell=(sold, ), proceeds=m.fetches(sold))
-    mv = u.rank([a]).rows[0]
+    mv = u.rank([a])[0]
     print(show(u, mv))
     b = board(u)
-    picked, gain = plan(u, [*b.rows, mv], b.base) if verdict(mv) is None else ([], 0.0)
+    picked, gain = plan(u, [*b.rows, mv]) if verdict(mv) is None else ([], 0.0)
     print(step(plan, "the plan would take it: together %+.1f, against %+.1f" % (gain, b.gain))
           if mv in picked else fate(u, b, mv))
 
@@ -206,7 +206,7 @@ def _selftest() -> None:
     cand = next(r for r in pb.rows if r.action.buy == "cand_free")
     real = globals()["joint"]
     try:
-        globals()["joint"] = lambda u, moves, base: Move(Action("plan"), 5.0, 0.6)
+        globals()["joint"] = lambda u, moves: Move(Action("plan"), 5.0, 0.6)
         said = fate(poor, pb._replace(plan=[], gain=0.0), cand)
     finally:
         globals()["joint"] = real

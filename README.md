@@ -75,11 +75,13 @@ Every forecast is the same product, for every player and jornada, and
   the backtest.
 - **Points history** (`ffcore/points.py`, `scored()`): each change in a player's points
   total, given to the latest match his club had played.
-- **Uncertainty** (`ffcore/forecast.py`, `ffcore/season.py`): match-level
-  points drawn from the pool of real single-match scores, and one
-  persistent per-player error (`PERSISTENT_SHARE`, measured by the
-  backtest), drawn once per simulated season. A jornada under way keeps
-  the elevens that fielded it.
+- **Uncertainty** (`ffcore/forecast.py`): match-level points as the pool
+  of real single-match scores, and one persistent per-player error
+  (`PERSISTENT_SHARE`, measured by the backtest). A move's expected gain
+  and its chance of helping are worked out from them in SQL
+  (`ffcore/gain.py`, docs/notes/gain.md); the standings if nobody moves
+  are simulated (`ffcore/season.py`). A jornada under way keeps the elevens
+  that fielded it.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one, h being the longest
   horizon the data can fit (a rise was still carrying there), not the
