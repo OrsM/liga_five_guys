@@ -170,6 +170,14 @@ CREATE TABLE IF NOT EXISTS grade_forecast (
 -- error is acceptable. The same outcomes as grade_forecast, forecast again
 -- under the information of each moment, so it says how early a forecast is
 -- good, not which model is (paired_gain).
+-- The moments replay has tried for a variant, kept or found empty
+-- (grading.TODO): so a moment that forecasts nobody is not tried again.
+CREATE TABLE IF NOT EXISTS replay_tried (
+    variant TEXT NOT NULL,
+    as_of   TEXT NOT NULL,
+    PRIMARY KEY (variant, as_of)
+);
+
 CREATE TABLE IF NOT EXISTS replay_forecast (
     variant   TEXT NOT NULL,
     as_of     TEXT NOT NULL,       -- the snapshot replayed

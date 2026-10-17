@@ -85,18 +85,26 @@ def replay_rows(variant: str, as_of: str, jornada: int, lead_h: float, pred: dic
             for k, p in pred.items()]
 
 
+# The moments replay still owes a variant (:v): those of a finished
+# jornada neither kept (replay_forecast) nor tried and found empty
+# (replay_tried).
+TODO = """SELECT m.jornada, m.as_of FROM replay_moments m
+WHERE m.jornada IN (SELECT jornada FROM jornadas_done)
+  AND m.as_of NOT IN (SELECT as_of FROM replay_forecast WHERE variant = :v)
+  AND m.as_of NOT IN (SELECT as_of FROM replay_tried WHERE variant = :v)
+ORDER BY m.as_of"""
+
+
 def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> int:
     """Forecast the next jornada at every line-up snapshot before a played
     jornada's lock (replay_moments) with this code, and keep it
     (replay_forecast) against what then happened, under the variant's
-    constants (assemble.applied). Resumes: a moment already kept for the
-    variant is skipped. shard (i, n) takes every nth moment."""
+    constants (assemble.applied). Resumes: only the moments TODO owes it,
+    each marked tried (replay_tried) even when it forecast nobody. shard
+    (i, n) takes every nth moment."""
     locks, actual = round_locks(), jornada_points()
-    played = done_jornadas()
     with closing(connect()) as db:
-        have = {a for (a,) in db.execute("SELECT DISTINCT as_of FROM replay_forecast WHERE variant = ?", (variant,))}
-        todo = [(j, a) for j, a, _l in db.execute("SELECT jornada, as_of, lock FROM replay_moments")
-                if j in played and a not in have][shard[0]::shard[1]]
+        todo = [(j, a) for j, a in db.execute(TODO, {"v": variant})][shard[0]::shard[1]]
     kept = 0
     held = applied(variant)
     held.__enter__()
@@ -125,6 +133,7 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
                         raise
                     time.sleep(1 + attempt)
             record(out, "replay_forecast")
+            record([{"variant": variant, "as_of": at}], "replay_tried")
             kept += bool(out)
             print("  replay %s j%d %s: %d players" % (at, j, variant, len(out)), flush=True)
     finally:
@@ -313,7 +322,8 @@ def due(run: int, resolved: float, path: Path | None = None) -> bool:
 def record_grades() -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code,
     and keep every player forecast and every ranked move against what then
-    happened; skipped when nothing is new (due)."""
+    happened, and the live replay's moments it still owes (replay);
+    skipped when nothing is new (due)."""
     actual = jornada_points()
     resolved = len(done_jornadas())
     run = this_run()
@@ -330,8 +340,26 @@ def record_grades() -> dict[str, int]:
             record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
     finally:
         _AT.clear()
-    print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
-    return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
+    replayed = replay(REPLAY_VARIANT)
+    print("  grade: %d forecasts, %d moves over %d jornadas, %d moments replayed"
+          % (len(fc), len(moves), resolved, replayed))
+    return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves), "replayed": replayed}
+
+
+def _selftest_todo() -> None:
+    """replay_todo on its inputs as tables: a finished jornada's moments not
+    yet tried for the variant, kept or not."""
+    import sqlite3
+    db = sqlite3.connect(":memory:")
+    db.executescript("""CREATE TABLE replay_moments (jornada, as_of, lock);
+        CREATE TABLE jornadas_done (jornada); CREATE TABLE replay_forecast (variant, as_of);
+        CREATE TABLE replay_tried (variant, as_of);
+        INSERT INTO replay_moments VALUES (2, 'a', ''), (2, 'b', ''), (2, 'c', ''), (3, 'd', ''), (9, 'e', '');
+        INSERT INTO jornadas_done VALUES (2), (3);
+        INSERT INTO replay_forecast VALUES ('live', 'a'), ('other', 'd');
+        INSERT INTO replay_tried VALUES ('live', 'b');""")
+    assert [tuple(r) for r in db.execute(TODO, {"v": "live"})] == [(2, "c"), (3, "d")], \
+        "kept (a) or tried empty (b): done; another variant's (d) is not this one's; 9 unfinished"
 
 
 def _selftest() -> None:
@@ -388,6 +416,7 @@ def _selftest() -> None:
         finally:
             set_now(None)
 
+    _selftest_todo()
     rr = replay_rows("v", "2026-08-10T0800Z", 2, 57.0, {"a": 3.0, "b": 1.0}, {"b"}, {("a", 2): 5.0})
     assert rr == [
         {"variant": "v", "as_of": "2026-08-10T0800Z", "jornada": 2, "player": "a", "predicted": 3.0,
