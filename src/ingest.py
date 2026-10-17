@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Iterable, Iterator
+from contextlib import closing
 import functools
 import hashlib
 import io
@@ -23,9 +24,9 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
-from ffcore.db import TABLES_SQL
+from ffcore.db import TABLES_SQL, connect
 from ffcore.tidy import (NUMBERS, ROOT, SEASON, TIDY, clear_sql, store_sql, stored,
-                         csv_string, write_csv)
+                         csv_string, read_csv, write_csv)
 from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
                                   season_label)
 from ffcore.laliga_api import ROW_TABLE
@@ -334,9 +335,23 @@ def _version() -> str:
                            digest_size=8).hexdigest()
 
 
+def load_season(files: Iterable[Path] | None = None) -> int:
+    """season_points refilled from the season CSVs (baseline writes them);
+    how many rows."""
+    got = [{"season": r["season"], "ff_id": r["ff_id"], "points": float(r["points"] or 0),
+            "games": float(r["games"] or 0)}
+           for f in (sorted(SEASON.glob("points_*.csv")) if files is None else files)
+           for r in read_csv(f) if r.get("ff_id")]
+    with closing(connect()) as db, db:
+        db.execute("DELETE FROM season_points")
+        db.executemany("INSERT OR REPLACE INTO season_points VALUES (:season, :ff_id, :points, :games)", got)
+    return len(got)
+
+
 def parse() -> dict[str, int]:
-    """Fold new snapshots into the tidy tables; how many snapshots,
-    documents parsed and rows routed."""
+    """Fold new snapshots into the tidy tables, and last season's points
+    (load_season); how many snapshots, documents parsed and rows routed."""
+    load_season()
     version = _version()
     walk = doc_keys()
     state = _read_json(TIDY / _STATE, {})
@@ -556,7 +571,22 @@ POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
                  "source_url"]
 
 
+def _selftest_season() -> None:
+    import tempfile
+    from ffcore.db import rows
+    from ffcore.tidy import tables_in
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        f = Path(tmp) / "points_2025-26.csv"
+        write_csv(f, [{"ff_id": "1", "points": "150", "games": "30", "season": "2025-26"},
+                      {"ff_id": "", "points": "9", "games": "9", "season": "2025-26"},
+                      {"ff_id": "2", "points": "", "games": "", "season": "2025-26"}], POINTS_FIELDS)
+        assert load_season([f]) == 2 and load_season([f]) == 2, "refilled, not added to"
+        assert rows("SELECT ff_id, pts, pj FROM last_season ORDER BY ff_id") == [
+            ("1", 150.0, 30.0), ("2", 0.0, 0.0)], "no id, no row; no points, none"
+
+
 def _selftest() -> None:
+    _selftest_season()
     uses = compile("mod.thing", "<fp>", "eval")
     at = {}
     for where in ("/repo/.venv", "/elsewhere/.venv"):

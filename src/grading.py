@@ -52,9 +52,10 @@ def universe_at(jornada: int, locks: dict[int, dt.datetime]) -> Universe | None:
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
-    """Rebuild the forecast at each past lock: every player's expected points
-    for the jornada it locks and, with ahead, the next ones too, and who was
-    listed injured, doubtful or suspended then. Scored in SQL (grade_error)."""
+    """Rebuild the forecast at each past lock: every player's forecast cell
+    (points if he plays, chance he plays) for the jornada it locks and, with
+    ahead, the next ones too, and who was listed injured, doubtful or
+    suspended then. Scored in SQL (grade_error)."""
     locks, actual = round_locks(), jornada_points()
     done = {j for _k, j in actual}
     out = []
@@ -69,9 +70,8 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
             for j in range(i, i + ahead + 1):
                 if j not in done or j not in per_j:
                     continue
-                pred = {k: expected_points(cell) for k, cell in per_j[j].items()}
-                out.append({"jornada": j, "from": i, "pred": pred,
-                            "hurt": sorted(k for k in pred if k in flagged)})
+                out.append({"jornada": j, "from": i, "pred": dict(per_j[j]),
+                            "hurt": sorted(k for k in per_j[j] if k in flagged)})
     finally:
         set_now(None)
     return out
@@ -288,11 +288,13 @@ def sim_calibration() -> list[dict[str, Any]]:
 
 
 def forecast_rows(runs: list[dict[str, Any]], actual: dict[tuple[str, int], float]) -> list[dict[str, Any]]:
-    """backtest's forecasts, one row a player: what was forecast at the
-    lock (from_j) for a jornada, and what he scored (0 if nothing)."""
-    return [{"from_j": r["from"], "jornada": r["jornada"], "player": k, "predicted": p,
+    """backtest's forecast cells, one row a player: what was forecast at the
+    lock (from_j) for a jornada and his chance of playing, and what he
+    scored (0 if nothing)."""
+    return [{"from_j": r["from"], "jornada": r["jornada"], "player": k,
+             "predicted": expected_points(cell), "plays": cell[1],
              "actual": actual.get((k, r["jornada"]), 0.0), "flagged": int(k in r["hurt"])}
-            for r in runs for k, p in r["pred"].items()]
+            for r in runs for k, cell in r["pred"].items()]
 
 
 def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -333,11 +335,11 @@ def record_grades() -> dict[str, int]:
 
 
 def _selftest() -> None:
-    bt = [{"from": 7, "jornada": 8, "pred": {"a": 3.0, "b": 1.0}, "hurt": ["b"]}]
+    bt = [{"from": 7, "jornada": 8, "pred": {"a": (6.0, 0.5), "b": (2.0, 0.5)}, "hurt": ["b"]}]
     assert forecast_rows(bt, {("a", 8): 5.0}) == [
-        {"from_j": 7, "jornada": 8, "player": "a", "predicted": 3.0, "actual": 5.0, "flagged": 0},
-        {"from_j": 7, "jornada": 8, "player": "b", "predicted": 1.0, "actual": 0.0, "flagged": 1}], \
-        "one row a player forecast; no points scored is 0, as score_forecast has it"
+        {"from_j": 7, "jornada": 8, "player": "a", "predicted": 3.0, "plays": 0.5, "actual": 5.0, "flagged": 0},
+        {"from_j": 7, "jornada": 8, "player": "b", "predicted": 1.0, "plays": 0.5, "actual": 0.0, "flagged": 1}], \
+        "one row a player forecast, with his chance of playing; no points scored is 0"
     moves = decision_rows([{"lock": 7, "move": "buy X", "group": "plan", "kind": "get"},
                            {"lock": 7, "move": "sell Y", "group": "rejected", "kind": "sell"}])
     assert [(m["ord"], m["reached"], "group" in m) for m in moves] \

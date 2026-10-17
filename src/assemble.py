@@ -29,7 +29,7 @@ from ffcore.schedule import expectations, phantom_fill
 from ffcore.score import fit_promoted_discount, Scorer
 from ffcore.season import LeagueState
 from ffcore.startprob import Availability, Calibration, StartOdds, fit_availability
-from ffcore.tidy import LINEUP_SOURCE, SEASON, age_hours, current, read_csv, typed
+from ffcore.tidy import LINEUP_SOURCE, age_hours, current
 from stats import percentile
 
 __all__ = ["applied", "constants", "universe", "built", "params", "scorer", "fixture_ratings", "price_momentum",
@@ -48,7 +48,7 @@ NAMES: dict[str, tuple[str, ...]] = {
     "pricing": ("BID_BEATS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "remind": ("REMIND_HOURS",),
     "rules": ("MATCH_LEN",),
-    "score": ("PROMOTED_DISCOUNT_K", "SHRINK_K"),
+    "score": ("PPM_BANDS", "PROMOTED_DISCOUNT_K", "SHRINK_K"),
     "startprob": ("ABSENT_START", "AVAIL_K", "FALLBACK_K", "NEUTRAL_START", "PICK_K"),
 }
 MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "decide": decide, "fixture": fixture,
@@ -86,12 +86,9 @@ def applied(variant: str) -> Iterator[None]:
 def scorer(market: Rows, xi_rows: Rows) -> Scorer:
     """The scorer as of cut(), its fits read from the start and points views
     (written constants first: the views read them)."""
-    files = sorted(SEASON.glob("points_*.csv"))
-    last_season = {r["ff_id"]: {"pts": r.get("points") or 0.0,
-                                "pj": r.get("games") or 0.0}
-                   for r in (typed("points", read_csv(files[-1])) if files else ())
-                   if r.get("ff_id")}
     write_constants()
+    last_season = {k: {"pts": pts, "pj": pj} for k, pts, pj in rows("SELECT ff_id, pts, pj FROM last_season")}
+    priors: dict[str, float] = dict(rows("SELECT player, prior FROM ppm_prior"))
     season = season_record()
     cal, = rows("SELECT alpha, beta, neutral_start, absent_start FROM start_calibration")
     return Scorer(
@@ -102,7 +99,8 @@ def scorer(market: Rows, xi_rows: Rows) -> Scorer:
                           dict(rows("SELECT player, p FROM pick_later"))),
         last_season,
         current={k: {"pts": pts, "pj": apps} for k, (pts, apps, _n) in season.items()},
-        promoted_discount=fit_promoted_discount(market, last_season, scored()))
+        promoted_discount=fit_promoted_discount(market, last_season, scored(), priors),
+        priors=priors)
 
 
 def app_status() -> dict[str, str]:

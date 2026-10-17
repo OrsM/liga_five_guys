@@ -20,7 +20,7 @@ from ffcore import kept
 from ffcore.clock import cut, variant
 from ffcore.facts import ensure
 from ffcore.names import Name
-from ffcore.rules import position
+from ffcore.rules import position, slot
 from ffcore.startprob import platt, prognosis_bucket
 
 __all__ = ["DB", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
@@ -128,6 +128,7 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
         db.create_function(fn.__name__, 2, fn, deterministic=True)
     db.create_function("platt", 3, platt, deterministic=True)
     db.create_function("position", 1, position, deterministic=True)
+    db.create_function("slot", 1, slot, deterministic=True)
     db.create_function("prognosis_bucket", 6, prognosis_bucket, deterministic=True)
 
 

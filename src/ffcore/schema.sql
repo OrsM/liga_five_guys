@@ -161,6 +161,7 @@ CREATE TABLE IF NOT EXISTS grade_forecast (
     predicted REAL NOT NULL,
     actual    REAL NOT NULL,       -- 0 if he scored nothing
     flagged   INTEGER NOT NULL,    -- injured, doubtful or suspended then
+    plays     REAL,                -- his chance of playing (NULL in runs graded before 2026-10-17)
     PRIMARY KEY (run_id, from_j, jornada, player)
 );
 
@@ -633,6 +634,7 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
     (SELECT value FROM model_constants WHERE name = 'FALLBACK_K' AND variant = (SELECT variant())) AS fallback_k,
     (SELECT value FROM model_constants WHERE name = 'PICK_K' AND variant = (SELECT variant())) AS pick_k,
+    (SELECT value FROM model_constants WHERE name = 'PPM_BANDS' AND variant = (SELECT variant())) AS ppm_bands,
     (SELECT value FROM model_constants WHERE name = 'REMIND_HOURS' AND variant = (SELECT variant())) AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
     (SELECT printf('%.9g|%.9g|%.9g|%.9g', c.value, w0.value, w1.value, w2.value)
@@ -950,6 +952,37 @@ DROP VIEW IF EXISTS season_record;
 CREATE VIEW season_record AS
 SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
 FROM player_jornadas GROUP BY player;
+
+-- Last season's points per player, from season/points_<season>.csv
+-- (ingest.load_season refills it each parse), and the latest season's.
+CREATE TABLE IF NOT EXISTS season_points (
+    season TEXT NOT NULL,
+    ff_id  TEXT NOT NULL,
+    points REAL NOT NULL,
+    games  REAL NOT NULL,
+    PRIMARY KEY (season, ff_id)
+);
+DROP VIEW IF EXISTS last_season;
+CREATE VIEW last_season AS
+SELECT ff_id, points AS pts, games AS pj FROM season_points
+WHERE season = (SELECT max(season) FROM season_points);
+
+-- What a player's points per match is pulled toward: the median of last
+-- season's (10+ matches) in his position, or with PPM_BANDS in his
+-- position and band of value (that many, cheapest first, as of cut());
+-- a band with none, his position's; no position, everyone's.
+DROP VIEW IF EXISTS ppm_prior;
+CREATE VIEW ppm_prior AS
+WITH m AS (SELECT ff_id AS player, slot(position) AS pos,
+                  ntile(max(1, CAST((SELECT ppm_bands FROM k) AS INTEGER)))
+                      OVER (ORDER BY value, ff_id) AS band
+           FROM current_market WHERE ff_id <> ''),
+s AS (SELECT m.pos, m.band, l.pts / l.pj AS ppm FROM m JOIN last_season l ON l.ff_id = m.player
+      WHERE m.pos <> '' AND l.pj >= 10),
+b AS (SELECT pos, band, median(ppm) AS prior FROM s GROUP BY pos, band),
+p AS (SELECT pos, median(ppm) AS prior FROM s GROUP BY pos)
+SELECT m.player, coalesce(b.prior, p.prior, (SELECT median(ppm) FROM s)) AS prior
+FROM m LEFT JOIN b USING (pos, band) LEFT JOIN p USING (pos);
 
 -- The chance he is picked if fit, after his next match: his record this
 -- season (appearances over matchday squads) pulled toward NEUTRAL_START,

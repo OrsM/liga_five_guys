@@ -40,13 +40,15 @@ def _open(db: Path) -> sqlite3.Connection:
 
 
 def _fingerprint(lfg: sqlite3.Connection, tables: Sequence[str], cut: str) -> str:
-    """What each raw table held up to the cut, and the registry."""
+    """What each raw table held up to the cut, the registry, and last
+    season's points (season_points: no observed_at, refilled whole)."""
     parts = []
     for t in tables:
         parts.append("%s:%s" % (t, lfg.execute(
             'SELECT count(*) || "/" || coalesce(max(rowid), 0) FROM "%s" WHERE observed_at <= ?' % t, (cut,)).fetchone()[0]))
     parts.append(repr(lfg.execute("SELECT * FROM crosswalk ORDER BY 1").fetchall()))
     parts.append(repr(lfg.execute("SELECT * FROM league_config").fetchall()))
+    parts.append(repr(lfg.execute("SELECT * FROM season_points ORDER BY 1, 2").fetchall()))
     return hashlib.sha1("|".join(parts).encode()).hexdigest()
 
 
@@ -119,7 +121,8 @@ def _selftest() -> None:
                        "CREATE TABLE IF NOT EXISTS u (v);")
         with closing(sqlite3.connect(db)) as con, con:
             con.executescript("CREATE TABLE t (observed_at TEXT, v); CREATE TABLE u (v);"
-                              "CREATE TABLE crosswalk (a); CREATE TABLE league_config (a);")
+                              "CREATE TABLE crosswalk (a); CREATE TABLE league_config (a);"
+                              "CREATE TABLE season_points (season, ff_id, points, games);")
             con.execute("INSERT INTO t VALUES ('2026-08-01T0000Z', 1), ('2026-09-01T0000Z', 2)")
         with scope(db, raw, "A=1"):
             assert get(db, "q", ()) is None, "outside a pinned cut nothing is kept"
@@ -144,6 +147,11 @@ def _selftest() -> None:
                 con.execute("INSERT INTO t VALUES ('2026-08-10T0000Z', 3)")
             with scope(db, raw, "A=1"):
                 assert get(db, "q", ()) is None, "a row at or before the cut changed: a miss"
+                put(db, "q", (), [(2.5, None)])
+            with closing(sqlite3.connect(db)) as con, con:
+                con.execute("INSERT INTO season_points VALUES ('2025-26', '1', 9, 9)")
+            with scope(db, raw, "A=1"):
+                assert get(db, "q", ()) is None, "last season's points changed: a miss"
         finally:
             clock.set_now(None)
 
