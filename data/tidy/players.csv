@@ -133,7 +133,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 12870,carlos espi,real-madrid,carlos-espi,3129,Carlos Espí
 12878,buba sangare,elche,buba-sangare,2949,B. Sangare|Iñaki Peña
 12879,jorge cabello,levante,jorge-cabello,3111,Cabello
-12883,ian forns,betis,,,
+12883,ian forns,betis,ian-forns,,
 12891,llorenç serred,espanyol,-llorenc-serred,3171,Llorenç
 12917,alberto risco,getafe,alberto-risco,2662,Risco
 12918,rafel bauza,espanyol,rafel-bauza,3169,Bauza
@@ -275,7 +275,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 16156,oscar marcos,celta,,2849,Óscar Marcos
 16158,mauro echegoyen,osasuna,mauro-echegoyen,2723,Mauro
 16166,mykyta aleksandrov,getafe,,,
-16171,juan hernandez,barcelona,,2842,Juan Hernández
+16171,juan hernandez,barcelona,juan-hernandez-1,2842,Juan Hernández
 16186,mikel rodriguez,alaves,mikel-rodriguez,3144,Mikel Rodriguez
 16198,edu altozano,sevilla,edu-altozano,2745,Edu Altozano
 16201,mahamoud barry,villarreal,mahamoud-barry,2840,Barry
@@ -290,7 +290,7 @@ player_id,name,club_id,ff_slug,app_id,app_names
 16262,sergio martinez,real-madrid,sergio-martinez,3024,Sergio
 16263,santi franco,racing,,,
 16286,dani lorenzo,malaga,dani-lorenzo-1,3036,Dani Lorenzo
-16287,ivan corralejo,betis,,2739,Iván
+16287,ivan corralejo,betis,ivan-corralejo,2739,Iván
 16308,clemens riedel,espanyol,clemens-riedel,2785,Riedel
 16317,marcos navarro,valencia,marcos-navarro-1,2795,
 16349,adrian perez,athletic,adrian-perez-1,2710,D. Pérez
