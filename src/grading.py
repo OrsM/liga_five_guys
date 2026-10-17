@@ -253,7 +253,7 @@ def calibration_rows(jornada: int, draws: dict[str, np.ndarray[Any, Any]], actua
 
 def sim_calibration() -> list[dict[str, Any]]:
     """The season simulation held to account one jornada at a time: at each
-    clean lock, every manager's points that jornada drawn from the squads
+    clean lock of a finished jornada, every manager's points that jornada drawn from the squads
     then (his best eleven, the forecast then) against what he scored (his
     team_points over the window)."""
     locks = round_locks()
@@ -267,7 +267,10 @@ def sim_calibration() -> list[dict[str, Any]]:
             return None if got is None else float(got[0])
         out: list[dict[str, Any]] = []
         try:
+            done = done_jornadas()
             for j, (start, end) in sorted(clean_windows(locks, kicks).items()):
+                if j not in done:
+                    continue
                 u = universe_at(j, locks)
                 if u is None:
                     continue

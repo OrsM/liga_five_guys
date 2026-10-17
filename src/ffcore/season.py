@@ -99,12 +99,13 @@ _DRAWN: list[tuple[Bootstrap, tuple[int, ...], int, int,
 
 def draws(forecaster: Bootstrap, jornadas: Iterable[int], trials: int, seed: int
           ) -> list[tuple[int, list[str], npt.NDArray[np.float64]]]:
-    """The simulated points of every player and jornada. Same inputs, same
-    draws, so the last set is kept: a board asks for it eight times."""
+    """The simulated points of every player and jornada, a row a player
+    (his trials contiguous). Same inputs, same draws, so the last set is
+    kept: a board asks for it eight times."""
     key = (tuple(jornadas), trials, seed)
     if _DRAWN and _DRAWN[0][0] is forecaster and _DRAWN[0][1:4] == key:
         return _DRAWN[0][4]
-    out = list(_draw(forecaster, key[0], trials, seed))
+    out = [(j, keys, np.ascontiguousarray(d.T)) for j, keys, d in _draw(forecaster, key[0], trials, seed)]
     _DRAWN[:] = [(forecaster, *key, out)]
     return out
 
@@ -131,12 +132,18 @@ def _draw(forecaster: Bootstrap, jornadas: Iterable[int], trials: int, seed: int
             * (pts / forecaster.pool_mean) * rate[:, [col[k] for k in keys]], 0.0)
 
 
+_XI: list[tuple[Bootstrap, dict[int, dict[str, float]],
+                dict[tuple[int, tuple[tuple[str, str], ...]], list[str]]]] = []
+
+
 def _elevens(states: list[LeagueState], forecaster: Bootstrap
              ) -> list[dict[int, dict[str, list[str]]]]:
     """Each state's eleven per manager and jornada: the best by expected
-    points, as the manager would field them."""
-    exp_by_j: dict[int, dict[str, float]] = {}
-    xi_memo: dict[tuple[int, tuple[tuple[str, str], ...]], list[str]] = {}
+    points, as the manager would field them. Kept for the forecaster: a
+    board's candidates change one squad at a time."""
+    if not _XI or _XI[0][0] is not forecaster:
+        _XI[:] = [(forecaster, {}, {})]
+    _f, exp_by_j, xi_memo = _XI[0]
     xis = []
     for st in states:
         per_state: dict[int, dict[str, list[str]]] = {}
@@ -163,7 +170,7 @@ def _run_np(states: list[LeagueState], forecaster: Bootstrap, trials: int, seed:
     totals = [{m: np.full(trials, float(st.carried.get(m, 0.0)))
                for m in ms} for st, ms in zip(states, managers)]
     xis = _elevens(states, forecaster)
-    for j, keys, drawn in draws(forecaster, states[0].jornadas, trials, seed):
+    for j, keys, rows in draws(forecaster, states[0].jornadas, trials, seed):
         at = {k: i for i, k in enumerate(keys)}
         summed: dict[tuple[int, ...], npt.NDArray[np.float64]] = {}
         for i in range(len(states)):
@@ -171,7 +178,7 @@ def _run_np(states: list[LeagueState], forecaster: Bootstrap, trials: int, seed:
                 idx = tuple(at[k] for k in xis[i][j][m] if k in at)
                 if idx:
                     if idx not in summed:
-                        summed[idx] = drawn[:, list(idx)].sum(axis=1)
+                        summed[idx] = rows[list(idx)].sum(axis=0)
                     totals[i][m] += summed[idx]
     return [{m: v.tolist() for m, v in tot.items()} for tot in totals]
 
@@ -237,6 +244,7 @@ def _selftest() -> None:
                         carried={"A": 10.0})
     assert simulate(two_j, Bootstrap(mixed), trials=200, seed=5).mean("A") > 10.0, \
         "points carried count"
+
 
     swapped = {**{k: v for k, v in a.items() if k != "a_m1"}, "b_m1": "MED"}
     under_way = LeagueState(squads={"A": swapped, "B": b}, jornadas=[1, 2], me="A",

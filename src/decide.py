@@ -290,9 +290,14 @@ def fielded(u: Universe) -> dict[int, Squads]:
     return {j: now for j in u.part_played}
 
 
+TIE = 1e-9  # points; a smaller difference is the order the sums were added in
+
+
 def paired(after: Standings, base: Standings, me: str) -> list[float]:
-    return sorted(x - y for x, y in zip(after.totals.get(me, []),
-                                        base.totals.get(me, [])))
+    """My total after less before, trial by trial, sorted; a trial the move
+    changed nothing in is 0 exactly (TIE)."""
+    return sorted(0.0 if abs(d := x - y) < TIE else d
+                  for x, y in zip(after.totals.get(me, []), base.totals.get(me, [])))
 
 
 def median_gain(pairs: list[float]) -> float:
@@ -309,6 +314,14 @@ def apply(u: Universe, *acts: Action) -> Squads:
     sq = {m: dict(s) for m, s in u.state.squads.items()}
     sq[u.me] = u.squad_after(*acts)
     return {m: phantom_topup(s) for m, s in sq.items()}
+
+
+def _selftest_tie() -> None:
+    base = Standings({"me": [10.0, 20.0, 30.0, 0.1 + 0.2]}, "me")
+    after = Standings({"me": [10.0, 21.0, 29.0, 0.3]}, "me")
+    pairs = paired(after, base, "me")
+    assert pairs == [-1.0, 0.0, 0.0, 1.0], "0.1 + 0.2 against 0.3 is a tie, not a gain of 5e-17"
+    assert _move(Action("plan"), pairs).p_better == 0.25
 
 
 def _selftest() -> None:
@@ -607,4 +620,5 @@ def _selftest() -> None:
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
+        _selftest_tie()
         _selftest()
