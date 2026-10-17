@@ -39,17 +39,17 @@ data/tidy/startcal.json
 data/tidy/.parse_spill/
 
 # The tables parse derives from data/raw live in data/lfg.db (ignored
-# below), not as CSVs here. data/tidy keeps players.csv, the crosswalk's
-# committed record (it accumulates ids a rebuild would lose), and caches;
-# any other CSV there is stale and must not be committed (the report
-# commit adds all of data/: 2026-10-11 it committed seven stale tables).
+# below), not as CSVs here; any CSV under data/tidy is stale and must not be
+# committed (the report commit adds all of data/: 2026-10-11 it committed
+# seven stale tables).
 data/tidy/*.csv
-!data/tidy/players.csv
 data/tidy/snapindex.json
 data/tidy/parse_state.json
 
-# The run database (docs/plan-datasette.md): disposable, rebuilt from
+# The run database (docs/plan-datasette.md) and its kept answers (kept.py):
+# disposable, rebuilt from
 # data/raw, git and replays, so never committed.
 data/lfg.db
 data/lfg.db-*
+data/lfg.db.kept
 data/*.schema.lock
