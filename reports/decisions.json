@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-16T20:54Z",
+ "generated_at": "2026-10-17T08:03Z",
  "lock_at": "2026-10-17T12:00:00+00:00",
- "cash": 3995680.0,
- "cash_locked": 0.0,
- "finish": 1.83,
- "p_win": 0.296,
+ "cash": 4095680.0,
+ "cash_locked": 14442228.0,
+ "finish": 1.82,
+ "p_win": 0.301,
  "band": [
-  1817.39648682005,
-  2091.47464514563
+  1824.34635301229,
+  2094.46504030859
  ],
  "do": [],
  "plan_gain": 0.0,
@@ -17,7 +17,7 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 23231254.0
+   "clause": 22935235.0
   },
   {
    "name": "Ante Budimir",
@@ -32,7 +32,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 58161050.0
+   "clause": 57063785.0
   },
   {
    "name": "Pablo Fornals",
@@ -45,14 +45,14 @@
    "clause": 28589508.0
   },
   {
-   "name": "Miguel Roman",
-   "pos": "MED",
-   "clause": 14858531.0
-  },
-  {
    "name": "Iñigo Vicente",
    "pos": "DEL",
    "clause": 31271675.0
+  },
+  {
+   "name": "Miguel Roman",
+   "pos": "MED",
+   "clause": 14521703.0
   },
   {
    "name": "German Valera",
@@ -62,12 +62,12 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 19656596.0
+   "clause": 20399946.0
   },
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
-   "clause": 24368183.0
+   "clause": 24326769.0
   },
   {
    "name": "Yeray Alvarez",
@@ -80,108 +80,108 @@
    "name": "Natan",
    "pos": "DEF",
    "offer": 63671742.0,
-   "value": 58160465.0,
+   "value": 57063785.0,
    "beats": 1.0,
-   "season": -69.4645755088709,
-   "sell": false
-  },
-  {
-   "name": "Yeray Alvarez",
-   "pos": "DEF",
-   "offer": 4831944.0,
-   "value": 4475248.0,
-   "beats": 0.9,
-   "season": -12.332110356316,
-   "sell": false
-  },
-  {
-   "name": "Pepelu",
-   "pos": "MED",
-   "offer": 21005510.0,
-   "value": 19656230.0,
-   "beats": 0.86,
-   "season": -44.4869983822532,
+   "season": -66.702815198409,
    "sell": false
   },
   {
    "name": "Miguel Roman",
    "pos": "MED",
    "offer": 15853643.0,
-   "value": 14858423.0,
-   "beats": 0.84,
-   "season": -53.5252432611514,
+   "value": 14521703.0,
+   "beats": 0.98,
+   "season": -51.2591152758993,
+   "sell": false
+  },
+  {
+   "name": "Yeray Alvarez",
+   "pos": "DEF",
+   "offer": 4831944.0,
+   "value": 4462936.0,
+   "beats": 0.9,
+   "season": -9.03540744733959,
+   "sell": false
+  },
+  {
+   "name": "Pepelu",
+   "pos": "MED",
+   "offer": 21005510.0,
+   "value": 20399946.0,
+   "beats": 0.66,
+   "season": -41.4028987135664,
    "sell": false
   },
   {
    "name": "Iñigo Vicente",
    "pos": "DEL",
    "offer": 27954183.0,
-   "value": 26864562.0,
-   "beats": 0.76,
-   "season": -52.9289467794788,
-   "sell": false
-  },
-  {
-   "name": "Marcos Alonso",
-   "pos": "DEF",
-   "offer": 23320216.0,
-   "value": 22596648.0,
-   "beats": 0.7,
-   "season": -58.756922725866,
+   "value": 27223637.0,
+   "beats": 0.58,
+   "season": -48.5463453982717,
    "sell": false
   },
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
    "offer": 24965034.0,
-   "value": 24367736.0,
+   "value": 24326769.0,
    "beats": 0.58,
-   "season": -37.9311233692277,
+   "season": -33.4323829417816,
    "sell": false
   },
   {
-   "name": "Georges Mikautadze",
-   "pos": "DEL",
-   "offer": 37411530.0,
-   "value": 37779671.0,
-   "beats": 0.46,
-   "season": -78.1831735206227,
+   "name": "Marcos Alonso",
+   "pos": "DEF",
+   "offer": 23320216.0,
+   "value": 22844123.0,
+   "beats": 0.54,
+   "season": -52.9533049987976,
    "sell": false
   },
   {
    "name": "Mathew Ryan",
    "pos": "POR",
    "offer": 22964941.0,
-   "value": 23230999.0,
-   "beats": 0.4,
+   "value": 22935235.0,
+   "beats": 0.46,
    "season": null,
    "sell": false
   },
   {
-   "name": "German Valera",
-   "pos": "MED",
-   "offer": 13432470.0,
-   "value": 13851110.0,
-   "beats": 0.32,
-   "season": -50.0525499169102,
-   "sell": false
-  },
-  {
-   "name": "Ante Budimir",
+   "name": "Georges Mikautadze",
    "pos": "DEL",
-   "offer": 62708111.0,
-   "value": 64944700.0,
-   "beats": 0.28,
-   "season": -88.097990248628,
+   "offer": 37411530.0,
+   "value": 37589494.0,
+   "beats": 0.46,
+   "season": -72.2337259623934,
    "sell": false
   },
   {
    "name": "Pablo Fornals",
    "pos": "MED",
    "offer": 37640866.0,
-   "value": 39200051.0,
+   "value": 38717570.0,
+   "beats": 0.34,
+   "season": -59.2520765829871,
+   "sell": false
+  },
+  {
+   "name": "Ante Budimir",
+   "pos": "DEL",
+   "offer": 62708111.0,
+   "value": 64820510.0,
+   "beats": 0.3,
+   "season": -82.5351980430405,
+   "sell": false
+  },
+  {
+   "name": "German Valera",
+   "pos": "MED",
+   "offer": 13432470.0,
+   "value": 13945486.0,
    "beats": 0.24,
-   "season": -62.9440393235814,
+   "season": -44.4877334183017,
    "sell": false
   }
  ],
@@ -191,10 +191,10 @@
    "pos": "DEF",
    "asking": 20115962.0,
    "bid": 20504308.6773933,
-   "gain": 37.8257331833133,
-   "better": 0.876666666666667,
+   "gain": 36.6667305322306,
+   "better": 0.871,
    "verdict": null,
-   "trend": -6.2037173335155,
+   "trend": -5.65725731354533,
    "plan": false
   },
   {
@@ -202,10 +202,10 @@
    "pos": "MED",
    "asking": 14442228.0,
    "bid": 14721040.9773737,
-   "gain": 14.2754246214284,
-   "better": 0.709,
+   "gain": 13.9496078880263,
+   "better": 0.711333333333333,
    "verdict": null,
-   "trend": 11.6318012565074,
+   "trend": 13.1258682086941,
    "plan": false
   },
   {
@@ -213,10 +213,10 @@
    "pos": "POR",
    "asking": 28259347.0,
    "bid": 28804904.9759374,
-   "gain": 6.74502529220126,
-   "better": 0.619666666666667,
-   "verdict": "better off in 62% of seasons, under 70%",
-   "trend": -7.67416590882614,
+   "gain": 6.44500864837164,
+   "better": 0.63,
+   "verdict": "better off in 63% of seasons, under 70%",
+   "trend": -7.13283664672303,
    "plan": false
   },
   {
@@ -224,10 +224,10 @@
    "pos": "DEF",
    "asking": 939679.0,
    "bid": 957819.878247146,
-   "gain": 2.67040085210749,
-   "better": 0.586666666666667,
-   "verdict": "better off in 59% of seasons, under 70%",
-   "trend": 15.8611549338651,
+   "gain": 2.14981380590098,
+   "better": 0.578,
+   "verdict": "better off in 58% of seasons, under 70%",
+   "trend": 17.318441156342,
    "plan": false
   }
  ],
@@ -235,57 +235,57 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 362.0,
-   "mean": 2033.82022817146,
-   "lo": 1881.29591309807,
-   "hi": 2189.61697644887,
-   "cash": -22617294.0,
+   "now": 367.0,
+   "mean": 2036.57169250635,
+   "lo": 1881.77781209345,
+   "hi": 2192.21334495741,
+   "cash": -22517294.0,
    "estimated": true,
-   "p_above": 0.694666666666667
+   "p_above": 0.685333333333333
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 415.0,
-   "mean": 1954.81369112951,
-   "lo": 1817.39648682005,
-   "hi": 2091.47464514563,
-   "cash": 3995680.0,
+   "now": 421.0,
+   "mean": 1957.83837036684,
+   "lo": 1824.34635301229,
+   "hi": 2094.46504030859,
+   "cash": 4095680.0,
    "estimated": false,
    "p_above": null
   },
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 300.0,
-   "mean": 1773.61343177477,
-   "lo": 1641.63945314624,
-   "hi": 1911.94104213446,
-   "cash": 22306521.0,
+   "now": 304.0,
+   "mean": 1776.12694236959,
+   "lo": 1640.7470156772,
+   "hi": 1911.30656464291,
+   "cash": 22406521.0,
    "estimated": true,
-   "p_above": 0.113666666666667
+   "p_above": 0.118
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 263.0,
-   "mean": 1657.79059361791,
-   "lo": 1534.52623126365,
-   "hi": 1781.91897114727,
-   "cash": -11578604.0,
+   "now": 266.0,
+   "mean": 1664.58145981702,
+   "lo": 1545.29839964657,
+   "hi": 1784.62830992017,
+   "cash": -11478604.0,
    "estimated": true,
-   "p_above": 0.0176666666666667
+   "p_above": 0.0146666666666667
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 298.0,
-   "mean": 1545.34831856421,
-   "lo": 1433.62168077394,
-   "hi": 1656.99846641658,
-   "cash": 46993671.0,
+   "mean": 1543.87259819854,
+   "lo": 1434.71839038736,
+   "hi": 1658.19004944547,
+   "cash": 47093671.0,
    "estimated": true,
-   "p_above": 0.002
+   "p_above": 0.000333333333333297
   }
  ]
 }
