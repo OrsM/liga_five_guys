@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-17T20:37Z",
+ "generated_at": "2026-10-17T22:18Z",
  "lock_at": "2026-10-18T12:00:00+00:00",
  "cash": 4095680.0,
  "cash_locked": 0.0,
- "finish": 1.91,
- "p_win": 0.231,
+ "finish": 1.9,
+ "p_win": 0.235,
  "band": [
-  1868.30626954377,
-  2151.40699633183
+  1873.81025290051,
+  2155.47647069235
  ],
  "do": [],
  "plan_gain": 0.0,
@@ -17,7 +17,7 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 22935235.0
+   "clause": 22726669.0
   },
   {
    "name": "Ante Budimir",
@@ -32,7 +32,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 57063785.0
+   "clause": 56120121.0
   },
   {
    "name": "Iñigo Vicente",
@@ -52,22 +52,22 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 14521703.0
+   "clause": 14236131.0
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 13966262.0
+   "clause": 13978825.0
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 20399946.0
+   "clause": 21013333.0
   },
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
-   "clause": 24326769.0
+   "clause": 24111576.0
   },
   {
    "name": "Yeray Alvarez",
@@ -78,17 +78,6 @@
  "offers": [],
  "market": [
   {
-   "name": "Eric Garcia",
-   "pos": "DEF",
-   "asking": 47703362.0,
-   "bid": 48624294.4482313,
-   "gain": 43.0117418167995,
-   "better": 0.871375240344206,
-   "verdict": null,
-   "trend": 16.1350674907872,
-   "plan": false
-  },
-  {
    "name": "Aymeric Laporte",
    "pos": "DEF",
    "asking": 44337531.0,
@@ -96,7 +85,18 @@
    "gain": 38.3859987862914,
    "better": 0.867233112366631,
    "verdict": null,
-   "trend": -17.9955151802158,
+   "trend": -23.7991038863343,
+   "plan": false
+  },
+  {
+   "name": "Eric Garcia",
+   "pos": "DEF",
+   "asking": 47703362.0,
+   "bid": 48624294.4482313,
+   "gain": 22.3540480885933,
+   "better": 0.734873879261714,
+   "verdict": null,
+   "trend": 21.2783560268612,
    "plan": false
   },
   {
@@ -107,7 +107,7 @@
    "gain": 19.2016451236523,
    "better": 0.716699601284469,
    "verdict": null,
-   "trend": -18.3507137730468,
+   "trend": -24.6785635881758,
    "plan": false
   },
   {
@@ -118,7 +118,7 @@
    "gain": 17.2832485844135,
    "better": 0.730224726062365,
    "verdict": null,
-   "trend": 18.0083898169032,
+   "trend": 24.2286199026043,
    "plan": false
   },
   {
@@ -128,8 +128,8 @@
    "bid": 22798568.4051278,
    "gain": 6.5205434776823,
    "better": 0.61288416642371,
-   "verdict": "better off in 61% of seasons, under 70%",
-   "trend": 37.707229900964,
+   "verdict": "a 61% chance of helping, under 70%",
+   "trend": 55.7052909097457,
    "plan": false
   },
   {
@@ -139,8 +139,8 @@
    "bid": 1229953.01442934,
    "gain": 0.362898703328057,
    "better": 0.519655950470468,
-   "verdict": "better off in 52% of seasons, under 70%",
-   "trend": -18.9593154323185,
+   "verdict": "a 52% chance of helping, under 70%",
+   "trend": -25.320829756181,
    "plan": false
   },
   {
@@ -150,8 +150,8 @@
    "bid": 4636517.52741354,
    "gain": 0.139387186414107,
    "better": 0.506093584140992,
-   "verdict": "better off in 51% of seasons, under 70%",
-   "trend": -29.9227315542346,
+   "verdict": "a 51% chance of helping, under 70%",
+   "trend": -41.050456157881,
    "plan": false
   }
  ],
@@ -159,21 +159,21 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 400.0,
-   "mean": 2124.86334093317,
-   "lo": 1966.55413739812,
-   "hi": 2285.773201573,
+   "now": 408.0,
+   "mean": 2131.02731370399,
+   "lo": 1972.89336607727,
+   "hi": 2289.16126133072,
    "cash": -22517294.0,
    "estimated": true,
-   "p_above": 0.763
+   "p_above": 0.75939579498896
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 439.0,
-   "mean": 2007.24025691939,
-   "lo": 1868.30626954377,
-   "hi": 2151.40699633183,
+   "now": 445.0,
+   "mean": 2014.64336179643,
+   "lo": 1873.81025290051,
+   "hi": 2155.47647069235,
    "cash": 4095680.0,
    "estimated": false,
    "p_above": null
@@ -181,35 +181,35 @@
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 322.0,
-   "mean": 1826.58880808003,
-   "lo": 1687.67590157513,
-   "hi": 1970.99021156311,
+   "now": 328.0,
+   "mean": 1832.36510035515,
+   "lo": 1693.64907520659,
+   "hi": 1971.0811255037,
    "cash": 22406521.0,
    "estimated": true,
-   "p_above": 0.123666666666667
+   "p_above": 0.118657994067134
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 276.0,
-   "mean": 1707.93595244298,
-   "lo": 1582.16884147291,
-   "hi": 1836.30678770058,
+   "now": 282.0,
+   "mean": 1714.02726000527,
+   "lo": 1589.52024029548,
+   "hi": 1838.53427971507,
    "cash": -26328604.0,
    "estimated": true,
-   "p_above": 0.0203333333333333
+   "p_above": 0.02020848200646
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 312.0,
-   "mean": 1571.07662938967,
-   "lo": 1459.86971949223,
-   "hi": 1685.78406848488,
+   "now": 325.0,
+   "mean": 1572.9911684392,
+   "lo": 1459.56209000514,
+   "hi": 1686.42024687327,
    "cash": 47093671.0,
    "estimated": true,
-   "p_above": 0.001
+   "p_above": 0.000874085904380095
   }
  ]
 }
