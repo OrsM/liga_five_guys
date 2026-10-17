@@ -1,4 +1,4 @@
-"""The simulation stage: rank and plan the moves (decide.board), record
+"""The sim stage: rank and plan the moves (decide.board), record
 what they decided for the run (funnel, forecast, params, sim_*), and write
 decisions.json, the phone's copy of the board, from the board views
 (schema.sql: board_json)."""
@@ -155,13 +155,13 @@ def _selftest() -> None:
     assert all("by" not in e for e in exposed), \
         "no 'who can afford him': a rival's cash is no limit when sales to the game pay at once"
     assert all(CONFIDENCE <= v <= 1.0 for d in doc["do"] for _, v, unit in d["facts"]
-               if unit == "seasons"), "only moves that clear the bar are shown"
+               if unit == "chance"), "only moves that clear the bar are shown"
     assert report(ub, b._replace(plan=[]))["cash_after"] is None, \
         "no cash line when the plan moves no money"
     assert [r["estimated"] for r in doc["standings"] if r["me"]] == [False]
     riv_row = next(r for r in doc["standings"] if not r["me"])
-    assert riv_row["p_above"] == 1.0 - b.base.beat("riv"), \
-        "above you: the chance he finishes above you, not that you beat him"
+    assert abs(riv_row["p_above"] - (1.0 - b.base.beat("riv"))) < 1e-12, \
+        "above you: the chance he finishes above you, not that you beat him (JSON keeps 15 digits)"
     assert all(r["estimated"] for r in doc["standings"] if not r["me"]), \
         "rival cash is estimated from the feed"
     assert "squad" not in doc, "no squad table: offers and the market are what to act on"
@@ -353,7 +353,7 @@ def forecast(u: Universe, run: int) -> list[Doc]:
 
 
 def standings(u: Universe, b: Board, run: int) -> list[Doc]:
-    """Each manager's simulated season if you do nothing (Board.base): mean
+    """Each manager's season if you do nothing (Board.base): mean
     points and their 10th-90th percentile band, expected final position,
     the chance of first, the chance he finishes above you, and his cash."""
     base = b.base
@@ -459,7 +459,7 @@ def board_doc() -> Doc:
 def main() -> None:
     u = universe()
     if len(u.state.squads) < 2 or not u.state.jornadas:
-        print("sim: nothing to simulate (%d squads, %d jornadas left)"
+        print("sim: nothing to rank (%d squads, %d jornadas left)"
               % (len(u.state.squads), len(u.state.jornadas)))
         return
     run = this_run()

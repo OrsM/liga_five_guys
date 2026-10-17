@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS run_measures (
 
 -- Every move the board ranked (decide.board's rows), in board order: the
 -- funnel's candidates, rank and verdict, and whether the plan took it.
--- Why the plan left a move out costs a joint simulation: ask.py why.
+-- Why the plan left a move out costs a joint scoring: ask.py why.
 CREATE TABLE IF NOT EXISTS funnel (
     run_id      INTEGER NOT NULL REFERENCES runs(run_id),
     rank        INTEGER NOT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS funnel (
     cost        REAL NOT NULL,
     proceeds    REAL NOT NULL,
     gain        REAL NOT NULL,     -- median season points against doing nothing
-    p_better    REAL NOT NULL,     -- share of seasons better off
+    p_better    REAL NOT NULL,     -- chance it leaves you better off (ffcore.gain)
     per_million REAL NOT NULL,
     verdict     TEXT,              -- why it fails the bar; NULL if it clears it
     in_plan     INTEGER NOT NULL,
@@ -216,8 +216,8 @@ SELECT l.src, l.at AS last_at, l.n AS rows, round(u.usual_rows, 1) AS usual_rows
        (SELECT max(g.at) FROM r g WHERE g.src = l.src AND g.n >= 0.5 * u.usual_rows) AS last_good
 FROM r l JOIN usual u USING (src), now WHERE l.k = 1;
 
--- The season simulation held to account (grading.sim_calibration): each
--- manager's points in a clean jornada against the simulation's draws of it
+-- The standings forecast held to account (grading.sim_calibration): each
+-- manager's points in a clean jornada against the forecast of it
 -- at the lock (pit: where he fell, 0..1; calibrated is uniform), and you
 -- minus him the same way (diff_*), which is what who-finishes-above uses.
 CREATE TABLE IF NOT EXISTS sim_calibration (
@@ -295,7 +295,7 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
     move       TEXT NOT NULL,
     reached    TEXT NOT NULL,      -- plan, cleared, rejected
     kind       TEXT NOT NULL,      -- get, sell
-    chance     REAL,               -- share of seasons better off
+    chance     REAL,               -- chance it leaves you better off (ffcore.gain)
     jornadas   INTEGER,            -- jornadas played since
     pred       REAL,               -- points change forecast over them
     real       REAL,               -- points change that happened
@@ -1322,7 +1322,7 @@ moves AS (
                 SELECT 0 AS n, 'asking' AS l, coalesce(b.price, p.cost) AS v, 'money' AS u
                 WHERE p.what = 'buy'
                 UNION ALL SELECT 1, '', p.per_million, 'per_million' WHERE p.what = 'buy'
-                UNION ALL SELECT 2, 'better off in', round(p.p_better, 3), 'seasons' WHERE p.what = 'buy'
+                UNION ALL SELECT 2, 'chance of helping', round(p.p_better, 3), 'chance' WHERE p.what = 'buy'
                 UNION ALL SELECT 3, '', b.trend, 'trend' WHERE p.what = 'buy'
                 UNION ALL SELECT 0, 'raises', b.raises, 'money' WHERE p.what = 'sell'
                 UNION ALL SELECT 1, '', p.per_million, 'per_million' WHERE p.what = 'sell'

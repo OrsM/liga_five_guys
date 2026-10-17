@@ -50,7 +50,7 @@ def step(fn: Callable[..., Any], why: str) -> str:
 
 def show(u: Universe, mv: Move) -> str:
     names = u.market.names
-    return "%s: %+.1f points (%+.2f a million), better off in %.0f%% of seasons" % (
+    return "%s: %+.1f points (%+.2f a million), a %.0f%% chance of helping" % (
         mv.action.label(names), mv.d_pts, mv.per_million, 100 * mv.p_better)
 
 
@@ -211,7 +211,7 @@ def _selftest() -> None:
     finally:
         globals()["joint"] = real
     assert said == ("4/4 plan: clears the bar alone, left out (paid for by sell bench_m,"
-                    " sell bench_k): better off in 60% of seasons, under 70%"), said
+                    " sell bench_k): a 60% chance of helping, under 70%"), said
     accented = replace(u, market=replace(u.market, name={
         **u.market.name, "cand_free": Name("Iñigo Vicente"), "cand_rival": Name("Iñigo Martínez")}))
     assert find(accented, ["inigo", "vicente"]) == "cand_free", "accents never count"

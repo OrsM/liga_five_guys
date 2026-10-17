@@ -8,17 +8,16 @@ from typing import NamedTuple
 
 from ffcore.action import Action
 from ffcore.forecast import Bootstrap
-from ffcore.gain import gains
+from ffcore.gain import Standings, gains, standings
 from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.rules import Squad, Squads, position, shortfall
 from ffcore.schedule import PerJornadaFactors, phantom_topup
-from ffcore.season import LeagueState, Standings, simulate
+from ffcore.season import LeagueState
 
 __all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe",
            "board", "plan", "verdict"]
 
-FINAL_TRIALS = 3000
 CONFIDENCE = 0.7
 
 @dataclass(frozen=True)
@@ -49,7 +48,7 @@ class Board(NamedTuple):
 
     @property
     def base(self) -> Standings:
-        """The season if you do nothing (from start), simulated when asked."""
+        """The season if you do nothing (from start)."""
         return self.start.standings
 
     def sale(self, k: str) -> Move | None:
@@ -81,9 +80,9 @@ class Universe:
 
     @cached_property
     def standings(self) -> Standings:
-        """Every manager's season if nobody moves, simulated."""
-        return simulate(replace(self.state, fielded=fielded(self)), self.forecaster,
-                        trials=FINAL_TRIALS, seed=1)
+        """Every manager's season if nobody moves (ffcore.gain)."""
+        st = self.state
+        return standings(self.forecaster, apply(self), st.jornadas, st.carried, st.me)
 
     @cached_property
     def outlook(self) -> Outlook:
@@ -151,7 +150,7 @@ def verdict(mv: Move) -> str | None:
     if mv.d_pts <= 0:
         return "no expected gain (%+.1f points)" % mv.d_pts
     if mv.p_better < CONFIDENCE:
-        return "better off in %.0f%% of seasons, under %.0f%%" % (
+        return "a %.0f%% chance of helping, under %.0f%%" % (
             100 * mv.p_better, 100 * CONFIDENCE)
     return None
 
@@ -278,13 +277,6 @@ def _fieldable(squad: Squad) -> bool:
     return not shortfall(squad)
 
 
-def fielded(u: Universe) -> dict[int, Squads]:
-    """The squads as they stand, for the jornadas already under way: a
-    move made now cannot change those."""
-    now = apply(u)
-    return {j: now for j in u.part_played}
-
-
 def fieldable_spares(u: Universe) -> list[str]:
     mine_squad = u.mine
     return [k for k in mine_squad if _fieldable(
@@ -336,7 +328,7 @@ def _selftest() -> None:
     names = {a.buy for a in acts}
     assert {"dud", "star"} <= names, "every player on the market is ranked; no second measure filters first"
     assert u.why_not("star") is None and u.why_not("dud") is None
-    assert "dud" not in {r.action.buy for r in board(u).plan}, "the simulated bar rejects him"
+    assert "dud" not in {r.action.buy for r in board(u).plan}, "the bar rejects him"
     assert u.why_not("nobody") == "nobody's, and not on the market now"
     assert u.why_not("th_m1") == "riv's player"
 
@@ -503,7 +495,7 @@ def _selftest() -> None:
     coin = Move(Action("buy", buy="c"), 9.0, p_better=0.55)
     loss = Move(Action("buy", buy="l"), -1.0, p_better=0.9)
     assert verdict(sure) is None
-    assert verdict(coin) == "better off in 55% of seasons, under 70%", \
+    assert verdict(coin) == "a 55% chance of helping, under 70%", \
         "a bigger gain that is a coin flip is not worth doing"
     assert verdict(loss) == "no expected gain (-1.0 points)"
 

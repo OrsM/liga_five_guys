@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
 import os
 import sqlite3
 import sys
 import time
 from collections.abc import Callable
-from dataclasses import replace
 from contextlib import closing
 from pathlib import Path
+from statistics import NormalDist
 from typing import Any
 
-import numpy as np
 
 from ffcore.forecast import expected_points
-from ffcore.season import simulate
+from ffcore.gain import Standings, standings
 from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
 
@@ -229,33 +229,35 @@ def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datet
     return out
 
 
-def calibration_rows(jornada: int, draws: dict[str, np.ndarray[Any, Any]], actual: dict[str, float],
+def calibration_rows(jornada: int, st: Standings, actual: dict[str, float],
                      me: str) -> list[dict[str, Any]]:
-    """Where what happened falls in the simulation's draws of one jornada,
-    for each manager, and for you minus him (the draws share their trials, so
-    what the league as a whole does cancels, as it does in who finishes above)."""
-    def pit(v: np.ndarray[Any, Any], x: float) -> float:
-        return float((v < x).mean() + 0.5 * (v == x).mean())
+    """Where what happened falls in the forecast of one jornada (its normal:
+    pit, the share below it), for each manager, and for you minus him (the
+    managers' players are their own, so the difference's spread is both)."""
+    def pit(mean: float, sd: float, x: float) -> float:
+        if sd <= 0:
+            return 1.0 if x > mean else 0.5 if x == mean else 0.0
+        return NormalDist(mean, sd).cdf(x)
     out = []
-    for m, v in draws.items():
+    for m, (mean, sd) in st.dist.items():
         if m not in actual:
             continue
         row: dict[str, Any] = {"jornada": jornada, "manager": m, "actual": actual[m],
-                               "mean": float(v.mean()), "sd": float(v.std(ddof=1)), "pit": pit(v, actual[m]),
+                               "mean": mean, "sd": sd, "pit": pit(mean, sd, actual[m]),
                                "diff_actual": None, "diff_mean": None, "diff_sd": None, "diff_pit": None}
-        if m != me and me in draws and me in actual:
-            d = draws[me] - v
-            row.update(diff_actual=actual[me] - actual[m], diff_mean=float(d.mean()),
-                       diff_sd=float(d.std(ddof=1)), diff_pit=pit(d, actual[me] - actual[m]))
+        if m != me and me in st.dist and me in actual:
+            dm, ds = st.dist[me][0] - mean, math.hypot(st.dist[me][1], sd)
+            row.update(diff_actual=actual[me] - actual[m], diff_mean=dm, diff_sd=ds,
+                       diff_pit=pit(dm, ds, actual[me] - actual[m]))
         out.append(row)
     return out
 
 
 def sim_calibration() -> list[dict[str, Any]]:
-    """The season simulation held to account one jornada at a time: at each
-    clean lock of a finished jornada, every manager's points that jornada drawn from the squads
-    then (his best eleven, the forecast then) against what he scored (his
-    team_points over the window)."""
+    """The standings forecast held to account one jornada at a time: at each
+    clean lock of a finished jornada, every manager's points that jornada
+    (his best eleven of his squad then, the forecast then) against what he
+    scored (his team_points over the window)."""
     locks = round_locks()
     with closing(connect()) as db:
         kicks = [(j, snapshot_stamp(k) or dt.datetime.min.replace(tzinfo=dt.timezone.utc))
@@ -274,15 +276,14 @@ def sim_calibration() -> list[dict[str, Any]]:
                 u = universe_at(j, locks)
                 if u is None:
                     continue
-                st = replace(u.state, jornadas=[j], carried={}, fielded={})
-                totals = simulate(st, u.forecaster, trials=4000, seed=1).totals
+                st = standings(u.forecaster, {m: sq for m, sq in u.state.squads.items()
+                                              if not m.startswith("__")}, [j], {}, u.me)
                 actual = {}
-                for m in totals:
+                for m in st.dist:
                     a0, a1 = points(m, start), points(m, end)
                     if a0 is not None and a1 is not None:
                         actual[m] = a1 - a0
-                out += calibration_rows(j, {m: np.array(v) for m, v in totals.items()
-                                            if not m.startswith("__")}, actual, u.me)
+                out += calibration_rows(j, st, actual, u.me)
         finally:
             set_now(None)
             built.cache_clear()
@@ -468,15 +469,14 @@ def _selftest() -> None:
 
     assert clean_windows({1: day(0), 2: day(5)}, [(1, day(0)), (9, day(0)), (2, day(5))]) == {}, \
         "another jornada's match at the very kickoff of the lock is in the window too"
-    draws = {"me": np.array([40.0, 50.0, 60.0, 70.0]), "riv": np.array([30.0, 40.0, 50.0, 60.0])}
-    cal = {r["manager"]: r for r in calibration_rows(7, draws, {"me": 55.0, "riv": 100.0}, "me")}
+    fcst = Standings({"me": (55.0, 10.0), "riv": (45.0, 0.0)}, "me")
+    cal = {r["manager"]: r for r in calibration_rows(7, fcst, {"me": 55.0, "riv": 100.0}, "me")}
     assert (cal["me"]["mean"], cal["me"]["pit"], cal["me"]["diff_pit"]) == (55.0, 0.5, None), cal["me"]
-    assert cal["riv"]["pit"] == 1.0 and cal["riv"]["actual"] == 100.0, "above every draw"
-    assert (cal["riv"]["diff_actual"], cal["riv"]["diff_mean"], cal["riv"]["diff_sd"]) == (-45.0, 10.0, 0.0), \
-        "me minus him: the draws share trials, so a constant 10 apart has no spread"
-    assert cal["riv"]["diff_pit"] == 0.0, "-45 is below every draw of +10"
-    assert calibration_rows(7, draws, {"me": 50.0}, "me")[0]["pit"] == 0.375, "a draw equal to it counts half"
-    assert abs(cal["me"]["sd"] - float(np.std([40, 50, 60, 70], ddof=1))) < 1e-9
+    assert cal["riv"]["pit"] == 1.0 and cal["riv"]["actual"] == 100.0, "above a forecast with no spread"
+    assert (cal["riv"]["diff_actual"], cal["riv"]["diff_mean"], cal["riv"]["diff_sd"]) == (-45.0, 10.0, 10.0), \
+        "me minus him: the spreads add"
+    assert abs(cal["riv"]["diff_pit"] - NormalDist().cdf(-5.5)) < 1e-12, "-45 against +10, sd 10"
+    assert abs(calibration_rows(7, fcst, {"me": 65.0}, "me")[0]["pit"] - NormalDist().cdf(1.0)) < 1e-12
 
     print("grading self-test OK")
 

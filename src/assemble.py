@@ -42,7 +42,7 @@ APP_FRESH_HOURS = 14.4
 # and what a variant may set (variants).
 NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS",),
-    "decide": ("CONFIDENCE", "FINAL_TRIALS"),
+    "decide": ("CONFIDENCE",),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
     "pricing": ("BID_BEATS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),

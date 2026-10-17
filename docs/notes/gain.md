@@ -28,6 +28,18 @@ What changed on the golden boards: numbers by a few percent, and on
 in the median and 0.05 on average, so the cheapest cover became Houary +
 Radu instead of four sales.
 
-Kept simulated: the season if nobody moves (`Universe.standings`: finish,
-the chance each manager ends above you), which needs every manager at once;
-it runs only when something reads it.
+The standings went the same way the next day (Miguel: "why do we need that
+other simulation?"). A manager's final points are his eleven's sum, mean
+and spread as above; managers' players are their own, so "he ends above
+you" is the normal of the difference, expected finish is 1 plus those, and
+the chance of each position integrates the others over your own total
+(`Standings.position`). On the live board of 2026-10-17 against 3000
+simulated seasons: means within 3 points, spreads within 2%, each "above
+you" within 0.011, p_win 0.233 against 0.240, expected finish 1.903 against
+1.889: the simulation's own noise. The golden boards' standings moved by
+the same amounts; no plan or verdict changed. `ffcore/season.py` keeps only
+the league state and best_xi.
+
+Both ways share the same assumptions (players independent, one persistent
+error each), so neither corrects p_win's suspected overconfidence; the
+calibration check (`sim_calibration`) now tests the formula's spread.

@@ -1,24 +1,26 @@
-"""What a squad of yours gains over another in season points, worked out in
-SQL rather than simulated: each forecast cell's mean and spread (the
-Bootstrap's draw: plays with chance p, then a real single-match score scaled
-to his points, times his persistent rate), your best eleven of each squad
-each jornada as best_xi picks it, and the change in sum with its spread. A
-move's chance of helping is the normal's at that mean and spread.
+"""Season points worked out in SQL, not simulated: each forecast cell's
+mean and spread (the Bootstrap's draw: plays with chance p, then a real
+single-match score scaled to his points, times his persistent rate), the
+best eleven of each squad each jornada as best_xi picks it, and the sum
+with its spread. gains: a squad of yours against another, and the chance it
+scores more. standings: every manager's final points, and who ends where.
 
-Why: the per-candidate simulation drew 3000 seasons for every squad the
-board tried; on 140 past moves this agreed with it on every verdict
-(p_better within 0.01, its noise): docs/notes/gain.md.
+Why: the simulation drew 3000 seasons for every squad; on 140 past moves
+and today's standings this agreed with it within its own noise:
+docs/notes/gain.md.
 """
 from __future__ import annotations
 
 import math
 import sqlite3
 import statistics
+from dataclasses import dataclass
+from statistics import NormalDist
 
 from ffcore.forecast import Bootstrap
-from ffcore.rules import SHAPES, Squad
+from ffcore.rules import SHAPES, Squad, Squads
 
-__all__ = ["gains"]
+__all__ = ["Standings", "gains", "standings"]
 
 SCHEMA = """
 CREATE TABLE cell (jornada INTEGER, player TEXT, e REAL, m REAL, v REAL,
@@ -58,7 +60,8 @@ d AS (SELECT id, jornada, player, sum(w) AS w FROM (
 per AS (SELECT d.id, d.player, sum(d.w * c.m) AS a, sum(d.w * d.w * c.v) AS v
         FROM d JOIN cell c USING (jornada, player) GROUP BY d.id, d.player),
 g AS (SELECT id, sum(a) AS mean, (1 + :s2) * sum(v) + :s2 * sum(a * a) AS var FROM per GROUP BY id)
-SELECT o.id, coalesce(g.mean, 0.0), normal_above(coalesce(g.mean, 0.0), coalesce(g.var, 0.0))
+SELECT o.id, coalesce(g.mean, 0.0), coalesce(g.var, 0.0),
+       normal_above(coalesce(g.mean, 0.0), coalesce(g.var, 0.0))
 FROM (SELECT DISTINCT id FROM squad WHERE id > 0) o LEFT JOIN g USING (id) ORDER BY o.id
 """
 
@@ -93,6 +96,12 @@ def gains(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
           ) -> list[tuple[float, float]]:
     """Each squad against base over these jornadas: (expected change in
     season points, chance it is more)."""
+    return [(m, p) for m, _v, p in _moments(fc, jornadas, base, squads)]
+
+
+def _moments(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
+             ) -> list[tuple[float, float, float]]:
+    """Each squad's eleven's points less base's: (mean, variance, chance above 0)."""
     if not squads:
         return []
     db = _db(fc)
@@ -104,12 +113,75 @@ def gains(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
                        [(i, o, k, slot) for i, sq in enumerate([base, *squads])
                         for o, (k, slot) in enumerate(sq.items())])
         got = db.execute(GAIN, {"s2": fc.share ** 2}).fetchall()
-    assert [i for i, _m, _p in got] == list(range(1, len(squads) + 1))
-    return [(m, p) for _i, m, p in got]
+    assert [r[0] for r in got] == list(range(1, len(squads) + 1))
+    return [(m, v, p) for _i, m, v, p in got]
+
+
+@dataclass(frozen=True)
+class Standings:
+    """Each manager's final points as a normal (mean with the points he has,
+    sd); me is you."""
+    dist: dict[str, tuple[float, float]]
+    me: str = ""
+
+    def mean(self, manager: str) -> float:
+        return self.dist.get(manager, (0.0, 0.0))[0]
+
+    def band(self, manager: str, lo: float = 0.1, hi: float = 0.9) -> tuple[float, float]:
+        mu, sd = self.dist.get(manager, (0.0, 0.0))
+        if sd <= 0:
+            return mu, mu
+        z = NormalDist()
+        return mu + sd * z.inv_cdf(lo), mu + sd * z.inv_cdf(hi)
+
+    def beat(self, rival: str, manager: str = "") -> float:
+        """The chance manager (you by default) ends above rival; level is half."""
+        me = manager or self.me
+        if me not in self.dist or rival not in self.dist:
+            return 0.0
+        (a, sa), (b, sb) = self.dist[me], self.dist[rival]
+        if sa * sa + sb * sb <= 1e-12 and abs(a - b) <= 1e-9:
+            return 0.5
+        return normal_above(a - b, sa * sa + sb * sb)
+
+    def position(self, manager: str = "") -> dict[int, float]:
+        """The chance of each final position (1 + those strictly above): over
+        his own total, the others above it counted as independent chances."""
+        me = manager or self.me
+        if me not in self.dist:
+            return {}
+        mu, sd = self.dist[me]
+        others = [v for m, v in self.dist.items() if m != me]
+        z = NormalDist()
+        grid = [(mu, 1.0)] if sd <= 0 else [
+            (mu + sd * x / 25.0, z.pdf(x / 25.0)) for x in range(-200, 201)]
+        total = sum(w for _t, w in grid)
+        out = [0.0] * (len(others) + 1)
+        for t, w in grid:
+            ways = [1.0]
+            for o_mu, o_sd in others:
+                q = (1.0 if o_mu > t else 0.0) if o_sd <= 0 else 1.0 - z.cdf((t - o_mu) / o_sd)
+                ways = [a * (1 - q) + b * q for a, b in zip([*ways, 0.0], [0.0, *ways])]
+            out = [o + w / total * c for o, c in zip(out, ways)]
+        return {k + 1: p for k, p in enumerate(out) if p > 0}
+
+    def expected_position(self, manager: str = "") -> float:
+        me = manager or self.me
+        return 1.0 + sum(self.beat(me, o) for o in self.dist if o != me) if me in self.dist else 0.0
+
+
+def standings(fc: Bootstrap, squads: Squads, jornadas: list[int], carried: dict[str, float],
+              me: str) -> Standings:
+    """Every manager's season from here, his squad fielding every jornada
+    left, with the points he has."""
+    mans = list(squads)
+    got = _moments(fc, jornadas, {}, [squads[m] for m in mans])
+    return Standings({m: (mean + carried.get(m, 0.0), math.sqrt(max(var, 0.0)))
+                      for m, (mean, var, _p) in zip(mans, got)}, me)
 
 
 def _selftest() -> None:
-    from ffcore.season import LeagueState, best_xi, simulate
+    from ffcore.season import best_xi
 
     xi = {"k": "POR", **{"d%d" % i: "DEF" for i in range(4)}, **{"m%d" % i: "MED" for i in range(4)},
           "f0": "DEL", "f1": "DEL"}
@@ -125,13 +197,31 @@ def _selftest() -> None:
     assert (g_bench, p_bench) == (0.0, 0.0), "a bench player's sale changes no eleven: no gain, never better"
     picked = best_xi(buy_star, {k: c[0] * c[1] for k, c in per[1].items()})
     assert "star" in picked and "f1" not in picked, "as best_xi picks"
-    sim = [simulate(LeagueState({"me": sq}, [1, 2, 3], "me"), fc, trials=6000, seed=2).totals["me"]
-           for sq in (base, buy_star)]
-    better = sum(b > a + 1e-9 for a, b in zip(*sim)) / 6000
-    assert abs(better - p_star) < 0.03, (better, p_star)
+    # the star for f1 in three jornadas: match noise of both, and each one's rate across the three
+    m2 = statistics.fmean(x * x for x in fc.pool) / fc.pool_mean ** 2
+    def noise(pts: float, p: float) -> float:
+        return p * pts * pts * m2 - (p * pts) ** 2
+    s2 = fc.share ** 2
+    var = (1 + s2) * 3 * (noise(9.0, 0.8) + noise(3.0, 0.9)) + s2 * ((3 * 7.2) ** 2 + (3 * 2.7) ** 2)
+    assert abs(p_star - (1 - NormalDist(g_star, math.sqrt(var)).cdf(0))) < 1e-12, p_star
     assert gains(fc, [2, 3], base, [buy_star])[0][0] == g_star * 2 / 3, "only the jornadas asked"
     short = {"k": "POR", "d0": "DEF"}
     assert gains(fc, [1], short, [short]) == [(0.0, 0.0)], "no eleven either way: nothing"
+    riv = {k.upper(): v for k, v in xi.items()}
+    per2 = {j: {**per[j], **{k.upper(): (2.0, 0.9) for k in xi}} for j in per}
+    fc2 = Bootstrap(per2, pool=fc.pool)
+    st = standings(fc2, {"me": base, "riv": riv}, [1, 2, 3], {"riv": 10.0}, "me")
+    assert abs(st.mean("me") - 3 * sum(per[1][k][0] * per[1][k][1] for k in xi)) < 1e-9
+    assert abs(st.mean("riv") - (10.0 + 3 * 11 * 1.8)) < 1e-9, "his points carried count"
+    (mu, sd), (rmu, rsd) = st.dist["me"], st.dist["riv"]
+    assert abs(st.beat("riv") - (1 - NormalDist(mu - rmu, math.hypot(sd, rsd)).cdf(0))) < 1e-12
+    lo, hi = st.band("me")
+    assert lo < st.mean("me") < hi
+    pos = st.position()
+    assert abs(sum(pos.values()) - 1) < 1e-6 and abs(pos[1] - st.beat("riv")) < 1e-3, pos
+    assert abs(st.expected_position() - (1 + st.beat("me", "riv"))) < 1e-12
+    level = Standings({"a": (5.0, 0.0), "b": (5.0, 0.0)}, "a")
+    assert level.beat("b") == 0.5 and level.position() == {1: 1.0}, "level: half, and nobody above"
     print("ffcore.gain self-test OK")
 
 
