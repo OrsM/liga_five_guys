@@ -210,7 +210,7 @@ rather than reaching through them; ruff flags reads of private members.
                     action, fixtures (test data)
     inputs/         league.ini
     data/raw/       archived pages, append-only
-    data/tidy/      parse caches; players.csv, the registry's committed export
-                    (lfg.db owns it; an empty lfg.db is restored from it, and
-                    last season from raw/season=<season>.tar.xz)
+    data/tidy/      parse caches (lfg.db and everything in it is rebuilt from
+                    raw: the registry each run, last season from
+                    raw/season=<season>.tar.xz)
     reports/        decisions.json, what the phone draws
