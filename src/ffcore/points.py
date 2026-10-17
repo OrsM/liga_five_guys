@@ -7,7 +7,7 @@ from __future__ import annotations
 from ffcore.db import rows
 from ffcore.score import Scored
 
-__all__ = ["jornada_points", "scored", "season_record"]
+__all__ = ["done_jornadas", "jornada_points", "scored", "season_record"]
 
 
 def scored() -> list[Scored]:
@@ -27,7 +27,30 @@ def season_record() -> dict[str, tuple[float, float, float]]:
     return {k: (pts, apps, n) for k, pts, apps, n in rows("SELECT player, pts, apps, squads FROM season_record")}
 
 
+def done_jornadas() -> set[int]:
+    """The jornadas every match of which has a score (jornadas_done): the
+    ones a forecast can be graded on."""
+    return {j for (j,) in rows("SELECT jornada FROM jornadas_done")}
+
+
+def _selftest_done() -> None:
+    import sqlite3
+    from ffcore.db import SCHEMA
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE current_matches (jornada, score)")
+    db.executemany("INSERT INTO current_matches VALUES (?, ?)", [
+        (6, "2-1"), (6, ""),            # one postponed: not done
+        (8, "0-0"), (8, "3-1"),         # done
+        (9, "1-1"), (9, "")])           # under way: not done
+    sql = SCHEMA.read_text()
+    i = sql.index("CREATE VIEW jornadas_done AS")
+    db.execute(sql[i:sql.index(";\n", i)])
+    assert [j for (j,) in db.execute("SELECT jornada FROM jornadas_done")] == [8], \
+        "only a jornada whose every match has a score"
+
+
 def _selftest() -> None:
+    _selftest_done()
     import tempfile
     from pathlib import Path
 

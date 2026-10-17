@@ -370,7 +370,8 @@ def _selftest_queries() -> None:
             record([{"player_id": k, "name": n, "app_id": a} for k, n, a in
                     [("x", "X Man", "1"), ("y", "Y Man", "2"), ("z", "Z Man", "3")]], "crosswalk")
             store_sql("matches", [{"observed_at": "2026-08-01T0000Z", "match_id": "m", "jornada": "1",
-                                   "home": "c1", "away": "c2", "kickoff": "2026-08-20T19:00:00+00:00"}])
+                                   "home": "c1", "away": "c2", "kickoff": "2026-08-20T19:00:00+00:00",
+                                   "score": "1-0"}])
             store_sql("market", [{"observed_at": "2026-08-24T1000Z", "ff_id": k, "club": "c1"} for k in "xyz"])
             store_sql("points", [{"observed_at": "2026-08-10T0000Z", "season": "2026-27", "ff_id": k,
                                   "points": "0", "games": "0"} for k in "xyz"]

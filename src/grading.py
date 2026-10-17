@@ -17,7 +17,7 @@ from ffcore.forecast import expected_points
 from ffcore.schedule import expectations
 from ffcore.season import simulate
 from ffcore.jornadas import round_locks, rounds_ahead
-from ffcore.points import jornada_points
+from ffcore.points import done_jornadas, jornada_points
 
 from assemble import applied, built, fixture_ratings, price_change, price_momentum, scorer, universe
 from decide import Action, Universe, board, verdict
@@ -56,8 +56,8 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     (points if he plays, chance he plays) for the jornada it locks and, with
     ahead, the next ones too, and who was listed injured, doubtful or
     suspended then. Scored in SQL (grade_error)."""
-    locks, actual = round_locks(), jornada_points()
-    done = {j for _k, j in actual}
+    locks = round_locks()
+    done = done_jornadas()
     out = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
@@ -92,7 +92,7 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
     constants (assemble.applied). Resumes: a moment already kept for the
     variant is skipped. shard (i, n) takes every nth moment."""
     locks, actual = round_locks(), jornada_points()
-    played = {j for _k, j in actual}
+    played = done_jornadas()
     with closing(connect()) as db:
         have = {a for (a,) in db.execute("SELECT DISTINCT as_of FROM replay_forecast WHERE variant = ?", (variant,))}
         todo = [(j, a) for j, a, _l in db.execute("SELECT jornada, as_of, lock FROM replay_moments")
@@ -141,7 +141,7 @@ def decisions() -> list[dict[str, Any]]:
     to gain (bought) or lose (sold) over the price horizon, in millions,
     against what they did."""
     locks, actual = round_locks(), jornada_points()
-    done = {j for _k, j in actual}
+    done = done_jornadas()
     out = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
@@ -184,7 +184,7 @@ def phantom_season() -> list[dict[str, Any]]:
     lock's forecast and scored on what they got; beside a manager who never
     moves, picked the same way. One row a played jornada."""
     locks, actual = round_locks(), jornada_points()
-    done = {j for _k, j in actual}
+    done = done_jornadas()
     squad: dict[str, str] | None = None
     hold: dict[str, str] = {}
     cash = 0.0
@@ -315,7 +315,7 @@ def record_grades() -> dict[str, int]:
     and keep every player forecast and every ranked move against what then
     happened; skipped when nothing is new (due)."""
     actual = jornada_points()
-    resolved = len({j for _k, j in actual})
+    resolved = len(done_jornadas())
     run = this_run()
     if run is not None and not due(run, resolved):
         print("  grade: same code, same %d jornadas: nothing new" % resolved)

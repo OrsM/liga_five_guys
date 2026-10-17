@@ -953,6 +953,12 @@ CREATE VIEW season_record AS
 SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
 FROM player_jornadas GROUP BY player;
 
+-- The jornadas every match of which has a score: what a forecast is
+-- graded on (one under way, or with a match postponed, is not).
+DROP VIEW IF EXISTS jornadas_done;
+CREATE VIEW jornadas_done AS
+SELECT jornada FROM current_matches GROUP BY jornada HAVING sum(score = '') = 0 ORDER BY jornada;
+
 -- Last season's points per player, from season/points_<season>.csv
 -- (ingest.load_season refills it each parse), and the latest season's.
 CREATE TABLE IF NOT EXISTS season_points (
