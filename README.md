@@ -211,6 +211,6 @@ rather than reaching through them; ruff flags reads of private members.
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      parse caches; players.csv, the registry's committed export
-    data/season/    points_<season>.csv, last season's committed export
-                    (lfg.db owns both; an empty lfg.db is restored from them)
+                    (lfg.db owns it; an empty lfg.db is restored from it, and
+                    last season from raw/season=<season>.tar.xz)
     reports/        decisions.json, what the phone draws

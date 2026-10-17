@@ -17,14 +17,13 @@ from ffcore.clock import run_now
 from ffcore.db import ROOT
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
-__all__ = ["ROOT", "TIDY", "SEASON", "REPORTS",
+__all__ = ["ROOT", "TIDY", "REPORTS",
            "current", "history", "typed", "age_hours", "table_path", "tables_in",
            "input_path", "read_csv", "write_csv",
            "csv_string", "mtime_cached", "store_sql", "stored",
            "clear_sql", "NUMBERS", "LINEUP_SOURCE"]
 
 TIDY = ROOT / "tidy"
-SEASON = ROOT / "season"
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 
 

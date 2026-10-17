@@ -38,9 +38,9 @@ data/raw tarballs
   survives the box being down; `Fantasy.jsx` stays the one renderer and
   links into Datasette (as `Band.jsx` does).
 - **broom**: `runs` is glance, `params` tidy, `funnel`/`forecast` augment.
-- **`lfg.db` is rebuilt from `data/raw`** plus the committed exports of
-  the registry (`players.csv`) and last season (`points_<season>.csv`),
-  git and replays; only `runs` history is not. No backup.
+- **`lfg.db` is rebuilt from `data/raw`** (last season included:
+  `season=<season>.tar.xz`) plus the registry's committed export
+  (`players.csv`), git and replays; only `runs` history is not. No backup.
 
 ## Decisions
 
@@ -62,10 +62,13 @@ data/raw tarballs
 - `ask.py why`'s plan step (`fate`) runs joint simulations on demand;
   storing it for every ranked move costs sim time. Store steps 1-3 only.
 - SQLite views take no parameters: `current`'s cut is a `:cut` saved query.
-- `players.csv` and `points.csv` are state no rebuild recovers: lfg.db
-  owns them (`crosswalk`, `season_points`) and writes each a committed
-  export, read only to restore an empty lfg.db. (Until 2026-10-17 the code
-  read the CSVs as the source and mirrored them into SQL, against this.)
+- `players.csv` is state no rebuild recovers (rebuilt from scratch on
+  2026-10-17 it lost 65 players and 54 app ids): lfg.db owns it
+  (`crosswalk`) and writes a committed export, read only to restore an
+  empty lfg.db. Last season's points need no export: raw holds the page
+  (`season=<season>.tar.xz`), which reproduces all 757 rows. (Until
+  2026-10-17 the code read both CSVs as the source and mirrored them into
+  SQL, against this.)
 - `golden.py` copies tidy and runs only `sim`; S0 makes it freeze
   `data/raw` and run `parse sim` (a cold parse is ~5 minutes).
 - The only `sqlite3` CLI on the box is Android's: bash steps log through a

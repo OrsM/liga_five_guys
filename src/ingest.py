@@ -26,8 +26,8 @@ from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
 from ffcore.players import load_crosswalk
 from ffcore.db import TABLES_SQL, connect
-from ffcore.tidy import (NUMBERS, ROOT, SEASON, TIDY, clear_sql, store_sql, stored,
-                         csv_string, read_csv, write_csv)
+from ffcore.tidy import (NUMBERS, ROOT, TIDY, clear_sql, store_sql, stored,
+                         csv_string)
 from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
                                   season_label)
 from ffcore.laliga_api import ROW_TABLE
@@ -347,13 +347,24 @@ def season_rows(rows: Iterable[Mapping[str, Any]]) -> int:
     return len(got)
 
 
-def load_season(files: Iterable[Path] | None = None) -> int:
-    """An empty season_points (a rebuilt lfg.db) restored from the season
-    exports baseline writes; how many rows, 0 when it held some."""
+def archive_season(html: str, label: str, raw: Path = RAW) -> Path:
+    """A season's points page into the raw archive (season=<label>.tar.xz),
+    what season_points is restored from."""
+    path = raw / f"season={label}.tar.xz"
+    _write(path, {"points.html": html,
+                  MANIFEST: csv_string([{"page": "points", "sig": "", "stored": label,
+                                         "seen": label}], MANIFEST_FIELDS)})
+    return path
+
+
+def load_season(archives: Iterable[Path] | None = None) -> int:
+    """An empty season_points (a rebuilt lfg.db) restored from the archived
+    season pages; how many rows, 0 when it held some."""
     if stored("season_points"):
         return 0
-    return season_rows(r for f in (sorted(SEASON.glob("points_*.csv")) if files is None else files)
-                       for r in read_csv(f))
+    return season_rows(dict(r, season=path.name.removeprefix("season=").removesuffix(".tar.xz"))
+                       for path in (sorted(RAW.glob("season=*.tar.xz")) if archives is None else archives)
+                       for r in parse_points(_read(path, {"points.html"})["points.html"]))
 
 
 def parse() -> dict[str, int]:
@@ -554,48 +565,28 @@ def baseline(url: str = "", label: str = "") -> None:
 
     label = re.sub(r"[^0-9A-Za-z._-]", "", label or season_label(html)) or "unknown"
 
-    _write(RAW / f"season={label}.tar.xz",
-           {"points.html": html,
-            MANIFEST: csv_string([{"page": "points", "sig": "", "stored": label,
-                                   "seen": label}], MANIFEST_FIELDS)})
-
     rows = parse_points(html)
     if not rows:
-        sys.exit("PARSE FAILED — no table matched, so nothing was written and "
-                 "the last good file is untouched. The markup has probably "
-                 "changed: fix ffcore.futbolfantasy.parse_points.")
-
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
-    out = SEASON / f"points_{label}.csv"
-    out.parent.mkdir(parents=True, exist_ok=True)
+        sys.exit("PARSE FAILED — no table matched, so nothing was written. The "
+                 "markup has probably changed: fix ffcore.futbolfantasy.parse_points.")
+    archive_season(html, label)
     season_rows([dict(r, season=label) for r in rows])
-    write_csv(out, [dict(r, season=label, observed_at=stamp, source_url=url)
-                    for r in rows], POINTS_FIELDS)        # the export a rebuilt lfg.db is restored from
-
     played = sum(1 for r in rows if (r["games"] or "0") != "0")
-    print(f"wrote {out} — {len(rows)} players, "
-          f"{played} with minutes, season label '{label}'")
+    print(f"season {label}: {len(rows)} players, {played} with minutes, into season_points")
     print("Spot-check a few names against the app before trusting the report.")
-
-
-POINTS_FIELDS = ["player_name", "player_name_full", "team", "points",
-                 "games", "avg", "ff_id", "season", "observed_at",
-                 "source_url"]
 
 
 def _selftest_season() -> None:
     import tempfile
     from ffcore.db import rows
+    from ffcore.futbolfantasy import _POINTS_FIXTURE
     from ffcore.tidy import tables_in
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        f = Path(tmp) / "points_2025-26.csv"
-        write_csv(f, [{"ff_id": "1", "points": "150", "games": "30", "season": "2025-26"},
-                      {"ff_id": "", "points": "9", "games": "9", "season": "2025-26"},
-                      {"ff_id": "2", "points": "", "games": "", "season": "2025-26"}], POINTS_FIELDS)
-        assert load_season([f]) == 2, "an empty table restored from the export"
-        assert rows("SELECT ff_id, pts, pj FROM last_season ORDER BY ff_id") == [
-            ("1", 150.0, 30.0), ("2", 0.0, 0.0)], "no id, no row; no points, none"
-        assert load_season([f]) == 0, "the table owns it: the export is not read again"
+        arc = archive_season(_POINTS_FIXTURE, "2025-26", Path(tmp))
+        assert arc.name == "season=2025-26.tar.xz"
+        assert load_season([arc]) == 1, "an empty table restored from the archived page"
+        assert rows("SELECT ff_id, pts, pj FROM last_season") == [("4242", 156.0, 34.0)]
+        assert load_season([arc]) == 0, "the table owns it: the archive is not read again"
         assert season_rows([{"season": "2025-26", "ff_id": "3", "points": "8", "games": "2"}]) == 1
         assert rows("SELECT ff_id FROM last_season") == [("3",)], "a fetch replaces its season"
 

@@ -959,8 +959,9 @@ DROP VIEW IF EXISTS jornadas_done;
 CREATE VIEW jornadas_done AS
 SELECT jornada FROM current_matches GROUP BY jornada HAVING sum(score = '') = 0 ORDER BY jornada;
 
--- Last season's points per player, from season/points_<season>.csv
--- (ingest.load_season refills it each parse), and the latest season's.
+-- Last season's points per player (ingest.baseline writes it; an empty
+-- table is restored from the archived page, raw/season=<season>.tar.xz),
+-- and the latest season's.
 CREATE TABLE IF NOT EXISTS season_points (
     season TEXT NOT NULL,
     ff_id  TEXT NOT NULL,

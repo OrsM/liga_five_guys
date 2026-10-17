@@ -2,7 +2,7 @@
 # A pipeline run that touches nothing in the tracked repo — for testing and
 # profiling changes to src/, not for producing a report.
 #
-# WHY THIS EXISTS. lfg-run writes data/tidy, data/decisions, data/season and
+# WHY THIS EXISTS. lfg-run writes data/tidy, data/decisions and
 # reports/{METHOD.md,decisions.json} straight into the tracked working tree,
 # because that IS the product: report-bot's own commits are the point (see
 # lfg-run's own comments). A run done only to check "does this still work"
@@ -13,7 +13,7 @@
 # This runs the same generate chain against a SCRATCH copy instead. data/raw
 # (the immutable source archives ingest.py reads from) is symlinked in
 # read-only, so parse still has real history to rebuild from; everything
-# parse/points/squads/methodology/sim/digest WRITE — tidy, season, decisions,
+# parse/points/squads/methodology/sim/digest WRITE — tidy, decisions,
 # reports, .runtime — lands under the scratch dir via the env vars
 # ffcore/tidy.py and report.py/sim.py already support for exactly this
 # (FF_ROOT, LFG_REPORTS, LFG_PARTS, LFG_ALERTS, LFG_WARNINGS). The tracked
