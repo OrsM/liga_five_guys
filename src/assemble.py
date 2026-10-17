@@ -98,7 +98,8 @@ def scorer(market: Rows, xi_rows: Rows) -> Scorer:
         market, StartOdds(xi_rows, Calibration(*cal),
                           fit_availability(rows("SELECT * FROM availability_tally")),
                           {k: (apps, squads) for k, (_pts, apps, squads) in season.items()},
-                          dict(rows("SELECT player, pct FROM last_fit")), app_status()),
+                          dict(rows("SELECT player, pct FROM last_fit")), app_status(),
+                          dict(rows("SELECT player, p FROM pick_later"))),
         last_season,
         current={k: {"pts": pts, "pj": apps} for k, (pts, apps, _n) in season.items()},
         promoted_discount=fit_promoted_discount(market, last_season, scored()))

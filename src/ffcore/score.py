@@ -7,7 +7,7 @@ from datetime import date
 from typing import Any, NamedTuple
 
 from ffcore.parse import Rows, text
-from ffcore.startprob import NEUTRAL_START, PICK_K, StartOdds
+from ffcore.startprob import PICK_K, StartOdds
 from ffcore.names import Name
 from ffcore.rules import slot
 from stats import shrink
@@ -221,9 +221,9 @@ def _selftest() -> None:
                      current={"p0": {"pts": 30.0, "pj": 3.0}}).rates(dict(row, name="p0", ff_id="p0"))
     assert abs(benched.p_now - PICK_K / (PICK_K + 6)) < 1e-9, benched
     susp = typed("lineups", [{"player": "p0", "player_name": "p0", "start_pct": "0", "status": "suspended"}])
-    back = Scorer(market, StartOdds(susp, history={"p0": (1.8, 2.0)}), hist,
+    back = Scorer(market, StartOdds(susp, history={"p0": (1.8, 2.0)}, later={"p0": 0.7}), hist,
                   current={"p0": {"pts": 30.0, "pj": 2.0}}).rates(dict(row, name="p0", ff_id="p0"))
-    assert abs(back.p_rest - (PICK_K * NEUTRAL_START / 100 + 1.8) / (PICK_K + 2)) < 1e-9, back
+    assert back.p_rest == 0.7, "after his next match: pick_later's"
     assert back.p_now == back.p_rest, "the suspension is the fit factor's, not selection's"
 
     print("ffcore.score self-test OK")

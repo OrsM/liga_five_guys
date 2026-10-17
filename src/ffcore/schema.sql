@@ -632,6 +632,7 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
     (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
     (SELECT value FROM model_constants WHERE name = 'FALLBACK_K' AND variant = (SELECT variant())) AS fallback_k,
+    (SELECT value FROM model_constants WHERE name = 'PICK_K' AND variant = (SELECT variant())) AS pick_k,
     (SELECT value FROM model_constants WHERE name = 'REMIND_HOURS' AND variant = (SELECT variant())) AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
     (SELECT printf('%.9g|%.9g|%.9g|%.9g', c.value, w0.value, w1.value, w2.value)
@@ -949,6 +950,15 @@ DROP VIEW IF EXISTS season_record;
 CREATE VIEW season_record AS
 SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
 FROM player_jornadas GROUP BY player;
+
+-- The chance he is picked if fit, after his next match: his record this
+-- season (appearances over matchday squads) pulled toward NEUTRAL_START,
+-- which is worth PICK_K matches. No squads, no row.
+DROP VIEW IF EXISTS pick_prior;
+DROP VIEW IF EXISTS pick_later;
+CREATE VIEW pick_later AS
+SELECT player, (k.pick_k * k.neutral_start / 100.0 + apps) / (k.pick_k + squads) AS p
+FROM season_record, k WHERE squads > 0;
 
 -- Starts: each matchday squad (starters) against the club's last
 -- futbolfantasy listing before the jornada locked. Each player in either,

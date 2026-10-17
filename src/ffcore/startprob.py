@@ -156,14 +156,17 @@ class StartOdds:
     """Whether a player plays in a jornada, as two factors: the chance he is
     fit (1 unless flagged; else his prognosis, through Availability) times the
     chance he is picked if fit. history is his record this season as
-    (appearances, matchday squads), which is what picking is pulled toward."""
+    (appearances, matchday squads), which his next match is pulled toward;
+    later is the chance after it (schema.sql pick_later)."""
 
     def __init__(self, xi: Rows, cal: Calibration | None = None,
                  avail: Availability | None = None,
                  history: dict[str, tuple[float, float]] | None = None,
                  last_fit: dict[str, float] | None = None,
-                 app: dict[str, str] | None = None) -> None:
+                 app: dict[str, str] | None = None,
+                 later: dict[str, float] | None = None) -> None:
         self.cal = cal or Calibration()
+        self.later = later or {}
         self.avail = avail or Availability()
         self.history = history or {}
         self.last_fit = last_fit or {}
@@ -211,12 +214,11 @@ class StartOdds:
     def picked(self, key: str, next_match: bool) -> float:
         """The chance he is picked if fit. His next match, if he is fit: this
         week's listing, pulled toward his record. Later matches (and the next
-        one, if he is flagged): 60% pulled toward his record; with no record,
-        his listing while fit."""
+        one, if he is flagged): pick_later; with no record, his listing while fit."""
         got, n = self.history.get(key, (0.0, 0.0))
         if next_match and key not in self.status:
             return shrink(self.p_now(key), PICK_K, got, n)
-        return shrink(NEUTRAL_START / 100.0, PICK_K, got, n) if n else self.listing(key)
+        return self.later[key] if key in self.later else self.listing(key)
 
     def status_of(self, key: str) -> str:
         return self.status.get(key, "")
@@ -397,7 +399,30 @@ def _selftest_views() -> None:
     (got,), = views([], [], [], "SELECT * FROM start_calibration")
     assert got == (0.0, 1.0, NEUTRAL_START, ABSENT_START), "no outcomes yet: the constants"
 
+    _selftest_pick_later()
     print("ffcore.startprob self-test OK")
+
+
+def _selftest_pick_later() -> None:
+    """schema.sql's pick_later on season_record as a table."""
+    import sqlite3
+    from ffcore.db import SCHEMA
+
+    db = sqlite3.connect(":memory:")
+    db.create_function("variant", 0, lambda: "live")
+    db.execute("CREATE TABLE model_constants (variant, name, value)")
+    db.executemany("INSERT INTO model_constants VALUES ('live', ?, ?)",
+                   [("NEUTRAL_START", 60.0), ("PICK_K", 4.0)])
+    db.execute("CREATE TABLE season_record (player, pts, apps, squads)")
+    db.executemany("INSERT INTO season_record VALUES (?, 0, ?, ?)",
+                   [("star", 8.0, 8.0), ("poor", 0.0, 8.0), ("new", 0.0, 0.0)])
+    sql = SCHEMA.read_text()
+    for view in ("k", "pick_later"):
+        i = sql.index("CREATE VIEW %s AS" % view)
+        db.execute(sql[i:sql.index(";\n", i)])
+    assert dict(db.execute("SELECT player, p FROM pick_later")) == {
+        "star": (4 * 0.6 + 8) / 12, "poor": 2.4 / 12}, \
+        "his record pulled toward NEUTRAL_START; no squads, no record (the listing decides)"
 
 
 if __name__ == "__main__":
