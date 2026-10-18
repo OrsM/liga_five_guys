@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-18T19:46Z",
+ "generated_at": "2026-10-18T20:40Z",
  "lock_at": "2026-10-19T19:00:00+00:00",
  "cash": 4195680.0,
  "cash_locked": 0.0,
@@ -76,85 +76,7 @@
   }
  ],
  "offers": [],
- "market": [
-  {
-   "name": "Aymeric Laporte",
-   "pos": "DEF",
-   "asking": 44337531.0,
-   "bid": 45193484.7370209,
-   "gain": 35.28855680493,
-   "better": 0.85708360393134,
-   "verdict": null,
-   "trend": -14.8506377116365,
-   "plan": false
-  },
-  {
-   "name": "Eric Garcia",
-   "pos": "DEF",
-   "asking": 47703362.0,
-   "bid": 48624294.4482313,
-   "gain": 29.7408580731745,
-   "better": 0.802946735639755,
-   "verdict": null,
-   "trend": 13.1262910085242,
-   "plan": false
-  },
-  {
-   "name": "Ibrahima Konate",
-   "pos": "DEF",
-   "asking": 29016969.0,
-   "bid": 29577153.1711161,
-   "gain": 19.3942483639718,
-   "better": 0.750148177010401,
-   "verdict": null,
-   "trend": 15.4975322796239,
-   "plan": false
-  },
-  {
-   "name": "Marc Bartra",
-   "pos": "DEF",
-   "asking": 22119316.0,
-   "bid": 22546338.226171,
-   "gain": 14.7812353345044,
-   "better": 0.678888029123505,
-   "verdict": "a 68% chance of helping, under 70%",
-   "trend": -16.6018733293153,
-   "plan": false
-  },
-  {
-   "name": "Yeremay Hernandez",
-   "pos": "DEL",
-   "asking": 22366769.0,
-   "bid": 22798568.4051278,
-   "gain": 6.97010278548549,
-   "better": 0.616536413546528,
-   "verdict": "a 62% chance of helping, under 70%",
-   "trend": 39.7898130521088,
-   "plan": false
-  },
-  {
-   "name": "Carl Starfelt",
-   "pos": "DEF",
-   "asking": 4548703.0,
-   "bid": 4636517.52741354,
-   "gain": 0.530875145928387,
-   "better": 0.518860369206259,
-   "verdict": "a 52% chance of helping, under 70%",
-   "trend": -28.8143539115429,
-   "plan": false
-  },
-  {
-   "name": "Thiago Fernandez",
-   "pos": "MED",
-   "asking": 1206658.0,
-   "bid": 1229953.01442934,
-   "gain": 0.364632291979173,
-   "better": 0.516977076889036,
-   "verdict": "a 52% chance of helping, under 70%",
-   "trend": -16.6637842835089,
-   "plan": false
-  }
- ],
+ "market": [],
  "standings": [
   {
    "manager": "BurtonGM89",
@@ -203,13 +125,13 @@
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 320.0,
-   "mean": 1514.71983970409,
-   "lo": 1404.90905909205,
-   "hi": 1624.53062031613,
+   "now": 321.0,
+   "mean": 1515.71983970409,
+   "lo": 1405.90905909205,
+   "hi": 1625.53062031613,
    "cash": 47193671.0,
    "estimated": true,
-   "p_above": 0.000270094708942348
+   "p_above": 0.000277473211066637
   }
  ]
 }
