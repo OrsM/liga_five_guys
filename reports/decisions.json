@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-17T22:18Z",
+ "generated_at": "2026-10-18T08:02Z",
  "lock_at": "2026-10-18T12:00:00+00:00",
  "cash": 4095680.0,
  "cash_locked": 0.0,
- "finish": 1.9,
- "p_win": 0.235,
+ "finish": 1.93,
+ "p_win": 0.198,
  "band": [
-  1873.81025290051,
-  2155.47647069235
+  1832.08585138155,
+  2108.08370185831
  ],
  "do": [],
  "plan_gain": 0.0,
@@ -30,14 +30,14 @@
    "clause": 42016585.0
   },
   {
-   "name": "Natan",
-   "pos": "DEF",
-   "clause": 56120121.0
-  },
-  {
    "name": "Iñigo Vicente",
    "pos": "DEL",
    "clause": 31271675.0
+  },
+  {
+   "name": "Marcos Alonso",
+   "pos": "DEF",
+   "clause": 28589508.0
   },
   {
    "name": "Pablo Fornals",
@@ -45,9 +45,9 @@
    "clause": 58220110.0
   },
   {
-   "name": "Marcos Alonso",
+   "name": "Natan",
    "pos": "DEF",
-   "clause": 28589508.0
+   "clause": 56120121.0
   },
   {
    "name": "Miguel Roman",
@@ -60,14 +60,14 @@
    "clause": 13978825.0
   },
   {
-   "name": "Pepelu",
-   "pos": "MED",
-   "clause": 21013333.0
-  },
-  {
    "name": "Dakonam Djene",
    "pos": "DEF",
    "clause": 24111576.0
+  },
+  {
+   "name": "Pepelu",
+   "pos": "MED",
+   "clause": 21013333.0
   },
   {
    "name": "Yeray Alvarez",
@@ -82,10 +82,10 @@
    "pos": "DEF",
    "asking": 44337531.0,
    "bid": 45193484.7370209,
-   "gain": 38.3859987862914,
-   "better": 0.867233112366631,
+   "gain": 35.7350447123625,
+   "better": 0.860409749782818,
    "verdict": null,
-   "trend": -23.7991038863343,
+   "trend": -14.8506377116365,
    "plan": false
   },
   {
@@ -93,21 +93,10 @@
    "pos": "DEF",
    "asking": 47703362.0,
    "bid": 48624294.4482313,
-   "gain": 22.3540480885933,
-   "better": 0.734873879261714,
+   "gain": 24.0141617883831,
+   "better": 0.757884088518054,
    "verdict": null,
-   "trend": 21.2783560268612,
-   "plan": false
-  },
-  {
-   "name": "Marc Bartra",
-   "pos": "DEF",
-   "asking": 22119316.0,
-   "bid": 22546338.226171,
-   "gain": 19.2016451236523,
-   "better": 0.716699601284469,
-   "verdict": null,
-   "trend": -24.6785635881758,
+   "trend": 13.1262910085242,
    "plan": false
   },
   {
@@ -115,10 +104,21 @@
    "pos": "DEF",
    "asking": 29016969.0,
    "bid": 29577153.1711161,
-   "gain": 17.2832485844135,
-   "better": 0.730224726062365,
+   "gain": 19.3942483639718,
+   "better": 0.750148177010401,
    "verdict": null,
-   "trend": 24.2286199026043,
+   "trend": 15.4975322796239,
+   "plan": false
+  },
+  {
+   "name": "Marc Bartra",
+   "pos": "DEF",
+   "asking": 22119316.0,
+   "bid": 22546338.226171,
+   "gain": 14.7812353345044,
+   "better": 0.678888029123505,
+   "verdict": "a 68% chance of helping, under 70%",
+   "trend": -16.6018733293153,
    "plan": false
   },
   {
@@ -126,21 +126,10 @@
    "pos": "DEL",
    "asking": 22366769.0,
    "bid": 22798568.4051278,
-   "gain": 6.5205434776823,
-   "better": 0.61288416642371,
-   "verdict": "a 61% chance of helping, under 70%",
-   "trend": 55.7052909097457,
-   "plan": false
-  },
-  {
-   "name": "Thiago Fernandez",
-   "pos": "MED",
-   "asking": 1206658.0,
-   "bid": 1229953.01442934,
-   "gain": 0.362898703328057,
-   "better": 0.519655950470468,
-   "verdict": "a 52% chance of helping, under 70%",
-   "trend": -25.320829756181,
+   "gain": 6.97010278548549,
+   "better": 0.616536413546528,
+   "verdict": "a 62% chance of helping, under 70%",
+   "trend": 39.7898130521088,
    "plan": false
   },
   {
@@ -148,10 +137,21 @@
    "pos": "DEF",
    "asking": 4548703.0,
    "bid": 4636517.52741354,
-   "gain": 0.139387186414107,
-   "better": 0.506093584140992,
-   "verdict": "a 51% chance of helping, under 70%",
-   "trend": -41.050456157881,
+   "gain": 0.530875145928387,
+   "better": 0.518860369206259,
+   "verdict": "a 52% chance of helping, under 70%",
+   "trend": -28.8143539115429,
+   "plan": false
+  },
+  {
+   "name": "Thiago Fernandez",
+   "pos": "MED",
+   "asking": 1206658.0,
+   "bid": 1229953.01442934,
+   "gain": 0.364632291979173,
+   "better": 0.516977076889036,
+   "verdict": "a 52% chance of helping, under 70%",
+   "trend": -16.6637842835089,
    "plan": false
   }
  ],
@@ -160,20 +160,20 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 408.0,
-   "mean": 2131.02731370399,
-   "lo": 1972.89336607727,
-   "hi": 2289.16126133072,
+   "mean": 2105.28217358002,
+   "lo": 1950.66600628541,
+   "hi": 2259.89834087463,
    "cash": -22517294.0,
    "estimated": true,
-   "p_above": 0.75939579498896
+   "p_above": 0.798431888117995
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 445.0,
-   "mean": 2014.64336179643,
-   "lo": 1873.81025290051,
-   "hi": 2155.47647069235,
+   "mean": 1970.08477661993,
+   "lo": 1832.08585138155,
+   "hi": 2108.08370185831,
    "cash": 4095680.0,
    "estimated": false,
    "p_above": null
@@ -182,34 +182,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 328.0,
-   "mean": 1832.36510035515,
-   "lo": 1693.64907520659,
-   "hi": 1971.0811255037,
+   "mean": 1786.22240669802,
+   "lo": 1652.46713393868,
+   "hi": 1919.97767945737,
    "cash": 22406521.0,
    "estimated": true,
-   "p_above": 0.118657994067134
+   "p_above": 0.110086451829865
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 282.0,
-   "mean": 1714.02726000527,
-   "lo": 1589.52024029548,
-   "hi": 1838.53427971507,
+   "mean": 1687.44025920641,
+   "lo": 1565.31791444567,
+   "hi": 1809.56260396715,
    "cash": -26328604.0,
    "estimated": true,
-   "p_above": 0.02020848200646
+   "p_above": 0.0246689633111351
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 325.0,
-   "mean": 1572.9911684392,
-   "lo": 1459.56209000514,
-   "hi": 1686.42024687327,
+   "mean": 1516.7190802921,
+   "lo": 1407.01237696307,
+   "hi": 1626.42578362113,
    "cash": 47093671.0,
    "estimated": true,
-   "p_above": 0.000874085904380095
+   "p_above": 0.000490861346206239
   }
  ]
 }
