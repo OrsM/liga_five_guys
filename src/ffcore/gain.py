@@ -1,14 +1,6 @@
-"""Season points worked out in SQL, not simulated: each forecast cell's
-mean and spread (the Bootstrap's draw: plays with chance p, then a real
-single-match score scaled to his points, times his persistent rate), the
-best eleven of each squad each jornada (ELEVEN, the one rule), and the sum
-with its spread. gains: a squad of yours against another, and the chance it
-scores more. standings: every manager's final points, and who ends where.
-
-Why: the simulation drew 3000 seasons for every squad; on 140 past moves
-and today's standings this agreed with it within its own noise:
-docs/notes/gain.md.
-"""
+"""Season points in SQL: each forecast cell's mean and variance as the
+Bootstrap defines them, each squad's eleven a jornada (ELEVEN), and their
+sums. Why not simulated: docs/notes/gain.md."""
 from __future__ import annotations
 
 import math
@@ -31,11 +23,9 @@ CREATE TABLE squad (id INTEGER, ord INTEGER, player TEXT, slot TEXT);
 CREATE TABLE valued (player TEXT PRIMARY KEY, e REAL) WITHOUT ROWID;
 """
 
-# THE eleven rule, the only one: of each squad's players a jornada (pick:
-# id, jornada, player, slot, ord, e), the formation whose top n a slot by
-# expected points (e) sum most, the first on a tie; a formation fits when
-# every slot has its nth player (equal to 1e-9 is a tie: how the sums were
-# added must not decide); equal points within a slot, the squad's order.
+# The eleven rule, per (id, jornada) of pick: the formation whose top n a
+# slot by e sum most; formations within 1e-9 tie (the first wins), players
+# level in a slot keep the squad's order.
 ELEVEN = """
 ranked AS MATERIALIZED (
     SELECT id, jornada, player, slot, row_number() OVER w AS r,
@@ -52,13 +42,11 @@ best AS MATERIALIZED (SELECT id, jornada, shape FROM (
 xi AS MATERIALIZED (SELECT x.id, x.jornada, x.player FROM best b JOIN shape sh ON sh.shape = b.shape
        JOIN ranked x ON x.id = b.id AND x.jornada = b.jornada AND x.slot = sh.slot AND x.r <= sh.n)"""
 
-# One squad's eleven by the points given it (valued).
 XI = "WITH pick AS (SELECT 1 AS id, 0 AS jornada, s.player, s.slot, s.ord, coalesce(v.e, 0.0) AS e" \
      " FROM squad s LEFT JOIN valued v USING (player))," + ELEVEN + "\nSELECT player FROM xi"
 
-# Each squad's eleven each jornada scored, then each squad but 0 against
-# squad 0: its mean change, and its variance (each player's match noise,
-# and his persistent rate, which moves all his jornadas together).
+# Each squad (id > 0) against squad 0 over the jornadas scored: mean and
+# variance of the change, a player's persistent rate shared by his jornadas.
 GAIN = """
 WITH pick AS (
     SELECT s.id, j.jornada, s.player, s.slot, s.ord, coalesce(c.e, 0.0) AS e
@@ -100,8 +88,7 @@ def _con() -> sqlite3.Connection:
 
 
 def _db(fc: Bootstrap) -> sqlite3.Connection:
-    """The connection with this forecaster's cells, loaded once for it (a
-    board asks hundreds of times)."""
+    """The connection, with this forecaster's cells loaded."""
     db = _con()
     if not _CELLS or _CELLS[0] is not fc:
         m2 = statistics.fmean(x * x for x in fc.pool) / fc.pool_mean ** 2
@@ -115,8 +102,7 @@ def _db(fc: Bootstrap) -> sqlite3.Connection:
 
 
 def eleven(squad: Squad, value: dict[str, float]) -> list[str]:
-    """The eleven of squad (player: slot) that makes the most of value (a
-    player missing is worth 0), by ELEVEN; none if no formation fits."""
+    """Squad's (player: slot) eleven by value (missing: 0), ELEVEN; [] if none fits."""
     db = _con()
     with db:
         db.execute("DELETE FROM squad")
@@ -129,14 +115,13 @@ def eleven(squad: Squad, value: dict[str, float]) -> list[str]:
 
 def gains(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
           ) -> list[tuple[float, float]]:
-    """Each squad against base over these jornadas: (expected change in
-    season points, chance it is more)."""
+    """Each squad against base over jornadas: (mean change, P(change > 0))."""
     return [(m, p) for m, _v, p in _moments(fc, jornadas, base, squads)]
 
 
 def _moments(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
              ) -> list[tuple[float, float, float]]:
-    """Each squad's eleven's points less base's: (mean, variance, chance above 0)."""
+    """Each squad against base over jornadas: (mean, variance, P(> 0))."""
     if not squads:
         return []
     db = _db(fc)
@@ -154,8 +139,7 @@ def _moments(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad
 
 @dataclass(frozen=True)
 class Standings:
-    """Each manager's final points as a normal (mean with the points he has,
-    sd); me is you."""
+    """Each manager's final points as a normal: (mean incl. points banked, sd)."""
     dist: dict[str, tuple[float, float]]
     me: str = ""
 
@@ -170,7 +154,7 @@ class Standings:
         return mu + sd * z.inv_cdf(lo), mu + sd * z.inv_cdf(hi)
 
     def beat(self, rival: str, manager: str = "") -> float:
-        """The chance manager (you by default) ends above rival; level is half."""
+        """P(manager, default you, ends above rival); level counts half."""
         me = manager or self.me
         if me not in self.dist or rival not in self.dist:
             return 0.0
@@ -180,8 +164,7 @@ class Standings:
         return normal_above(a - b, sa * sa + sb * sb)
 
     def position(self, manager: str = "") -> dict[int, float]:
-        """The chance of each final position (1 + those strictly above): over
-        his own total, the others above it counted as independent chances."""
+        """P(each final position: 1 + those strictly above), integrated over his total."""
         me = manager or self.me
         if me not in self.dist:
             return {}
@@ -207,8 +190,7 @@ class Standings:
 
 def standings(fc: Bootstrap, squads: Squads, jornadas: list[int], carried: dict[str, float],
               me: str) -> Standings:
-    """Every manager's season from here, his squad fielding every jornada
-    left, with the points he has."""
+    """Every manager's final points, his squad fielding every jornada left."""
     mans = list(squads)
     got = _moments(fc, jornadas, {}, [squads[m] for m in mans])
     return Standings({m: (mean + carried.get(m, 0.0), math.sqrt(max(var, 0.0)))

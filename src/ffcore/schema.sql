@@ -961,12 +961,9 @@ SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS s
 FROM player_jornadas GROUP BY player;
 
 -- Each app id's player: the futbolfantasy player whose value it equalled
--- at the most market snapshots (both feeds are fetched together, and
--- futbolfantasy mirrors the app's values; an all-players row, kept only
--- when it changes, holds until the player's next), their names sharing a stem, then the most
--- stems (stems_meet): each app id's unique best, then of those naming the
--- same player, the unique best. Over every row, not as of cut():
--- the registry is what all the data says, as players.csv was.
+-- at the most market snapshots (an all-players row holds until his next),
+-- then the most name stems shared (stems_meet); each app id's unique best,
+-- then per player the unique best. Over all rows, not as of cut().
 CREATE INDEX IF NOT EXISTS market_by_value ON market (value);
 DROP VIEW IF EXISTS app_links;
 CREATE VIEW app_links AS

@@ -1,12 +1,6 @@
 """The publish stage: the report to the phone (~/.local/bin/lfg-publish),
-then the ping it calls for: the board's on the scheduled runs
-(LFG_NOTIFY=1), the line-up reminder on the run before a lock (LFG_REMIND=1,
-remind.text). LFG_NO_PUBLISH=1 (a dry run) publishes and sends nothing.
-
-notify sends through the notes host (/api/fantasy-notify, which holds the
-Telegram credential), past Cloudflare Access with its service token. A ping
-is best-effort: it never fails a run.
-"""
+then its ping: the board's (LFG_NOTIFY=1) or the line-up reminder
+(LFG_REMIND=1). LFG_NO_PUBLISH=1 sends nothing. A ping never fails a run."""
 from __future__ import annotations
 
 import json
@@ -25,8 +19,7 @@ ACCESS_ENV = Path.home() / ".config/lemonworlds-capture.env"
 
 
 def _access(env: Path) -> dict[str, str]:
-    """The Access service token's headers from a KEY=VALUE file (quotes
-    dropped); none if the file is missing."""
+    """Headers for the notes host: Access's service token (KEY=VALUE file)."""
     got = {}
     if env.is_file():
         for line in env.read_text(encoding="utf-8").splitlines():
@@ -48,8 +41,7 @@ def _post(url: str, headers: dict[str, str], body: bytes | None) -> str:
 
 def notify(text: str | None = None, env: Path = ACCESS_ENV,
            post: Callable[[str, dict[str, str], bytes | None], str] = _post) -> bool:
-    """Send text, or (none) the board's ping; True only when the server
-    answers that it sent it ({"sent": true}: a 200 alone is not delivery)."""
+    """Send text (none: the board's ping); True only on {"sent": true}."""
     if os.environ.get("LFG_NO_PUBLISH") == "1":
         print("  (no ping: LFG_NO_PUBLISH=1)")
         return False
@@ -70,7 +62,7 @@ def notify(text: str | None = None, env: Path = ACCESS_ENV,
 
 
 def main() -> dict[str, int]:
-    """Publish, then ping as the run was asked to (module docstring)."""
+    """Publish, then ping as asked."""
     if os.environ.get("LFG_NO_PUBLISH") == "1":
         print("  (skipped: LFG_NO_PUBLISH=1)")
         return {"published": 0}
