@@ -486,60 +486,32 @@ l AS (SELECT julianday(substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || 'Z')
 SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights
 FROM e, l;
 
--- The nights the game will offer for a player bought at tonight's auctions
--- before the next match locks: one a day after the auctions close (0 with
--- none open).
-DROP VIEW IF EXISTS resale_nights;
-CREATE VIEW resale_nights AS
-WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_market
-           WHERE seller = 'marketPlayerLeague' AND coalesce(expires_at, '') <> ''),
-l AS (SELECT julianday(substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || 'Z') AS lock
-      FROM next_kickoff)
-SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) ELSE 0 END AS nights
-FROM e, l;
-
--- What waiting to sell is worth, over the nights before the next match
--- locks: each night's offer to come taken only when it beats waiting on
--- (the last before the lock always). An offer to come is a past one's
--- share of value (offer_ratios, the last PRICE_WINDOW) of the value he will
--- have that night: his value moved by his trend, the share carry says is
--- made by then (price_carry). For a player of yours with an offer standing
--- (kind 'sale', nights_left), and for one on the game's market bought
--- tonight and sold before the lock (kind 'resale', resale_nights; 'flat',
--- the same with his value standing still). NULL without a value or past offers.
-DROP VIEW IF EXISTS waiting;
-CREATE VIEW waiting AS
+-- What selling a player with an offer standing on him gets: the offer, or
+-- what turning it down is worth if each night's offer to come is then
+-- taken only when it beats waiting on (the last before the lock always),
+-- whichever is more. An offer to come is a past one's share of value
+-- (offer_ratios, the last PRICE_WINDOW) of the value he will have that
+-- night: his value moved by his trend, the share carry says is made by
+-- then (price_carry). Waiting is NULL without a value or past offers.
+DROP VIEW IF EXISTS sale_odds;
+CREATE VIEW sale_odds AS
 WITH RECURSIVE
 r AS MATERIALIZED (SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
                    LIMIT (SELECT CAST(price_window AS INTEGER) FROM k)),
 c AS MATERIALIZED (SELECT h, carry FROM price_carry),
-s AS MATERIALIZED (
-    SELECT player, 'sale' AS kind, value, coalesce(trend, 0.0) AS trend,
-           (SELECT nights FROM nights_left) AS nights
-    FROM player_facts WHERE offer IS NOT NULL
-  UNION ALL
-    SELECT player, kind, value, CASE kind WHEN 'flat' THEN 0.0 ELSE coalesce(trend, 0.0) END,
-           (SELECT nights FROM resale_nights)
-    FROM player_facts, (SELECT 'resale' AS kind UNION ALL SELECT 'flat')
-    WHERE route = 'free' AND owner IS NULL AND price IS NOT NULL),
-w(player, kind, night, later) AS (
-    SELECT player, kind, nights, 0.0 FROM s
+s AS MATERIALIZED (SELECT player, offer, value, coalesce(trend, 0.0) AS trend
+                   FROM player_facts WHERE offer IS NOT NULL),
+w(player, night, later) AS (
+    SELECT player, (SELECT nights FROM nights_left), 0.0 FROM s
     WHERE value IS NOT NULL AND EXISTS (SELECT 1 FROM r)
   UNION ALL
-    SELECT w.player, w.kind, w.night - 1,
+    SELECT w.player, w.night - 1,
            (SELECT avg(max(r.ratio * s.value * (1 + s.trend / 100 * coalesce(
                     (SELECT carry FROM c WHERE h = min(w.night, (SELECT max(h) FROM c))), 1.0)),
                     w.later)) FROM r)
-    FROM w JOIN s USING (player, kind) WHERE w.night > 0)
-SELECT player, kind, later FROM w WHERE night = 0;
-
--- What selling a player with an offer standing on him gets: the offer, or
--- what turning it down is worth (waiting), whichever is more.
-DROP VIEW IF EXISTS sale_odds;
-CREATE VIEW sale_odds AS
-SELECT f.player, f.offer, w.later AS waiting, max(f.offer, coalesce(w.later, 0.0)) AS fetches
-FROM player_facts f LEFT JOIN waiting w ON w.player = f.player AND w.kind = 'sale'
-WHERE f.offer IS NOT NULL;
+    FROM w JOIN s USING (player) WHERE w.night > 0)
+SELECT s.player, s.offer, w.later AS waiting, max(s.offer, coalesce(w.later, 0.0)) AS fetches
+FROM s LEFT JOIN w ON w.player = s.player AND w.night = 0;
 
 -- Every player the market or a futbolfantasy line-up names, as of cut():
 -- his name and position, what he is worth (market value; 0 is none),
@@ -1313,35 +1285,6 @@ SELECT p.ord, f.label, f.gain, f.per_million, f.p_better, f.cost,
 FROM sim_plan p JOIN board_run USING (run_id)
 JOIN funnel f ON f.run_id = p.run_id AND f.rank = p.rank;
 
--- Players on the game's market worth buying tonight to sell before the
--- next match locks: what waiting would sell him for (waiting, 'resale')
--- over the bid it takes (premium), most profit first. Taken while the bids
--- stay within your cash after the plan plus the debt the game allows (20%
--- of your team value), and while, were every price to stand still ('flat'),
--- the sales would still leave you at least zero at the lock. A player the
--- plan buys is the plan's.
-DROP VIEW IF EXISTS board_resale;
-CREATE VIEW board_resale AS
-WITH me AS (SELECT s.team_value, b.cash - (SELECT total(net) FROM board_plan) AS left
-            FROM current_api_standings s, league_config c, board_league b
-            WHERE s.manager = c.me AND b.me),
-f AS (SELECT f.player, name_shown(coalesce(nullif(f.name, ''), f.player)) AS name, f.pos, f.price, f.trend, f.my_bid,
-             coalesce(f.my_bid, f.price * (SELECT premium FROM premium)) AS cost,
-             r.later AS resale, l.later AS flat
-      FROM player_facts f
-      JOIN waiting r ON r.player = f.player AND r.kind = 'resale'
-      JOIN waiting l ON l.player = f.player AND l.kind = 'flat'
-      WHERE f.player NOT IN (SELECT coalesce(buy, '') FROM board_plan)),
-ranked AS (SELECT f.*, resale - cost AS profit,
-                  row_number() OVER w AS n,
-                  sum(cost) OVER w AS spent, sum(cost - flat) OVER w AS risked
-           FROM f WHERE resale > cost
-           WINDOW w AS (ORDER BY resale - cost DESC, player)),
-fits AS (SELECT ranked.*, spent <= me.left + 0.2 * me.team_value AND risked <= me.left AS ok
-         FROM ranked, me)
-SELECT n - 1 AS ord, player, name, pos, price, cost, resale, flat, profit, trend, my_bid
-FROM fits WHERE n < coalesce((SELECT min(n) FROM fits WHERE NOT ok), 1e9);
-
 DROP VIEW IF EXISTS board_moves;
 CREATE VIEW board_moves AS
 WITH sold AS (SELECT b.player FROM board_players b JOIN board_plan p
@@ -1383,21 +1326,10 @@ moves AS (
                 UNION ALL SELECT 2, 'offer', CASE WHEN NOT b.takes THEN b.offer END, 'money'
                 WHERE p.what = 'sell')
             WHERE v IS NOT NULL) AS facts
-    FROM board_plan p LEFT JOIN board_players b USING (player)),
-resale AS (
-    SELECT 1000 + ord, 'resale', 'buy to resell ' || name, name, pos,
-           CASE WHEN my_bid IS NULL THEN 'bid up to' ELSE 'bid in' END, cost, my_bid IS NOT NULL,
-           NULL, 'season',
-           (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
-                SELECT 0 AS n, 'asking' AS l, price AS v, 'money' AS u
-                UNION ALL SELECT 1, 'sell before the lock for', resale, 'money'
-                UNION ALL SELECT 2, 'profit', profit, 'money'
-                UNION ALL SELECT 3, '', trend, 'trend')
-            WHERE v IS NOT NULL)
-    FROM board_resale)
+    FROM board_plan p LEFT JOIN board_players b USING (player))
 SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name, pos, step, amount, done,
        gain, per, facts
-FROM (SELECT * FROM field UNION ALL SELECT * FROM moves UNION ALL SELECT * FROM resale);
+FROM (SELECT * FROM field UNION ALL SELECT * FROM moves);
 
 -- The board's headline: when the next match locks, your money, where you
 -- are expected to finish and your chance of first, your season's points
