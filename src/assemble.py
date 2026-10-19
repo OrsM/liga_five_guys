@@ -45,7 +45,7 @@ NAMES: dict[str, tuple[str, ...]] = {
     "decide": ("CONFIDENCE",),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
-    "pricing": ("BID_BEATS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
+    "pricing": ("BID_BEATS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW", "RESALE_MARGIN"),
     "remind": ("REMIND_HOURS",),
     "rules": ("MATCH_LEN",),
     "score": ("PPM_BANDS", "PROMOTED_DISCOUNT_K", "SHRINK_K"),
@@ -393,7 +393,7 @@ def _selftest_sale() -> None:
             record([{"player_id": "p1", "app_id": "1"}, {"player_id": "p2", "app_id": "2"}],
                    "crosswalk")
             store_sql("market", [{"observed_at": at(1), "ff_id": k, "name": k, "value": "10000000"}
-                                 for k in ("p1", "p2")])
+                                 for k in ("p1", "p2", "p3")])
             store_sql("api_standings", [{"observed_at": at(1), "user_id": "1", "manager": "me"}])
             store_sql("matches", [{"observed_at": at(1), "match_id": "m", "jornada": "1",
                                    "home": "a", "away": "b", "kickoff": "2026-09-05T19:00:00+00:00"}])
@@ -425,7 +425,7 @@ def _selftest_sale() -> None:
 
             # a rising player, momentum fitted: the offers to come are on the value he will have
             store_sql("market", [{"observed_at": at(n), "ff_id": k, "name": k, "value": v}
-                                 for n, v in ((2, "10500000"), (3, "11025000")) for k in ("p1", "p2")])
+                                 for n, v in ((2, "10500000"), (3, "11025000")) for k in ("p1", "p2", "p3")])
             record([{"as_of": at(3), "h": 1, "slope": 2.0}, {"as_of": at(3), "h": 2, "slope": 8.0}],
                    "momentum_fit")
             assert rows("SELECT count(*) FROM price_trend") == [(0,)], "nothing kept until a run keeps it"
@@ -441,6 +441,22 @@ def _selftest_sale() -> None:
                 later = sum(max(x * then, later) for x in (0.9, 1.0, 1.1)) / 3
             (waiting, fetches), = rows("SELECT waiting, fetches FROM sale_odds")
             assert abs(waiting - later) < 1e-6 and fetches == max(10.5e6, later), (waiting, later)
+
+            # p3 (rising as p1 is) on the game's market, its auction closing 09-04 18:00 UTC, a day before
+            # the lock: bought, he has one night's offer to be sold on
+            assert rows("SELECT nights FROM resale_nights") == [(0,)], "no auction open: no nights"
+            record([{"player_id": "p3", "app_id": "3"}], "crosswalk")
+            store_sql("api_market", [{"observed_at": at(3), "player_id": "3", "sale_price": "11025000",
+                                      "seller": "marketPlayerLeague",
+                                      "expires_at": "2026-09-04T20:00:00+02:00"}])
+            assert rows("SELECT nights FROM resale_nights") == [(1,)]
+            odds: dict[tuple[str, str], float] = dict(((k, kind), v) for k, kind, v in rows("SELECT player, kind, later FROM waiting"))
+            share = sum((0.9, 1.0, 1.1)) / 3
+            assert abs(odds["p3", "resale"] - share * value * (1 + trend / 100 * carry[0])) < 1e-6, odds
+            assert abs(odds["p3", "flat"] - share * value) < 1e-6, "flat: his value standing still"
+            assert {k for k, _ in odds} == {"p1", "p3"} and ("p1", "resale") not in odds, \
+                "a sale for yours with an offer, a resale for the game's market"
+            assert [r[0] for r in rows("SELECT player FROM sale_odds")] == ["p1"]
         finally:
             set_now(None)
 

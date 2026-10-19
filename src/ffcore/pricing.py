@@ -10,6 +10,10 @@ BID_BEATS = 0.8
 PRICE_W0 = 0.4
 PRICE_W1 = 0.4
 PRICE_W2 = 0.2
+# A buy to resell is shown when its forecast sale beats the bid by this share:
+# past nights' picks over 5% made money 76% of the time, those under it
+# lost on average (grading.py resales, 2026-10-19).
+RESALE_MARGIN = 0.05
 
 
 def _selftest() -> None:

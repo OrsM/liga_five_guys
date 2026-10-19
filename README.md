@@ -19,7 +19,10 @@ a request that `lfg-watch.timer` picks up within a minute.
 
 `lfg.service` runs with MemoryMax=750M and a 10-minute timeout. The timers
 run the working tree, so keep it green: work in a worktree, check
-`systemctl --user is-active lfg.service` before merging.
+`systemctl --user is-active lfg.service` before merging. Give a worktree its
+own `.venv` (`uv sync` in it), never a link to this one: `uv run` installs
+the project it runs in into the venv it uses, so a linked venv runs the
+timers on the worktree's code.
 
 ## What you edit
 
@@ -91,9 +94,19 @@ Every forecast is the same product, for every player and jornada, and
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more
-  (`Market.fetches`; `Market.waiting`: each later night's offer, at his
-  value then (`Momentum.carry`), taken when it beats waiting on, the last
+  (`Market.fetches`; schema.sql's `waiting`: each later night's offer, at
+  his value then (`price_carry`), taken when it beats waiting on, the last
   before the lock always); with no offer yet, his value.
+- **Buys to resell** (`board_resale`): a player on the game's market bought
+  at tonight's auctions and sold before the next lock, priced by the same
+  `waiting` over the nights left after the auctions close. Shown, after the
+  plan's moves, when the sale beats the bid by `RESALE_MARGIN` (5%: past
+  nights' picks over it made money 76% of the time, those under it lost on
+  average; `grading.py resales`), most profit first, each while the bids
+  stay within cash after the plan plus the game's 20% debt and, every
+  price standing still, you end the lock at zero or more. No points: a
+  player resold before the lock never plays for you. Not yet: holding one
+  over the lock, a manager's listing, and whether you win the auction.
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.
@@ -191,6 +204,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     python src/grading.py --compare a.json b.json # two backtests, jornada by jornada
     python src/grading.py --decisions             # each past lock's board, rebuilt: its moves' forecast vs what happened
     python src/grading.py --prices                # price model walk-forward vs "no change"
+    python src/grading.py resales                 # each past night's buys to resell vs what selling paid
     bash tools/selftests.sh                       # every module's self-test
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
     python tools/golden.py freeze|check           # a refactor must rebuild the same board

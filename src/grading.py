@@ -17,13 +17,14 @@ from ffcore.forecast import expected_points
 from ffcore.gain import Standings, standings
 from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
+from ffcore.pricing import RESALE_MARGIN
 
 from assemble import applied, built, forecast_cells, price_change, price_momentum, universe
 from decide import Action, Universe, board, verdict
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
-from ffcore.db import connect, record, this_run
-__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "forecast_rows", "superseded",
+from ffcore.db import connect, query, record, rows, this_run
+__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "resales", "forecast_rows", "superseded",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -173,6 +174,45 @@ def decisions() -> list[dict[str, Any]]:
     finally:
         set_now(None)
         built.cache_clear()
+    return out
+
+
+def resales() -> list[dict[str, Any]]:
+    """Every past night's buys to resell (schema.sql's waiting, kinds
+    'resale' and 'flat'), as the views priced them ten minutes before that
+    night's auctions closed, set against what selling then paid: his last
+    value before the next match locked, at the offer share (offer_ratios)
+    the view used. Every player on the game's market, not only those taken,
+    so the bar can be read off it."""
+    closes = [c for (c, ) in rows(
+        "SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
+        " AND coalesce(expires_at, '') <> '' ORDER BY 1")]
+    picks: list[dict[str, Any]] = []
+    try:
+        for c in closes:
+            close = dt.datetime.fromisoformat(c)
+            if close > dt.datetime.now(dt.timezone.utc):
+                continue
+            set_now(close - dt.timedelta(minutes=10))
+            cols, got = query(
+                "SELECT f.player, f.price * (SELECT premium FROM premium) AS cost, r.later AS resale,"
+                " l.later AS flat, (SELECT kick FROM next_kickoff) AS lock,"
+                " (SELECT nights FROM resale_nights) AS nights,"
+                " (SELECT avg(ratio) FROM (SELECT ratio FROM offer_ratios ORDER BY created_at DESC,"
+                "  ratio DESC LIMIT (SELECT CAST(price_window AS INTEGER) FROM k))) AS ratio"
+                " FROM player_facts f JOIN waiting r ON r.player = f.player AND r.kind = 'resale'"
+                " JOIN waiting l ON l.player = f.player AND l.kind = 'flat'")
+            picks += [{"close": c, **dict(zip(cols, r))} for r in got]
+    finally:
+        set_now(None)
+    out = []
+    for pk in picks:
+        if not pk["nights"]:
+            continue
+        last = rows("SELECT value FROM price_obs WHERE ff_id = ? AND observed_at < ?"
+                    " ORDER BY observed_at DESC LIMIT 1", (pk["player"], pk["lock"]))
+        if last:
+            out.append({**pk, "real": pk["ratio"] * last[0][0]})
     return out
 
 
@@ -504,5 +544,20 @@ if __name__ == "__main__":
                      for i in range(jobs)]
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
-    print("grading.py --selftest | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    if sys.argv[1:2] == ["resales"]:
+        # resales: each past night's buys to resell, forecast against what selling paid
+        got = resales()
+        print("%d priced, over %d nights" % (len(got), len({g["close"] for g in got})))
+        for name, keep in (("every player", lambda g: True),
+                           ("forecast profit", lambda g: g["resale"] > g["cost"]),
+                           ("over the margin", lambda g: g["resale"] >= g["cost"] * (1 + RESALE_MARGIN))):
+            sel = [g for g in got if keep(g)]
+            if sel:
+                pnl = sorted(g["real"] - g["cost"] for g in sel)
+                print("%-17s %4d  forecast %+6.0fk  real median %+6.0fk mean %+6.0fk  made money %3.0f%%" % (
+                    name, len(sel), sum(g["resale"] - g["cost"] for g in sel) / len(sel) / 1e3,
+                    pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
+                    100 * sum(x > 0 for x in pnl) / len(pnl)))
+        raise SystemExit(0)
+    print("grading.py --selftest | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

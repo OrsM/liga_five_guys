@@ -91,10 +91,12 @@ def _selftest() -> None:
     assert not {m["label"] for m in moves} & {"buy star"}, "never a player you own: the owner stays"
 
     def report(u: Universe, bd: Board, fielded: Sequence[str] = (),
-               ratios: Sequence[float] = ()) -> Doc:
+               ratios: Sequence[float] = (),
+               resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0) -> Doc:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
-        past offers (assemble tests those)."""
+        past offers, resale for what waiting sells the game's market players
+        for, rising and flat (assemble tests those), team_value yours."""
         m = u.market
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             with closing(connect()) as db, db:
@@ -114,6 +116,14 @@ def _selftest() -> None:
                 db.executemany("INSERT INTO offer_ratios VALUES ('', ?)", [(r,) for r in ratios])
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
                                [(k, k) for k in fielded])
+                db.execute("DROP VIEW waiting")
+                db.execute("CREATE TABLE waiting (player, kind, later)")
+                db.executemany("INSERT INTO waiting VALUES (?, ?, ?)", [
+                    (k, kind, v) for k, up, flat in resale for kind, v in (("resale", up), ("flat", flat))])
+                db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
+                    ("RESALE_MARGIN", 0.05), ("PRICE_WINDOW", 50.0), ("BID_BEATS", 0.8)])
+            store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me,
+                                         "team_value": str(team_value)}])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
                                      for k in fielded])
             record_run(u, bd, 7)
@@ -223,6 +233,26 @@ def _selftest() -> None:
     assert report(offered, b._replace(plan=[sales["dead"]]))["offers"][0]["sell"] is True, \
         "sell: the plan sells him"
     assert report(offered, b)["offers"][0]["beats"] is None, "no past offers, no rank among them"
+
+    # buys to resell: the game's market players whose sale before the lock beats the bid
+    free = replace(ub, market=replace(ub.market, cash=1e6,
+                                      pos={**ub.market.pos, "up": "MED", "thin": "MED", "dear": "MED"},
+                                      price={"up": 2e6, "thin": 2e6, "dear": 8e6},
+                                      route={"up": "free", "thin": "free", "dear": "free"}))
+    none = b._replace(plan=[], gain=0.0)
+    def resold(cash: float, team_value: float, **flat: float) -> list[tuple[str, float, Any]]:
+        u = replace(free, market=replace(free.market, cash=cash))
+        doc = report(u, none, resale=[("up", 2.4e6, flat.get("up", 2e6)), ("thin", 2.06e6, 2e6),
+                                      ("dear", 9e6, flat.get("dear", 8e6))], team_value=team_value)
+        return [(d["name"].lower(), d["amount"], round(dict((f[0], f[1]) for f in d["facts"])["profit"]))
+                for d in doc["do"] if d["what"] == "resale"]
+    assert resold(1e6, 50e6) == [("dear", 8e6, 1e6), ("up", 2e6, 0.4e6)], \
+        "most profit first; a 3% margin is under RESALE_MARGIN; 9M of bids on 1M cash is within 20% debt"
+    assert resold(1e6, 30e6) == [("up", 2e6, 0.4e6)], "8M of bids is over the 7M allowed: skipped, the next fits"
+    assert resold(1e6, 50e6, dear=7.5e6) == [("dear", 8e6, 1e6), ("up", 2e6, 0.4e6)], \
+        "flat, he loses 0.5M and Up nothing: 1M of cash covers both"
+    assert resold(0.2e6, 50e6, dear=7.5e6, up=1.9e6) == [("up", 2e6, 0.4e6)], \
+        "flat, Dear would leave you below zero at the lock; Up loses 0.1M, which 0.2M covers"
 
     ranked = funnel(ub, b, 7)
     assert [r["rank"] for r in ranked] == list(range(len(b.rows))) \
