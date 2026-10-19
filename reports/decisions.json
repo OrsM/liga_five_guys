@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-18T20:40Z",
+ "generated_at": "2026-10-19T07:47Z",
  "lock_at": "2026-10-19T19:00:00+00:00",
- "cash": 4195680.0,
+ "cash": 4295680.0,
  "cash_locked": 0.0,
- "finish": 1.92,
- "p_win": 0.198,
+ "finish": 1.94,
+ "p_win": 0.178,
  "band": [
-  1852.95204662091,
-  2129.11485843651
+  1861.09764816053,
+  2137.9654886159
  ],
  "do": [],
  "plan_gain": 0.0,
@@ -17,7 +17,7 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 22726669.0
+   "clause": 22633624.0
   },
   {
    "name": "Ante Budimir",
@@ -30,9 +30,19 @@
    "clause": 42016585.0
   },
   {
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "clause": 58220110.0
+  },
+  {
    "name": "Iñigo Vicente",
    "pos": "DEL",
    "clause": 31271675.0
+  },
+  {
+   "name": "Natan",
+   "pos": "DEF",
+   "clause": 55128597.0
   },
   {
    "name": "Marcos Alonso",
@@ -40,34 +50,24 @@
    "clause": 28589508.0
   },
   {
-   "name": "Pablo Fornals",
-   "pos": "MED",
-   "clause": 58220110.0
-  },
-  {
-   "name": "Natan",
-   "pos": "DEF",
-   "clause": 56120121.0
-  },
-  {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 14236131.0
-  },
-  {
-   "name": "German Valera",
-   "pos": "MED",
-   "clause": 13978825.0
-  },
-  {
-   "name": "Dakonam Djene",
-   "pos": "DEF",
-   "clause": 24111576.0
+   "clause": 13912345.0
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 21013333.0
+   "clause": 21916045.0
+  },
+  {
+   "name": "German Valera",
+   "pos": "MED",
+   "clause": 14086653.0
+  },
+  {
+   "name": "Dakonam Djene",
+   "pos": "DEF",
+   "clause": 23814447.0
   },
   {
    "name": "Yeray Alvarez",
@@ -76,62 +76,85 @@
   }
  ],
  "offers": [],
- "market": [],
+ "market": [
+  {
+   "name": "Kang-In Lee",
+   "pos": "MED",
+   "asking": 72097114.0,
+   "bid": 73488977.5694153,
+   "gain": 52.7123919918291,
+   "better": 0.912201622037567,
+   "verdict": null,
+   "trend": -11.7211827289201,
+   "plan": false
+  },
+  {
+   "name": "Mujaid Sadick",
+   "pos": "DEF",
+   "asking": 2150685.0,
+   "bid": 2192204.83255235,
+   "gain": 3.04189248707031,
+   "better": 0.589664405487756,
+   "verdict": "a 59% chance of helping, under 70%",
+   "trend": -14.6775132922018,
+   "plan": false
+  }
+ ],
  "standings": [
   {
    "manager": "BurtonGM89",
    "me": false,
    "now": 416.0,
-   "mean": 2126.74816122937,
-   "lo": 1971.78114053571,
-   "hi": 2281.71518192304,
-   "cash": -22417294.0,
+   "mean": 2148.6992349019,
+   "lo": 1990.197069336,
+   "hi": 2307.20140046781,
+   "cash": -75917400.0,
    "estimated": true,
-   "p_above": 0.798971008321027
+   "p_above": 0.818164371940266
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 463.0,
-   "mean": 1991.03345252871,
-   "lo": 1852.95204662091,
-   "hi": 2129.11485843651,
-   "cash": 4195680.0,
+   "mean": 1999.53156838821,
+   "lo": 1861.09764816053,
+   "hi": 2137.9654886159,
+   "cash": 4295680.0,
    "estimated": false,
    "p_above": null
   },
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 341.0,
-   "mean": 1799.23559374443,
-   "lo": 1665.48039214887,
-   "hi": 1932.99079533998,
-   "cash": 22506521.0,
+   "now": 350.0,
+   "mean": 1818.4450237534,
+   "lo": 1683.94676354452,
+   "hi": 1952.94328396227,
+   "cash": 22606521.0,
    "estimated": true,
-   "p_above": 0.10052042494125
+   "p_above": 0.11461051035064
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1687.63334144778,
-   "lo": 1565.93035522285,
-   "hi": 1809.3363276727,
-   "cash": 2027960.0,
+   "mean": 1672.83336599143,
+   "lo": 1552.46164300656,
+   "hi": 1793.2050889763,
+   "cash": 2127960.0,
    "estimated": true,
-   "p_above": 0.0173227026211301
+   "p_above": 0.0112363972496468
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 321.0,
-   "mean": 1515.71983970409,
-   "lo": 1405.90905909205,
-   "hi": 1625.53062031613,
-   "cash": 47193671.0,
+   "now": 323.0,
+   "mean": 1519.64148710121,
+   "lo": 1409.59908751719,
+   "hi": 1629.68388668524,
+   "cash": 47293671.0,
    "estimated": true,
-   "p_above": 0.000277473211066637
+   "p_above": 0.000252875148380571
   }
  ]
 }
