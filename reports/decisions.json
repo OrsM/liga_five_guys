@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-19T19:46Z",
+ "generated_at": "2026-10-19T20:23Z",
  "lock_at": "2026-10-21T18:00:00+00:00",
  "cash": 4295680.0,
  "cash_locked": 0.0,
@@ -9,10 +9,44 @@
   1856.66084110016,
   2133.51445335206
  ],
- "do": [],
+ "do": [
+  {
+   "name": "Angel Fortuño",
+   "pos": "POR",
+   "what": "resale",
+   "label": "buy to resell Angel Fortuño",
+   "step": "bid up to",
+   "amount": 619273.898777841,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": [
+    [
+     "asking",
+     607545.0,
+     "money"
+    ],
+    [
+     "sell before the lock for",
+     680792.085157655,
+     "money"
+    ],
+    [
+     "profit",
+     61518.1863798148,
+     "money"
+    ],
+    [
+     "",
+     46.0138308028203,
+     "trend"
+    ]
+   ]
+  }
+ ],
  "plan_gain": 0.0,
  "cash_after": null,
- "ping": "",
+ "ping": "buy to resell Angel Fortuño",
  "exposed": [
   {
    "name": "Mathew Ryan",
