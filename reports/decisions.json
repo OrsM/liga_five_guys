@@ -1,52 +1,68 @@
 {
- "generated_at": "2026-10-19T20:23Z",
+ "generated_at": "2026-10-19T20:38Z",
  "lock_at": "2026-10-21T18:00:00+00:00",
  "cash": 4295680.0,
  "cash_locked": 0.0,
  "finish": 1.96,
- "p_win": 0.168,
+ "p_win": 0.17,
  "band": [
   1856.66084110016,
   2133.51445335206
  ],
  "do": [
   {
-   "name": "Angel Fortuño",
-   "pos": "POR",
-   "what": "resale",
-   "label": "buy to resell Angel Fortuño",
-   "step": "bid up to",
-   "amount": 619273.898777841,
+   "what": "field",
+   "label": "field Pablo Martinez",
+   "step": null,
+   "amount": null,
    "done": false,
-   "gain": null,
+   "gain": 1.57990611462493,
+   "per": "next",
+   "facts": [
+    [
+     "bench",
+     "Yeray Alvarez",
+     "names"
+    ]
+   ]
+  },
+  {
+   "name": "Pablo Martinez",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Pablo Martinez",
+   "step": "bid up to",
+   "amount": 3431440.66125252,
+   "done": false,
+   "gain": 22.3682066247738,
    "per": "season",
    "facts": [
     [
      "asking",
-     607545.0,
-     "money"
-    ],
-    [
-     "sell before the lock for",
-     680792.085157655,
-     "money"
-    ],
-    [
-     "profit",
-     61518.1863798148,
+     3366450.0,
      "money"
     ],
     [
      "",
-     46.0138308028203,
+     6.51860510873854,
+     "per_million"
+    ],
+    [
+     "chance of helping",
+     0.747,
+     "chance"
+    ],
+    [
+     "",
+     6.57987992222264,
      "trend"
     ]
    ]
   }
  ],
- "plan_gain": 0.0,
- "cash_after": null,
- "ping": "buy to resell Angel Fortuño",
+ "plan_gain": 22.3682066247738,
+ "cash_after": 864239.338747481,
+ "ping": "field Pablo Martinez; buy Pablo Martinez",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -112,25 +128,80 @@
  "offers": [],
  "market": [
   {
-   "name": "Kang-In Lee",
-   "pos": "MED",
-   "asking": 72097114.0,
-   "bid": 73488977.5694153,
-   "gain": 52.7123919918291,
-   "better": 0.912201622037567,
+   "name": "Dean Huijsen",
+   "pos": "DEF",
+   "asking": 31634086.0,
+   "bid": 32244794.6596441,
+   "gain": 35.1867403210939,
+   "better": 0.838965456651175,
    "verdict": null,
-   "trend": -11.7211827289201,
+   "trend": -2.67510757816508,
    "plan": false
   },
   {
-   "name": "Mujaid Sadick",
+   "name": "Pablo Martinez",
+   "pos": "MED",
+   "asking": 3366450.0,
+   "bid": 3431440.66125252,
+   "gain": 22.3682066247738,
+   "better": 0.746798928965645,
+   "verdict": null,
+   "trend": 6.57987992222264,
+   "plan": true
+  },
+  {
+   "name": "Roberto Fernandez",
+   "pos": "DEL",
+   "asking": 56765809.0,
+   "bid": 57861695.6056065,
+   "gain": 18.774365029099,
+   "better": 0.713453142244572,
+   "verdict": null,
+   "trend": -0.535828732649093,
+   "plan": false
+  },
+  {
+   "name": "Yassir Zabiri",
+   "pos": "DEL",
+   "asking": 37321922.0,
+   "bid": 38042436.6044037,
+   "gain": 14.3644107475332,
+   "better": 0.634462313736702,
+   "verdict": "a 63% chance of helping, under 70%",
+   "trend": 20.077418203909,
+   "plan": false
+  },
+  {
+   "name": "Carlos Dotor",
+   "pos": "MED",
+   "asking": 4761755.0,
+   "bid": 4853682.58133122,
+   "gain": 2.20368897907237,
+   "better": 0.563596354937803,
+   "verdict": "a 56% chance of helping, under 70%",
+   "trend": -14.5902412872065,
+   "plan": false
+  },
+  {
+   "name": "Eduardo Camavinga",
+   "pos": "MED",
+   "asking": 5070327.0,
+   "bid": 5168211.68698377,
+   "gain": 0.498631728551885,
+   "better": 0.528054165842004,
+   "verdict": "a 53% chance of helping, under 70%",
+   "trend": -16.1872576673003,
+   "plan": false
+  },
+  {
+   "name": "Jesus Areso",
    "pos": "DEF",
-   "asking": 2150685.0,
-   "bid": 2192204.83255235,
-   "gain": 3.04189248707031,
-   "better": 0.589664405487756,
-   "verdict": "a 59% chance of helping, under 70%",
-   "trend": -14.6775132922018,
+   "asking": 2738146.0,
+   "bid": 2791007.00169197,
+   "gain": 0.175713548203139,
+   "better": 0.510341381781013,
+   "verdict": "a 51% chance of helping, under 70%",
+   "trend": -15.4256139998974,
    "plan": false
   }
  ],
@@ -138,13 +209,13 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 418.0,
-   "mean": 2150.70083914891,
-   "lo": 1992.19866691315,
-   "hi": 2309.20301138467,
+   "now": 417.0,
+   "mean": 2149.70083914891,
+   "lo": 1991.19866691315,
+   "hi": 2308.20301138467,
    "cash": -75917400.0,
    "estimated": true,
-   "p_above": 0.828349836058053
+   "p_above": 0.826794743017724
   },
   {
    "manager": "miguel_autentico",
@@ -172,23 +243,23 @@
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1672.83336599143,
-   "lo": 1552.46164300656,
-   "hi": 1793.2050889763,
-   "cash": 2127960.0,
+   "mean": 1676.023114549,
+   "lo": 1555.20172628863,
+   "hi": 1796.84450280937,
+   "cash": -7450861.0,
    "estimated": true,
-   "p_above": 0.0121832257954602
+   "p_above": 0.0130260519853769
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 324.0,
-   "mean": 1518.43393837533,
-   "lo": 1408.54374735116,
-   "hi": 1628.3241293995,
+   "now": 323.0,
+   "mean": 1517.43393837533,
+   "lo": 1407.54374735116,
+   "hi": 1627.3241293995,
    "cash": 47293671.0,
    "estimated": true,
-   "p_above": 0.000273926477576736
+   "p_above": 0.000266648987453544
   }
  ]
 }
