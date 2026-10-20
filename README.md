@@ -88,9 +88,12 @@ Every forecast is the same product, for every player and jornada, and
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one, h being the longest
   horizon the data can fit (a rise was still carrying there), not the
-  lock: a buy pays its premium once and keeps rising after it. A bid is the
-  premium over asking at or above 80% of your last 50 winning bids (yours,
-  not the league's: the league's are mostly its boldest bidder's).
+  lock: a buy pays its premium once and keeps rising after it. A bid's
+  chance of winning is read off the 60 past auctions of the players nearest
+  in price trend (schema.sql's `bid_odds`, from `auction_results`: what the
+  winner paid, or asking if nobody bought): rising players draw rivals'
+  bids, falling ones almost never. A buy bids the level whose chance times
+  what the move is then worth is greatest (`Universe.bid`).
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more

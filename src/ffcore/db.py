@@ -133,6 +133,29 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     db.create_function("prognosis_bucket", 6, prognosis_bucket, deterministic=True)
 
 
+def add_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
+    """The columns these schema texts give a table that db's copy of it lacks,
+    added (CREATE TABLE IF NOT EXISTS leaves a kept table as it was made). A
+    column a table cannot gain (NOT NULL without a default) raises."""
+    with closing(sqlite3.connect(":memory:")) as want:
+        functions(want)
+        for sql in texts:
+            want.executescript(sql)
+        for (t,) in want.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall():
+            have = {r[1] for r in db.execute('PRAGMA table_info("%s")' % t)}
+            if not have:
+                continue
+            for _cid, col, typ, notnull, dflt, _pk in want.execute('PRAGMA table_info("%s")' % t).fetchall():
+                if col in have:
+                    continue
+                if notnull and dflt is None:
+                    raise ValueError("%s.%s is NOT NULL with no default: a kept table cannot gain it"
+                                     % (t, col))
+                db.execute('ALTER TABLE "%s" ADD COLUMN "%s" %s%s%s' % (
+                    t, col, typ, " NOT NULL" if notnull else "",
+                    "" if dflt is None else " DEFAULT %s" % dflt))
+
+
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
     cut() the model's clock as a stamp, which the tables' as-of views read.
@@ -153,6 +176,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
             if db.execute("PRAGMA user_version").fetchone()[0] != version:   # else it is applied: leave the views
                 db.execute("PRAGMA journal_mode=WAL")                       # other processes are using
+                add_columns(db, texts)
                 for sql in texts:
                     db.executescript(sql)
                 db.execute("PRAGMA user_version = %d" % version)
@@ -279,6 +303,26 @@ def _selftest() -> None:
         with closing(sqlite3.connect(path)) as raw:
             assert raw.execute("SELECT count(*) FROM sqlite_master WHERE name = 'marker'").fetchone()[0] == 0, \
                 "a changed schema is applied"
+
+        schema.write_text("CREATE TABLE IF NOT EXISTS kept (a INTEGER NOT NULL);")
+        _APPLIED.clear()
+        with closing(connect(path, schema)) as db, db:
+            db.execute("INSERT INTO kept VALUES (1)")
+        schema.write_text("CREATE TABLE IF NOT EXISTS kept (a INTEGER NOT NULL, b REAL, c TEXT NOT NULL DEFAULT '');"
+                          " CREATE VIEW IF NOT EXISTS kb AS SELECT b, c FROM kept;")
+        _APPLIED.clear()
+        with closing(connect(path, schema)) as db:
+            assert db.execute("SELECT a, b, c FROM kept").fetchall() == [(1, None, "")], \
+                "a kept table gains the schema's new columns, its rows kept"
+        schema.write_text("CREATE TABLE IF NOT EXISTS kept (a INTEGER NOT NULL, b REAL, c TEXT NOT NULL DEFAULT '',"
+                          " d INTEGER NOT NULL);")
+        _APPLIED.clear()
+        try:
+            connect(path, schema)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("a NOT NULL column with no default cannot be added to kept rows")
 
     mem = sqlite3.connect(":memory:")
     functions(mem)

@@ -12,6 +12,7 @@ from dataclasses import replace
 from typing import Any
 
 from assemble import built, universe
+import decide
 from decide import CONFIDENCE, Board, Universe, board, verdict
 from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
@@ -24,6 +25,17 @@ Doc = dict[str, Any]  # a JSON object of decisions.json
 
 
 def _selftest() -> None:
+    """The board's tests, with money at no value (decide._selftest): their
+    players have no market value to count."""
+    was = decide.MONEY_RATE
+    try:
+        decide.MONEY_RATE = 0.0
+        _selftest_board()
+    finally:
+        decide.MONEY_RATE = was
+
+
+def _selftest_board() -> None:
     import tempfile
     from contextlib import closing
     from pathlib import Path
@@ -121,8 +133,7 @@ def _selftest() -> None:
                 db.executemany("INSERT INTO waiting VALUES (?, ?, ?)", [
                     (k, kind, v) for k, up, flat in resale for kind, v in (("resale", up), ("flat", flat))])
                 db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
-                    ("RESALE_MARGIN", 0.05), ("GOOD_OFFER", 0.9), ("PRICE_WINDOW", 50.0),
-                    ("BID_BEATS", 0.8)])
+                    ("RESALE_MARGIN", 0.05), ("GOOD_OFFER", 0.9), ("PRICE_WINDOW", 50.0)])
             store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me,
                                          "team_value": str(team_value)}])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
@@ -165,8 +176,8 @@ def _selftest() -> None:
         "exposed: every player with a clause, most valuable first"
     assert all("by" not in e for e in exposed), \
         "no 'who can afford him': a rival's cash is no limit when sales to the game pay at once"
-    assert all(CONFIDENCE <= v <= 1.0 for d in doc["do"] for _, v, unit in d["facts"]
-               if unit == "chance"), "only moves that clear the bar are shown"
+    assert all(CONFIDENCE <= v <= 1.0 for d in doc["do"] for label, v, _unit in d["facts"]
+               if label == "chance of helping"), "only moves that clear the bar are shown"
     assert report(ub, b._replace(plan=[]))["cash_after"] is None, \
         "no cash line when the plan moves no money"
     assert [r["estimated"] for r in doc["standings"] if r["me"]] == [False]
@@ -185,6 +196,10 @@ def _selftest() -> None:
     assert all(dict((f[0], f[1]) for f in d["facts"])["listed at"] == ub.market.price[d["name"].lower()]
                for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"), \
         "what he is listed at, and the bid it takes"
+    wins = {m.action.buy: round(m.win, 3) for m in b.rows if m.action.kind == "buy"}
+    assert all(dict((f[0], f[1]) for f in d["facts"])["chance to win"] == wins[d["name"].lower()]
+               for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"), \
+        "and the chance that bid wins his auction"
     assert "market" not in doc and "offers" not in doc, "one list of lines, not a section per source"
     listing = doc["do"][-1]
     assert listing["what"] == "list" and set(listing["label"].removeprefix("list ").lower().split(", ")) \
@@ -385,7 +400,8 @@ def funnel(u: Universe, b: Board, run: int) -> list[Doc]:
              "label": m.action.label(u.market.names),
              "cost": m.action.cost, "proceeds": m.action.proceeds,
              "gain": m.d_pts, "p_better": m.p_better, "per_million": m.per_million,
-             "verdict": verdict(m), "in_plan": int(m in b.plan)}
+             "verdict": verdict(m), "in_plan": int(m in b.plan), "money": m.money,
+             "win": m.win, "alone": int(m.alone)}
             for i, m in enumerate(b.rows)]
 
 

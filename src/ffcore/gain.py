@@ -116,10 +116,10 @@ def eleven(squad: Squad, value: dict[str, float]) -> list[str]:
 def gains(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
           ) -> list[tuple[float, float]]:
     """Each squad against base over jornadas: (mean change, P(change > 0))."""
-    return [(m, p) for m, _v, p in _moments(fc, jornadas, base, squads)]
+    return [(m, p) for m, _v, p in moments(fc, jornadas, base, squads)]
 
 
-def _moments(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
+def moments(fc: Bootstrap, jornadas: list[int], base: Squad, squads: list[Squad]
              ) -> list[tuple[float, float, float]]:
     """Each squad against base over jornadas: (mean, variance, P(> 0))."""
     if not squads:
@@ -192,7 +192,7 @@ def standings(fc: Bootstrap, squads: Squads, jornadas: list[int], carried: dict[
               me: str) -> Standings:
     """Every manager's final points, his squad fielding every jornada left."""
     mans = list(squads)
-    got = _moments(fc, jornadas, {}, [squads[m] for m in mans])
+    got = moments(fc, jornadas, {}, [squads[m] for m in mans])
     return Standings({m: (mean + carried.get(m, 0.0), math.sqrt(max(var, 0.0)))
                       for m, (mean, var, _p) in zip(mans, got)}, me)
 

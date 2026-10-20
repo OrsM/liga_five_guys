@@ -34,11 +34,14 @@ CREATE TABLE IF NOT EXISTS funnel (
     label       TEXT NOT NULL,     -- Action.label
     cost        REAL NOT NULL,
     proceeds    REAL NOT NULL,
-    gain        REAL NOT NULL,     -- median season points against doing nothing
-    p_better    REAL NOT NULL,     -- chance it leaves you better off (ffcore.gain)
+    gain        REAL NOT NULL,     -- season points against doing nothing, its money at MONEY_RATE
+    p_better    REAL NOT NULL,     -- chance it leaves you better off (ffcore.gain, Market.money)
     per_million REAL NOT NULL,
     verdict     TEXT,              -- why it fails the bar; NULL if it clears it
     in_plan     INTEGER NOT NULL,
+    money       REAL,              -- what it does to your money MONEY_H updates on, millions (Move.money)
+    win         REAL,              -- a buy's chance its bid wins (Move.win)
+    alone       INTEGER,           -- whether it can be made by itself (Move.alone)
     PRIMARY KEY (run_id, rank)
 );
 
@@ -246,7 +249,8 @@ CREATE TABLE IF NOT EXISTS sim_calibration (
 );
 
 -- The phantom manager (grading.phantom_season): the points of his eleven
--- each jornada, beside the same squad never moved, and what he did.
+-- each jornada, beside the same squad never moved, what he did, and his
+-- cash and his squad's worth once he had.
 CREATE TABLE IF NOT EXISTS phantom_jornadas (
     run_id   INTEGER NOT NULL REFERENCES runs(run_id),
     jornada  INTEGER NOT NULL,
@@ -254,6 +258,7 @@ CREATE TABLE IF NOT EXISTS phantom_jornadas (
     standpat REAL NOT NULL,
     moves    TEXT NOT NULL,
     cash     REAL NOT NULL,
+    value    REAL,
     PRIMARY KEY (run_id, jornada)
 );
 
@@ -511,7 +516,7 @@ FROM e, l;
 -- What waiting to sell is worth, over the nights before the next match
 -- locks: each night's offer to come taken only when it beats waiting on
 -- (the last before the lock always). An offer to come is a past one's
--- share of value (offer_ratios, the last PRICE_WINDOW) of the value he will
+-- share of value (recent_offers) of the value he will
 -- have that night: his value moved by his trend, the share carry says is
 -- made by then (price_carry). For a player of yours with an offer standing
 -- (kind 'sale', nights_left), and for one on the game's market bought
@@ -520,8 +525,7 @@ FROM e, l;
 DROP VIEW IF EXISTS waiting;
 CREATE VIEW waiting AS
 WITH RECURSIVE
-r AS MATERIALIZED (SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
-                   LIMIT (SELECT CAST(price_window AS INTEGER) FROM k)),
+r AS MATERIALIZED (SELECT ratio FROM recent_offers),
 c AS MATERIALIZED (SELECT h, carry FROM price_carry),
 s AS MATERIALIZED (
     SELECT player, 'sale' AS kind, value, coalesce(trend, 0.0) AS trend,
@@ -670,7 +674,7 @@ DROP VIEW IF EXISTS k;
 CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'CLIP' AND variant = (SELECT variant())) AS clip,
     (SELECT value FROM model_constants WHERE name = 'PRICE_WINDOW' AND variant = (SELECT variant())) AS price_window,
-    (SELECT value FROM model_constants WHERE name = 'BID_BEATS' AND variant = (SELECT variant())) AS bid_beats,
+    (SELECT value FROM model_constants WHERE name = 'BID_NEIGHBOURS' AND variant = (SELECT variant())) AS bid_neighbours,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W0' AND variant = (SELECT variant())) AS price_w0,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W1' AND variant = (SELECT variant())) AS price_w1,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W2' AND variant = (SELECT variant())) AS price_w2,
@@ -805,6 +809,27 @@ CREATE VIEW fitted AS
 SELECT h, slope FROM momentum_fit
 WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut()));
 
+-- How far a value forecast is off, as of cut(): per horizon, the root mean
+-- square of momentum's error over every pair it is fitted on (in % of
+-- value, each move clipped as the fit clips it). Prices have fat tails: it
+-- is well over the mean absolute error. Kept a run (price_error_fit), as
+-- momentum is: it walks every pair (~5s).
+DROP VIEW IF EXISTS price_error_now;
+CREATE VIEW price_error_now AS
+SELECT p.h, sqrt(avg((m.slope * p.x - p.y) * (m.slope * p.x - p.y))) AS rmse
+FROM momentum_pairs p JOIN fitted m USING (h) GROUP BY p.h;
+
+CREATE TABLE IF NOT EXISTS price_error_fit (
+    as_of TEXT NOT NULL,
+    h     INTEGER NOT NULL,
+    rmse  REAL NOT NULL,
+    PRIMARY KEY (as_of, h)
+);
+DROP VIEW IF EXISTS price_error;
+CREATE VIEW price_error AS
+SELECT h, rmse FROM price_error_fit
+WHERE as_of = (SELECT max(as_of) FROM price_error_fit WHERE as_of <= (SELECT cut()));
+
 -- The share of a trend (its move over the horizon, the longest h fitted)
 -- already made after each update.
 DROP VIEW IF EXISTS price_carry;
@@ -839,31 +864,74 @@ CREATE VIEW price_trend AS
 SELECT ff_id, trend FROM price_trend_fit
 WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut()));
 
--- Your own winning bids over the asking price: each of your buys, oldest
--- first, set against the league listing of that player that closed within
--- ten minutes of it (its last sighting; the first such listing seen).
+-- How each listing's auction went: every listing on the market (the game's
+-- or a manager's) by player and close, its asking price at its last
+-- sighting and his price trend then (the last kept at or before its
+-- close), and the buy made within ten minutes of its close if one was:
+-- what the winner paid (won; NULL: nobody bought) and whether it was you.
+-- bar is what a bid had to reach, over asking: the winner's bid; asking
+-- where nobody bought or the winner was you (the bids you beat are not
+-- seen); NULL for a manager's listing (no one's deal with him is seen).
+-- Ground truth for the replays, so it reads every sighting whatever cut().
 DROP VIEW IF EXISTS auction_ratios;
-CREATE VIEW auction_ratios AS
-WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM current_api_standings s, league_config c
+DROP VIEW IF EXISTS premium;
+DROP VIEW IF EXISTS auction_results;
+CREATE VIEW auction_results AS
+WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM api_standings s, league_config c
               WHERE s.manager = c.me),
-buys AS (SELECT a.at, a.player_id AS pid, a.amount,
-                row_number() OVER (ORDER BY a.at) AS n
-         FROM current_api_activity a WHERE a.kind = 'buy' AND a.user_id IN (SELECT uid FROM mine)),
-ends AS (SELECT pid, close, sale_price, first_id FROM (
-             SELECT player_id AS pid, julianday(expires_at) AS close, sale_price,
-                    row_number() OVER k AS pick,
-                    min(rowid) OVER (PARTITION BY player_id, julianday(expires_at)) AS first_id
-             FROM api_market
-             WHERE observed_at <= (SELECT cut()) AND seller = 'marketPlayerLeague'
-               AND coalesce(expires_at, '') <> ''
-             WINDOW k AS (PARTITION BY player_id, julianday(expires_at)
-                          ORDER BY observed_at DESC, rowid))
+ends AS (SELECT pid, player, close, at, asking, seller FROM (
+             SELECT m.player_id AS pid, a.player, julianday(m.expires_at) AS close,
+                    m.expires_at AS at, m.sale_price AS asking, m.seller,
+                    row_number() OVER (PARTITION BY m.player_id, julianday(m.expires_at)
+                                       ORDER BY m.observed_at DESC, m.rowid) AS pick
+             FROM api_market m JOIN app_player a ON a.app_id = m.player_id
+             WHERE m.seller IN ('marketPlayerLeague', 'marketPlayerTeam')
+               AND coalesce(m.expires_at, '') <> '' AND coalesce(m.sale_price, 0) > 0)
          WHERE pick = 1),
-matched AS (SELECT b.n, b.amount / e.sale_price AS ratio,
-                   row_number() OVER (PARTITION BY b.n ORDER BY e.first_id) AS k
-            FROM buys b JOIN ends e ON e.pid = b.pid
-             AND abs(julianday(b.at) - e.close) * 86400 < 600 AND coalesce(e.sale_price, 0) > 0)
-SELECT n, ratio FROM matched WHERE k = 1 ORDER BY n;
+buys AS (SELECT player_id AS pid, julianday(at) AS t, amount, user_id IN (SELECT uid FROM mine) AS me
+         FROM (SELECT player_id, at, amount, user_id,
+                      row_number() OVER (PARTITION BY activity_id ORDER BY rowid DESC) AS last
+               FROM api_activity WHERE kind = 'buy' AND activity_id <> '')
+         WHERE last = 1),
+won AS (SELECT * FROM (
+            SELECT e.*, b.amount AS won, b.me,
+                   row_number() OVER (PARTITION BY e.pid, e.close ORDER BY b.amount DESC) AS top
+            FROM ends e LEFT JOIN buys b ON b.pid = e.pid AND abs(b.t - e.close) * 86400 < 600)
+        WHERE top = 1),
+fits AS (SELECT DISTINCT as_of FROM price_trend_fit)
+SELECT w.player, w.at AS close, w.asking, w.seller, w.won, w.me AS by_me,
+       CASE WHEN w.seller <> 'marketPlayerLeague' THEN NULL
+            WHEN w.won IS NULL OR w.me THEN 1.0 ELSE w.won / w.asking END AS bar,
+       (SELECT t.trend FROM price_trend_fit t
+        WHERE t.ff_id = w.player
+          AND t.as_of = (SELECT max(as_of) FROM fits WHERE as_of <= strftime('%Y-%m-%dT%H%MZ', w.at)))
+       AS trend
+FROM won w;
+
+-- What a bid wins on the game's market now, for each player listed there:
+-- his BID_NEIGHBOURS past listings closest to him in price trend (before
+-- cut(), none you won: what you beat is not seen), and for each bid over
+-- asking that reached one of their bars (and asking itself) the share it
+-- would have won (p_win; 1 with no past to go on).
+DROP VIEW IF EXISTS bid_odds;
+CREATE VIEW bid_odds AS
+WITH past AS MATERIALIZED (
+    SELECT trend, bar FROM auction_results
+    WHERE bar IS NOT NULL AND trend IS NOT NULL AND NOT coalesce(by_me, 0)
+      AND strftime('%Y-%m-%dT%H%MZ', close) <= (SELECT cut())),
+now AS (SELECT DISTINCT s.player, coalesce(t.trend, 0.0) AS trend
+        FROM current_api_market s LEFT JOIN price_trend t ON t.ff_id = s.player
+        WHERE s.seller = 'marketPlayerLeague' AND s.player IS NOT NULL AND s.sale_price <> 0),
+near AS MATERIALIZED (
+    SELECT player, bar FROM (
+        SELECT n.player, p.bar,
+               row_number() OVER (PARTITION BY n.player ORDER BY abs(p.trend - n.trend), p.bar) AS r
+        FROM now n, past p)
+    WHERE r <= (SELECT CAST(bid_neighbours AS INTEGER) FROM k)),
+levels AS (SELECT player, max(bar, 1.0) AS ratio FROM near UNION SELECT player, 1.0 FROM now)
+SELECT l.player, l.ratio,
+       coalesce((SELECT avg(n.bar <= l.ratio) FROM near n WHERE n.player = l.player), 1.0) AS p_win
+FROM levels l;
 
 -- The game's nightly offers for listed players, each once (its first
 -- sighting), over the player's value when it was made; by when made.
@@ -883,16 +951,12 @@ o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value 
         AND v.market_value <> 0 AND coalesce(o.offer_id, '') <> '')
 SELECT created_at, ratio FROM o WHERE first = 1 ORDER BY created_at, ratio;
 
--- The bid over asking at or above BID_BEATS of your last PRICE_WINDOW
--- winning bids (1.0 with none).
-DROP VIEW IF EXISTS premium;
-CREATE VIEW premium AS
-WITH recent AS (SELECT ratio FROM auction_ratios ORDER BY n DESC
-                LIMIT (SELECT CAST(price_window AS INTEGER) FROM k)),
-r AS (SELECT ratio, row_number() OVER (ORDER BY ratio) - 1 AS i, count(*) OVER () AS cnt
-      FROM recent)
-SELECT coalesce((SELECT ratio FROM r, k WHERE i = min(cnt - 1, CAST(k.bid_beats * cnt AS INTEGER))),
-                1.0) AS premium;
+-- The game's last PRICE_WINDOW offers as shares of value (every one with
+-- no constants set): what an offer to come is drawn from.
+DROP VIEW IF EXISTS recent_offers;
+CREATE VIEW recent_offers AS
+SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
+LIMIT coalesce((SELECT CAST(price_window AS INTEGER) FROM k), -1);
 
 -- The jornada calendar, as of cut(). Each fixture's kickoff as last seen
 -- (a played match's page drops it) and its jornada, as a UTC stamp (as
@@ -1231,8 +1295,8 @@ FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN sim_facts f USING (ru
 
 -- Every buy the last run ranked (the funnel: each player on the market you
 -- could get), with what the run saw of him: what he is listed at (asking),
--- the bid it takes, your bid if it is in, what you pay (cost: yours, else
--- the bid it takes), his value and trend, what the
+-- the bid it takes and its chance of winning (win), your bid if it is in,
+-- what you pay (cost: yours, else the bid it takes), his value and trend, what the
 -- funnel made of him, and what selling him on before the lock would get
 -- (sim_waiting: resale, and flat, his value standing still).
 DROP VIEW IF EXISTS board_market;
@@ -1241,7 +1305,8 @@ CREATE VIEW board_buys AS
 SELECT f.rank, f.buy AS player, coalesce(s.name, f.buy) AS name, coalesce(s.pos, '') AS pos,
        coalesce(s.price, f.cost) AS asking, f.cost AS bid, s.my_bid, coalesce(s.my_bid, f.cost) AS cost,
        s.value, s.trend,
-       f.gain, f.p_better, f.per_million, f.verdict, f.in_plan, r.later AS resale, l.later AS flat
+       f.gain, f.p_better, f.per_million, f.verdict, f.in_plan, f.money, f.win,
+       r.later AS resale, l.later AS flat
 FROM funnel f JOIN board_run USING (run_id)
 LEFT JOIN sim_facts s ON s.run_id = f.run_id AND s.player = f.buy
 LEFT JOIN sim_waiting r ON r.run_id = f.run_id AND r.player = f.buy AND r.kind = 'resale'
@@ -1249,21 +1314,21 @@ LEFT JOIN sim_waiting l ON l.run_id = f.run_id AND l.player = f.buy AND l.kind =
 WHERE f.kind = 'buy';
 
 -- Each of your players: his facts (board_players), whether he is listed,
--- the game's offer standing on him and the share of its last price_window
--- offers (offer_ratios), as a share of value, it beats; what selling him
--- does to your season (the funnel's sale: no rank if your side cannot be
--- fielded without him) and whether the plan sells him.
+-- the game's offer standing on him and the share of its recent offers
+-- (recent_offers), as a share of value, it beats; what selling him
+-- does to your season (the funnel's sale), whether that sale can be made
+-- by itself (alone: your side can be fielded without him) and whether the
+-- plan sells him.
 DROP VIEW IF EXISTS board_holdings;
 DROP VIEW IF EXISTS board_offers;
 DROP VIEW IF EXISTS board_mine;
 CREATE VIEW board_mine AS
-WITH r AS (SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
-           LIMIT coalesce((SELECT CAST(price_window AS INTEGER) FROM k), -1))
+WITH r AS (SELECT ratio FROM recent_offers)
 SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.takes,
        b.route IS 'listed' AS listed,
        CASE WHEN b.offer IS NOT NULL AND b.value > 0
             THEN (SELECT avg(r.ratio < b.offer / b.value) FROM r) END AS beats,
-       f.rank, f.gain, f.per_million, coalesce(f.in_plan, 0) AS sell
+       f.rank, f.gain, f.money, f.per_million, coalesce(f.in_plan, 0) AS sell, f.alone
 FROM board_players b JOIN board_run USING (run_id)
 LEFT JOIN funnel f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.sell = b.player
 WHERE b.mine;
@@ -1402,12 +1467,14 @@ buys AS (
            CASE WHEN r.player IS NULL THEN b.gain END, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
+                UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance' WHERE b.my_bid IS NULL
                 UNION ALL SELECT 1, 'sell before the lock for', b.resale, 'money' WHERE r.player IS NOT NULL
                 UNION ALL SELECT 2, 'profit', r.profit, 'money'
                 UNION ALL SELECT 3, 'chance of helping', round(b.p_better, 3), 'chance' WHERE r.player IS NULL
                 UNION ALL SELECT 4, '', b.trend, 'trend'
-                UNION ALL SELECT 5, '', b.per_million, 'per_million' WHERE r.player IS NULL
-                UNION ALL SELECT 6, 'short by', b.bid - max(m.left, 0.0), 'money'
+                UNION ALL SELECT 5, 'money', 1e6 * b.money, 'money' WHERE r.player IS NULL
+                UNION ALL SELECT 6, '', b.per_million, 'per_million' WHERE r.player IS NULL
+                UNION ALL SELECT 7, 'short by', b.bid - max(m.left, 0.0), 'money'
                 WHERE r.player IS NULL AND NOT b.in_plan AND b.bid > m.left)
             WHERE v IS NOT NULL)
     FROM board_buys b LEFT JOIN board_plan p ON p.rank = b.rank
@@ -1425,10 +1492,11 @@ sells AS (
                 UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
                 UNION ALL SELECT 2, 'the game''s recent offers', round(s.beats, 3), 'beats'
                 UNION ALL SELECT 3, '', s.trend, 'trend'
-                UNION ALL SELECT 4, '', s.per_million, 'per_million')
+                UNION ALL SELECT 4, 'money', 1e6 * s.money, 'money'
+                UNION ALL SELECT 5, '', s.per_million, 'per_million')
             WHERE v IS NOT NULL)
     FROM board_mine s LEFT JOIN board_plan p ON p.rank = s.rank
-    WHERE s.sell OR (s.listed AND s.takes AND s.rank IS NOT NULL
+    WHERE s.sell OR (s.listed AND s.takes AND s.alone
                      AND s.beats >= (SELECT good_offer FROM k))),
 unlisted AS (
     SELECT 'do', 2000, 'list',

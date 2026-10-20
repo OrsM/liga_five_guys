@@ -90,7 +90,7 @@ def tiny_market_universe(**overrides: Any) -> Universe:
 
     market = {"pos": {**squad, "cand_free": "MED", "cand_rival": "MED"},
               "price": {"cand_free": 5e6, "cand_rival": 100e6},
-              "value": {"bench_m": 3e6, "bench_k": 2e6},
+              "value": {"bench_m": 3e6, "bench_k": 2e6, "cand_free": 5e6},
               "owner": {"cand_rival": "riv"},
               "route": {"cand_rival": "listed"},
               "cash": 5.5e6}

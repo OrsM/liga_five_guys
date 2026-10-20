@@ -6,7 +6,7 @@ import os
 import sqlite3
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import closing
 from pathlib import Path
 from statistics import NormalDist
@@ -20,34 +20,51 @@ from ffcore.points import done_jornadas, jornada_points
 from ffcore.pricing import RESALE_MARGIN
 
 from assemble import applied, built, forecast_cells, price_change, price_momentum, universe
-from decide import Action, Universe, board, verdict
+import decide
+from decide import Action, Universe, board, raised, verdict
+from ffcore import pricing
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
 from ffcore.db import connect, query, record, rows, this_run
-__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "resales", "forecast_rows", "superseded",
+__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "phantom_path", "resales", "forecast_rows", "superseded",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 
 
-_AT: dict[int, Universe | None] = {}
+_AT: dict[tuple[dt.datetime, frozenset[str]], Universe | None] = {}
+
+
+def universe_when(t: dt.datetime, also: frozenset[str] = frozenset()) -> Universe | None:
+    """The universe at t (None if no board could be built then), with the
+    clock set to it, forecasting also these players (assemble.built). Built
+    once however many of the replays ask: a universe costs ~10s cold."""
+    set_now(t)
+    if (t, also) not in _AT:
+        built.cache_clear()
+        try:
+            _AT[t, also] = universe(also)
+        except SystemExit as e:
+            print("%s: no board (%s)" % (t.isoformat(), e), file=sys.stderr)
+            _AT[t, also] = None
+    return _AT[t, also]
 
 
 def universe_at(jornada: int, locks: dict[int, dt.datetime]) -> Universe | None:
-    """The universe a minute before this jornada locked (None if no board
-    could be built then), with the clock set to it. Built once however many
-    of the replays ask: decisions, phantom_season and sim_calibration all
-    stand at the same locks, and a universe costs ~10s."""
-    set_now(locks[jornada] - dt.timedelta(minutes=1))
-    if jornada not in _AT:
-        built.cache_clear()
-        try:
-            _AT[jornada] = universe()
-        except SystemExit as e:
-            print("j%d: no board (%s)" % (jornada, e), file=sys.stderr)
-            _AT[jornada] = None
-    return _AT[jornada]
+    """The universe a minute before this jornada locked (universe_when):
+    decisions, phantom_season and sim_calibration all stand at the locks."""
+    return universe_when(locks[jornada] - dt.timedelta(minutes=1))
+
+
+def auction_closes() -> list[dt.datetime]:
+    """When each past night's auctions on the game's market closed (the
+    listings' expiry), oldest first: a day's buying and selling is decided
+    before it."""
+    now = dt.datetime.now(dt.timezone.utc)
+    return [t for (c, ) in rows("SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
+                                " AND coalesce(expires_at, '') <> '' ORDER BY 1")
+            if (t := dt.datetime.fromisoformat(c)) <= now]
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
@@ -142,64 +159,65 @@ def decisions() -> list[dict[str, Any]]:
     against what they did."""
     locks, actual = round_locks(), jornada_points()
     done = done_jornadas()
-    out = []
+    boards: list[tuple[int, Universe, Any, int]] = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
             u = universe_at(i, locks)
             if u is None:
                 continue
-            b, per_j, m = board(u), u.forecaster.per_jornada, u.market
-            later = sorted(j for j in done if j >= i and j in per_j)
-            rose = price_change(locks[i].strftime("%Y-%m-%d"), price_momentum().horizon)
-
-            def worth(a: Action, pct: Callable[[str], float]) -> float:
-                return (m.value.get(a.buy, 0.0) * pct(a.buy) - sum(
-                    m.value.get(k, 0.0) * pct(k) for k in a.sell)) / 100e6
-
-            def change(a: Action, pts: Callable[[str, int], float]) -> float:
-                return sum(pts(a.buy, j) for j in later) - sum(
-                    pts(k, j) for k in a.sell for j in later)
-            for r in b.rows:
-                a = r.action
-                out.append({
-                    "lock": i, "jornadas": len(later), "move": a.label(u.market.names),
-                    "group": "plan" if r in b.plan else
-                             "cleared" if verdict(r) is None else "rejected",
-                    "kind": "sell" if not a.buy else "get",
-                    "chance": r.p_better,
-                    "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
-                    "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
-                    "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
-                    "value_real": worth(a, lambda k: rose.get(k, 0.0))})
+            boards.append((i, u, board(u), price_momentum().horizon))
     finally:
         set_now(None)
         built.cache_clear()
+    out = []
+    for i, u, b, horizon in boards:
+        # what happened is read with the clock let go: as of the lock, no later price is seen
+        rose = price_change(locks[i].strftime("%Y-%m-%d"), horizon)
+        per_j, m = u.forecaster.per_jornada, u.market
+        later = sorted(j for j in done if j >= i and j in per_j)
+
+        def worth(a: Action, pct: Callable[[str], float]) -> float:
+            return (m.value.get(a.buy, 0.0) * pct(a.buy) - sum(
+                m.value.get(k, 0.0) * pct(k) for k in a.sell)) / 100e6
+
+        def change(a: Action, pts: Callable[[str, int], float]) -> float:
+            return sum(pts(a.buy, j) for j in later) - sum(
+                pts(k, j) for k in a.sell for j in later)
+        for r in b.rows:
+            a = r.action
+            out.append({
+                "lock": i, "jornadas": len(later), "move": a.label(u.market.names),
+                "group": "plan" if r in b.plan else
+                         "cleared" if verdict(r) is None else "rejected",
+                "kind": "sell" if not a.buy else "get",
+                "chance": r.p_better,
+                "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
+                "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
+                "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
+                "value_real": worth(a, lambda k: rose.get(k, 0.0))})
     return out
 
 
 def resales() -> list[dict[str, Any]]:
     """Every past night's buys to resell (schema.sql's waiting, kinds
-    'resale' and 'flat'), as the views priced them ten minutes before that
+    'resale' and 'flat') at the bid worth most in money (bid_odds: its
+    chance times the resale over it), as the views priced them ten minutes before that
     night's auctions closed, set against what selling then paid: his last
-    value before the next match locked, at the offer share (offer_ratios)
+    value before the next match locked, at the offer share (recent_offers)
     the view used. Every player on the game's market, not only those taken,
     so the bar can be read off it."""
-    closes = [c for (c, ) in rows(
-        "SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
-        " AND coalesce(expires_at, '') <> '' ORDER BY 1")]
     picks: list[dict[str, Any]] = []
     try:
-        for c in closes:
-            close = dt.datetime.fromisoformat(c)
-            if close > dt.datetime.now(dt.timezone.utc):
-                continue
+        for close in auction_closes():
+            c = close.isoformat()
             set_now(close - dt.timedelta(minutes=10))
             cols, got = query(
-                "SELECT f.player, f.price * (SELECT premium FROM premium) AS cost, r.later AS resale,"
+                "SELECT f.player, f.price * coalesce((SELECT o.ratio FROM bid_odds o WHERE o.player = f.player"
+                " ORDER BY o.p_win * (r.later - f.price * o.ratio) DESC, o.ratio LIMIT 1), 1.0) AS cost,"
+                " r.later AS resale,"
                 " l.later AS flat, (SELECT kick FROM next_kickoff) AS lock,"
                 " (SELECT nights FROM resale_nights) AS nights,"
-                " (SELECT avg(ratio) FROM (SELECT ratio FROM offer_ratios ORDER BY created_at DESC,"
-                "  ratio DESC LIMIT (SELECT CAST(price_window AS INTEGER) FROM k))) AS ratio"
+                " (SELECT avg(ratio) FROM recent_offers) AS ratio"
                 " FROM player_facts f JOIN waiting r ON r.player = f.player AND r.kind = 'resale'"
                 " JOIN waiting l ON l.player = f.player AND l.kind = 'flat'")
             picks += [{"close": c, **dict(zip(cols, r))} for r in got]
@@ -216,38 +234,98 @@ def resales() -> list[dict[str, Any]]:
     return out
 
 
-def phantom_season() -> list[dict[str, Any]]:
-    """The league's sixth manager: your squad at the first lock, then at each
-    lock the plan this code makes for the squad and cash he has (bids win at
-    the model's price, rivals do not react), his eleven picked from that
-    lock's forecast and scored on what they got; beside a manager who never
-    moves, picked the same way. One row a played jornada."""
+def auction_bars() -> dict[tuple[str, dt.datetime], float | None]:
+    """What a bid had to reach at each past close for each player listed
+    then, keyed by player and close (auction_results' bar, in money; None:
+    no bid gets him)."""
+    return {(p, dt.datetime.fromisoformat(c)): None if bar is None else bar * asking
+            for p, c, asking, bar in rows("SELECT player, close, asking, bar FROM auction_results")}
+
+
+def settled(u: Universe, acts: list[Action], bars: dict[tuple[str, dt.datetime], float | None],
+            close: dt.datetime) -> tuple[list[Action], int]:
+    """The moves as they came out at this close: a buy goes through if its bid
+    beats what it had to (auction_bars; it pays its own bid). The plan's
+    sales paid for its buys or made room for them, so with any bid lost they
+    are not made as planned: only the ones the money rule then needs are
+    (raised: the sales clearing a debt at fewest points), the rest the next
+    night's plan decides again. And how many bids lost."""
+    won = [a for a in acts if a.buy and (bar := bars.get((a.buy, close))) is not None and a.cost >= bar]
+    lost = sum(1 for a in acts if a.buy) - len(won)
+    if not lost:
+        return acts, 0
+    buys = [Action("buy", buy=a.buy, cost=a.cost) for a in won]
+    after = u.after(*buys)
+    return buys + [r.action for r in raised(after, [], after.rank(after.candidates())) or []], lost
+
+
+def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
+    """The league's sixth manager: your squad and cash at the first lock,
+    then the plan (every player he or the manager beside him holds
+    forecast, though nobody may hold him now) this code makes for the squad and cash he has, made: at
+    each lock (bids win at the model's price), or with daily ten minutes
+    before each night's auctions close (auction_closes), his bids settled
+    against what the real auction took (settled). At each lock his eleven
+    picked from that lock's forecast from the squad he holds and scored on
+    what they got (nothing in debt, the game's rule), beside a manager who never moves, picked the same way.
+    One row a played jornada: both elevens' points and what the lock's
+    forecast expected of them, the moves made since the last, the bids
+    lost, his cash and his squad's worth after them."""
+    set_now(None)
     locks, actual = round_locks(), jornada_points()
-    done = done_jornadas()
+    played = {locks[j] - dt.timedelta(minutes=1): j for j in done_jornadas() & set(locks)}
+    first = min(played, default=None)
+    closes = {c - dt.timedelta(minutes=10): c for c in auction_closes()
+              if first is not None and c - dt.timedelta(minutes=10) > first} if daily else {}
+    bars = auction_bars() if daily else {}
     squad: dict[str, str] | None = None
     hold: dict[str, str] = {}
     cash = 0.0
+    made: list[str] = []
+    lost = 0
     out = []
     try:
-        for i in sorted(done & set(locks), key=lambda j: locks[j]):
-            u = universe_at(i, locks)
+        for t in sorted(set(played) | set(closes)):
+            if squad is None:
+                if t not in played or (start := universe_when(t)) is None:
+                    continue
+                squad, hold, cash = dict(start.mine), dict(start.mine), start.market.cash
+            u = universe_when(t, frozenset(squad) | frozenset(hold))
             if u is None:
                 continue
-            if squad is None:
-                squad, hold, cash = dict(u.mine), dict(u.mine), u.market.cash
             up = with_squad(u, squad, cash)
-            acts = [r.action for r in board(up).plan]
-            fielded = up.after(*acts).outlook.xi.players
-            still = with_squad(u, hold, cash).outlook.xi.players
-            out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in fielded),
-                        "standpat": sum(actual.get((k, i), 0.0) for k in still),
-                        "moves": "; ".join(a.label(up.market.names) for a in acts),
-                        "cash": up.market.left(acts)})
-            squad, cash = up.squad_after(*acts), up.market.left(acts)
+            if t in closes or not daily:
+                acts = [r.action for r in board(up).plan]
+                if t in closes:
+                    acts, n = settled(up, acts, bars, closes[t])
+                    lost += n
+                made += [a.label(up.market.names) for a in acts]
+                squad, cash = up.squad_after(*acts), up.market.left(acts)
+                up = up.after(*acts)
+            if t in played:
+                i = played[t]
+                fielded = up.outlook.xi
+                still = with_squad(u, hold, cash).outlook.xi
+                out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in fielded.players)
+                            if cash >= 0 else 0.0,
+                            "standpat": sum(actual.get((k, i), 0.0) for k in still.players),
+                            "expected": sum(fielded.expected.get(k, 0.0) for k in fielded.players),
+                            "standpat_expected": sum(still.expected.get(k, 0.0) for k in still.players),
+                            "moves": "; ".join(made), "lost": lost, "cash": cash,
+                            "value": sum(u.market.value.get(k, 0.0) for k in squad)})
+                made, lost = [], 0
     finally:
         set_now(None)
         built.cache_clear()
     return out
+
+
+def phantom_season() -> list[dict[str, Any]]:
+    """The phantom manager deciding at each lock (phantom_path): what the
+    grade stage keeps (phantom_jornadas: no bid is settled there, so no
+    lost, and the forecasts are the grade's own business)."""
+    return [{k: v for k, v in r.items() if k not in ("lost", "expected", "standpat_expected")}
+            for r in phantom_path()]
 
 
 def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datetime]]
@@ -544,6 +622,22 @@ if __name__ == "__main__":
                      for i in range(jobs)]
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
+    if sys.argv[1:2] == ["money"]:
+        # money [RATES [HORIZONS]]: the phantom deciding daily with money at each rate and horizon
+        rates = [float(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,3,5,8,12").split(",")]
+        hs = [int(x) for x in (sys.argv[3] if len(sys.argv) > 3 else "7,14").split(",")]
+        print("%5s %3s %6s %5s %8s %8s %9s %9s" % ("rate", "h", "moves", "lost", "points", "standpat",
+                                                 "cash(M)", "value(M)"))
+        for rate in rates:
+            for h in hs:
+                decide.MONEY_RATE, pricing.MONEY_H = rate, h
+                got = phantom_path(daily=True)
+                print("%5.1f %3d %6d %5d %+8.0f %+8.0f %+9.1f %+9.1f" % (
+                    rate, h, sum(len(g["moves"].split("; ")) for g in got if g["moves"]),
+                    sum(g["lost"] for g in got),
+                    sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
+                    got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0), flush=True)
+        raise SystemExit(0)
     if sys.argv[1:2] == ["resales"]:
         # resales: each past night's buys to resell, forecast against what selling paid
         got = resales()
@@ -559,5 +653,5 @@ if __name__ == "__main__":
                     pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
                     100 * sum(x > 0 for x in pnl) / len(pnl)))
         raise SystemExit(0)
-    print("grading.py --selftest | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money [RATES [HORIZONS]] | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)
