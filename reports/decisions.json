@@ -1,28 +1,83 @@
 {
- "generated_at": "2026-10-19T20:38Z",
+ "generated_at": "2026-10-20T06:09Z",
  "lock_at": "2026-10-21T18:00:00+00:00",
- "cash": 4295680.0,
- "cash_locked": 0.0,
- "finish": 1.96,
- "p_win": 0.17,
+ "cash": 9195680.0,
+ "cash_locked": 3366450.0,
+ "finish": 2.04,
+ "p_win": 0.138,
  "band": [
-  1856.66084110016,
-  2133.51445335206
+  1833.2258589609,
+  2108.24942415244
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Pablo Martinez",
+   "label": "field Pablo Martinez, Dean Huijsen",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 1.57990611462493,
+   "gain": 3.9746766970065,
    "per": "next",
+   "facts": []
+  },
+  {
+   "name": "Dean Huijsen",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Dean Huijsen",
+   "step": "bid up to",
+   "amount": 32244794.6596441,
+   "done": false,
+   "gain": 42.457670913915,
+   "per": "season",
    "facts": [
     [
-     "bench",
-     "Yeray Alvarez",
-     "names"
+     "listed at",
+     31634086.0,
+     "money"
+    ],
+    [
+     "chance of helping",
+     0.876,
+     "chance"
+    ],
+    [
+     "",
+     -5.86721487042459,
+     "trend"
+    ],
+    [
+     "",
+     1.31672945546938,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Dakonam Djene",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Dakonam Djene",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "gain": -22.6115501544336,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     23468243.0,
+     "money"
+    ],
+    [
+     "",
+     -12.298330159318,
+     "trend"
+    ],
+    [
+     "",
+     -0.963495654720875,
+     "per_million"
     ]
    ]
   },
@@ -31,43 +86,129 @@
    "pos": "MED",
    "what": "buy",
    "label": "buy Pablo Martinez",
-   "step": "bid up to",
-   "amount": 3431440.66125252,
-   "done": false,
-   "gain": 22.3682066247738,
+   "step": "bid in",
+   "amount": 3366450.0,
+   "done": true,
+   "gain": 24.4569443610455,
    "per": "season",
    "facts": [
     [
-     "asking",
+     "listed at",
      3366450.0,
      "money"
     ],
     [
-     "",
-     6.51860510873854,
-     "per_million"
-    ],
-    [
      "chance of helping",
-     0.747,
+     0.768,
      "chance"
     ],
     [
      "",
-     6.57987992222264,
+     22.0138469165485,
      "trend"
+    ],
+    [
+     "",
+     7.12731088059042,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Yeray Alvarez",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Yeray Alvarez",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "gain": -11.012269698937,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     4222387.0,
+     "money"
+    ],
+    [
+     "",
+     -18.3044187030869,
+     "trend"
+    ],
+    [
+     "",
+     -2.60806735596169,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente, Marcos Alonso, Mathew Ryan, Georges Mikautadze, Natan, Miguel Roman",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": [
+    [
+     "rising",
+     "Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente",
+     "names"
     ]
    ]
   }
  ],
- "plan_gain": 22.3682066247738,
- "cash_after": 864239.338747481,
- "ping": "field Pablo Martinez; buy Pablo Martinez",
+ "consider": [
+  {
+   "name": "Roberto Fernandez",
+   "pos": "DEL",
+   "what": "buy",
+   "label": "buy Roberto Fernandez",
+   "step": "bid up to",
+   "amount": 57861695.6056065,
+   "done": false,
+   "gain": 18.535071740078,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     56765809.0,
+     "money"
+    ],
+    [
+     "chance of helping",
+     0.711,
+     "chance"
+    ],
+    [
+     "",
+     -7.99191285260325,
+     "trend"
+    ],
+    [
+     "",
+     0.320334057723017,
+     "per_million"
+    ],
+    [
+     "short by",
+     56651620.9265032,
+     "money"
+    ]
+   ]
+  }
+ ],
+ "plan_gain": 56.025710269461,
+ "cash_after": 1210074.67910334,
+ "ping": "field Pablo Martinez, Dean Huijsen; buy Dean Huijsen; sell Dakonam Djene; sell Yeray Alvarez; list Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente, Marcos Alonso, Mathew Ryan, Georges Mikautadze, Natan, Miguel Roman",
  "exposed": [
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 22633624.0
+   "clause": 22445817.0
   },
   {
    "name": "Ante Budimir",
@@ -92,7 +233,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 55128597.0
+   "clause": 54136469.0
   },
   {
    "name": "Marcos Alonso",
@@ -100,24 +241,24 @@
    "clause": 28589508.0
   },
   {
-   "name": "Miguel Roman",
-   "pos": "MED",
-   "clause": 13912345.0
-  },
-  {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 21916045.0
+   "clause": 23004334.0
+  },
+  {
+   "name": "Miguel Roman",
+   "pos": "MED",
+   "clause": 13579843.0
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 14086653.0
+   "clause": 14223955.0
   },
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
-   "clause": 23814447.0
+   "clause": 23468243.0
   },
   {
    "name": "Yeray Alvarez",
@@ -125,141 +266,61 @@
    "clause": 6931556.0
   }
  ],
- "offers": [],
- "market": [
-  {
-   "name": "Dean Huijsen",
-   "pos": "DEF",
-   "asking": 31634086.0,
-   "bid": 32244794.6596441,
-   "gain": 35.1867403210939,
-   "better": 0.838965456651175,
-   "verdict": null,
-   "trend": -2.67510757816508,
-   "plan": false
-  },
-  {
-   "name": "Pablo Martinez",
-   "pos": "MED",
-   "asking": 3366450.0,
-   "bid": 3431440.66125252,
-   "gain": 22.3682066247738,
-   "better": 0.746798928965645,
-   "verdict": null,
-   "trend": 6.57987992222264,
-   "plan": true
-  },
-  {
-   "name": "Roberto Fernandez",
-   "pos": "DEL",
-   "asking": 56765809.0,
-   "bid": 57861695.6056065,
-   "gain": 18.774365029099,
-   "better": 0.713453142244572,
-   "verdict": null,
-   "trend": -0.535828732649093,
-   "plan": false
-  },
-  {
-   "name": "Yassir Zabiri",
-   "pos": "DEL",
-   "asking": 37321922.0,
-   "bid": 38042436.6044037,
-   "gain": 14.3644107475332,
-   "better": 0.634462313736702,
-   "verdict": "a 63% chance of helping, under 70%",
-   "trend": 20.077418203909,
-   "plan": false
-  },
-  {
-   "name": "Carlos Dotor",
-   "pos": "MED",
-   "asking": 4761755.0,
-   "bid": 4853682.58133122,
-   "gain": 2.20368897907237,
-   "better": 0.563596354937803,
-   "verdict": "a 56% chance of helping, under 70%",
-   "trend": -14.5902412872065,
-   "plan": false
-  },
-  {
-   "name": "Eduardo Camavinga",
-   "pos": "MED",
-   "asking": 5070327.0,
-   "bid": 5168211.68698377,
-   "gain": 0.498631728551885,
-   "better": 0.528054165842004,
-   "verdict": "a 53% chance of helping, under 70%",
-   "trend": -16.1872576673003,
-   "plan": false
-  },
-  {
-   "name": "Jesus Areso",
-   "pos": "DEF",
-   "asking": 2738146.0,
-   "bid": 2791007.00169197,
-   "gain": 0.175713548203139,
-   "better": 0.510341381781013,
-   "verdict": "a 51% chance of helping, under 70%",
-   "trend": -15.4256139998974,
-   "plan": false
-  }
- ],
  "standings": [
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 417.0,
-   "mean": 2149.70083914891,
-   "lo": 1991.19866691315,
-   "hi": 2308.20301138467,
-   "cash": -75917400.0,
+   "now": 427.0,
+   "mean": 2145.67242912988,
+   "lo": 1988.00505756751,
+   "hi": 2303.33980069226,
+   "cash": -69317400.0,
    "estimated": true,
-   "p_above": 0.826794743017724
+   "p_above": 0.858049456200659
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 459.0,
-   "mean": 1995.08764722611,
-   "lo": 1856.66084110016,
-   "hi": 2133.51445335206,
-   "cash": 4295680.0,
+   "now": 460.0,
+   "mean": 1970.73764155667,
+   "lo": 1833.2258589609,
+   "hi": 2108.24942415244,
+   "cash": 9195680.0,
    "estimated": false,
    "p_above": null
   },
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 350.0,
-   "mean": 1818.44714647946,
-   "lo": 1683.94887295811,
-   "hi": 1952.9454200008,
-   "cash": 22606521.0,
+   "now": 352.0,
+   "mean": 1821.06148761201,
+   "lo": 1686.22409487954,
+   "hi": 1955.89888034447,
+   "cash": 28106521.0,
    "estimated": true,
-   "p_above": 0.120422313431938
+   "p_above": 0.159626544788542
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1676.023114549,
-   "lo": 1555.20172628863,
-   "hi": 1796.84450280937,
-   "cash": -7450861.0,
+   "mean": 1681.69666862946,
+   "lo": 1560.44076457195,
+   "hi": 1802.95257268697,
+   "cash": -3450861.0,
    "estimated": true,
-   "p_above": 0.0130260519853769
+   "p_above": 0.0216690696256011
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 323.0,
-   "mean": 1517.43393837533,
-   "lo": 1407.54374735116,
-   "hi": 1627.3241293995,
-   "cash": 47293671.0,
+   "now": 328.0,
+   "mean": 1520.46372654719,
+   "lo": 1410.78323575045,
+   "hi": 1630.14421734392,
+   "cash": 50393671.0,
    "estimated": true,
-   "p_above": 0.000266648987453544
+   "p_above": 0.000517872371462613
   }
  ]
 }
