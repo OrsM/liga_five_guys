@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-10-20T19:46Z",
+ "generated_at": "2026-10-20T20:36Z",
  "lock_at": "2026-10-21T18:00:00+00:00",
  "cash": 9195680.0,
- "cash_locked": 3366450.0,
- "finish": 2.1,
- "p_win": 0.129,
+ "cash_locked": 0.0,
+ "finish": 2.29,
+ "p_win": 0.119,
  "band": [
   1877.07726053976,
   2165.05044783937
@@ -12,104 +12,43 @@
  "do": [
   {
    "what": "field",
-   "label": "field Pablo Martinez, Dean Huijsen",
+   "label": "field Nahuel Tenaglia, Leandro Cabrera",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 3.91036436990539,
+   "gain": 10.174763531506,
    "per": "next",
    "facts": []
   },
   {
-   "name": "Dean Huijsen",
+   "name": "Leandro Cabrera",
    "pos": "DEF",
    "what": "buy",
-   "label": "buy Dean Huijsen",
+   "label": "buy Leandro Cabrera",
    "step": "bid up to",
-   "amount": 32244794.6596441,
+   "amount": 9422191.03320245,
    "done": false,
-   "gain": 46.5980974870199,
+   "gain": 32.6480471064811,
    "per": "season",
    "facts": [
     [
      "listed at",
-     31634086.0,
+     9243737.0,
      "money"
     ],
     [
      "chance of helping",
-     0.888,
+     0.84,
      "chance"
     ],
     [
      "",
-     -5.86721487042459,
+     8.17633648224441,
      "trend"
     ],
     [
      "",
-     1.44513550105933,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Dakonam Djene",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Dakonam Djene",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "gain": -25.3398202405838,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     23468243.0,
-     "money"
-    ],
-    [
-     "",
-     -12.298330159318,
-     "trend"
-    ],
-    [
-     "",
-     -1.07974935492972,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Pablo Martinez",
-   "pos": "MED",
-   "what": "buy",
-   "label": "buy Pablo Martinez",
-   "step": "bid in",
-   "amount": 3366450.0,
-   "done": true,
-   "gain": 24.285686563717,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     3366450.0,
-     "money"
-    ],
-    [
-     "chance of helping",
-     0.766,
-     "chance"
-    ],
-    [
-     "",
-     22.0138469165485,
-     "trend"
-    ],
-    [
-     "",
-     7.07740245604375,
+     3.46501646925159,
      "per_million"
     ]
    ]
@@ -143,6 +82,67 @@
    ]
   },
   {
+   "name": "Nahuel Tenaglia",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Nahuel Tenaglia",
+   "step": "bid up to",
+   "amount": 26138537.6191584,
+   "done": false,
+   "gain": 25.6444450757198,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     25643480.0,
+     "money"
+    ],
+    [
+     "chance of helping",
+     0.816,
+     "chance"
+    ],
+    [
+     "",
+     -9.6337496372946,
+     "trend"
+    ],
+    [
+     "",
+     0.981097161951539,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Dakonam Djene",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Dakonam Djene",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "gain": -25.3398202405838,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     23468243.0,
+     "money"
+    ],
+    [
+     "",
+     -12.298330159318,
+     "trend"
+    ],
+    [
+     "",
+     -1.07974935492972,
+     "per_million"
+    ]
+   ]
+  },
+  {
    "name": null,
    "pos": null,
    "what": "list",
@@ -163,47 +163,47 @@
  ],
  "consider": [
   {
-   "name": "Roberto Fernandez",
-   "pos": "DEL",
+   "name": "Jorge Salinas",
+   "pos": "DEF",
    "what": "buy",
-   "label": "buy Roberto Fernandez",
+   "label": "buy Jorge Salinas",
    "step": "bid up to",
-   "amount": 57861695.6056065,
+   "amount": 4082004.17787066,
    "done": false,
-   "gain": 20.2447085638374,
+   "gain": 8.99804001460771,
    "per": "season",
    "facts": [
     [
      "listed at",
-     56765809.0,
+     4004692.0,
      "money"
     ],
     [
      "chance of helping",
-     0.73,
+     0.702,
      "chance"
     ],
     [
      "",
-     -7.99191285260325,
+     -19.3504947041512,
      "trend"
     ],
     [
      "",
-     0.349881011123977,
+     2.20431915856134,
      "per_million"
     ],
     [
      "short by",
-     56651620.9265032,
+     2756422.83023148,
      "money"
     ]
    ]
   }
  ],
- "plan_gain": 52.3581202333243,
- "cash_after": 1210074.67910334,
- "ping": "field Pablo Martinez, Dean Huijsen; buy Dean Huijsen; sell Dakonam Djene; sell Yeray Alvarez; list Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente, Marcos Alonso, Mathew Ryan, Georges Mikautadze, Natan, Miguel Roman",
+ "plan_gain": 39.6606125321099,
+ "cash_after": 1325581.34763918,
+ "ping": "field Nahuel Tenaglia, Leandro Cabrera; buy Leandro Cabrera; sell Yeray Alvarez; buy Nahuel Tenaglia; sell Dakonam Djene; list Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente, Marcos Alonso, Mathew Ryan, Georges Mikautadze, Natan, Miguel Roman",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -293,23 +293,23 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 352.0,
-   "mean": 1886.27100297846,
-   "lo": 1743.40085149601,
-   "hi": 2029.14115446092,
-   "cash": 28106521.0,
+   "mean": 1961.16381265706,
+   "lo": 1814.28231021015,
+   "hi": 2108.04531510397,
+   "cash": -27944597.0,
    "estimated": true,
-   "p_above": 0.197210484272929
+   "p_above": 0.354493730524115
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1743.57967624119,
-   "lo": 1615.1335481256,
-   "hi": 1872.02580435678,
-   "cash": -3450861.0,
+   "mean": 1792.16376820129,
+   "lo": 1659.83763218742,
+   "hi": 1924.48990421516,
+   "cash": -49006416.0,
    "estimated": true,
-   "p_above": 0.0326647324068106
+   "p_above": 0.0667989157644109
   },
   {
    "manager": "Magic Mike 333",
