@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-20T08:05Z",
+ "generated_at": "2026-10-20T19:46Z",
  "lock_at": "2026-10-21T18:00:00+00:00",
  "cash": 9195680.0,
  "cash_locked": 3366450.0,
- "finish": 2.04,
- "p_win": 0.138,
+ "finish": 2.1,
+ "p_win": 0.129,
  "band": [
-  1833.2258589609,
-  2108.24942415244
+  1877.07726053976,
+  2165.05044783937
  ],
  "do": [
   {
@@ -16,7 +16,7 @@
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 3.9746766970065,
+   "gain": 3.91036436990539,
    "per": "next",
    "facts": []
   },
@@ -28,7 +28,7 @@
    "step": "bid up to",
    "amount": 32244794.6596441,
    "done": false,
-   "gain": 42.457670913915,
+   "gain": 46.5980974870199,
    "per": "season",
    "facts": [
     [
@@ -38,7 +38,7 @@
     ],
     [
      "chance of helping",
-     0.876,
+     0.888,
      "chance"
     ],
     [
@@ -48,7 +48,7 @@
     ],
     [
      "",
-     1.31672945546938,
+     1.44513550105933,
      "per_million"
     ]
    ]
@@ -61,7 +61,7 @@
    "step": "list",
    "amount": null,
    "done": false,
-   "gain": -22.6115501544336,
+   "gain": -25.3398202405838,
    "per": "season",
    "facts": [
     [
@@ -76,7 +76,7 @@
     ],
     [
      "",
-     -0.963495654720875,
+     -1.07974935492972,
      "per_million"
     ]
    ]
@@ -89,7 +89,7 @@
    "step": "bid in",
    "amount": 3366450.0,
    "done": true,
-   "gain": 24.4569443610455,
+   "gain": 24.285686563717,
    "per": "season",
    "facts": [
     [
@@ -99,7 +99,7 @@
     ],
     [
      "chance of helping",
-     0.768,
+     0.766,
      "chance"
     ],
     [
@@ -109,7 +109,7 @@
     ],
     [
      "",
-     7.12731088059042,
+     7.07740245604375,
      "per_million"
     ]
    ]
@@ -122,7 +122,7 @@
    "step": "list",
    "amount": null,
    "done": false,
-   "gain": -11.012269698937,
+   "gain": -15.6485193645712,
    "per": "season",
    "facts": [
     [
@@ -137,7 +137,7 @@
     ],
     [
      "",
-     -2.60806735596169,
+     -3.70608363576602,
      "per_million"
     ]
    ]
@@ -170,7 +170,7 @@
    "step": "bid up to",
    "amount": 57861695.6056065,
    "done": false,
-   "gain": 18.535071740078,
+   "gain": 20.2447085638374,
    "per": "season",
    "facts": [
     [
@@ -180,7 +180,7 @@
     ],
     [
      "chance of helping",
-     0.711,
+     0.73,
      "chance"
     ],
     [
@@ -190,7 +190,7 @@
     ],
     [
      "",
-     0.320334057723017,
+     0.349881011123977,
      "per_million"
     ],
     [
@@ -201,7 +201,7 @@
    ]
   }
  ],
- "plan_gain": 56.025710269461,
+ "plan_gain": 52.3581202333243,
  "cash_after": 1210074.67910334,
  "ping": "field Pablo Martinez, Dean Huijsen; buy Dean Huijsen; sell Dakonam Djene; sell Yeray Alvarez; list Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente, Marcos Alonso, Mathew Ryan, Georges Mikautadze, Natan, Miguel Roman",
  "exposed": [
@@ -226,14 +226,14 @@
    "clause": 58220110.0
   },
   {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
-   "clause": 31271675.0
-  },
-  {
    "name": "Natan",
    "pos": "DEF",
    "clause": 54136469.0
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "clause": 31271675.0
   },
   {
    "name": "Marcos Alonso",
@@ -246,14 +246,14 @@
    "clause": 23004334.0
   },
   {
-   "name": "Miguel Roman",
-   "pos": "MED",
-   "clause": 13579843.0
-  },
-  {
    "name": "German Valera",
    "pos": "MED",
    "clause": 14223955.0
+  },
+  {
+   "name": "Miguel Roman",
+   "pos": "MED",
+   "clause": 13579843.0
   },
   {
    "name": "Dakonam Djene",
@@ -271,20 +271,20 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 427.0,
-   "mean": 2145.67242912988,
-   "lo": 1988.00505756751,
-   "hi": 2303.33980069226,
+   "mean": 2209.86980860889,
+   "lo": 2044.74655358011,
+   "hi": 2374.99306363766,
    "cash": -69317400.0,
    "estimated": true,
-   "p_above": 0.858049456200659
+   "p_above": 0.865298207336668
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 460.0,
-   "mean": 1970.73764155667,
-   "lo": 1833.2258589609,
-   "hi": 2108.24942415244,
+   "mean": 2021.06385418957,
+   "lo": 1877.07726053976,
+   "hi": 2165.05044783937,
    "cash": 9195680.0,
    "estimated": false,
    "p_above": null
@@ -293,34 +293,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 352.0,
-   "mean": 1821.06148761201,
-   "lo": 1686.22409487954,
-   "hi": 1955.89888034447,
+   "mean": 1886.27100297846,
+   "lo": 1743.40085149601,
+   "hi": 2029.14115446092,
    "cash": 28106521.0,
    "estimated": true,
-   "p_above": 0.159626544788542
+   "p_above": 0.197210484272929
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1681.69666862946,
-   "lo": 1560.44076457195,
-   "hi": 1802.95257268697,
+   "mean": 1743.57967624119,
+   "lo": 1615.1335481256,
+   "hi": 1872.02580435678,
    "cash": -3450861.0,
    "estimated": true,
-   "p_above": 0.0216690696256011
+   "p_above": 0.0326647324068106
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 328.0,
-   "mean": 1520.46372654719,
-   "lo": 1410.78323575045,
-   "hi": 1630.14421734392,
+   "mean": 1541.06476009601,
+   "lo": 1426.82042039323,
+   "hi": 1655.30909979879,
    "cash": 50393671.0,
    "estimated": true,
-   "p_above": 0.000517872371462613
+   "p_above": 0.000408844045590051
   }
  ]
 }
