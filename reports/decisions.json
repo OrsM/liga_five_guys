@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-10-20T20:36Z",
+ "generated_at": "2026-10-20T21:27Z",
  "lock_at": "2026-10-21T18:00:00+00:00",
  "cash": 9195680.0,
- "cash_locked": 0.0,
- "finish": 2.29,
- "p_win": 0.119,
+ "cash_locked": 34887217.0,
+ "finish": 2.25,
+ "p_win": 0.12,
  "band": [
   1877.07726053976,
   2165.05044783937
@@ -12,23 +12,29 @@
  "do": [
   {
    "what": "field",
-   "label": "field Nahuel Tenaglia, Leandro Cabrera",
+   "label": "field Leandro Cabrera, Miguel Roman",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 10.174763531506,
+   "gain": 3.55204783008756,
    "per": "next",
-   "facts": []
+   "facts": [
+    [
+     "bench",
+     "Dakonam Djene",
+     "names"
+    ]
+   ]
   },
   {
    "name": "Leandro Cabrera",
    "pos": "DEF",
    "what": "buy",
    "label": "buy Leandro Cabrera",
-   "step": "bid up to",
-   "amount": 9422191.03320245,
-   "done": false,
-   "gain": 32.6480471064811,
+   "step": "bid in",
+   "amount": 9243737.0,
+   "done": true,
+   "gain": 32.2043985498021,
    "per": "season",
    "facts": [
     [
@@ -38,7 +44,7 @@
     ],
     [
      "chance of helping",
-     0.84,
+     0.83,
      "chance"
     ],
     [
@@ -47,8 +53,13 @@
      "trend"
     ],
     [
+     "money",
+     -55456.0695848726,
+     "money"
+    ],
+    [
      "",
-     3.46501646925159,
+     3.33287179145804,
      "per_million"
     ]
    ]
@@ -58,10 +69,10 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Yeray Alvarez",
-   "step": "list",
+   "step": "listed",
    "amount": null,
-   "done": false,
-   "gain": -15.6485193645712,
+   "done": true,
+   "gain": -12.6750770221998,
    "per": "season",
    "facts": [
     [
@@ -75,135 +86,22 @@
      "trend"
     ],
     [
-     "",
-     -3.70608363576602,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Nahuel Tenaglia",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Nahuel Tenaglia",
-   "step": "bid up to",
-   "amount": 26138537.6191584,
-   "done": false,
-   "gain": 25.6444450757198,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     25643480.0,
-     "money"
-    ],
-    [
-     "chance of helping",
-     0.816,
-     "chance"
-    ],
-    [
-     "",
-     -9.6337496372946,
-     "trend"
-    ],
-    [
-     "",
-     0.981097161951539,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Dakonam Djene",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Dakonam Djene",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "gain": -25.3398202405838,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     23468243.0,
+     "money",
+     371680.292796425,
      "money"
     ],
     [
      "",
-     -12.298330159318,
-     "trend"
-    ],
-    [
-     "",
-     -1.07974935492972,
+     -3.00187477419757,
      "per_million"
-    ]
-   ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente, Marcos Alonso, Mathew Ryan, Georges Mikautadze, Natan, Miguel Roman",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente",
-     "names"
     ]
    ]
   }
  ],
- "consider": [
-  {
-   "name": "Jorge Salinas",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Jorge Salinas",
-   "step": "bid up to",
-   "amount": 4082004.17787066,
-   "done": false,
-   "gain": 8.99804001460771,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     4004692.0,
-     "money"
-    ],
-    [
-     "chance of helping",
-     0.702,
-     "chance"
-    ],
-    [
-     "",
-     -19.3504947041512,
-     "trend"
-    ],
-    [
-     "",
-     2.20431915856134,
-     "per_million"
-    ],
-    [
-     "short by",
-     2756422.83023148,
-     "money"
-    ]
-   ]
-  }
- ],
- "plan_gain": 39.6606125321099,
- "cash_after": 1325581.34763918,
- "ping": "field Nahuel Tenaglia, Leandro Cabrera; buy Leandro Cabrera; sell Yeray Alvarez; buy Nahuel Tenaglia; sell Dakonam Djene; list Pepelu, Pablo Fornals, German Valera, Ante Budimir, Iñigo Vicente, Marcos Alonso, Mathew Ryan, Georges Mikautadze, Natan, Miguel Roman",
+ "consider": [],
+ "plan_gain": 26.880410437249,
+ "cash_after": 3755409.5187431,
+ "ping": "field Leandro Cabrera, Miguel Roman",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -304,12 +202,12 @@
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1792.16376820129,
-   "lo": 1659.83763218742,
-   "hi": 1924.48990421516,
-   "cash": -49006416.0,
+   "mean": 1737.4920491851,
+   "lo": 1608.28266032434,
+   "hi": 1866.70143804587,
+   "cash": -1126745.0,
    "estimated": true,
-   "p_above": 0.0667989157644109
+   "p_above": 0.0301581029196827
   },
   {
    "manager": "Magic Mike 333",
