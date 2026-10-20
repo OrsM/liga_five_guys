@@ -143,17 +143,26 @@ Every forecast is the same product, for every player and jornada, and
   board also lists your players a rival can take by clause now (`decide.at_risk`):
   all of them, since a sale to the game pays at once and any rival can raise
   a clause that way.
-  Each line of the board is one `sim.row`: the move (`Action.label`), the
-  step it takes in the app, whether it is done, its points and the numbers
-  that made it. The page lays rows out and decides nothing.
+  Each line of the board is one row of `board_rows` (schema.sql), worded
+  there once: the move, the step it takes in the app and its amount,
+  whether it is done, its points and the numbers that made it. They come
+  from what the run recorded (funnel, sim_facts, sim_waiting) through one
+  view for every buy the funnel ranked (`board_buys`) and one for every
+  player of yours (`board_mine`). The page lays rows out and decides nothing.
 - **The ledger** (`ffcore/league.py`, `ledger`): the activity feed read
   once, each event keyed like every other table. Rival cash and the price
   paid (each owned player's last buy or transfer to his owner) are both
   read from it (`price_paid` on the box).
-- **The board's offers and market** (`board_offers`, `board_market`): each
-  offer the game made for your players against his value, the share of
-  its recent offers it beats and the points his sale costs; each player on
-  sale whose purchase gains, with the funnel's verdict.
+- **What the board says** (`board_rows`), in two lists. *Do*: the line-up,
+  the plan's moves (a buy: what he is listed at and the bid to make; a
+  sale: take the offer, wait, or list him), the buys to resell, and your
+  players not listed, rising first: the game offers only for listed
+  players, listing costs nothing and a listed player still plays.
+  *Consider*: each buy that clears the bar alone but not in the plan, short
+  by what it costs over your cash after it; and each listed player whose
+  offer tonight beats waiting and `GOOD_OFFER` (90%) of the game's recent
+  offers, with the points his sale costs. Every ranked buy and offer is on
+  the box (`market`, `offers`).
 - **Rival cash**: budget plus their sales, bonuses and
   transfer income, less buys and transfer payments, plus the income the feed
   never records (your real balance minus the same sum for you).

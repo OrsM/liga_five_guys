@@ -14,6 +14,9 @@ PRICE_W2 = 0.2
 # past nights' picks over 5% made money 76% of the time, those under it
 # lost on average (grading.py resales, 2026-10-19).
 RESALE_MARGIN = 0.05
+# An offer for a player of yours is worth considering when it beats this share
+# of the game's recent offers (as a share of value): its top tenth.
+GOOD_OFFER = 0.9
 
 
 def _selftest() -> None:

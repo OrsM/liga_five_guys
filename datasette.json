@@ -41,11 +41,11 @@
         },
         "offers": {
           "title": "The game's offers for your players (latest run), the best price first: the offer against his value, the share of the game's last offers it beats, what selling him does to your season in points, and whether the plan sells him",
-          "sql": "SELECT name, pos, round(offer / 1e6, 2) AS offer_m, round(value / 1e6, 2) AS value_m,\n       round(100 * (offer / value - 1), 1) AS vs_value_pct, round(100 * beats) AS beats_pct,\n       round(season, 1) AS season_points, sell\nFROM board_offers ORDER BY ord"
+          "sql": "SELECT name, pos, round(offer / 1e6, 2) AS offer_m, round(value / 1e6, 2) AS value_m,\n       round(100 * (offer / value - 1), 1) AS vs_value_pct, round(100 * beats) AS beats_pct,\n       round(gain, 1) AS season_points, sell\nFROM board_mine WHERE offer IS NOT NULL AND value > 0 ORDER BY offer / value DESC, player"
         },
         "market": {
           "title": "The market as the latest run ranked it: every player on sale whose purchase gains you season points, the bid it takes, the share of seasons you are better off, and why it fails the bar (empty: worth buying)",
-          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m,\n       round(gain, 1) AS season_points, round(100 * better) AS better_pct, verdict, plan, round(trend, 1) AS trend_pct\nFROM board_market ORDER BY ord"
+          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m,\n       round(gain, 1) AS season_points, round(100 * p_better) AS better_pct, verdict, in_plan AS plan,\n       round(trend, 1) AS trend_pct, round(resale / 1e6, 2) AS resale_m\nFROM board_buys WHERE gain > 0 ORDER BY rank"
         },
         "why_sell": {
           "title": "Why these sales: every sale of yours ranked by points lost per million raised; the plan takes the cheapest that clear the debt (a balance below zero at the lock scores nothing)",

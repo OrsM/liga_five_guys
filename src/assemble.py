@@ -45,7 +45,7 @@ NAMES: dict[str, tuple[str, ...]] = {
     "decide": ("CONFIDENCE",),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
-    "pricing": ("BID_BEATS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW", "RESALE_MARGIN"),
+    "pricing": ("BID_BEATS", "CLIP", "GOOD_OFFER", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW", "RESALE_MARGIN"),
     "remind": ("REMIND_HOURS",),
     "rules": ("MATCH_LEN",),
     "score": ("PPM_BANDS", "PROMOTED_DISCOUNT_K", "SHRINK_K"),
