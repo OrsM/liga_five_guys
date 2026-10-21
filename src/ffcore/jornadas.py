@@ -71,7 +71,10 @@ def _selftest() -> None:
                 {"observed_at": "2026-08-21T0900Z", "match_id": "m3", "jornada": "3",
                  "home": "rayo", "away": "celta", "kickoff": "2026-08-23T17:00:00+00:00"},
                 {"observed_at": "2026-08-12T0900Z", "match_id": "m4", "jornada": "4",
-                 "home": "rayo", "away": "elche", "kickoff": "2026-08-30T17:00:00+00:00"}])
+                 "home": "rayo", "away": "elche", "kickoff": "2026-08-30T17:00:00+00:00"},
+                # Jornada 2's last match, put back past jornada 3's lock (seen after the first cut).
+                {"observed_at": "2026-08-22T0900Z", "match_id": "m5", "jornada": "2",
+                 "home": "celta", "away": "getafe", "kickoff": "2026-08-26T17:00:00+00:00"}])
             assert round_locks() == {2: utc(17, 19, 30), 4: utc(30, 17)}, round_locks()
             assert list(round_locks()) == [2, 4], "in lock order"
             assert jornada_of_match() == {"b1": 1, "b2": 1, "m1": 2, "m2": 2, "m4": 4}
@@ -83,6 +86,13 @@ def _selftest() -> None:
                 "the rest of a jornada under way"
             set_now(utc(22, 0))
             assert 3 in round_locks(), "set_now clears the cache"
+            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-23T1700Z",)], \
+                "jornada 3's lock comes before jornada 2's match put back"
+            set_now(utc(24, 0))
+            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-30T1700Z",)], \
+                "once jornada 3 locks, jornada 2's match put back locks nothing"
+            assert rows("SELECT jornada FROM behind_jornadas") == [(2,)], \
+                "jornada 2 is behind: no line-up is picked for its match put back"
             set_now(utc(31, 0))
             assert rows("SELECT kick FROM next_kickoff") == [(None,)], "none left to play"
         finally:

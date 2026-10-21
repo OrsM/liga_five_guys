@@ -279,7 +279,9 @@ def _built(also: frozenset[str]) -> Built:
               for mgr in lg.managers}
     ratings = fixture_ratings(mkt_rows)
     ex = expectations(sc, ratings, set(price).union(*squads.values(), also), m, rounds_ahead())
-    per_j, first_jornada_of, rem, played = ex.per_j, ex.first_of, ex.rem, ex.played
+    per_j, rem, played = ex.per_j, ex.rem, ex.played
+    behind = {j for (j,) in rows("SELECT jornada FROM behind_jornadas")}
+    ahead = [j for j in rem if j not in behind]
     market = Market(
         cash=lg.cash[me], odds=bid_odds(),
         name={k: Name(f["name"]) for k, f in facts.items()},
@@ -291,8 +293,12 @@ def _built(also: frozenset[str]) -> Built:
         carry=prices.carry, error=prices.error, offer_sd=offer_spread())
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
-    if rem:
-        first_jornada_of.update({k: rem[0] for layer in per_j.values()
+    # The jornada each player's next line-up is for: his first to play of
+    # those not behind (a match put back from one behind is not picked for).
+    first_jornada_of = {k: j for k in ex.first_of
+                        if (j := next((j for j in ahead if k in per_j.get(j, {})), None)) is not None}
+    if ahead:
+        first_jornada_of.update({k: ahead[0] for layer in per_j.values()
                                  for k in layer if k.startswith("__phantom_")})
 
     fc = Bootstrap(per_j, pool=[s.pts for s in scored() if s.games == 1])

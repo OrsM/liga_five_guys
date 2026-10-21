@@ -485,10 +485,22 @@ SELECT player, amount AS paid FROM (
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
+-- The jornadas behind as of cut(): those that locked before the last lock
+-- (a match of one put back past a later jornada's lock is still to play,
+-- but its elevens were set long before: it locks nothing, and no line-up
+-- is picked for it).
+DROP VIEW IF EXISTS behind_jornadas;
+CREATE VIEW behind_jornadas AS
+SELECT jornada FROM round_locks
+WHERE lock < (SELECT max(lock) FROM round_locks WHERE lock <= (SELECT cut()));
+
 -- When the next match kicks off after cut(): each player locks at his own
--- match's kickoff (NULL once none is left to play).
+-- match's kickoff, of the jornada under way or one to come (not one behind;
+-- NULL once none is left to play).
 DROP VIEW IF EXISTS next_kickoff;
-CREATE VIEW next_kickoff AS SELECT min(kick) AS kick FROM kickoffs WHERE kick > (SELECT cut());
+CREATE VIEW next_kickoff AS
+SELECT min(kick) AS kick FROM kickoffs
+WHERE kick > (SELECT cut()) AND jornada NOT IN (SELECT jornada FROM behind_jornadas);
 
 -- The game's nightly offers still to come before the next match locks: one
 -- as each standing offer expires, then one a day (0 with none standing).
