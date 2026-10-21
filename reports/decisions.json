@@ -1,30 +1,24 @@
 {
- "generated_at": "2026-10-20T21:27Z",
+ "generated_at": "2026-10-21T04:42Z",
  "lock_at": "2026-10-21T18:00:00+00:00",
  "cash": 9195680.0,
  "cash_locked": 34887217.0,
- "finish": 2.25,
+ "finish": 2.26,
  "p_win": 0.12,
  "band": [
-  1877.07726053976,
-  2165.05044783937
+  1875.78691208336,
+  2163.48793289205
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Leandro Cabrera, Miguel Roman",
+   "label": "field Leandro Cabrera",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 3.55204783008756,
+   "gain": 4.82966459239232,
    "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Dakonam Djene",
-     "names"
-    ]
-   ]
+   "facts": []
   },
   {
    "name": "Leandro Cabrera",
@@ -34,7 +28,7 @@
    "step": "bid in",
    "amount": 9243737.0,
    "done": true,
-   "gain": 32.2043985498021,
+   "gain": 36.1279939858519,
    "per": "season",
    "facts": [
     [
@@ -44,74 +38,74 @@
     ],
     [
      "chance of helping",
-     0.83,
+     0.849,
      "chance"
     ],
     [
      "",
-     8.17633648224441,
+     14.4209032525333,
      "trend"
     ],
     [
      "money",
-     -55456.0695848726,
+     145061.080790086,
      "money"
     ],
     [
      "",
-     3.33287179145804,
+     3.64943025808627,
      "per_million"
     ]
    ]
   },
   {
-   "name": "Yeray Alvarez",
+   "name": "Dakonam Djene",
    "pos": "DEF",
    "what": "sell",
-   "label": "sell Yeray Alvarez",
+   "label": "sell Dakonam Djene",
    "step": "listed",
    "amount": null,
    "done": true,
-   "gain": -12.6750770221998,
+   "gain": -6.84107638269621,
    "per": "season",
    "facts": [
     [
      "value",
-     4222387.0,
+     22877058.0,
      "money"
     ],
     [
      "",
-     -18.3044187030869,
+     -20.9923739412898,
      "trend"
     ],
     [
      "money",
-     371680.292796425,
+     2312191.53379134,
      "money"
     ],
     [
      "",
-     -3.00187477419757,
+     -0.29903654493931,
      "per_million"
     ]
    ]
   }
  ],
  "consider": [],
- "plan_gain": 26.880410437249,
- "cash_after": 3755409.5187431,
- "ping": "field Leandro Cabrera, Miguel Roman",
+ "plan_gain": 45.6454258079595,
+ "cash_after": 22173112.1869567,
+ "ping": "field Leandro Cabrera",
  "exposed": [
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 22445817.0
+   "clause": 22234794.0
   },
   {
    "name": "Ante Budimir",
    "pos": "DEL",
-   "clause": 65568523.0
+   "clause": 66472319.0
   },
   {
    "name": "Georges Mikautadze",
@@ -126,7 +120,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 54136469.0
+   "clause": 53213204.0
   },
   {
    "name": "Iñigo Vicente",
@@ -141,22 +135,22 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 23004334.0
+   "clause": 23995920.0
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 14223955.0
+   "clause": 14351955.0
   },
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 13579843.0
+   "clause": 13250562.0
   },
   {
    "name": "Dakonam Djene",
    "pos": "DEF",
-   "clause": 23468243.0
+   "clause": 22877058.0
   },
   {
    "name": "Yeray Alvarez",
@@ -169,20 +163,20 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 427.0,
-   "mean": 2209.86980860889,
-   "lo": 2044.74655358011,
-   "hi": 2374.99306363766,
+   "mean": 2208.03478065889,
+   "lo": 2043.07898163286,
+   "hi": 2372.99057968491,
    "cash": -69317400.0,
    "estimated": true,
-   "p_above": 0.865298207336668
+   "p_above": 0.865015247732719
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 460.0,
-   "mean": 2021.06385418957,
-   "lo": 1877.07726053976,
-   "hi": 2165.05044783937,
+   "mean": 2019.63742248771,
+   "lo": 1875.78691208336,
+   "hi": 2163.48793289205,
    "cash": 9195680.0,
    "estimated": false,
    "p_above": null
@@ -191,34 +185,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 352.0,
-   "mean": 1961.16381265706,
-   "lo": 1814.28231021015,
-   "hi": 2108.04531510397,
+   "mean": 1960.54849439978,
+   "lo": 1813.70516707378,
+   "hi": 2107.39182172579,
    "cash": -27944597.0,
    "estimated": true,
-   "p_above": 0.354493730524115
+   "p_above": 0.356294223563239
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1737.4920491851,
-   "lo": 1608.28266032434,
-   "hi": 1866.70143804587,
+   "mean": 1748.68802390823,
+   "lo": 1618.85588482435,
+   "hi": 1878.5201629921,
    "cash": -1126745.0,
    "estimated": true,
-   "p_above": 0.0301581029196827
+   "p_above": 0.0365714276985267
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 328.0,
-   "mean": 1541.06476009601,
-   "lo": 1426.82042039323,
-   "hi": 1655.30909979879,
+   "mean": 1551.55495242494,
+   "lo": 1436.64234194049,
+   "hi": 1666.4675629094,
    "cash": 50393671.0,
    "estimated": true,
-   "p_above": 0.000408844045590051
+   "p_above": 0.000560688736140458
   }
  ]
 }
