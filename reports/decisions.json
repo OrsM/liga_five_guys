@@ -1,101 +1,167 @@
 {
- "generated_at": "2026-10-21T19:45Z",
+ "generated_at": "2026-10-21T20:34Z",
  "lock_at": "2026-10-23T19:00:00+00:00",
- "cash": 9295680.0,
- "cash_locked": 34887217.0,
- "finish": 2.22,
- "p_win": 0.156,
+ "cash": 7893094.0,
+ "cash_locked": 0.0,
+ "finish": 2.19,
+ "p_win": 0.15,
  "band": [
-  1875.64293693114,
-  2163.34151280981
+  1887.62723310324,
+  2175.90226835282
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Leandro Cabrera",
+   "label": "field Aurelien Tchouameni",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 4.82966459239232,
+   "gain": -1.01337191761196,
    "per": "next",
    "facts": []
   },
   {
-   "name": "Leandro Cabrera",
+   "name": "Sergio Carreira",
    "pos": "DEF",
    "what": "buy",
-   "label": "buy Leandro Cabrera",
-   "step": "bid in",
-   "amount": 9243737.0,
-   "done": true,
-   "gain": 36.1279939858519,
+   "label": "buy Sergio Carreira",
+   "step": "bid up to",
+   "amount": 5772873.0,
+   "done": false,
+   "gain": 14.0325901578378,
    "per": "season",
    "facts": [
     [
      "listed at",
-     9243737.0,
+     5772873.0,
      "money"
     ],
     [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
      "chance of helping",
-     0.849,
+     0.723,
      "chance"
     ],
     [
      "",
-     14.4209032525333,
+     -1.7042991524888,
      "trend"
     ],
     [
      "money",
-     145061.080790086,
+     -47369.6210965794,
      "money"
     ],
     [
      "",
-     3.64943025808627,
+     2.43078102668078,
      "per_million"
     ]
    ]
   },
   {
-   "name": "Dakonam Djene",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Dakonam Djene",
-   "step": "listed",
-   "amount": null,
-   "done": true,
-   "gain": -6.84107638269621,
+   "name": "Aurelien Tchouameni",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Aurelien Tchouameni",
+   "step": "bid up to",
+   "amount": 24488372.0471936,
+   "done": false,
+   "gain": 32.1463205204977,
    "per": "season",
    "facts": [
     [
-     "value",
-     22877058.0,
+     "listed at",
+     23749863.0,
      "money"
     ],
     [
+     "chance to win",
+     0.767,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.802,
+     "chance"
+    ],
+    [
      "",
-     -20.9923739412898,
+     12.2045094424024,
      "trend"
     ],
     [
      "money",
-     2312191.53379134,
+     657034.895265158,
      "money"
     ],
     [
      "",
-     -0.29903654493931,
+     1.31271774450935,
      "per_million"
     ]
    ]
+  },
+  {
+   "name": "Natan",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Natan",
+   "step": "take offer",
+   "amount": 54757933.0,
+   "done": false,
+   "gain": -21.2537539842247,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     53213204.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.68,
+     "beats"
+    ],
+    [
+     "",
+     -20.0751867752418,
+     "trend"
+    ],
+    [
+     "money",
+     6688019.83550924,
+     "money"
+    ],
+    [
+     "",
+     -0.388140180240637,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Nahuel Tenaglia",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": []
   }
  ],
  "consider": [],
- "plan_gain": 45.6454258079595,
- "cash_after": 22273112.1869567,
- "ping": "field Leandro Cabrera",
+ "plan_gain": 40.9801425282789,
+ "cash_after": 32389781.9528064,
+ "can_bid": 102145329.352806,
+ "ping": "field Aurelien Tchouameni; buy Sergio Carreira; buy Aurelien Tchouameni; sell Natan; list Nahuel Tenaglia",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -148,9 +214,9 @@
    "clause": 13250562.0
   },
   {
-   "name": "Dakonam Djene",
+   "name": "Nahuel Tenaglia",
    "pos": "DEF",
-   "clause": 22877058.0
+   "clause": 25643480.0
   },
   {
    "name": "Yeray Alvarez",
@@ -163,21 +229,21 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 427.0,
-   "mean": 2175.62159928647,
-   "lo": 2012.03615276518,
-   "hi": 2339.20704580776,
-   "cash": -6384132.0,
+   "mean": 2196.07821389021,
+   "lo": 2031.60742958088,
+   "hi": 2360.54899819953,
+   "cash": -15776683.0,
    "estimated": true,
-   "p_above": 0.820827258333144
+   "p_above": 0.832198265735853
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 460.0,
-   "mean": 2019.49222487048,
-   "lo": 1875.64293693114,
-   "hi": 2163.34151280981,
-   "cash": 9295680.0,
+   "mean": 2031.76475072803,
+   "lo": 1887.62723310324,
+   "hi": 2175.90226835282,
+   "cash": 7893094.0,
    "estimated": false,
    "p_above": null
   },
@@ -190,7 +256,7 @@
    "hi": 2107.5815359657,
    "cash": -27844597.0,
    "estimated": true,
-   "p_above": 0.357066928902753
+   "p_above": 0.329104754926664
   },
   {
    "manager": "SusoGattuso",
@@ -201,7 +267,7 @@
    "hi": 1879.17144668925,
    "cash": -1026745.0,
    "estimated": true,
-   "p_above": 0.0369944558576081
+   "p_above": 0.0310357656003296
   },
   {
    "manager": "Magic Mike 333",
@@ -212,7 +278,7 @@
    "hi": 1670.94403572824,
    "cash": 50493671.0,
    "estimated": true,
-   "p_above": 0.000628793694922525
+   "p_above": 0.000471788565565068
   }
  ]
 }
