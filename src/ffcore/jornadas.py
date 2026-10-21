@@ -1,5 +1,6 @@
-"""The jornada calendar as schema.sql's views have it, as of cut(): when
-each round locks, and which jornada a match belongs to."""
+"""The jornada calendar as schema.sql's jornada_calendar has it, as of
+cut(): when each round locks, the jornadas left, and which jornada a match
+belongs to."""
 from __future__ import annotations
 
 
@@ -9,8 +10,9 @@ from functools import cache
 from ffcore.clock import on_reset
 from ffcore.db import rows
 from ffcore.parse import snapshot_stamp
+from ffcore.schedule import Rounds
 
-__all__ = ["round_locks", "rounds_ahead", "jornada_of_match"]
+__all__ = ["round_locks", "rounds", "rounds_ahead", "jornada_of_match"]
 
 
 @cache
@@ -28,11 +30,26 @@ def rounds_ahead() -> dict[int, datetime]:
 
 
 @cache
+def rounds() -> Rounds:
+    """The jornadas left (jornada_calendar's not done), by when each next
+    plays (rounds_ahead; none known last), the clubs that have played in each
+    (clubs_played), and those behind."""
+    nxt = rounds_ahead()
+    left = {j: state for j, state in rows("SELECT jornada, state FROM jornada_calendar WHERE state <> 'done'")}
+    rem = [j for j in nxt if j in left] + sorted(set(left) - set(nxt))
+    played: dict[int, set[str]] = {}
+    for j, club in rows("SELECT jornada, club FROM clubs_played"):
+        played.setdefault(j, set()).add(club)
+    return Rounds(rem, {j: nxt[j] for j in rem if j in nxt}, played,
+                  {j for j, state in left.items() if state == "behind"})
+
+
+@cache
 def jornada_of_match() -> dict[str, int]:
     return dict(rows("SELECT match_id, jornada FROM match_jornada"))
 
 
-for _cached in (round_locks, rounds_ahead, jornada_of_match):
+for _cached in (round_locks, rounds, rounds_ahead, jornada_of_match):
     on_reset(_cached.cache_clear)
 
 
@@ -91,10 +108,21 @@ def _selftest() -> None:
             set_now(utc(24, 0))
             assert rows("SELECT kick FROM next_kickoff") == [("2026-08-30T1700Z",)], \
                 "once jornada 3 locks, jornada 2's match put back locks nothing"
-            assert rows("SELECT jornada FROM behind_jornadas") == [(2,)], \
-                "jornada 2 is behind: no line-up is picked for its match put back"
+            assert rows("SELECT jornada, state FROM jornada_calendar ORDER BY jornada") == [
+                (1, "behind"), (2, "behind"), (3, "under way"), (4, "ahead")], \
+                rows("SELECT * FROM jornada_calendar ORDER BY jornada")
+            assert rounds() == Rounds([1, 2, 3, 4], {1: utc(14, 19, 30), 2: utc(18, 17), 3: utc(23, 17),
+                                                     4: utc(30, 17)},
+                                      {1: {"alaves", "getafe"}, 2: {"rayo", "osasuna"}}, {1, 2}), \
+                ("the jornadas left by when each next plays, the clubs played in each, those behind", rounds())
+            store_sql("matches", [
+                {"observed_at": "2026-08-27T0900Z", "match_id": m, "jornada": "2", "home": h, "away": a,
+                 "score": "1-1", "kickoff": ""} for m, h, a in (("m2", "elche", "levante"),
+                                                                ("m5", "celta", "getafe"))])
             set_now(utc(31, 0))
             assert rows("SELECT kick FROM next_kickoff") == [(None,)], "none left to play"
+            assert rows("SELECT jornada FROM jornadas_done") == [(2,)], \
+                "done: every match has a score (jornada 1 still has one to play, 3 and 4 theirs)"
         finally:
             set_now(None)
     print("ffcore.jornadas self-test OK")

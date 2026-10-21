@@ -20,7 +20,7 @@ from ffcore import db as lfgdb, kept
 from ffcore.db import connect, named, query, record, rows
 from ffcore.fixture import Ratings, difficulty_ratings
 from ffcore.forecast import Bootstrap
-from ffcore.jornadas import rounds_ahead
+from ffcore.jornadas import rounds
 from ffcore.league import League
 from ffcore.market import Market
 from ffcore.names import Name
@@ -241,7 +241,7 @@ def forecast_cells() -> tuple[PerJornada, set[str]]:
         market = current("market")
         sc = scorer(market, current("lineups", LINEUP_SOURCE))
         per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
-                             current("matches"), rounds_ahead()).per_j
+                             current("matches"), rounds()).per_j
         return per_j, {k for k in sc.lookup if sc.starts.status_of(k)}
 
 
@@ -278,10 +278,10 @@ def _built(also: frozenset[str]) -> Built:
     squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
               for mgr in lg.managers}
     ratings = fixture_ratings(mkt_rows)
-    ex = expectations(sc, ratings, set(price).union(*squads.values(), also), m, rounds_ahead())
+    left = rounds()
+    ex = expectations(sc, ratings, set(price).union(*squads.values(), also), m, left)
     per_j, rem, played = ex.per_j, ex.rem, ex.played
-    behind = {j for (j,) in rows("SELECT jornada FROM behind_jornadas")}
-    ahead = [j for j in rem if j not in behind]
+    ahead = [j for j in rem if j not in left.behind]
     market = Market(
         cash=lg.cash[me], odds=bid_odds(),
         name={k: Name(f["name"]) for k, f in facts.items()},

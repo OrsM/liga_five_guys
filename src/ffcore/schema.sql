@@ -485,22 +485,14 @@ SELECT player, amount AS paid FROM (
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
--- The jornadas behind as of cut(): those that locked before the last lock
--- (a match of one put back past a later jornada's lock is still to play,
--- but its elevens were set long before: it locks nothing, and no line-up
--- is picked for it).
-DROP VIEW IF EXISTS behind_jornadas;
-CREATE VIEW behind_jornadas AS
-SELECT jornada FROM round_locks
-WHERE lock < (SELECT max(lock) FROM round_locks WHERE lock <= (SELECT cut()));
-
 -- When the next match kicks off after cut(): each player locks at his own
--- match's kickoff, of the jornada under way or one to come (not one behind;
+-- match's kickoff, of the jornada under way or one to come (jornada_calendar;
 -- NULL once none is left to play).
+DROP VIEW IF EXISTS behind_jornadas;
 DROP VIEW IF EXISTS next_kickoff;
 CREATE VIEW next_kickoff AS
-SELECT min(kick) AS kick FROM kickoffs
-WHERE kick > (SELECT cut()) AND jornada NOT IN (SELECT jornada FROM behind_jornadas);
+SELECT min(k.kick) AS kick FROM kickoffs k JOIN jornada_calendar c USING (jornada)
+WHERE k.kick > (SELECT cut()) AND c.state IN ('under way', 'ahead');
 
 -- The game's nightly offers still to come before the next match locks: one
 -- as each standing offer expires, then one a day (0 with none standing).
@@ -992,23 +984,54 @@ WHERE observed_at <= (SELECT cut()) AND score <> '' AND jornada IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM kickoffs k WHERE k.home = m.home AND k.away = m.away)
 GROUP BY home, away;
 
--- When each jornada locks: its first kickoff. None for a jornada with a
--- blind result (its first kickoff is not known).
+-- The jornada calendar as of cut(), one row a jornada, what everything
+-- about locks and jornadas left reads: when it locks (its first kickoff;
+-- NULL with a blind result, its first kickoff not known), when its next
+-- match still to play kicks off (NULL with none), and its state, by its
+-- first kickoff known:
+--   done       every match has a score;
+--   behind     locked before the last jornada to lock, a match still to
+--              play (put back): its elevens were set long before, so it
+--              locks nothing and no line-up is picked for it;
+--   under way  the last to lock, a match still to play;
+--   ahead      not locked yet.
+DROP VIEW IF EXISTS jornada_calendar;
+CREATE VIEW jornada_calendar AS
+WITH games AS (SELECT m.jornada, k.kick, m.score <> '' AS played
+               FROM current_matches m LEFT JOIN kickoffs k ON k.home = m.home AND k.away = m.away
+               WHERE m.jornada IS NOT NULL),
+j AS (SELECT jornada, min(kick) AS start,
+             CASE WHEN jornada NOT IN (SELECT jornada FROM blind_results) THEN min(kick) END AS lock,
+             min(CASE WHEN NOT played THEN kick END) AS next, sum(NOT played) AS left
+      FROM games GROUP BY jornada),
+last AS (SELECT max(start) AS start FROM j WHERE start <= (SELECT cut()))
+SELECT j.jornada, j.lock, j.next,
+       CASE WHEN j.left = 0 THEN 'done'
+            WHEN j.start < last.start THEN 'behind'
+            WHEN j.start <= (SELECT cut()) THEN 'under way'
+            ELSE 'ahead' END AS state
+FROM j, last;
+
+-- The clubs that have played in each jornada not done: whose players a
+-- jornada left has no match for.
+DROP VIEW IF EXISTS clubs_played;
+CREATE VIEW clubs_played AS
+WITH p AS (SELECT m.jornada, m.home, m.away FROM current_matches m JOIN jornada_calendar j USING (jornada)
+           WHERE j.state <> 'done' AND m.score <> '')
+SELECT jornada, home AS club FROM p WHERE home <> ''
+UNION SELECT jornada, away FROM p WHERE away <> '';
+
+-- When each jornada locks (jornada_calendar; one with no lock known left out).
 DROP VIEW IF EXISTS round_locks;
 CREATE VIEW round_locks AS
-SELECT jornada, min(kick) AS lock FROM kickoffs
-WHERE jornada NOT IN (SELECT jornada FROM blind_results)
-GROUP BY jornada;
+SELECT jornada, lock FROM jornada_calendar WHERE lock IS NOT NULL;
 
--- When each jornada's next match still to play kicks off (a postponed
--- match dates the rest of its jornada): what the season ahead is
--- ordered and dated by.
+-- When each jornada not done next plays (jornada_calendar; a postponed
+-- match dates the rest of its jornada): what the season ahead is ordered
+-- and dated by.
 DROP VIEW IF EXISTS rounds_ahead;
 CREATE VIEW rounds_ahead AS
-SELECT k.jornada, min(k.kick) AS next FROM kickoffs k
-WHERE NOT EXISTS (SELECT 1 FROM current_matches m
-                  WHERE m.home = k.home AND m.away = k.away AND m.score <> '')
-GROUP BY k.jornada;
+SELECT jornada, next FROM jornada_calendar WHERE next IS NOT NULL;
 
 DROP VIEW IF EXISTS match_jornada;
 CREATE VIEW match_jornada AS
@@ -1122,11 +1145,11 @@ WITH last AS (SELECT ff_id, trim(name) AS name, club,
 SELECT l.ff_id AS player_id, l.name, l.club AS club_id, coalesce(a.app_id, '') AS app_id
 FROM last l LEFT JOIN app_links a ON a.player = l.ff_id WHERE l.n = 1;
 
--- The jornadas every match of which has a score: what a forecast is
--- graded on (one under way, or with a match postponed, is not).
+-- The jornadas every match of which has a score (jornada_calendar): what a
+-- forecast is graded on (one under way, or with a match postponed, is not).
 DROP VIEW IF EXISTS jornadas_done;
 CREATE VIEW jornadas_done AS
-SELECT jornada FROM current_matches GROUP BY jornada HAVING sum(score = '') = 0 ORDER BY jornada;
+SELECT jornada FROM jornada_calendar WHERE state = 'done' ORDER BY jornada;
 
 -- Last season's points per player (ingest.baseline writes it; an empty
 -- table is restored from the archived page, raw/season=<season>.tar.xz),

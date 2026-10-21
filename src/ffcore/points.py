@@ -33,24 +33,7 @@ def done_jornadas() -> set[int]:
     return {j for (j,) in rows("SELECT jornada FROM jornadas_done")}
 
 
-def _selftest_done() -> None:
-    import sqlite3
-    from ffcore.db import SCHEMA
-    db = sqlite3.connect(":memory:")
-    db.execute("CREATE TABLE current_matches (jornada, score)")
-    db.executemany("INSERT INTO current_matches VALUES (?, ?)", [
-        (6, "2-1"), (6, ""),            # one postponed: not done
-        (8, "0-0"), (8, "3-1"),         # done
-        (9, "1-1"), (9, "")])           # under way: not done
-    sql = SCHEMA.read_text()
-    i = sql.index("CREATE VIEW jornadas_done AS")
-    db.execute(sql[i:sql.index(";\n", i)])
-    assert [j for (j,) in db.execute("SELECT jornada FROM jornadas_done")] == [8], \
-        "only a jornada whose every match has a score"
-
-
 def _selftest() -> None:
-    _selftest_done()
     import tempfile
     from pathlib import Path
 

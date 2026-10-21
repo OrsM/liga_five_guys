@@ -15,25 +15,15 @@ from ffcore.score import Rates, Scorer
 Fit = Callable[[str, int, int], float]
 
 
-def rounds_left(matches: Rows, locks: dict[int, datetime]
-                ) -> tuple[list[int], dict[int, set[str]]]:
-    """The jornadas not finished, by when each next plays (rounds_ahead; none known last),
-    and the clubs that have played in each."""
-
-    js = {r["jornada"] for r in matches if r.get("jornada") is not None}
-    finished = {j for j in js
-                if all(r.get("score") for r in matches if r.get("jornada") == j)}
-    open_j = js - finished
-    clock_order = [j for j in sorted(locks, key=locks.__getitem__) if j in open_j]
-    rem = clock_order + sorted(open_j - set(clock_order))
-
-    played: dict[int, set[str]] = {}
-    for r in matches:
-        j = r.get("jornada")
-        if j is not None and j in rem and r.get("score"):
-            played.setdefault(j, set()).update(
-                c for c in (r.get("home"), r.get("away")) if c)
-    return rem, played
+class Rounds(NamedTuple):
+    """The jornadas left as jornadas.rounds reads them (schema.sql's
+    jornada_calendar): those not done, by when each next plays (none known
+    last); when each next plays; the clubs that have played in each; and
+    those behind (a match put back: no line-up is picked for them)."""
+    rem: list[int]
+    next: dict[int, datetime]
+    played: dict[int, set[str]]
+    behind: set[int]
 
 
 UNSCORED_DEFAULT = (2.0, 0.5)
@@ -107,13 +97,13 @@ class Expectations(NamedTuple):
 
 
 def expectations(sc: Scorer, ratings: Ratings, keys: Iterable[str], matches: Rows,
-                 locks: dict[int, datetime]) -> Expectations:
+                 rounds: Rounds) -> Expectations:
 
-    rem, played = rounds_left(matches, locks)
+    rem, played = rounds.rem, rounds.played
     rates = {k: sc.rates(sc.lookup[k]) if k in sc.lookup else None
              for k in keys}
     club = {k: c for k in keys if k in sc.lookup and (c := sc.lookup[k].get("club"))}
-    dates = jornada_dates(locks, rem)
+    dates = jornada_dates(rounds.next, rem)
     per_j, first_of, factors = season(
         rates, club, rem, played, season_board(ratings, matches, rem),
         lambda k, j, first_j: sc.fit(k, j, dates.get(j), first_j))
@@ -155,7 +145,6 @@ def phantom_fill(squads: Squads, per_jornada: PerJornada, pos: dict[str, str]
 
 def _selftest() -> None:
     from ffcore.score import Rates as R
-    from ffcore.tidy import typed
 
     got = jornada_dates({8: datetime(2026, 10, 11, 14, tzinfo=timezone.utc)}, [8, 9, 10])
     assert got == {8: date(2026, 10, 11), 9: date(2026, 10, 18),
@@ -168,18 +157,6 @@ def _selftest() -> None:
     assert jornada_factors(hurt, None, False, 0.5) == Factors(4.0, 1.0, 0.8, 0.5)
     assert Factors(4.0, 1.1, 0.6, 1.0).cell == (4.0 * 1.1, 0.6), "points = rate x fixture"
     assert Factors(-1.0, 1.0, 0.6, 1.0).cell[0] == 0.0, "never below zero"
-
-    ms = typed("matches", [{"jornada": "1", "home": "alaves", "away": "getafe", "score": "3-0"},
-          {"jornada": "1", "home": "celta", "away": "osasuna", "score": ""},
-          {"jornada": "2", "home": "alaves", "away": "celta", "score": ""},
-          {"jornada": "3", "home": "alaves", "away": "getafe", "score": "1-1"},
-          {"jornada": "", "home": "alaves", "away": "celta", "score": ""}])
-    rem, done = rounds_left(ms, {})
-    assert rem == [1, 2], rem
-    assert rounds_left(ms, {2: datetime(2026, 8, 20, tzinfo=timezone.utc),
-                            1: datetime(2026, 8, 22, tzinfo=timezone.utc)})[0] == [2, 1], \
-        "in lock order"
-    assert done == {1: {"alaves", "getafe"}}, done
 
     from ffcore.fixture import Match
     from ffcore.score import Rates
