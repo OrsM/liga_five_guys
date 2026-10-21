@@ -291,6 +291,9 @@ def _built(also: frozenset[str]) -> Built:
         trend=prices.trend, clause=column("clause"),
         fetch=dict(rows("SELECT player, fetches FROM sale_odds")),
         carry=prices.carry, error=prices.error, offer_sd=offer_spread())
+    for k, j in rows("SELECT player, jornada FROM late_arrivals"):
+        if k in per_j.get(j, {}):
+            per_j[j][k] = (per_j[j][k][0], 0.0)     # bought tonight, he joins after that match
     squads, per_j = phantom_fill(squads, per_j, pos)
     assert all(_fieldable(sq) for sq in squads.values()), squads
     # The jornada each player's next line-up is for: his first to play of

@@ -58,7 +58,10 @@ def _selftest() -> None:
     from datetime import timezone
     from pathlib import Path
 
+    from contextlib import closing
+
     from ffcore.clock import set_now
+    from ffcore.db import connect
     from ffcore.tidy import store_sql, tables_in
 
     def utc(d: int, h: int, m: int = 0) -> datetime:
@@ -106,6 +109,20 @@ def _selftest() -> None:
             assert rows("SELECT kick FROM next_kickoff") == [("2026-08-23T1700Z",)], \
                 "jornada 3's lock comes before jornada 2's match put back"
             set_now(utc(24, 0))
+            store_sql("market", [{"observed_at": "2026-08-23T0900Z", "ff_id": k, "club": c, "value": "1"}
+                                 for k, c in (("late", "rayo"), ("early", "elche"), ("theirs", "rayo"))])
+            store_sql("api_market", [
+                {"observed_at": "2026-08-23T0900Z", "seller": seller, "player_id": app, "sale_price": "100",
+                 "expires_at": close}
+                for app, seller, close in (("1", "marketPlayerLeague", "2026-08-30T22:24:00+02:00"),
+                                           ("2", "marketPlayerLeague", "2026-08-29T22:24:00+02:00"),
+                                           ("3", "marketPlayerTeam", "2026-08-30T22:24:00+02:00"))])
+            with closing(connect()) as db, db:
+                db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
+                               [("late", "1"), ("early", "2"), ("theirs", "3")])
+            assert sorted(rows("SELECT player, jornada FROM late_arrivals")) == [("late", 3), ("late", 4)], \
+                ("his auction closes after rayo kick off in jornadas 3 (under way) and 4: he plays neither; "
+                 "elche's man joins the night before; a manager's player plays for him till sold")
             assert rows("SELECT kick FROM next_kickoff") == [("2026-08-30T1700Z",)], \
                 "once jornada 3 locks, jornada 2's match put back locks nothing"
             assert rows("SELECT jornada, state FROM jornada_calendar ORDER BY jornada") == [

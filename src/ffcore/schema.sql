@@ -491,8 +491,24 @@ WHERE last = 1;
 DROP VIEW IF EXISTS behind_jornadas;
 DROP VIEW IF EXISTS next_kickoff;
 CREATE VIEW next_kickoff AS
-SELECT min(k.kick) AS kick FROM kickoffs k JOIN jornada_calendar c USING (jornada)
+SELECT min(k.kick) AS kick, min(k.t) AS t FROM kickoffs k JOIN jornada_calendar c USING (jornada)
 WHERE k.kick > (SELECT cut()) AND c.state IN ('under way', 'ahead');
+
+-- The players on the game's market who could not play a jornada's match
+-- for whoever buys them: his auction closes after his club's kickoff in it
+-- (of a jornada under way or to come). Nobody holds them, so for everyone
+-- they play none of it.
+DROP VIEW IF EXISTS late_arrivals;
+CREATE VIEW late_arrivals AS
+WITH listed AS (SELECT player, max(julianday(expires_at)) AS close FROM current_api_market
+                WHERE seller = 'marketPlayerLeague' AND player IS NOT NULL AND sale_price <> 0
+                  AND coalesce(expires_at, '') <> ''
+                GROUP BY player)
+SELECT DISTINCT l.player, k.jornada
+FROM listed l JOIN current_market m ON m.ff_id = l.player AND m.club <> ''
+JOIN kickoffs k ON m.club IN (k.home, k.away)
+JOIN jornada_calendar c ON c.jornada = k.jornada AND c.state IN ('under way', 'ahead')
+WHERE k.t < l.close;
 
 -- The game's nightly offers still to come before the next match locks: one
 -- as each standing offer expires, then one a day (0 with none standing).
@@ -500,8 +516,7 @@ DROP VIEW IF EXISTS nights_left;
 CREATE VIEW nights_left AS
 WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_offers
            WHERE status = 'pending' AND expires_at <> ''),
-l AS (SELECT julianday(substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || 'Z') AS lock
-      FROM next_kickoff)
+l AS (SELECT t AS lock FROM next_kickoff)
 SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights
 FROM e, l;
 
@@ -512,8 +527,7 @@ DROP VIEW IF EXISTS resale_nights;
 CREATE VIEW resale_nights AS
 WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_market
            WHERE seller = 'marketPlayerLeague' AND coalesce(expires_at, '') <> ''),
-l AS (SELECT julianday(substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || 'Z') AS lock
-      FROM next_kickoff)
+l AS (SELECT t AS lock FROM next_kickoff)
 SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) ELSE 0 END AS nights
 FROM e, l;
 
@@ -964,11 +978,11 @@ LIMIT coalesce((SELECT CAST(price_window AS INTEGER) FROM k), -1);
 
 -- The jornada calendar, as of cut(). Each fixture's kickoff as last seen
 -- (a played match's page drops it) and its jornada, as a UTC stamp (as
--- observed_at is).
+-- observed_at is), and as a julian day (t).
 DROP VIEW IF EXISTS kickoffs;
 CREATE VIEW kickoffs AS
-SELECT home, away, jornada, kick FROM (
-    SELECT home, away, jornada, strftime('%Y-%m-%dT%H%MZ', kickoff) AS kick,
+SELECT home, away, jornada, kick, t FROM (
+    SELECT home, away, jornada, strftime('%Y-%m-%dT%H%MZ', kickoff) AS kick, julianday(kickoff) AS t,
            row_number() OVER (PARTITION BY home, away ORDER BY observed_at DESC, rowid DESC) AS n
     FROM matches
     WHERE observed_at <= (SELECT cut()) AND jornada IS NOT NULL
