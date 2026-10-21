@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-21T20:34Z",
+ "generated_at": "2026-10-21T20:39Z",
  "lock_at": "2026-10-23T19:00:00+00:00",
  "cash": 7893094.0,
- "cash_locked": 0.0,
+ "cash_locked": 23749863.0,
  "finish": 2.19,
  "p_win": 0.15,
  "band": [
@@ -68,9 +68,9 @@
    "pos": "MED",
    "what": "buy",
    "label": "buy Aurelien Tchouameni",
-   "step": "bid up to",
-   "amount": 24488372.0471936,
-   "done": false,
+   "step": "bid in",
+   "amount": 23749863.0,
+   "done": true,
    "gain": 32.1463205204977,
    "per": "season",
    "facts": [
@@ -78,11 +78,6 @@
      "listed at",
      23749863.0,
      "money"
-    ],
-    [
-     "chance to win",
-     0.767,
-     "chance"
     ],
     [
      "chance of helping",
@@ -161,7 +156,7 @@
  "plan_gain": 40.9801425282789,
  "cash_after": 32389781.9528064,
  "can_bid": 102145329.352806,
- "ping": "field Aurelien Tchouameni; buy Sergio Carreira; buy Aurelien Tchouameni; sell Natan; list Nahuel Tenaglia",
+ "ping": "field Aurelien Tchouameni; buy Sergio Carreira; sell Natan; list Nahuel Tenaglia",
  "exposed": [
   {
    "name": "Mathew Ryan",
