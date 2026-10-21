@@ -1562,7 +1562,9 @@ FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM s
 
 -- The board's headline: when the next match locks, your money, where you
 -- are expected to finish and your chance of first, your season's points
--- band, what the plan gains and leaves you, and what is still to do.
+-- band, what the plan gains and leaves you, what more you could bid after
+-- it and your bids it does not make (into the debt the game allows, to
+-- clear by selling before the lock), and what is still to do.
 DROP VIEW IF EXISTS board_head;
 CREATE VIEW board_head AS
 WITH me AS (SELECT * FROM board_league WHERE me),
@@ -1575,6 +1577,12 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        me.lo AS band_lo, me.hi AS band_hi,
        (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
+       (SELECT max(0.0, left + debt) - (
+            SELECT total(f.my_bid) FROM sim_facts f JOIN board_run USING (run_id)
+            WHERE f.my_bid > 0 AND f.player NOT IN (
+                SELECT u.buy FROM board_plan p JOIN funnel u ON u.rank = p.rank
+                JOIN board_run r ON r.run_id = u.run_id WHERE u.buy IS NOT NULL))
+        FROM board_money) AS can_bid,
        (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
         WHERE section = 'do' AND NOT done) AS ping
 FROM me;
@@ -1596,7 +1604,7 @@ SELECT json_object(
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'do'),
     'consider', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'consider'),
-    'plan_gain', h.plan_gain, 'cash_after', h.cash_after, 'ping', coalesce(h.ping, ''),
+    'plan_gain', h.plan_gain, 'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
     'standings', (SELECT json_group_array(json_object(

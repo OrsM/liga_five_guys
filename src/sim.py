@@ -212,6 +212,16 @@ def _selftest_board() -> None:
         "the ping is each move's Action.label, not words of its own"
     assert doc["do"][0]["label"].startswith("field ")
 
+    rich_doc = report(ub, b, team_value=100e6)
+    assert rich_doc["can_bid"] == max(0.0, rich_doc["cash_after"] + 20e6), \
+        "what you can bid: your cash after the plan and the debt the game allows, 20% of team value"
+    stray = replace(ub.market, pos={**ub.market.pos, "ghost": "DEF"}, my_bid={"ghost": 3e6})
+    assert abs(report(replace(ub, market=stray), b, team_value=100e6)["can_bid"]
+               - (rich_doc["can_bid"] - 3e6)) < 1, \
+        "a bid of yours the plan does not make is money you cannot bid again"
+    in_plan = replace(ub.market, my_bid={bought[0]: 4e6})
+    assert report(replace(ub, market=in_plan), b, team_value=100e6)["can_bid"] == rich_doc["can_bid"], \
+        "the plan's own bid is counted once, in the plan"
     ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: 4e6},
                                     route={"dead": "listed"}))
     sell_dead = Move(Action("sell", sell=("dead",), proceeds=1e6), 0.5, p_better=0.8)
