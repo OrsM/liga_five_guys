@@ -511,14 +511,26 @@ JOIN jornada_calendar c ON c.jornada = k.jornada AND c.state IN ('under way', 'a
 WHERE k.t < l.close;
 
 -- The game's nightly offers still to come before the next match locks: one
--- as each standing offer expires, then one a day (0 with none standing).
+-- as each standing offer expires, then one a day (0 with none standing),
+-- and when the first of them comes (first, a julian day).
 DROP VIEW IF EXISTS nights_left;
 CREATE VIEW nights_left AS
 WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_offers
            WHERE status = 'pending' AND expires_at <> ''),
 l AS (SELECT t AS lock FROM next_kickoff)
-SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights
+SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights,
+       ends AS first
 FROM e, l;
+
+-- When each manager's listing on the game's market ends, as of cut() (t, a
+-- julian day): a listing runs three days, and the game offers for a player
+-- at each close only while he is listed.
+DROP VIEW IF EXISTS listing_ends;
+CREATE VIEW listing_ends AS
+SELECT player, max(expires_at) AS ends, max(julianday(expires_at)) AS t
+FROM current_api_market
+WHERE player IS NOT NULL AND seller = 'marketPlayerTeam' AND expires_at <> ''
+GROUP BY player;
 
 -- The nights the game will offer for a player bought at tonight's auctions
 -- before the next match locks: one a day after the auctions close (0 with
@@ -697,6 +709,7 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'PRICE_W1' AND variant = (SELECT variant())) AS price_w1,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W2' AND variant = (SELECT variant())) AS price_w2,
     (SELECT value FROM model_constants WHERE name = 'GOOD_OFFER' AND variant = (SELECT variant())) AS good_offer,
+    (SELECT value FROM model_constants WHERE name = 'MONEY_RATE' AND variant = (SELECT variant())) AS money_rate,
     (SELECT value FROM model_constants WHERE name = 'RESALE_MARGIN' AND variant = (SELECT variant())) AS resale_margin,
     (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
     (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
@@ -1366,21 +1379,46 @@ WHERE f.kind = 'buy';
 -- the game's offer standing on him and the share of its recent offers
 -- (recent_offers), as a share of value, it beats; what selling him
 -- does to your season (the funnel's sale), whether that sale can be made
--- by itself (alone: your side can be fielded without him) and whether the
--- plan sells him.
+-- by itself (alone: your side can be fielded without him), whether the
+-- plan sells him, and what turning the offer down is worth (waiting: the
+-- best of the game's offers still to come before the lock, sim_waiting).
+-- relist_after: when his listing ends, if before the last of those offers.
+-- A sale the plan makes that loses by itself (its gain, or no side left to
+-- field) pays only with the plan's buys at auction (with_bids: their names and the
+-- chance all are won, bids_p). They close as the next offer comes, so if
+-- one comes before the lock the sale can wait for them; wait_bids is what
+-- waiting is worth in points against taking tonight's offer: if won, the
+-- money waiting loses (at MONEY_RATE), if lost, the sale not made.
 DROP VIEW IF EXISTS board_holdings;
 DROP VIEW IF EXISTS board_offers;
 DROP VIEW IF EXISTS board_mine;
 CREATE VIEW board_mine AS
-WITH r AS (SELECT ratio FROM recent_offers)
-SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.takes,
-       b.route IS 'listed' AS listed,
-       CASE WHEN b.offer IS NOT NULL AND b.value > 0
-            THEN (SELECT avg(r.ratio < b.offer / b.value) FROM r) END AS beats,
-       f.rank, f.gain, f.money, f.per_million, coalesce(f.in_plan, 0) AS sell, f.alone
-FROM board_players b JOIN board_run USING (run_id)
-LEFT JOIN funnel f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.sell = b.player
-WHERE b.mine;
+WITH r AS (SELECT ratio FROM recent_offers),
+n AS (SELECT nights, first FROM nights_left),
+bids AS (SELECT exp(total(ln(max(u.win, 1e-9)))) AS p, count(*) AS n,
+                group_concat(coalesce(s.name, u.buy), ', ' ORDER BY p.ord) AS names
+         FROM board_plan p JOIN board_run x JOIN funnel u ON u.run_id = x.run_id AND u.rank = p.rank
+         LEFT JOIN sim_facts s ON s.run_id = u.run_id AND s.player = u.buy
+         WHERE u.kind = 'buy' AND u.win < 1),
+m AS (SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.takes,
+             b.route IS 'listed' AS listed,
+             CASE WHEN b.offer IS NOT NULL AND b.value > 0
+                  THEN (SELECT avg(r.ratio < b.offer / b.value) FROM r) END AS beats,
+             f.rank, f.gain, f.money, f.per_million, coalesce(f.in_plan, 0) AS sell, f.alone,
+             w.later AS waiting,
+             CASE WHEN b.route IS 'listed' AND l.t < n.first + n.nights - 1 THEN l.ends END AS relist_after,
+             coalesce(f.in_plan AND (f.gain <= 0 OR NOT f.alone) AND bids.n > 0, 0) AS with_bids,
+             bids.p AS bids_p, bids.names AS bids_names, n.nights
+      FROM board_players b JOIN board_run USING (run_id) CROSS JOIN n CROSS JOIN bids
+      LEFT JOIN funnel f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.sell = b.player
+      LEFT JOIN sim_waiting w ON w.run_id = b.run_id AND w.player = b.player AND w.kind = 'sale'
+      LEFT JOIN listing_ends l ON l.player = b.player
+      WHERE b.mine)
+SELECT m.*,
+       CASE WHEN with_bids AND nights > 0 AND offer IS NOT NULL
+            THEN bids_p * -(SELECT money_rate FROM k) * (offer - coalesce(waiting, 0.0)) / 1e6
+                 + (1 - bids_p) * -gain END AS wait_bids
+FROM m;
 
 -- Your players a rival can take now by paying their clause (any can: a sale
 -- to the game pays at once, so cash is no limit), most valuable first.
@@ -1487,10 +1525,13 @@ FROM ranked JOIN took USING (n) WHERE taken;
 -- value, unit], none without a value).
 --   do: the line-up the plan wants; the plan's moves in its order (a buy:
 --   bid up to its bid, or yours is in; a sale: take tonight's offer, or
---   wait for what waiting is worth, or it is listed, or list it); the buys
---   to resell (board_resale); and your players not listed, rising first:
---   the game offers only for those listed, listing costs nothing and a
---   listed player still plays for you.
+--   wait for what waiting is worth, or sell after the auctions when it pays
+--   only with the plan's buys and waiting for them is worth more
+--   (board_mine.wait_bids), or it is listed, or list it); the buys to
+--   resell (board_resale); your players not listed, rising first: the game
+--   offers only for those listed, listing costs nothing and a listed player
+--   still plays for you; and those whose listing ends before the last
+--   offer before the lock, to relist once it does.
 --   consider: each buy that clears the bar alone but is not in the plan
 --   (short by what the bid is over your cash after it), and each sale the
 --   plan does not make of a listed player whose offer tonight beats what
@@ -1539,14 +1580,22 @@ buys AS (
 sells AS (
     SELECT CASE WHEN s.sell THEN 'do' ELSE 'consider' END, coalesce(p.ord, s.rank), 'sell',
            'sell ' || s.name, s.name, s.pos,
-           CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait'
+           CASE WHEN s.takes AND s.wait_bids > 0 THEN 'sell after the auctions'
+                WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait'
                 WHEN s.listed THEN 'listed' ELSE 'list' END,
-           CASE WHEN s.offer IS NOT NULL THEN s.raises END,
-           s.listed AND NOT s.takes, s.gain, 'season',
+           CASE WHEN s.takes AND s.wait_bids > 0 THEN s.waiting WHEN s.offer IS NOT NULL THEN s.raises END,
+           s.listed AND (NOT s.takes OR coalesce(s.wait_bids > 0, 0)), s.gain, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'value' AS l, s.value AS v, 'money' AS u
                 UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
                 UNION ALL SELECT 2, 'the game''s recent offers', round(s.beats, 3), 'beats'
+                UNION ALL SELECT 2.2, 'waiting is worth', s.waiting, 'money'
+                    WHERE s.offer IS NOT NULL AND s.nights > 0
+                UNION ALL SELECT 2.4, 'more offers before the lock', s.nights, 'count'
+                    WHERE s.offer IS NOT NULL
+                UNION ALL SELECT 2.6, 'only pays if you win', s.bids_names, 'names' WHERE s.with_bids
+                UNION ALL SELECT 2.7, 'chance of winning them', round(s.bids_p, 3), 'chance' WHERE s.with_bids
+                UNION ALL SELECT 2.8, 'waiting for them', s.wait_bids, 'points' WHERE s.takes
                 UNION ALL SELECT 3, '', s.trend, 'trend'
                 UNION ALL SELECT 4, 'money', 1e6 * s.money, 'money'
                 UNION ALL SELECT 5, '', s.per_million, 'per_million')
@@ -1561,11 +1610,17 @@ unlisted AS (
            (SELECT json_group_array(json_array('rising', rising, 'names')) FROM (
                 SELECT group_concat(name, ', ' ORDER BY -trend, player) AS rising
                 FROM board_mine WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL)
-    FROM board_mine WHERE NOT listed AND NOT sell HAVING count(*) > 0)
+    FROM board_mine WHERE NOT listed AND NOT sell HAVING count(*) > 0),
+relist AS (
+    SELECT 'do', 1999, 'relist',
+           'relist ' || group_concat(name, ', ' ORDER BY relist_after, -coalesce(trend, 0.0), player), NULL, NULL,
+           NULL, NULL, 0, NULL, 'season',
+           json_array(json_array('once the listing ends', min(relist_after), 'time'))
+    FROM board_mine WHERE relist_after IS NOT NULL HAVING count(*) > 0)
 SELECT section, row_number() OVER (PARTITION BY section ORDER BY ord) - 1 AS ord, what, label, name,
        pos, step, amount, done, gain, per, facts
 FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM sells
-      UNION ALL SELECT * FROM unlisted);
+      UNION ALL SELECT * FROM unlisted UNION ALL SELECT * FROM relist);
 
 -- The board's headline: when the next match locks, your money, where you
 -- are expected to finish and your chance of first, your season's points

@@ -104,11 +104,16 @@ def _selftest_board() -> None:
 
     def report(u: Universe, bd: Board, fielded: Sequence[str] = (),
                ratios: Sequence[float] = (),
-               resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0) -> Doc:
+               resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0,
+               waits: Sequence[tuple[str, float]] = (), nights: int = 0,
+               listings: Sequence[tuple[str, str]] = ()) -> Doc:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
         past offers, resale for what waiting sells the game's market players
-        for, rising and flat (assemble tests those), team_value yours."""
+        for, rising and flat (assemble tests those), team_value yours, waits
+        what turning down an offer on a player of yours is worth, nights the
+        game's offers still to come before the lock (the first a day after
+        2026-08-01), listings when each of yours ends."""
         m = u.market
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             with closing(connect()) as db, db:
@@ -127,15 +132,22 @@ def _selftest_board() -> None:
                 db.execute("CREATE TABLE offer_ratios (created_at, ratio)")
                 db.executemany("INSERT INTO offer_ratios VALUES ('', ?)", [(r,) for r in ratios])
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
-                               [(k, k) for k in fielded])
+                               [(k, k) for k in dict.fromkeys([*fielded, *(k for k, _e in listings)])])
                 db.execute("DROP VIEW waiting")
                 db.execute("CREATE TABLE waiting (player, kind, later)")
                 db.executemany("INSERT INTO waiting VALUES (?, ?, ?)", [
                     (k, kind, v) for k, up, flat in resale for kind, v in (("resale", up), ("flat", flat))])
+                db.executemany("INSERT INTO waiting VALUES (?, 'sale', ?)", waits)
+                db.execute("DROP VIEW nights_left")
+                db.execute("CREATE TABLE nights_left AS SELECT ? AS nights,"
+                           " julianday('2026-08-02T20:24:00Z') AS first", (nights,))
                 db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
-                    ("RESALE_MARGIN", 0.05), ("GOOD_OFFER", 0.9), ("PRICE_WINDOW", 50.0)])
+                    ("RESALE_MARGIN", 0.05), ("GOOD_OFFER", 0.9), ("PRICE_WINDOW", 50.0),
+                    ("MONEY_RATE", 8.0)])
             store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me,
                                          "team_value": str(team_value)}])
+            store_sql("api_market", [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerTeam",
+                                      "expires_at": e} for k, e in listings])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
                                      for k in fielded])
             record_run(u, bd, 7)
@@ -238,9 +250,10 @@ def _selftest_board() -> None:
     assert [(d["step"], d["done"]) for d in unlisted["do"] if d["what"] == "sell"] \
         == [("list", False)]
 
-    def sale(offer: float) -> tuple[Doc, list[str]]:
+    def sale(offer: float, nights: int = 0) -> tuple[Doc, list[str]]:
         mk = replace(ub.market, offer={"dead": offer}, fetch={"dead": max(offer, 1.0e6)})
-        doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead], rows=b.rows + [sell_dead]))
+        doc = report(replace(ub, market=mk), b._replace(plan=[sell_dead], rows=b.rows + [sell_dead]),
+                     waits=[("dead", 1.0e6)], nights=nights)
         return (next(d for d in doc["do"] if d["what"] == "sell"),
                 doc["ping"].split("; "))
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
@@ -253,6 +266,44 @@ def _selftest_board() -> None:
     assert wait["step"] == "wait" and wait["done"] and wait["amount"] == 1.0e6, \
         "waiting: done for tonight, and the sale raises what waiting is worth"
     assert facts(wait)["offer"] == 0.9e6
+    assert "waiting is worth" not in facts(take) and facts(take)["more offers before the lock"] == 0, \
+        "the last offer before the lock: none to wait for"
+    rolls = facts(sale(0.9e6, nights=2)[0])
+    assert (rolls["waiting is worth"], rolls["more offers before the lock"]) == (1.0e6, 2), \
+        "turning an offer down: what the game's offers still to come are worth, and how many come"
+    assert "only pays if you win" not in rolls, "a sale that pays by itself waits for no bid"
+
+    def relists(ends: str, nights: int) -> list[tuple[Any, ...]]:
+        doc = report(replace(ub, market=replace(ub.market, route={"dead": "listed"})), b,
+                     nights=nights, listings=[("dead", ends)])
+        return [(d["label"], d["facts"]) for d in doc["do"] if d["what"] == "relist"]
+    assert relists("2026-08-03T10:00:00+02:00", 3) == [
+        ("relist Dead", [["once the listing ends", "2026-08-03T10:00:00+02:00", "time"]])], \
+        "his listing ends before two of the three offers to come: relist him once it does"
+    assert relists("2026-08-03T10:00:00+02:00", 1) == relists("2026-08-05T10:00:00+02:00", 3) == [], \
+        "a listing that outlasts the offers to come needs nothing"
+
+    # a sale that pays only with the plan's buy, which may be lost at auction
+    gamble = Move(Action("buy", buy="cand", cost=2e6), 3.0, p_better=0.9, win=0.5)
+    weak = Move(Action("sell", sell=("dead",), proceeds=1e6), -5.0, p_better=0.2)
+    def hedge(offer: float, waits: float, nights: int, win: float = 0.5) -> Doc:
+        mk = replace(ub.market, route={"dead": "listed"}, offer={"dead": offer}, fetch={"dead": max(offer, waits)})
+        both = [replace(gamble, win=win), weak]
+        doc = report(replace(ub, market=mk), b._replace(plan=both, rows=b.rows + both),
+                     waits=[("dead", waits)], nights=nights)
+        return next(d for d in doc["do"] if d["what"] == "sell")
+    near = hedge(1.0e6, 0.99e6, 1)
+    assert (near["step"], near["amount"], near["done"]) == ("sell after the auctions", 0.99e6, True), near
+    assert abs(facts(near)["waiting for them"] - (0.5 * -8.0 * 0.01 + 0.5 * 5.0)) < 1e-9 \
+        and facts(near)["only pays if you win"] == "Cand" and facts(near)["chance of winning them"] == 0.5, \
+        "won (half the time): waiting loses 0.01M at 8 points a million; lost: the -5 sale is not made"
+    assert hedge(1.0e6, 0.3e6, 1)["step"] == "take offer", "waiting loses 0.7M if won: 5.6 points half the time, over 2.5"
+    assert hedge(1.0e6, 0.99e6, 0)["step"] == "take offer", "no offer after the auctions before the lock"
+    assert hedge(0.9e6, 1.0e6, 1)["step"] == "wait", "an offer under what waiting is worth: wait, bids or not"
+    assert "only pays if you win" not in facts(hedge(1.0e6, 0.99e6, 1, win=1.0)), "a buy sure to land"
+    weak = replace(weak, d_pts=1.0)
+    assert hedge(1.0e6, 0.99e6, 1)["step"] == "take offer" and "only pays if you win" not in facts(
+        hedge(1.0e6, 0.99e6, 1)), "a sale that gains by itself, if not surely, waits for no bid"
     assert "sell Dead" not in quiet, quiet
 
     offered = replace(ub, market=replace(ub.market, offer={"dead": 1.1e6, "star": 19e6},
