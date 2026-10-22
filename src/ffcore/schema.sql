@@ -1440,11 +1440,16 @@ SELECT p.ord, f.rank, f.kind, f.cost - f.proceeds AS net
 FROM sim_plan p JOIN board_run USING (run_id)
 JOIN funnel f ON f.run_id = p.run_id AND f.rank = p.rank;
 
--- Your cash once the plan is made, and how far below zero the game lets
--- bids take you before the lock: 20% of your team value.
+-- Your cash once the plan is made, how far below zero the game lets
+-- bids take you before the lock (20% of your team value), and your bids
+-- in that the plan does not make (held: money no other bid can use).
 DROP VIEW IF EXISTS board_money;
 CREATE VIEW board_money AS
-SELECT b.cash - (SELECT total(net) FROM board_plan) AS left, 0.2 * s.team_value AS debt
+SELECT b.cash - (SELECT total(net) FROM board_plan) AS left, 0.2 * s.team_value AS debt,
+       (SELECT total(f.my_bid) FROM sim_facts f JOIN board_run USING (run_id)
+        WHERE f.my_bid > 0 AND f.player NOT IN (
+            SELECT u.buy FROM board_plan p JOIN board_run r JOIN funnel u
+            ON u.run_id = r.run_id AND u.rank = p.rank WHERE u.buy IS NOT NULL)) AS held
 FROM board_league b JOIN current_api_standings s USING (manager) WHERE b.me;
 
 -- Players on the game's market worth buying tonight to sell before the
@@ -1452,16 +1457,18 @@ FROM board_league b JOIN current_api_standings s USING (manager) WHERE b.me;
 -- gets (board_buys.resale) over the bid it takes (or yours, if it is in),
 -- when that beats the bid by RESALE_MARGIN, most profit first. Each is
 -- taken if, with those taken before it, the bids stay within your cash
--- after the plan plus the debt the game allows, and, every price standing
+-- after the plan plus the debt the game allows, less your bids in on
+-- players neither the plan nor this list buys, and, every price standing
 -- still (flat), the sales would still leave you at least zero at the lock.
 DROP VIEW IF EXISTS board_resale;
 CREATE VIEW board_resale AS
-WITH ranked AS MATERIALIZED (
-    SELECT b.*, b.resale - b.cost AS profit,
-           row_number() OVER (ORDER BY b.resale - b.cost DESC, b.player) AS n,
-           m.left + m.debt AS can_spend, m.left AS can_lose
-    FROM board_buys b, board_money m
+WITH pick AS MATERIALIZED (
+    SELECT b.*, b.resale - b.cost AS profit FROM board_buys b
     WHERE NOT b.in_plan AND b.resale >= b.cost * (1 + (SELECT resale_margin FROM k))),
+ranked AS MATERIALIZED (
+    SELECT p.*, row_number() OVER (ORDER BY p.profit DESC, p.player) AS n,
+           m.left + m.debt - m.held + (SELECT total(my_bid) FROM pick) AS can_spend, m.left AS can_lose
+    FROM pick p, board_money m),
 took(n, spent, lost, taken) AS (
     SELECT 0, 0.0, 0.0, 0
   UNION ALL
@@ -1577,12 +1584,7 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        me.lo AS band_lo, me.hi AS band_hi,
        (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
-       (SELECT max(0.0, left + debt) - (
-            SELECT total(f.my_bid) FROM sim_facts f JOIN board_run USING (run_id)
-            WHERE f.my_bid > 0 AND f.player NOT IN (
-                SELECT u.buy FROM board_plan p JOIN funnel u ON u.rank = p.rank
-                JOIN board_run r ON r.run_id = u.run_id WHERE u.buy IS NOT NULL))
-        FROM board_money) AS can_bid,
+       (SELECT max(0.0, left + debt) - held FROM board_money) AS can_bid,
        (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
         WHERE section = 'do' AND NOT done) AS ping
 FROM me;

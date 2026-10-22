@@ -281,8 +281,10 @@ def _selftest_board() -> None:
     # ranked like any buy (the funnel's bid), none worth it for points
     none = b._replace(plan=[], gain=0.0, rows=b.rows + [
         Move(Action("buy", buy=k, cost=c), -1.0, 0.1) for k, c in free.market.price.items()])
-    def resold(cash: float, team_value: float, **flat: float) -> list[tuple[str, float, Any]]:
-        u = replace(free, market=replace(free.market, cash=cash))
+    def resold(cash: float, team_value: float, bids: dict[str, float] | None = None,
+               **flat: float) -> list[tuple[str, float, Any]]:
+        u = replace(free, market=replace(free.market, cash=cash, my_bid=bids or {},
+                                         pos={**free.market.pos, "ghost": "DEF"}))
         doc = report(u, none, resale=[("up", 2.4e6, flat.get("up", 2e6)), ("thin", 2.06e6, 2e6),
                                       ("dear", 9e6, flat.get("dear", 8e6))], team_value=team_value)
         return [(d["name"].lower(), d["amount"], round(dict((f[0], f[1]) for f in d["facts"])["profit"]))
@@ -294,6 +296,10 @@ def _selftest_board() -> None:
         "flat, he loses 0.5M and Up nothing: 1M of cash covers both"
     assert resold(0.2e6, 50e6, dear=7.5e6, up=1.9e6) == [("up", 2e6, 0.4e6)], \
         "flat, Dear would leave you below zero at the lock; Up loses 0.1M, which 0.2M covers"
+    assert resold(1e6, 50e6, bids={"ghost": 3e6}) == [("dear", 8e6, 1e6)], \
+        "your bid in on a player nothing here buys leaves 8M of the 11M: Up's 2M no longer fits"
+    assert resold(1e6, 50e6, bids={"dear": 8e6}) == [("dear", 8e6, 1e6), ("up", 2e6, 0.4e6)], \
+        "your bid in on a buy to resell is its cost, counted once"
 
     ranked = funnel(ub, b, 7)
     assert [r["rank"] for r in ranked] == list(range(len(b.rows))) \
