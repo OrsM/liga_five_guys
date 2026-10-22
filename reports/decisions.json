@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-10-22T19:46Z",
+ "generated_at": "2026-10-22T20:37Z",
  "lock_at": "2026-10-23T19:00:00+00:00",
  "cash": 7993094.0,
- "cash_locked": 23749863.0,
- "finish": 2.17,
- "p_win": 0.164,
+ "cash_locked": 0.0,
+ "finish": 1.97,
+ "p_win": 0.201,
  "band": [
   1884.32942989051,
   2172.16710255545
@@ -12,28 +12,28 @@
  "do": [
   {
    "what": "field",
-   "label": "field Aurelien Tchouameni",
+   "label": "field Miguel Roman",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": -1.01692589178558,
+   "gain": -2.99606682432911,
    "per": "next",
    "facts": []
   },
   {
-   "name": "Sergio Carreira",
-   "pos": "DEF",
+   "name": "Joan Garcia",
+   "pos": "POR",
    "what": "buy",
-   "label": "buy Sergio Carreira",
+   "label": "buy Joan Garcia",
    "step": "bid up to",
-   "amount": 5772873.0,
+   "amount": 64185510.0,
    "done": false,
-   "gain": 15.1812733579258,
+   "gain": 61.8251361244167,
    "per": "season",
    "facts": [
     [
      "listed at",
-     5772873.0,
+     64185510.0,
      "money"
     ],
     [
@@ -43,60 +43,22 @@
     ],
     [
      "chance of helping",
-     0.737,
+     0.786,
      "chance"
     ],
     [
      "",
-     4.40091810997075,
+     2.02400463599171,
      "trend"
     ],
     [
      "money",
-     164931.977474823,
+     626055.749390118,
      "money"
     ],
     [
      "",
-     2.62976049497811,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Aurelien Tchouameni",
-   "pos": "MED",
-   "what": "buy",
-   "label": "buy Aurelien Tchouameni",
-   "step": "bid in",
-   "amount": 23749863.0,
-   "done": true,
-   "gain": 40.5582951060962,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     23749863.0,
-     "money"
-    ],
-    [
-     "chance of helping",
-     0.861,
-     "chance"
-    ],
-    [
-     "",
-     16.5763427416273,
-     "trend"
-    ],
-    [
-     "money",
-     1784169.36332463,
-     "money"
-    ],
-    [
-     "",
-     1.67311571235396,
+     0.963225751800004,
      "per_million"
     ]
    ]
@@ -107,9 +69,9 @@
    "what": "sell",
    "label": "sell Natan",
    "step": "take offer",
-   "amount": 54757933.0,
+   "amount": 56650923.0,
    "done": false,
-   "gain": -14.3890916543336,
+   "gain": 0.754828345666411,
    "per": "season",
    "facts": [
     [
@@ -119,33 +81,13 @@
     ],
     [
      "the game's recent offers",
-     0.8,
+     0.9,
      "beats"
     ],
     [
-     "waiting is worth",
-     51437786.6083284,
-     "money"
-    ],
-    [
      "more offers before the lock",
-     1,
+     0,
      "count"
-    ],
-    [
-     "only pays if you win",
-     "Sergio Carreira, Aurelien Tchouameni",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.581,
-     "chance"
-    ],
-    [
-     "waiting for them",
-     -9.39618598152586,
-     "points"
     ],
     [
      "",
@@ -154,22 +96,114 @@
     ],
     [
      "money",
-     7232189.29812355,
+     9125179.29812355,
      "money"
     ],
     [
      "",
-     -0.262776384461656,
+     0.0133242020728667,
      "per_million"
     ]
    ]
   }
  ],
- "consider": [],
- "plan_gain": 55.7773322193017,
- "cash_after": 32736976.4134042,
- "can_bid": 102617454.813404,
- "ping": "field Aurelien Tchouameni; buy Sergio Carreira; sell Natan",
+ "consider": [
+  {
+   "name": "Frenkie de Jong",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Frenkie de Jong",
+   "step": "bid up to",
+   "amount": 6061293.0,
+   "done": false,
+   "gain": 3.54714068858244,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     6061293.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.533,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.744,
+     "chance"
+    ],
+    [
+     "",
+     15.1795410144042,
+     "trend"
+    ],
+    [
+     "money",
+     443392.586072805,
+     "money"
+    ],
+    [
+     "",
+     0.58521188277525,
+     "per_million"
+    ],
+    [
+     "short by",
+     5602786.0,
+     "money"
+    ]
+   ]
+  },
+  {
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "what": "sell",
+   "label": "sell Pablo Fornals",
+   "step": "take offer",
+   "amount": 43676752.0,
+   "done": false,
+   "gain": -75.0282907000138,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     40360929.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.92,
+     "beats"
+    ],
+    [
+     "more offers before the lock",
+     0,
+     "count"
+    ],
+    [
+     "",
+     17.5068488591201,
+     "trend"
+    ],
+    [
+     "money",
+     -89306.5956444591,
+     "money"
+    ],
+    [
+     "",
+     -1.71780838236355,
+     "per_million"
+    ]
+   ]
+  }
+ ],
+ "plan_gain": 62.5799644700831,
+ "cash_after": 458507.0,
+ "can_bid": 70338985.4,
+ "ping": "field Miguel Roman; buy Joan Garcia; sell Natan",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -237,12 +271,12 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 427.0,
-   "mean": 2181.69495726808,
-   "lo": 2018.30069768521,
-   "hi": 2345.08921685095,
-   "cash": -15676683.0,
+   "mean": 2166.56067187526,
+   "lo": 2004.56995665659,
+   "hi": 2328.55138709392,
+   "cash": 14265130.0,
    "estimated": true,
-   "p_above": 0.816775367297426
+   "p_above": 0.793326440426369
   },
   {
    "manager": "miguel_autentico",
@@ -259,23 +293,23 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 352.0,
-   "mean": 1951.8026193895,
-   "lo": 1805.68214038761,
-   "hi": 2097.9230983914,
-   "cash": -27744597.0,
+   "mean": 1860.13790793487,
+   "lo": 1720.18036648804,
+   "hi": 2000.09544938169,
+   "cash": 21985707.0,
    "estimated": true,
-   "p_above": 0.316440007847511
+   "p_above": 0.141594376284738
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1748.4517283242,
-   "lo": 1618.65368348632,
-   "hi": 1878.24977316207,
-   "cash": -926745.0,
+   "mean": 1749.61573976234,
+   "lo": 1619.25245078613,
+   "hi": 1879.97902873856,
+   "cash": -15237985.0,
    "estimated": true,
-   "p_above": 0.032143590280805
+   "p_above": 0.0329657151949877
   },
   {
    "manager": "Magic Mike 333",
