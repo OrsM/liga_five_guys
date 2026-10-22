@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-22T21:14Z",
+ "generated_at": "2026-10-22T21:39Z",
  "lock_at": "2026-10-23T19:00:00+00:00",
  "cash": 7993094.0,
- "cash_locked": 0.0,
+ "cash_locked": 64185510.0,
  "finish": 1.96,
  "p_win": 0.201,
  "band": [
@@ -25,9 +25,9 @@
    "pos": "POR",
    "what": "buy",
    "label": "buy Joan Garcia",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 64185510.0,
-   "done": false,
+   "done": true,
    "gain": 61.8251361244167,
    "per": "season",
    "facts": [
@@ -35,11 +35,6 @@
      "listed at",
      64185510.0,
      "money"
-    ],
-    [
-     "chance to win",
-     0.85,
-     "chance"
     ],
     [
      "chance of helping",
@@ -203,7 +198,7 @@
  "plan_gain": 62.5799644700831,
  "cash_after": 458507.0,
  "can_bid": 70338985.4,
- "ping": "field Miguel Roman; buy Joan Garcia; sell Natan",
+ "ping": "field Miguel Roman; sell Natan",
  "exposed": [
   {
    "name": "Mathew Ryan",
