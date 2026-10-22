@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-21T20:39Z",
+ "generated_at": "2026-10-22T08:03Z",
  "lock_at": "2026-10-23T19:00:00+00:00",
- "cash": 7893094.0,
+ "cash": 7993094.0,
  "cash_locked": 23749863.0,
- "finish": 2.19,
- "p_win": 0.15,
+ "finish": 2.17,
+ "p_win": 0.164,
  "band": [
-  1887.62723310324,
-  2175.90226835282
+  1884.32942989051,
+  2172.16710255545
  ],
  "do": [
   {
@@ -16,7 +16,7 @@
    "step": null,
    "amount": null,
    "done": false,
-   "gain": -1.01337191761196,
+   "gain": -1.01692589178558,
    "per": "next",
    "facts": []
   },
@@ -28,7 +28,7 @@
    "step": "bid up to",
    "amount": 5772873.0,
    "done": false,
-   "gain": 14.0325901578378,
+   "gain": 15.1812733579258,
    "per": "season",
    "facts": [
     [
@@ -38,27 +38,27 @@
     ],
     [
      "chance to win",
-     1.0,
+     0.85,
      "chance"
     ],
     [
      "chance of helping",
-     0.723,
+     0.737,
      "chance"
     ],
     [
      "",
-     -1.7042991524888,
+     4.40091810997075,
      "trend"
     ],
     [
      "money",
-     -47369.6210965794,
+     164931.977474823,
      "money"
     ],
     [
      "",
-     2.43078102668078,
+     2.62976049497811,
      "per_million"
     ]
    ]
@@ -71,7 +71,7 @@
    "step": "bid in",
    "amount": 23749863.0,
    "done": true,
-   "gain": 32.1463205204977,
+   "gain": 40.5582951060962,
    "per": "season",
    "facts": [
     [
@@ -81,22 +81,22 @@
     ],
     [
      "chance of helping",
-     0.802,
+     0.861,
      "chance"
     ],
     [
      "",
-     12.2045094424024,
+     16.5763427416273,
      "trend"
     ],
     [
      "money",
-     657034.895265158,
+     1784169.36332463,
      "money"
     ],
     [
      "",
-     1.31271774450935,
+     1.67311571235396,
      "per_million"
     ]
    ]
@@ -109,64 +109,77 @@
    "step": "take offer",
    "amount": 54757933.0,
    "done": false,
-   "gain": -21.2537539842247,
+   "gain": -14.3890916543336,
    "per": "season",
    "facts": [
     [
      "value",
-     53213204.0,
+     52366122.0,
      "money"
     ],
     [
      "the game's recent offers",
-     0.68,
+     0.8,
      "beats"
     ],
     [
+     "waiting is worth",
+     51437786.6083284,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "only pays if you win",
+     "Sergio Carreira, Aurelien Tchouameni",
+     "names"
+    ],
+    [
+     "chance of winning them",
+     0.581,
+     "chance"
+    ],
+    [
+     "waiting for them",
+     -9.39618598152586,
+     "points"
+    ],
+    [
      "",
-     -20.0751867752418,
+     -19.180696917966,
      "trend"
     ],
     [
      "money",
-     6688019.83550924,
+     7232189.29812355,
      "money"
     ],
     [
      "",
-     -0.388140180240637,
+     -0.262776384461656,
      "per_million"
     ]
    ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Nahuel Tenaglia",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": []
   }
  ],
  "consider": [],
- "plan_gain": 40.9801425282789,
- "cash_after": 32389781.9528064,
- "can_bid": 102145329.352806,
- "ping": "field Aurelien Tchouameni; buy Sergio Carreira; sell Natan; list Nahuel Tenaglia",
+ "plan_gain": 55.7773322193017,
+ "cash_after": 32736976.4134042,
+ "can_bid": 102617454.813404,
+ "ping": "field Aurelien Tchouameni; buy Sergio Carreira; sell Natan",
  "exposed": [
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 22234794.0
+   "clause": 22029594.0
   },
   {
    "name": "Ante Budimir",
    "pos": "DEL",
-   "clause": 66472319.0
+   "clause": 67543239.0
   },
   {
    "name": "Georges Mikautadze",
@@ -181,7 +194,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 53213204.0
+   "clause": 52366122.0
   },
   {
    "name": "Iñigo Vicente",
@@ -196,17 +209,17 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 23995920.0
+   "clause": 25003157.0
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 14351955.0
+   "clause": 14524850.0
   },
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 13250562.0
+   "clause": 12935038.0
   },
   {
    "name": "Nahuel Tenaglia",
@@ -224,21 +237,21 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 427.0,
-   "mean": 2196.07821389021,
-   "lo": 2031.60742958088,
-   "hi": 2360.54899819953,
-   "cash": -15776683.0,
+   "mean": 2181.69495726808,
+   "lo": 2018.30069768521,
+   "hi": 2345.08921685095,
+   "cash": -15676683.0,
    "estimated": true,
-   "p_above": 0.832198265735853
+   "p_above": 0.816775367297426
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 460.0,
-   "mean": 2031.76475072803,
-   "lo": 1887.62723310324,
-   "hi": 2175.90226835282,
-   "cash": 7893094.0,
+   "mean": 2028.24826622298,
+   "lo": 1884.32942989051,
+   "hi": 2172.16710255545,
+   "cash": 7993094.0,
    "estimated": false,
    "p_above": null
   },
@@ -246,34 +259,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 352.0,
-   "mean": 1960.73531451626,
-   "lo": 1813.88909306682,
-   "hi": 2107.5815359657,
-   "cash": -27844597.0,
+   "mean": 1951.8026193895,
+   "lo": 1805.68214038761,
+   "hi": 2097.9230983914,
+   "cash": -27744597.0,
    "estimated": true,
-   "p_above": 0.329104754926664
+   "p_above": 0.316440007847511
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1749.33273222008,
-   "lo": 1619.4940177509,
-   "hi": 1879.17144668925,
-   "cash": -1026745.0,
+   "mean": 1748.4517283242,
+   "lo": 1618.65368348632,
+   "hi": 1878.24977316207,
+   "cash": -926745.0,
    "estimated": true,
-   "p_above": 0.0310357656003296
+   "p_above": 0.032143590280805
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 328.0,
-   "mean": 1555.90097695784,
-   "lo": 1440.85791818744,
-   "hi": 1670.94403572824,
-   "cash": 50493671.0,
+   "mean": 1561.26040443992,
+   "lo": 1445.68712184486,
+   "hi": 1676.83368703497,
+   "cash": 50593671.0,
    "estimated": true,
-   "p_above": 0.000471788565565068
+   "p_above": 0.000592789881853295
   }
  ]
 }
