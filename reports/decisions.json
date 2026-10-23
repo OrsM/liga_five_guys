@@ -1,166 +1,112 @@
 {
- "generated_at": "2026-10-23T19:46Z",
+ "generated_at": "2026-10-23T20:40Z",
  "lock_at": "2026-10-24T12:00:00+00:00",
  "cash": 8093094.0,
- "cash_locked": 64185510.0,
- "finish": 1.96,
- "p_win": 0.202,
+ "cash_locked": 0.0,
+ "finish": 2.06,
+ "p_win": 0.191,
  "band": [
-  1885.66295223311,
-  2173.71997914694
+  1884.66295223311,
+  2172.71997914694
  ],
- "do": [
-  {
-   "what": "field",
-   "label": "field Miguel Roman",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": -2.99017906167636,
-   "per": "next",
-   "facts": []
-  },
-  {
-   "name": "Joan Garcia",
-   "pos": "POR",
-   "what": "buy",
-   "label": "buy Joan Garcia",
-   "step": "bid in",
-   "amount": 64185510.0,
-   "done": true,
-   "gain": 51.6381684163606,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     64185510.0,
-     "money"
-    ],
-    [
-     "chance of helping",
-     0.747,
-     "chance"
-    ],
-    [
-     "",
-     -1.49711991422419,
-     "trend"
-    ],
-    [
-     "money",
-     -647315.214116886,
-     "money"
-    ],
-    [
-     "",
-     0.804514421033044,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Natan",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Natan",
-   "step": "take offer",
-   "amount": 56650923.0,
-   "done": false,
-   "gain": 0.766362964169815,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     51721759.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     1.0,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     51168835.4535083,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     1,
-     "count"
-    ],
-    [
-     "",
-     -17.4744462756555,
-     "trend"
-    ],
-    [
-     "money",
-     9114629.65048196,
-     "money"
-    ],
-    [
-     "",
-     0.0135278107325774,
-     "per_million"
-    ]
-   ]
-  }
- ],
+ "do": [],
  "consider": [
   {
-   "name": "Frenkie de Jong",
-   "pos": "MED",
+   "name": "Florian Lejeune",
+   "pos": "DEF",
    "what": "buy",
-   "label": "buy Frenkie de Jong",
+   "label": "buy Florian Lejeune",
    "step": "bid up to",
-   "amount": 6186683.26707359,
+   "amount": 15577938.2892154,
    "done": false,
-   "gain": 3.54214451729087,
+   "gain": 35.7150709360489,
    "per": "season",
    "facts": [
     [
      "listed at",
-     6061293.0,
+     15108146.0,
      "money"
     ],
     [
      "chance to win",
-     0.667,
+     0.783,
      "chance"
     ],
     [
      "chance of helping",
-     0.742,
+     0.849,
      "chance"
     ],
     [
      "",
-     16.70014265016,
+     10.9099407631663,
      "trend"
     ],
     [
      "money",
-     442768.064661358,
+     293894.297451558,
      "money"
     ],
     [
      "",
-     0.572543374919913,
+     2.29266994598216,
      "per_million"
     ],
     [
      "short by",
-     5628176.26707359,
+     7484844.28921538,
      "money"
+    ]
+   ]
+  },
+  {
+   "name": "Pepelu",
+   "pos": "MED",
+   "what": "sell",
+   "label": "sell Pepelu",
+   "step": "take offer",
+   "amount": 28238541.0,
+   "done": false,
+   "gain": -84.1609806848654,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     25912376.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.96,
+     "beats"
+    ],
+    [
+     "more offers before the lock",
+     0,
+     "count"
+    ],
+    [
+     "",
+     47.4969654507549,
+     "trend"
+    ],
+    [
+     "money",
+     -3373379.82348474,
+     "money"
+    ],
+    [
+     "",
+     -2.98035867663508,
+     "per_million"
     ]
    ]
   }
  ],
- "plan_gain": 52.4045313805305,
- "cash_after": 558507.0,
- "can_bid": 70628913.6,
- "ping": "field Miguel Roman; sell Natan",
+ "plan_gain": 0.0,
+ "cash_after": null,
+ "can_bid": 78163500.6,
+ "ping": "",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -227,21 +173,21 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 427.0,
-   "mean": 2167.20994862035,
-   "lo": 2005.16238681117,
-   "hi": 2329.25751042953,
+   "now": 428.0,
+   "mean": 2168.20994862035,
+   "lo": 2006.16238681117,
+   "hi": 2330.25751042953,
    "cash": 14365130.0,
    "estimated": true,
-   "p_above": 0.791859275292761
+   "p_above": 0.795232355460692
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 460.0,
-   "mean": 2029.69146569003,
-   "lo": 1885.66295223311,
-   "hi": 2173.71997914694,
+   "now": 459.0,
+   "mean": 2028.69146569003,
+   "lo": 1884.66295223311,
+   "hi": 2172.71997914694,
    "cash": 8093094.0,
    "estimated": false,
    "p_above": null
@@ -250,12 +196,12 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 352.0,
-   "mean": 1860.51818240247,
-   "lo": 1720.5374329457,
-   "hi": 2000.49893185923,
-   "cash": 22085707.0,
+   "mean": 1916.9532830955,
+   "lo": 1772.1496078951,
+   "hi": 2061.75695829589,
+   "cash": -49563935.0,
    "estimated": true,
-   "p_above": 0.140191524703695
+   "p_above": 0.241607428304532
   },
   {
    "manager": "SusoGattuso",
@@ -266,7 +212,7 @@
    "hi": 1865.38085537774,
    "cash": 15949885.0,
    "estimated": true,
-   "p_above": 0.0259469457928767
+   "p_above": 0.0263481357286197
   },
   {
    "manager": "Magic Mike 333",
@@ -277,7 +223,7 @@
    "hi": 1676.61087105999,
    "cash": 50693671.0,
    "estimated": true,
-   "p_above": 0.000572051238816651
+   "p_above": 0.000586179911001961
   }
  ]
 }
