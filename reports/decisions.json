@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-22T21:39Z",
+ "generated_at": "2026-10-23T08:01Z",
  "lock_at": "2026-10-23T19:00:00+00:00",
- "cash": 7993094.0,
+ "cash": 8093094.0,
  "cash_locked": 64185510.0,
  "finish": 1.96,
- "p_win": 0.201,
+ "p_win": 0.202,
  "band": [
-  1884.32942989051,
-  2172.16710255545
+  1885.57516286603,
+  2173.63018402371
  ],
  "do": [
   {
@@ -16,7 +16,7 @@
    "step": null,
    "amount": null,
    "done": false,
-   "gain": -2.99606682432911,
+   "gain": -2.99208063181145,
    "per": "next",
    "facts": []
   },
@@ -28,7 +28,7 @@
    "step": "bid in",
    "amount": 64185510.0,
    "done": true,
-   "gain": 61.8251361244167,
+   "gain": 51.6381684163606,
    "per": "season",
    "facts": [
     [
@@ -38,22 +38,22 @@
     ],
     [
      "chance of helping",
-     0.786,
+     0.747,
      "chance"
     ],
     [
      "",
-     2.02400463599171,
+     -1.49711991422419,
      "trend"
     ],
     [
      "money",
-     626055.749390118,
+     -647315.214116886,
      "money"
     ],
     [
      "",
-     0.963225751800004,
+     0.804514421033044,
      "per_million"
     ]
    ]
@@ -66,17 +66,17 @@
    "step": "take offer",
    "amount": 56650923.0,
    "done": false,
-   "gain": 0.754828345666411,
+   "gain": 0.764461394034726,
    "per": "season",
    "facts": [
     [
      "value",
-     52366122.0,
+     51721759.0,
      "money"
     ],
     [
      "the game's recent offers",
-     0.9,
+     1.0,
      "beats"
     ],
     [
@@ -86,17 +86,17 @@
     ],
     [
      "",
-     -19.180696917966,
+     -17.4744462756555,
      "trend"
     ],
     [
      "money",
-     9125179.29812355,
+     9114629.65048196,
      "money"
     ],
     [
      "",
-     0.0133242020728667,
+     0.0134942442868005,
      "per_million"
     ]
    ]
@@ -109,9 +109,9 @@
    "what": "buy",
    "label": "buy Frenkie de Jong",
    "step": "bid up to",
-   "amount": 6061293.0,
+   "amount": 6186683.26707359,
    "done": false,
-   "gain": 3.54714068858244,
+   "gain": 3.54214451729087,
    "per": "season",
    "facts": [
     [
@@ -121,94 +121,51 @@
     ],
     [
      "chance to win",
-     0.533,
+     0.667,
      "chance"
     ],
     [
      "chance of helping",
-     0.744,
+     0.742,
      "chance"
     ],
     [
      "",
-     15.1795410144042,
+     16.70014265016,
      "trend"
     ],
     [
      "money",
-     443392.586072805,
+     442768.064661358,
      "money"
     ],
     [
      "",
-     0.58521188277525,
+     0.572543374919913,
      "per_million"
     ],
     [
      "short by",
-     5602786.0,
+     5628176.26707359,
      "money"
-    ]
-   ]
-  },
-  {
-   "name": "Pablo Fornals",
-   "pos": "MED",
-   "what": "sell",
-   "label": "sell Pablo Fornals",
-   "step": "take offer",
-   "amount": 43676752.0,
-   "done": false,
-   "gain": -75.0282907000138,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     40360929.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.92,
-     "beats"
-    ],
-    [
-     "more offers before the lock",
-     0,
-     "count"
-    ],
-    [
-     "",
-     17.5068488591201,
-     "trend"
-    ],
-    [
-     "money",
-     -89306.5956444591,
-     "money"
-    ],
-    [
-     "",
-     -1.71780838236355,
-     "per_million"
     ]
    ]
   }
  ],
- "plan_gain": 62.5799644700831,
- "cash_after": 458507.0,
- "can_bid": 70338985.4,
+ "plan_gain": 52.4026298103954,
+ "cash_after": 558507.0,
+ "can_bid": 70629510.0,
  "ping": "field Miguel Roman; sell Natan",
  "exposed": [
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 22029594.0
+   "clause": 21876171.0
   },
   {
    "name": "Ante Budimir",
    "pos": "DEL",
-   "clause": 67543239.0
+   "clause": 68450550.0
   },
   {
    "name": "Georges Mikautadze",
@@ -223,7 +180,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 52366122.0
+   "clause": 51721759.0
   },
   {
    "name": "Iñigo Vicente",
@@ -238,17 +195,17 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 25003157.0
+   "clause": 25912376.0
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 14524850.0
+   "clause": 14654794.0
   },
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 12935038.0
+   "clause": 12626819.0
   },
   {
    "name": "Nahuel Tenaglia",
@@ -266,21 +223,21 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 427.0,
-   "mean": 2166.56067187526,
-   "lo": 2004.56995665659,
-   "hi": 2328.55138709392,
-   "cash": 14265130.0,
+   "mean": 2167.1558508999,
+   "lo": 2005.10877195334,
+   "hi": 2329.20292984647,
+   "cash": 14365130.0,
    "estimated": true,
-   "p_above": 0.793326440426369
+   "p_above": 0.791919171310408
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 460.0,
-   "mean": 2028.24826622298,
-   "lo": 1884.32942989051,
-   "hi": 2172.16710255545,
-   "cash": 7993094.0,
+   "mean": 2029.60267344487,
+   "lo": 1885.57516286603,
+   "hi": 2173.63018402371,
+   "cash": 8093094.0,
    "estimated": false,
    "p_above": null
   },
@@ -288,34 +245,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 352.0,
-   "mean": 1860.13790793487,
-   "lo": 1720.18036648804,
-   "hi": 2000.09544938169,
-   "cash": 21985707.0,
+   "mean": 1860.45089312534,
+   "lo": 1720.47104932614,
+   "hi": 2000.43073692454,
+   "cash": 22085707.0,
    "estimated": true,
-   "p_above": 0.141594376284738
+   "p_above": 0.140220477247744
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 302.0,
-   "mean": 1738.058145073,
-   "lo": 1608.50413532149,
-   "hi": 1867.6121548245,
-   "cash": 15849885.0,
+   "mean": 1744.85946704972,
+   "lo": 1614.77805634916,
+   "hi": 1874.94087775028,
+   "cash": 15949885.0,
    "estimated": true,
-   "p_above": 0.0273954690731301
+   "p_above": 0.0300357352590752
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 328.0,
-   "mean": 1561.26040443992,
-   "lo": 1445.68712184486,
-   "hi": 1676.83368703497,
-   "cash": 50593671.0,
+   "mean": 1561.05573920506,
+   "lo": 1445.50060735013,
+   "hi": 1676.61087105999,
+   "cash": 50693671.0,
    "estimated": true,
-   "p_above": 0.000592789881853295
+   "p_above": 0.000573265119886868
   }
  ]
 }
