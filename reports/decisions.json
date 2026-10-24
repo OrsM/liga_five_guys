@@ -1,34 +1,15 @@
 {
- "generated_at": "2026-10-24T19:19Z",
+ "generated_at": "2026-10-24T19:45Z",
  "lock_at": "2026-10-25T13:00:00+00:00",
  "cash": 8193094.0,
  "cash_locked": 15108146.0,
  "finish": 1.93,
- "p_win": 0.243,
+ "p_win": 0.242,
  "band": [
   1910.89898467164,
   2197.10015688896
  ],
- "do": [
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Pepelu, Ante Budimir, Pablo Fornals, German Valera, Iñigo Vicente, Yeray Alvarez, Mathew Ryan, Marcos Alonso, Georges Mikautadze, Natan, Miguel Roman",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Pepelu, Ante Budimir, Pablo Fornals, German Valera",
-     "names"
-    ]
-   ]
-  }
- ],
+ "do": [],
  "consider": [
   {
    "name": "Florian Lejeune",
@@ -77,7 +58,7 @@
  "plan_gain": 0.0,
  "cash_after": null,
  "can_bid": 63248471.4,
- "ping": "list Pepelu, Ante Budimir, Pablo Fornals, German Valera, Iñigo Vicente, Yeray Alvarez, Mathew Ryan, Marcos Alonso, Georges Mikautadze, Natan, Miguel Roman",
+ "ping": "",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -144,13 +125,13 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 434.0,
-   "mean": 2165.75779479698,
-   "lo": 2004.68008087475,
-   "hi": 2326.83550871921,
+   "now": 435.0,
+   "mean": 2166.75779479698,
+   "lo": 2005.68008087475,
+   "hi": 2327.83550871921,
    "cash": 14465130.0,
    "estimated": true,
-   "p_above": 0.746888359132106
+   "p_above": 0.748787096977008
   },
   {
    "manager": "miguel_autentico",
