@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-10-24T19:45Z",
+ "generated_at": "2026-10-24T20:36Z",
  "lock_at": "2026-10-25T13:00:00+00:00",
  "cash": 8193094.0,
- "cash_locked": 15108146.0,
- "finish": 1.93,
- "p_win": 0.242,
+ "cash_locked": 0.0,
+ "finish": 1.92,
+ "p_win": 0.308,
  "band": [
   1910.89898467164,
   2197.10015688896
@@ -12,52 +12,100 @@
  "do": [],
  "consider": [
   {
-   "name": "Florian Lejeune",
-   "pos": "DEF",
+   "name": "Alberto Moleiro",
+   "pos": "MED",
    "what": "buy",
-   "label": "buy Florian Lejeune",
-   "step": "bid in",
-   "amount": 15108146.0,
-   "done": true,
-   "gain": 33.2353332413854,
+   "label": "buy Alberto Moleiro",
+   "step": "bid up to",
+   "amount": 84119939.0,
+   "done": false,
+   "gain": 74.9745097462829,
    "per": "season",
    "facts": [
     [
      "listed at",
-     15108146.0,
+     84119939.0,
      "money"
     ],
     [
+     "chance to win",
+     0.817,
+     "chance"
+    ],
+    [
      "chance of helping",
-     0.833,
+     0.81,
      "chance"
     ],
     [
      "",
-     12.631274901091,
+     4.45600239083009,
      "trend"
     ],
     [
      "money",
-     -27579.021969948,
+     1728904.27348903,
      "money"
     ],
     [
      "",
-     2.05408147466825,
+     0.891281076015556,
      "per_million"
     ],
     [
      "short by",
-     7987049.60737722,
+     75926845.0,
      "money"
+    ]
+   ]
+  },
+  {
+   "name": "Nahuel Tenaglia",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Nahuel Tenaglia",
+   "step": "take offer",
+   "amount": 27654162.0,
+   "done": false,
+   "gain": -7.43255470226011,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     25280631.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.96,
+     "beats"
+    ],
+    [
+     "more offers before the lock",
+     0,
+     "count"
+    ],
+    [
+     "",
+     -2.00344557817285,
+     "trend"
+    ],
+    [
+     "money",
+     2607141.32998804,
+     "money"
+    ],
+    [
+     "",
+     -0.268768032177584,
+     "per_million"
     ]
    ]
   }
  ],
  "plan_gain": 0.0,
  "cash_after": null,
- "can_bid": 63248471.4,
+ "can_bid": 78356617.4,
  "ping": "",
  "exposed": [
   {
@@ -125,13 +173,13 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 435.0,
-   "mean": 2166.75779479698,
-   "lo": 2005.68008087475,
-   "hi": 2327.83550871921,
-   "cash": 14465130.0,
+   "now": 436.0,
+   "mean": 2124.01649031018,
+   "lo": 1965.15750310818,
+   "hi": 2282.87547751218,
+   "cash": 75913283.0,
    "estimated": true,
-   "p_above": 0.748787096977008
+   "p_above": 0.662639114250979
   },
   {
    "manager": "miguel_autentico",
@@ -147,13 +195,13 @@
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 355.0,
-   "mean": 1892.77770320103,
-   "lo": 1751.8780076906,
-   "hi": 2033.67739871146,
-   "cash": 10025414.0,
+   "now": 357.0,
+   "mean": 1937.11543803291,
+   "lo": 1793.72995244442,
+   "hi": 2080.5009236214,
+   "cash": -5238087.0,
    "estimated": true,
-   "p_above": 0.151780005986837
+   "p_above": 0.2298199432958
   },
   {
    "manager": "SusoGattuso",
