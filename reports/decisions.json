@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-10-25T05:08Z",
+ "generated_at": "2026-10-25T09:05Z",
  "lock_at": "2026-10-25T13:00:00+00:00",
- "cash": 8193094.0,
+ "cash": 8293094.0,
  "cash_locked": 0.0,
  "finish": 1.95,
  "p_win": 0.289,
@@ -9,7 +9,20 @@
   1912.57262151337,
   2198.84227152667
  ],
- "do": [],
+ "do": [
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Nahuel Tenaglia",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": []
+  }
+ ],
  "consider": [
   {
    "name": "Alberto Moleiro",
@@ -54,59 +67,16 @@
     ],
     [
      "short by",
-     76116820.3123885,
+     76016820.3123885,
      "money"
-    ]
-   ]
-  },
-  {
-   "name": "Nahuel Tenaglia",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Nahuel Tenaglia",
-   "step": "take offer",
-   "amount": 27654162.0,
-   "done": false,
-   "gain": 0.914936868917405,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     24894434.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     1.0,
-     "beats"
-    ],
-    [
-     "more offers before the lock",
-     0,
-     "count"
-    ],
-    [
-     "",
-     -7.74866626546358,
-     "trend"
-    ],
-    [
-     "money",
-     3650577.77638523,
-     "money"
-    ],
-    [
-     "",
-     0.0330849609153734,
-     "per_million"
     ]
    ]
   }
  ],
  "plan_gain": 0.0,
  "cash_after": null,
- "can_bid": 78418801.2,
- "ping": "",
+ "can_bid": 78518801.2,
+ "ping": "list Nahuel Tenaglia",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -177,7 +147,7 @@
    "mean": 2135.75113284158,
    "lo": 1976.90892192472,
    "hi": 2294.59334375843,
-   "cash": 75913283.0,
+   "cash": 76013283.0,
    "estimated": true,
    "p_above": 0.684298415842548
   },
@@ -188,7 +158,7 @@
    "mean": 2055.70744652002,
    "lo": 1912.57262151337,
    "hi": 2198.84227152667,
-   "cash": 8193094.0,
+   "cash": 8293094.0,
    "estimated": false,
    "p_above": null
   },
@@ -199,7 +169,7 @@
    "mean": 1940.58606281839,
    "lo": 1797.21306439313,
    "hi": 2083.95906124365,
-   "cash": -5238087.0,
+   "cash": -5138087.0,
    "estimated": true,
    "p_above": 0.233235436038806
   },
@@ -210,7 +180,7 @@
    "mean": 1766.94061060717,
    "lo": 1637.76686503583,
    "hi": 1896.11435617851,
-   "cash": 16049885.0,
+   "cash": 16149885.0,
    "estimated": true,
    "p_above": 0.0274664283510029
   },
@@ -221,7 +191,7 @@
    "mean": 1572.38425827754,
    "lo": 1457.22924641623,
    "hi": 1687.53927013884,
-   "cash": 50793671.0,
+   "cash": 50893671.0,
    "estimated": true,
    "p_above": 0.000373538025550957
   }
