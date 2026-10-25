@@ -1,28 +1,15 @@
 {
- "generated_at": "2026-10-25T09:05Z",
- "lock_at": "2026-10-25T13:00:00+00:00",
+ "generated_at": "2026-10-25T20:46Z",
+ "lock_at": "2026-10-26T20:00:00+00:00",
  "cash": 8293094.0,
  "cash_locked": 0.0,
- "finish": 1.95,
- "p_win": 0.289,
+ "finish": 1.94,
+ "p_win": 0.277,
  "band": [
-  1912.57262151337,
-  2198.84227152667
+  1932.486482971,
+  2218.75038337247
  ],
- "do": [
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Nahuel Tenaglia",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": []
-  }
- ],
+ "do": [],
  "consider": [
   {
    "name": "Alberto Moleiro",
@@ -71,12 +58,60 @@
      "money"
     ]
    ]
+  },
+  {
+   "name": "Nahuel Tenaglia",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Nahuel Tenaglia",
+   "step": "take offer",
+   "amount": 27654162.0,
+   "done": false,
+   "gain": 0.914936868917405,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     24894434.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     1.0,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     24416371.0955402,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "",
+     -7.74866626546358,
+     "trend"
+    ],
+    [
+     "money",
+     3650577.77638523,
+     "money"
+    ],
+    [
+     "",
+     0.0330849609153734,
+     "per_million"
+    ]
+   ]
   }
  ],
  "plan_gain": 0.0,
  "cash_after": null,
  "can_bid": 78518801.2,
- "ping": "list Nahuel Tenaglia",
+ "ping": "",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -143,21 +178,21 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 448.0,
-   "mean": 2135.75113284158,
-   "lo": 1976.90892192472,
-   "hi": 2294.59334375843,
+   "now": 477.0,
+   "mean": 2163.80334868756,
+   "lo": 2004.984939663,
+   "hi": 2322.62175771212,
    "cash": 76013283.0,
    "estimated": true,
-   "p_above": 0.684298415842548
+   "p_above": 0.701457429875311
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 495.0,
-   "mean": 2055.70744652002,
-   "lo": 1912.57262151337,
-   "hi": 2198.84227152667,
+   "now": 515.0,
+   "mean": 2075.61843317173,
+   "lo": 1932.486482971,
+   "hi": 2218.75038337247,
    "cash": 8293094.0,
    "estimated": false,
    "p_above": null
@@ -165,35 +200,35 @@
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 361.0,
-   "mean": 1940.58606281839,
-   "lo": 1797.21306439313,
-   "hi": 2083.95906124365,
+   "now": 373.0,
+   "mean": 1952.28263009438,
+   "lo": 1808.91385922675,
+   "hi": 2095.65140096202,
    "cash": -5138087.0,
    "estimated": true,
-   "p_above": 0.233235436038806
+   "p_above": 0.217632121831035
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 336.0,
-   "mean": 1766.94061060717,
-   "lo": 1637.76686503583,
-   "hi": 1896.11435617851,
+   "now": 340.0,
+   "mean": 1771.0715598207,
+   "lo": 1641.89674312793,
+   "hi": 1900.24637651346,
    "cash": 16149885.0,
    "estimated": true,
-   "p_above": 0.0274664283510029
+   "p_above": 0.021469119260675
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 342.0,
-   "mean": 1572.38425827754,
-   "lo": 1457.22924641623,
-   "hi": 1687.53927013884,
+   "now": 370.0,
+   "mean": 1599.79954787496,
+   "lo": 1484.66114499045,
+   "hi": 1714.93795075947,
    "cash": 50893671.0,
    "estimated": true,
-   "p_above": 0.000373538025550957
+   "p_above": 0.000450778802235208
   }
  ]
 }
