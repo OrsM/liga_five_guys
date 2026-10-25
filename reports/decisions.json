@@ -1,10 +1,10 @@
 {
- "generated_at": "2026-10-25T20:46Z",
+ "generated_at": "2026-10-25T21:37Z",
  "lock_at": "2026-10-26T20:00:00+00:00",
  "cash": 8293094.0,
  "cash_locked": 0.0,
- "finish": 1.94,
- "p_win": 0.277,
+ "finish": 1.97,
+ "p_win": 0.178,
  "band": [
   1932.486482971,
   2218.75038337247
@@ -12,98 +12,98 @@
  "do": [],
  "consider": [
   {
-   "name": "Alberto Moleiro",
-   "pos": "MED",
+   "name": "Gerard Martin",
+   "pos": "DEF",
    "what": "buy",
-   "label": "buy Alberto Moleiro",
+   "label": "buy Gerard Martin",
    "step": "bid up to",
-   "amount": 84309914.3123885,
+   "amount": 43917770.0,
    "done": false,
-   "gain": 79.7047851639328,
+   "gain": 42.0661145739959,
    "per": "season",
    "facts": [
     [
      "listed at",
-     84119939.0,
+     43917770.0,
      "money"
     ],
     [
      "chance to win",
-     0.817,
+     0.983,
      "chance"
     ],
     [
      "chance of helping",
-     0.825,
+     0.776,
      "chance"
     ],
     [
      "",
-     5.10489544454333,
+     -7.93100403012448,
      "trend"
     ],
     [
      "money",
-     2320188.70069526,
+     -1608583.88279507,
      "money"
     ],
     [
      "",
-     0.945378557361681,
+     0.957838127345625,
      "per_million"
     ],
     [
      "short by",
-     76016820.3123885,
+     35624676.0,
      "money"
     ]
    ]
   },
   {
-   "name": "Nahuel Tenaglia",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Nahuel Tenaglia",
-   "step": "take offer",
-   "amount": 27654162.0,
+   "name": "Alvaro Garcia",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Alvaro Garcia",
+   "step": "bid up to",
+   "amount": 13065782.1502258,
    "done": false,
-   "gain": 0.914936868917405,
+   "gain": 28.8993743187688,
    "per": "season",
    "facts": [
     [
-     "value",
-     24894434.0,
+     "listed at",
+     12690257.0,
      "money"
     ],
     [
-     "the game's recent offers",
-     1.0,
-     "beats"
+     "chance to win",
+     0.667,
+     "chance"
     ],
     [
-     "waiting is worth",
-     24416371.0955402,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     1,
-     "count"
+     "chance of helping",
+     0.82,
+     "chance"
     ],
     [
      "",
-     -7.74866626546358,
+     20.6992959449701,
      "trend"
     ],
     [
      "money",
-     3650577.77638523,
+     837587.841269098,
      "money"
     ],
     [
      "",
-     0.0330849609153734,
+     2.21183653504198,
      "per_million"
+    ],
+    [
+     "short by",
+     4772688.15022579,
+     "money"
     ]
    ]
   }
@@ -179,12 +179,12 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 477.0,
-   "mean": 2163.80334868756,
-   "lo": 2004.984939663,
-   "hi": 2322.62175771212,
-   "cash": 76013283.0,
+   "mean": 2229.13149556494,
+   "lo": 2066.56571688677,
+   "hi": 2391.6972742431,
+   "cash": -9487818.0,
    "estimated": true,
-   "p_above": 0.701457429875311
+   "p_above": 0.818139621176486
   },
   {
    "manager": "miguel_autentico",
@@ -200,24 +200,24 @@
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 373.0,
-   "mean": 1952.28263009438,
-   "lo": 1808.91385922675,
-   "hi": 2095.65140096202,
-   "cash": -5138087.0,
+   "now": 376.0,
+   "mean": 1893.82202833006,
+   "lo": 1754.05801518711,
+   "hi": 2033.586041473,
+   "cash": 53043453.0,
    "estimated": true,
-   "p_above": 0.217632121831035
+   "p_above": 0.122089352000073
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 340.0,
-   "mean": 1771.0715598207,
-   "lo": 1641.89674312793,
-   "hi": 1900.24637651346,
-   "cash": 16149885.0,
+   "now": 341.0,
+   "mean": 1782.64624528711,
+   "lo": 1652.62544395254,
+   "hi": 1912.66704662169,
+   "cash": 14179996.0,
    "estimated": true,
-   "p_above": 0.021469119260675
+   "p_above": 0.0260894088311628
   },
   {
    "manager": "Magic Mike 333",
