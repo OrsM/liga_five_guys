@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-26T05:04Z",
+ "generated_at": "2026-10-26T09:01Z",
  "lock_at": "2026-10-26T20:00:00+00:00",
  "cash": 8393094.0,
- "cash_locked": 0.0,
+ "cash_locked": 56614180.0,
  "finish": 1.99,
  "p_win": 0.174,
  "band": [
@@ -16,9 +16,9 @@
    "pos": "DEF",
    "what": "buy",
    "label": "buy Gerard Martin",
-   "step": "bid up to",
-   "amount": 43917770.0,
-   "done": false,
+   "step": "bid in",
+   "amount": 43516633.0,
+   "done": true,
    "gain": 36.2310065874887,
    "per": "season",
    "facts": [
@@ -26,11 +26,6 @@
      "listed at",
      43917770.0,
      "money"
-    ],
-    [
-     "chance to win",
-     0.967,
-     "chance"
     ],
     [
      "chance of helping",
@@ -64,9 +59,9 @@
    "pos": "MED",
    "what": "buy",
    "label": "buy Alvaro Garcia",
-   "step": "bid up to",
-   "amount": 13084864.3122911,
-   "done": false,
+   "step": "bid in",
+   "amount": 13097547.0,
+   "done": true,
    "gain": 23.7994019783399,
    "per": "season",
    "facts": [
@@ -74,11 +69,6 @@
      "listed at",
      12690257.0,
      "money"
-    ],
-    [
-     "chance to win",
-     0.833,
-     "chance"
     ],
     [
      "chance of helping",
@@ -110,7 +100,7 @@
  ],
  "plan_gain": 0.0,
  "cash_after": null,
- "can_bid": 78956234.2,
+ "can_bid": 22342054.2,
  "ping": "",
  "exposed": [
   {
