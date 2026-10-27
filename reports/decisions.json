@@ -1,22 +1,22 @@
 {
- "generated_at": "2026-10-26T21:36Z",
+ "generated_at": "2026-10-27T08:48Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": -48221086.0,
- "cash_locked": 0.0,
- "finish": 1.96,
- "p_win": 0.172,
+ "cash": -42521086.0,
+ "cash_locked": 11296820.0,
+ "finish": 1.91,
+ "p_win": 0.208,
  "band": [
-  1903.8128496682,
-  2194.9049943439
+  1950.42281670902,
+  2241.90611825128
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Alvaro Garcia, Gerard Martin, Miguel Roman, Alvaro F. Carreras",
+   "label": "field Gerard Martin, Miguel Roman",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": -6.85461497172974,
+   "gain": 3.13698971477847,
    "per": "next",
    "facts": []
   },
@@ -28,277 +28,42 @@
    "step": "take offer",
    "amount": 26748122.0,
    "done": false,
-   "gain": 18.3944779393897,
+   "gain": 26.1975737162524,
    "per": "season",
    "facts": [
     [
      "value",
-     24518718.0,
+     24098539.0,
      "money"
     ],
     [
      "the game's recent offers",
-     0.94,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     24651029.5125692,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     3,
-     "count"
-    ],
-    [
-     "",
-     -14.3706293087039,
-     "trend"
-    ],
-    [
-     "money",
-     3860582.16051234,
-     "money"
-    ],
-    [
-     "",
-     0.687692314974101,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Natan",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Natan",
-   "step": "take offer",
-   "amount": 50692027.0,
-   "done": false,
-   "gain": -11.402228269579,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     49657041.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.66,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     49777377.9756006,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     3,
-     "count"
-    ],
-    [
-     "only pays if you win",
-     "Cesar Tarrega, Valentin Rosier, Fernando Niño",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.618,
-     "chance"
-    ],
-    [
-     "waiting for them",
-     -0.157013867419013,
-     "points"
-    ],
-    [
-     "",
-     -16.5433405833869,
-     "trend"
-    ],
-    [
-     "money",
-     4838034.81840027,
-     "money"
-    ],
-    [
-     "",
-     -0.224931393443372,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Alvaro F. Carreras",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Alvaro F. Carreras",
-   "step": "bid up to",
-   "amount": 5743730.0,
-   "done": false,
-   "gain": 25.6864378372808,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     5743730.0,
-     "money"
-    ],
-    [
-     "chance to win",
      1.0,
-     "chance"
+     "beats"
     ],
     [
-     "chance of helping",
-     0.76,
-     "chance"
+     "waiting is worth",
+     24078755.3159463,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     3,
+     "count"
     ],
     [
      "",
-     -20.0718155384682,
+     -19.5914945290857,
      "trend"
     ],
     [
      "money",
-     -533713.915403172,
+     4761394.53939265,
      "money"
     ],
     [
      "",
-     4.47208309535455,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Cesar Tarrega",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Cesar Tarrega",
-   "step": "bid up to",
-   "amount": 4973967.62179342,
-   "done": false,
-   "gain": 25.1475504534305,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     4488264.0,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.867,
-     "chance"
-    ],
-    [
-     "chance of helping",
-     0.808,
-     "chance"
-    ],
-    [
-     "",
-     17.4343307429063,
-     "trend"
-    ],
-    [
-     "money",
-     -123451.008248978,
-     "money"
-    ],
-    [
-     "",
-     5.05583316289528,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Valentin Rosier",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Valentin Rosier",
-   "step": "bid up to",
-   "amount": 1123608.39797253,
-   "done": false,
-   "gain": 12.2033411094234,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     1112963.0,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.95,
-     "chance"
-    ],
-    [
-     "chance of helping",
-     0.73,
-     "chance"
-    ],
-    [
-     "",
-     -0.229393762445459,
-     "trend"
-    ],
-    [
-     "money",
-     -11827.3236935386,
-     "money"
-    ],
-    [
-     "",
-     10.8608489678819,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Fernando Niño",
-   "pos": "DEL",
-   "what": "buy",
-   "label": "buy Fernando Niño",
-   "step": "bid up to",
-   "amount": 40791399.1544671,
-   "done": false,
-   "gain": 38.2801966224893,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     40699484.0,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.75,
-     "chance"
-    ],
-    [
-     "chance of helping",
-     0.768,
-     "chance"
-    ],
-    [
-     "",
-     5.94126039725471,
-     "trend"
-    ],
-    [
-     "money",
-     1027510.72534157,
-     "money"
-    ],
-    [
-     "",
-     0.938437940741662,
+     0.979417310727551,
      "per_million"
     ]
    ]
@@ -311,22 +76,22 @@
    "step": "take offer",
    "amount": 4113021.0,
    "done": false,
-   "gain": 11.4882733693885,
+   "gain": 2.14400654521054,
    "per": "season",
    "facts": [
     [
      "value",
-     3937028.0,
+     3847738.0,
      "money"
     ],
     [
      "the game's recent offers",
-     0.84,
+     0.88,
      "beats"
     ],
     [
      "waiting is worth",
-     3943763.87726685,
+     3818194.53977281,
      "money"
     ],
     [
@@ -335,96 +100,51 @@
      "count"
     ],
     [
-     "only pays if you win",
-     "Cesar Tarrega, Valentin Rosier, Fernando Niño",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.618,
-     "chance"
-    ],
-    [
-     "waiting for them",
-     -5.23039475009286,
-     "points"
-    ],
-    [
      "",
-     -17.0640175239518,
+     -25.0065485743195,
      "trend"
     ],
     [
      "money",
-     487005.356975358,
+     695667.006528012,
      "money"
     ],
     [
      "",
-     2.79314726800288,
+     0.521272939090401,
      "per_million"
     ]
    ]
   },
   {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
+   "name": "Alvaro Garcia",
+   "pos": "MED",
    "what": "sell",
-   "label": "sell Iñigo Vicente",
-   "step": "wait",
-   "amount": 27425485.6354207,
+   "label": "sell Alvaro Garcia",
+   "step": "listed",
+   "amount": null,
    "done": true,
-   "gain": -25.394310452462,
+   "gain": -19.5154285870598,
    "per": "season",
    "facts": [
     [
      "value",
-     27161349.0,
+     12675849.0,
      "money"
-    ],
-    [
-     "offer",
-     25235577.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.2,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     27425485.6354207,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     3,
-     "count"
-    ],
-    [
-     "only pays if you win",
-     "Cesar Tarrega, Valentin Rosier, Fernando Niño",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.618,
-     "chance"
     ],
     [
      "",
-     -11.2123302150231,
+     1.73001227729423,
      "trend"
     ],
     [
      "money",
-     1673993.64592633,
+     -98089.6353009529,
      "money"
     ],
     [
      "",
-     -0.925938405979024,
+     -1.53957565974948,
      "per_million"
     ]
    ]
@@ -446,41 +166,115 @@
      "time"
     ]
    ]
-  },
+  }
+ ],
+ "consider": [
   {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Alvaro Garcia, Gerard Martin",
-   "step": null,
-   "amount": null,
+   "name": "Fernando Niño",
+   "pos": "DEL",
+   "what": "buy",
+   "label": "buy Fernando Niño",
+   "step": "bid up to",
+   "amount": 41903847.3035337,
    "done": false,
-   "gain": null,
+   "gain": 74.9632181059904,
    "per": "season",
    "facts": [
     [
-     "rising",
-     "Alvaro Garcia",
-     "names"
+     "listed at",
+     40699484.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.667,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.923,
+     "chance"
+    ],
+    [
+     "",
+     25.4751014996803,
+     "trend"
+    ],
+    [
+     "money",
+     4851192.81167738,
+     "money"
+    ],
+    [
+     "",
+     1.78893402228651,
+     "per_million"
+    ],
+    [
+     "short by",
+     40887941.3035337,
+     "money"
+    ]
+   ]
+  },
+  {
+   "name": "Cesar Tarrega",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Cesar Tarrega",
+   "step": "bid in",
+   "amount": 4557282.0,
+   "done": true,
+   "gain": 19.3782830759444,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     4488264.0,
+     "money"
+    ],
+    [
+     "chance of helping",
+     0.77,
+     "chance"
+    ],
+    [
+     "",
+     17.4717186363244,
+     "trend"
+    ],
+    [
+     "money",
+     40507.8752532853,
+     "money"
+    ],
+    [
+     "",
+     3.97672214386533,
+     "per_million"
+    ],
+    [
+     "short by",
+     3857022.60172246,
+     "money"
     ]
    ]
   }
  ],
- "consider": [],
- "plan_gain": 80.1003327778004,
- "cash_after": 8124864.4611876,
- "can_bid": 89930840.6611876,
- "ping": "field Alvaro Garcia, Gerard Martin, Miguel Roman, Alvaro F. Carreras; sell Nahuel Tenaglia; sell Natan; buy Alvaro F. Carreras; buy Cesar Tarrega; buy Valentin Rosier; buy Fernando Niño; sell Yeray Alvarez; relist Mathew Ryan, Yeray Alvarez, Natan, Marcos Alonso, Miguel Roman, German Valera, Pablo Fornals, Pepelu, Iñigo Vicente, Ante Budimir, Georges Mikautadze, Nahuel Tenaglia; list Alvaro Garcia, Gerard Martin",
+ "plan_gain": 0.0,
+ "cash_after": 1015906.0,
+ "can_bid": 71868691.0,
+ "ping": "field Gerard Martin, Miguel Roman; sell Nahuel Tenaglia; sell Yeray Alvarez; relist Mathew Ryan, Yeray Alvarez, Natan, Marcos Alonso, Miguel Roman, German Valera, Pablo Fornals, Pepelu, Iñigo Vicente, Ante Budimir, Georges Mikautadze, Nahuel Tenaglia",
  "exposed": [
   {
    "name": "Ante Budimir",
    "pos": "DEL",
-   "clause": 71480259.0
+   "clause": 72464173.0
   },
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "clause": 21530747.0
+   "clause": 21511188.0
   },
   {
    "name": "Georges Mikautadze",
@@ -488,24 +282,19 @@
    "clause": 42016585.0
   },
   {
-   "name": "Natan",
-   "pos": "DEF",
-   "clause": 49657041.0
-  },
-  {
    "name": "Pablo Fornals",
    "pos": "MED",
    "clause": 58220110.0
   },
   {
+   "name": "Natan",
+   "pos": "DEF",
+   "clause": 49426124.0
+  },
+  {
    "name": "Marcos Alonso",
    "pos": "DEF",
    "clause": 28589508.0
-  },
-  {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
-   "clause": 31271675.0
   },
   {
    "name": "Gerard Martin",
@@ -515,17 +304,22 @@
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 15464068.0
+   "clause": 16047253.0
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 29113428.0
+   "clause": 30473402.0
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "clause": 31271675.0
   },
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 11808096.0
+   "clause": 11535120.0
   },
   {
    "name": "Alvaro Garcia",
@@ -547,22 +341,22 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 482.0,
-   "mean": 2210.93322683468,
-   "lo": 2044.24994756551,
-   "hi": 2377.61650610386,
-   "cash": -9387818.0,
+   "now": 492.0,
+   "mean": 2233.31025944786,
+   "lo": 2070.10358270316,
+   "hi": 2396.51693619255,
+   "cash": 97131.0,
    "estimated": true,
-   "p_above": 0.825297324823357
+   "p_above": 0.789087094932975
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 514.0,
-   "mean": 2049.35892200605,
-   "lo": 1903.8128496682,
-   "hi": 2194.9049943439,
-   "cash": -48221086.0,
+   "now": 516.0,
+   "mean": 2096.16446748015,
+   "lo": 1950.42281670902,
+   "hi": 2241.90611825128,
+   "cash": -42521086.0,
    "estimated": false,
    "p_above": null
   },
@@ -570,34 +364,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 387.0,
-   "mean": 1851.89799230861,
-   "lo": 1710.17675491736,
-   "hi": 1993.61922969985,
-   "cash": 53143453.0,
+   "mean": 1884.33837524068,
+   "lo": 1744.01145393734,
+   "hi": 2024.66529654402,
+   "cash": 56743453.0,
    "estimated": true,
-   "p_above": 0.106440385913122
+   "p_above": 0.0898330223455308
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 343.0,
-   "mean": 1754.31569328683,
-   "lo": 1620.40425659235,
-   "hi": 1888.22712998131,
-   "cash": 14279996.0,
+   "now": 354.0,
+   "mean": 1802.16286636127,
+   "lo": 1668.64552086583,
+   "hi": 1935.6802118567,
+   "cash": 19579996.0,
    "estimated": true,
-   "p_above": 0.0279502371613851
+   "p_above": 0.0283094420682631
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 370.0,
-   "mean": 1610.16519267418,
-   "lo": 1490.92786468129,
-   "hi": 1729.40252066708,
-   "cash": 50993671.0,
+   "now": 389.0,
+   "mean": 1642.8557984338,
+   "lo": 1521.85797101958,
+   "hi": 1763.85362584803,
+   "cash": 57193671.0,
    "estimated": true,
-   "p_above": 0.00138823370047425
+   "p_above": 0.00108151728175065
   }
  ]
 }
