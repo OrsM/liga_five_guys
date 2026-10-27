@@ -10,7 +10,7 @@ from collections.abc import Callable, Sequence
 from contextlib import closing
 from pathlib import Path
 from statistics import NormalDist
-from typing import Any
+from typing import Any, NamedTuple
 
 
 from ffcore.forecast import expected_points
@@ -242,66 +242,133 @@ def auction_bars() -> dict[tuple[str, dt.datetime], float | None]:
             for p, c, asking, bar in rows("SELECT player, close, asking, bar FROM auction_results")}
 
 
-def settled(u: Universe, acts: list[Action], bars: dict[tuple[str, dt.datetime], float | None],
-            close: dt.datetime) -> tuple[list[Action], int]:
-    """The moves as they came out at this close: a buy goes through if its bid
-    beats what it had to (auction_bars; it pays its own bid). The plan's
-    sales paid for its buys or made room for them, so with any bid lost they
-    are not made as planned: only the ones the money rule then needs are
-    (raised: the sales clearing a debt at fewest points), the rest the next
-    night's plan decides again. And how many bids lost."""
-    won = [a for a in acts if a.buy and (bar := bars.get((a.buy, close))) is not None and a.cost >= bar]
-    lost = sum(1 for a in acts if a.buy) - len(won)
-    if not lost:
-        return acts, 0
-    buys = [Action("buy", buy=a.buy, cost=a.cost) for a in won]
-    after = u.after(*buys)
-    return buys + [r.action for r in raised(after, [], after.rank(after.candidates())) or []], lost
+# The runs a day the board is acted on, local time as the closes are
+# (lfg.timer at 10:00, lfg-flip.timer at 21:45, Europe/Madrid): bids placed
+# at one stand until the next, which sees them as yours.
+RUNS = ((10, 0), (21, 45))
+
+
+def run_times(closes: list[dt.datetime]) -> dict[dt.datetime, dt.datetime]:
+    """Each run before a night's close (RUNS on its day), to that close."""
+    return {r: c for c in closes for h, m in RUNS
+            if (r := c.replace(hour=h, minute=m, second=0, microsecond=0)) < c}
+
+
+class Day(NamedTuple):
+    """The phantom between runs: his squad and cash, his bids in, and the
+    sales the last run left for after the auctions (pending)."""
+    squad: dict[str, str]
+    cash: float
+    bids: dict[str, float]
+    pending: tuple[Action, ...] = ()
+
+
+def acted(up: Universe, bids: dict[str, float], acts: list[Action]) -> tuple[Day, list[Action]]:
+    """A run's plan, made: its withdrawals taken back, its buys bid (a bid
+    already in keeps its amount), and its sales made at once, or, with any
+    bid placed, left for after the auctions (they pay for those bids or make
+    room for them: closed). The app refuses a bid that takes your bids in
+    past your cash and the debt it allows, 20% of your squad's value; a bid
+    on a player gone from the market is gone. And the moves made."""
+    m = up.market
+    bids = {k: b for k, b in bids.items() if k in m.price}
+    made, sales = [], []
+    for a in acts:
+        if a.kind == "withdraw":
+            bids.pop(a.sell[0], None)
+        elif a.sell:
+            sales.append(a)
+            continue
+        elif a.buy not in bids:
+            room = m.cash + 0.2 * sum(m.value.get(k, 0.0) for k in up.mine) - sum(bids.values())
+            if a.cost > room:
+                continue
+            bids[a.buy] = a.cost
+        made.append(a)
+    if any(k not in m.my_bid for k in bids):
+        return Day(dict(up.mine), m.cash, bids, tuple(sales)), made
+    return Day(up.squad_after(*sales), m.left(sales), bids), made + sales
+
+
+def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | None],
+           close: dt.datetime) -> tuple[Day, list[Action], int]:
+    """The auctions closing: a bid on a player whose auction closes then
+    (auction_bars) wins if it reaches what it had to and is paid, the player
+    yours; otherwise it is lost. Bids on the others stand. The sales left for
+    after the auctions are made if none was lost; with one lost, only those
+    the money rule then needs (raised: the sales clearing a debt at fewest
+    points), the rest the next run decides again. The day after, the sales
+    made and how many bids were lost."""
+    closing = {k: b for k, b in day.bids.items() if (k, close) in bars}
+    won = [k for k, b in closing.items() if (bar := bars[k, close]) is not None and b >= bar]
+    after = with_squad(up, up.squad_after(*(Action("buy", buy=k) for k in won)),
+                       up.market.cash - sum(closing[k] for k in won))
+    sales = list(day.pending) if len(won) == len(closing) else [
+        r.action for r in raised(after, [], after.rank(after.candidates())) or []]
+    return (Day(after.squad_after(*sales), after.market.left(sales),
+                {k: b for k, b in day.bids.items() if k not in closing}),
+            sales, len(closing) - len(won))
 
 
 def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
     """The league's sixth manager: your squad and cash at the first lock,
     then the plan (every player he or the manager beside him holds
-    forecast, though nobody may hold him now) this code makes for the squad and cash he has, made: at
-    each lock (bids win at the model's price), or with daily ten minutes
-    before each night's auctions close (auction_closes), his bids settled
-    against what the real auction took (settled). At each lock his eleven
-    picked from that lock's forecast from the squad he holds and scored on
-    what they got (nothing in debt, the game's rule), beside a manager who never moves, picked the same way.
-    One row a played jornada: both elevens' points and what the lock's
-    forecast expected of them, the moves made since the last, the bids
-    lost, his cash and his squad's worth after them."""
+    forecast, though nobody may hold him now) this code makes for the squad
+    and cash he has, made: at each lock (bids win at the model's price), or
+    with daily at each run the board is acted on (run_times), his bids
+    standing from one run to the next as yours do (acted) and settled at
+    each close against what the real auction took (closed). At each lock his
+    eleven picked from that lock's forecast from the squad he holds and
+    scored on what they got (nothing in debt, the game's rule), beside a
+    manager who never moves, picked the same way. One row a played jornada:
+    both elevens' points and what the lock's forecast expected of them, the
+    moves made since the last, the bids lost, his cash and his squad's worth
+    after them."""
     set_now(None)
     locks, actual = round_locks(), jornada_points()
     played = {locks[j] - dt.timedelta(minutes=1): j for j in done_jornadas() & set(locks)}
     first = min(played, default=None)
-    closes = {c - dt.timedelta(minutes=10): c for c in auction_closes()
-              if first is not None and c - dt.timedelta(minutes=10) > first} if daily else {}
+    runs = run_times([c for c in auction_closes() if first is not None and c > first]) if daily else {}
+    runs = {r: c for r, c in runs.items() if first is not None and r > first}
+    closes = set(runs.values())
     bars = auction_bars() if daily else {}
     squad: dict[str, str] | None = None
     hold: dict[str, str] = {}
+    bids: dict[str, float] = {}
+    pending: tuple[Action, ...] = ()
     cash = 0.0
     made: list[str] = []
     lost = 0
+    last: Universe | None = None
     out = []
     try:
-        for t in sorted(set(played) | set(closes)):
+        for t in sorted(set(played) | set(runs) | closes):
             if squad is None:
                 if t not in played or (start := universe_when(t)) is None:
                     continue
                 squad, hold, cash = dict(start.mine), dict(start.mine), start.market.cash
-            u = universe_when(t, frozenset(squad) | frozenset(hold))
+            if t in closes:
+                if last is not None:
+                    day, sold, n = closed(with_squad(last, squad, cash), Day(squad, cash, bids, pending), bars, t)
+                    squad, cash, bids, pending = day
+                    made += [a.label(last.market.names) for a in sold]
+                    lost += n
+                if t not in played and t not in runs:
+                    continue
+            u = universe_when(t, frozenset(squad) | frozenset(hold) | frozenset(bids))
             if u is None:
                 continue
-            up = with_squad(u, squad, cash)
-            if t in closes or not daily:
+            up = with_squad(u, squad, cash, bids)
+            if t in runs or not daily:
                 acts = [r.action for r in board(up).plan]
-                if t in closes:
-                    acts, n = settled(up, acts, bars, closes[t])
-                    lost += n
+                if daily:
+                    (squad, cash, bids, pending), acts = acted(up, bids, acts)
+                    up = with_squad(u, squad, cash, bids)
+                else:
+                    squad, cash = up.squad_after(*acts), up.market.left(acts)
+                    up = up.after(*acts)
                 made += [a.label(up.market.names) for a in acts]
-                squad, cash = up.squad_after(*acts), up.market.left(acts)
-                up = up.after(*acts)
+                last = u
             if t in played:
                 i = played[t]
                 fielded = up.outlook.xi
@@ -479,7 +546,49 @@ def _selftest_todo() -> None:
         "kept (a) or tried empty (b): done; another variant's (d) is not this one's; 9 unfinished"
 
 
+def _selftest_phantom() -> None:
+    """The phantom's day: bids placed at a run stand to the next and are
+    settled at the close."""
+    from dataclasses import replace
+    from ffcore.fixtures import tiny_market_universe
+    madrid = dt.timezone(dt.timedelta(hours=2))
+    close = dt.datetime(2026, 10, 20, 22, 24, tzinfo=madrid)
+    assert run_times([close]) == {close.replace(hour=10, minute=0): close,
+                                  close.replace(hour=21, minute=45): close}, "the morning run and the flip"
+    u = with_squad(tiny_market_universe(), dict(tiny_market_universe().mine), 5.5e6)
+    buy, sale = Action("buy", buy="cand_free", cost=5e6), Action("sell", sell=("bench_m",), proceeds=3e6)
+    day, made = acted(u, {}, [buy, sale])
+    assert (day.bids, day.cash, "bench_m" in day.squad, day.pending, made) \
+        == ({"cand_free": 5e6}, 5.5e6, True, (sale,), [buy]), \
+        "a buy is a bid in, paid only if it wins; the sale beside it waits for the auction"
+    alone, made = acted(u, {}, [sale])
+    assert (alone.cash, "bench_m" in alone.squad, alone.pending, made) == (8.5e6, False, (), [sale]), \
+        "a sale with no bid placed is made at once"
+    held = with_squad(u, day.squad, day.cash, day.bids)
+    assert held.market.my_bid == {"cand_free": 5e6}, "the next run sees it as your bid in"
+    again, made = acted(held, day.bids, [Action("buy", buy="cand_free", cost=6e6), sale])
+    assert (again.bids, again.pending, made[-1:]) == ({"cand_free": 5e6}, (), [sale]), \
+        "a bid already in keeps its amount, and places no new bid: the sale is made"
+    assert acted(held, day.bids, [Action("withdraw", sell=("cand_free",), proceeds=5e6)])[0].bids == {}, \
+        "withdrawn"
+    broke = with_squad(u, dict(u.mine), -1e6)
+    assert acted(broke, {}, [buy])[0].bids == {}, "5M of bids on -1M and 1M of allowed debt: the app refuses it"
+    gone = replace(held, market=replace(held.market, price={}))
+    assert acted(gone, day.bids, [])[0].bids == {}, "off the market: the bid is gone"
+    won, sold, n = closed(held, day, {("cand_free", close): 4.9e6}, close)
+    assert ("cand_free" in won.squad, "bench_m" in won.squad, won.cash, won.bids, sold, n) \
+        == (True, False, 3.5e6, {}, [sale], 0), "won: paid, yours, and the sale beside it made"
+    lost, sold, n = closed(held, day, {("cand_free", close): 5.2e6}, close)
+    assert ("cand_free" in lost.squad, "bench_m" in lost.squad, lost.cash, sold, n) \
+        == (False, True, 5.5e6, [], 1), "lost: no charge, and the sale it needed not made"
+    owing = with_squad(u, dict(u.mine), -1e6)
+    _o, sold, _n = closed(owing, day._replace(cash=-1e6), {("cand_free", close): 5.2e6}, close)
+    assert [a.sell for a in sold] == [("bench_m",)], "lost, in debt: the sale the money rule needs, fewest points"
+    assert closed(held, day, {}, close)[0].bids == {"cand_free": 5e6}, "his auction is not tonight: it stands"
+
+
 def _selftest() -> None:
+    _selftest_phantom()
     bt = [{"from": 7, "jornada": 8, "pred": {"a": (6.0, 0.5), "b": (2.0, 0.5)}, "hurt": ["b"]}]
     assert forecast_rows(bt, {("a", 8): 5.0}) == [
         {"from_j": 7, "jornada": 8, "player": "a", "predicted": 3.0, "plays": 0.5, "actual": 5.0, "flagged": 0},

@@ -535,11 +535,14 @@ def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> N
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
 
 
-def with_squad(u: Universe, squad: dict[str, str], cash: float) -> Universe:
-    """The league with this squad and cash as yours, and none of your bids
-    or the offers on your players (they are not these players')."""
+def with_squad(u: Universe, squad: dict[str, str], cash: float,
+               bids: dict[str, float] | None = None) -> Universe:
+    """The league with this squad, cash and bids in (on players still on
+    the market) as yours, and none of your own bids or the offers on your
+    players (they are not these players')."""
     return replace(u, state=replace(u.state, squads={**u.state.squads, u.me: dict(squad)}),
-                   market=replace(u.market, cash=cash, my_bid={}, offer={}, fetch={}))
+                   market=replace(u.market, cash=cash, offer={}, fetch={},
+                                  my_bid={k: b for k, b in (bids or {}).items() if k in u.market.price}))
 
 
 def rival_universe(u: Universe, mgr: str) -> Universe:
