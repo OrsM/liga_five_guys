@@ -1,13 +1,13 @@
 {
- "generated_at": "2026-10-27T09:02Z",
+ "generated_at": "2026-10-27T20:45Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": -42521086.0,
  "cash_locked": 11296820.0,
- "finish": 1.91,
+ "finish": 1.9,
  "p_win": 0.208,
  "band": [
-  1950.42281670902,
-  2241.90611825128
+  1950.42536206143,
+  2241.90873918042
  ],
  "do": [
   {
@@ -153,7 +153,7 @@
    "name": null,
    "pos": null,
    "what": "relist",
-   "label": "relist Mathew Ryan, Yeray Alvarez, Natan, Marcos Alonso, Miguel Roman, German Valera, Pablo Fornals, Pepelu, Iñigo Vicente, Ante Budimir, Georges Mikautadze, Nahuel Tenaglia",
+   "label": "relist Nahuel Tenaglia",
    "step": null,
    "amount": null,
    "done": false,
@@ -162,8 +162,26 @@
    "facts": [
     [
      "once the listing ends",
-     "2026-10-27T21:32:07+01:00",
+     "2026-10-28T10:22:20+01:00",
      "time"
+    ]
+   ]
+  },
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Pepelu, German Valera, Ante Budimir, Georges Mikautadze, Pablo Fornals, Marcos Alonso, Mathew Ryan, Natan, Iñigo Vicente, Miguel Roman",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": [
+    [
+     "rising",
+     "Pepelu, German Valera, Ante Budimir, Georges Mikautadze, Pablo Fornals, Marcos Alonso",
+     "names"
     ]
    ]
   }
@@ -264,7 +282,7 @@
  "plan_gain": 0.0,
  "cash_after": 1015906.0,
  "can_bid": 71868691.0,
- "ping": "field Gerard Martin, Miguel Roman; sell Nahuel Tenaglia; sell Yeray Alvarez; relist Mathew Ryan, Yeray Alvarez, Natan, Marcos Alonso, Miguel Roman, German Valera, Pablo Fornals, Pepelu, Iñigo Vicente, Ante Budimir, Georges Mikautadze, Nahuel Tenaglia",
+ "ping": "field Gerard Martin, Miguel Roman; sell Nahuel Tenaglia; sell Yeray Alvarez; relist Nahuel Tenaglia; list Pepelu, German Valera, Ante Budimir, Georges Mikautadze, Pablo Fornals, Marcos Alonso, Mathew Ryan, Natan, Iñigo Vicente, Miguel Roman",
  "exposed": [
   {
    "name": "Ante Budimir",
@@ -347,15 +365,15 @@
    "hi": 2396.51693619255,
    "cash": 97131.0,
    "estimated": true,
-   "p_above": 0.789087094932975
+   "p_above": 0.78908269679275
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 516.0,
-   "mean": 2096.16446748015,
-   "lo": 1950.42281670902,
-   "hi": 2241.90611825128,
+   "mean": 2096.16705062093,
+   "lo": 1950.42536206143,
+   "hi": 2241.90873918042,
    "cash": -42521086.0,
    "estimated": false,
    "p_above": null
@@ -364,12 +382,12 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 387.0,
-   "mean": 1884.33837524068,
-   "lo": 1744.01145393734,
-   "hi": 2024.66529654402,
-   "cash": 56743453.0,
+   "mean": 1871.45062285544,
+   "lo": 1731.30180852177,
+   "hi": 2011.59943718912,
+   "cash": 60509767.0,
    "estimated": true,
-   "p_above": 0.0898330223455308
+   "p_above": 0.0771790578629242
   },
   {
    "manager": "SusoGattuso",
@@ -380,18 +398,18 @@
    "hi": 1935.6802118567,
    "cash": 19579996.0,
    "estimated": true,
-   "p_above": 0.0283094420682631
+   "p_above": 0.0283083735186247
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 389.0,
-   "mean": 1642.8557984338,
-   "lo": 1521.85797101958,
-   "hi": 1763.85362584803,
+   "mean": 1643.26422142057,
+   "lo": 1522.25825988932,
+   "hi": 1764.27018295183,
    "cash": 57193671.0,
    "estimated": true,
-   "p_above": 0.00108151728175065
+   "p_above": 0.00109180177475565
   }
  ]
 }
