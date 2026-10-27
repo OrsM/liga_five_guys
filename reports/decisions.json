@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-10-27T20:45Z",
+ "generated_at": "2026-10-27T20:49Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": -42521086.0,
+ "cash": -15772964.0,
  "cash_locked": 11296820.0,
  "finish": 1.9,
  "p_win": 0.208,
@@ -12,61 +12,13 @@
  "do": [
   {
    "what": "field",
-   "label": "field Gerard Martin, Miguel Roman",
+   "label": "field Miguel Roman",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 3.13698971477847,
+   "gain": -1.07843357410961,
    "per": "next",
    "facts": []
-  },
-  {
-   "name": "Nahuel Tenaglia",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Nahuel Tenaglia",
-   "step": "take offer",
-   "amount": 26748122.0,
-   "done": false,
-   "gain": 26.1975737162524,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     24098539.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     1.0,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     24078755.3159463,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     3,
-     "count"
-    ],
-    [
-     "",
-     -19.5914945290857,
-     "trend"
-    ],
-    [
-     "money",
-     4761394.53939265,
-     "money"
-    ],
-    [
-     "",
-     0.979417310727551,
-     "per_million"
-    ]
-   ]
   },
   {
    "name": "Yeray Alvarez",
@@ -76,7 +28,7 @@
    "step": "take offer",
    "amount": 4113021.0,
    "done": false,
-   "gain": 2.14400654521054,
+   "gain": 0.54138034311353,
    "per": "season",
    "facts": [
     [
@@ -111,7 +63,7 @@
     ],
     [
      "",
-     0.521272939090401,
+     0.131625961334389,
      "per_million"
     ]
    ]
@@ -124,7 +76,7 @@
    "step": "listed",
    "amount": null,
    "done": true,
-   "gain": -19.5154285870598,
+   "gain": -20.2403136708278,
    "per": "season",
    "facts": [
     [
@@ -144,44 +96,8 @@
     ],
     [
      "",
-     -1.53957565974948,
+     -1.59676197395754,
      "per_million"
-    ]
-   ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "relist",
-   "label": "relist Nahuel Tenaglia",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "once the listing ends",
-     "2026-10-28T10:22:20+01:00",
-     "time"
-    ]
-   ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Pepelu, German Valera, Ante Budimir, Georges Mikautadze, Pablo Fornals, Marcos Alonso, Mathew Ryan, Natan, Iñigo Vicente, Miguel Roman",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Pepelu, German Valera, Ante Budimir, Georges Mikautadze, Pablo Fornals, Marcos Alonso",
-     "names"
     ]
    ]
   }
@@ -281,8 +197,8 @@
  ],
  "plan_gain": 0.0,
  "cash_after": 1015906.0,
- "can_bid": 71868691.0,
- "ping": "field Gerard Martin, Miguel Roman; sell Nahuel Tenaglia; sell Yeray Alvarez; relist Nahuel Tenaglia; list Pepelu, German Valera, Ante Budimir, Georges Mikautadze, Pablo Fornals, Marcos Alonso, Mathew Ryan, Natan, Iñigo Vicente, Miguel Roman",
+ "can_bid": 67048983.2,
+ "ping": "field Miguel Roman; sell Yeray Alvarez",
  "exposed": [
   {
    "name": "Ante Budimir",
@@ -345,11 +261,6 @@
    "clause": 13097547.0
   },
   {
-   "name": "Nahuel Tenaglia",
-   "pos": "DEF",
-   "clause": 25643480.0
-  },
-  {
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "clause": 6931556.0
@@ -374,7 +285,7 @@
    "mean": 2096.16705062093,
    "lo": 1950.42536206143,
    "hi": 2241.90873918042,
-   "cash": -42521086.0,
+   "cash": -15772964.0,
    "estimated": false,
    "p_above": null
   },
