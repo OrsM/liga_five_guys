@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-28T19:19Z",
+ "generated_at": "2026-10-28T19:34Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 15164825.0,
- "cash_locked": 9473887.0,
+ "cash_locked": 10647283.0,
  "finish": 1.85,
  "p_win": 0.252,
  "p_win_after": 0.29,
@@ -146,6 +146,11 @@
      "money"
     ],
     [
+     "your bid",
+     581012.0,
+     "money"
+    ],
+    [
      "chance to win",
      0.8,
      "chance"
@@ -191,6 +196,11 @@
     [
      "listed at",
      591382.0,
+     "money"
+    ],
+    [
+     "your bid",
+     592384.0,
      "money"
     ],
     [
