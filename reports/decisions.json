@@ -1,12 +1,12 @@
 {
- "generated_at": "2026-10-28T09:02Z",
+ "generated_at": "2026-10-28T18:21Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 15164825.0,
  "cash_locked": 9473887.0,
  "finish": 1.85,
  "p_win": 0.252,
- "p_win_after": 0.309,
- "lam": 0.418442752865416,
+ "p_win_after": 0.29,
+ "lam": 0.420353516841764,
  "band": [
   1975.22914282003,
   2267.94737654174
@@ -14,16 +14,16 @@
  "do": [
   {
    "what": "field",
-   "label": "field Bil Nsongo, Alvaro Garcia",
+   "label": "field Bil Nsongo",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 3.2370762046833,
+   "gain": 1.27736484170922,
    "per": "next",
    "facts": [
     [
      "bench",
-     "Yeray Alvarez",
+     "Iñigo Vicente",
      "names"
     ]
    ]
@@ -33,9 +33,9 @@
    "pos": "DEL",
    "what": "buy",
    "label": "buy Bil Nsongo",
-   "step": "bid in",
-   "amount": 9473887.0,
-   "done": true,
+   "step": "bid up to",
+   "amount": 9993447.78098411,
+   "done": false,
    "gain": 18.6788240022004,
    "per": "season",
    "facts": [
@@ -43,6 +43,16 @@
      "listed at",
      9204574.0,
      "money"
+    ],
+    [
+     "your bid",
+     9473887.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.767,
+     "chance"
     ],
     [
      "chance of helping",
@@ -67,54 +77,6 @@
     [
      "",
      1.86910708011535,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Luka Sucic",
-   "pos": "MED",
-   "what": "buy",
-   "label": "buy Luka Sucic",
-   "step": "bid up to",
-   "amount": 27615432.0,
-   "done": false,
-   "gain": 18.1519964808765,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     27615432.0,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.85,
-     "chance"
-    ],
-    [
-     "chance of helping",
-     0.692,
-     "chance"
-    ],
-    [
-     "chance of first",
-     3.79,
-     "first"
-    ],
-    [
-     "",
-     3.60068839166363,
-     "trend"
-    ],
-    [
-     "money",
-     700050.674942244,
-     "money"
-    ],
-    [
-     "",
-     0.65731350792834,
      "per_million"
     ]
    ]
@@ -262,128 +224,12 @@
      "per_million"
     ]
    ]
-  },
-  {
-   "name": "Alvaro F. Carreras",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Alvaro F. Carreras",
-   "step": "listed",
-   "amount": null,
-   "done": true,
-   "gain": -1.13512587947349,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     5519055.0,
-     "money"
-    ],
-    [
-     "only pays if you win",
-     "Bil Nsongo, Luka Sucic, Angel Recio, Alvaro Odriozola, Manu Bueno",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.428,
-     "chance"
-    ],
-    [
-     "",
-     -23.5586866713474,
-     "trend"
-    ],
-    [
-     "chance of first",
-     -0.3,
-     "first"
-    ],
-    [
-     "money",
-     584967.961886979,
-     "money"
-    ],
-    [
-     "",
-     -0.205673956768594,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Iñigo Vicente",
-   "step": "wait",
-   "amount": 26164965.5731081,
-   "done": true,
-   "gain": -21.949165142332,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     26463608.0,
-     "money"
-    ],
-    [
-     "offer",
-     25219343.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.38,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     26164965.5731081,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     2,
-     "count"
-    ],
-    [
-     "only pays if you win",
-     "Bil Nsongo, Luka Sucic, Angel Recio, Alvaro Odriozola, Manu Bueno",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.428,
-     "chance"
-    ],
-    [
-     "",
-     -15.6470163850262,
-     "trend"
-    ],
-    [
-     "chance of first",
-     -3.87,
-     "first"
-    ],
-    [
-     "money",
-     1564289.02446032,
-     "money"
-    ],
-    [
-     "",
-     -0.838876133087328,
-     "per_million"
-    ]
-   ]
   }
  ],
- "plan_gain": 27.3276721229043,
- "cash_after": 4304405.66840521,
- "can_bid": 77156488.2684052,
- "ping": "field Bil Nsongo, Alvaro Garcia; buy Luka Sucic; buy Angel Recio; buy Alvaro Odriozola; buy Manu Bueno",
+ "plan_gain": 19.3707849645418,
+ "cash_after": 235817.095297128,
+ "can_bid": 73087899.6952971,
+ "ping": "field Bil Nsongo; buy Bil Nsongo; buy Angel Recio; buy Alvaro Odriozola; buy Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
