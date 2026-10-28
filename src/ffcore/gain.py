@@ -4,6 +4,7 @@ sums. Why not simulated: docs/notes/gain.md."""
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 import sqlite3
 import statistics
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from statistics import NormalDist
 from ffcore.forecast import Bootstrap
 from ffcore.rules import SHAPES, Squad, Squads
 
-__all__ = ["Standings", "eleven", "gains", "standings"]
+__all__ = ["Standings", "cell_variance", "eleven", "gains", "standings"]
 
 SCHEMA = """
 CREATE TABLE cell (jornada INTEGER, player TEXT, e REAL, m REAL, v REAL,
@@ -87,15 +88,22 @@ def _con() -> sqlite3.Connection:
     return _CON[0]
 
 
+def cell_variance(fc: Bootstrap) -> Callable[[float, float], float]:
+    """A forecast cell's match variance as the Bootstrap draws it (points if
+    he plays pts, chance p): p*pts^2*E[pool^2]/mean(pool)^2 - (p*pts)^2."""
+    m2 = statistics.fmean(x * x for x in fc.pool) / fc.pool_mean ** 2
+    return lambda pts, p: p * pts * pts * m2 - (p * pts) ** 2
+
+
 def _db(fc: Bootstrap) -> sqlite3.Connection:
     """The connection, with this forecaster's cells loaded."""
     db = _con()
     if not _CELLS or _CELLS[0] is not fc:
-        m2 = statistics.fmean(x * x for x in fc.pool) / fc.pool_mean ** 2
+        var = cell_variance(fc)
         with db:
             db.execute("DELETE FROM cell")
             db.executemany("INSERT INTO cell VALUES (?, ?, ?, ?, ?)",
-                           ((j, k, pts * p, pts * p, p * pts * pts * m2 - (p * pts) ** 2)
+                           ((j, k, pts * p, pts * p, var(pts, p))
                             for j, cells in fc.per_jornada.items() for k, (pts, p) in cells.items()))
         _CELLS[:] = [fc]
     return db

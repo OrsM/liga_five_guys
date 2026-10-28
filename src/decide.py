@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from ffcore.action import Action
 from ffcore.forecast import Bootstrap, expected_points
-from ffcore.gain import Standings, moments, normal_above, standings
+from ffcore.gain import Standings, cell_variance, moments, normal_above, standings
 from ffcore import pricing
 from ffcore.market import Market
 from ffcore.outlook import Outlook
@@ -31,6 +31,12 @@ MONEY_RATE = 8.0
 # What each move costs the plan by itself, in points: none worth making
 # that gains nothing (a tie goes to doing nothing).
 TIE = 1e-4
+# How much a point of season variance is worth, in points, for each plan
+# the program makes (Hunter, Vielma and Zaman, arXiv 1604.01455): above 0 it
+# seeks variance, below it avoids it. Of the plans, the one that most
+# raises your chance of first (Move.d_first) is made: behind the leader a
+# riskier one, ahead a steadier one (docs/notes/plan.md).
+KAPPAS = (0.0, -0.05, -0.02, 0.02, 0.05)
 
 @dataclass(frozen=True)
 class Move:
@@ -198,10 +204,19 @@ def plan(u: Universe, rows: list[Move]) -> tuple[list[Move], float]:
     fields from it, so moves are valued as a set against the slots. A buy's
     chosen bid is ranked again at it, with its chance of winning. What a
     million is worth: the budget's price in the program's linear
-    relaxation, in points a million."""
-    chosen, _value, _price = program(u, rows, relax=False)
-    _x, _v, lam = program(u, rows, relax=True)
-    return [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in chosen], lam
+    relaxation, in points a million. The program is solved at each of
+    KAPPAS, a weight on the season's variance, and the plan that most raises
+    your chance of first is the one made."""
+    best: tuple[float, list[Move], float] | None = None
+    for kappa in KAPPAS:
+        chosen, _value, _price = program(u, rows, relax=False, kappa=kappa)
+        moves = [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in chosen]
+        first = joint(u, moves).d_first if moves else 0.0
+        if best is None or first > best[0] + 1e-9:
+            best = (first, moves, kappa)
+    assert best is not None
+    _x, _v, lam = program(u, rows, relax=True, kappa=best[2])
+    return best[1], lam
 
 
 def options(u: Universe, rows: list[Move]) -> list[Move]:
@@ -220,8 +235,8 @@ def options(u: Universe, rows: list[Move]) -> list[Move]:
     return out
 
 
-def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = None
-            ) -> tuple[list[Move], float, float]:
+def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = None,
+            kappa: float = 0.0) -> tuple[list[Move], float, float]:
     """The plan's program over the options of these moves: the options it
     makes, the objective, and the budget's price (relax: its linear
     relaxation, where the price is defined); force: a move the plan must
@@ -235,7 +250,9 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     rule holds if every bid wins: cash at the lock, after every bid and
     every sale, at least zero. A squad that fields a side keeps one if every
     bid that can lose does. Objective: the elevens' expected points and the moves'
-    money at MONEY_RATE, less TIE a move."""
+    money at MONEY_RATE, less TIE a move, and kappa times the elevens'
+    season variance (gain.py's: each cell's match variance and the
+    persistent share, the latter taken at each player's own season)."""
     import highspy
 
     m = u.market
@@ -252,7 +269,16 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
         h.addConstr(sum(x for o, x in bids if o.action.buy == k) <= 1)
     pos = {k: position(m.pos.get(k)) for k in [*u.mine, *(o.action.buy for o, _x in bids)]}
     to_come = [j for j in u.state.jornadas if j not in u.part_played]
-    cells = u.forecaster.per_jornada
+    fc = u.forecaster
+    cells, var, s2 = fc.per_jornada, cell_variance(fc), fc.share ** 2
+    season = {k: sum(expected_points(cells.get(j, {}).get(k)) for j in to_come) for k in pos}
+
+    def worth(k: str, j: int) -> float:
+        """What his place in jornada j's eleven adds: its expected points and
+        kappa times its variance."""
+        cell = cells.get(j, {}).get(k)
+        e = expected_points(cell)
+        return e + kappa * ((1 + s2) * (var(*cell) if cell else 0.0) + s2 * season[k] * e)
     points = []
     for j in to_come:
         shape = [binary() for _s in SHAPES]
@@ -268,8 +294,8 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
             empty = h.addVariable(0.0, MAX_SLOT[p])
             h.addConstr(sum(xi.values()) + sum(o.win * y for o, y in yi) + empty
                         == sum(sh[p] * z for sh, z in zip(SHAPES, shape)))
-            points += [expected_points(cells.get(j, {}).get(k)) * x for k, x in xi.items()]
-            points += [expected_points(cells.get(j, {}).get(o.action.buy)) * o.win * y for o, y in yi]
+            points += [worth(k, j) * x for k, x in xi.items()]
+            points += [worth(o.action.buy, j) * o.win * y for o, y in yi]
     if _fieldable(u.mine):
         lost = [binary() for _s in SHAPES]
         h.addConstr(sum(lost) == 1)
@@ -714,6 +740,23 @@ def _selftest_program() -> None:
     sold = plan_of(0.0, {"ace": ((1.0, 0.5),)}, value={"f1": 10e6})
     assert not ("sell f1" in sold and "buy ace" in sold), \
         ("selling your only forward to bid on another: if the bid is lost you field no forward", sold)
+
+    # the result wanted is first: behind, the riskier of two buys alike on average; ahead, the steadier
+    eleven = {"k": "POR", **{"d%d" % i: "DEF" for i in range(1, 5)}, **{"m%d" % i: "MED" for i in range(1, 5)},
+              "f1": "DEL", "f2": "DEL"}
+    theirs = {"r_" + k: v for k, v in eleven.items()}
+    cells2 = {j: {**{k: (3.0, 1.0) for k in [*eleven, *theirs]}, "m4": (0.5, 1.0),
+                  "steady": (3.0, 1.0), "swing": (6.0, 0.5)} for j in js}
+    def bought(lead: float) -> set[str]:
+        uu = Universe(state=LeagueState({"me": dict(eleven), "riv": dict(theirs)}, js, "me",
+                                        carried={"me": max(lead, 0.0), "riv": max(-lead, 0.0)}),
+                      forecaster=Bootstrap(cells2),
+                      market=Market(cash=1e6, pos={**eleven, **theirs, "steady": "MED", "swing": "MED"},
+                                    price={"steady": 1e6, "swing": 1e6}))
+        return {m.action.buy for m in board(uu).plan if m.action.buy}
+    assert bought(-40.0) == {"swing"} and bought(40.0) == {"steady"}, \
+        ("the same points on average: behind, the swing of the one who plays half the time is a chance to catch up;"
+         " ahead, the steady one keeps the lead", bought(-40.0), bought(40.0))
 
 
 if __name__ == "__main__":
