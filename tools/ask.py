@@ -67,10 +67,10 @@ def fate(u: Universe, b: Board, r: Move) -> str:
         return step(plan, "in the plan")
     _x, best, _p = program(u, b.rows, relax=False)
     took, worse, _q = program(u, b.rows, relax=False, force=r)
-    if not any(took):
+    if not took:
         return step(plan, "left out: the plan cannot make it (no side to field, or no money for it)")
     names = u.market.names
-    with_it = [m.action.label(names) for m, t in zip(b.rows, took) if t and m is not r]
+    with_it = [o.action.label(names) for o in took if o.action.players != r.action.players]
     return step(plan, "left out: made, the plan does %.1f points worse%s; a million is worth %.2f points now" % (
         best - worse, " (with %s)" % ", ".join(with_it) if with_it else "", b.lam))
 
@@ -193,8 +193,9 @@ def _selftest() -> None:
         said = fate(u, b, r)
         assert said == "3/3 plan: in the plan" if r in b.plan else said.startswith("3/3 plan: left out"), said
     keeper = next(r for r in b.rows if r.action.sell == ("k",))
-    assert keeper not in b.plan and "points worse" in fate(u, b, keeper), \
-        "selling your only keeper: what it costs the plan, in points"
+    said = fate(u, b, keeper)
+    assert keeper not in b.plan and "points worse" in said and "sell k" not in said.split("(with")[-1], \
+        ("selling your only keeper: what it costs the plan, and what else it would then make", said)
     accented = replace(u, market=replace(u.market, name={
         **u.market.name, "cand_free": Name("Iñigo Vicente"), "cand_rival": Name("Iñigo Martínez")}))
     assert find(accented, ["inigo", "vicente"]) == "cand_free", "accents never count"

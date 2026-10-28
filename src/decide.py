@@ -17,7 +17,7 @@ from ffcore.rules import MAX_SLOT, POSITIONS, SHAPES, Squad, Squads, position, s
 from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState
 
-__all__ = ["Action", "Board", "FUNNEL", "Move", "Universe", "board", "joint", "plan", "program"]
+__all__ = ["Action", "Board", "FUNNEL", "Move", "Universe", "board", "joint", "options", "plan", "program"]
 
 # What a million of your worth (cash and squad value) left at the horizon is
 # worth in season points: a move's money (Market.money, MONEY_H updates on)
@@ -121,19 +121,6 @@ class Universe:
             return None
         return Action("buy", buy=k, cost=m.price[k])
 
-    def bid(self, a: Action, total: float) -> tuple[Action, float]:
-        """A buy at the bid worth most, and its chance of winning: of the bids
-        over asking his auction's odds offer (Market.odds), the one whose
-        chance times what the move is then worth (total, scored at asking,
-        less what bidding more costs at MONEY_RATE) is greatest, the lowest
-        of equals. One with no odds, or worth nothing, stays at asking."""
-        odds = self.market.odds.get(a.buy, ())
-        if total <= 0 or not odds:
-            return a, odds[0][1] if odds else 1.0
-        asking = self.market.price[a.buy]
-        ratio, p = max(odds, key=lambda o: (o[1] * (total - MONEY_RATE * (o[0] - 1) * asking / 1e6), -o[0]))
-        return replace(a, cost=asking * ratio), p
-
     def after(self, *acts: Action) -> Universe:
         """The league once these moves are made, your cash with it."""
         return replace(self, state=replace(self.state, squads=apply(self, *acts)),
@@ -166,12 +153,13 @@ class Universe:
 
     def rank(self, acts: list[Action]) -> list[Move]:
         """Each move, scored against doing nothing (score), best first; a buy
-        at the bid worth most (bid), scored again at it; a sale marked if it
-        leaves no side to field (Move.alone)."""
-        bids = [self.bid(a, g) if a.buy else (a, 1.0)
-                for a, (g, _p, _c, _f) in zip(acts, score(self, [[a] for a in acts]))]
-        return sorted((Move(a, g, p, c, win, bool(a.buy) or _fieldable(self.squad_after(a)), f)
-                       for (a, win), (g, p, c, f) in zip(bids, score(self, [[a] for a, _w in bids]))),
+        at its cost, with its auction's chance at the lowest bid it offers
+        (the plan chooses the bid: options); a sale marked if it leaves no
+        side to field (Move.alone)."""
+        odds = self.market.odds
+        return sorted((Move(a, g, p, c, (odds.get(a.buy) or ((1.0, 1.0),))[0][1] if a.buy else 1.0,
+                            bool(a.buy) or _fieldable(self.squad_after(a)), f)
+                       for a, (g, p, c, f) in zip(acts, score(self, [[a] for a in acts]))),
                       key=lambda mv: (-mv.d_pts, mv.action.net))
 
 
@@ -205,57 +193,96 @@ def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, flo
 def plan(u: Universe, rows: list[Move]) -> tuple[list[Move], float]:
     """The best set of the ranked moves, made together, and what a million
     is worth at the margin (docs/notes/plan.md). One integer program
-    (program): which of yours to keep, which buys to make, and the eleven
-    each jornada to come fields from the squad that leaves, so moves are
-    valued as a set against the slots; your cash at the lock at least zero
-    (the game's money rule: below it you score nothing). Objective: the
-    elevens' expected points and the moves' money at MONEY_RATE, the
-    measure score ranks by, less TIE a move. What a million is worth: the price of the
-    budget in the program's linear relaxation, in points a million."""
+    (program) over each sale and each buy at each bid its auction offers
+    (options): the squad that leaves and the eleven each jornada to come
+    fields from it, so moves are valued as a set against the slots. A buy's
+    chosen bid is ranked again at it, with its chance of winning. What a
+    million is worth: the budget's price in the program's linear
+    relaxation, in points a million."""
     chosen, _value, _price = program(u, rows, relax=False)
     _x, _v, lam = program(u, rows, relax=True)
-    return [r for r, take in zip(rows, chosen) if take], lam
+    return [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in chosen], lam
+
+
+def options(u: Universe, rows: list[Move]) -> list[Move]:
+    """What the plan chooses from: each sale as ranked, and each buy at every
+    bid his auction's odds offer (Market.odds; at asking, sure, with none),
+    with its chance of winning (Move.win) and its money at that bid."""
+    m, out = u.market, []
+    for r in rows:
+        if not r.action.buy:
+            out.append(r)
+            continue
+        asking = m.price[r.action.buy]
+        for ratio, p in m.odds.get(r.action.buy) or ((1.0, 1.0),):
+            a = replace(r.action, cost=asking * ratio)
+            out.append(replace(r, action=a, win=p, money=m.money([a], pricing.MONEY_H)[0]))
+    return out
 
 
 def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = None
-            ) -> tuple[list[bool], float, float]:
-    """The plan's program over these moves (each a sale of one of yours or
-    a buy of one player): whether each is made, the objective, and the
-    budget's price (relax: its linear relaxation, where the price is
-    defined); force: a move the plan must make (what it costs the plan). Each jornada's eleven is one formation (rules.SHAPES) from the
-    squad after the moves; a slot nobody fills scores nothing (empty)."""
+            ) -> tuple[list[Move], float, float]:
+    """The plan's program over the options of these moves: the options it
+    makes, the objective, and the budget's price (relax: its linear
+    relaxation, where the price is defined); force: a move the plan must
+    make, at some bid (what it costs the plan).
+
+    One bid at most a player. Each jornada's eleven is one formation
+    (rules.SHAPES) from the squad after the moves; a slot nobody fills
+    scores nothing (empty). A bid that wins with chance P holds his slot
+    that share of the time, the rest left to whoever else would fill it,
+    and brings its points and its money that share of the time. The money
+    rule holds if every bid wins: cash at the lock, after every bid and
+    every sale, at least zero. A squad that fields a side keeps one if every
+    bid that can lose does. Objective: the elevens' expected points and the moves'
+    money at MONEY_RATE, less TIE a move."""
     import highspy
 
     m = u.market
     h = highspy.Highs()
     h.setOptionValue("output_flag", False)
     h.setOptionValue("mip_rel_gap", 0.0)
-    made = [h.addVariable(0.0, 1.0) if relax else h.addBinary() for _r in rows]
-    sold = {r.action.sell[0]: x for r, x in zip(rows, made) if not r.action.buy}
-    bought = {r.action.buy: x for r, x in zip(rows, made) if r.action.buy}
-    inn = {k: 1 - sold[k] if k in sold else 1 for k in u.mine} | bought
-    pos = {k: position(m.pos.get(k)) for k in inn}
+    binary = (lambda: h.addVariable(0.0, 1.0)) if relax else h.addBinary
+    opts = options(u, rows)
+    made = [binary() for _o in opts]
+    sold = {o.action.sell[0]: x for o, x in zip(opts, made) if not o.action.buy}
+    keep = {k: 1 - sold[k] if k in sold else 1 for k in u.mine}
+    bids = [(o, x) for o, x in zip(opts, made) if o.action.buy]
+    for k in {o.action.buy for o, _x in bids}:
+        h.addConstr(sum(x for o, x in bids if o.action.buy == k) <= 1)
+    pos = {k: position(m.pos.get(k)) for k in [*u.mine, *(o.action.buy for o, _x in bids)]}
     to_come = [j for j in u.state.jornadas if j not in u.part_played]
     cells = u.forecaster.per_jornada
     points = []
     for j in to_come:
-        shape = [h.addVariable(0.0, 1.0) if relax else h.addBinary() for _s in SHAPES]
+        shape = [binary() for _s in SHAPES]
         h.addConstr(sum(shape) == 1)
         for p in POSITIONS:
-            xi = {k: h.addVariable(0.0, 1.0) for k in inn if pos[k] == p}
-            empty = h.addVariable(0.0, MAX_SLOT[p])
+            xi = {k: h.addVariable(0.0, 1.0) for k in u.mine if pos[k] == p}
+            yi = [(o, h.addVariable(0.0, 1.0)) for o, _x in bids if pos[o.action.buy] == p]
             for k, x in xi.items():
-                if k in sold or k in bought:
-                    h.addConstr(x <= inn[k])
-            h.addConstr(sum(xi.values()) + empty == sum(sh[p] * x for sh, x in zip(SHAPES, shape)))
+                if k in sold:
+                    h.addConstr(x <= keep[k])
+            for (o, y), x in ((oy, x) for oy in yi for o2, x in bids if o2 is oy[0]):
+                h.addConstr(y <= x)
+            empty = h.addVariable(0.0, MAX_SLOT[p])
+            h.addConstr(sum(xi.values()) + sum(o.win * y for o, y in yi) + empty
+                        == sum(sh[p] * z for sh, z in zip(SHAPES, shape)))
             points += [expected_points(cells.get(j, {}).get(k)) * x for k, x in xi.items()]
-    budget = h.addConstr(sum(r.action.net / 1e6 * x for r, x in zip(rows, made)) <= m.cash / 1e6)
-    for r, x in zip(rows, made):
-        if r is force:
-            h.addConstr(x == 1)
-    h.maximize(sum(points) + sum((MONEY_RATE * r.money - TIE) * x for r, x in zip(rows, made)))
+            points += [expected_points(cells.get(j, {}).get(o.action.buy)) * o.win * y for o, y in yi]
+    if _fieldable(u.mine):
+        lost = [binary() for _s in SHAPES]
+        h.addConstr(sum(lost) == 1)
+        for p in POSITIONS:
+            h.addConstr(sum(keep[k] for k in u.mine if pos[k] == p)
+                        + sum(x for o, x in bids if o.win >= 1.0 and pos[o.action.buy] == p)
+                        >= sum(sh[p] * z for sh, z in zip(SHAPES, lost)))
+    budget = h.addConstr(sum(o.action.net / 1e6 * x for o, x in zip(opts, made)) <= m.cash / 1e6)
+    if force is not None:
+        h.addConstr(sum(x for o, x in zip(opts, made) if o.action.players == force.action.players) == 1)
+    h.maximize(sum(points) + sum((MONEY_RATE * o.win * o.money - TIE) * x for o, x in zip(opts, made)))
     sol = h.getSolution()
-    return ([sol.col_value[x.index] > 0.5 for x in made], h.getInfo().objective_function_value,
+    return ([o for o, x in zip(opts, made) if sol.col_value[x.index] > 0.5], h.getInfo().objective_function_value,
             abs(sol.row_dual[budget.index]) if relax else 0.0)
 
 
@@ -274,12 +301,14 @@ FUNNEL = (Universe.candidates, Universe.rank, plan)
 
 def board(u: Universe) -> Board:
     """The funnel end to end: what the report shows and ask.py explains.
-    Every move ranked from your squad as it is, the plan the program makes
-    of them (in debt, the sales that clear it are among its moves), what
+    Every move ranked from your squad as it is (a buy the plan makes, at
+    its bid), the plan the program makes of them (in debt, the sales that clear it are among its moves), what
     they gain together and what a million is worth."""
     rows = u.rank(u.candidates())
     picked, lam = plan(u, rows)
-    return Board(picked, joint(u, picked).d_pts if picked else 0.0, rows, u, lam)
+    made = {m.action.players: m for m in picked}
+    return Board(picked, joint(u, picked).d_pts if picked else 0.0,
+                 [made.get(r.action.players, r) for r in rows], u, lam)
 
 
 def _fieldable(squad: Squad) -> bool:
@@ -360,22 +389,6 @@ def _selftest_funnel() -> None:
     assert not any(a.buy == "th_m1" for a in open_th.candidates()), \
         "not even when his clause can be paid: no clause buys"
     assert next(a for a in acts if a.buy == "star").cost == 10e6, "a buy is offered at asking"
-    contested = replace(u, market=replace(u.market, odds={"star": ((1.0, 0.2), (1.25, 1.0))}))
-    likely = replace(u, market=replace(u.market, odds={"star": ((1.0, 0.95), (1.25, 1.0))},
-                                       value={**u.market.value, "star": 10e6}))
-    was = globals()["MONEY_RATE"]
-    try:
-        globals()["MONEY_RATE"] = 0.0
-        bought = next(r for r in contested.rank(contested.candidates()) if r.action.buy == "star")
-        assert (bought.action.cost, bought.win) == (12.5e6, 1.0), \
-            "a contested auction: the bid that wins, worth five times one at asking"
-        for rate, cost in ((0.0, 12.5e6), (3.0, 10e6)):
-            globals()["MONEY_RATE"] = rate
-            bought = next(r for r in likely.rank(likely.candidates()) if r.action.buy == "star")
-            assert bought.action.cost == cost, (rate, bought, "points alone pay 2.5M for the last 5%; "
-                                                          "at 3 points a million they do not")
-    finally:
-        globals()["MONEY_RATE"] = was
     sells = {r.action.sell: r for r in u.rank(acts) if r.action.kind == "sell"}
     assert sells[("me_bench",)].alone and not sells[("me_k",)].alone, \
         "a spare can be sold by himself; your only keeper cannot"
@@ -665,6 +678,42 @@ def _selftest_program() -> None:
     rich = replace(owing, market=replace(owing.market, cash=50e6))
     assert board(rich).plan == [] and board(rich).lam == 0.0, \
         "with cash and nothing worth buying, a million more is worth nothing now"
+
+    # bids: an amount each, with its chance of winning; the budget if all win, the squad if all lose
+    xi = {"k": "POR", **{"d%d" % i: "DEF" for i in range(1, 5)}, **{"m%d" % i: "MED" for i in range(1, 5)},
+          "f1": "DEL", "f2": "DEL"}
+    base = {j: {**{k: (3.0, 1.0) for k in xi}, "m5": (3.0, 1.0), "ace": (9.0, 1.0), "sure": (6.0, 1.0), "long": (6.0, 1.0)} for j in js}
+    def plan_of(cash: float, odds: dict[str, tuple[tuple[float, float], ...]], value: dict[str, float] | None = None,
+                price: dict[str, float] | None = None, rate: float = 0.0) -> dict[str, float]:
+        was = globals()["MONEY_RATE"]
+        try:
+            globals()["MONEY_RATE"] = rate
+            uu = Universe(state=LeagueState({"me": dict(xi)}, js, "me"), forecaster=Bootstrap(base),
+                          market=Market(cash=cash, pos={**xi, "m5": "MED", "ace": "DEL", "sure": "MED", "long": "MED"},
+                                        price=price or {"ace": 10e6}, odds=odds, value=value or {}))
+            got = board(uu)
+            assert all(m in got.rows for m in got.plan), "the plan's moves are the board's rows"
+            return {m.action.label(): m.action.cost or m.action.proceeds for m in got.plan}
+        finally:
+            globals()["MONEY_RATE"] = was
+    assert plan_of(20e6, {"ace": ((1.0, 0.2), (1.25, 1.0))}) == {"buy ace": 12.5e6}, \
+        "a contested auction: the bid that wins, worth five times one at asking"
+    assert plan_of(20e6, {"ace": ((1.0, 0.95), (1.25, 1.0))}, value={"ace": 10e6}) == {"buy ace": 12.5e6} \
+        and plan_of(20e6, {"ace": ((1.0, 0.95), (1.25, 1.0))}, value={"ace": 10e6}, rate=3.0) == {"buy ace": 10e6}, \
+        "points alone pay 2.5M for the last 5%; at 3 points a million they do not"
+    assert plan_of(10e6, {"sure": ((1.0, 1.0),), "long": ((1.0, 0.1),)},
+                   price={"sure": 6e6, "long": 6e6}) == {"buy sure": 6e6}, \
+        "the same points, one sure to come and one a long shot: room for one, the sure one"
+    assert len(plan_of(10e6, {"sure": ((1.0, 0.5),), "long": ((1.0, 0.5),)},
+                       price={"sure": 6e6, "long": 6e6})) == 1, \
+        "two bids of 6M on 10M: half the time each, but both may win, and then you are 2M under at the lock"
+    lone = {**{k: v for k, v in xi.items() if k != "f2"}, "m5": "MED"}
+    assert _fieldable(lone), "the case: a side of 4-5-1, one forward"
+    xi.clear()
+    xi.update(lone)
+    sold = plan_of(0.0, {"ace": ((1.0, 0.5),)}, value={"f1": 10e6})
+    assert not ("sell f1" in sold and "buy ace" in sold), \
+        ("selling your only forward to bid on another: if the bid is lost you field no forward", sold)
 
 
 if __name__ == "__main__":
