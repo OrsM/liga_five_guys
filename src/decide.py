@@ -253,7 +253,8 @@ def raised(u: Universe, moves: list[Move], rows: list[Move]) -> list[Move] | Non
     money rule is a balance of at least zero at the lock (below it you
     score nothing), so what they leave below zero is raised by the set of
     ranked sales that covers it at fewest points; with them made a side is
-    left to field."""
+    left to field, or, with none to field now, a side no further off
+    (fits: so the buys that rebuild one can be made one at a time)."""
     m, out = u.market, list(moves)
     players = [k for mv in out for k in mv.action.players]
     taken = set(players)
@@ -261,10 +262,10 @@ def raised(u: Universe, moves: list[Move], rows: list[Move]) -> list[Move] | Non
         return None
     short = -m.left([mv.action for mv in out])
     if short <= 0:
-        return out if _fieldable(u.squad_after(*(mv.action for mv in out))) else None
+        return out if fits(u, u.squad_after(*(mv.action for mv in out))) else None
     sales = sorted((r for r in rows if not r.action.buy and r.action.proceeds
                     and not taken & set(r.action.sell)), key=lambda r: -worth(r))
-    cover = cheapest_cover(sales, short, lambda chosen: _fieldable(u.squad_after(
+    cover = cheapest_cover(sales, short, lambda chosen: fits(u, u.squad_after(
         *(mv.action for mv in out), *(r.action for r in chosen))))
     return None if cover is None else out + cover
 
@@ -358,6 +359,12 @@ def board(u: Universe) -> Board:
 
 def _fieldable(squad: Squad) -> bool:
     return not shortfall(squad)
+
+
+def fits(u: Universe, squad: Squad) -> bool:
+    """Whether a squad after some moves can be had: it can field a side,
+    or yours cannot now and it is no more players short of one (rules.shortfall)."""
+    return _fieldable(squad) or sum(shortfall(squad).values()) <= sum(shortfall(u.mine).values())
 
 
 
@@ -551,6 +558,15 @@ def _selftest_funnel() -> None:
         part_played={1: {"somewhere"}})
     assert "dud" not in {r.action.buy for r in board(half).plan}, \
         "a jornada already under way is the squads as they stand: he adds nothing"
+
+    # a squad with no side to field (no keeper, no forward) rebuilds one, a buy at a time
+    gap = {k: v for k, v in mine.items() if v not in ("POR", "DEL")}
+    holed = Universe(state=LeagueState({"me": gap, "riv": dict(theirs)}, [1], "me"),
+                     forecaster=B({1: {**per[1], "keeper": (4.0, 1.0), "striker": (5.0, 1.0)}}),
+                     market=Market(cash=50e6, pos={**u.market.pos, "keeper": "POR", "striker": "DEL"},
+                                   price={"keeper": 1e6, "striker": 1e6}))
+    assert not _fieldable(holed.mine) and {"keeper", "striker"} <= {r.action.buy for r in board(holed).plan}, \
+        ("no keeper and no forward: both bought, though neither alone leaves a side", board(holed).plan)
 
     ok_squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF",
                "d4": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
