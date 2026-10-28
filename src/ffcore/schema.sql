@@ -62,12 +62,10 @@ CREATE TABLE IF NOT EXISTS debt_sales (
 );
 
 -- Each plan a run made and its headline: the board's own (profile
--- 'steady': CONFIDENCE, MONEY_RATE; its moves are sim_plan's) and the plan
--- to win ('win', decide.to_win: each move judged by your chance of first):
--- what it gains in season points, the cash it leaves you at the lock and
--- your chance of first once it is made. The plan to win's moves are
--- sim_plans', each gain in its own terms (points of percentage of your
--- chance of first).
+-- 'steady': CONFIDENCE, MONEY_RATE; its moves are sim_plan's) and the bold
+-- one (decide.bold), what it gains, the cash it leaves you at the lock and
+-- your chance of first once it is made. The bold plan's moves are
+-- sim_plans'.
 CREATE TABLE IF NOT EXISTS sim_plan_heads (
     run_id      INTEGER NOT NULL REFERENCES runs(run_id),
     profile     TEXT NOT NULL,
@@ -84,7 +82,7 @@ CREATE TABLE IF NOT EXISTS sim_plans (
     label       TEXT NOT NULL,     -- Action.label
     cost        REAL NOT NULL,
     proceeds    REAL NOT NULL,
-    gain        REAL NOT NULL,     -- what the profile weighs it by (Move.d_pts)
+    gain        REAL NOT NULL,     -- as funnel.gain, at the profile's money rate
     p_better    REAL NOT NULL,
     PRIMARY KEY (run_id, profile, ord)
 );

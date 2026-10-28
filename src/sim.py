@@ -106,7 +106,7 @@ def _selftest_board() -> None:
                ratios: Sequence[float] = (),
                resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0,
                waits: Sequence[tuple[str, float]] = (), nights: int = 0,
-               listings: Sequence[tuple[str, str]] = (), win: Board | None = None) -> Doc:
+               listings: Sequence[tuple[str, str]] = (), bold: Board | None = None) -> Doc:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
         past offers, resale for what waiting sells the game's market players
@@ -150,28 +150,25 @@ def _selftest_board() -> None:
                                       "expires_at": e} for k, e in listings])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
                                      for k in fielded])
-            record_run(u, bd, 7, win=win)
+            record_run(u, bd, 7, bold=bold)
             return board_doc()
 
     ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
     from decide import Risk
-    bb = board(replace(ub, risk=Risk(0.0, 0.0, True)))
-    plans = {p["profile"]: p for p in report(ub, b, win=bb)["plans"]}
-    assert set(plans) == {"steady", "win"}, plans
-    for name, bd in (("steady", b), ("win", bb)):
+    bb = board(replace(ub, risk=Risk(0.5, 0.0)))
+    plans = {p["profile"]: p for p in report(ub, b, bold=bb)["plans"]}
+    assert set(plans) == {"steady", "bold"}, plans
+    for name, bd in (("steady", b), ("bold", bb)):
         got = plans[name]
         assert [m["label"] for m in got["moves"]] == [m.action.label(ub.market.names) for m in bd.plan] \
-            and abs(got["gain"] - decide.joint(ub, bd.plan).d_pts) < 1e-9 \
+            and abs(got["gain"] - bd.gain) < 1e-9 \
             and got["cash_after"] == ub.market.left([m.action for m in bd.plan]) \
-            and abs(got["p_first"] - ub.standings.position().get(1, 0.0) - decide.first_gain(
-                replace(ub, risk=decide.to_win()), [[m.action for m in bd.plan]])[0][0] / 100) < 1e-9, \
+            and abs(got["p_first"] - ub.after(*(m.action for m in bd.plan)).standings.position().get(1, 0.0)) < 1e-9, \
             ("each plan whole: its moves, gain, cash at the lock and chance of first", name, got)
     steady_labels = {m["label"] for m in plans["steady"]["moves"]}
-    assert all(m["shared"] == (m["label"] in steady_labels) for m in plans["win"]["moves"]), \
-        "a move of the plan to win is marked when the steady plan makes it too"
-    assert plans["win"]["p_first"] >= plans["steady"]["p_first"] - 1e-9, \
-        "the plan to win leaves you at least as likely to finish first"
-    assert [p["profile"] for p in report(ub, b)["plans"]] == ["steady"], "no plan to win, the steady plan alone"
+    assert all(m["shared"] == (m["label"] in steady_labels) for m in plans["bold"]["moves"]), \
+        "a bold move is marked when the steady plan makes it too"
+    assert [p["profile"] for p in report(ub, b)["plans"]] == ["steady"], "no bold board, the steady plan alone"
     doc = report(ub, b)
     after = ub.after(*(r.action for r in b.plan))
     field = doc["do"][0]
@@ -554,16 +551,11 @@ def plan_head(b: Board, run: int) -> Doc:
 
 
 def plan_heads(u: Universe, plans: Sequence[tuple[str, Board]], run: int) -> list[Doc]:
-    """Each profile's plan: what it gains in season points (its moves
-    made together against doing nothing, decide.joint at the board's own
-    risk, so plans compare), the cash it leaves you at the lock and your
-    chance of first once it is made, its money counted at MONEY_RATE as
-    the plan to win counts it (decide.first_gain)."""
-    steady, win = replace(u, risk=None), replace(u, risk=decide.to_win())
-    now = u.standings.position().get(1, 0.0)
-    return [{"run_id": run, "profile": name, "gain": decide.joint(steady, b.plan).d_pts,
+    """Each profile's plan: what it gains, the cash it leaves you at the
+    lock and your chance of first once it is made."""
+    return [{"run_id": run, "profile": name, "gain": b.gain,
              "cash_after": u.market.left([m.action for m in b.plan]),
-             "p_first": now + decide.first_gain(win, [[m.action for m in b.plan]])[0][0] / 100}
+             "p_first": u.after(*(m.action for m in b.plan)).standings.position().get(1, 0.0)}
             for name, b in plans]
 
 
@@ -576,10 +568,10 @@ def alt_plans(u: Universe, plans: Sequence[tuple[str, Board]], run: int) -> list
 
 
 def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = (),
-               win: Board | None = None) -> None:
+               bold: Board | None = None) -> None:
     """Everything the run decided, into its tables: the board views read them.
-    win: the plan to win's board (decide.to_win), beside the board's own."""
-    others = [("win", win)] if win is not None else []
+    bold: the bold plan's board (decide.bold), beside the board's own."""
+    others = [("bold", bold)] if bold is not None else []
     record(plan_heads(u, [("steady", b), *others], run), "sim_plan_heads")
     record(alt_plans(u, others, run), "sim_plans")
     record(funnel(u, b, run), "funnel")
@@ -658,7 +650,7 @@ def main() -> None:
     run = this_run()
     if run is None:
         raise SystemExit("sim: the board is the views over a run's rows; run it as run.py sim")
-    record_run(u, board(u), run, built().params, win=board(replace(u, risk=decide.to_win())))
+    record_run(u, board(u), run, built().params, bold=board(replace(u, risk=decide.bold())))
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
         board_doc(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
