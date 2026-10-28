@@ -18,7 +18,7 @@ from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
 
-__all__ = ["alt_plans", "plan_heads", "with_squad", "rival_rows", "rival_universe", "board_doc", "debt_sales", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
+__all__ = ["with_squad", "rival_rows", "rival_universe", "board_doc", "debt_sales", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
            "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -106,7 +106,7 @@ def _selftest_board() -> None:
                ratios: Sequence[float] = (),
                resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0,
                waits: Sequence[tuple[str, float]] = (), nights: int = 0,
-               listings: Sequence[tuple[str, str]] = (), bold: Board | None = None) -> Doc:
+               listings: Sequence[tuple[str, str]] = ()) -> Doc:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
         past offers, resale for what waiting sells the game's market players
@@ -150,25 +150,10 @@ def _selftest_board() -> None:
                                       "expires_at": e} for k, e in listings])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
                                      for k in fielded])
-            record_run(u, bd, 7, bold=bold)
+            record_run(u, bd, 7)
             return board_doc()
 
     ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
-    from decide import Risk
-    bb = board(replace(ub, risk=Risk(0.5, 0.0)))
-    plans = {p["profile"]: p for p in report(ub, b, bold=bb)["plans"]}
-    assert set(plans) == {"steady", "bold"}, plans
-    for name, bd in (("steady", b), ("bold", bb)):
-        got = plans[name]
-        assert [m["label"] for m in got["moves"]] == [m.action.label(ub.market.names) for m in bd.plan] \
-            and abs(got["gain"] - bd.gain) < 1e-9 \
-            and got["cash_after"] == ub.market.left([m.action for m in bd.plan]) \
-            and abs(got["p_first"] - ub.after(*(m.action for m in bd.plan)).standings.position().get(1, 0.0)) < 1e-9, \
-            ("each plan whole: its moves, gain, cash at the lock and chance of first", name, got)
-    steady_labels = {m["label"] for m in plans["steady"]["moves"]}
-    assert all(m["shared"] == (m["label"] in steady_labels) for m in plans["bold"]["moves"]), \
-        "a bold move is marked when the steady plan makes it too"
-    assert [p["profile"] for p in report(ub, b)["plans"]] == ["steady"], "no bold board, the steady plan alone"
     doc = report(ub, b)
     after = ub.after(*(r.action for r in b.plan))
     field = doc["do"][0]
@@ -550,30 +535,8 @@ def plan_head(b: Board, run: int) -> Doc:
     return {"run_id": run, "plan_gain": b.gain}
 
 
-def plan_heads(u: Universe, plans: Sequence[tuple[str, Board]], run: int) -> list[Doc]:
-    """Each profile's plan: what it gains, the cash it leaves you at the
-    lock and your chance of first once it is made."""
-    return [{"run_id": run, "profile": name, "gain": b.gain,
-             "cash_after": u.market.left([m.action for m in b.plan]),
-             "p_first": u.after(*(m.action for m in b.plan)).standings.position().get(1, 0.0)}
-            for name, b in plans]
-
-
-def alt_plans(u: Universe, plans: Sequence[tuple[str, Board]], run: int) -> list[Doc]:
-    """Each other profile's plan, its moves in order."""
-    return [{"run_id": run, "profile": name, "ord": i, "kind": m.action.kind,
-             "label": m.action.label(u.market.names), "cost": m.action.cost,
-             "proceeds": m.action.proceeds, "gain": m.d_pts, "p_better": m.p_better}
-            for name, b in plans for i, m in enumerate(b.plan)]
-
-
-def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = (),
-               bold: Board | None = None) -> None:
-    """Everything the run decided, into its tables: the board views read them.
-    bold: the bold plan's board (decide.bold), beside the board's own."""
-    others = [("bold", bold)] if bold is not None else []
-    record(plan_heads(u, [("steady", b), *others], run), "sim_plan_heads")
-    record(alt_plans(u, others, run), "sim_plans")
+def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> None:
+    """Everything the run decided, into its tables: the board views read them."""
     record(funnel(u, b, run), "funnel")
     record(debt_sales(u, b, run), "debt_sales")
     record(forecast(u, run), "forecast")
@@ -650,7 +613,7 @@ def main() -> None:
     run = this_run()
     if run is None:
         raise SystemExit("sim: the board is the views over a run's rows; run it as run.py sim")
-    record_run(u, board(u), run, built().params, bold=board(replace(u, risk=decide.bold())))
+    record_run(u, board(u), run, built().params)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
         board_doc(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

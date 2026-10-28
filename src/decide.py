@@ -16,7 +16,7 @@ from ffcore.rules import Squad, Squads, position, shortfall
 from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState
 
-__all__ = ["Action", "Board", "bold", "CONFIDENCE", "FUNNEL", "Move", "Risk", "Universe",
+__all__ = ["Action", "Board", "CONFIDENCE", "FUNNEL", "Move", "Universe",
            "board", "plan", "verdict"]
 
 CONFIDENCE = 0.7
@@ -27,29 +27,6 @@ CONFIDENCE = 0.7
 # 373M; points alone (0) 350 and 297M, overbidding for certainty
 # (2026-10-20).
 MONEY_RATE = 8.0
-# The bold plan's bar and money rate, the board's second plan beside the
-# one CONFIDENCE and MONEY_RATE make: a lower bar and money worth fewer
-# points, so it spends more on points and takes moves less sure to help.
-# Not chosen by a backtest: grading.py money, bids held between the timers'
-# runs (2026-10-28), made 451, 390, 367 and 445 points over jornadas 2-9
-# with money at 3, 5, 8 and 12 (standing pat 395), one path's noise with no
-# trend in the rate. The bold plan is shown, never followed by itself.
-BOLD_CONFIDENCE = 0.6
-BOLD_MONEY_RATE = 3.0
-
-
-class Risk(NamedTuple):
-    """How sure a move must be to be made (bar, the share of seasons it
-    must leave you better off in) and what a million is worth in points
-    (rate): a plan's appetite for risk."""
-    bar: float
-    rate: float
-
-
-def bold() -> Risk:
-    """The bold plan's risk (BOLD_CONFIDENCE, BOLD_MONEY_RATE), read when asked
-    so a variant's constants count."""
-    return Risk(BOLD_CONFIDENCE, BOLD_MONEY_RATE)
 
 @dataclass(frozen=True)
 class Move:
@@ -111,17 +88,6 @@ class Universe:
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
     factors: PerJornadaFactors = field(default_factory=dict)
-    risk: Risk | None = None
-
-    @property
-    def bar(self) -> float:
-        """The chance a move must have of helping: the risk's, else CONFIDENCE."""
-        return self.risk.bar if self.risk else CONFIDENCE
-
-    @property
-    def rate(self) -> float:
-        """What a million is worth in points: the risk's, else MONEY_RATE."""
-        return self.risk.rate if self.risk else MONEY_RATE
 
     @property
     def me(self) -> str:
@@ -155,13 +121,13 @@ class Universe:
         """A buy at the bid worth most, and its chance of winning: of the bids
         over asking his auction's odds offer (Market.odds), the one whose
         chance times what the move is then worth (total, scored at asking,
-        less what bidding more costs at the universe's rate) is greatest, the lowest
+        less what bidding more costs at MONEY_RATE) is greatest, the lowest
         of equals. One with no odds, or worth nothing, stays at asking."""
         odds = self.market.odds.get(a.buy, ())
         if total <= 0 or not odds:
             return a, odds[0][1] if odds else 1.0
         asking = self.market.price[a.buy]
-        ratio, p = max(odds, key=lambda o: (o[1] * (total - self.rate * (o[0] - 1) * asking / 1e6), -o[0]))
+        ratio, p = max(odds, key=lambda o: (o[1] * (total - MONEY_RATE * (o[0] - 1) * asking / 1e6), -o[0]))
         return replace(a, cost=asking * ratio), p
 
     def after(self, *acts: Action) -> Universe:
@@ -207,7 +173,7 @@ class Universe:
 
 def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, float]]:
     """Each set of actions made together against doing nothing: (its
-    expected change in your season points with its money at the universe's rate, the
+    expected change in your season points with its money at MONEY_RATE, the
     chance that is more than nothing, its money in millions). Points and
     money are independent normals (ffcore.gain, Market.money). A jornada
     under way is fielded as it stands, so only the ones to come count."""
@@ -216,25 +182,23 @@ def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, flo
     out = []
     for acts, (mean, var, _p) in zip(sets, pts):
         cash, spread = u.market.money(acts, pricing.MONEY_H)
-        total = mean + u.rate * cash
-        out.append((total, normal_above(total, var + u.rate ** 2 * spread), cash))
+        total = mean + MONEY_RATE * cash
+        out.append((total, normal_above(total, var + MONEY_RATE ** 2 * spread), cash))
     return out
 
 
-def verdict(mv: Move, bar: float | None = None) -> str | None:
+def verdict(mv: Move) -> str | None:
     """Worth doing only if it gains and is likely to help. It must gain on
-    average and leave you better off with a chance of at least bar
-    (CONFIDENCE unless a risk says otherwise); below that its gain is noise.
-    A sale that leaves no side to field is not made by itself at all.
-    Returns why not, or None."""
-    bar = CONFIDENCE if bar is None else bar
+    average and leave you better off with a chance of at least CONFIDENCE;
+    below that its gain is noise. A sale that leaves no side to field is
+    not made by itself at all. Returns why not, or None."""
     if not mv.alone:
         return "leaves no side to field"
     if mv.d_pts <= 0:
         return "no expected gain (%+.1f points)" % mv.d_pts
-    if mv.p_better < bar:
+    if mv.p_better < CONFIDENCE:
         return "a %.0f%% chance of helping, under %.0f%%" % (
-            100 * mv.p_better, 100 * bar)
+            100 * mv.p_better, 100 * CONFIDENCE)
     return None
 
 
@@ -244,7 +208,7 @@ def plan(u: Universe, rows: list[Move]) -> tuple[list[Move], float]:
     since one dear move can crowd out two cheaper ones that gain more; the
     set that gains more is the plan. Every move it leaves out was last
     tried against the whole of it."""
-    good = [r for r in rows if verdict(r, u.bar) is None]
+    good = [r for r in rows if verdict(r) is None]
     return max((fill(u, good, rows, key) for key in (
         lambda r: -r.d_pts, lambda r: -r.per_million)), key=lambda pg: pg[1])
 
@@ -312,7 +276,7 @@ def fill(u: Universe, good: list[Move], rows: list[Move],
             if r in picked or (trial := raised(u, [*picked, r], rows)) is None:
                 continue
             total = joint(u, trial)
-            if verdict(total, u.bar) is None and total.d_pts > gain:
+            if verdict(total) is None and total.d_pts > gain:
                 picked, gain, grew = trial, total.d_pts, True
     return picked, gain
 
@@ -611,8 +575,6 @@ def _selftest_funnel() -> None:
     assert verdict(coin) == "a 55% chance of helping, under 70%", \
         "a bigger gain that is a coin flip is not worth doing"
     assert verdict(loss) == "no expected gain (-1.0 points)"
-    assert verdict(coin, 0.5) is None and verdict(sure, 0.9) == "a 80% chance of helping, under 90%", \
-        "a risk's own bar"
 
     assert [f.__name__ for f in FUNNEL] == ["candidates", "rank", "verdict", "plan"]
 
@@ -715,11 +677,6 @@ def _selftest_funnel() -> None:
         finally:
             globals()["MONEY_RATE"] = was
     flat, rich = by_rate(0.0), by_rate(3.0)
-    risky = replace(um, risk=Risk(0.7, 3.0))
-    assert (risky.bar, risky.rate) == (0.7, 3.0) and (um.bar, um.rate) == (CONFIDENCE, MONEY_RATE)
-    assert {r.action.label(): round(r.d_pts, 9) for r in risky.rank(risky.candidates())} \
-        == {k: round(r.d_pts, 9) for k, r in rich.items()}, "a risk's money rate is the one its moves are scored at"
-    assert bold() == Risk(BOLD_CONFIDENCE, BOLD_MONEY_RATE)
     assert verdict(flat["sell fall"]) is not None and verdict(rich["sell fall"]) is None, \
         ("points alone, his sale gains nothing; at 3 points a million, 5M now for one worth 3M is worth it",
          flat["sell fall"], rich["sell fall"])

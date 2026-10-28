@@ -61,32 +61,6 @@ CREATE TABLE IF NOT EXISTS debt_sales (
     PRIMARY KEY (run_id, rank)
 );
 
--- Each plan a run made and its headline: the board's own (profile
--- 'steady': CONFIDENCE, MONEY_RATE; its moves are sim_plan's) and the bold
--- one (decide.bold), what it gains, the cash it leaves you at the lock and
--- your chance of first once it is made. The bold plan's moves are
--- sim_plans'.
-CREATE TABLE IF NOT EXISTS sim_plan_heads (
-    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
-    profile     TEXT NOT NULL,
-    gain        REAL NOT NULL,
-    cash_after  REAL NOT NULL,
-    p_first     REAL NOT NULL,
-    PRIMARY KEY (run_id, profile)
-);
-CREATE TABLE IF NOT EXISTS sim_plans (
-    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
-    profile     TEXT NOT NULL,
-    ord         INTEGER NOT NULL,
-    kind        TEXT NOT NULL,
-    label       TEXT NOT NULL,     -- Action.label
-    cost        REAL NOT NULL,
-    proceeds    REAL NOT NULL,
-    gain        REAL NOT NULL,     -- as funnel.gain, at the profile's money rate
-    p_better    REAL NOT NULL,
-    PRIMARY KEY (run_id, profile, ord)
-);
-
 -- Every forecast cell with factors (ffcore.schedule.Factors): points =
 -- ppm x fixture, plays = picked x fit, expected from the two. Squads and
 -- the market only, ~2.8k rows a run.
@@ -1686,26 +1660,6 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
         WHERE section = 'do' AND NOT done) AS ping
 FROM me;
 
--- Each plan the last run made (sim_plan_heads): what it gains, the cash it
--- leaves you at the lock and your chance of first once made, and its
--- moves in order (the steady plan's from the funnel, the others' from
--- sim_plans), each with its points and whether the other plan makes it too.
-DROP VIEW IF EXISTS board_plans;
-CREATE VIEW board_plans AS
-WITH moves AS (
-    SELECT 'steady' AS profile, p.ord, f.label, f.gain
-    FROM sim_plan p JOIN board_run USING (run_id) JOIN funnel f ON f.run_id = p.run_id AND f.rank = p.rank
-    UNION ALL
-    SELECT a.profile, a.ord, a.label, a.gain FROM sim_plans a JOIN board_run USING (run_id))
-SELECT h.profile, h.gain, h.cash_after, h.p_first,
-       (SELECT json_group_array(json_object(
-                   'label', m.label, 'gain', m.gain,
-                   'shared', json(CASE WHEN EXISTS (SELECT 1 FROM moves o WHERE o.profile <> m.profile
-                                                    AND o.label = m.label) THEN 'true' ELSE 'false' END))
-               ORDER BY m.ord)
-        FROM moves m WHERE m.profile = h.profile) AS moves
-FROM sim_plan_heads h JOIN board_run USING (run_id);
-
 -- decisions.json: the board as one JSON document, the phone's copy: its
 -- lines (board_rows) by section, as the phone draws them.
 DROP VIEW IF EXISTS board_json;
@@ -1724,9 +1678,6 @@ SELECT json_object(
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'do'),
     'consider', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'consider'),
     'plan_gain', h.plan_gain, 'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
-    'plans', (SELECT json_group_array(json_object('profile', profile, 'gain', gain, 'cash_after', cash_after,
-                                                  'p_first', p_first, 'moves', json(moves))
-                                      ORDER BY profile <> 'steady', profile) FROM board_plans),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
     'standings', (SELECT json_group_array(json_object(
