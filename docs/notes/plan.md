@@ -135,10 +135,25 @@ them, evidence growing a jornada a week.
 ## Order
 
 1. The program for one night, lambda shown, on a branch; golden boards and
-   the backtest against the current plan.
-2. Bids as levels with their odds; the money rule on every outcome.
-3. The chance of first by the variance sweep.
-4. The nights before the lock.
+   the backtest against the current plan. Done 2026-10-28 (decide.program):
+   backtest, jornadas 2-9, 352 points and 456M of squad value against the
+   old plan step's 325 and 336M (never moving: 395).
+2. Bids as levels with their odds; the money rule on every outcome. Done
+   (decide.options): a bid holds his slot the share of the time it wins,
+   the budget holds if every bid wins, the squad if every one loses.
+3. The chance of first by the variance sweep. Done (decide.KAPPAS).
+4. The nights before the lock: by re-solving, not yet by one program. The
+   board is solved again at every run (10:00, the 21:45 flip, after the
+   close), each time from what the night before left: a rolling horizon,
+   the usual answer to planning under uncertainty that resolves as it goes
+   (model predictive control). Planning the nights in one program needs the
+   outcomes of tonight's auctions as scenarios (a tree, every win or loss
+   of every bid), and tomorrow's market is not known tonight: the gain over
+   re-solving is the sequences re-solving cannot see, such as a sale held
+   for tomorrow's offer to pay for a bid tonight. The waiting values
+   (sim_waiting: what each later night's offer is worth) already price
+   that one. To revisit if the backtest shows money left on the table
+   between runs.
 
 Sources: Ramezani & Dinh, FPL team selection as a mixed-integer program
 (arXiv 2505.02170); Beal, Norman & Ramchurn, daily fantasy NFL by integer
