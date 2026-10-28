@@ -166,6 +166,12 @@ Every forecast is the same product, for every player and jornada, and
   offer tonight beats waiting and `GOOD_OFFER` (90%) of the game's recent
   offers, with the points his sale costs. Every ranked buy and offer is on
   the box (`market`, `offers`).
+- **Plans** (`board_plans`): the board's own plan ("steady": `CONFIDENCE`,
+  `MONEY_RATE`) beside a bold one (`decide.bold`: a lower bar, money worth
+  fewer points), each whole and paid for: its moves, what it gains, the
+  cash it leaves you at the lock and your chance of first once made, a
+  move marked when both plans make it. The bold plan is shown, not
+  followed: no backtest has yet chosen its settings (`decide.py`).
 - **Rival cash**: budget plus their sales, bonuses and
   transfer income, less buys and transfer payments, plus the income the feed
   never records (your real balance minus the same sum for you).
