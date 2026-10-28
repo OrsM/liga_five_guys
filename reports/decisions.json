@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-28T06:50Z",
+ "generated_at": "2026-10-28T07:51Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 14464825.0,
  "cash_locked": 9473887.0,
@@ -70,6 +70,44 @@
  "cash_after": 4471377.21901589,
  "can_bid": 77323459.8190159,
  "ping": "field Bil Nsongo, Alvaro Garcia",
+ "plans": [
+  {
+   "profile": "steady",
+   "gain": 18.6788240022004,
+   "cash_after": 4471377.21901589,
+   "p_first": 0.277303661368846,
+   "moves": [
+    {
+     "label": "buy Bil Nsongo",
+     "gain": 18.6788240022004,
+     "shared": true
+    }
+   ]
+  },
+  {
+   "profile": "win",
+   "gain": 26.6753579083283,
+   "cash_after": 3020910.79212397,
+   "p_first": 0.296687193521237,
+   "moves": [
+    {
+     "label": "buy Bil Nsongo",
+     "gain": 3.6421857723326,
+     "shared": true
+    },
+    {
+     "label": "buy Luka Sucic",
+     "gain": 3.72064584296613,
+     "shared": false
+    },
+    {
+     "label": "sell Iñigo Vicente",
+     "gain": -3.76177014454993,
+     "shared": false
+    }
+   ]
+  }
+ ],
  "exposed": [
   {
    "name": "Mathew Ryan",
