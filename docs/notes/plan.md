@@ -142,6 +142,9 @@ them, evidence growing a jornada a week.
    (decide.options): a bid holds his slot the share of the time it wins,
    the budget holds if every bid wins, the squad if every one loses.
 3. The chance of first by the variance sweep. Done (decide.KAPPAS).
+   Backtest of 2 and 3 together, jornadas 2-9: 414 points, no jornada
+   scoring nothing, 374M of squad value: the first plan to beat never
+   moving (395); the one-night program alone made 352.
 4. The nights before the lock: by re-solving, not yet by one program. The
    board is solved again at every run (10:00, the 21:45 flip, after the
    close), each time from what the night before left: a rolling horizon,
