@@ -37,6 +37,10 @@ TIE = 1e-4
 # raises your chance of first (Move.d_first) is made: behind the leader a
 # riskier one, ahead a steadier one (docs/notes/plan.md).
 KAPPAS = (0.0, -0.05, -0.02, 0.02, 0.05)
+# The longest one program may take, in seconds: past it, the best plan
+# found so far (a board is built at every run, and rivals' too, within
+# lfg.service's ten minutes).
+SOLVE_SECONDS = 5.0
 
 @dataclass(frozen=True)
 class Move:
@@ -196,7 +200,7 @@ def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, flo
     return out
 
 
-def plan(u: Universe, rows: list[Move]) -> tuple[list[Move], float]:
+def plan(u: Universe, rows: list[Move], kappas: tuple[float, ...] = KAPPAS) -> tuple[list[Move], float]:
     """The best set of the ranked moves, made together, and what a million
     is worth at the margin (docs/notes/plan.md). One integer program
     (program) over each sale and each buy at each bid its auction offers
@@ -208,7 +212,7 @@ def plan(u: Universe, rows: list[Move]) -> tuple[list[Move], float]:
     KAPPAS, a weight on the season's variance, and the plan that most raises
     your chance of first is the one made."""
     best: tuple[float, list[Move], float] | None = None
-    for kappa in KAPPAS:
+    for kappa in kappas:
         chosen, _value, _price = program(u, rows, relax=False, kappa=kappa)
         moves = [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in chosen]
         first = joint(u, moves).d_first if moves else 0.0
@@ -259,6 +263,7 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     h = highspy.Highs()
     h.setOptionValue("output_flag", False)
     h.setOptionValue("mip_rel_gap", 0.0)
+    h.setOptionValue("time_limit", SOLVE_SECONDS)
     binary = (lambda: h.addVariable(0.0, 1.0)) if relax else h.addBinary
     opts = options(u, rows)
     made = [binary() for _o in opts]
@@ -325,13 +330,13 @@ def joint(u: Universe, moves: list[Move]) -> Move:
 FUNNEL = (Universe.candidates, Universe.rank, plan)
 
 
-def board(u: Universe) -> Board:
+def board(u: Universe, kappas: tuple[float, ...] = KAPPAS) -> Board:
     """The funnel end to end: what the report shows and ask.py explains.
     Every move ranked from your squad as it is (a buy the plan makes, at
     its bid), the plan the program makes of them (in debt, the sales that clear it are among its moves), what
     they gain together and what a million is worth."""
     rows = u.rank(u.candidates())
-    picked, lam = plan(u, rows)
+    picked, lam = plan(u, rows, kappas)
     made = {m.action.players: m for m in picked}
     return Board(picked, joint(u, picked).d_pts if picked else 0.0,
                  [made.get(r.action.players, r) for r in rows], u, lam)
@@ -747,13 +752,14 @@ def _selftest_program() -> None:
     theirs = {"r_" + k: v for k, v in eleven.items()}
     cells2 = {j: {**{k: (3.0, 1.0) for k in [*eleven, *theirs]}, "m4": (0.5, 1.0),
                   "steady": (3.0, 1.0), "swing": (6.0, 0.5)} for j in js}
-    def bought(lead: float) -> set[str]:
+    def bought(lead: float, kappas: tuple[float, ...] = KAPPAS) -> set[str]:
         uu = Universe(state=LeagueState({"me": dict(eleven), "riv": dict(theirs)}, js, "me",
                                         carried={"me": max(lead, 0.0), "riv": max(-lead, 0.0)}),
                       forecaster=Bootstrap(cells2),
                       market=Market(cash=1e6, pos={**eleven, **theirs, "steady": "MED", "swing": "MED"},
                                     price={"steady": 1e6, "swing": 1e6}))
-        return {m.action.buy for m in board(uu).plan if m.action.buy}
+        return {m.action.buy for m in board(uu, kappas).plan if m.action.buy}
+    assert bought(-40.0, (0.0,)) == {"steady"}, "variance weighed at nothing: the tie goes the first way"
     assert bought(-40.0) == {"swing"} and bought(40.0) == {"steady"}, \
         ("the same points on average: behind, the swing of the one who plays half the time is a chance to catch up;"
          " ahead, the steady one keeps the lead", bought(-40.0), bought(40.0))

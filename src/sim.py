@@ -96,7 +96,7 @@ def _selftest_board() -> None:
     assert uv.mine == sqb and uv.market.cash == 10e6, "the original is untouched"
     heads, moves = rival_rows(uv, 7)
     assert [(h["manager"], h["cash"]) for h in heads] == [("riv", 7e6)], heads
-    want = board(ru)
+    want = board(ru, kappas=(0.0,))
     assert heads[0]["plan_gain"] == want.gain and [m["label"] for m in moves] == [
         r.action.label(ru.market.names) for r in want.plan], "the board of the universe he is"
     assert {m["manager"] for m in moves} <= {"riv"} and [m["ord"] for m in moves] == list(range(len(moves)))
@@ -570,14 +570,16 @@ def rival_universe(u: Universe, mgr: str) -> Universe:
 
 
 def rival_rows(u: Universe, run: int) -> tuple[list[Doc], list[Doc]]:
-    """Every rival's board (the same funnel, him as "me"): per rival his
-    cash and what his plan gains, and his plan's moves in order."""
+    """Every rival's board (the same funnel, him as "me", his plan the
+    program's with variance weighed at nothing: what he would do, not how
+    he would play for first): per rival his cash and what his plan gains,
+    and his plan's moves in order."""
     heads, moves = [], []
     for mgr in u.state.squads:
         if mgr == u.me:
             continue
         ru = rival_universe(u, mgr)
-        b = board(ru)
+        b = board(ru, kappas=(0.0,))
         heads.append({"run_id": run, "manager": mgr, "cash": ru.market.cash, "plan_gain": b.gain})
         moves += [{"run_id": run, "manager": mgr, "ord": i, "label": m.action.label(ru.market.names),
                    "kind": m.action.kind, "gain": m.d_pts, "p_better": m.p_better,
