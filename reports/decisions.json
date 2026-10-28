@@ -1,52 +1,95 @@
 {
- "generated_at": "2026-10-28T20:46Z",
+ "generated_at": "2026-10-28T21:36Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": 15164825.0,
- "cash_locked": 11167283.0,
- "finish": 1.85,
- "p_win": 0.252,
- "p_win_after": 0.29,
- "lam": 0.420353516841764,
+ "cash": 3997542.0,
+ "cash_locked": 0.0,
+ "finish": 1.82,
+ "p_win": 0.275,
+ "p_win_after": 0.419,
+ "lam": 0.0,
  "band": [
-  1975.22914282003,
-  2267.94737654174
+  1986.57090608787,
+  2280.4460093714
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Bil Nsongo",
+   "label": "field Martin Satriano, Thomas Lemar, Robin Le Normand",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 1.27736484170922,
+   "gain": 0.0012680455730365,
    "per": "next",
    "facts": [
     [
      "bench",
-     "Iñigo Vicente",
+     "Alvaro Garcia, Iñigo Vicente",
      "names"
     ]
    ]
   },
   {
-   "name": "Bil Nsongo",
-   "pos": "DEL",
+   "name": "Thomas Lemar",
+   "pos": "MED",
    "what": "buy",
-   "label": "buy Bil Nsongo",
+   "label": "buy Thomas Lemar",
    "step": "bid up to",
-   "amount": 9993447.78098411,
+   "amount": 6901174.50975384,
    "done": false,
-   "gain": 18.6788240022004,
+   "gain": 30.1155147198983,
    "per": "season",
    "facts": [
     [
      "listed at",
-     9204574.0,
+     6356402.0,
      "money"
     ],
     [
-     "your bid",
-     9993887.0,
+     "chance to win",
+     0.733,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.826,
+     "chance"
+    ],
+    [
+     "chance of first",
+     6.3,
+     "first"
+    ],
+    [
+     "",
+     71.7194885424559,
+     "trend"
+    ],
+    [
+     "money",
+     1506223.53150362,
+     "money"
+    ],
+    [
+     "",
+     4.36382454571091,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Martin Satriano",
+   "pos": "DEL",
+   "what": "buy",
+   "label": "buy Martin Satriano",
+   "step": "bid up to",
+   "amount": 17259193.0952704,
+   "done": false,
+   "gain": 21.5722639701562,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     17220303.0,
      "money"
     ],
     [
@@ -56,108 +99,156 @@
     ],
     [
      "chance of helping",
-     0.775,
+     0.724,
      "chance"
     ],
     [
      "chance of first",
-     3.72,
+     4.53,
      "first"
     ],
     [
      "",
-     34.4341876557572,
+     6.55327271610348,
      "trend"
     ],
     [
      "money",
-     948129.184403013,
+     468819.432014339,
      "money"
     ],
     [
      "",
-     1.86910708011535,
+     1.24989991427049,
      "per_million"
     ]
    ]
   },
   {
-   "name": "Angel Recio",
+   "name": "Gerard Martin",
    "pos": "DEF",
-   "what": "buy",
-   "label": "buy Angel Recio",
-   "step": "bid up to",
-   "amount": 3764642.12371876,
+   "what": "sell",
+   "label": "sell Gerard Martin",
+   "step": "take offer",
+   "amount": 46738575.0,
    "done": false,
-   "gain": 0.488426507021584,
+   "gain": 5.50684156491124,
    "per": "season",
    "facts": [
     [
-     "listed at",
-     3764569.0,
+     "value",
+     42613766.0,
      "money"
     ],
     [
-     "chance to win",
-     0.967,
-     "chance"
+     "the game's recent offers",
+     0.98,
+     "beats"
     ],
     [
-     "chance of helping",
-     0.514,
-     "chance"
+     "waiting is worth",
+     41676139.2720777,
+     "money"
     ],
     [
-     "chance of first",
-     0.08,
-     "first"
+     "more offers before the lock",
+     1,
+     "count"
     ],
     [
      "",
-     -4.9819142253374,
+     -12.4252903955948,
      "trend"
     ],
     [
+     "chance of first",
+     1.41,
+     "first"
+    ],
+    [
      "money",
-     -108964.799936857,
+     6506978.9779736,
      "money"
     ],
     [
      "",
-     0.129740488197882,
+     0.117822196438621,
      "per_million"
     ]
    ]
   },
   {
-   "name": "Alvaro Odriozola",
+   "name": "Adria Pedrosa",
    "pos": "DEF",
    "what": "buy",
-   "label": "buy Alvaro Odriozola",
+   "label": "buy Adria Pedrosa",
    "step": "bid up to",
-   "amount": 579536.0,
+   "amount": 3313813.0,
    "done": false,
-   "gain": 0.114585430007851,
+   "gain": 2.36696531492829,
    "per": "season",
    "facts": [
     [
      "listed at",
-     579536.0,
-     "money"
-    ],
-    [
-     "your bid",
-     581012.0,
+     3313813.0,
      "money"
     ],
     [
      "chance to win",
-     0.8,
+     1.0,
      "chance"
     ],
     [
      "chance of helping",
-     0.59,
+     0.561,
+     "chance"
+    ],
+    [
+     "chance of first",
+     0.48,
+     "first"
+    ],
+    [
+     "",
+     -21.329183600355,
+     "trend"
+    ],
+    [
+     "money",
+     -317993.697591065,
+     "money"
+    ],
+    [
+     "",
+     0.714272445345675,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Dani Martinez",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Dani Martinez",
+   "step": "bid up to",
+   "amount": 589371.0,
+   "done": false,
+   "gain": 0.0867208728495091,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     589371.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.817,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.567,
      "chance"
     ],
     [
@@ -167,50 +258,93 @@
     ],
     [
      "",
-     4.91480602335669,
+     4.08816681079798,
      "trend"
     ],
     [
      "money",
-     14323.1787509813,
+     10840.1091061886,
      "money"
     ],
     [
      "",
-     0.114585430007851,
+     0.0867208728495091,
      "per_million"
     ]
    ]
   },
   {
-   "name": "Manu Bueno",
+   "name": "Luis Castro",
    "pos": "MED",
    "what": "buy",
-   "label": "buy Manu Bueno",
+   "label": "buy Luis Castro",
    "step": "bid up to",
-   "amount": 591382.0,
+   "amount": 615230.0,
    "done": false,
-   "gain": 0.0889490253119618,
+   "gain": 0.0372988483872106,
    "per": "season",
    "facts": [
     [
      "listed at",
-     591382.0,
-     "money"
-    ],
-    [
-     "your bid",
-     592384.0,
+     615230.0,
      "money"
     ],
     [
      "chance to win",
-     0.85,
+     0.867,
      "chance"
     ],
     [
      "chance of helping",
-     0.569,
+     0.528,
+     "chance"
+    ],
+    [
+     "chance of first",
+     0.01,
+     "first"
+    ],
+    [
+     "",
+     1.6844248849767,
+     "trend"
+    ],
+    [
+     "money",
+     4662.35604840133,
+     "money"
+    ],
+    [
+     "",
+     0.0372988483872106,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Robin Le Normand",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Robin Le Normand",
+   "step": "bid up to",
+   "amount": 6865304.0,
+   "done": false,
+   "gain": -0.106584097061828,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     6865304.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.498,
      "chance"
     ],
     [
@@ -220,26 +354,112 @@
     ],
     [
      "",
-     3.79591243272394,
+     -23.5409983325899,
      "trend"
     ],
     [
      "money",
-     11118.6281639952,
+     -727111.363699438,
      "money"
     ],
     [
      "",
-     0.0889490253119618,
+     -0.0155250367735832,
      "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Yeray Alvarez",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Yeray Alvarez",
+   "step": "take offer",
+   "amount": 3856738.0,
+   "done": false,
+   "gain": -0.539338639222,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     3767291.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.72,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     3648174.50549261,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "only pays if you win",
+     "Thomas Lemar, Martin Satriano, Dani Martinez, Luis Castro",
+     "names"
+    ],
+    [
+     "chance of winning them",
+     0.398,
+     "chance"
+    ],
+    [
+     "waiting for them",
+     -0.339226212980711,
+     "points"
+    ],
+    [
+     "",
+     -26.1498716521488,
+     "trend"
+    ],
+    [
+     "chance of first",
+     -0.14,
+     "first"
+    ],
+    [
+     "money",
+     532662.573865164,
+     "money"
+    ],
+    [
+     "",
+     -0.139843214452732,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": [
+    [
+     "rising",
+     "Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+     "names"
     ]
    ]
   }
  ],
- "plan_gain": 19.3707849645418,
- "cash_after": 235817.095297128,
- "can_bid": 73087899.6952971,
- "ping": "field Bil Nsongo; buy Bil Nsongo; buy Angel Recio; buy Alvaro Odriozola; buy Manu Bueno",
+ "plan_gain": 65.6095220402243,
+ "cash_after": 19048769.3949758,
+ "can_bid": 94030308.5949758,
+ "ping": "field Martin Satriano, Thomas Lemar, Robin Le Normand; buy Thomas Lemar; buy Martin Satriano; sell Gerard Martin; buy Adria Pedrosa; buy Dani Martinez; buy Luis Castro; buy Robin Le Normand; sell Yeray Alvarez; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -297,6 +517,11 @@
    "clause": 11262269.0
   },
   {
+   "name": "Bil Nsongo",
+   "pos": "DEL",
+   "clause": 9993887.0
+  },
+  {
    "name": "Alvaro Garcia",
    "pos": "MED",
    "clause": 13097547.0
@@ -310,6 +535,16 @@
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "clause": 6931556.0
+  },
+  {
+   "name": "Manu Bueno",
+   "pos": "MED",
+   "clause": 1000000.0
+  },
+  {
+   "name": "Alvaro Odriozola",
+   "pos": "DEF",
+   "clause": 1000000.0
   }
  ],
  "standings": [
@@ -322,16 +557,16 @@
    "hi": 2397.02060088269,
    "cash": 897131.0,
    "estimated": true,
-   "p_above": 0.744213179422842
+   "p_above": 0.720948582112308
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 523.0,
-   "mean": 2121.58825968089,
-   "lo": 1975.22914282003,
-   "hi": 2267.94737654174,
-   "cash": 15164825.0,
+   "mean": 2133.50845772963,
+   "lo": 1986.57090608787,
+   "hi": 2280.4460093714,
+   "cash": 3997542.0,
    "estimated": false,
    "p_above": null
   },
@@ -344,18 +579,18 @@
    "hi": 2043.03125091754,
    "cash": 61355056.0,
    "estimated": true,
-   "p_above": 0.0828561847717738
+   "p_above": 0.0724135091376649
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 365.0,
-   "mean": 1813.00916048069,
-   "lo": 1679.50234514041,
-   "hi": 1946.51597582097,
-   "cash": 20379996.0,
+   "mean": 1830.00102930734,
+   "lo": 1695.38885141061,
+   "hi": 1964.61320720407,
+   "cash": -7484102.0,
    "estimated": true,
-   "p_above": 0.0229545689544574
+   "p_above": 0.0254771784491115
   },
   {
    "manager": "Magic Mike 333",
@@ -366,7 +601,7 @@
    "hi": 1764.04211109296,
    "cash": 57993671.0,
    "estimated": true,
-   "p_above": 0.000619904478574629
+   "p_above": 0.000479564712404512
   }
  ]
 }
