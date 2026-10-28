@@ -56,11 +56,14 @@ class Board(NamedTuple):
     """The recommendation: the moves to make and what they gain together,
     every move ranked, and the league they are measured from (start). In
     debt, doing nothing is the sales that clear it (first in plan and rows);
-    the rest is measured from the league after them."""
+    the rest is measured from the league after them. owed: in debt, every
+    sale as ranked from your squad as it is, what those were chosen from
+    (raised)."""
     plan: list[Move]
     gain: float
     rows: list[Move]
     start: Universe
+    owed: list[Move] = []
 
     @property
     def base(self) -> Standings:
@@ -311,11 +314,12 @@ def board(u: Universe) -> Board:
     clears it with are made first, and every move is measured from there."""
     rows = u.rank(u.candidates())
     forced = raised(u, [], rows) or []
+    owed = [r for r in rows if not r.action.buy] if forced else []
     if forced:
         u = u.after(*(r.action for r in forced))
         rows = u.rank(u.candidates())
     picked, gain = plan(u, rows)
-    return Board(forced + picked, gain, forced + rows, u)
+    return Board(forced + picked, gain, forced + rows, u, owed)
 
 
 def _fieldable(squad: Squad) -> bool:
@@ -617,6 +621,10 @@ def _selftest_funnel() -> None:
     assert got[:1] == ["sell x2"], (
         "the sales that cover the gap at fewest points, though the cheapest one leaves"
         " no second defender to sell", got)
+    assert [r.action.label() for r in owed.owed] == [r.action.label() for r in owing.rank(owing.candidates())
+                                                     if not r.action.buy], \
+        "in debt, every sale as ranked from your squad as it is: what the cover was chosen from"
+    assert board(uk).owed == [], "no debt, none"
     assert owed.gain == 0.0 and owed.sale("idle") is owed.plan[0], \
         "measured from the sales the money rule forces, not from a debt you cannot keep"
     assert owing.after(owed.plan[0].action).market.cash == 1e6, "after a move, its cash too"

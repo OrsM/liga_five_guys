@@ -18,7 +18,7 @@ from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
 
-__all__ = ["with_squad", "rival_rows", "rival_universe", "board_doc", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
+__all__ = ["with_squad", "rival_rows", "rival_universe", "board_doc", "debt_sales", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
            "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -476,6 +476,16 @@ def funnel(u: Universe, b: Board, run: int) -> list[Doc]:
             for i, m in enumerate(b.rows)]
 
 
+def debt_sales(u: Universe, b: Board, run: int) -> list[Doc]:
+    """In debt, every sale of yours as ranked from your squad as it is
+    (Board.owed), and whether the plan makes it."""
+    made = {m.action for m in b.plan}
+    return [{"run_id": run, "rank": i, "sell": ",".join(m.action.sell), "label": m.action.label(u.market.names),
+             "proceeds": m.action.proceeds, "gain": m.d_pts, "money": m.money,
+             "per_million": m.per_million, "in_plan": int(m.action in made)}
+            for i, m in enumerate(b.owed)]
+
+
 def forecast(u: Universe, run: int) -> list[Doc]:
     """Every forecast cell that has factors, factor by factor
     (ffcore.schedule.Factors), with the expected points they make."""
@@ -528,6 +538,7 @@ def plan_head(b: Board, run: int) -> Doc:
 def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> None:
     """Everything the run decided, into its tables: the board views read them."""
     record(funnel(u, b, run), "funnel")
+    record(debt_sales(u, b, run), "debt_sales")
     record(forecast(u, run), "forecast")
     record([{"run_id": run, **r} for r in params], "params")
     record(standings(u, b, run), "sim_standings")

@@ -45,6 +45,22 @@ CREATE TABLE IF NOT EXISTS funnel (
     PRIMARY KEY (run_id, rank)
 );
 
+-- In debt, every sale of yours as ranked from your squad as it is (Board.owed):
+-- what the sales clearing the debt were chosen from. The funnel ranks the
+-- rest from the squad after those sales.
+CREATE TABLE IF NOT EXISTS debt_sales (
+    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
+    rank        INTEGER NOT NULL,
+    sell        TEXT NOT NULL,     -- player key
+    label       TEXT NOT NULL,     -- Action.label
+    proceeds    REAL NOT NULL,
+    gain        REAL NOT NULL,     -- as funnel.gain
+    money       REAL,              -- as funnel.money
+    per_million REAL NOT NULL,
+    in_plan     INTEGER NOT NULL,
+    PRIMARY KEY (run_id, rank)
+);
+
 -- Every forecast cell with factors (ffcore.schedule.Factors): points =
 -- ppm x fixture, plays = picked x fit, expected from the two. Squads and
 -- the market only, ~2.8k rows a run.
