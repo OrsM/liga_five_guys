@@ -167,7 +167,7 @@ def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
     with closing(connect()) as db, db:
         db.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha)"
                    " VALUES (1, 't', 't', 'test', 'c')")
-        db.execute("INSERT INTO sim_runs VALUES (1, 0.0)")
+        db.execute("INSERT INTO sim_runs (run_id, plan_gain) VALUES (1, 0.0)")
         db.executemany("INSERT INTO sim_players (run_id, player, mine, xi, plan_xi, next)"
                        " VALUES (1, ?, ?, ?, ?, ?)",
                        [("ionut radu", 1, 1, 1, 3.0), ("pepelu", 1, 1, 0, 2.0),

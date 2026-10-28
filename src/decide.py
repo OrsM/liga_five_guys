@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -27,6 +28,15 @@ CONFIDENCE = 0.7
 # 373M; points alone (0) 350 and 297M, overbidding for certainty
 # (2026-10-20).
 MONEY_RATE = 8.0
+# What a move is judged by. Every move is scored both ways (score): its
+# season points (with its money at MONEY_RATE) and the chance it helps, and
+# what it adds to your chance of finishing first (Standings.position), in
+# points of percentage. False: it must gain points with at least CONFIDENCE
+# of helping. True: it must raise your chance of first by FIRST_BAR, so a
+# move that may well not help can be worth its chance of catching the
+# leader. A backtest decides which, and the other goes.
+JUDGE_BY_FIRST = False
+FIRST_BAR = 0.5
 
 @dataclass(frozen=True)
 class Move:
@@ -34,7 +44,8 @@ class Move:
     season points, its money counted at MONEY_RATE (score), and the chance
     it leaves you better off (ffcore.gain, Market.money); money, what it
     does to your money MONEY_H updates on, in millions; win, for a buy the
-    chance its bid wins the auction (Universe.bid); alone, whether it can be
+    chance its bid wins the auction (Universe.bid); d_first, what it adds to
+    your chance of finishing first, in points of percentage; alone, whether it can be
     made by itself (a sale of a player your eleven can do without: one of
     any other can only pay for a buy that leaves a side to field). The
     money rule bounds what can be done (decide.raised)."""
@@ -44,6 +55,7 @@ class Move:
     money: float = 0.0
     win: float = 1.0
     alone: bool = True
+    d_first: float = 0.0
 
     @property
     def per_million(self) -> float:
@@ -165,35 +177,57 @@ class Universe:
         at the bid worth most (bid), scored again at it; a sale marked if it
         leaves no side to field (Move.alone)."""
         bids = [self.bid(a, g) if a.buy else (a, 1.0)
-                for a, (g, _p, _c) in zip(acts, score(self, [[a] for a in acts]))]
-        return sorted((Move(a, g, p, c, win, bool(a.buy) or _fieldable(self.squad_after(a)))
-                       for (a, win), (g, p, c) in zip(bids, score(self, [[a] for a, _w in bids]))),
+                for a, (g, _p, _c, _f) in zip(acts, score(self, [[a] for a in acts]))]
+        return sorted((Move(a, g, p, c, win, bool(a.buy) or _fieldable(self.squad_after(a)), f)
+                       for (a, win), (g, p, c, f) in zip(bids, score(self, [[a] for a, _w in bids]))),
                       key=lambda mv: (-mv.d_pts, mv.action.net))
 
 
-def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, float]]:
+def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, float, float]]:
     """Each set of actions made together against doing nothing: (its
     expected change in your season points with its money at MONEY_RATE, the
-    chance that is more than nothing, its money in millions). Points and
-    money are independent normals (ffcore.gain, Market.money). A jornada
-    under way is fielded as it stands, so only the ones to come count."""
-    pts = moments(u.forecaster, [j for j in u.state.jornadas if j not in u.part_played],
-                  u.mine, [apply(u, *acts)[u.me] for acts in sets])
+    chance that is more than nothing, its money in millions, and what it
+    adds to your chance of first in points of percentage). Points and money
+    are independent normals (ffcore.gain, Market.money). A jornada under
+    way is fielded as it stands, so only the ones to come count. Your
+    chance of first: your season (Universe.standings) with the jornadas to
+    come played by the squad after it, its money at MONEY_RATE, against the
+    rivals' as they stand (Standings.position)."""
+    to_come = [j for j in u.state.jornadas if j not in u.part_played]
+    squads = [apply(u, *acts)[u.me] for acts in sets]
+    pts = moments(u.forecaster, to_come, u.mine, squads)
+    (old_m, old_v, _p), *alone = moments(u.forecaster, to_come, {}, [apply(u)[u.me], *squads])
+    base = u.standings
+    (mean_me, sd_me), first = base.dist.get(u.me, (0.0, 0.0)), base.position().get(1, 0.0)
     out = []
-    for acts, (mean, var, _p) in zip(sets, pts):
+    for acts, (mean, var, _p), (new_m, new_v, _q) in zip(sets, pts, alone):
         cash, spread = u.market.money(acts, pricing.MONEY_H)
         total = mean + MONEY_RATE * cash
-        out.append((total, normal_above(total, var + MONEY_RATE ** 2 * spread), cash))
+        mine = (mean_me - old_m + new_m + MONEY_RATE * cash,
+                math.sqrt(max(sd_me ** 2 - old_v + new_v + MONEY_RATE ** 2 * spread, 0.0)))
+        after = Standings({**base.dist, u.me: mine}, u.me).position().get(1, 0.0)
+        out.append((total, normal_above(total, var + MONEY_RATE ** 2 * spread), cash, 100.0 * (after - first)))
     return out
+
+
+def worth(mv: Move) -> float:
+    """What a move is judged by (JUDGE_BY_FIRST): what it adds to your
+    chance of first, or its season points."""
+    return mv.d_first if JUDGE_BY_FIRST else mv.d_pts
 
 
 def verdict(mv: Move) -> str | None:
     """Worth doing only if it gains and is likely to help. It must gain on
     average and leave you better off with a chance of at least CONFIDENCE;
-    below that its gain is noise. A sale that leaves no side to field is
-    not made by itself at all. Returns why not, or None."""
+    below that its gain is noise. Judged by your chance of first
+    (JUDGE_BY_FIRST), it must raise it by FIRST_BAR instead. A sale that
+    leaves no side to field is not made by itself at all. Returns why not,
+    or None."""
     if not mv.alone:
         return "leaves no side to field"
+    if JUDGE_BY_FIRST:
+        return None if mv.d_first >= FIRST_BAR else \
+            "raises your chance of first by %.1f points, under %.1f" % (mv.d_first, FIRST_BAR)
     if mv.d_pts <= 0:
         return "no expected gain (%+.1f points)" % mv.d_pts
     if mv.p_better < CONFIDENCE:
@@ -210,7 +244,7 @@ def plan(u: Universe, rows: list[Move]) -> tuple[list[Move], float]:
     tried against the whole of it."""
     good = [r for r in rows if verdict(r) is None]
     return max((fill(u, good, rows, key) for key in (
-        lambda r: -r.d_pts, lambda r: -r.per_million)), key=lambda pg: pg[1])
+        lambda r: -worth(r), lambda r: -r.per_million)), key=lambda pg: pg[1])
 
 
 def raised(u: Universe, moves: list[Move], rows: list[Move]) -> list[Move] | None:
@@ -229,7 +263,7 @@ def raised(u: Universe, moves: list[Move], rows: list[Move]) -> list[Move] | Non
     if short <= 0:
         return out if _fieldable(u.squad_after(*(mv.action for mv in out))) else None
     sales = sorted((r for r in rows if not r.action.buy and r.action.proceeds
-                    and not taken & set(r.action.sell)), key=lambda r: -r.d_pts)
+                    and not taken & set(r.action.sell)), key=lambda r: -worth(r))
     cover = cheapest_cover(sales, short, lambda chosen: _fieldable(u.squad_after(
         *(mv.action for mv in out), *(r.action for r in chosen))))
     return None if cover is None else out + cover
@@ -240,7 +274,7 @@ def cheapest_cover(sales: list[Move], short: float,
     """The sales raising at least short that lose fewest points in sum (a
     sale that gains counts as losing none), leaving a side fieldable; None
     if none do. Sales come fewest points lost first."""
-    cost = [max(-r.d_pts, 0.0) for r in sales]
+    cost = [max(-worth(r), 0.0) for r in sales]
     rest = [sum(r.action.proceeds for r in sales[i:]) for i in range(len(sales) + 1)]
     best: list[Move] | None = None
     least = float("inf")
@@ -276,15 +310,15 @@ def fill(u: Universe, good: list[Move], rows: list[Move],
             if r in picked or (trial := raised(u, [*picked, r], rows)) is None:
                 continue
             total = joint(u, trial)
-            if verdict(total) is None and total.d_pts > gain:
-                picked, gain, grew = trial, total.d_pts, True
+            if verdict(total) is None and worth(total) > gain:
+                picked, gain, grew = trial, worth(total), True
     return picked, gain
 
 
 def joint(u: Universe, moves: list[Move]) -> Move:
     """These moves made together, scored against doing nothing."""
-    (g, p, c), = score(u, [[mv.action for mv in moves]])
-    return Move(Action("plan"), g, p, c)
+    (g, p, c, f), = score(u, [[mv.action for mv in moves]])
+    return Move(Action("plan"), g, p, c, d_first=f)
 
 
 def blocked(u: Universe, picked: list[Move], a: Action, rows: list[Move]) -> str | None:
@@ -386,6 +420,21 @@ def _selftest_funnel() -> None:
     assert {"dud", "star"} <= names, "every player on the market is ranked; no second measure filters first"
     assert u.why_not("star") is None and u.why_not("dud") is None
     assert "dud" not in {r.action.buy for r in board(u).plan}, "the bar rejects him"
+    behind = replace(u, state=replace(u.state, carried={"riv": 30.0}))
+    by = {r.action.buy: r for r in behind.rank(behind.candidates()) if r.action.buy}
+    assert by["star"].d_first > 0 and by["star"].d_first > by["dud"].d_first, \
+        "behind, a buy that adds points adds to your chance of first, a better one more"
+    (_g, _p, _c, none), = score(behind, [[]])
+    assert abs(none) < 1e-9, "doing nothing changes nothing"
+    was = globals()["JUDGE_BY_FIRST"]
+    try:
+        globals()["JUDGE_BY_FIRST"] = True
+        won = board(behind)
+        assert "star" in {r.action.buy for r in won.plan} and joint(behind, won.plan).d_first >= FIRST_BAR \
+            and verdict(replace(by["dud"], d_first=0.1)) == "raises your chance of first by 0.1 points, under 0.5", \
+            "judged by your chance of first: the plan raises it, a move under FIRST_BAR is not made"
+    finally:
+        globals()["JUDGE_BY_FIRST"] = was
     assert u.why_not("nobody") == "nobody's, and not on the market now"
     assert u.why_not("th_m1") == "riv's player"
 

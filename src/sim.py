@@ -212,6 +212,10 @@ def _selftest_board() -> None:
     assert all(dict((f[0], f[1]) for f in d["facts"])["chance to win"] == wins[d["name"].lower()]
                for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"), \
         "and the chance that bid wins his auction"
+    firsts = {m.action.buy: round(m.d_first, 2) for m in b.rows if m.action.kind == "buy"}
+    assert all(dict((f[0], f[1]) for f in d["facts"])["chance of first"] == firsts[d["name"].lower()]
+               for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"), \
+        "and what he adds to your chance of first"
     assert "market" not in doc and "offers" not in doc, "one list of lines, not a section per source"
     listing = doc["do"][-1]
     assert listing["what"] == "list" and set(listing["label"].removeprefix("list ").lower().split(", ")) \
@@ -395,7 +399,11 @@ def _selftest_board() -> None:
     assert dead is not None and who["dead"]["per_million"] == dead.per_million, who["dead"]
     assert plan(ub, b, 7) == [{"run_id": 7, "ord": i, "rank": b.rows.index(m)}
                               for i, m in enumerate(b.plan)]
-    assert plan_head(b, 7) == {"run_id": 7, "plan_gain": b.gain}
+    head = plan_head(ub, b, 7)
+    assert (head["run_id"], head["plan_gain"]) == (7, b.gain) \
+        and abs(head["first_after"] - ub.standings.position().get(1, 0.0)
+                - decide.joint(ub, b.plan).d_first / 100) < 1e-12, head
+    assert report(ub, b)["p_win_after"] == round(head["first_after"], 3), "your chance of first once the plan is made"
 
     debt = replace(ub, market=replace(ub.market, cash=-5e6,
                                       value={**ub.market.value, "k": 4e6, "d1": 9e6, "m1": 1e6}))
@@ -472,7 +480,7 @@ def funnel(u: Universe, b: Board, run: int) -> list[Doc]:
              "cost": m.action.cost, "proceeds": m.action.proceeds,
              "gain": m.d_pts, "p_better": m.p_better, "per_million": m.per_million,
              "verdict": verdict(m), "in_plan": int(m in b.plan), "money": m.money,
-             "win": m.win, "alone": int(m.alone)}
+             "win": m.win, "alone": int(m.alone), "d_first": m.d_first}
             for i, m in enumerate(b.rows)]
 
 
@@ -530,9 +538,11 @@ def plan(u: Universe, b: Board, run: int) -> list[Doc]:
     return [{"run_id": run, "ord": i, "rank": b.rows.index(m)} for i, m in enumerate(b.plan)]
 
 
-def plan_head(b: Board, run: int) -> Doc:
-    """What the plan gains, its moves made together."""
-    return {"run_id": run, "plan_gain": b.gain}
+def plan_head(u: Universe, b: Board, run: int) -> Doc:
+    """What the plan gains, its moves made together, and your chance of
+    first once it is made (decide.joint from your squad as it is)."""
+    return {"run_id": run, "plan_gain": b.gain,
+            "first_after": u.standings.position().get(1, 0.0) + decide.joint(u, b.plan).d_first / 100}
 
 
 def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> None:
@@ -544,7 +554,7 @@ def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> N
     record(standings(u, b, run), "sim_standings")
     record(players(u, b, run), "sim_players")
     record(plan(u, b, run), "sim_plan")
-    record([plan_head(b, run)], "sim_runs")
+    record([plan_head(u, b, run)], "sim_runs")
     with closing(connect()) as db, db:
         db.execute("INSERT INTO sim_facts SELECT ?, * FROM sim_facts_now", (run,))
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))

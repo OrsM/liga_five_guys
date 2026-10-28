@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS funnel (
     money       REAL,              -- what it does to your money MONEY_H updates on, millions (Move.money)
     win         REAL,              -- a buy's chance its bid wins (Move.win)
     alone       INTEGER,           -- whether it can be made by itself (Move.alone)
+    d_first     REAL,              -- what it adds to your chance of first, points of percentage (Move.d_first)
     PRIMARY KEY (run_id, rank)
 );
 
@@ -60,6 +61,11 @@ CREATE TABLE IF NOT EXISTS debt_sales (
     in_plan     INTEGER NOT NULL,
     PRIMARY KEY (run_id, rank)
 );
+
+-- The second plan's tables, from before one score measured both (2026-10-28).
+DROP VIEW IF EXISTS board_plans;
+DROP TABLE IF EXISTS sim_plans;
+DROP TABLE IF EXISTS sim_plan_heads;
 
 -- Every forecast cell with factors (ffcore.schedule.Factors): points =
 -- ppm x fixture, plays = picked x fit, expected from the two. Squads and
@@ -176,7 +182,8 @@ CREATE TABLE IF NOT EXISTS sim_plan (
 -- What the plan gains, its moves made together.
 CREATE TABLE IF NOT EXISTS sim_runs (
     run_id    INTEGER PRIMARY KEY REFERENCES runs(run_id),
-    plan_gain REAL
+    plan_gain REAL,
+    first_after REAL                -- your chance of first once the plan is made
 );
 
 -- grading, when run.py grade finds something new: each past lock replayed
@@ -1383,7 +1390,7 @@ CREATE VIEW board_buys AS
 SELECT f.rank, f.buy AS player, coalesce(s.name, f.buy) AS name, coalesce(s.pos, '') AS pos,
        coalesce(s.price, f.cost) AS asking, f.cost AS bid, s.my_bid, coalesce(s.my_bid, f.cost) AS cost,
        s.value, s.trend,
-       f.gain, f.p_better, f.per_million, f.verdict, f.in_plan, f.money, f.win,
+       f.gain, f.p_better, f.per_million, f.verdict, f.in_plan, f.money, f.win, f.d_first,
        r.later AS resale, l.later AS flat
 FROM funnel f JOIN board_run USING (run_id)
 LEFT JOIN sim_facts s ON s.run_id = f.run_id AND s.player = f.buy
@@ -1420,7 +1427,7 @@ m AS (SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raise
              b.route IS 'listed' AS listed,
              CASE WHEN b.offer IS NOT NULL AND b.value > 0
                   THEN (SELECT avg(r.ratio < b.offer / b.value) FROM r) END AS beats,
-             f.rank, f.gain, f.money, f.per_million, coalesce(f.in_plan, 0) AS sell, f.alone,
+             f.rank, f.gain, f.money, f.per_million, coalesce(f.in_plan, 0) AS sell, f.alone, f.d_first,
              w.later AS waiting,
              CASE WHEN b.route IS 'listed' AND l.t < n.first + n.nights - 1 THEN l.ends END AS relist_after,
              coalesce(f.in_plan AND (f.gain <= 0 OR NOT f.alone) AND bids.n > 0, 0) AS with_bids,
@@ -1584,6 +1591,7 @@ buys AS (
                 UNION ALL SELECT 1, 'sell before the lock for', b.resale, 'money' WHERE r.player IS NOT NULL
                 UNION ALL SELECT 2, 'profit', r.profit, 'money'
                 UNION ALL SELECT 3, 'chance of helping', round(b.p_better, 3), 'chance' WHERE r.player IS NULL
+                UNION ALL SELECT 3.5, 'chance of first', round(b.d_first, 2), 'first' WHERE r.player IS NULL
                 UNION ALL SELECT 4, '', b.trend, 'trend'
                 UNION ALL SELECT 5, 'money', 1e6 * b.money, 'money' WHERE r.player IS NULL
                 UNION ALL SELECT 6, '', b.per_million, 'per_million' WHERE r.player IS NULL
@@ -1613,6 +1621,7 @@ sells AS (
                 UNION ALL SELECT 2.7, 'chance of winning them', round(s.bids_p, 3), 'chance' WHERE s.with_bids
                 UNION ALL SELECT 2.8, 'waiting for them', s.wait_bids, 'points' WHERE s.takes
                 UNION ALL SELECT 3, '', s.trend, 'trend'
+                UNION ALL SELECT 3.5, 'chance of first', round(s.d_first, 2), 'first'
                 UNION ALL SELECT 4, 'money', 1e6 * s.money, 'money'
                 UNION ALL SELECT 5, '', s.per_million, 'per_million')
             WHERE v IS NOT NULL)
@@ -1652,6 +1661,7 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
        me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
+       (SELECT round(first_after, 3) FROM sim_runs JOIN board_run USING (run_id)) AS p_win_after,
        me.lo AS band_lo, me.hi AS band_hi,
        (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
@@ -1673,7 +1683,7 @@ WITH lines AS (SELECT section, ord, json(CASE WHEN what = 'field' THEN json_remo
                      FROM board_rows))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
-    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,
+    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win, 'p_win_after', h.p_win_after,
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'do'),
     'consider', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'consider'),

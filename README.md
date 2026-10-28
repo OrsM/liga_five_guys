@@ -129,7 +129,11 @@ Every forecast is the same product, for every player and jornada, and
      the points it adds, and per million it spends or raises
      (`Move.per_million`).
   3. **verdict**: a gain in the median, and better off in at least 70% of
-     seasons (`CONFIDENCE`); below that its gain is noise.
+     seasons (`CONFIDENCE`); below that its gain is noise. Every move is
+     also scored by what it adds to your chance of finishing first
+     (`Move.d_first`, shown on each line and, for the plan, in the
+     headline); `JUDGE_BY_FIRST` makes that the bar instead (`FIRST_BAR`),
+     once a backtest says it should.
   4. **plan**: the best set that shares no player and, paid for, clears
      the same bar as one move (`verdict` on the whole set) while adding to
      its gain, built best first and best per million first (one dear move can
