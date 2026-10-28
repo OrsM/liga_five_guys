@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-28T05:22Z",
+ "generated_at": "2026-10-28T06:32Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": -64130332.0,
- "cash_locked": 0.0,
+ "cash": 14464825.0,
+ "cash_locked": 9473887.0,
  "finish": 1.86,
  "p_win": 0.241,
  "band": [
@@ -12,11 +12,11 @@
  "do": [
   {
    "what": "field",
-   "label": "field Fernando Niño, Bil Nsongo, Alvaro Garcia",
+   "label": "field Bil Nsongo, Alvaro Garcia",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 1.48055527183965,
+   "gain": 3.2370762046833,
    "per": "next",
    "facts": [
     [
@@ -27,76 +27,13 @@
    ]
   },
   {
-   "name": "Ante Budimir",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Ante Budimir",
-   "step": "take offer",
-   "amount": 78495157.0,
-   "done": false,
-   "gain": -28.8604391450122,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     72777152.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.9,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     74226967.2028785,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     2,
-     "count"
-    ],
-    [
-     "only pays if you win",
-     "Bil Nsongo",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.767,
-     "chance"
-    ],
-    [
-     "waiting for them",
-     -19.4441282885089,
-     "points"
-    ],
-    [
-     "",
-     13.0604628836566,
-     "trend"
-    ],
-    [
-     "money",
-     1441687.83631977,
-     "money"
-    ],
-    [
-     "",
-     -0.36767158953529,
-     "per_million"
-    ]
-   ]
-  },
-  {
    "name": "Bil Nsongo",
    "pos": "DEL",
    "what": "buy",
    "label": "buy Bil Nsongo",
-   "step": "bid up to",
-   "amount": 9993447.78098411,
-   "done": false,
+   "step": "bid in",
+   "amount": 9473887.0,
+   "done": true,
    "gain": 18.6788240022004,
    "per": "season",
    "facts": [
@@ -104,11 +41,6 @@
      "listed at",
      9204574.0,
      "money"
-    ],
-    [
-     "chance to win",
-     0.767,
-     "chance"
     ],
     [
      "chance of helping",
@@ -135,15 +67,10 @@
  ],
  "consider": [],
  "plan_gain": 18.6788240022004,
- "cash_after": 4371377.2190159,
- "can_bid": 91778890.2190159,
- "ping": "field Fernando Niño, Bil Nsongo, Alvaro Garcia; sell Ante Budimir; buy Bil Nsongo",
+ "cash_after": 4471377.21901589,
+ "can_bid": 77323459.8190159,
+ "ping": "field Bil Nsongo, Alvaro Garcia",
  "exposed": [
-  {
-   "name": "Ante Budimir",
-   "pos": "DEL",
-   "clause": 72777152.0
-  },
   {
    "name": "Mathew Ryan",
    "pos": "POR",
@@ -223,7 +150,7 @@
    "mean": 2232.85386333871,
    "lo": 2069.68712579472,
    "hi": 2396.02060088269,
-   "cash": 97131.0,
+   "cash": 197131.0,
    "estimated": true,
    "p_above": 0.755364846457812
   },
@@ -234,7 +161,7 @@
    "mean": 2114.58825968089,
    "lo": 1968.22914282003,
    "hi": 2260.94737654174,
-   "cash": -64130332.0,
+   "cash": 14464825.0,
    "estimated": false,
    "p_above": null
   },
@@ -245,7 +172,7 @@
    "mean": 1897.01061914983,
    "lo": 1754.98998738212,
    "hi": 2039.03125091754,
-   "cash": 60555056.0,
+   "cash": 60655056.0,
    "estimated": true,
    "p_above": 0.0857717461622198
   },
@@ -256,7 +183,7 @@
    "mean": 1802.00916048069,
    "lo": 1668.50234514041,
    "hi": 1935.51597582097,
-   "cash": 19579996.0,
+   "cash": 19679996.0,
    "estimated": true,
    "p_above": 0.0215827974192153
   },
@@ -267,7 +194,7 @@
    "mean": 1643.0571889714,
    "lo": 1522.07226684985,
    "hi": 1764.04211109296,
-   "cash": 57193671.0,
+   "cash": 57293671.0,
    "estimated": true,
    "p_above": 0.000730507541231495
   }
