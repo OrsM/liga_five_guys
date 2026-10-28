@@ -1,13 +1,15 @@
 {
- "generated_at": "2026-10-28T07:51Z",
+ "generated_at": "2026-10-28T09:02Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": 14464825.0,
+ "cash": 15164825.0,
  "cash_locked": 9473887.0,
- "finish": 1.86,
- "p_win": 0.241,
+ "finish": 1.85,
+ "p_win": 0.252,
+ "p_win_after": 0.309,
+ "lam": 0.418442752865416,
  "band": [
-  1968.22914282003,
-  2260.94737654174
+  1975.22914282003,
+  2267.94737654174
  ],
  "do": [
   {
@@ -21,7 +23,7 @@
    "facts": [
     [
      "bench",
-     "Yeray Alvarez, Iñigo Vicente",
+     "Yeray Alvarez",
      "names"
     ]
    ]
@@ -48,6 +50,11 @@
      "chance"
     ],
     [
+     "chance of first",
+     3.72,
+     "first"
+    ],
+    [
      "",
      34.4341876557572,
      "trend"
@@ -63,51 +70,320 @@
      "per_million"
     ]
    ]
-  }
- ],
- "consider": [],
- "plan_gain": 18.6788240022004,
- "cash_after": 4471377.21901589,
- "can_bid": 77323459.8190159,
- "ping": "field Bil Nsongo, Alvaro Garcia",
- "plans": [
+  },
   {
-   "profile": "steady",
-   "gain": 18.6788240022004,
-   "cash_after": 4471377.21901589,
-   "p_first": 0.277303661368846,
-   "moves": [
-    {
-     "label": "buy Bil Nsongo",
-     "gain": 18.6788240022004,
-     "shared": true
-    }
+   "name": "Luka Sucic",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Luka Sucic",
+   "step": "bid up to",
+   "amount": 27615432.0,
+   "done": false,
+   "gain": 18.1519964808765,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     27615432.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.85,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.692,
+     "chance"
+    ],
+    [
+     "chance of first",
+     3.79,
+     "first"
+    ],
+    [
+     "",
+     3.60068839166363,
+     "trend"
+    ],
+    [
+     "money",
+     700050.674942244,
+     "money"
+    ],
+    [
+     "",
+     0.65731350792834,
+     "per_million"
+    ]
    ]
   },
   {
-   "profile": "win",
-   "gain": 26.6753579083283,
-   "cash_after": 3020910.79212397,
-   "p_first": 0.296687193521237,
-   "moves": [
-    {
-     "label": "buy Bil Nsongo",
-     "gain": 3.6421857723326,
-     "shared": true
-    },
-    {
-     "label": "buy Luka Sucic",
-     "gain": 3.72064584296613,
-     "shared": false
-    },
-    {
-     "label": "sell Iñigo Vicente",
-     "gain": -3.76177014454993,
-     "shared": false
-    }
+   "name": "Angel Recio",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Angel Recio",
+   "step": "bid up to",
+   "amount": 3764642.12371876,
+   "done": false,
+   "gain": 0.488426507021584,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     3764569.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.967,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.514,
+     "chance"
+    ],
+    [
+     "chance of first",
+     0.08,
+     "first"
+    ],
+    [
+     "",
+     -4.9819142253374,
+     "trend"
+    ],
+    [
+     "money",
+     -108964.799936857,
+     "money"
+    ],
+    [
+     "",
+     0.129740488197882,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Alvaro Odriozola",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Alvaro Odriozola",
+   "step": "bid up to",
+   "amount": 579536.0,
+   "done": false,
+   "gain": 0.114585430007851,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     579536.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.8,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.59,
+     "chance"
+    ],
+    [
+     "chance of first",
+     0.02,
+     "first"
+    ],
+    [
+     "",
+     4.91480602335669,
+     "trend"
+    ],
+    [
+     "money",
+     14323.1787509813,
+     "money"
+    ],
+    [
+     "",
+     0.114585430007851,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Manu Bueno",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Manu Bueno",
+   "step": "bid up to",
+   "amount": 591382.0,
+   "done": false,
+   "gain": 0.0889490253119618,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     591382.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.85,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.569,
+     "chance"
+    ],
+    [
+     "chance of first",
+     0.02,
+     "first"
+    ],
+    [
+     "",
+     3.79591243272394,
+     "trend"
+    ],
+    [
+     "money",
+     11118.6281639952,
+     "money"
+    ],
+    [
+     "",
+     0.0889490253119618,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Alvaro F. Carreras",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Alvaro F. Carreras",
+   "step": "listed",
+   "amount": null,
+   "done": true,
+   "gain": -1.13512587947349,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     5519055.0,
+     "money"
+    ],
+    [
+     "only pays if you win",
+     "Bil Nsongo, Luka Sucic, Angel Recio, Alvaro Odriozola, Manu Bueno",
+     "names"
+    ],
+    [
+     "chance of winning them",
+     0.428,
+     "chance"
+    ],
+    [
+     "",
+     -23.5586866713474,
+     "trend"
+    ],
+    [
+     "chance of first",
+     -0.3,
+     "first"
+    ],
+    [
+     "money",
+     584967.961886979,
+     "money"
+    ],
+    [
+     "",
+     -0.205673956768594,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Iñigo Vicente",
+   "step": "wait",
+   "amount": 26164965.5731081,
+   "done": true,
+   "gain": -21.949165142332,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     26463608.0,
+     "money"
+    ],
+    [
+     "offer",
+     25219343.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.38,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     26164965.5731081,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     2,
+     "count"
+    ],
+    [
+     "only pays if you win",
+     "Bil Nsongo, Luka Sucic, Angel Recio, Alvaro Odriozola, Manu Bueno",
+     "names"
+    ],
+    [
+     "chance of winning them",
+     0.428,
+     "chance"
+    ],
+    [
+     "",
+     -15.6470163850262,
+     "trend"
+    ],
+    [
+     "chance of first",
+     -3.87,
+     "first"
+    ],
+    [
+     "money",
+     1564289.02446032,
+     "money"
+    ],
+    [
+     "",
+     -0.838876133087328,
+     "per_million"
+    ]
    ]
   }
  ],
+ "plan_gain": 27.3276721229043,
+ "cash_after": 4304405.66840521,
+ "can_bid": 77156488.2684052,
+ "ping": "field Bil Nsongo, Alvaro Garcia; buy Luka Sucic; buy Angel Recio; buy Alvaro Odriozola; buy Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -184,46 +460,46 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 492.0,
-   "mean": 2232.85386333871,
-   "lo": 2069.68712579472,
-   "hi": 2396.02060088269,
-   "cash": 197131.0,
+   "now": 493.0,
+   "mean": 2233.85386333871,
+   "lo": 2070.68712579472,
+   "hi": 2397.02060088269,
+   "cash": 897131.0,
    "estimated": true,
-   "p_above": 0.755364846457812
+   "p_above": 0.744213179422842
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 516.0,
-   "mean": 2114.58825968089,
-   "lo": 1968.22914282003,
-   "hi": 2260.94737654174,
-   "cash": 14464825.0,
+   "now": 523.0,
+   "mean": 2121.58825968089,
+   "lo": 1975.22914282003,
+   "hi": 2267.94737654174,
+   "cash": 15164825.0,
    "estimated": false,
    "p_above": null
   },
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 387.0,
-   "mean": 1897.01061914983,
-   "lo": 1754.98998738212,
-   "hi": 2039.03125091754,
-   "cash": 60655056.0,
+   "now": 391.0,
+   "mean": 1901.01061914983,
+   "lo": 1758.98998738212,
+   "hi": 2043.03125091754,
+   "cash": 61355056.0,
    "estimated": true,
-   "p_above": 0.0857717461622198
+   "p_above": 0.0828561847717738
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 354.0,
-   "mean": 1802.00916048069,
-   "lo": 1668.50234514041,
-   "hi": 1935.51597582097,
-   "cash": 19679996.0,
+   "now": 365.0,
+   "mean": 1813.00916048069,
+   "lo": 1679.50234514041,
+   "hi": 1946.51597582097,
+   "cash": 20379996.0,
    "estimated": true,
-   "p_above": 0.0215827974192153
+   "p_above": 0.0229545689544574
   },
   {
    "manager": "Magic Mike 333",
@@ -232,9 +508,9 @@
    "mean": 1643.0571889714,
    "lo": 1522.07226684985,
    "hi": 1764.04211109296,
-   "cash": 57293671.0,
+   "cash": 57993671.0,
    "estimated": true,
-   "p_above": 0.000730507541231495
+   "p_above": 0.000619904478574629
   }
  ]
 }
