@@ -232,16 +232,28 @@ def _selftest_board() -> None:
     assert abs(report(replace(ub, market=stray), b, team_value=100e6)["can_bid"]
                - (rich_doc["can_bid"] - 3e6)) < 1, \
         "a bid of yours the plan does not make is money you cannot bid again"
-    in_plan = replace(ub.market, my_bid={bought[0]: 4e6})
+    in_plan = replace(ub.market, my_bid={bought[0]: next(m.action.cost for m in b.plan if m.action.buy == bought[0])})
     assert report(replace(ub, market=in_plan), b, team_value=100e6)["can_bid"] == rich_doc["can_bid"], \
         "the plan's own bid is counted once, in the plan"
-    ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: 4e6},
+    pulled = [(d["what"], d["label"], d["step"], d["amount"], d["done"])
+              for d in report(replace(ub, market=stray), b)["do"] if d["what"] == "withdraw"]
+    assert pulled == [("withdraw", "withdraw bid on Ghost", "withdraw bid", 3e6, False)], \
+        ("a bid of yours the plan does not make: take it back, or it may win beside the plan's", pulled)
+    cost = next(m.action.cost for m in b.plan if m.action.buy == bought[0])
+    def bid_line(mine: float) -> tuple[Any, ...]:
+        d = next(d for d in report(replace(ub, market=replace(ub.market, my_bid={bought[0]: mine})), b)["do"]
+                 if d["what"] == "buy" and d["name"].lower() == bought[0])
+        return d["step"], d["amount"], d["done"], dict((f[0], f[1]) for f in d["facts"]).get("your bid")
+    assert bid_line(cost) == ("bid in", cost, True, None), "your bid is the plan's: done"
+    assert bid_line(cost - 1e6) == ("bid up to", cost, False, cost - 1e6), \
+        "your bid under the plan's: change it to the plan's"
+    ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: cost},
                                     route={"dead": "listed"}))
     sell_dead = Move(Action("sell", sell=("dead",), proceeds=1e6), 0.5, p_better=0.8)
     doc = report(ub, b._replace(plan=b.plan + [sell_dead], rows=b.rows + [sell_dead]))
     buys = {d["name"].lower(): d for d in doc["do"] if d["what"] == "buy"}
     assert buys[bought[0]]["done"] and (buys[bought[0]]["step"], buys[bought[0]]["amount"]) \
-        == ("bid in", 4e6), buys
+        == ("bid in", cost), buys
     assert all(not d["done"] and d["step"] == "bid up to"
                for n, d in buys.items() if n != bought[0]), buys
     assert [(d["name"].lower(), d["done"], d["step"], d["amount"]) for d in doc["do"]

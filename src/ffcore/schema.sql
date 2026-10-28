@@ -1374,7 +1374,7 @@ DROP VIEW IF EXISTS board_market;
 DROP VIEW IF EXISTS board_buys;
 CREATE VIEW board_buys AS
 SELECT f.rank, f.buy AS player, coalesce(s.name, f.buy) AS name, coalesce(s.pos, '') AS pos,
-       coalesce(s.price, f.cost) AS asking, f.cost AS bid, s.my_bid, coalesce(s.my_bid, f.cost) AS cost,
+       coalesce(s.price, f.cost) AS asking, f.cost AS bid, s.my_bid, f.cost AS cost,
        s.value, s.trend,
        f.gain, f.p_better, f.per_million, f.in_plan, f.money, f.win, f.d_first,
        r.later AS resale, l.later AS flat
@@ -1533,7 +1533,10 @@ FROM ranked JOIN took USING (n) WHERE taken;
 -- that made it (facts: [label, value, unit], none without a value). The
 -- plan is the one judgement: no line shows a move it does not make.
 --   The line-up the plan wants; the plan's moves in its order (a buy:
---   bid up to its bid, or yours is in; a sale: take tonight's offer, or
+--   bid up to the plan's bid, yours shown if it is another, or yours is
+--   in at it); each bid of yours the plan does not make, to withdraw (it
+--   would win beside the plan's: the plan weighs every bid, yours or not);
+--   (a sale: take tonight's offer, or
 --   wait for what waiting is worth, or sell after the auctions when it pays
 --   only with the plan's buys and waiting for them is worth more
 --   (board_mine.wait_bids), or it is listed, or list it); the buys to
@@ -1563,11 +1566,12 @@ field AS (
 buys AS (
     SELECT coalesce(p.ord, 1000 + r.ord), CASE WHEN r.player IS NULL THEN 'buy' ELSE 'resale' END,
            CASE WHEN r.player IS NULL THEN 'buy ' ELSE 'buy to resell ' END || b.name, b.name, b.pos,
-           CASE WHEN b.my_bid IS NULL THEN 'bid up to' ELSE 'bid in' END, b.cost, b.my_bid IS NOT NULL,
+           CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END, b.cost, coalesce(b.my_bid = b.cost, 0),
            CASE WHEN r.player IS NULL THEN b.gain END, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
-                UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance' WHERE b.my_bid IS NULL
+                UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
+                UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
                 UNION ALL SELECT 1, 'sell before the lock for', b.resale, 'money' WHERE r.player IS NOT NULL
                 UNION ALL SELECT 2, 'profit', r.profit, 'money'
                 UNION ALL SELECT 3, 'chance of helping', round(b.p_better, 3), 'chance' WHERE r.player IS NULL
@@ -1605,6 +1609,13 @@ sells AS (
             WHERE v IS NOT NULL)
     FROM board_mine s JOIN board_plan p ON p.rank = s.rank
     WHERE s.sell),
+pulled AS (
+    SELECT 900 + row_number() OVER (ORDER BY f.player), 'withdraw', 'withdraw bid on ' || f.name, f.name, f.pos,
+           'withdraw bid', f.my_bid, 0, NULL, 'season', '[]'
+    FROM sim_facts f JOIN board_run USING (run_id)
+    WHERE f.my_bid > 0 AND f.player NOT IN (
+        SELECT u.buy FROM board_plan p JOIN board_run r JOIN funnel u
+        ON u.run_id = r.run_id AND u.rank = p.rank WHERE u.buy IS NOT NULL)),
 unlisted AS (
     SELECT 2000, 'list',
            'list ' || group_concat(name, ', ' ORDER BY -coalesce(trend, 0.0), player), NULL, NULL,
@@ -1621,7 +1632,7 @@ relist AS (
     FROM board_mine WHERE relist_after IS NOT NULL HAVING count(*) > 0)
 SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name,
        pos, step, amount, done, gain, per, facts
-FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM sells
+FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM pulled UNION ALL SELECT * FROM sells
       UNION ALL SELECT * FROM unlisted UNION ALL SELECT * FROM relist);
 
 -- The board's headline: when the next match locks, your money, where you

@@ -263,28 +263,26 @@ class Day(NamedTuple):
 
 
 def acted(up: Universe, bids: dict[str, float], acts: list[Action]) -> tuple[Day, list[Action]]:
-    """A run's plan, made: its withdrawals taken back, its buys bid (a bid
-    already in keeps its amount), and its sales made at once, or, with any
-    bid placed, left for after the auctions (they pay for those bids or make
-    room for them: closed). The app refuses a bid that takes your bids in
-    past your cash and the debt it allows, 20% of your squad's value; a bid
-    on a player gone from the market is gone. And the moves made."""
+    """A run's plan, made: its buys bid at its amounts (a bid already in
+    set to the plan's, one the plan does not make taken back: the plan
+    weighs every bid, yours in or not), and its sales made at once, or, with
+    any bid placed, left for after the auctions (they pay for those bids or
+    make room for them: closed). The app refuses a bid that takes your bids
+    in past your cash and the debt it allows, 20% of your squad's value. And
+    the moves made."""
     m = up.market
-    bids = {k: b for k, b in bids.items() if k in m.price}
+    was, bids = {k: b for k, b in bids.items() if k in m.price}, {}
     made, sales = [], []
     for a in acts:
-        if a.kind == "withdraw":
-            bids.pop(a.sell[0], None)
-        elif a.sell:
+        if a.sell:
             sales.append(a)
             continue
-        elif a.buy not in bids:
-            room = m.cash + 0.2 * sum(m.value.get(k, 0.0) for k in up.mine) - sum(bids.values())
-            if a.cost > room:
-                continue
-            bids[a.buy] = a.cost
+        room = m.cash + 0.2 * sum(m.value.get(k, 0.0) for k in up.mine) - sum(bids.values())
+        if a.cost > room:
+            continue
+        bids[a.buy] = a.cost
         made.append(a)
-    if any(k not in m.my_bid for k in bids):
+    if any(was.get(k) != b for k, b in bids.items()):
         return Day(dict(up.mine), m.cash, bids, tuple(sales)), made
     return Day(up.squad_after(*sales), m.left(sales), bids), made + sales
 
@@ -566,8 +564,13 @@ def _selftest_phantom() -> None:
     held = with_squad(u, day.squad, day.cash, day.bids)
     assert held.market.my_bid == {"cand_free": 5e6}, "the next run sees it as your bid in"
     again, made = acted(held, day.bids, [Action("buy", buy="cand_free", cost=6e6), sale])
-    assert (again.bids, again.pending, made[-1:]) == ({"cand_free": 5e6}, (), [sale]), \
-        "a bid already in keeps its amount, and places no new bid: the sale is made"
+    assert (again.bids, again.pending) == ({"cand_free": 6e6}, (sale,)), \
+        "a bid already in, raised to the plan's amount: a bid to win again, the sale beside it waits for it"
+    same, made = acted(held, day.bids, [Action("buy", buy="cand_free", cost=5e6), sale])
+    assert (same.bids, same.pending, made[-1:]) == ({"cand_free": 5e6}, (), [sale]), \
+        "the plan keeps your bid as it is: no bid placed, the sale is made"
+    assert acted(held, day.bids, [sale])[0].bids == {}, \
+        "a bid in that the plan does not make is taken back: it would win beside the plan's"
     assert acted(held, day.bids, [Action("withdraw", sell=("cand_free",), proceeds=5e6)])[0].bids == {}, \
         "withdrawn"
     broke = with_squad(u, dict(u.mine), -1e6)
