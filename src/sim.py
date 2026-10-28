@@ -403,20 +403,24 @@ def _selftest_board() -> None:
     from ffcore.db import named
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         record_run(debt, owed, 8)
+        with closing(connect()) as db, db:
+            db.execute("INSERT INTO model_constants VALUES (variant(), 'MONEY_RATE', ?)", (decide.MONEY_RATE,))
         cols, why = named("why_sell")
-    assert cols == ["player", "debt_m", "raises_m", "season_points", "points_per_m",
-                    "raised_so_far_m", "debt_left_m", "covers_alone", "in_plan"], cols
-    per = [r[4] for r in why]
-    assert per == sorted(per, reverse=True), "cheapest points per million first"
-    taken = [r for r in why if r[8]]
+    assert cols == ["player", "debt_m", "raises_m", "points", "money_m", "season_points", "points_per_m",
+                    "points_alone_per_m", "raised_so_far_m", "debt_left_m", "covers_alone", "in_plan"], cols
+    per = [r[6] for r in why]
+    assert per == sorted(per, reverse=True), "cheapest per million first, as the plan weighs a sale"
+    assert all(abs(r[3] + decide.MONEY_RATE * r[4] - r[5]) < 0.2 for r in why), \
+        "its points and its money at MONEY_RATE make what the plan weighs"
+    taken = [r for r in why if r[11]]
     assert taken and {r[0] for r in taken} == {
         m.action.label(debt.market.names).removeprefix("sell ") for m in owed.plan
         if m.action.kind == "sell"}, \
         "in_plan is the plan's sales, no others"
     assert all(r[1] == 5.0 for r in why), "the debt, in millions"
-    assert all(a[5] <= b[5] for a, b in zip(why, why[1:])), "raised so far only grows"
-    assert min(r[6] for r in taken) == 0.0, "the plan's sales clear the debt"
-    assert all(r[6] >= 0 for r in why)
+    assert all(a[8] <= b[8] for a, b in zip(why, why[1:])), "raised so far only grows"
+    assert min(r[9] for r in taken) == 0.0, "the plan's sales clear the debt"
+    assert all(r[9] >= 0 for r in why)
 
     _selftest_lineup()
     print("sim self-test OK")
