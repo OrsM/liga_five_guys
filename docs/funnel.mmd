@@ -1,9 +1,7 @@
 flowchart LR
-    s0["<b>candidates</b><br/>Every move to rank: each spare sold, and each player on the market you could get"]
-    s1["<b>rank</b><br/>Each move, scored against doing nothing in simulated seasons."]
+    s0["<b>candidates</b><br/>Every move to rank: each of your players sold, and each player on the market you could get"]
+    s1["<b>rank</b><br/>Each move, scored against doing nothing (score), best first; a buy at the bid worth most (bid), scored again at it; a sale marked if it leaves no side to field (Move.alone)."]
     s0 --> s1
-    s2["<b>verdict</b><br/>Worth doing only if it gains and is likely to help"]
+    s2["<b>plan</b><br/>The best set of the ranked moves, made together, and what a million is worth at the margin (docs/notes/plan.md)"]
     s1 --> s2
-    s3["<b>plan</b><br/>The best set of moves to make together"]
-    s2 --> s3
-    s3 --> board(["the board"])
+    s2 --> board(["the board"])

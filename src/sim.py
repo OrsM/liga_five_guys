@@ -13,12 +13,12 @@ from typing import Any
 
 from assemble import built, universe
 import decide
-from decide import CONFIDENCE, Board, Universe, board, verdict
+from decide import Board, Universe, board
 from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
 
-__all__ = ["with_squad", "rival_rows", "rival_universe", "board_doc", "debt_sales", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
+__all__ = ["with_squad", "rival_rows", "rival_universe", "board_doc", "forecast", "funnel", "plan", "plan_head", "players", "record_run",
            "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
@@ -142,7 +142,7 @@ def _selftest_board() -> None:
                 db.execute("CREATE TABLE nights_left AS SELECT ? AS nights,"
                            " julianday('2026-08-02T20:24:00Z') AS first", (nights,))
                 db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
-                    ("RESALE_MARGIN", 0.05), ("GOOD_OFFER", 0.9), ("PRICE_WINDOW", 50.0),
+                    ("RESALE_MARGIN", 0.05), ("PRICE_WINDOW", 50.0),
                     ("MONEY_RATE", 8.0)])
             store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me,
                                          "team_value": str(team_value)}])
@@ -188,8 +188,6 @@ def _selftest_board() -> None:
         "exposed: every player with a clause, most valuable first"
     assert all("by" not in e for e in exposed), \
         "no 'who can afford him': a rival's cash is no limit when sales to the game pay at once"
-    assert all(CONFIDENCE <= v <= 1.0 for d in doc["do"] for label, v, _unit in d["facts"]
-               if label == "chance of helping"), "only moves that clear the bar are shown"
     assert report(ub, b._replace(plan=[]))["cash_after"] is None, \
         "no cash line when the plan moves no money"
     assert [r["estimated"] for r in doc["standings"] if r["me"]] == [False]
@@ -199,23 +197,22 @@ def _selftest_board() -> None:
     assert all(r["estimated"] for r in doc["standings"] if not r["me"]), \
         "rival cash is estimated from the feed"
     assert "squad" not in doc, "no squad table: offers and the market are what to act on"
-    cleared = [(m.action.buy, m.action.cost, round(m.d_pts, 6), "do" if m in b.plan else "consider")
-               for m in b.rows if m.action.kind == "buy" and verdict(m) is None]
-    shown = [(d["name"].lower(), d["amount"], round(d["gain"], 6), sec)
-             for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"]
-    assert cleared and sorted(shown) == sorted(cleared), \
-        ("each buy that clears the bar, once: to do if the plan buys him, else to consider", shown)
+    planned = [(m.action.buy, m.action.cost, round(m.d_pts, 6)) for m in b.plan if m.action.kind == "buy"]
+    shown = [(d["name"].lower(), d["amount"], round(d["gain"], 6)) for d in doc["do"] if d["what"] == "buy"]
+    assert planned and sorted(shown) == sorted(planned) and "consider" not in doc, \
+        ("the plan's buys, each once, and no move it does not make: the plan is the one judgement", shown)
     assert all(dict((f[0], f[1]) for f in d["facts"])["listed at"] == ub.market.price[d["name"].lower()]
-               for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"), \
+               for d in doc["do"] if d["what"] == "buy"), \
         "what he is listed at, and the bid it takes"
     wins = {m.action.buy: round(m.win, 3) for m in b.rows if m.action.kind == "buy"}
     assert all(dict((f[0], f[1]) for f in d["facts"])["chance to win"] == wins[d["name"].lower()]
-               for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"), \
+               for d in doc["do"] if d["what"] == "buy"), \
         "and the chance that bid wins his auction"
     firsts = {m.action.buy: round(m.d_first, 2) for m in b.rows if m.action.kind == "buy"}
     assert all(dict((f[0], f[1]) for f in d["facts"])["chance of first"] == firsts[d["name"].lower()]
-               for sec in ("do", "consider") for d in doc[sec] if d["what"] == "buy"), \
+               for d in doc["do"] if d["what"] == "buy"), \
         "and what he adds to your chance of first"
+    assert report(ub, b)["lam"] == b.lam, "what a million is worth now, in the headline"
     assert "market" not in doc and "offers" not in doc, "one list of lines, not a section per source"
     listing = doc["do"][-1]
     assert listing["what"] == "list" and set(listing["label"].removeprefix("list ").lower().split(", ")) \
@@ -312,21 +309,14 @@ def _selftest_board() -> None:
 
     offered = replace(ub, market=replace(ub.market, offer={"dead": 1.1e6, "star": 19e6},
                                          fetch={"dead": 1.1e6, "star": 19e6}))
-    def tips(doc: Doc) -> list[tuple[Any, ...]]:
-        return [(d["name"].lower(), d["step"], d["amount"], round(d["gain"], 6),
-                 facts(d).get("the game's recent offers")) for d in doc["consider"] if d["what"] == "sell"]
     sales = {m.action.sell[0]: m for m in b.rows if m.action.kind == "sell"}
     told = report(offered, b, ratios=[0.9, 0.95, 1.0, 1.05])
-    assert tips(told) == [("dead", "take offer", 1.1e6, round(sales["dead"].d_pts, 6), 1.0)], \
-        ("consider selling a listed player whose offer beats waiting and GOOD_OFFER of the game's:"
-         " what it costs in points, and how it ranks; Star is not listed, so no offer to take", tips(told))
+    assert not [d for d in told["do"] if d["what"] == "sell"], \
+        "an offer the plan does not take is not shown, however good: the plan is the one judgement"
     assert "star" in told["do"][-1]["label"].lower(), "Star is listed for: no offers come until then"
-    assert tips(report(offered, b, ratios=[0.9, 0.95, 1.0, 1.05, 1.2])) == [], \
-        "beating 80% of the game's offers is not a good offer"
-    assert tips(report(offered, b)) == [], "no past offers, no rank among them: nothing to consider"
     took = report(offered, b._replace(plan=[sales["dead"]]), ratios=[0.9, 0.95, 1.0, 1.05])
-    assert tips(took) == [] and [d["step"] for d in took["do"] if d["what"] == "sell"] == ["take offer"], \
-        "the plan sells him: to do"
+    assert [(d["step"], facts(d)["the game's recent offers"]) for d in took["do"] if d["what"] == "sell"] \
+        == [("take offer", 1.0)], "the plan sells him: to do, and how his offer ranks among the game's"
 
     # buys to resell: the game's market players whose sale before the lock beats the bid
     free = replace(ub, market=replace(ub.market, cash=1e6,
@@ -360,8 +350,6 @@ def _selftest_board() -> None:
     assert [r["rank"] for r in ranked] == list(range(len(b.rows))) \
         and {r["run_id"] for r in ranked} == {7}, "every ranked move, in board order"
     assert [r["in_plan"] for r in ranked] == [int(m in b.plan) for m in b.rows]
-    assert [r["verdict"] for r in ranked] == [verdict(m) for m in b.rows], \
-        "why a move fails the bar, or NULL when it clears it"
     mv = next(m for m in b.rows if m.action.buy == "cand")
     got = next(r for r in ranked if r["buy"] == "cand")
     assert (got["gain"], got["p_better"], got["per_million"], got["cost"], got["label"]) \
@@ -400,7 +388,7 @@ def _selftest_board() -> None:
     assert plan(ub, b, 7) == [{"run_id": 7, "ord": i, "rank": b.rows.index(m)}
                               for i, m in enumerate(b.plan)]
     head = plan_head(ub, b, 7)
-    assert (head["run_id"], head["plan_gain"]) == (7, b.gain) \
+    assert (head["run_id"], head["plan_gain"], head["lam"]) == (7, b.gain, b.lam) \
         and abs(head["first_after"] - ub.standings.position().get(1, 0.0)
                 - decide.joint(ub, b.plan).d_first / 100) < 1e-12, head
     assert report(ub, b)["p_win_after"] == round(head["first_after"], 3), "your chance of first once the plan is made"
@@ -472,26 +460,16 @@ def _selftest_lineup() -> None:
 
 
 def funnel(u: Universe, b: Board, run: int) -> list[Doc]:
-    """Every ranked move, in board order: the funnel's first three steps
-    (candidates, rank, verdict) and whether the plan took it."""
+    """Every ranked move, in board order: the funnel's candidates and rank,
+    and whether the plan took it."""
     return [{"run_id": run, "rank": i, "kind": m.action.kind,
              "buy": m.action.buy or None, "sell": ",".join(m.action.sell) or None,
              "label": m.action.label(u.market.names),
              "cost": m.action.cost, "proceeds": m.action.proceeds,
              "gain": m.d_pts, "p_better": m.p_better, "per_million": m.per_million,
-             "verdict": verdict(m), "in_plan": int(m in b.plan), "money": m.money,
+             "in_plan": int(m in b.plan), "money": m.money,
              "win": m.win, "alone": int(m.alone), "d_first": m.d_first}
             for i, m in enumerate(b.rows)]
-
-
-def debt_sales(u: Universe, b: Board, run: int) -> list[Doc]:
-    """In debt, every sale of yours as ranked from your squad as it is
-    (Board.owed), and whether the plan makes it."""
-    made = {m.action for m in b.plan}
-    return [{"run_id": run, "rank": i, "sell": ",".join(m.action.sell), "label": m.action.label(u.market.names),
-             "proceeds": m.action.proceeds, "gain": m.d_pts, "money": m.money,
-             "per_million": m.per_million, "in_plan": int(m.action in made)}
-            for i, m in enumerate(b.owed)]
 
 
 def forecast(u: Universe, run: int) -> list[Doc]:
@@ -540,15 +518,15 @@ def plan(u: Universe, b: Board, run: int) -> list[Doc]:
 
 def plan_head(u: Universe, b: Board, run: int) -> Doc:
     """What the plan gains, its moves made together, and your chance of
-    first once it is made (decide.joint from your squad as it is)."""
-    return {"run_id": run, "plan_gain": b.gain,
+    first once it is made (decide.joint from your squad as it is), and what
+    a million is worth now (Board.lam)."""
+    return {"run_id": run, "plan_gain": b.gain, "lam": b.lam,
             "first_after": u.standings.position().get(1, 0.0) + decide.joint(u, b.plan).d_first / 100}
 
 
 def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> None:
     """Everything the run decided, into its tables: the board views read them."""
     record(funnel(u, b, run), "funnel")
-    record(debt_sales(u, b, run), "debt_sales")
     record(forecast(u, run), "forecast")
     record([{"run_id": run, **r} for r in params], "params")
     record(standings(u, b, run), "sim_standings")

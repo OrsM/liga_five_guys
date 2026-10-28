@@ -21,7 +21,7 @@ from ffcore.pricing import RESALE_MARGIN
 
 from assemble import applied, built, forecast_cells, price_change, price_momentum, universe
 import decide
-from decide import Action, Universe, board, raised, verdict
+from decide import Action, Universe, board, plan
 from ffcore import pricing
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
@@ -187,8 +187,7 @@ def decisions() -> list[dict[str, Any]]:
             a = r.action
             out.append({
                 "lock": i, "jornadas": len(later), "move": a.label(u.market.names),
-                "group": "plan" if r in b.plan else
-                         "cleared" if verdict(r) is None else "rejected",
+                "group": "plan" if r in b.plan else "left out",
                 "kind": "sell" if not a.buy else "get",
                 "chance": r.p_better,
                 "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
@@ -296,7 +295,7 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
     (auction_bars) wins if it reaches what it had to and is paid, the player
     yours; otherwise it is lost. Bids on the others stand. The sales left for
     after the auctions are made if none was lost; with one lost, only those
-    the money rule then needs (raised: the sales clearing a debt at fewest
+    the money rule then needs (decide.plan over the sales alone: those clearing a debt at fewest
     points), the rest the next run decides again. The day after, the sales
     made and how many bids were lost."""
     closing = {k: b for k, b in day.bids.items() if (k, close) in bars}
@@ -304,7 +303,7 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
     after = with_squad(up, up.squad_after(*(Action("buy", buy=k) for k in won)),
                        up.market.cash - sum(closing[k] for k in won))
     sales = list(day.pending) if len(won) == len(closing) else [
-        r.action for r in raised(after, [], after.rank(after.candidates())) or []]
+        r.action for r in plan(after, [r for r in after.rank(after.candidates()) if not r.action.buy])[0]]
     return (Day(after.squad_after(*sales), after.market.left(sales),
                 {k: b for k, b in day.bids.items() if k not in closing}),
             sales, len(closing) - len(won))
@@ -583,7 +582,8 @@ def _selftest_phantom() -> None:
         == (False, True, 5.5e6, [], 1), "lost: no charge, and the sale it needed not made"
     owing = with_squad(u, dict(u.mine), -1e6)
     _o, sold, _n = closed(owing, day._replace(cash=-1e6), {("cand_free", close): 5.2e6}, close)
-    assert [a.sell for a in sold] == [("bench_m",)], "lost, in debt: the sale the money rule needs, fewest points"
+    assert [a.sell for a in sold] in ([("bench_m",)], [("bench_k",)]), \
+        "lost, in debt: one sale the money rule needs, of a bench player costing no points"
     assert closed(held, day, {}, close)[0].bids == {"cand_free": 5e6}, "his auction is not tonight: it stands"
 
 
@@ -595,9 +595,9 @@ def _selftest() -> None:
         {"from_j": 7, "jornada": 8, "player": "b", "predicted": 1.0, "plays": 0.5, "actual": 0.0, "flagged": 1}], \
         "one row a player forecast, with his chance of playing; no points scored is 0"
     moves = decision_rows([{"lock": 7, "move": "buy X", "group": "plan", "kind": "get"},
-                           {"lock": 7, "move": "sell Y", "group": "rejected", "kind": "sell"}])
+                           {"lock": 7, "move": "sell Y", "group": "left out", "kind": "sell"}])
     assert [(m["ord"], m["reached"], "group" in m) for m in moves] \
-        == [(0, "plan", False), (1, "rejected", False)], moves
+        == [(0, "plan", False), (1, "left out", False)], moves
 
     import tempfile
     from ffcore.tidy import store_sql, tables_in

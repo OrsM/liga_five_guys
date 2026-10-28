@@ -1,18 +1,31 @@
 classDiagram
     direction LR
+    class Prices {
+        <<NamedTuple>>
+        assemble
+        +slope: dict~int float~
+        +carry: tuple~float ...~
+        +trend: dict~str float~
+        +horizon: int
+        +error: tuple~float ...~
+    }
+    class Built {
+        <<NamedTuple>>
+        assemble
+        +universe: Universe
+        +params: list~dict~str Any~~
+    }
     class Move {
         <<frozen dataclass>>
         decide
         +action: Action
         +d_pts: float
         +p_better: float
+        +money: float
+        +win: float
+        +alone: bool
+        +d_first: float
         +per_million()
-    }
-    class Ranking {
-        <<NamedTuple>>
-        decide
-        +rows: list~Move~
-        +base: Standings
     }
     class Board {
         <<NamedTuple>>
@@ -20,7 +33,9 @@ classDiagram
         +plan: list~Move~
         +gain: float
         +rows: list~Move~
-        +base: Standings
+        +start: Universe
+        +lam: float
+        +base()
         +sale()
     }
     class Universe {
@@ -32,10 +47,13 @@ classDiagram
         +rival_cash: dict~str float~
         +part_played: dict~int set~str~~
         +first_jornada_of: dict~str int~
+        +factors: PerJornadaFactors
         +me()
         +mine()
+        +standings()
         +outlook()
         +acquire()
+        +bid()
         +after()
         +squad_after()
         +candidates()
@@ -71,18 +89,13 @@ classDiagram
         +club_id: str
         +ff_slug: str
         +app_id: AppId
-        +app_names: set~str~
         +row()
     }
     class Crosswalk {
         ffcore.crosswalk
         +players
-        +clashes()
-        +player()
-        +key_of()
+        +mirror()
         +coverage()
-        +read()
-        +write()
     }
     class Match {
         <<NamedTuple>>
@@ -99,11 +112,21 @@ classDiagram
     class Bootstrap {
         ffcore.forecast
         +per_jornada: PerJornada
-        +share: float
+        +share
         +pool
         +pool_mean
-        +order()
         +expected()
+    }
+    class Standings {
+        <<frozen dataclass>>
+        ffcore.gain
+        +dist
+        +me: str
+        +mean()
+        +band()
+        +beat()
+        +position()
+        +expected_position()
     }
     class Config {
         <<dataclass>>
@@ -111,60 +134,37 @@ classDiagram
         +me: str
         +budget: float
     }
-    class Entry {
-        <<NamedTuple>>
-        ffcore.league
-        +at: str
-        +kind: str
-        +who: str | None
-        +other: str | None
-        +key: PlayerKey | None
-        +amount: float
-        +buyer()
-        +seller()
-    }
     class League {
         ffcore.league
         +cfg: Config
-        +xw: Crosswalk
-        +standings: Rows
         +owner
         +cash
         +paid
+        +standings
         +managers
         +load()
         +me()
-        +key_of_app()
         +squad()
-    }
-    class JornadaClock {
-        ffcore.locks
-        +team_locks
-        +round_locks
-        +team_lock()
-        +round_lock()
-        +order()
-        +next_deadline()
     }
     class Market {
         <<frozen dataclass>>
         ffcore.market
         +cash: float
-        +premium: float
         +name: dict~str Name~
         +pos: dict~str str~
         +price: dict~str float~
         +route: dict~str str~
         +owner: dict~str str~
         +value: dict~str float~
-        ...8 more fields
+        +trend: dict~str float~
+        ...9 more fields
         +shown()
         +names()
-        +locked_cash()
         +fetches()
-        +waiting()
         +takes()
         +left()
+        +later()
+        +money()
     }
     class Name {
         ffcore.names
@@ -190,14 +190,32 @@ classDiagram
         +xi()
         +season()
     }
-    class Momentum {
-        ffcore.pricing
-        +by_player
-        +hmax
-        +slope
-        +carry()
-        +horizon()
-        +trend()
+    class Rounds {
+        <<NamedTuple>>
+        ffcore.schedule
+        +rem: list~int~
+        +next: dict~int datetime~
+        +played: dict~int set~str~~
+        +behind: set~int~
+    }
+    class Factors {
+        <<NamedTuple>>
+        ffcore.schedule
+        +ppm: float
+        +fixture: float
+        +picked: float
+        +fit: float
+        +cell()
+    }
+    class Expectations {
+        <<NamedTuple>>
+        ffcore.schedule
+        +per_j: PerJornada
+        +first_of: dict~str int~
+        +rates: dict~str Rates | None~
+        +rem: list~int~
+        +played: dict~int set~str~~
+        +factors: PerJornadaFactors
     }
     class Scored {
         <<NamedTuple>>
@@ -231,12 +249,12 @@ classDiagram
         +market: Rows
         +starts: StartOdds
         +last_season: Mapping~str Tally~ | None
-        +shrink_k: float
         +promoted_discount: float
         +current: Mapping~str Tally~ | None
+        +priors: Mapping~str float~ | None
+        +shrink_k
         +lookup
-        +promoted
-        ...2 more fields
+        ...1 more fields
         +rate()
         +fit()
         +rates()
@@ -248,19 +266,6 @@ classDiagram
         +jornadas: list~int~
         +me: str
         +carried: dict~str float~
-        +fielded: dict~int Squads~
-    }
-    class Standings {
-        <<dataclass>>
-        ffcore.season
-        +totals: dict~str list~float~~
-        +me: str
-        +trials()
-        +mean()
-        +band()
-        +beat()
-        +position()
-        +expected_position()
     }
     class Source {
         <<NamedTuple>>
@@ -273,13 +278,6 @@ classDiagram
         +enabled: bool
         +auth: bool
         +follow
-    }
-    class Obs {
-        <<NamedTuple>>
-        ffcore.startprob
-        +ff: float | None
-        +started: float
-        +group: str
     }
     class Calibration {
         <<dataclass>>
@@ -298,39 +296,27 @@ classDiagram
     class StartOdds {
         ffcore.startprob
         +cal: Calibration | None
+        +later: dict~str float~ | None
         +avail: Availability | None
         +history
         +last_fit: dict~str float~ | None
         +start_pct
         +listed
         +status
-        +prognosis
+        ...1 more fields
         +p_now()
         +listing()
         +picked()
         +status_of()
         +fit()
     }
-    class Outcome {
+    class Day {
         <<NamedTuple>>
-        ffcore.startprob
-        +at: str
-        +jornada: int
-        +group: str
-        +who: str
-        +key: str | None
-        +listed: bool
-        +ff: float | None
-        +status: str
-        ...3 more fields
-    }
-    class Table {
-        <<NamedTuple>>
-        ffcore.tidy
-        +snapshot: bool
-        +key: tuple~str ...~
-        +store: str
-        +numbers
+        grading
+        +squad: dict~str str~
+        +cash: float
+        +bids: dict~str float~
+        +pending: tuple~Action ...~
     }
     class Sigs {
         ingest
@@ -338,15 +324,15 @@ classDiagram
     }
     Board *-- Move : plan
     Board *-- Move : rows
-    Board *-- Standings : base
+    Board *-- Universe : start
+    Built *-- Universe : universe
+    Day *-- Action : pending
+    Expectations *-- Rates : rates
     League *-- Config : cfg
-    League *-- Crosswalk : xw
     Market *-- Name : name
     Move *-- Action : action
     Outlook *-- Bootstrap : forecaster
     Outlook *-- LeagueState : state
-    Ranking *-- Move : rows
-    Ranking *-- Standings : base
     Scorer *-- StartOdds : starts
     StartOdds *-- Availability : avail
     StartOdds *-- Calibration : cal

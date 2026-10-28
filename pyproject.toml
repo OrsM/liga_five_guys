@@ -23,6 +23,7 @@ dependencies = [
     "lxml>=5.0",
     "cssselect>=1.2",
     "numpy>=2.5.2",
+    "highspy>=1.15.1",
 ]
 
 [tool.mypy]

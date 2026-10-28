@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS run_measures (
 );
 
 -- Every move the board ranked (decide.board's rows), in board order: the
--- funnel's candidates, rank and verdict, and whether the plan took it.
+-- funnel's candidates and rank, and whether the plan took it.
 -- Why the plan left a move out costs a joint scoring: ask.py why.
 CREATE TABLE IF NOT EXISTS funnel (
     run_id      INTEGER NOT NULL REFERENCES runs(run_id),
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS funnel (
     gain        REAL NOT NULL,     -- season points against doing nothing, its money at MONEY_RATE
     p_better    REAL NOT NULL,     -- chance it leaves you better off (ffcore.gain, Market.money)
     per_million REAL NOT NULL,
-    verdict     TEXT,              -- why it fails the bar; NULL if it clears it
+    verdict     TEXT,              -- unused since the plan became one program (2026-10-28)
     in_plan     INTEGER NOT NULL,
     money       REAL,              -- what it does to your money MONEY_H updates on, millions (Move.money)
     win         REAL,              -- a buy's chance its bid wins (Move.win)
@@ -46,21 +46,7 @@ CREATE TABLE IF NOT EXISTS funnel (
     PRIMARY KEY (run_id, rank)
 );
 
--- In debt, every sale of yours as ranked from your squad as it is (Board.owed):
--- what the sales clearing the debt were chosen from. The funnel ranks the
--- rest from the squad after those sales.
-CREATE TABLE IF NOT EXISTS debt_sales (
-    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
-    rank        INTEGER NOT NULL,
-    sell        TEXT NOT NULL,     -- player key
-    label       TEXT NOT NULL,     -- Action.label
-    proceeds    REAL NOT NULL,
-    gain        REAL NOT NULL,     -- as funnel.gain
-    money       REAL,              -- as funnel.money
-    per_million REAL NOT NULL,
-    in_plan     INTEGER NOT NULL,
-    PRIMARY KEY (run_id, rank)
-);
+DROP TABLE IF EXISTS debt_sales;
 
 -- The second plan's tables, from before one score measured both (2026-10-28).
 DROP VIEW IF EXISTS board_plans;
@@ -183,7 +169,8 @@ CREATE TABLE IF NOT EXISTS sim_plan (
 CREATE TABLE IF NOT EXISTS sim_runs (
     run_id    INTEGER PRIMARY KEY REFERENCES runs(run_id),
     plan_gain REAL,
-    first_after REAL                -- your chance of first once the plan is made
+    first_after REAL,               -- your chance of first once the plan is made
+    lam       REAL                  -- what a million is worth now, points (Board.lam)
 );
 
 -- grading, when run.py grade finds something new: each past lock replayed
@@ -331,7 +318,7 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
     ord        INTEGER NOT NULL,
     lock       INTEGER NOT NULL,   -- the jornada whose lock it was ranked at
     move       TEXT NOT NULL,
-    reached    TEXT NOT NULL,      -- plan, cleared, rejected
+    reached    TEXT NOT NULL,      -- plan, left out (cleared, rejected before 2026-10-28)
     kind       TEXT NOT NULL,      -- get, sell
     chance     REAL,               -- chance it leaves you better off (ffcore.gain)
     jornadas   INTEGER,            -- jornadas played since
@@ -731,7 +718,6 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'PRICE_W0' AND variant = (SELECT variant())) AS price_w0,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W1' AND variant = (SELECT variant())) AS price_w1,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W2' AND variant = (SELECT variant())) AS price_w2,
-    (SELECT value FROM model_constants WHERE name = 'GOOD_OFFER' AND variant = (SELECT variant())) AS good_offer,
     (SELECT value FROM model_constants WHERE name = 'MONEY_RATE' AND variant = (SELECT variant())) AS money_rate,
     (SELECT value FROM model_constants WHERE name = 'RESALE_MARGIN' AND variant = (SELECT variant())) AS resale_margin,
     (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
@@ -1390,7 +1376,7 @@ CREATE VIEW board_buys AS
 SELECT f.rank, f.buy AS player, coalesce(s.name, f.buy) AS name, coalesce(s.pos, '') AS pos,
        coalesce(s.price, f.cost) AS asking, f.cost AS bid, s.my_bid, coalesce(s.my_bid, f.cost) AS cost,
        s.value, s.trend,
-       f.gain, f.p_better, f.per_million, f.verdict, f.in_plan, f.money, f.win, f.d_first,
+       f.gain, f.p_better, f.per_million, f.in_plan, f.money, f.win, f.d_first,
        r.later AS resale, l.later AS flat
 FROM funnel f JOIN board_run USING (run_id)
 LEFT JOIN sim_facts s ON s.run_id = f.run_id AND s.player = f.buy
@@ -1541,12 +1527,12 @@ took(n, spent, lost, taken) AS (
 SELECT row_number() OVER (ORDER BY n) - 1 AS ord, player, profit
 FROM ranked JOIN took USING (n) WHERE taken;
 
--- Every line of the board, each once: what to do now ('do') and what to
--- consider ('consider'), each with the step it takes in the app and the
--- amount that step names, whether it is done, its points (over the season,
--- or next for the line-up) and the numbers that made it (facts: [label,
--- value, unit], none without a value).
---   do: the line-up the plan wants; the plan's moves in its order (a buy:
+-- Every line of the board, each once: what to do now, each with the step
+-- it takes in the app and the amount that step names, whether it is done,
+-- its points (over the season, or next for the line-up) and the numbers
+-- that made it (facts: [label, value, unit], none without a value). The
+-- plan is the one judgement: no line shows a move it does not make.
+--   The line-up the plan wants; the plan's moves in its order (a buy:
 --   bid up to its bid, or yours is in; a sale: take tonight's offer, or
 --   wait for what waiting is worth, or sell after the auctions when it pays
 --   only with the plan's buys and waiting for them is worth more
@@ -1555,19 +1541,14 @@ FROM ranked JOIN took USING (n) WHERE taken;
 --   offers only for those listed, listing costs nothing and a listed player
 --   still plays for you; and those whose listing ends before the last
 --   offer before the lock, to relist once it does.
---   consider: each buy that clears the bar alone but is not in the plan
---   (short by what the bid is over your cash after it), and each sale the
---   plan does not make of a listed player whose offer tonight beats what
---   waiting is worth and GOOD_OFFER of the game's recent offers.
 DROP VIEW IF EXISTS board_moves;
 DROP VIEW IF EXISTS board_rows;
 CREATE VIEW board_rows AS
 WITH ins AS (SELECT * FROM lineup_gap WHERE basis = 'plan' AND side = 'in'),
 outs AS (SELECT * FROM lineup_gap WHERE basis = 'plan' AND side = 'out'),
 legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap WHERE basis = 'plan'),
-m AS (SELECT * FROM board_money),
 field AS (
-    SELECT 'do' AS section, -1 AS ord, 'field' AS what,
+    SELECT -1 AS ord, 'field' AS what,
            'field ' || (SELECT group_concat(name, ', ' ORDER BY -next, player) FROM ins) AS label,
            NULL AS name, NULL AS pos,
            CASE WHEN legal.ok THEN NULL ELSE 'check line-up' END AS step, NULL AS amount,
@@ -1580,8 +1561,7 @@ field AS (
     FROM legal
     WHERE EXISTS (SELECT 1 FROM ins) OR EXISTS (SELECT 1 FROM outs)),
 buys AS (
-    SELECT CASE WHEN b.in_plan OR r.player IS NOT NULL THEN 'do' ELSE 'consider' END,
-           coalesce(p.ord, 1000 + r.ord, b.rank), CASE WHEN r.player IS NULL THEN 'buy' ELSE 'resale' END,
+    SELECT coalesce(p.ord, 1000 + r.ord), CASE WHEN r.player IS NULL THEN 'buy' ELSE 'resale' END,
            CASE WHEN r.player IS NULL THEN 'buy ' ELSE 'buy to resell ' END || b.name, b.name, b.pos,
            CASE WHEN b.my_bid IS NULL THEN 'bid up to' ELSE 'bid in' END, b.cost, b.my_bid IS NOT NULL,
            CASE WHEN r.player IS NULL THEN b.gain END, 'season',
@@ -1594,15 +1574,13 @@ buys AS (
                 UNION ALL SELECT 3.5, 'chance of first', round(b.d_first, 2), 'first' WHERE r.player IS NULL
                 UNION ALL SELECT 4, '', b.trend, 'trend'
                 UNION ALL SELECT 5, 'money', 1e6 * b.money, 'money' WHERE r.player IS NULL
-                UNION ALL SELECT 6, '', b.per_million, 'per_million' WHERE r.player IS NULL
-                UNION ALL SELECT 7, 'short by', b.bid - max(m.left, 0.0), 'money'
-                WHERE r.player IS NULL AND NOT b.in_plan AND b.bid > m.left)
+                UNION ALL SELECT 6, '', b.per_million, 'per_million' WHERE r.player IS NULL)
             WHERE v IS NOT NULL)
     FROM board_buys b LEFT JOIN board_plan p ON p.rank = b.rank
-    LEFT JOIN board_resale r USING (player), m
-    WHERE b.in_plan OR b.verdict IS NULL OR r.player IS NOT NULL),
+    LEFT JOIN board_resale r USING (player)
+    WHERE b.in_plan OR r.player IS NOT NULL),
 sells AS (
-    SELECT CASE WHEN s.sell THEN 'do' ELSE 'consider' END, coalesce(p.ord, s.rank), 'sell',
+    SELECT p.ord, 'sell',
            'sell ' || s.name, s.name, s.pos,
            CASE WHEN s.takes AND s.wait_bids > 0 THEN 'sell after the auctions'
                 WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait'
@@ -1625,11 +1603,10 @@ sells AS (
                 UNION ALL SELECT 4, 'money', 1e6 * s.money, 'money'
                 UNION ALL SELECT 5, '', s.per_million, 'per_million')
             WHERE v IS NOT NULL)
-    FROM board_mine s LEFT JOIN board_plan p ON p.rank = s.rank
-    WHERE s.sell OR (s.listed AND s.takes AND s.alone
-                     AND s.beats >= (SELECT good_offer FROM k))),
+    FROM board_mine s JOIN board_plan p ON p.rank = s.rank
+    WHERE s.sell),
 unlisted AS (
-    SELECT 'do', 2000, 'list',
+    SELECT 2000, 'list',
            'list ' || group_concat(name, ', ' ORDER BY -coalesce(trend, 0.0), player), NULL, NULL,
            NULL, NULL, 0, NULL, 'season',
            (SELECT json_group_array(json_array('rising', rising, 'names')) FROM (
@@ -1637,12 +1614,12 @@ unlisted AS (
                 FROM board_mine WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL)
     FROM board_mine WHERE NOT listed AND NOT sell HAVING count(*) > 0),
 relist AS (
-    SELECT 'do', 1999, 'relist',
+    SELECT 1999, 'relist',
            'relist ' || group_concat(name, ', ' ORDER BY relist_after, -coalesce(trend, 0.0), player), NULL, NULL,
            NULL, NULL, 0, NULL, 'season',
            json_array(json_array('once the listing ends', min(relist_after), 'time'))
     FROM board_mine WHERE relist_after IS NOT NULL HAVING count(*) > 0)
-SELECT section, row_number() OVER (PARTITION BY section ORDER BY ord) - 1 AS ord, what, label, name,
+SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name,
        pos, step, amount, done, gain, per, facts
 FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM sells
       UNION ALL SELECT * FROM unlisted UNION ALL SELECT * FROM relist);
@@ -1662,21 +1639,22 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
        (SELECT round(first_after, 3) FROM sim_runs JOIN board_run USING (run_id)) AS p_win_after,
+       (SELECT lam FROM sim_runs JOIN board_run USING (run_id)) AS lam,
        me.lo AS band_lo, me.hi AS band_hi,
        (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
        (SELECT max(0.0, left + debt) - held FROM board_money) AS can_bid,
        (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
-        WHERE section = 'do' AND NOT done) AS ping
+        WHERE NOT done) AS ping
 FROM me;
 
 -- decisions.json: the board as one JSON document, the phone's copy: its
--- lines (board_rows) by section, as the phone draws them.
+-- lines (board_rows), as the phone draws them.
 DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
-WITH lines AS (SELECT section, ord, json(CASE WHEN what = 'field' THEN json_remove(o, '$.name', '$.pos')
+WITH lines AS (SELECT ord, json(CASE WHEN what = 'field' THEN json_remove(o, '$.name', '$.pos')
                                              ELSE o END) AS o
-               FROM (SELECT section, ord, what, json_object(
+               FROM (SELECT ord, what, json_object(
                          'name', name, 'pos', pos, 'what', what, 'label', label, 'step', step,
                          'amount', amount, 'done', json(CASE WHEN done THEN 'true' ELSE 'false' END),
                          'gain', gain, 'per', per, 'facts', json(coalesce(facts, '[]'))) AS o
@@ -1684,9 +1662,9 @@ WITH lines AS (SELECT section, ord, json(CASE WHEN what = 'field' THEN json_remo
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
     'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win, 'p_win_after', h.p_win_after,
+    'lam', h.lam,
     'band', json_array(h.band_lo, h.band_hi),
-    'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'do'),
-    'consider', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE section = 'consider'),
+    'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines),
     'plan_gain', h.plan_gain, 'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),

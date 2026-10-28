@@ -119,33 +119,30 @@ Every forecast is the same product, for every player and jornada, and
   and debt, no points). A player comes from the market, at the bid it takes
   to win the auction; never from a rival by his release clause (you do
   not shoot first). Every
-  recommendation passes the same four steps, `decide.FUNNEL`, drawn in
-  `docs/funnel.mmd`:
-  1. **candidates**: every sale of a spare, and every player on the market
-     you could get. No quicker measure filters them first: the simulated
-     rank is the one judgement (a filter on expected points kept 4 of 11
-     buys on 2026-10-08, saved 0.1s, and dropped none that passed).
-  2. **rank**: each move against doing nothing, in simulated seasons:
-     the points it adds, and per million it spends or raises
-     (`Move.per_million`).
-  3. **verdict**: a gain in the median, and better off in at least 70% of
-     seasons (`CONFIDENCE`); below that its gain is noise. Every move is
-     also scored by what it adds to your chance of finishing first
-     (`Move.d_first`, shown on each line and, for the plan, in the
-     headline); `JUDGE_BY_FIRST` makes that the bar instead (`FIRST_BAR`),
-     once a backtest says it should.
-  4. **plan**: the best set that shares no player and, paid for, clears
-     the same bar as one move (`verdict` on the whole set) while adding to
-     its gain, built best first and best per million first (one dear move can
-     crowd out two cheaper ones that gain more), keeping the set that gains
-     more. Money has no price of its own: it only bounds the set, by the
-     game's one money rule, a balance of at least zero at the lock (below
-     it you score nothing). What a debt or a buy leaves below zero is
-     raised by the set of ranked sales that covers it at fewest points
-     (`decide.raised`).
+  recommendation passes the same three steps, `decide.FUNNEL`, drawn in
+  `docs/funnel.mmd` (the design: `docs/notes/plan.md`):
+  1. **candidates**: every sale of yours, and every player on the market
+     you could get.
+  2. **rank**: each move alone against doing nothing: the points it adds
+     (with its money at `MONEY_RATE`), the chance it helps, what it adds to
+     your chance of first (`Move.d_first`), and per million it spends or
+     raises (`Move.per_million`). Shown on each line; not what the plan is
+     chosen by.
+  3. **plan**: one integer program (`decide.program`, HiGHS): which of
+     yours to keep, which buys to make, and the eleven each jornada to come
+     fields from the squad that leaves, so moves are valued as a set
+     against the slots (two forwards sold together cost more than each
+     alone). The game's money rule, cash at the lock at least zero (below
+     it you score nothing), is its one constraint; in debt, the sales that
+     clear it are among its moves. Objective: the elevens' expected points
+     and the moves' money at `MONEY_RATE`. What a million is worth now
+     (`Board.lam`, the headline) is the budget's price in the program's
+     linear relaxation: a move is worth making while its points a million
+     beat it.
 
-  `python tools/ask.py why <player>` names the step a player stopped at,
-  `ask.py whatif buy X sell Y` scores a move of your own the same way, and
+  `python tools/ask.py why <player>` says whether the plan makes his move
+  and, if not, what making it would cost the plan (the program with it
+  forced in), `ask.py whatif buy X sell Y` scores a move of your own the same way, and
   `ask.py forecast <player>` prints his forecast factor by factor. The
   board also lists your players a rival can take by clause now (`decide.at_risk`):
   all of them, since a sale to the game pays at once and any rival can raise
@@ -160,16 +157,13 @@ Every forecast is the same product, for every player and jornada, and
   once, each event keyed like every other table. Rival cash and the price
   paid (each owned player's last buy or transfer to his owner) are both
   read from it (`price_paid` on the box).
-- **What the board says** (`board_rows`), in two lists. *Do*: the line-up,
-  the plan's moves (a buy: what he is listed at and the bid to make; a
-  sale: take the offer, wait, or list him), the buys to resell, and your
-  players not listed, rising first: the game offers only for listed
-  players, listing costs nothing and a listed player still plays.
-  *Consider*: each buy that clears the bar alone but not in the plan, short
-  by what it costs over your cash after it; and each listed player whose
-  offer tonight beats waiting and `GOOD_OFFER` (90%) of the game's recent
-  offers, with the points his sale costs. Every ranked buy and offer is on
-  the box (`market`, `offers`).
+- **What the board says** (`board_rows`), one list: the line-up, the
+  plan's moves (a buy: what he is listed at and the bid to make; a sale:
+  take the offer, wait, or list him), the buys to resell, and your players
+  not listed, rising first: the game offers only for listed players,
+  listing costs nothing and a listed player still plays. No line shows a
+  move the plan does not make. Every ranked buy and offer is on the box
+  (`market`, `offers`).
 - **Rival cash**: budget plus their sales, bonuses and
   transfer income, less buys and transfer payments, plus the income the feed
   never records (your real balance minus the same sum for you).
@@ -197,8 +191,8 @@ which move wins.
   league). Not modelled: ours paid one 9h before kickoff, and the app
   refuses a closed one anyway.
 - **A negative balance at the matchday's start scores 0 points; debt is
-  capped at 20% of team value.** Enforced by the plan (`decide.raised`:
-  the same rule that keeps a buy within your cash) and by the app (bids).
+  capped at 20% of team value.** Enforced by the plan (`decide.program`'s
+  one constraint, cash at the lock at least zero) and by the app (bids).
   Not modelled for rivals: the simulated seasons ignore every manager's
   cash, so a rival below zero at the lock still scores.
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:

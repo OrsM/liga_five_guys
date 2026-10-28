@@ -2,56 +2,62 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 167<br/>in 2 · out 18"]:::hub
-        crosswalk["crosswalk 159"]
-        decide["decide 618"]
-        grading["grading 246<br/>in 0 · out 10"]:::hub
-        ingest["ingest 765"]
-        run["run 84"]
-        sim["sim 292"]
+        assemble["assemble 708<br/>in 2 · out 18"]:::hub
+        crosswalk["crosswalk 106"]
+        decide["decide 672"]
+        grading["grading 766<br/>in 0 · out 10"]:::hub
+        ingest["ingest 748"]
+        run["run 232"]
+        sim["sim 615"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 253"]
         footballdata["footballdata 132"]
-        futbolfantasy["futbolfantasy 766"]
+        futbolfantasy["futbolfantasy 761"]
         laliga_api["laliga_api 592"]
         source["source 50"]
         sources["sources 130"]
     end
     subgraph data["Tables and time"]
-        clock["clock 86"]
-        ff_crosswalk["ff_crosswalk 179"]
-        jornadas["jornadas 76"]
-        league["league 271"]
-        players["players 113"]
-        points["points 106"]
-        tidy["tidy 414<br/>in 10 · out 2"]:::hub
+        clock["clock 113"]
+        ff_crosswalk["ff_crosswalk 96"]
+        db["db 420<br/>in 11 · out 6"]:::hub
+        jornadas["jornadas 149"]
+        league["league 148"]
+        points["points 93"]
+        tidy["tidy 326"]
     end
     subgraph model["Model"]
         action["action 44"]
         fixture["fixture 170"]
-        forecast["forecast 64"]
-        market["market 201"]
-        outlook["outlook 87"]
-        pricing["pricing 181"]
-        rules["rules 89"]
-        schedule["schedule 215"]
-        score["score 334"]
-        season["season 267"]
-        startprob["startprob 581"]
+        forecast["forecast 60"]
+        market["market 142"]
+        outlook["outlook 88"]
+        pricing["pricing 32"]
+        rules["rules 78"]
+        schedule["schedule 230"]
+        score["score 260"]
+        season["season 30"]
+        startprob["startprob 429"]
     end
     subgraph util["Pure utilities"]
-        locks["locks 89"]:::leaf
-        names["names 93<br/>in 11 · out 2"]:::hub
-        parse["parse 173<br/>in 18 · out 0"]:::hub
-        text["text 106"]:::leaf
+        facts["facts 250"]:::leaf
+        gain["gain 263"]:::leaf
+        kept["kept 161"]:::leaf
+        names["names 81"]:::leaf
+        parse["parse 158<br/>in 15 · out 0"]:::hub
+        text["text 113"]:::leaf
+        health["health 93"]:::leaf
+        publish["publish 114"]:::leaf
+        remind["remind 121"]:::leaf
         stats["stats 36"]:::leaf
     end
     run -. "by name" .-> ingest
     run -. "by name" .-> crosswalk
     run -. "by name" .-> sim
     assemble --> decide
-    assemble --> ff_crosswalk
+    assemble --> clock
+    assemble --> db
     assemble --> fixture
     assemble --> forecast
     assemble --> jornadas
@@ -59,100 +65,94 @@ flowchart LR
     assemble --> market
     assemble --> names
     assemble --> parse
-    assemble --> players
     assemble --> points
-    assemble --> pricing
-    assemble --> rules
     assemble --> schedule
     assemble --> score
     assemble --> season
     assemble --> startprob
     assemble --> tidy
+    assemble --> remind
+    assemble --> stats
     crosswalk --> ff_crosswalk
+    crosswalk --> db
     crosswalk --> names
     crosswalk --> parse
-    crosswalk --> text
     crosswalk --> tidy
     decide --> action
     decide --> forecast
+    decide --> gain
     decide --> market
     decide --> outlook
     decide --> rules
     decide --> schedule
     decide --> season
-    decide --> stats
     clock --> parse
+    ff_crosswalk --> facts
     ff_crosswalk --> names
-    ff_crosswalk --> tidy
+    db --> clock
+    db --> facts
+    db --> names
+    db --> rules
+    db --> startprob
+    db --> text
     fixture --> parse
     footballdata --> futbolfantasy
     footballdata --> source
     futbolfantasy --> names
     futbolfantasy --> parse
+    futbolfantasy --> rules
     futbolfantasy --> source
     futbolfantasy --> text
+    gain --> forecast
+    gain --> rules
     jornadas --> clock
-    jornadas --> locks
-    jornadas --> tidy
+    jornadas --> db
+    jornadas --> parse
+    jornadas --> schedule
     laliga_api --> parse
     laliga_api --> source
-    league --> ff_crosswalk
     league --> names
     league --> parse
-    league --> players
     league --> tidy
-    locks --> parse
     market --> action
     market --> names
-    market --> parse
-    market --> pricing
     names --> parse
     names --> text
     outlook --> forecast
+    outlook --> gain
     outlook --> season
-    players --> ff_crosswalk
-    players --> names
-    players --> parse
-    players --> tidy
-    points --> names
-    points --> parse
+    points --> db
     points --> score
-    points --> tidy
-    pricing --> names
-    pricing --> parse
     schedule --> fixture
     schedule --> forecast
-    schedule --> locks
     schedule --> parse
     schedule --> rules
     schedule --> score
-    score --> ff_crosswalk
     score --> names
     score --> parse
     score --> rules
     score --> startprob
     score --> stats
-    season --> forecast
     season --> rules
-    season --> stats
-    startprob --> ff_crosswalk
-    startprob --> names
     startprob --> parse
-    startprob --> rules
     startprob --> stats
     tidy --> clock
+    tidy --> db
     tidy --> parse
     grading --> assemble
     grading --> decide
     grading --> clock
+    grading --> db
     grading --> forecast
+    grading --> gain
     grading --> jornadas
     grading --> points
     grading --> pricing
-    grading --> schedule
-    grading --> score
-    grading --> tidy
+    grading --> sim
+    health --> db
+    health --> publish
     ingest --> auth
+    ingest --> db
     ingest --> futbolfantasy
     ingest --> laliga_api
     ingest --> league
@@ -160,13 +160,15 @@ flowchart LR
     ingest --> source
     ingest --> tidy
     ingest --> sources
+    publish --> remind
+    remind --> db
+    run --> clock
+    run --> db
+    run --> parse
     sim --> assemble
     sim --> decide
-    sim --> clock
-    sim --> jornadas
-    sim --> league
-    sim --> market
-    sim --> rules
+    sim --> db
+    sim --> forecast
     sim --> tidy
     sources --> footballdata
     sources --> futbolfantasy

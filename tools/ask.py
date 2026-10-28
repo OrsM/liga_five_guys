@@ -20,8 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from assemble import scorer, universe  # noqa: E402
-from decide import (FUNNEL, Action, Board, Move, Universe, blocked, board, joint,  # noqa: E402
-                    plan, raised, verdict)
+from decide import FUNNEL, Action, Board, Move, Universe, board, plan, program  # noqa: E402
 from ffcore.names import Name  # noqa: E402
 from ffcore.text import resolve  # noqa: E402
 from ffcore.jornadas import rounds_ahead  # noqa: E402
@@ -61,22 +60,19 @@ def not_offered(u: Universe, k: str) -> str:
 
 
 def fate(u: Universe, b: Board, r: Move) -> str:
-    """Where a ranked move stopped: at verdict, or at plan and why. The plan
-    last tried every move it left out against all of itself, paid for."""
+    """Whether the plan makes a ranked move, and if not what making it
+    would cost the plan (decide.program with it forced in), beside what a
+    million is worth now (Board.lam)."""
     if r in b.plan:
         return step(plan, "in the plan")
-    if (no := verdict(r)) is not None:
-        return step(verdict, no)
-    if (no := blocked(u, b.plan, r.action, b.rows)) is not None:
-        return step(plan, "clears the bar alone, left out: %s" % no)
-    funded = raised(u, [*b.plan, r], b.rows)
-    assert funded is not None, "blocked said it can be raised"
-    paid = [m.action.label(u.market.names) for m in funded[len(b.plan) + 1:]]
-    total = joint(u, funded)
-    return step(plan, "clears the bar alone, left out%s: %s" % (
-        " (paid for by %s)" % ", ".join(paid) if paid else "",
-        verdict(total) or "together %+.1f, no more than the plan's %+.1f" % (
-            total.d_pts, b.gain)))
+    _x, best, _p = program(u, b.rows, relax=False)
+    took, worse, _q = program(u, b.rows, relax=False, force=r)
+    if not any(took):
+        return step(plan, "left out: the plan cannot make it (no side to field, or no money for it)")
+    names = u.market.names
+    with_it = [m.action.label(names) for m, t in zip(b.rows, took) if t and m is not r]
+    return step(plan, "left out: made, the plan does %.1f points worse%s; a million is worth %.2f points now" % (
+        best - worse, " (with %s)" % ", ".join(with_it) if with_it else "", b.lam))
 
 
 def why(u: Universe, k: str) -> None:
@@ -124,9 +120,9 @@ def whatif(u: Universe, words: list[str]) -> None:
     mv = u.rank([a])[0]
     print(show(u, mv))
     b = board(u)
-    picked, gain = plan(u, [*b.rows, mv]) if verdict(mv) is None else ([], 0.0)
-    print(step(plan, "the plan would take it: together %+.1f, against %+.1f" % (gain, b.gain))
-          if mv in picked else fate(u, b, mv))
+    picked, _lam = plan(u, [*b.rows, mv])
+    print(step(plan, "the plan would take it") if mv in picked
+          else fate(u, b._replace(rows=[*b.rows, mv]), mv))
 
 
 def forecast(u: Universe, k: str, ahead: int) -> None:
@@ -195,30 +191,17 @@ def _selftest() -> None:
     assert b.plan, "the fixture has a move worth making"
     for r in b.rows:
         said = fate(u, b, r)
-        if r in b.plan:
-            assert said == "4/4 plan: in the plan", said
-        elif verdict(r) is None:
-            assert said.startswith("4/4 plan: clears the bar alone, left out"), said
-        else:
-            assert said == "3/4 verdict: %s" % verdict(r), said
-    poor = replace(u, market=replace(u.market, cash=1e6))
-    pb = board(poor)
-    cand = next(r for r in pb.rows if r.action.buy == "cand_free")
-    real = globals()["joint"]
-    try:
-        globals()["joint"] = lambda u, moves: Move(Action("plan"), 5.0, 0.6)
-        said = fate(poor, pb._replace(plan=[], gain=0.0), cand)
-    finally:
-        globals()["joint"] = real
-    assert said == ("4/4 plan: clears the bar alone, left out (paid for by sell bench_m,"
-                    " sell bench_k): a 60% chance of helping, under 70%"), said
+        assert said == "3/3 plan: in the plan" if r in b.plan else said.startswith("3/3 plan: left out"), said
+    keeper = next(r for r in b.rows if r.action.sell == ("k",))
+    assert keeper not in b.plan and "points worse" in fate(u, b, keeper), \
+        "selling your only keeper: what it costs the plan, in points"
     accented = replace(u, market=replace(u.market, name={
         **u.market.name, "cand_free": Name("Iñigo Vicente"), "cand_rival": Name("Iñigo Martínez")}))
     assert find(accented, ["inigo", "vicente"]) == "cand_free", "accents never count"
     assert find(accented, ["INIGO"]) is None, "two Iñigos: ask which"
     assert not_offered(u, "cand_rival") == \
-        "1/4 candidates: riv's player"
-    assert not_offered(u, "nobody") == "1/4 candidates: nobody's, and not on the market now"
+        "1/3 candidates: riv's player"
+    assert not_offered(u, "nobody") == "1/3 candidates: nobody's, and not on the market now"
     assert not_offered(u, "cand_free") == ""
     print("ask self-test OK")
 

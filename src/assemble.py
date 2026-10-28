@@ -13,7 +13,7 @@ from typing import Any, NamedTuple
 
 import decide
 import remind
-from decide import CONFIDENCE, Universe, _fieldable
+from decide import MONEY_RATE, Universe, _fieldable
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import set_variant
 from ffcore import db as lfgdb, kept
@@ -43,10 +43,10 @@ APP_FRESH_HOURS = 14.4
 # and what a variant may set (variants).
 NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS",),
-    "decide": ("CONFIDENCE", "MONEY_RATE"),
+    "decide": ("MONEY_RATE", "TIE"),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
-    "pricing": ("BID_NEIGHBOURS", "CLIP", "GOOD_OFFER", "MONEY_H", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW",
+    "pricing": ("BID_NEIGHBOURS", "CLIP", "MONEY_H", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW",
                 "RESALE_MARGIN"),
     "remind": ("REMIND_HOURS",),
     "rules": ("MATCH_LEN",),
@@ -336,10 +336,10 @@ def _selftest() -> None:
                        (("fixture.difficulty", "a"), 1.1),
                        (("fixture.scored", "a"), 1.2),
                        (("fixture.conceded", "a"), 0.8),
-                       (("decide", "CONFIDENCE"), CONFIDENCE)]:
+                       (("decide", "MONEY_RATE"), MONEY_RATE)]:
         assert got[key]["value"] == value, (key, got.get(key))
     assert got[("pricing.offer_ratios", "median")]["n"] == 3
-    assert got[("decide", "CONFIDENCE")]["kind"] == "constant"
+    assert got[("decide", "MONEY_RATE")]["kind"] == "constant"
     assert got[("startprob.availability", "doubt_for:at")]["kind"] == "fitted", \
         "a bucket with no data keeps its prior, and is still what the run used"
     _selftest_market()
