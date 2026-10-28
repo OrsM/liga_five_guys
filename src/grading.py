@@ -151,7 +151,8 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
 
 
 def decisions() -> list[dict[str, Any]]:
-    """Rebuild each past lock's board with this code and set every ranked
+    """Rebuild each past lock's board with this code (variance weighed at
+    nothing, as phantom_season) and set every ranked
     move against what its players then scored: the change in points it
     forecast (players got minus players sold) over the jornadas played
     since, and the change that happened; and the value its players were
@@ -165,7 +166,7 @@ def decisions() -> list[dict[str, Any]]:
             u = universe_at(i, locks)
             if u is None:
                 continue
-            boards.append((i, u, board(u), price_momentum().horizon))
+            boards.append((i, u, board(u, kappas=(0.0,)), price_momentum().horizon))
     finally:
         set_now(None)
         built.cache_clear()
@@ -307,7 +308,7 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
             sales, len(closing) - len(won))
 
 
-def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
+def phantom_path(daily: bool = False, kappas: tuple[float, ...] = decide.KAPPAS) -> list[dict[str, Any]]:
     """The league's sixth manager: your squad and cash at the first lock,
     then the plan (every player he or the manager beside him holds
     forecast, though nobody may hold him now) this code makes for the squad
@@ -357,7 +358,7 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
                 continue
             up = with_squad(u, squad, cash, bids)
             if t in runs or not daily:
-                acts = [r.action for r in board(up).plan]
+                acts = [r.action for r in board(up, kappas).plan]
                 if daily:
                     (squad, cash, bids, pending), acts = acted(up, bids, acts)
                     up = with_squad(u, squad, cash, bids)
@@ -387,9 +388,11 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
 def phantom_season() -> list[dict[str, Any]]:
     """The phantom manager deciding at each lock (phantom_path): what the
     grade stage keeps (phantom_jornadas: no bid is settled there, so no
-    lost, and the forecasts are the grade's own business)."""
+    lost, and the forecasts are the grade's own business), its plans with
+    variance weighed at nothing: the grade is the forecasts' and the
+    moves', the plan's appetite for variance the backtest's (money)."""
     return [{k: v for k, v in r.items() if k not in ("lost", "expected", "standpat_expected")}
-            for r in phantom_path()]
+            for r in phantom_path(kappas=(0.0,))]
 
 
 def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datetime]]
@@ -502,14 +505,30 @@ def superseded(run: int, path: Path | None = None) -> None:
                        % t, (run,))
 
 
+def graded(run: int, last: int, path: Path | None = None) -> bool:
+    """Whether an earlier run of this run's code (runs.commit_sha) graded the
+    past locks on every jornada done up to last: its grades stand, and
+    nothing would change them."""
+    with closing(connect(path)) as db:
+        return db.execute("SELECT 1 FROM grade_forecast g JOIN runs e ON e.run_id = g.run_id"
+                          " JOIN runs r ON r.run_id = ? AND e.commit_sha = r.commit_sha AND e.run_id < r.run_id"
+                          " GROUP BY g.run_id HAVING max(g.jornada) >= ? LIMIT 1", (run, last)).fetchone() is not None
+
+
 def record_grades() -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code,
     and keep every player forecast and every ranked move against what then
-    happened (one set a code: superseded), and the live replay's moments it
-    still owes (replay)."""
+    happened (one set a code: superseded), unless this code has graded them
+    on every jornada done (graded); and the live replay's moments it still
+    owes (replay)."""
     actual = jornada_points()
-    resolved = len(done_jornadas())
+    done = done_jornadas()
+    resolved = len(done)
     run = this_run()
+    if run is not None and done and graded(run, max(done)):
+        replayed = replay(REPLAY_VARIANT)
+        print("  grade: this code's grades stand (every jornada done graded), %d moments replayed" % replayed)
+        return {"resolved": resolved, "forecasts": 0, "moves": 0, "replayed": replayed}
     _AT.clear()
     try:
         fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
@@ -622,6 +641,9 @@ def _selftest() -> None:
         for t in GRADED:
             assert [r for r, in db.execute("SELECT run_id FROM %s ORDER BY run_id" % t)] in (
                 [other, now], []), "the same code's earlier grade goes; another code's stays"
+        later, elsewhere = run("a"), run("c")
+        assert graded(later, 7, path) and not graded(later, 8, path) and not graded(elsewhere, 7, path), \
+            "this code graded on every jornada done: nothing to grade again; a jornada more, or other code, is"
 
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
