@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-29T19:46Z",
+ "generated_at": "2026-10-29T20:28Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
- "cash_locked": 43859168.0,
+ "cash_locked": 44449163.0,
  "finish": 1.82,
  "p_win": 0.276,
  "p_win_after": 0.305,
@@ -319,9 +319,9 @@
    "pos": "DEF",
    "what": "buy",
    "label": "buy Dani Martinez",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 589995.0,
-   "done": false,
+   "done": true,
    "gain": 0.0,
    "per": "season",
    "facts": [
@@ -332,7 +332,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -504,7 +504,7 @@
  "plan_gain": 59.03418556295,
  "cash_after": 5665295.36504176,
  "can_bid": 81234419.1650418,
- "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; sell Gerard Martin; buy Dani Martinez; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+ "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; sell Gerard Martin; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
