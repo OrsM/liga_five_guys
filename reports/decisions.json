@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-29T18:22Z",
+ "generated_at": "2026-10-29T18:32Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
- "cash_locked": 6674686.0,
+ "cash_locked": 27208802.0,
  "finish": 1.82,
  "p_win": 0.276,
  "p_win_after": 0.305,
@@ -83,16 +83,19 @@
      4.43514277797527,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 6356402.0,
+   "win": 0.767,
+   "asking_win": 0.333
   },
   {
    "name": "Martin Satriano",
    "pos": "DEL",
    "what": "buy",
    "label": "buy Martin Satriano",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 17220303.0,
-   "done": false,
+   "done": true,
    "gain": 17.8217085140415,
    "per": "season",
    "facts": [
@@ -131,7 +134,10 @@
      1.08979757721787,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 17220303.0,
+   "win": 0.867,
+   "asking_win": 0.867
   },
   {
    "name": "Gerard Martin",
@@ -191,9 +197,9 @@
    "pos": "DEF",
    "what": "buy",
    "label": "buy Adria Pedrosa",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 3313813.0,
-   "done": false,
+   "done": true,
    "gain": 4.91091489565681,
    "per": "season",
    "facts": [
@@ -232,7 +238,10 @@
      0.649190007128173,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 3313813.0,
+   "win": 1.0,
+   "asking_win": 1.0
   },
   {
    "name": "Jon Moncayola",
@@ -280,7 +289,10 @@
      0.15974649658648,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 4279563.0,
+   "win": 0.967,
+   "asking_win": 0.967
   },
   {
    "name": "Dani Martinez",
@@ -328,7 +340,10 @@
      0.0561989366636993,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 589371.0,
+   "win": 0.85,
+   "asking_win": 0.85
   },
   {
    "name": "Luis Castro",
@@ -376,7 +391,10 @@
      0.000720170224370435,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 615230.0,
+   "win": 0.9,
+   "asking_win": 0.9
   },
   {
    "name": "Robin Le Normand",
@@ -424,7 +442,10 @@
      -0.0917263483054328,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 6865304.0,
+   "win": 1.0,
+   "asking_win": 1.0
   },
   {
    "name": "Augusto Batalla",
@@ -472,7 +493,10 @@
      -0.159806708589935,
      "per_million"
     ]
-   ]
+   ],
+   "asking": 5505499.0,
+   "win": 1.0,
+   "asking_win": 1.0
   },
   {
    "name": null,
@@ -495,8 +519,8 @@
  ],
  "plan_gain": 61.8565049872454,
  "cash_after": 5402765.27180065,
- "can_bid": 80975713.2718007,
- "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; buy Martin Satriano; sell Gerard Martin; buy Adria Pedrosa; buy Jon Moncayola; buy Dani Martinez; buy Luis Castro; buy Robin Le Normand; buy Augusto Batalla; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+ "can_bid": 80971889.0718006,
+ "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; sell Gerard Martin; buy Jon Moncayola; buy Dani Martinez; buy Luis Castro; buy Robin Le Normand; buy Augusto Batalla; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
