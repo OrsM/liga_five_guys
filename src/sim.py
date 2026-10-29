@@ -175,7 +175,8 @@ def _selftest_board() -> None:
         and {n.lower() for f in known["facts"] for n in f[1].split(", ")} == left, known
     assert known["step"] is None and known["gain"] is not None, known
     for d in doc["do"]:
-        assert set(d) >= ROW and not set(d) - ROW - {"name", "pos"}, d
+        assert set(d) >= ROW and not set(d) - ROW - {"name", "pos"} - (
+            {"asking", "win", "asking_win"} if d["what"] == "buy" else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
@@ -206,6 +207,11 @@ def _selftest_board() -> None:
     assert all(dict((f[0], f[1]) for f in d["facts"])["listed at"] == ub.market.price[d["name"].lower()]
                for d in doc["do"] if d["what"] == "buy"), \
         "what he is listed at, and the bid it takes"
+    assert all((d["asking"], d["win"]) == (ub.market.price[d["name"].lower()], round(dict(
+        (m.action.buy, m.win) for m in b.plan)[d["name"].lower()], 3)) and d["asking_win"] == 1.0
+               for d in doc["do"] if d["what"] == "buy"), \
+        ("each bid at its asking price too, and the chance of each (with no past auctions to go on, sure)",
+         [d for d in doc["do"] if d["what"] == "buy"])
     wins = {m.action.buy: round(m.win, 3) for m in b.rows if m.action.kind == "buy"}
     assert all(dict((f[0], f[1]) for f in d["facts"])["chance to win"] == wins[d["name"].lower()]
                for d in doc["do"] if d["what"] == "buy"), \

@@ -3,7 +3,7 @@ the phone (lfg-watch hands the request here).
 
 The request names the board it was made on (generated_at), the player and
 the amount. The bid is placed only if that is still the board, the line is
-one of its bids at that amount, and the player is still on the market; it is
+one of its bids at that amount or at his asking price, and the player is still on the market; it is
 then read back from the market. The bid endpoints are the app's own
 (fantasy-api.llt-services.com, as LaLigaApp calls them): POST a bid, PUT a
 new amount on yours.
@@ -70,9 +70,11 @@ def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], di
         return done(False, "the board has changed since: refresh and accept again")
     line = next((d for d in board.get("do", []) if d.get("what") == "buy" and d.get("name") == req.get("name")),
                 None)
-    if line is None or line.get("amount") is None or round(line["amount"]) != round(req.get("amount") or -1):
+    amounts = [a for a in (line.get("amount"), line.get("asking")) if a is not None] if line else []
+    chosen = next((a for a in amounts if round(a) == round(req.get("amount") or -1)), None)
+    if line is None or chosen is None:
         return done(False, "not a bid of this board at this amount")
-    money = math.ceil(line["amount"])
+    money = math.ceil(chosen)
     at = where(line["name"])
     if at is None:
         return done(False, "not on the app's market as the last run saw it")
@@ -134,7 +136,7 @@ def http_call() -> Call:
 def _selftest() -> None:
     base = "https://api"
     board = {"generated_at": "2026-10-29T15:57Z",
-             "do": [{"what": "buy", "name": "Thomas Lemar", "amount": 7044268.7},
+             "do": [{"what": "buy", "name": "Thomas Lemar", "amount": 7044268.7, "asking": 6356402.0},
                     {"what": "sell", "name": "Gerard Martin", "amount": 46738575.0}]}
     req = {"requested_at": "t", "generated_at": "2026-10-29T15:57Z", "name": "Thomas Lemar", "amount": 7044268.7}
     where = {"Thomas Lemar": {"market_id": "525303444", "player_id": "3182"}}.get
@@ -178,6 +180,9 @@ def _selftest() -> None:
     call, sent = app(None, shown_after=9)
     assert accept(req, board, where, call, base, naps.append)["message"].startswith("sent, but"), \
         "and not for ever"
+    call, sent = app(None)
+    assert accept({**req, "amount": 6356402.0}, board, where, call, base)["state"] == "placed" and \
+        [b for m, _u, b in sent if m != "GET"] == [{"money": 6356402}], "or at his asking price: the stingy bid"
     call, sent = app(None, answer=400)
     assert accept(req, board, where, call, base)["state"] == "failed", "the app refuses: said so"
     call, sent = app(None)

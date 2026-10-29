@@ -1664,16 +1664,23 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
 FROM me;
 
 -- decisions.json: the board as one JSON document, the phone's copy: its
--- lines (board_rows), as the phone draws them.
+-- lines (board_rows), as the phone draws them; a bid's also at its asking
+-- price, with the chance of winning at each (bid_odds; sure with no past).
 DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
-WITH lines AS (SELECT ord, json(CASE WHEN what = 'field' THEN json_remove(o, '$.name', '$.pos')
+WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
+                                             THEN json_remove(o, '$.name', '$.pos', '$.asking', '$.win', '$.asking_win')
+                                             WHEN what <> 'buy' THEN json_remove(o, '$.asking', '$.win', '$.asking_win')
                                              ELSE o END) AS o
-               FROM (SELECT ord, what, json_object(
-                         'name', name, 'pos', pos, 'what', what, 'label', label, 'step', step,
-                         'amount', amount, 'done', json(CASE WHEN done THEN 'true' ELSE 'false' END),
-                         'gain', gain, 'per', per, 'facts', json(coalesce(facts, '[]'))) AS o
-                     FROM board_rows))
+               FROM (SELECT r.ord, r.what, json_object(
+                         'name', r.name, 'pos', r.pos, 'what', r.what, 'label', r.label, 'step', r.step,
+                         'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
+                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')),
+                         'asking', b.asking, 'win', round(b.win, 3),
+                         'asking_win', CASE WHEN b.player IS NOT NULL THEN round(coalesce(
+                             (SELECT o.p_win FROM bid_odds o WHERE o.player = b.player AND o.ratio = 1.0), 1.0), 3)
+                         END) AS o
+                     FROM board_rows r LEFT JOIN board_buys b ON r.what = 'buy' AND b.in_plan AND b.name = r.name))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
     'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win, 'p_win_after', h.p_win_after,
