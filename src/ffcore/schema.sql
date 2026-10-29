@@ -1573,6 +1573,12 @@ buys AS (
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
                 UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
+                UNION ALL SELECT 0.45, 'bids', CASE WHEN n.bids = 0 THEN 'none yet'
+                                                   WHEN b.my_bid IS NULL THEN CAST(n.bids AS TEXT)
+                                                   WHEN n.bids = 1 THEN 'only yours'
+                                                   ELSE n.bids || ', yours among them' END, 'count'
+                    FROM (SELECT CAST(max(m.bids) AS INTEGER) AS bids FROM current_api_market m
+                          WHERE m.player = b.player AND m.bids <> '') n WHERE n.bids IS NOT NULL
                 UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
                 UNION ALL SELECT 0.6, 'chance of first', round(b.d_first, 2), 'first' WHERE r.player IS NULL
                 UNION ALL SELECT 1, 'sell before the lock for', b.resale, 'money' WHERE r.player IS NOT NULL

@@ -106,14 +106,16 @@ def _selftest_board() -> None:
                ratios: Sequence[float] = (),
                resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0,
                waits: Sequence[tuple[str, float]] = (), nights: int = 0,
-               listings: Sequence[tuple[str, str]] = (), money_rate: float | None = None) -> Doc:
+               listings: Sequence[tuple[str, str]] = (), money_rate: float | None = None,
+               bids: Sequence[tuple[str, int]] = ()) -> Doc:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
         past offers, resale for what waiting sells the game's market players
         for, rising and flat (assemble tests those), team_value yours, waits
         what turning down an offer on a player of yours is worth, nights the
         game's offers still to come before the lock (the first a day after
-        2026-08-01), listings when each of yours ends."""
+        2026-08-01), listings when each of yours ends, bids how many bids
+        each on the game's market has (yours among them, if you have one)."""
         m = u.market
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             with closing(connect()) as db, db:
@@ -132,7 +134,8 @@ def _selftest_board() -> None:
                 db.execute("CREATE TABLE offer_ratios (created_at, ratio)")
                 db.executemany("INSERT INTO offer_ratios VALUES ('', ?)", [(r,) for r in ratios])
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
-                               [(k, k) for k in dict.fromkeys([*fielded, *(k for k, _e in listings)])])
+                               [(k, k) for k in dict.fromkeys([*fielded, *(k for k, _e in listings),
+                                                                *(k for k, _n in bids)])])
                 db.execute("DROP VIEW waiting")
                 db.execute("CREATE TABLE waiting (player, kind, later)")
                 db.executemany("INSERT INTO waiting VALUES (?, ?, ?)", [
@@ -147,7 +150,9 @@ def _selftest_board() -> None:
             store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me,
                                          "team_value": str(team_value)}])
             store_sql("api_market", [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerTeam",
-                                      "expires_at": e} for k, e in listings])
+                                      "expires_at": e} for k, e in listings]
+                      + [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerLeague",
+                          "sale_price": str(m.price.get(k, 1e6)), "bids": str(n)} for k, n in bids])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
                                      for k in fielded])
             record_run(u, bd, 7)
@@ -266,6 +271,15 @@ def _selftest_board() -> None:
                for n, d in buys.items() if n != bought[0]), buys
     assert [(d["name"].lower(), d["done"], d["step"], d["amount"]) for d in doc["do"]
             if d["what"] == "sell"] == [("dead", True, "listed", None)], doc["do"]
+    mine, *others = [bought[0], *(n for n in buys if n != bought[0])]
+    def hot(n_mine: int, n_other: int) -> dict[str, Any]:
+        crowd = report(ub, b, bids=[(mine, n_mine), *((o, n_other) for o in others[:1])])
+        return {d["name"].lower(): dict((f[0], f[1]) for f in d["facts"]).get("bids")
+                for d in crowd["do"] if d["what"] == "buy"}
+    assert others, "the case: a buy of the plan you have not bid on"
+    assert hot(1, 3) == {mine: "only yours", others[0]: "3", **{o: None for o in others[1:]}}, hot(1, 3)
+    assert hot(4, 0) == {mine: "4, yours among them", others[0]: "none yet", **{o: None for o in others[1:]}}, \
+        "how many bid on each: a crowd, only yours, or none yet"
     unlisted = report(replace(ub, market=replace(ub.market, route={})),
                       b._replace(plan=[sell_dead], rows=b.rows + [sell_dead]))
     assert [(d["step"], d["done"]) for d in unlisted["do"] if d["what"] == "sell"] \
