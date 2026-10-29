@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-29T15:57Z",
+ "generated_at": "2026-10-29T18:22Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
  "cash_locked": 6674686.0,
@@ -506,7 +506,7 @@
   {
    "name": "Fernando Niño",
    "pos": "DEL",
-   "clause": 44561269.0
+   "clause": 44557322.0
   },
   {
    "name": "Georges Mikautadze",
@@ -521,7 +521,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 49777931.0
+   "clause": 49775356.0
   },
   {
    "name": "Marcos Alonso",
@@ -536,12 +536,12 @@
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 17067523.0
+   "clause": 17066267.0
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 33139182.0
+   "clause": 33136260.0
   },
   {
    "name": "Iñigo Vicente",
@@ -551,7 +551,7 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 10995519.0
+   "clause": 10995350.0
   },
   {
    "name": "Bil Nsongo",
