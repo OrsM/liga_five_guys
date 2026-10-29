@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
+__all__ = ["XI_SIZE", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -25,8 +25,10 @@ FREE_FORMATIONS = [(5, 4, 1), (5, 3, 2), (4, 5, 1), (4, 4, 2), (4, 3, 3),
 # Each formation as the players it fields by position.
 SHAPES = [dict(zip(POSITIONS, (1, d, m, f))) for d, m, f in FREE_FORMATIONS]
 
-# The most of each position any formation fields.
+# The most and the least of each position any formation fields: the
+# formations are every count between them that makes eleven (_selftest).
 MAX_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(max, zip(*FREE_FORMATIONS))))}
+MIN_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(min, zip(*FREE_FORMATIONS))))}
 
 
 def shortfall(squad: Squad) -> dict[str, int]:
@@ -62,6 +64,12 @@ def _selftest() -> None:
     assert POSITIONS == ("POR", "DEF", "MED", "DEL")
     assert all(1 + d + m + f == 11 for d, m, f in FREE_FORMATIONS)
     assert MAX_SLOT == {"POR": 1, "DEF": 5, "MED": 5, "DEL": 3}, MAX_SLOT
+    assert MIN_SLOT == {"POR": 1, "DEF": 3, "MED": 3, "DEL": 1}, MIN_SLOT
+    import itertools
+    box = [dict(zip(POSITIONS, n)) for n in itertools.product(*(range(MIN_SLOT[p], MAX_SLOT[p] + 1)
+                                                                for p in POSITIONS)) if sum(n) == XI_SIZE]
+    assert sorted(map(sorted, map(dict.items, box))) == sorted(map(sorted, map(dict.items, SHAPES))), \
+        "the formations are every count of each position between its least and most that makes eleven"
     four_four_two = {"k": "POR", **{f"d{i}": "DEF" for i in range(4)},
                      **{f"m{i}": "MED" for i in range(4)}, "f1": "DEL", "f2": "DEL"}
     assert shortfall(four_four_two) == {}

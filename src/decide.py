@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import math
+from concurrent.futures import ThreadPoolExecutor
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from functools import cached_property
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from ffcore.action import Action
 from ffcore.forecast import Bootstrap, expected_points
@@ -13,7 +14,7 @@ from ffcore.gain import Standings, cell_variance, moments, normal_above, standin
 from ffcore import pricing
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.rules import MAX_SLOT, POSITIONS, SHAPES, Squad, Squads, position, shortfall
+from ffcore.rules import MAX_SLOT, MIN_SLOT, POSITIONS, XI_SIZE, Squad, Squads, position, shortfall
 from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState
 
@@ -212,8 +213,9 @@ def plan(u: Universe, rows: list[Move], kappas: tuple[float, ...] = KAPPAS) -> t
     KAPPAS, a weight on the season's variance, and the plan that most raises
     your chance of first is the one made."""
     best: tuple[float, list[Move], float] | None = None
-    for kappa in kappas:
-        chosen, _value, _price = program(u, rows, relax=False, kappa=kappa)
+    with ThreadPoolExecutor(len(kappas)) as pool:
+        solved = list(pool.map(lambda kappa: program(u, rows, relax=False, kappa=kappa)[0], kappas))
+    for kappa, chosen in zip(kappas, solved):
         moves = [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in chosen]
         first = joint(u, moves).d_first if moves else 0.0
         if best is None or first > best[0] + 1e-9:
@@ -247,7 +249,7 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     make, at some bid (what it costs the plan).
 
     One bid at most a player. Each jornada's eleven is one formation
-    (rules.SHAPES) from the squad after the moves; a slot nobody fills
+    (rules.MIN_SLOT, MAX_SLOT) from the squad after the moves; a slot nobody fills
     scores nothing (empty). A bid that wins with chance P holds his slot
     that share of the time, the rest left to whoever else would fill it,
     and brings its points and its money that share of the time. The money
@@ -264,7 +266,16 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     h.setOptionValue("output_flag", False)
     h.setOptionValue("mip_rel_gap", 0.0)
     h.setOptionValue("time_limit", SOLVE_SECONDS)
+    h.setOptionValue("threads", 1)
     binary = (lambda: h.addVariable(0.0, 1.0)) if relax else h.addBinary
+    count = h.addVariable if relax else h.addIntegral
+
+    def eleven() -> dict[str, Any]:
+        """A formation: each position's count between its least and most,
+        eleven in all, which is every formation there is (rules.MIN_SLOT)."""
+        n = {p: count(MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS}
+        h.addConstr(sum(n.values()) == XI_SIZE)
+        return n
     opts = options(u, rows)
     made = [binary() for _o in opts]
     sold = {o.action.sell[0]: x for o, x in zip(opts, made) if not o.action.buy}
@@ -286,8 +297,7 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
         return e + kappa * ((1 + s2) * (var(*cell) if cell else 0.0) + s2 * season[k] * e)
     points = []
     for j in to_come:
-        shape = [binary() for _s in SHAPES]
-        h.addConstr(sum(shape) == 1)
+        shape = eleven()
         for p in POSITIONS:
             xi = {k: h.addVariable(0.0, 1.0) for k in u.mine if pos[k] == p}
             yi = [(o, h.addVariable(0.0, 1.0)) for o, _x in bids if pos[o.action.buy] == p]
@@ -297,17 +307,14 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
             for (o, y), x in ((oy, x) for oy in yi for o2, x in bids if o2 is oy[0]):
                 h.addConstr(y <= x)
             empty = h.addVariable(0.0, MAX_SLOT[p])
-            h.addConstr(sum(xi.values()) + sum(o.win * y for o, y in yi) + empty
-                        == sum(sh[p] * z for sh, z in zip(SHAPES, shape)))
+            h.addConstr(sum(xi.values()) + sum(o.win * y for o, y in yi) + empty == shape[p])
             points += [worth(k, j) * x for k, x in xi.items()]
             points += [worth(o.action.buy, j) * o.win * y for o, y in yi]
     if _fieldable(u.mine):
-        lost = [binary() for _s in SHAPES]
-        h.addConstr(sum(lost) == 1)
+        lost = eleven()
         for p in POSITIONS:
             h.addConstr(sum(keep[k] for k in u.mine if pos[k] == p)
-                        + sum(x for o, x in bids if o.win >= 1.0 and pos[o.action.buy] == p)
-                        >= sum(sh[p] * z for sh, z in zip(SHAPES, lost)))
+                        + sum(x for o, x in bids if o.win >= 1.0 and pos[o.action.buy] == p) >= lost[p])
     budget = h.addConstr(sum(o.action.net / 1e6 * x for o, x in zip(opts, made)) <= m.cash / 1e6)
     if force is not None:
         h.addConstr(sum(x for o, x in zip(opts, made) if o.action.players == force.action.players) == 1)
