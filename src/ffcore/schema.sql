@@ -1567,7 +1567,7 @@ buys AS (
     SELECT coalesce(p.ord, 1000 + r.ord), CASE WHEN r.player IS NULL THEN 'buy' ELSE 'resale' END,
            CASE WHEN r.player IS NULL THEN 'buy ' ELSE 'buy to resell ' END || b.name, b.name, b.pos,
            CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END, b.cost, coalesce(b.my_bid = b.cost, 0),
-           CASE WHEN r.player IS NULL THEN b.gain END, 'season',
+           CASE WHEN r.player IS NULL THEN b.gain - (SELECT money_rate FROM k) * b.money END, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
                 UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
@@ -1575,7 +1575,6 @@ buys AS (
                 UNION ALL SELECT 1, 'sell before the lock for', b.resale, 'money' WHERE r.player IS NOT NULL
                 UNION ALL SELECT 2, 'profit', r.profit, 'money'
                 UNION ALL SELECT 3, 'chance of helping', round(b.p_better, 3), 'chance' WHERE r.player IS NULL
-                UNION ALL SELECT 3.5, 'chance of first', round(b.d_first, 2), 'first' WHERE r.player IS NULL
                 UNION ALL SELECT 4, '', b.trend, 'trend'
                 UNION ALL SELECT 5, 'money', 1e6 * b.money, 'money' WHERE r.player IS NULL
                 UNION ALL SELECT 6, '', b.per_million, 'per_million' WHERE r.player IS NULL)
@@ -1590,7 +1589,7 @@ sells AS (
                 WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait'
                 WHEN s.listed THEN 'listed' ELSE 'list' END,
            CASE WHEN s.takes AND s.wait_bids > 0 THEN s.waiting WHEN s.offer IS NOT NULL THEN s.raises END,
-           s.listed AND (NOT s.takes OR coalesce(s.wait_bids > 0, 0)), s.gain, 'season',
+           s.listed AND (NOT s.takes OR coalesce(s.wait_bids > 0, 0)), s.gain - (SELECT money_rate FROM k) * s.money, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'value' AS l, s.value AS v, 'money' AS u
                 UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
@@ -1603,7 +1602,6 @@ sells AS (
                 UNION ALL SELECT 2.7, 'chance of winning them', round(s.bids_p, 3), 'chance' WHERE s.with_bids
                 UNION ALL SELECT 2.8, 'waiting for them', s.wait_bids, 'points' WHERE s.takes
                 UNION ALL SELECT 3, '', s.trend, 'trend'
-                UNION ALL SELECT 3.5, 'chance of first', round(s.d_first, 2), 'first'
                 UNION ALL SELECT 4, 'money', 1e6 * s.money, 'money'
                 UNION ALL SELECT 5, '', s.per_million, 'per_million')
             WHERE v IS NOT NULL)
@@ -1649,7 +1647,6 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
        me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
-       (SELECT round(first_after, 3) FROM sim_runs JOIN board_run USING (run_id)) AS p_win_after,
        (SELECT lam FROM sim_runs JOIN board_run USING (run_id)) AS lam,
        me.lo AS band_lo, me.hi AS band_hi,
        (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
@@ -1672,7 +1669,7 @@ WITH lines AS (SELECT ord, json(CASE WHEN what = 'field' THEN json_remove(o, '$.
                      FROM board_rows))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
-    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win, 'p_win_after', h.p_win_after,
+    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,
     'lam', h.lam,
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines),

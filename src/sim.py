@@ -106,7 +106,7 @@ def _selftest_board() -> None:
                ratios: Sequence[float] = (),
                resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0,
                waits: Sequence[tuple[str, float]] = (), nights: int = 0,
-               listings: Sequence[tuple[str, str]] = ()) -> Doc:
+               listings: Sequence[tuple[str, str]] = (), money_rate: float | None = None) -> Doc:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
         past offers, resale for what waiting sells the game's market players
@@ -143,7 +143,7 @@ def _selftest_board() -> None:
                            " julianday('2026-08-02T20:24:00Z') AS first", (nights,))
                 db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
                     ("RESALE_MARGIN", 0.05), ("PRICE_WINDOW", 50.0),
-                    ("MONEY_RATE", 8.0)])
+                    ("MONEY_RATE", decide.MONEY_RATE if money_rate is None else money_rate)])
             store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me,
                                          "team_value": str(team_value)}])
             store_sql("api_market", [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerTeam",
@@ -197,10 +197,12 @@ def _selftest_board() -> None:
     assert all(r["estimated"] for r in doc["standings"] if not r["me"]), \
         "rival cash is estimated from the feed"
     assert "squad" not in doc, "no squad table: offers and the market are what to act on"
-    planned = [(m.action.buy, m.action.cost, round(m.d_pts, 6)) for m in b.plan if m.action.kind == "buy"]
-    shown = [(d["name"].lower(), d["amount"], round(d["gain"], 6)) for d in doc["do"] if d["what"] == "buy"]
+    planned = [(m.action.buy, m.action.cost, round(m.d_pts - decide.MONEY_RATE * m.money, 4))
+               for m in b.plan if m.action.kind == "buy"]
+    shown = [(d["name"].lower(), d["amount"], round(d["gain"], 4)) for d in doc["do"] if d["what"] == "buy"]
     assert planned and sorted(shown) == sorted(planned) and "consider" not in doc, \
-        ("the plan's buys, each once, and no move it does not make: the plan is the one judgement", shown)
+        ("the plan's buys, each once, and no move it does not make: the plan is the one judgement;"
+         " its points are points, its money a fact of its own", shown)
     assert all(dict((f[0], f[1]) for f in d["facts"])["listed at"] == ub.market.price[d["name"].lower()]
                for d in doc["do"] if d["what"] == "buy"), \
         "what he is listed at, and the bid it takes"
@@ -208,10 +210,8 @@ def _selftest_board() -> None:
     assert all(dict((f[0], f[1]) for f in d["facts"])["chance to win"] == wins[d["name"].lower()]
                for d in doc["do"] if d["what"] == "buy"), \
         "and the chance that bid wins his auction"
-    firsts = {m.action.buy: round(m.d_first, 2) for m in b.rows if m.action.kind == "buy"}
-    assert all(dict((f[0], f[1]) for f in d["facts"])["chance of first"] == firsts[d["name"].lower()]
-               for d in doc["do"] if d["what"] == "buy"), \
-        "and what he adds to your chance of first"
+    assert not any(f[0] == "chance of first" for d in doc["do"] for f in d["facts"]), \
+        "no chance of first a move: it counts its money as points (decide.score)"
     assert report(ub, b)["lam"] == b.lam, "what a million is worth now, in the headline"
     assert "market" not in doc and "offers" not in doc, "one list of lines, not a section per source"
     listing = doc["do"][-1]
@@ -303,7 +303,7 @@ def _selftest_board() -> None:
         mk = replace(ub.market, route={"dead": "listed"}, offer={"dead": offer}, fetch={"dead": max(offer, waits)})
         both = [replace(gamble, win=win), weak]
         doc = report(replace(ub, market=mk), b._replace(plan=both, rows=b.rows + both),
-                     waits=[("dead", waits)], nights=nights)
+                     waits=[("dead", waits)], nights=nights, money_rate=8.0)
         return next(d for d in doc["do"] if d["what"] == "sell")
     near = hedge(1.0e6, 0.99e6, 1)
     assert (near["step"], near["amount"], near["done"]) == ("sell after the auctions", 0.99e6, True), near
@@ -403,7 +403,7 @@ def _selftest_board() -> None:
     assert (head["run_id"], head["plan_gain"], head["lam"]) == (7, b.gain, b.lam) \
         and abs(head["first_after"] - ub.standings.position().get(1, 0.0)
                 - decide.joint(ub, b.plan).d_first / 100) < 1e-12, head
-    assert report(ub, b)["p_win_after"] == round(head["first_after"], 3), "your chance of first once the plan is made"
+    assert "p_win_after" not in report(ub, b), "no chance of first after the plan: it counts its money as points"
 
     debt = replace(ub, market=replace(ub.market, cash=-5e6,
                                       value={**ub.market.value, "k": 4e6, "d1": 9e6, "m1": 1e6}))
