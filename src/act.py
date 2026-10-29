@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+import time
 from collections.abc import Callable
 from contextlib import closing
 from datetime import datetime, timezone
@@ -34,6 +35,12 @@ REBID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid/{bid}?x
 
 REPORT = Path("reports/decisions.json")
 
+# The market shows a bid a moment after the app takes it (19:26 on
+# 2026-10-29: placed, absent from the read right after): read back this many
+# times, this many seconds apart.
+READS = 5
+READ_WAIT = 2.0
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -52,7 +59,7 @@ def target(name: str) -> dict[str, str] | None:
 
 
 def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], dict[str, str] | None],
-           call: Call, base: str) -> dict[str, Any]:
+           call: Call, base: str, nap: Callable[[float], None] = time.sleep) -> dict[str, Any]:
     """The bid the request accepts, placed and read back, or why not."""
     out = {"requested_at": req.get("requested_at"), "name": req.get("name"), "amount": req.get("amount")}
 
@@ -96,8 +103,13 @@ def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], di
                              {"money": money})
     if status not in (200, 201):
         return done(False, "the app said %d: %s" % (status, json.dumps(reply)[:200]))
-    back = item()
-    got = ((back or {}).get("bid") or {}).get("money")
+    got = None
+    for i in range(READS):
+        if i:
+            nap(READ_WAIT)
+        got = ((item() or {}).get("bid") or {}).get("money")
+        if got == money:
+            break
     if got != money:
         return done(False, "sent, but the market shows %s" % got)
     return done(True, "bid %d, read back from the market" % money)
@@ -127,19 +139,23 @@ def _selftest() -> None:
     req = {"requested_at": "t", "generated_at": "2026-10-29T15:57Z", "name": "Thomas Lemar", "amount": 7044268.7}
     where = {"Thomas Lemar": {"market_id": "525303444", "player_id": "3182"}}.get
 
-    def app(bid: dict[str, Any] | None, answer: int = 200) -> tuple[Call, list[tuple[str, str, Any]]]:
+    def app(bid: dict[str, Any] | None, answer: int = 200,
+            shown_after: int = 0) -> tuple[Call, list[tuple[str, str, Any]]]:
         sent: list[tuple[str, str, Any]] = []
-        state = {"bid": bid}
+        state: dict[str, Any] = {"bid": bid, "hidden": 0}
 
         def call(method: str, url: str, body: dict[str, Any] | None) -> tuple[int, Any]:
             sent.append((method, url, body))
             if "/leagues?" in url:
                 return 200, [{"id": 77, "name": "five guys", "team": {"id": 9}}]
             if method == "GET":
-                return 200, [{"id": 525303444, "playerMaster": {"id": 3182}, "bid": state["bid"]},
+                shown = state["bid"] if state["hidden"] <= 0 else None
+                state["hidden"] -= 1
+                return 200, [{"id": 525303444, "playerMaster": {"id": 3182}, "bid": shown},
                              {"id": 1, "playerMaster": {"id": 2}}]
             if answer == 200:
                 state["bid"] = {"id": 5, "money": body["money"]} if body else None
+                state["hidden"] = shown_after
             return answer, {}
         return call, sent
 
@@ -155,6 +171,13 @@ def _selftest() -> None:
     call, sent = app({"id": 5, "money": 7044269})
     assert accept(req, board, where, call, base)["message"] == "already bid 7044269" and all(
         m == "GET" for m, _u, _b in sent), "already at that amount: nothing sent"
+    call, sent = app(None, shown_after=2)
+    naps: list[float] = []
+    assert accept(req, board, where, call, base, naps.append)["state"] == "placed" and naps == [READ_WAIT] * 2, \
+        "the market shows a new bid a moment late: read again before calling it lost"
+    call, sent = app(None, shown_after=9)
+    assert accept(req, board, where, call, base, naps.append)["message"].startswith("sent, but"), \
+        "and not for ever"
     call, sent = app(None, answer=400)
     assert accept(req, board, where, call, base)["state"] == "failed", "the app refuses: said so"
     call, sent = app(None)
