@@ -1,11 +1,11 @@
 {
- "generated_at": "2026-10-28T21:36Z",
+ "generated_at": "2026-10-29T09:02Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": 3997542.0,
+ "cash": 4097542.0,
  "cash_locked": 0.0,
  "finish": 1.82,
  "p_win": 0.275,
- "p_win_after": 0.419,
+ "p_win_after": 0.415,
  "lam": 0.0,
  "band": [
   1986.57090608787,
@@ -14,11 +14,11 @@
  "do": [
   {
    "what": "field",
-   "label": "field Martin Satriano, Thomas Lemar, Robin Le Normand",
+   "label": "field Martin Satriano, Thomas Lemar, Adria Pedrosa",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 0.0012680455730365,
+   "gain": -0.16511777139937,
    "per": "next",
    "facts": [
     [
@@ -34,9 +34,9 @@
    "what": "buy",
    "label": "buy Thomas Lemar",
    "step": "bid up to",
-   "amount": 6901174.50975384,
+   "amount": 7044268.72819935,
    "done": false,
-   "gain": 30.1155147198983,
+   "gain": 31.2423375759904,
    "per": "season",
    "facts": [
     [
@@ -46,32 +46,32 @@
     ],
     [
      "chance to win",
-     0.733,
+     0.767,
      "chance"
     ],
     [
      "chance of helping",
-     0.826,
+     0.834,
      "chance"
     ],
     [
      "chance of first",
-     6.3,
+     6.55,
      "first"
     ],
     [
      "",
-     71.7194885424559,
+     67.0829532968825,
      "trend"
     ],
     [
      "money",
-     1506223.53150362,
+     1647076.38851513,
      "money"
     ],
     [
      "",
-     4.36382454571091,
+     4.43514277797527,
      "per_million"
     ]
    ]
@@ -82,9 +82,9 @@
    "what": "buy",
    "label": "buy Martin Satriano",
    "step": "bid up to",
-   "amount": 17259193.0952704,
+   "amount": 17220303.0,
    "done": false,
-   "gain": 21.5722639701562,
+   "gain": 18.7666444883576,
    "per": "season",
    "facts": [
     [
@@ -94,32 +94,32 @@
     ],
     [
      "chance to win",
-     0.767,
+     0.867,
      "chance"
     ],
     [
      "chance of helping",
-     0.724,
+     0.697,
      "chance"
     ],
     [
      "chance of first",
-     4.53,
+     3.94,
      "first"
     ],
     [
      "",
-     6.55327271610348,
+     1.57256552262711,
      "trend"
     ],
     [
      "money",
-     468819.432014339,
+     118116.996789504,
      "money"
     ],
     [
      "",
-     1.24989991427049,
+     1.08979757721787,
      "per_million"
     ]
    ]
@@ -132,22 +132,22 @@
    "step": "take offer",
    "amount": 46738575.0,
    "done": false,
-   "gain": 5.50684156491124,
+   "gain": 5.93543018597733,
    "per": "season",
    "facts": [
     [
      "value",
-     42613766.0,
+     42303299.0,
      "money"
     ],
     [
      "the game's recent offers",
-     0.98,
+     1.0,
      "beats"
     ],
     [
      "waiting is worth",
-     41676139.2720777,
+     41409547.0581756,
      "money"
     ],
     [
@@ -157,22 +157,22 @@
     ],
     [
      "",
-     -12.4252903955948,
+     -11.1545417748463,
      "trend"
     ],
     [
      "chance of first",
-     1.41,
+     1.48,
      "first"
     ],
     [
      "money",
-     6506978.9779736,
+     6560552.55560686,
      "money"
     ],
     [
      "",
-     0.117822196438621,
+     0.126992108466664,
      "per_million"
     ]
    ]
@@ -185,7 +185,7 @@
    "step": "bid up to",
    "amount": 3313813.0,
    "done": false,
-   "gain": 2.36696531492829,
+   "gain": 2.15129428509143,
    "per": "season",
    "facts": [
     [
@@ -200,27 +200,75 @@
     ],
     [
      "chance of helping",
-     0.561,
+     0.556,
      "chance"
     ],
     [
      "chance of first",
-     0.48,
+     0.43,
      "first"
     ],
     [
      "",
-     -21.329183600355,
+     -20.0359566569513,
      "trend"
     ],
     [
      "money",
-     -317993.697591065,
+     -344952.576320672,
      "money"
     ],
     [
      "",
-     0.714272445345675,
+     0.649190007128173,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Jon Moncayola",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Jon Moncayola",
+   "step": "bid up to",
+   "amount": 4279563.0,
+   "done": false,
+   "gain": 0.683645196171127,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     4279563.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.967,
+     "chance"
+    ],
+    [
+     "chance of helping",
+     0.521,
+     "chance"
+    ],
+    [
+     "chance of first",
+     0.15,
+     "first"
+    ],
+    [
+     "",
+     -11.2328133166703,
+     "trend"
+    ],
+    [
+     "money",
+     -248442.147161064,
+     "money"
+    ],
+    [
+     "",
+     0.15974649658648,
      "per_million"
     ]
    ]
@@ -233,7 +281,7 @@
    "step": "bid up to",
    "amount": 589371.0,
    "done": false,
-   "gain": 0.0867208728495091,
+   "gain": 0.0561989366636993,
    "per": "season",
    "facts": [
     [
@@ -243,32 +291,85 @@
     ],
     [
      "chance to win",
-     0.817,
+     0.85,
      "chance"
     ],
     [
      "chance of helping",
-     0.567,
+     0.544,
      "chance"
     ],
     [
      "chance of first",
-     0.02,
+     0.01,
      "first"
     ],
     [
      "",
-     4.08816681079798,
+     2.40043277306411,
      "trend"
     ],
     [
      "money",
-     10840.1091061886,
+     7024.86708296242,
      "money"
     ],
     [
      "",
-     0.0867208728495091,
+     0.0561989366636993,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Yeray Alvarez",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Yeray Alvarez",
+   "step": "take offer",
+   "amount": 3856738.0,
+   "done": false,
+   "gain": 0.0341193391341532,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     3686861.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.88,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     3570123.33483191,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "",
+     -26.1644356280185,
+     "trend"
+    ],
+    [
+     "chance of first",
+     -0.02,
+     "first"
+    ],
+    [
+     "money",
+     604344.821159683,
+     "money"
+    ],
+    [
+     "",
+     0.00884668316441335,
      "per_million"
     ]
    ]
@@ -281,7 +382,7 @@
    "step": "bid up to",
    "amount": 615230.0,
    "done": false,
-   "gain": 0.0372988483872106,
+   "gain": 0.000720170224370435,
    "per": "season",
    "facts": [
     [
@@ -291,32 +392,32 @@
     ],
     [
      "chance to win",
-     0.867,
+     0.9,
      "chance"
     ],
     [
      "chance of helping",
-     0.528,
+     0.501,
      "chance"
     ],
     [
      "chance of first",
-     0.01,
+     0.0,
      "first"
     ],
     [
      "",
-     1.6844248849767,
+     0.172621235978572,
      "trend"
     ],
     [
      "money",
-     4662.35604840133,
+     90.0212780463044,
      "money"
     ],
     [
      "",
-     0.0372988483872106,
+     0.000720170224370435,
      "per_million"
     ]
    ]
@@ -329,7 +430,7 @@
    "step": "bid up to",
    "amount": 6865304.0,
    "done": false,
-   "gain": -0.106584097061828,
+   "gain": -0.629729265926681,
    "per": "season",
    "facts": [
     [
@@ -344,95 +445,27 @@
     ],
     [
      "chance of helping",
-     0.498,
+     0.487,
      "chance"
     ],
     [
      "chance of first",
-     0.02,
+     -0.09,
      "first"
     ],
     [
      "",
-     -23.5409983325899,
+     -22.288136707387,
      "trend"
     ],
     [
      "money",
-     -727111.363699438,
+     -792504.509807545,
      "money"
     ],
     [
      "",
-     -0.0155250367735832,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Yeray Alvarez",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Yeray Alvarez",
-   "step": "take offer",
-   "amount": 3856738.0,
-   "done": false,
-   "gain": -0.539338639222,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     3767291.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.72,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     3648174.50549261,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     1,
-     "count"
-    ],
-    [
-     "only pays if you win",
-     "Thomas Lemar, Martin Satriano, Dani Martinez, Luis Castro",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.398,
-     "chance"
-    ],
-    [
-     "waiting for them",
-     -0.339226212980711,
-     "points"
-    ],
-    [
-     "",
-     -26.1498716521488,
-     "trend"
-    ],
-    [
-     "chance of first",
-     -0.14,
-     "first"
-    ],
-    [
-     "money",
-     532662.573865164,
-     "money"
-    ],
-    [
-     "",
-     -0.139843214452732,
+     -0.0917263483054328,
      "per_million"
     ]
    ]
@@ -456,10 +489,10 @@
    ]
   }
  ],
- "plan_gain": 65.6095220402243,
- "cash_after": 19048769.3949758,
- "can_bid": 94030308.5949758,
- "ping": "field Martin Satriano, Thomas Lemar, Robin Le Normand; buy Thomas Lemar; buy Martin Satriano; sell Gerard Martin; buy Adria Pedrosa; buy Dani Martinez; buy Luis Castro; buy Robin Le Normand; sell Yeray Alvarez; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+ "plan_gain": 63.9471090523161,
+ "cash_after": 14765002.2718006,
+ "can_bid": 90337950.2718007,
+ "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; buy Martin Satriano; sell Gerard Martin; buy Adria Pedrosa; buy Jon Moncayola; buy Dani Martinez; sell Yeray Alvarez; buy Luis Castro; buy Robin Le Normand; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -469,7 +502,7 @@
   {
    "name": "Fernando Niño",
    "pos": "DEL",
-   "clause": 43244303.0
+   "clause": 44561269.0
   },
   {
    "name": "Georges Mikautadze",
@@ -484,7 +517,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 49543920.0
+   "clause": 49777931.0
   },
   {
    "name": "Marcos Alonso",
@@ -499,12 +532,12 @@
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 16513672.0
+   "clause": 17067523.0
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 31814390.0
+   "clause": 33139182.0
   },
   {
    "name": "Iñigo Vicente",
@@ -514,7 +547,7 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 11262269.0
+   "clause": 10995519.0
   },
   {
    "name": "Bil Nsongo",
@@ -555,7 +588,7 @@
    "mean": 2233.85386333871,
    "lo": 2070.68712579472,
    "hi": 2397.02060088269,
-   "cash": 897131.0,
+   "cash": 997131.0,
    "estimated": true,
    "p_above": 0.720948582112308
   },
@@ -566,7 +599,7 @@
    "mean": 2133.50845772963,
    "lo": 1986.57090608787,
    "hi": 2280.4460093714,
-   "cash": 3997542.0,
+   "cash": 4097542.0,
    "estimated": false,
    "p_above": null
   },
@@ -577,7 +610,7 @@
    "mean": 1901.01061914983,
    "lo": 1758.98998738212,
    "hi": 2043.03125091754,
-   "cash": 61355056.0,
+   "cash": 61455056.0,
    "estimated": true,
    "p_above": 0.0724135091376649
   },
@@ -585,23 +618,23 @@
    "manager": "SusoGattuso",
    "me": false,
    "now": 365.0,
-   "mean": 1830.00102930734,
-   "lo": 1695.38885141061,
-   "hi": 1964.61320720407,
-   "cash": -7484102.0,
+   "mean": 1830.55284551069,
+   "lo": 1695.88363811055,
+   "hi": 1965.22205291082,
+   "cash": -7384102.0,
    "estimated": true,
-   "p_above": 0.0254771784491115
+   "p_above": 0.0257111545100354
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 389.0,
-   "mean": 1643.0571889714,
-   "lo": 1522.07226684985,
-   "hi": 1764.04211109296,
-   "cash": 57993671.0,
+   "mean": 1632.54254008245,
+   "lo": 1512.25976389845,
+   "hi": 1752.82531626645,
+   "cash": 58093671.0,
    "estimated": true,
-   "p_above": 0.000479564712404512
+   "p_above": 0.000361166708793048
   }
  ]
 }
