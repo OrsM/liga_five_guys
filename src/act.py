@@ -31,6 +31,7 @@ from ingest import HEADERS, TIMEOUT
 Call = Callable[[str, str, dict[str, Any] | None], tuple[int, Any]]
 
 BID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid?x-lang=es"
+SELL_URL = "{base}/v1/competition/1/league/{league}/market/sell?x-lang=es"
 REBID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid/{bid}?x-lang=es"
 
 REPORT = Path("reports/decisions.json")
@@ -58,6 +59,62 @@ def target(name: str) -> dict[str, str] | None:
     return {"market_id": row[0], "player_id": row[1]} if row else None
 
 
+def owned(name: str) -> dict[str, Any] | None:
+    """A player of yours the board would list, as the app knows him: his
+    place in your team (the id the app lists him by), his id, his value
+    (board_mine, current_api_teams, player_facts)."""
+    with closing(lfg.connect()) as db:
+        row = db.execute(
+            "SELECT t.player_team_id, t.player_id, f.value FROM board_mine m"
+            " JOIN current_api_teams t ON t.player = m.player JOIN player_facts f ON f.player = m.player"
+            " WHERE m.name = ?", (name,)).fetchone()
+    return {"player_team_id": row[0], "player_id": row[1], "value": row[2]} if row and row[2] else None
+
+
+def league_of(call: Call, base: str) -> str:
+    """Your league's id in the app, or "!" and why not."""
+    status, leagues = call("GET", API_LEAGUES_URL.format(base=base), None)
+    ids = [r["league_id"] for r in parse_api_leagues(json.dumps(leagues), "")] if status == 200 else []
+    if len(ids) != 1:
+        return "!the app's leagues: %s" % (status if status != 200 else "%d, not one" % len(ids))
+    return ids[0]
+
+
+def list_all(req: dict[str, Any], board: dict[str, Any], own: Callable[[str], dict[str, Any] | None],
+             call: Call, base: str) -> dict[str, Any]:
+    """The players the board's list line names, each put on the market at
+    his value (as the app does by default), or why not. Offers on them are
+    yours to take or turn down; a listed player still plays for you."""
+    out = {"requested_at": req.get("requested_at"), "what": "list", "name": req.get("name")}
+    line = next((d for d in board.get("do", []) if d.get("what") == "list"), None)
+    names = line["label"].removeprefix("list ").split(", ") if line else []
+
+    def done(ok: bool, message: str) -> dict[str, Any]:
+        return {**out, "state": "placed" if ok else "failed", "message": message, "at": _now()}
+
+    if req.get("generated_at") != board.get("generated_at"):
+        return done(False, "the board has changed since: refresh and accept again")
+    if not names:
+        return done(False, "nothing for this board to list")
+    them = {n: own(n) for n in names}
+    if any(t is None for t in them.values()):
+        return done(False, "not yours as the last run saw them: %s" % ", ".join(n for n, t in them.items() if t is None))
+    league = league_of(call, base)
+    if league.startswith("!"):
+        return done(False, league[1:])
+    listed: list[str] = []
+    failed: list[str] = []
+    for n, t in them.items():
+        assert t is not None
+        status, reply = call("POST", SELL_URL.format(base=base, league=league),
+                             {"playerId": int(t["player_team_id"]), "salePrice": int(round(t["value"]))})
+        (listed if status in (200, 201) else failed).append(
+            n if status in (200, 201) else "%s (the app said %d: %s)" % (n, status, json.dumps(reply)[:120]))
+    if failed:
+        return done(False, "listed %s; not %s" % (", ".join(listed) or "none", "; ".join(failed)))
+    return done(True, "listed %s at their value, the app took each" % ", ".join(listed))
+
+
 def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], dict[str, str] | None],
            call: Call, base: str, nap: Callable[[float], None] = time.sleep) -> dict[str, Any]:
     """The bid the request accepts, placed and read back, or why not."""
@@ -78,11 +135,9 @@ def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], di
     at = where(line["name"])
     if at is None:
         return done(False, "not on the app's market as the last run saw it")
-    status, leagues = call("GET", API_LEAGUES_URL.format(base=base), None)
-    ids = [r["league_id"] for r in parse_api_leagues(json.dumps(leagues), "")] if status == 200 else []
-    if len(ids) != 1:
-        return done(False, "the app's leagues: %s" % (status if status != 200 else "%d, not one" % len(ids)))
-    league = ids[0]
+    league = league_of(call, base)
+    if league.startswith("!"):
+        return done(False, league[1:])
 
     def item() -> dict[str, Any] | None:
         status, market = call("GET", API_MARKET_URL.format(base=base, league=league), None)
@@ -158,9 +213,11 @@ def _selftest() -> None:
                 return 200, [{"id": 525303444, "playerMaster": {"id": 3182}, "bid": shown},
                              {"id": 1, "playerMaster": {"id": 2}}]
             if answer == 200:
-                state["bid"] = {"id": 5, "money": body["money"]} if body else None
+                if body and "money" in body:
+                    state["bid"] = {"id": 5, "money": body["money"]}
                 state["hidden"] = shown_after
-            return answer, ({"id": "5", "money": body["money"], "status": "pending"} if confirm and body else {})
+            return answer, ({"id": "5", "money": body["money"], "status": "pending"}
+                            if confirm and body and "money" in body else {})
         return call, sent
 
     call, sent = app({"id": 54045570, "money": 6674686})
@@ -198,6 +255,26 @@ def _selftest() -> None:
         assert accept(bad, board, where, call, base)["state"] == "failed", why
     assert sent == [], "refused before any call to the app"
     assert accept(req, board, lambda _n: None, call, base)["state"] == "failed", "not on the market"
+    listing = {"generated_at": board["generated_at"],
+               "do": [{"what": "list", "label": "list Bil Nsongo, Manu Bueno"}]}
+    mine = {"Bil Nsongo": {"player_team_id": "108468054", "player_id": "2973", "value": 9697829.0},
+            "Manu Bueno": {"player_team_id": "108468059", "player_id": "2687", "value": 592909.0}}
+    call, sent = app(None)
+    got = list_all({"requested_at": "t", "generated_at": board["generated_at"], "what": "list"},
+                   listing, mine.get, call, base)
+    assert got["state"] == "placed" and got["message"].startswith("listed Bil Nsongo, Manu Bueno"), got
+    assert [(m, u, b) for m, u, b in sent if m != "GET"] == [
+        ("POST", base + "/v1/competition/1/league/77/market/sell?x-lang=es", {"playerId": 108468054, "salePrice": 9697829}),
+        ("POST", base + "/v1/competition/1/league/77/market/sell?x-lang=es", {"playerId": 108468059, "salePrice": 592909})], \
+        ("each player of the board's list line, by his place in your team, at his value", sent)
+    call, sent = app(None)
+    assert list_all({"generated_at": "older", "what": "list"}, listing, mine.get, call, base)["state"] == "failed" \
+        and sent == [], "a board since: nothing sent"
+    assert list_all({"generated_at": board["generated_at"], "what": "list"}, listing, lambda _n: None, call, base)["state"] \
+        == "failed" and sent == [], "not yours: nothing sent"
+    call, sent = app(None, answer=400)
+    assert list_all({"generated_at": board["generated_at"], "what": "list"}, listing, mine.get, call, base)["state"] \
+        == "failed", "the app refuses: said so"
     print("act self-test OK")
 
 
@@ -207,7 +284,8 @@ if __name__ == "__main__":
     elif sys.argv[1:2] == ["accept"]:
         asked = json.loads(Path(sys.argv[2]).read_text())
         board, call = json.loads(REPORT.read_text()), http_call()
-        print(json.dumps([accept(r, board, target, call, API_BASE)
+        print(json.dumps([list_all(r, board, owned, call, API_BASE) if r.get("what") == "list"
+                          else accept(r, board, target, call, API_BASE)
                           for r in (asked if isinstance(asked, list) else [asked])]))
     else:
         print(__doc__)
