@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-29T18:39Z",
+ "generated_at": "2026-10-29T19:42Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
- "cash_locked": 27208802.0,
+ "cash_locked": 43859168.0,
  "finish": 1.82,
  "p_win": 0.276,
  "p_win_after": 0.305,
@@ -263,9 +263,9 @@
    "pos": "MED",
    "what": "buy",
    "label": "buy Jon Moncayola",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 4279563.0,
-   "done": false,
+   "done": true,
    "gain": 2.67118237345964,
    "per": "season",
    "facts": [
@@ -276,7 +276,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -431,9 +431,9 @@
    "pos": "DEF",
    "what": "buy",
    "label": "buy Robin Le Normand",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 6865304.0,
-   "done": false,
+   "done": true,
    "gain": 5.71030681253368,
    "per": "season",
    "facts": [
@@ -444,7 +444,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -487,9 +487,9 @@
    "pos": "POR",
    "what": "buy",
    "label": "buy Augusto Batalla",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 5505499.0,
-   "done": false,
+   "done": true,
    "gain": 6.58093141425131,
    "per": "season",
    "facts": [
@@ -500,7 +500,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -560,7 +560,7 @@
  "plan_gain": 61.8565049872454,
  "cash_after": 5402765.27180065,
  "can_bid": 80971889.0718006,
- "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; sell Gerard Martin; buy Jon Moncayola; buy Dani Martinez; buy Luis Castro; buy Robin Le Normand; buy Augusto Batalla; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+ "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; sell Gerard Martin; buy Dani Martinez; buy Luis Castro; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
