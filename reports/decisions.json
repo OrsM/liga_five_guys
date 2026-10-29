@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-29T19:42Z",
+ "generated_at": "2026-10-29T19:46Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
  "cash_locked": 43859168.0,
@@ -38,14 +38,14 @@
    "what": "buy",
    "label": "buy Thomas Lemar",
    "step": "bid up to",
-   "amount": 7044268.72819935,
+   "amount": 7396344.63495824,
    "done": false,
    "gain": 18.0657264678694,
    "per": "season",
    "facts": [
     [
      "listed at",
-     6356402.0,
+     6674098.0,
      "money"
     ],
     [
@@ -70,7 +70,7 @@
     ],
     [
      "chance of helping",
-     0.834,
+     0.811,
      "chance"
     ],
     [
@@ -80,16 +80,16 @@
     ],
     [
      "money",
-     1647076.38851513,
+     1295000.48175624,
      "money"
     ],
     [
      "",
-     4.43514277797527,
+     3.84321333372803,
      "per_million"
     ]
    ],
-   "asking": 6356402.0,
+   "asking": 6674098.0,
    "win": 0.767,
    "asking_win": 0.333
   },
@@ -320,14 +320,14 @@
    "what": "buy",
    "label": "buy Dani Martinez",
    "step": "bid up to",
-   "amount": 589371.0,
+   "amount": 589995.0,
    "done": false,
    "gain": 0.0,
    "per": "season",
    "facts": [
     [
      "listed at",
-     589371.0,
+     589995.0,
      "money"
     ],
     [
@@ -347,7 +347,7 @@
     ],
     [
      "chance of helping",
-     0.544,
+     0.54,
      "chance"
     ],
     [
@@ -357,74 +357,18 @@
     ],
     [
      "money",
-     7024.86708296242,
+     6400.86708296242,
      "money"
     ],
     [
      "",
-     0.0561989366636993,
+     0.0512069366636993,
      "per_million"
     ]
    ],
-   "asking": 589371.0,
+   "asking": 589995.0,
    "win": 0.85,
    "asking_win": 0.85
-  },
-  {
-   "name": "Luis Castro",
-   "pos": "MED",
-   "what": "buy",
-   "label": "buy Luis Castro",
-   "step": "bid up to",
-   "amount": 615230.0,
-   "done": false,
-   "gain": 0.0,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     615230.0,
-     "money"
-    ],
-    [
-     "bids",
-     "none yet",
-     "count"
-    ],
-    [
-     "chance to win",
-     0.9,
-     "chance"
-    ],
-    [
-     "chance of first",
-     0.0,
-     "first"
-    ],
-    [
-     "chance of helping",
-     0.501,
-     "chance"
-    ],
-    [
-     "",
-     0.172621235978572,
-     "trend"
-    ],
-    [
-     "money",
-     90.0212780463044,
-     "money"
-    ],
-    [
-     "",
-     0.000720170224370435,
-     "per_million"
-    ]
-   ],
-   "asking": 615230.0,
-   "win": 0.9,
-   "asking_win": 0.9
   },
   {
    "name": "Robin Le Normand",
@@ -557,10 +501,10 @@
    ]
   }
  ],
- "plan_gain": 61.8565049872454,
- "cash_after": 5402765.27180065,
- "can_bid": 80971889.0718006,
- "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; sell Gerard Martin; buy Dani Martinez; buy Luis Castro; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+ "plan_gain": 59.03418556295,
+ "cash_after": 5665295.36504176,
+ "can_bid": 81234419.1650418,
+ "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; sell Gerard Martin; buy Dani Martinez; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
