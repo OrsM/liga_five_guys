@@ -170,6 +170,8 @@ CREATE TABLE IF NOT EXISTS sim_runs (
     run_id    INTEGER PRIMARY KEY REFERENCES runs(run_id),
     plan_gain REAL,
     first_after REAL,               -- your chance of first once the plan is made
+    first_buys  REAL,               -- what its buys add to it, together
+    first_sales REAL,               -- what its sales add to it, together
     lam       REAL                  -- what a million is worth now, points (Board.lam)
 );
 
@@ -1572,6 +1574,7 @@ buys AS (
                 SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
                 UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
                 UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
+                UNION ALL SELECT 0.6, 'chance of first', round(b.d_first, 2), 'first' WHERE r.player IS NULL
                 UNION ALL SELECT 1, 'sell before the lock for', b.resale, 'money' WHERE r.player IS NOT NULL
                 UNION ALL SELECT 2, 'profit', r.profit, 'money'
                 UNION ALL SELECT 3, 'chance of helping', round(b.p_better, 3), 'chance' WHERE r.player IS NULL
@@ -1592,6 +1595,7 @@ sells AS (
            s.listed AND (NOT s.takes OR coalesce(s.wait_bids > 0, 0)), s.gain - (SELECT money_rate FROM k) * s.money, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'value' AS l, s.value AS v, 'money' AS u
+                UNION ALL SELECT 0.5, 'chance of first', round(s.d_first, 2), 'first'
                 UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
                 UNION ALL SELECT 2, 'the game''s recent offers', round(s.beats, 3), 'beats'
                 UNION ALL SELECT 2.2, 'waiting is worth', s.waiting, 'money'
@@ -1647,6 +1651,9 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
        me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
+       (SELECT round(first_after, 3) FROM sim_runs JOIN board_run USING (run_id)) AS p_win_after,
+       (SELECT round(first_buys, 3) FROM sim_runs JOIN board_run USING (run_id)) AS first_buys,
+       (SELECT round(first_sales, 3) FROM sim_runs JOIN board_run USING (run_id)) AS first_sales,
        (SELECT lam FROM sim_runs JOIN board_run USING (run_id)) AS lam,
        me.lo AS band_lo, me.hi AS band_hi,
        (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
@@ -1669,7 +1676,8 @@ WITH lines AS (SELECT ord, json(CASE WHEN what = 'field' THEN json_remove(o, '$.
                      FROM board_rows))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
-    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,
+    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win, 'p_win_after', h.p_win_after,
+    'blocks', json_object('buys', h.first_buys, 'sales', h.first_sales),
     'lam', h.lam,
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines),

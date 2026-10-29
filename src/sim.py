@@ -13,7 +13,7 @@ from typing import Any
 
 from assemble import built, universe
 import decide
-from decide import Board, Universe, board
+from decide import Board, Move, Universe, board
 from ffcore.db import connect, record, rows, this_run
 from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
@@ -210,8 +210,10 @@ def _selftest_board() -> None:
     assert all(dict((f[0], f[1]) for f in d["facts"])["chance to win"] == wins[d["name"].lower()]
                for d in doc["do"] if d["what"] == "buy"), \
         "and the chance that bid wins his auction"
-    assert not any(f[0] == "chance of first" for d in doc["do"] for f in d["facts"]), \
-        "no chance of first a move: it counts its money as points (decide.score)"
+    firsts = {m.action.buy: round(m.d_first, 2) for m in b.rows if m.action.kind == "buy"}
+    assert all(dict((f[0], f[1]) for f in d["facts"])["chance of first"] == firsts[d["name"].lower()]
+               for d in doc["do"] if d["what"] == "buy"), \
+        "and what he adds to your chance of first, on points (decide.score)"
     assert report(ub, b)["lam"] == b.lam, "what a million is worth now, in the headline"
     assert "market" not in doc and "offers" not in doc, "one list of lines, not a section per source"
     listing = doc["do"][-1]
@@ -403,7 +405,13 @@ def _selftest_board() -> None:
     assert (head["run_id"], head["plan_gain"], head["lam"]) == (7, b.gain, b.lam) \
         and abs(head["first_after"] - ub.standings.position().get(1, 0.0)
                 - decide.joint(ub, b.plan).d_first / 100) < 1e-12, head
-    assert "p_win_after" not in report(ub, b), "no chance of first after the plan: it counts its money as points"
+    blocks = {kind: decide.joint(ub, [m for m in b.plan if (m.action.kind == "buy") == (kind == "buys")]).d_first
+              for kind in ("buys", "sales")}
+    assert (abs(head["first_buys"] - blocks["buys"] / 100) < 1e-12
+            and abs(head["first_sales"] - blocks["sales"] / 100) < 1e-12), ("the plan by block: its buys, its sales", head)
+    doc7 = report(ub, b)
+    assert doc7["p_win_after"] == round(head["first_after"], 3), "your chance of first once the plan is made"
+    assert doc7["blocks"] == {"buys": round(head["first_buys"], 3), "sales": round(head["first_sales"], 3)}, doc7["blocks"]
 
     debt = replace(ub, market=replace(ub.market, cash=-5e6,
                                       value={**ub.market.value, "k": 4e6, "d1": 9e6, "m1": 1e6}))
@@ -530,10 +538,15 @@ def plan(u: Universe, b: Board, run: int) -> list[Doc]:
 
 def plan_head(u: Universe, b: Board, run: int) -> Doc:
     """What the plan gains, its moves made together, and your chance of
-    first once it is made (decide.joint from your squad as it is), and what
-    a million is worth now (Board.lam)."""
+    first once it is made (decide.joint from your squad as it is), what its
+    buys and its sales each add to it, and what a million is worth now
+    (Board.lam)."""
+    def block(moves: list[Move]) -> float:
+        return decide.joint(u, moves).d_first / 100 if moves else 0.0
     return {"run_id": run, "plan_gain": b.gain, "lam": b.lam,
-            "first_after": u.standings.position().get(1, 0.0) + decide.joint(u, b.plan).d_first / 100}
+            "first_after": u.standings.position().get(1, 0.0) + block(b.plan),
+            "first_buys": block([m for m in b.plan if m.action.kind == "buy"]),
+            "first_sales": block([m for m in b.plan if m.action.kind != "buy"])}
 
 
 def record_run(u: Universe, b: Board, run: int, params: Sequence[Doc] = ()) -> None:
