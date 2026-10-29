@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Run the report when the phone asks for it.
+#
+# THE PHONE CANNOT REACH THIS BOX. lfg-publish pushes one way and nothing
+# pulls the other, which is most of the safety argument for a site that is
+# served from a phone behind Cloudflare Access. So the button on the report
+# does not call anything here — it leaves a request file, and this picks it up
+# within the minute. Nothing new is exposed and the box stays unreachable.
+#
+# It also streams the run back, because the chain takes about five minutes and
+# a spinner that long reads as broken. The tail of the real log lands in
+# run.json beside the report, and the page shows it.
+#
+#   systemctl --user start lfg-watch.service    # check once, now
+#   journalctl --user -u lfg-watch -n 30        # what it did
+
+set -uo pipefail
+
+PHONE="${LFG_PHONE:-$("$HOME/.local/bin/phone-addr" || true)}"
+PORT="${LFG_PHONE_PORT:-8022}"
+DEST="${LFG_PHONE_DEST:-/data/data/com.termux/files/home/list-data/fantasy}"
+STATE="$HOME/.local/state/lfg"
+LOG="$STATE/run.log"
+JSON="$STATE/run.json"
+mkdir -p "$STATE"
+
+ssh_phone() { ssh -p "$PORT" -o BatchMode=yes -o ConnectTimeout=5 "$PHONE" "$@"; }
+
+if ! ssh_phone true 2>/dev/null; then
+    echo "phone unreachable — nothing to check"; exit 0
+fi
+
+# Bids accepted on the phone: taken and removed in one round trip, placed by
+# act.py (each checked against the board it was accepted on, and read back
+# from the market), and the results put back beside the report as act.json.
+# Not held behind a run in flight: a bid waits for nothing the run makes.
+ACC=$(ssh_phone "cat '$DEST/accept.json' 2>/dev/null && rm -f '$DEST/accept.json'" || true)
+if [ -n "$ACC" ]; then
+    echo "accepted: $ACC"
+    printf '%s' "$ACC" > "$STATE/accept.json"
+    REPO="${LFG_REPO:-$HOME/claude_projects/liga_five_guys}"
+    if ! (cd "$REPO" && PYTHONPATH=src "$HOME/.local/bin/uv" run --frozen python src/act.py accept \
+            "$STATE/accept.json" > "$STATE/act.json" 2> "$STATE/act.err"); then
+        python3 - "$STATE/accept.json" "$STATE/act.err" "$STATE/act.json" <<'PYEOF'
+import datetime, json, sys
+asked = json.load(open(sys.argv[1]))
+err = open(sys.argv[2], encoding="utf-8").read().strip().splitlines()[-1:] or ["no output"]
+at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+json.dump([{**r, "state": "failed", "message": "the box could not act: " + err[0][:200], "at": at}
+           for r in (asked if isinstance(asked, list) else [asked])], open(sys.argv[3], "w"))
+PYEOF
+    fi
+    cat "$STATE/act.json"; echo
+    scp -q -P "$PORT" -o BatchMode=yes "$STATE/act.json" "$PHONE:$DEST/act.json" || true
+fi
+
+# A run already in flight: leave it alone rather than stacking a second one on
+# top of it. The lock is the pid file, and a stale one is ignored.
+LOCK="$STATE/run.pid"
+if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
+    echo "a run is already in flight"; exit 0
+fi
+
+# The request, and its removal, in one round trip: taking it before the run
+# means a button pressed during the run queues the next one rather than being
+# silently eaten.
+REQ=$(ssh_phone "cat '$DEST/rerun.json' 2>/dev/null && rm -f '$DEST/rerun.json'" || true)
+[ -n "$REQ" ] || exit 0
+echo "requested: $REQ"
+
+echo $$ > "$LOCK"
+trap 'rm -f "$LOCK"' EXIT
+
+# JSON is the only shape the phone will serve back — its file reader is
+# whitelisted to *.json on purpose — so the log tail is carried inside one.
+#
+# `at` IS NOT DECORATION. The page believes a "running" it reads on load, so
+# that a refresh mid-run does not lose the console; a run this unit was killed
+# for (TimeoutStartSec above) would otherwise leave a file saying "running"
+# for ever, and a disabled button with it. Stamped on every push so the reader
+# can age it and stop believing — the same rule the Elo rating and the cash
+# anchor are held to.
+push_state() {
+    local state="$1"
+    python3 - "$state" "$LOG" "$JSON" <<'PYEOF'
+import datetime, json, sys
+state, log, out = sys.argv[1], sys.argv[2], sys.argv[3]
+try:
+    lines = [l.rstrip() for l in open(log, encoding="utf-8") if l.strip()][-14:]
+except OSError:
+    lines = []
+stamp = datetime.datetime.now(datetime.timezone.utc).strftime(
+    "%Y-%m-%dT%H:%M:%SZ")
+json.dump({"state": state, "lines": lines, "at": stamp}, open(out, "w"))
+PYEOF
+    scp -q -P "$PORT" -o BatchMode=yes "$JSON" "$PHONE:$DEST/run.json" || true
+}
+
+: > "$LOG"
+echo "$(TZ=Europe/Madrid date +'%H:%M:%S %Z')  starting" >> "$LOG"
+push_state running
+
+# Stream: the run writes to the log, and a background loop ships the tail up
+# every few seconds so the page has something moving to show.
+( while [ -f "$LOCK" ]; do sleep 4; push_state running; done ) &
+PUSHER=$!
+
+# LFG_TRIGGER: the run's row in data/lfg.db says the button asked for it.
+if LFG_TRIGGER=button "$HOME/.local/bin/lfg-run" >> "$LOG" 2>&1; then
+    echo "$(TZ=Europe/Madrid date +'%H:%M:%S %Z')  done" >> "$LOG"
+    FINAL=done
+else
+    echo "$(TZ=Europe/Madrid date +'%H:%M:%S %Z')  FAILED — see journalctl on the box" >> "$LOG"
+    FINAL=failed
+fi
+
+rm -f "$LOCK"
+kill "$PUSHER" 2>/dev/null || true
+wait "$PUSHER" 2>/dev/null || true
+push_state "$FINAL"
+echo "$FINAL"

@@ -8,7 +8,7 @@ then read back from the market. The bid endpoints are the app's own
 (fantasy-api.llt-services.com, as LaLigaApp calls them): POST a bid, PUT a
 new amount on yours.
 
-    python src/act.py accept REQUEST.json   # what lfg-watch runs; prints the result as JSON
+    python src/act.py accept REQUESTS.json  # what lfg-watch runs: each request's result, as JSON
 """
 from __future__ import annotations
 
@@ -22,8 +22,9 @@ from pathlib import Path
 from typing import Any
 
 from ffcore import db as lfg
-from ffcore.auth import API_BASE
+from ffcore.auth import API_BASE, TokenStore
 from ffcore.laliga_api import API_LEAGUES_URL, API_MARKET_URL, parse_api_leagues
+from ingest import HEADERS, TIMEOUT
 
 # One call to the app: (method, url, JSON body or None) to (status, JSON reply).
 Call = Callable[[str, str, dict[str, Any] | None], tuple[int, Any]]
@@ -105,8 +106,6 @@ def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], di
 def http_call() -> Call:
     """The app, with your league login (ffcore.auth)."""
     import httpx
-    from ffcore.auth import TokenStore
-    from ingest import HEADERS, TIMEOUT
     bearer = TokenStore().bearer()
     client = httpx.Client(headers={**HEADERS, "Accept": "application/json",
                                    "Authorization": "Bearer %s" % bearer}, timeout=TIMEOUT)
@@ -164,7 +163,7 @@ def _selftest() -> None:
                      ({**req, "name": "Gerard Martin", "amount": 46738575.0}, "a sale, not a bid")):
         assert accept(bad, board, where, call, base)["state"] == "failed", why
     assert sent == [], "refused before any call to the app"
-    assert accept(req, board, {}.get, call, base)["state"] == "failed", "not on the market"
+    assert accept(req, board, lambda _n: None, call, base)["state"] == "failed", "not on the market"
     print("act self-test OK")
 
 
@@ -172,10 +171,10 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
     elif sys.argv[1:2] == ["accept"]:
-        request = json.loads(Path(sys.argv[2]).read_text())
-        result = accept(request, json.loads(REPORT.read_text()), target, http_call(), API_BASE)
-        print(json.dumps(result))
-        raise SystemExit(0 if result["state"] == "placed" else 1)
+        asked = json.loads(Path(sys.argv[2]).read_text())
+        board, call = json.loads(REPORT.read_text()), http_call()
+        print(json.dumps([accept(r, board, target, call, API_BASE)
+                          for r in (asked if isinstance(asked, list) else [asked])]))
     else:
         print(__doc__)
         raise SystemExit(2)

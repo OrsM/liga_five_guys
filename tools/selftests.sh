@@ -20,7 +20,7 @@ TESTS=(ffcore/kept.py ffcore/facts.py ffcore/parse.py ffcore/text.py ffcore/tidy
        "grading.py --selftest"
        "crosswalk.py --selftest" "run.py --selftest" "remind.py --selftest" "health.py --selftest" publish.py assemble.py ffcore/gain.py
        ffcore/action.py ffcore/market.py ffcore/pricing.py ffcore/schedule.py
-       "stats.py --selftest"
+       "stats.py --selftest" "act.py --selftest"
       )
 # One list, in tools/session_selftests.py: the serial re-run below reads it.
 mapfile -t SESSION_TESTS < <("$UV" run --frozen python tools/session_selftests.py --list)
