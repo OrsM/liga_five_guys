@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-29T18:32Z",
+ "generated_at": "2026-10-29T18:39Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
  "cash_locked": 27208802.0,
@@ -54,6 +54,11 @@
      "money"
     ],
     [
+     "bids",
+     "only yours",
+     "count"
+    ],
+    [
      "chance to win",
      0.767,
      "chance"
@@ -103,6 +108,11 @@
      "listed at",
      17220303.0,
      "money"
+    ],
+    [
+     "bids",
+     "only yours",
+     "count"
     ],
     [
      "chance to win",
@@ -209,6 +219,11 @@
      "money"
     ],
     [
+     "bids",
+     "only yours",
+     "count"
+    ],
+    [
      "chance to win",
      1.0,
      "chance"
@@ -258,6 +273,11 @@
      "listed at",
      4279563.0,
      "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
     ],
     [
      "chance to win",
@@ -311,6 +331,11 @@
      "money"
     ],
     [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
      "chance to win",
      0.85,
      "chance"
@@ -360,6 +385,11 @@
      "listed at",
      615230.0,
      "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
     ],
     [
      "chance to win",
@@ -413,6 +443,11 @@
      "money"
     ],
     [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
      "chance to win",
      1.0,
      "chance"
@@ -462,6 +497,11 @@
      "listed at",
      5505499.0,
      "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
     ],
     [
      "chance to win",
