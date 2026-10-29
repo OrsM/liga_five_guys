@@ -597,9 +597,11 @@ SELECT f.player, f.offer, w.later AS waiting, max(f.offer, coalesce(w.later, 0.0
 FROM player_facts f LEFT JOIN waiting w ON w.player = f.player AND w.kind = 'sale'
 WHERE f.offer IS NOT NULL;
 
--- Every player the market or a futbolfantasy line-up names, as of cut():
--- his name and position, what he is worth (market value; 0 is none),
--- whether he is on sale (price; route: listed by a manager, else free,
+-- Every player the market or a futbolfantasy line-up names, as of cut(),
+-- but coaches (no slot of the eleven, and the league has none: "Coach is not
+-- enabled", 2026-10-29): his name and position, what he is worth (market
+-- value; 0 is none), whether he is on sale (price, never under his value:
+-- the game takes no bid under it; route: listed by a manager, else free,
 -- the game's own), your pending bid, his owner and release clause (any can
 -- be paid now), the best offer standing on him if he is yours, what his
 -- owner paid, his price trend. What Market is built from (assemble) and
@@ -608,12 +610,12 @@ DROP VIEW IF EXISTS player_facts;
 CREATE VIEW player_facts AS
 WITH who AS (
     SELECT ff_id AS player, trim(name) AS name, position, value FROM current_market
-    WHERE ff_id <> ''
+    WHERE ff_id <> '' AND lower(coalesce(position, '')) <> 'entrenador'
     UNION ALL
     SELECT player, trim(player_name), '', NULL FROM current_lineups
     WHERE source = 'futbolfantasy' AND player IS NOT NULL
       AND player NOT IN (SELECT ff_id FROM current_market)),
-sale AS (SELECT player, sale_price AS price,
+sale AS (SELECT player, max(sale_price, coalesce(market_value, 0)) AS price,
                 CASE seller WHEN 'marketPlayerTeam' THEN 'listed' ELSE 'free' END AS route
          FROM current_api_market WHERE player IS NOT NULL AND sale_price <> 0),
 bid AS (SELECT player, max(bid_money) AS my_bid FROM current_api_market

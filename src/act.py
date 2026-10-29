@@ -105,6 +105,8 @@ def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], di
                              {"money": money})
     if status not in (200, 201):
         return done(False, "the app said %d: %s" % (status, json.dumps(reply)[:200]))
+    if isinstance(reply, dict) and reply.get("money") == money and reply.get("status") == "pending":
+        return done(True, "bid %d, the app confirmed" % money)
     got = None
     for i in range(READS):
         if i:
@@ -141,8 +143,8 @@ def _selftest() -> None:
     req = {"requested_at": "t", "generated_at": "2026-10-29T15:57Z", "name": "Thomas Lemar", "amount": 7044268.7}
     where = {"Thomas Lemar": {"market_id": "525303444", "player_id": "3182"}}.get
 
-    def app(bid: dict[str, Any] | None, answer: int = 200,
-            shown_after: int = 0) -> tuple[Call, list[tuple[str, str, Any]]]:
+    def app(bid: dict[str, Any] | None, answer: int = 200, shown_after: int = 0,
+            confirm: bool = False) -> tuple[Call, list[tuple[str, str, Any]]]:
         sent: list[tuple[str, str, Any]] = []
         state: dict[str, Any] = {"bid": bid, "hidden": 0}
 
@@ -158,7 +160,7 @@ def _selftest() -> None:
             if answer == 200:
                 state["bid"] = {"id": 5, "money": body["money"]} if body else None
                 state["hidden"] = shown_after
-            return answer, {}
+            return answer, ({"id": "5", "money": body["money"], "status": "pending"} if confirm and body else {})
         return call, sent
 
     call, sent = app({"id": 54045570, "money": 6674686})
@@ -180,6 +182,10 @@ def _selftest() -> None:
     call, sent = app(None, shown_after=9)
     assert accept(req, board, where, call, base, naps.append)["message"].startswith("sent, but"), \
         "and not for ever"
+    call, sent = app(None, shown_after=99, confirm=True)
+    got = accept(req, board, where, call, base, naps.append)
+    assert got["state"] == "placed" and got["message"] == "bid 7044269, the app confirmed", \
+        "the app's own answer is the bid, pending: the market shows it later (over 10s, 2026-10-29)"
     call, sent = app(None)
     assert accept({**req, "amount": 6356402.0}, board, where, call, base)["state"] == "placed" and \
         [b for m, _u, b in sent if m != "GET"] == [{"money": 6356402}], "or at his asking price: the stingy bid"

@@ -506,13 +506,15 @@ def _selftest_facts() -> None:
             record([{"me": "me", "budget": 100e6}], "league_config")
             record([{"player_id": k, "app_id": app, "ff_slug": slug} for k, app, slug in
                     [("p1", "1", ""), ("p2", "2", ""), ("p3", "3", ""), ("p4", "", "cai"),
-                     ("p5", "5", "")]], "crosswalk")
+                     ("p5", "5", ""), ("p6", "6", ""), ("p7", "7", "")]], "crosswalk")
             store_sql("market", [{"observed_at": a, "ff_id": k, "name": n, "position": pos,
                                   "value": v} for k, n, pos, v in
                                  [("p1", "ana uno", "defensa", "5000000"),
                                   ("p2", "Bo Dos", "delantero", "0"),
                                   ("p3", "Cy Tres", "portero", "3000000"),
-                                  ("p5", "Di Cinco", "utillero", "1000000")]])
+                                  ("p5", "Di Cinco", "utillero", "1000000"),
+                                  ("p6", "Ed Seis", "entrenador", "600000"),
+                                  ("p7", "Fa Siete", "defensa", "590000")]])
             store_sql("lineups", [{"observed_at": a, "source": "futbolfantasy", "team_slug": "c",
                                    "player_slug": "cai", "player_name": "Cai Cuatro"}])
             store_sql("api_standings", [{"observed_at": a, "user_id": u, "manager": m}
@@ -521,11 +523,14 @@ def _selftest_facts() -> None:
                                      "buyout": b, "player_team_id": pt} for app, m, b, pt in
                                     [("1", "me", "9000000", "t1"), ("3", "riv", "", "t3")]])
             store_sql("api_market", [{"observed_at": a, "player_id": app, "sale_price": price,
-                                      "seller": seller, "bid_status": st, "bid_money": bid}
-                                     for app, price, seller, st, bid in
-                                     [("2", "2000000", "marketPlayerTeam", "pending", "2500000"),
-                                      ("5", "1000000", "marketPlayerLeague", "", ""),
-                                      ("3", "", "marketPlayerLeague", "pending", "")]])
+                                      "seller": seller, "bid_status": st, "bid_money": bid,
+                                      "market_value": mv}
+                                     for app, price, seller, st, bid, mv in
+                                     [("2", "2000000", "marketPlayerTeam", "pending", "2500000", ""),
+                                      ("5", "1000000", "marketPlayerLeague", "", "", ""),
+                                      ("3", "", "marketPlayerLeague", "pending", "", ""),
+                                      ("6", "615000", "marketPlayerLeague", "", "", "614800"),
+                                      ("7", "589371", "marketPlayerLeague", "", "", "589995")]])
             store_sql("api_offers", [{"observed_at": a, "player_team_id": pt, "status": st,
                                       "money": m, "offer_id": i} for pt, st, m, i in
                                      [("t1", "pending", "6000000", "o1"),
@@ -535,7 +540,10 @@ def _selftest_facts() -> None:
             got = market_facts()
         finally:
             set_now(None)
-    assert set(got) == {"p1", "p2", "p3", "p4", "p5"}, "every player the market or a line-up names"
+    assert set(got) == {"p1", "p2", "p3", "p4", "p5", "p7"}, \
+        "every player the market or a line-up names, but a coach: no slot of the eleven is his (and your league has none)"
+    assert got["p7"]["price"] == 589995, \
+        "listed under his value: the game takes no bid under it (2026-10-29, D. Martinez), so that is what he costs"
     assert got["p1"] == {"name": "ana uno", "pos": "DEF", "value": 5e6, "owner": "me",
                          "clause": 9e6, "price": None, "route": None, "my_bid": None,
                          "offer": 6e6, "paid": None, "trend": None}, got["p1"]
