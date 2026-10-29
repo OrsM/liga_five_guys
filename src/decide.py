@@ -182,8 +182,9 @@ def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, flo
     are independent normals (ffcore.gain, Market.money). A jornada under
     way is fielded as it stands, so only the ones to come count. Your
     chance of first: your season (Universe.standings) with the jornadas to
-    come played by the squad after it, its money at MONEY_RATE, against the
-    rivals' as they stand (Standings.position)."""
+    come played by the squad after it, against the rivals' as they stand
+    (Standings.position). Points alone: money wins nothing until it is spent,
+    and what it buys is a move of its own."""
     to_come = [j for j in u.state.jornadas if j not in u.part_played]
     squads = [apply(u, *acts)[u.me] for acts in sets]
     pts = moments(u.forecaster, to_come, u.mine, squads)
@@ -194,8 +195,7 @@ def score(u: Universe, sets: list[list[Action]]) -> list[tuple[float, float, flo
     for acts, (mean, var, _p), (new_m, new_v, _q) in zip(sets, pts, alone):
         cash, spread = u.market.money(acts, pricing.MONEY_H)
         total = mean + MONEY_RATE * cash
-        mine = (mean_me - old_m + new_m + MONEY_RATE * cash,
-                math.sqrt(max(sd_me ** 2 - old_v + new_v + MONEY_RATE ** 2 * spread, 0.0)))
+        mine = (mean_me - old_m + new_m, math.sqrt(max(sd_me ** 2 - old_v + new_v, 0.0)))
         after = Standings({**base.dist, u.me: mine}, u.me).position().get(1, 0.0)
         out.append((total, normal_above(total, var + MONEY_RATE ** 2 * spread), cash, 100.0 * (after - first)))
     return out
@@ -418,6 +418,18 @@ def _selftest_funnel() -> None:
         "behind, a buy that adds points adds to your chance of first, a better one more"
     (_g, _p, _c, none), = score(behind, [[]])
     assert abs(none) < 1e-9, "doing nothing changes nothing"
+    sets = [[a] for a in behind.candidates()]
+    was = globals()["MONEY_RATE"]
+    try:
+        globals()["MONEY_RATE"] = 0.0
+        at_zero = score(behind, sets)
+        globals()["MONEY_RATE"] = 8.0
+        at_rate = score(behind, sets)
+    finally:
+        globals()["MONEY_RATE"] = was
+    assert any(abs(c) > 1e-6 for _g, _p, c, _f in at_rate), "some move here makes or loses money"
+    assert all(abs(f0 - f8) < 1e-9 for (*_a, f0), (*_b, f8) in zip(at_zero, at_rate)), \
+        "points win the league: money moves your chance of first only once spent, not at MONEY_RATE"
     assert u.why_not("nobody") == "nobody's, and not on the market now"
     assert u.why_not("th_m1") == "riv's player"
 
