@@ -1,15 +1,14 @@
 {
- "generated_at": "2026-10-29T14:42Z",
+ "generated_at": "2026-10-29T15:37Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
  "cash_locked": 0.0,
  "finish": 1.82,
- "p_win": 0.275,
- "p_win_after": 0.415,
+ "p_win": 0.276,
  "lam": 0.0,
  "band": [
-  1986.57090608787,
-  2280.4460093714
+  1987.24338308963,
+  2281.13810810403
  ],
  "do": [
   {
@@ -18,7 +17,7 @@
    "step": null,
    "amount": null,
    "done": false,
-   "gain": -0.16511777139937,
+   "gain": -0.167127391786867,
    "per": "next",
    "facts": [
     [
@@ -36,7 +35,7 @@
    "step": "bid up to",
    "amount": 7044268.72819935,
    "done": false,
-   "gain": 31.2423375759904,
+   "gain": 18.0657264678694,
    "per": "season",
    "facts": [
     [
@@ -53,11 +52,6 @@
      "chance of helping",
      0.834,
      "chance"
-    ],
-    [
-     "chance of first",
-     6.55,
-     "first"
     ],
     [
      "",
@@ -84,7 +78,7 @@
    "step": "bid up to",
    "amount": 17220303.0,
    "done": false,
-   "gain": 18.7666444883576,
+   "gain": 17.8217085140415,
    "per": "season",
    "facts": [
     [
@@ -101,11 +95,6 @@
      "chance of helping",
      0.697,
      "chance"
-    ],
-    [
-     "chance of first",
-     3.94,
-     "first"
     ],
     [
      "",
@@ -132,7 +121,7 @@
    "step": "take offer",
    "amount": 46738575.0,
    "done": false,
-   "gain": 5.93543018597733,
+   "gain": -46.550999879265,
    "per": "season",
    "facts": [
     [
@@ -161,18 +150,13 @@
      "trend"
     ],
     [
-     "chance of first",
-     1.48,
-     "first"
-    ],
-    [
      "money",
      6560552.55560686,
      "money"
     ],
     [
      "",
-     0.126992108466664,
+     0.126949111426479,
      "per_million"
     ]
    ]
@@ -185,7 +169,7 @@
    "step": "bid up to",
    "amount": 3313813.0,
    "done": false,
-   "gain": 2.15129428509143,
+   "gain": 4.91091489565681,
    "per": "season",
    "facts": [
     [
@@ -202,11 +186,6 @@
      "chance of helping",
      0.556,
      "chance"
-    ],
-    [
-     "chance of first",
-     0.43,
-     "first"
     ],
     [
      "",
@@ -233,7 +212,7 @@
    "step": "bid up to",
    "amount": 4279563.0,
    "done": false,
-   "gain": 0.683645196171127,
+   "gain": 2.67118237345964,
    "per": "season",
    "facts": [
     [
@@ -250,11 +229,6 @@
      "chance of helping",
      0.521,
      "chance"
-    ],
-    [
-     "chance of first",
-     0.15,
-     "first"
     ],
     [
      "",
@@ -281,7 +255,7 @@
    "step": "bid up to",
    "amount": 589371.0,
    "done": false,
-   "gain": 0.0561989366636993,
+   "gain": 0.0,
    "per": "season",
    "facts": [
     [
@@ -298,11 +272,6 @@
      "chance of helping",
      0.544,
      "chance"
-    ],
-    [
-     "chance of first",
-     0.01,
-     "first"
     ],
     [
      "",
@@ -329,7 +298,7 @@
    "step": "take offer",
    "amount": 3856738.0,
    "done": false,
-   "gain": 0.0341193391341532,
+   "gain": -4.80063923014331,
    "per": "season",
    "facts": [
     [
@@ -358,11 +327,6 @@
      "trend"
     ],
     [
-     "chance of first",
-     -0.02,
-     "first"
-    ],
-    [
      "money",
      604344.821159683,
      "money"
@@ -382,7 +346,7 @@
    "step": "bid up to",
    "amount": 615230.0,
    "done": false,
-   "gain": 0.000720170224370435,
+   "gain": 0.0,
    "per": "season",
    "facts": [
     [
@@ -399,11 +363,6 @@
      "chance of helping",
      0.501,
      "chance"
-    ],
-    [
-     "chance of first",
-     0.0,
-     "first"
     ],
     [
      "",
@@ -430,7 +389,7 @@
    "step": "bid up to",
    "amount": 6865304.0,
    "done": false,
-   "gain": -0.629729265926681,
+   "gain": 5.71030681253368,
    "per": "season",
    "facts": [
     [
@@ -447,11 +406,6 @@
      "chance of helping",
      0.487,
      "chance"
-    ],
-    [
-     "chance of first",
-     -0.09,
-     "first"
     ],
     [
      "",
@@ -489,7 +443,7 @@
    ]
   }
  ],
- "plan_gain": 63.9471090523161,
+ "plan_gain": 63.9450994319286,
  "cash_after": 14765002.2718006,
  "can_bid": 90337950.2718007,
  "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; buy Martin Satriano; sell Gerard Martin; buy Adria Pedrosa; buy Jon Moncayola; buy Dani Martinez; sell Yeray Alvarez; buy Luis Castro; buy Robin Le Normand; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
@@ -590,15 +544,15 @@
    "hi": 2397.02060088269,
    "cash": 997131.0,
    "estimated": true,
-   "p_above": 0.720948582112308
+   "p_above": 0.71960288950811
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 523.0,
-   "mean": 2133.50845772963,
-   "lo": 1986.57090608787,
-   "hi": 2280.4460093714,
+   "mean": 2134.19074559683,
+   "lo": 1987.24338308963,
+   "hi": 2281.13810810403,
    "cash": 4097542.0,
    "estimated": false,
    "p_above": null
@@ -607,34 +561,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 391.0,
-   "mean": 1901.01061914983,
-   "lo": 1758.98998738212,
-   "hi": 2043.03125091754,
+   "mean": 1900.89622563509,
+   "lo": 1758.87675247864,
+   "hi": 2042.91569879154,
    "cash": 61455056.0,
    "estimated": true,
-   "p_above": 0.0724135091376649
+   "p_above": 0.071733620066935
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 365.0,
-   "mean": 1830.55284551069,
-   "lo": 1695.88363811055,
-   "hi": 1965.22205291082,
+   "mean": 1831.39325027847,
+   "lo": 1696.65328682335,
+   "hi": 1966.13321373358,
    "cash": -7384102.0,
    "estimated": true,
-   "p_above": 0.0257111545100354
+   "p_above": 0.0258042898499198
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 389.0,
-   "mean": 1632.54254008245,
-   "lo": 1512.25976389845,
-   "hi": 1752.82531626645,
+   "mean": 1632.8382653805,
+   "lo": 1512.54045867642,
+   "hi": 1753.13607208458,
    "cash": 58093671.0,
    "estimated": true,
-   "p_above": 0.000361166708793048
+   "p_above": 0.000358150149056491
   }
  ]
 }
