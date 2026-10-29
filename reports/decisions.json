@@ -1,10 +1,15 @@
 {
- "generated_at": "2026-10-29T15:52Z",
+ "generated_at": "2026-10-29T15:57Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 4097542.0,
- "cash_locked": 0.0,
+ "cash_locked": 6674686.0,
  "finish": 1.82,
  "p_win": 0.276,
+ "p_win_after": 0.305,
+ "blocks": {
+  "buys": 0.113,
+  "sales": -0.086
+ },
  "lam": 0.0,
  "band": [
   1987.24338308963,
@@ -44,9 +49,19 @@
      "money"
     ],
     [
+     "your bid",
+     6674686.0,
+     "money"
+    ],
+    [
      "chance to win",
      0.767,
      "chance"
+    ],
+    [
+     "chance of first",
+     3.74,
+     "first"
     ],
     [
      "chance of helping",
@@ -92,6 +107,11 @@
      "chance"
     ],
     [
+     "chance of first",
+     3.69,
+     "first"
+    ],
+    [
      "chance of helping",
      0.697,
      "chance"
@@ -128,6 +148,11 @@
      "value",
      42303299.0,
      "money"
+    ],
+    [
+     "chance of first",
+     -8.61,
+     "first"
     ],
     [
      "the game's recent offers",
@@ -183,6 +208,11 @@
      "chance"
     ],
     [
+     "chance of first",
+     0.99,
+     "first"
+    ],
+    [
      "chance of helping",
      0.556,
      "chance"
@@ -224,6 +254,11 @@
      "chance to win",
      0.967,
      "chance"
+    ],
+    [
+     "chance of first",
+     0.54,
+     "first"
     ],
     [
      "chance of helping",
@@ -269,6 +304,11 @@
      "chance"
     ],
     [
+     "chance of first",
+     0.0,
+     "first"
+    ],
+    [
      "chance of helping",
      0.544,
      "chance"
@@ -286,54 +326,6 @@
     [
      "",
      0.0561989366636993,
-     "per_million"
-    ]
-   ]
-  },
-  {
-   "name": "Yeray Alvarez",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Yeray Alvarez",
-   "step": "take offer",
-   "amount": 3856738.0,
-   "done": false,
-   "gain": -4.80063923014331,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     3686861.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.88,
-     "beats"
-    ],
-    [
-     "waiting is worth",
-     3570123.33483191,
-     "money"
-    ],
-    [
-     "more offers before the lock",
-     1,
-     "count"
-    ],
-    [
-     "",
-     -26.1644356280185,
-     "trend"
-    ],
-    [
-     "money",
-     604344.821159683,
-     "money"
-    ],
-    [
-     "",
-     0.00884668316441335,
      "per_million"
     ]
    ]
@@ -358,6 +350,11 @@
      "chance to win",
      0.9,
      "chance"
+    ],
+    [
+     "chance of first",
+     0.0,
+     "first"
     ],
     [
      "chance of helping",
@@ -403,6 +400,11 @@
      "chance"
     ],
     [
+     "chance of first",
+     1.17,
+     "first"
+    ],
+    [
      "chance of helping",
      0.487,
      "chance"
@@ -420,6 +422,54 @@
     [
      "",
      -0.0917263483054328,
+     "per_million"
+    ]
+   ]
+  },
+  {
+   "name": "Augusto Batalla",
+   "pos": "POR",
+   "what": "buy",
+   "label": "buy Augusto Batalla",
+   "step": "bid up to",
+   "amount": 5505499.0,
+   "done": false,
+   "gain": 6.58093141425131,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     5505499.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "chance of first",
+     1.37,
+     "first"
+    ],
+    [
+     "chance of helping",
+     0.48,
+     "chance"
+    ],
+    [
+     "",
+     -32.5574282927109,
+     "trend"
+    ],
+    [
+     "money",
+     -932593.386073311,
+     "money"
+    ],
+    [
+     "",
+     -0.159806708589935,
      "per_million"
     ]
    ]
@@ -443,10 +493,10 @@
    ]
   }
  ],
- "plan_gain": 63.9450994319286,
- "cash_after": 14765002.2718006,
- "can_bid": 90337950.2718007,
- "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; buy Martin Satriano; sell Gerard Martin; buy Adria Pedrosa; buy Jon Moncayola; buy Dani Martinez; sell Yeray Alvarez; buy Luis Castro; buy Robin Le Normand; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
+ "plan_gain": 61.8565049872454,
+ "cash_after": 5402765.27180065,
+ "can_bid": 80975713.2718007,
+ "ping": "field Martin Satriano, Thomas Lemar, Adria Pedrosa; buy Thomas Lemar; buy Martin Satriano; sell Gerard Martin; buy Adria Pedrosa; buy Jon Moncayola; buy Dani Martinez; buy Luis Castro; buy Robin Le Normand; buy Augusto Batalla; list Bil Nsongo, Alvaro Odriozola, Manu Bueno",
  "exposed": [
   {
    "name": "Mathew Ryan",
