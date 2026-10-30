@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-30T20:45Z",
+ "generated_at": "2026-10-30T21:02Z",
  "lock_at": "2026-10-31T13:00:00+00:00",
  "cash": 5079381.0,
  "cash_locked": 23048191.0,
@@ -94,8 +94,8 @@
   {
    "name": null,
    "pos": null,
-   "what": "relist",
-   "label": "relist Mathew Ryan, Yeray Alvarez, Natan, Marcos Alonso, Miguel Roman, German Valera, Pepelu, Iñigo Vicente, Georges Mikautadze",
+   "what": "list",
+   "label": "list Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan, Iñigo Vicente, Mathew Ryan, Yeray Alvarez, Miguel Roman",
    "step": null,
    "amount": null,
    "done": false,
@@ -103,82 +103,84 @@
    "per": "season",
    "facts": [
     [
-     "once the listing ends",
-     "2026-10-30T21:47:34+01:00",
-     "time"
+     "rising",
+     "Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan",
+     "names"
     ]
    ],
-   "accepts": [],
+   "accepts": [
+    null
+   ],
    "act": [
     {
      "player_team": "47459928",
      "player": "2543",
-     "market": "51255271",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEF",
      "value": 50145529.0
     },
     {
      "player_team": "95426553",
      "player": "2771",
-     "market": "51255290",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 37050871.0
     },
     {
      "player_team": "44068749",
      "player": "2639",
-     "market": "50121404",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "MED",
      "value": 10737413.0
     },
     {
      "player_team": "64086240",
      "player": "2755",
-     "market": "54892898",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "POR",
      "value": 20512914.0
     },
     {
      "player_team": "67102630",
      "player": "77",
-     "market": "51255275",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEF",
      "value": 3618125.0
     },
     {
      "player_team": "24338726",
      "player": "2464",
-     "market": "54752027",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "MED",
      "value": 34129784.0
     },
     {
      "player_team": "37280098",
      "player": "3123",
-     "market": "51255255",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEF",
      "value": 23509761.0
     },
     {
      "player_team": "24338723",
      "player": "3002",
-     "market": "54752103",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 25872201.0
     },
     {
      "player_team": "90937863",
      "player": "3074",
-     "market": "50121325",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "MED",
      "value": 17539463.0
     }
@@ -188,7 +190,7 @@
  "plan_gain": 0.0,
  "cash_after": null,
  "can_bid": 58641647.6,
- "ping": "withdraw bid on Filip Ugrinic; withdraw bid on Ivan Romero; withdraw bid on Matias Dituro; relist Mathew Ryan, Yeray Alvarez, Natan, Marcos Alonso, Miguel Roman, German Valera, Pepelu, Iñigo Vicente, Georges Mikautadze",
+ "ping": "withdraw bid on Filip Ugrinic; withdraw bid on Ivan Romero; withdraw bid on Matias Dituro; list Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan, Iñigo Vicente, Mathew Ryan, Yeray Alvarez, Miguel Roman",
  "exposed": [
   {
    "name": "Mathew Ryan",
