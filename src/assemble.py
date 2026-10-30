@@ -150,9 +150,20 @@ class Prices(NamedTuple):
 def record_trend() -> None:
     """Each player's price trend as of the model's cut, kept (price_trend_fit)
     for the views that read it; the momentum it rests on kept first."""
-    with closing(connect()) as db, db:
-        db.execute("DELETE FROM price_trend_fit WHERE as_of = cut()")
-        db.execute("INSERT INTO price_trend_fit SELECT cut(), ff_id, trend FROM price_trend_now")
+    _keep("price_trend_fit", "SELECT cut(), ff_id, trend FROM price_trend_now")
+
+
+def _keep(table: str, select: str) -> None:
+    """The cut's rows of a fit table replaced by what select makes: worked
+    out first, the write after, so a universe built beside others (a
+    backtest builds them side by side) holds lfg.db's one writer's lock for
+    the write alone, not for the fit."""
+    with closing(connect()) as db:
+        got = db.execute(select).fetchall()
+        with db:
+            db.execute("DELETE FROM %s WHERE as_of = cut()" % table)
+            if got:
+                db.executemany("INSERT INTO %s VALUES (%s)" % (table, ", ".join("?" * len(got[0]))), got)
 
 
 def fits_in_place() -> bool:
@@ -169,11 +180,8 @@ def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
     if not (kept.written(lfgdb.DB, "fits") and fits_in_place()):
-        with closing(connect()) as db, db:
-            db.execute("DELETE FROM momentum_fit WHERE as_of = cut()")
-            db.execute("INSERT INTO momentum_fit SELECT cut(), h, slope FROM momentum")
-            db.execute("DELETE FROM price_error_fit WHERE as_of = cut()")
-            db.execute("INSERT INTO price_error_fit SELECT cut(), h, rmse FROM price_error_now")
+        _keep("momentum_fit", "SELECT cut(), h, slope FROM momentum")
+        _keep("price_error_fit", "SELECT cut(), h, rmse FROM price_error_now")
         record_trend()
         kept.mark(lfgdb.DB, "fits")
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
@@ -255,8 +263,10 @@ def forecast_cells() -> tuple[PerJornada, set[str]]:
         return per_j, {k for k in sc.lookup if sc.starts.status_of(k)}
 
 
-# The forecast's weight against its price's (forecast.price_blend); 1, the forecast alone.
-PRICE_BLEND = 1.0
+# The forecast's weight against its price's (forecast.price_blend); 1, the
+# forecast alone. At a move cost of 10 (decide.TIE), 0.5 made +5 to 1's +4
+# against standing still, and less than 1 at every move cost tried (2026-10-30).
+PRICE_BLEND = 0.5
 
 
 def universe(also: frozenset[str] = frozenset()) -> Universe:

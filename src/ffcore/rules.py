@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
+__all__ = ["XI_SIZE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -56,6 +56,9 @@ def position(raw: str | None) -> str:
 
 MATCH_LEN = 90.0
 XI_SIZE = 11  # players a side fields
+# Players a squad may hold, its bids in counted: the app refuses a bid past
+# it ("Bid or offer for more players is not allowed", 23 and a bid, 2026-10-30).
+SQUAD_MAX = 24
 
 # What the plan considers: our choices, not the game's rules, each lifted
 # here, in one place, if the league turns nasty. The code each one narrows

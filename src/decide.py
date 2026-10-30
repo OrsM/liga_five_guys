@@ -14,7 +14,7 @@ from ffcore.gain import Standings, cell_variance, moments, normal_above, standin
 from ffcore import pricing
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.rules import CLAUSE_BUYS, MANAGER_TRADES, MAX_SLOT, MIN_SLOT, POSITIONS, XI_SIZE, Squad, Squads, position, shortfall
+from ffcore.rules import CLAUSE_BUYS, MANAGER_TRADES, MAX_SLOT, MIN_SLOT, POSITIONS, SQUAD_MAX, XI_SIZE, Squad, Squads, position, shortfall
 from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState
 
@@ -29,9 +29,11 @@ __all__ = ["Action", "Board", "FUNNEL", "Move", "Universe", "board", "joint", "o
 # 373M; points alone (0) 350 and 297M, overbidding for certainty
 # (2026-10-20).
 MONEY_RATE = 8.0
-# What each move costs the plan by itself, in points: none worth making
-# that gains nothing (a tie goes to doing nothing).
-TIE = 1e-4
+# What each move costs the plan by itself, in season points: a move must
+# beat it to be made. The forecasts tell players apart too poorly for small
+# gains to be real: the daily backtest (2026-10-30, plan less standing
+# still) -51 at none, -74 at 5, +4 at 10, with a fifth of the moves.
+TIE = 10.0
 # How much a point of season variance is worth, in points, for each plan
 # the program makes (Hunter, Vielma and Zaman, arXiv 1604.01455): above 0 it
 # seeks variance, below it avoids it. Of the plans, the one that most
@@ -286,7 +288,7 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     bids offered on him: the program a fifth the size, the same plans), the rest left to whoever else would fill it,
     and brings its points and its money that share of the time. The money
     rule holds if every bid wins: cash at the lock, after every bid and
-    every sale, at least zero. A squad that fields a side keeps one if every
+    every sale, at least zero. The squad, its bids in, at most SQUAD_MAX. A squad that fields a side keeps one if every
     bid that can lose does. Objective: the elevens' expected points and the moves'
     money at MONEY_RATE, less TIE a move, and kappa times the elevens'
     season variance (gain.py's: each cell's match variance and the
@@ -361,6 +363,7 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
         for p in POSITIONS:
             h.addConstr(sum(keep[k] for k in u.mine if pos[k] == p)
                         + sum(x for o, x in bids if o.win >= 1.0 and pos[o.action.buy] == p) >= lost[p])
+    h.addConstr(sum(keep.values()) + sum(x for _o, x in bids) <= SQUAD_MAX)
     budget = h.addConstr(sum(o.action.net / 1e6 * x for o, x in zip(opts, made)) <= m.cash / 1e6)
     if force is not None:
         h.addConstr(sum(x for o, x in zip(opts, made) if o.action.players == force.action.players) == 1)
@@ -441,13 +444,30 @@ def apply(u: Universe, *acts: Action) -> Squads:
 
 def _selftest() -> None:
     """The funnel's tests run with money at no value but where a test sets
-    MONEY_RATE: their players have no market value to count."""
-    was = globals()["MONEY_RATE"]
+    MONEY_RATE: their players have no market value to count; and each move
+    at no cost but a tie's, their gains a few points (TIE's own test is
+    _selftest_tie)."""
+    was, tie = globals()["MONEY_RATE"], globals()["TIE"]
     try:
-        globals()["MONEY_RATE"] = 0.0
+        globals()["MONEY_RATE"], globals()["TIE"] = 0.0, 1e-4
         _selftest_funnel()
     finally:
-        globals()["MONEY_RATE"] = was
+        globals()["MONEY_RATE"], globals()["TIE"] = was, tie
+    _selftest_tie()
+
+
+def _selftest_tie() -> None:
+    js = list(range(1, 11))
+    ks = {"k": "POR", **{"d%d" % i: "DEF" for i in range(1, 5)},
+          **{"m%d" % i: "MED" for i in range(1, 5)}, "f1": "DEL", "f2": "DEL"}
+
+    def bought(gain: float) -> list[str]:
+        per = {j: {**{k: (3.0, 1.0) for k in ks}, "new": (3.0 + gain / len(js), 1.0)} for j in js}
+        u = Universe(state=LeagueState({"me": dict(ks)}, js, "me"), forecaster=Bootstrap(per),
+                     market=Market(cash=10e6, pos={**ks, "new": "MED"}, price={"new": 1e6}))
+        return [a.buy for a in moves(u) if a.buy]
+    assert bought(2 * TIE) == ["new"] and bought(TIE / 2) == [], \
+        ("a move is made only if it gains more than it costs (TIE)", bought(2 * TIE), bought(TIE / 2))
 
 
 def _selftest_funnel() -> None:
@@ -697,6 +717,14 @@ def _selftest_funnel() -> None:
                                 price={"dear": 20e6, "b": 10e6, "c": 10e6}))
     got = sorted(r.action.buy for r in board(uk).plan)
     assert got == ["b", "c"], ("two cheaper moves gaining more beat one dear one", got)
+    was = globals()["SQUAD_MAX"]
+    try:
+        globals()["SQUAD_MAX"] = len(ks) + 1
+        plan_ = board(uk).plan
+        assert sum(1 for r in plan_ if r.action.buy) - sum(len(r.action.sell) for r in plan_) <= 1, \
+            ("a squad one short of full: one more player, its bids in, at most", [r.action.label() for r in plan_])
+    finally:
+        globals()["SQUAD_MAX"] = was
     assert moves(uk) == [r.action for r in board(uk).plan], "the plan's moves, unscored: the board's"
     SOLVED.clear()
     once = [r.action for r in board(uk).plan]
