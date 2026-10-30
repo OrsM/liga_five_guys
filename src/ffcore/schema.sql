@@ -1493,8 +1493,7 @@ SELECT CASE WHEN coalesce((SELECT nights FROM nights_left), 0) > 0 THEN 'plan' E
 
 DROP VIEW IF EXISTS board_eleven;
 CREATE VIEW board_eleven AS
-SELECT p.name, p.pos, t.player_team_id, p.next FROM board_players p
-JOIN current_api_teams t ON t.player = p.player
+SELECT p.player, p.name, p.pos, p.next FROM board_players p
 WHERE CASE (SELECT basis FROM field_basis) WHEN 'plan' THEN p.plan_xi ELSE p.xi END;
 
 -- The plan's moves, in its order, each by its funnel rank, and what it
@@ -1578,7 +1577,8 @@ field AS (
            'next' AS per,
            (SELECT json_group_array(json_array('bench', bench, 'names')) FROM (
                 SELECT group_concat(name, ', ' ORDER BY i) AS bench FROM outs
-                WHERE player NOT IN (SELECT player FROM board_mine WHERE sell)) WHERE bench IS NOT NULL) AS facts
+                WHERE player NOT IN (SELECT player FROM board_mine WHERE sell)) WHERE bench IS NOT NULL) AS facts,
+           (SELECT json_group_array(player ORDER BY -next, player) FROM board_eleven) AS players
     FROM legal
     WHERE EXISTS (SELECT 1 FROM ins) OR EXISTS (SELECT 1 FROM outs)),
 buys AS (
@@ -1603,7 +1603,8 @@ buys AS (
                 UNION ALL SELECT 4, '', b.trend, 'trend'
                 UNION ALL SELECT 5, 'money', 1e6 * b.money, 'money' WHERE r.player IS NULL
                 UNION ALL SELECT 6, '', b.per_million, 'per_million' WHERE r.player IS NULL)
-            WHERE v IS NOT NULL)
+            WHERE v IS NOT NULL),
+           json_array(b.player)
     FROM board_buys b LEFT JOIN board_plan p ON p.rank = b.rank
     LEFT JOIN board_resale r USING (player)
     WHERE b.in_plan OR r.player IS NOT NULL),
@@ -1630,12 +1631,13 @@ sells AS (
                 UNION ALL SELECT 3, '', s.trend, 'trend'
                 UNION ALL SELECT 4, 'money', 1e6 * s.money, 'money'
                 UNION ALL SELECT 5, '', s.per_million, 'per_million')
-            WHERE v IS NOT NULL)
+            WHERE v IS NOT NULL),
+           json_array(s.player)
     FROM board_mine s JOIN board_plan p ON p.rank = s.rank
     WHERE s.sell),
 pulled AS (
     SELECT 900 + row_number() OVER (ORDER BY f.player), 'withdraw', 'withdraw bid on ' || f.name, f.name, f.pos,
-           'withdraw bid', f.my_bid, 0, NULL, 'season', '[]'
+           'withdraw bid', f.my_bid, 0, NULL, 'season', '[]', json_array(f.player)
     FROM sim_facts f JOIN board_run USING (run_id)
     WHERE f.my_bid > 0 AND f.player NOT IN (
         SELECT u.buy FROM board_plan p JOIN board_run r JOIN funnel u
@@ -1646,16 +1648,18 @@ unlisted AS (
            NULL, NULL, 0, NULL, 'season',
            (SELECT json_group_array(json_array('rising', rising, 'names')) FROM (
                 SELECT group_concat(name, ', ' ORDER BY -trend, player) AS rising
-                FROM board_mine WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL)
+                FROM board_mine WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL),
+           json_group_array(player)
     FROM board_mine WHERE NOT listed AND NOT sell HAVING count(*) > 0),
 relist AS (
     SELECT 1999, 'relist',
            'relist ' || group_concat(name, ', ' ORDER BY relist_after, -coalesce(trend, 0.0), player), NULL, NULL,
            NULL, NULL, 0, NULL, 'season',
-           json_array(json_array('once the listing ends', min(relist_after), 'time'))
+           json_array(json_array('once the listing ends', min(relist_after), 'time')),
+           json_group_array(player)
     FROM board_mine WHERE relist_after IS NOT NULL HAVING count(*) > 0)
 SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name,
-       pos, step, amount, done, gain, per, facts
+       pos, step, amount, done, gain, per, facts, players
 FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM pulled UNION ALL SELECT * FROM sells
       UNION ALL SELECT * FROM unlisted UNION ALL SELECT * FROM relist);
 
@@ -1701,7 +1705,22 @@ WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
                          'asking', b.asking, 'win', round(b.win, 3),
                          'asking_win', CASE WHEN b.player IS NOT NULL THEN round(coalesce(
                              (SELECT o.p_win FROM bid_odds o WHERE o.player = b.player AND o.ratio = 1.0), 1.0), 3)
-                         END) AS o
+                         END,
+                         -- what the line is accepted at on the phone (act.py does it): a bid at
+                         -- its amount or his asking price, an offer to take at its amount, a
+                         -- withdrawal, listing or line-up as it is (null); nothing else.
+                         'accepts', json(CASE WHEN r.what = 'buy' AND b.asking IS NOT NULL AND b.asking <> r.amount
+                                                  THEN json_array(b.asking, r.amount)
+                                              WHEN r.what = 'buy' OR (r.what = 'sell' AND r.step = 'take offer')
+                                                  THEN json_array(r.amount)
+                                              WHEN r.what IN ('withdraw', 'list', 'field') THEN json_array(NULL)
+                                              ELSE '[]' END),
+                         'act', (SELECT json_group_array(json_object(
+                                     'player_team', t.player_team_id, 'player', coalesce(t.player_id, m.player_id),
+                                     'market', m.market_id, 'bid', m.bid_id, 'pos', f.pos, 'value', f.value))
+                                 FROM json_each(r.players) e LEFT JOIN player_facts f ON f.player = e.value
+                                 LEFT JOIN current_api_teams t ON t.player = e.value
+                                 LEFT JOIN current_api_market m ON m.player = e.value)) AS o
                      FROM board_rows r LEFT JOIN board_buys b ON r.what = 'buy' AND b.in_plan AND b.name = r.name))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 from concurrent.futures import ThreadPoolExecutor
-import threading
 import sys
 from dataclasses import dataclass, field, replace
 from functools import cached_property
@@ -367,42 +366,10 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     budget = h.addConstr(sum(o.action.net / 1e6 * x for o, x in zip(opts, made)) <= m.cash / 1e6)
     if force is not None:
         h.addConstr(sum(x for o, x in zip(opts, made) if o.action.players == force.action.players) == 1)
-    h.setObjective(sum(points) + sum((MONEY_RATE * o.win * o.money - TIE) * x for o, x in zip(opts, made)),
-                   highspy.ObjSense.kMaximize)
-    key = _fingerprint(h.getLp(), SOLVE_SECONDS)
-    if key not in SOLVED:
-        h.solve()
-        sol = h.getSolution()
-        with _SOLVED_LOCK:
-            SOLVED[key] = ([i for i, x in enumerate(made) if sol.col_value[x.index] > 0.5],
-                           h.getInfo().objective_function_value, abs(sol.row_dual[budget.index]) if relax else 0.0)
-            while len(SOLVED) > SOLVED_KEEP:
-                SOLVED.pop(next(iter(SOLVED)))
-    chosen, obj, price = SOLVED[key]
-    return [opts[i] for i in chosen], obj, price
-
-
-# Programs solved, by what they are (_fingerprint): the same program is not
-# solved twice. The backtest's runs twice a day meet it often, nothing
-# known having changed between them.
-SOLVED: dict[str, tuple[list[int], float, float]] = {}
-SOLVED_KEEP = 4000
-_SOLVED_LOCK = threading.Lock()     # the kappas solve in threads
-
-
-def _fingerprint(lp: Any, *also: object) -> str:
-    """The program itself, exactly: its costs, bounds, matrix and which of
-    its variables are whole. Any change in what it was made from (squad,
-    market, forecast, cash, constants) changes one of them."""
-    import hashlib
-
-    import numpy as np
-    a = lp.a_matrix_
-    d = hashlib.sha1(repr(also).encode())
-    for arr in (lp.col_cost_, lp.col_lower_, lp.col_upper_, lp.row_lower_, lp.row_upper_, a.start_, a.index_, a.value_):
-        d.update(np.asarray(arr).tobytes())
-    d.update(repr([int(v) for v in lp.integrality_]).encode())
-    return d.hexdigest()
+    h.maximize(sum(points) + sum((MONEY_RATE * o.win * o.money - TIE) * x for o, x in zip(opts, made)))
+    sol = h.getSolution()
+    return ([o for o, x in zip(opts, made) if sol.col_value[x.index] > 0.5], h.getInfo().objective_function_value,
+            abs(sol.row_dual[budget.index]) if relax else 0.0)
 
 
 def joint(u: Universe, moves: list[Move]) -> Move:
@@ -726,13 +693,6 @@ def _selftest_funnel() -> None:
     finally:
         globals()["SQUAD_MAX"] = was
     assert moves(uk) == [r.action for r in board(uk).plan], "the plan's moves, unscored: the board's"
-    SOLVED.clear()
-    once = [r.action for r in board(uk).plan]
-    n = len(SOLVED)
-    assert n and [r.action for r in board(uk).plan] == once and len(SOLVED) == n, \
-        ("the same program is solved once: a second board of the same universe solves nothing", n, len(SOLVED))
-    board(replace(uk, market=replace(uk.market, cash=uk.market.cash + 1e6)))
-    assert len(SOLVED) > n, "a program anything changed in is solved again"
 
 
     perd = {j: {**perk[j], "idle": (0.1, 1.0), "useful": (2.0, 1.0)} for j in js}
