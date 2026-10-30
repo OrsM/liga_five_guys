@@ -1,313 +1,62 @@
 {
- "generated_at": "2026-10-30T17:04Z",
+ "generated_at": "2026-10-30T18:09Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 5079381.0,
  "cash_locked": 23048191.0,
- "finish": 1.8,
- "p_win": 0.274,
- "p_win_after": 0.316,
+ "finish": 1.87,
+ "p_win": 0.249,
+ "p_win_after": 0.249,
  "blocks": {
-  "buys": 0.07,
-  "sales": -0.031
+  "buys": 0.0,
+  "sales": 0.0
  },
- "lam": 0.695166997350998,
+ "lam": 0.156735525830842,
  "band": [
-  2003.54095671347,
-  2297.41885576894
+  1931.59378227974,
+  2206.68324522773
  ],
  "do": [
   {
-   "name": "Matias Dituro",
-   "pos": "POR",
-   "what": "buy",
-   "label": "buy Matias Dituro",
-   "step": "bid up to",
-   "amount": 14560725.1776036,
+   "name": "Filip Ugrinic",
+   "pos": "MED",
+   "what": "withdraw",
+   "label": "withdraw bid on Filip Ugrinic",
+   "step": "withdraw bid",
+   "amount": 1814727.0,
    "done": false,
-   "gain": 24.41625447138,
+   "gain": null,
    "per": "season",
-   "facts": [
-    [
-     "listed at",
-     13138883.0,
-     "money"
-    ],
-    [
-     "your bid",
-     13138883.0,
-     "money"
-    ],
-    [
-     "bids",
-     "2, yours among them",
-     "count"
-    ],
-    [
-     "chance to win",
-     0.85,
-     "chance"
-    ],
-    [
-     "chance of first",
-     5.09,
-     "first"
-    ],
-    [
-     "chance of helping",
-     0.78,
-     "chance"
-    ],
-    [
-     "",
-     30.0190612186469,
-     "trend"
-    ],
-    [
-     "money",
-     353622.756312452,
-     "money"
-    ],
-    [
-     "",
-     1.87114557754214,
-     "per_million"
-    ]
-   ],
-   "asking": 13138883.0,
-   "win": 0.85,
-   "asking_win": 0.367
+   "facts": []
   },
   {
    "name": "Ivan Romero",
    "pos": "DEL",
-   "what": "buy",
-   "label": "buy Ivan Romero",
-   "step": "bid in",
+   "what": "withdraw",
+   "label": "withdraw bid on Ivan Romero",
+   "step": "withdraw bid",
    "amount": 8094581.0,
-   "done": true,
-   "gain": 6.93937881008297,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     8094581.0,
-     "money"
-    ],
-    [
-     "bids",
-     "only yours",
-     "count"
-    ],
-    [
-     "chance to win",
-     0.983,
-     "chance"
-    ],
-    [
-     "chance of first",
-     1.41,
-     "first"
-    ],
-    [
-     "chance of helping",
-     0.627,
-     "chance"
-    ],
-    [
-     "",
-     -1.32833791303398,
-     "trend"
-    ],
-    [
-     "money",
-     -48546.7014468834,
-     "money"
-    ],
-    [
-     "",
-     0.80930751060591,
-     "per_million"
-    ]
-   ],
-   "asking": 8094581.0,
-   "win": 0.983,
-   "asking_win": 0.983
-  },
-  {
-   "name": "Filip Ugrinic",
-   "pos": "MED",
-   "what": "buy",
-   "label": "buy Filip Ugrinic",
-   "step": "bid in",
-   "amount": 1814727.0,
-   "done": true,
-   "gain": 1.73959830877538,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     1814727.0,
-     "money"
-    ],
-    [
-     "bids",
-     "only yours",
-     "count"
-    ],
-    [
-     "chance to win",
-     1.0,
-     "chance"
-    ],
-    [
-     "chance of first",
-     0.34,
-     "first"
-    ],
-    [
-     "chance of helping",
-     0.508,
-     "chance"
-    ],
-    [
-     "",
-     -20.5192322984197,
-     "trend"
-    ],
-    [
-     "money",
-     -189670.328480001,
-     "money"
-    ],
-    [
-     "",
-     0.122462321294259,
-     "per_million"
-    ]
-   ],
-   "asking": 1814727.0,
-   "win": 1.0,
-   "asking_win": 1.0
-  },
-  {
-   "name": "Marcao",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Marcao",
-   "step": "bid up to",
-   "amount": 584723.0,
    "done": false,
-   "gain": 0.0,
+   "gain": null,
    "per": "season",
-   "facts": [
-    [
-     "listed at",
-     584723.0,
-     "money"
-    ],
-    [
-     "bids",
-     "none yet",
-     "count"
-    ],
-    [
-     "chance to win",
-     0.883,
-     "chance"
-    ],
-    [
-     "chance of first",
-     0.0,
-     "first"
-    ],
-    [
-     "chance of helping",
-     0.534,
-     "chance"
-    ],
-    [
-     "",
-     2.0414711182645,
-     "trend"
-    ],
-    [
-     "money",
-     5373.40981962206,
-     "money"
-    ],
-    [
-     "",
-     0.0429872785569765,
-     "per_million"
-    ]
-   ],
-   "asking": 584723.0,
-   "win": 0.883,
-   "asking_win": 0.883
+   "facts": []
   },
   {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Iñigo Vicente",
-   "step": "take offer",
-   "amount": 24700827.0,
+   "name": "Matias Dituro",
+   "pos": "POR",
+   "what": "withdraw",
+   "label": "withdraw bid on Matias Dituro",
+   "step": "withdraw bid",
+   "amount": 13138883.0,
    "done": false,
-   "gain": -15.8855589647513,
+   "gain": null,
    "per": "season",
-   "facts": [
-    [
-     "value",
-     25872201.0,
-     "money"
-    ],
-    [
-     "chance of first",
-     -3.09,
-     "first"
-    ],
-    [
-     "the game's recent offers",
-     0.26,
-     "beats"
-    ],
-    [
-     "more offers before the lock",
-     0,
-     "count"
-    ],
-    [
-     "only pays if you win",
-     "Matias Dituro, Ivan Romero, Marcao",
-     "names"
-    ],
-    [
-     "chance of winning them",
-     0.738,
-     "chance"
-    ],
-    [
-     "",
-     -14.2966167658847,
-     "trend"
-    ],
-    [
-     "money",
-     493660.358309709,
-     "money"
-    ],
-    [
-     "",
-     -0.4832338649339,
-     "per_million"
-    ]
-   ]
+   "facts": []
   }
  ],
- "plan_gain": 24.9160202486618,
- "cash_after": 4725451.82239637,
- "can_bid": 81335909.4223964,
- "ping": "buy Matias Dituro; buy Marcao; sell Iñigo Vicente",
+ "plan_gain": 0.0,
+ "cash_after": null,
+ "can_bid": 58641647.6,
+ "ping": "withdraw bid on Filip Ugrinic; withdraw bid on Ivan Romero; withdraw bid on Matias Dituro",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -330,9 +79,9 @@
    "clause": 50145529.0
   },
   {
-   "name": "Marcos Alonso",
-   "pos": "DEF",
-   "clause": 28589508.0
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "clause": 31271675.0
   },
   {
    "name": "Gerard Martin",
@@ -340,9 +89,19 @@
    "clause": 43516633.0
   },
   {
+   "name": "Pepelu",
+   "pos": "MED",
+   "clause": 34129784.0
+  },
+  {
    "name": "Martin Satriano",
    "pos": "DEL",
    "clause": 17220303.0
+  },
+  {
+   "name": "Marcos Alonso",
+   "pos": "DEF",
+   "clause": 28589508.0
   },
   {
    "name": "German Valera",
@@ -350,24 +109,9 @@
    "clause": 17539463.0
   },
   {
-   "name": "Pepelu",
-   "pos": "MED",
-   "clause": 34129784.0
-  },
-  {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
-   "clause": 31271675.0
-  },
-  {
    "name": "Miguel Roman",
    "pos": "MED",
    "clause": 10737413.0
-  },
-  {
-   "name": "Thomas Lemar",
-   "pos": "MED",
-   "clause": 7005586.0
   },
   {
    "name": "Bil Nsongo",
@@ -380,6 +124,21 @@
    "clause": 13097547.0
   },
   {
+   "name": "Thomas Lemar",
+   "pos": "MED",
+   "clause": 7005586.0
+  },
+  {
+   "name": "Augusto Batalla",
+   "pos": "POR",
+   "clause": 5505499.0
+  },
+  {
+   "name": "Robin Le Normand",
+   "pos": "DEF",
+   "clause": 6865304.0
+  },
+  {
    "name": "Alvaro F. Carreras",
    "pos": "DEF",
    "clause": 5634247.0
@@ -388,16 +147,6 @@
    "name": "Jon Moncayola",
    "pos": "MED",
    "clause": 4279563.0
-  },
-  {
-   "name": "Robin Le Normand",
-   "pos": "DEF",
-   "clause": 6865304.0
-  },
-  {
-   "name": "Augusto Batalla",
-   "pos": "POR",
-   "clause": 5505499.0
   },
   {
    "name": "Adria Pedrosa",
@@ -420,20 +169,20 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 493.0,
-   "mean": 2251.66549757847,
-   "lo": 2088.8631252018,
-   "hi": 2414.46786995515,
+   "mean": 2174.64710332272,
+   "lo": 2024.40500443075,
+   "hi": 2324.88920221469,
    "cash": 1097131.0,
    "estimated": true,
-   "p_above": 0.722837504711486
+   "p_above": 0.746594966086409
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 523.0,
-   "mean": 2150.47990624121,
-   "lo": 2003.54095671347,
-   "hi": 2297.41885576894,
+   "mean": 2069.13851375373,
+   "lo": 1931.59378227974,
+   "hi": 2206.68324522773,
    "cash": 5079381.0,
    "estimated": false,
    "p_above": null
@@ -442,34 +191,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 391.0,
-   "mean": 1902.27488022028,
-   "lo": 1760.49630736606,
-   "hi": 2044.05345307451,
+   "mean": 1865.06157065393,
+   "lo": 1729.02629994313,
+   "hi": 2001.09684136472,
    "cash": 61555056.0,
    "estimated": true,
-   "p_above": 0.0596371628519151
+   "p_above": 0.0881989248010894
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 365.0,
-   "mean": 1809.8997790096,
-   "lo": 1677.33686270913,
-   "hi": 1942.46269531008,
+   "mean": 1791.45440139604,
+   "lo": 1664.02702923253,
+   "hi": 1918.88177355955,
    "cash": 21618534.0,
    "estimated": true,
-   "p_above": 0.0137086404701811
+   "p_above": 0.0288510920700275
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 389.0,
-   "mean": 1631.77298547008,
-   "lo": 1512.89166608572,
-   "hi": 1750.65430485444,
+   "mean": 1642.14860710861,
+   "lo": 1518.81905775312,
+   "hi": 1765.4781564641,
    "cash": 58193671.0,
    "estimated": true,
-   "p_above": 0.000218181651841287
+   "p_above": 0.00152794880131568
   }
  ]
 }
