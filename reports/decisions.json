@@ -1,28 +1,28 @@
 {
- "generated_at": "2026-10-30T05:19Z",
+ "generated_at": "2026-10-30T05:31Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": -40251621.0,
- "cash_locked": 0.0,
- "finish": 1.65,
- "p_win": 0.393,
+ "cash": 3882337.0,
+ "cash_locked": 13138883.0,
+ "finish": 1.76,
+ "p_win": 0.314,
  "p_win_after": 0.358,
  "blocks": {
-  "buys": 0.074,
-  "sales": -0.112
+  "buys": 0.073,
+  "sales": -0.033
  },
  "lam": 0.695166997350998,
  "band": [
-  2036.0700593485,
-  2336.18627959099
+  2003.83038640431,
+  2297.71621498224
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Matias Dituro, Martin Satriano, Thomas Lemar",
+   "label": "field Matias Dituro, Martin Satriano",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 2.41985874041616,
+   "gain": 4.76381947943705,
    "per": "next",
    "facts": [
     [
@@ -49,8 +49,13 @@
      "money"
     ],
     [
+     "your bid",
+     13138883.0,
+     "money"
+    ],
+    [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -60,7 +65,7 @@
     ],
     [
      "chance of first",
-     5.61,
+     5.37,
      "first"
     ],
     [
@@ -89,54 +94,6 @@
    "asking_win": 0.367
   },
   {
-   "name": "Pablo Fornals",
-   "pos": "MED",
-   "what": "sell",
-   "label": "sell Pablo Fornals",
-   "step": "take offer",
-   "amount": 44133958.0,
-   "done": false,
-   "gain": -35.3548687764699,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     40916093.0,
-     "money"
-    ],
-    [
-     "chance of first",
-     -7.87,
-     "first"
-    ],
-    [
-     "the game's recent offers",
-     0.86,
-     "beats"
-    ],
-    [
-     "more offers before the lock",
-     0,
-     "count"
-    ],
-    [
-     "",
-     -11.3014826770781,
-     "trend"
-    ],
-    [
-     "money",
-     5299411.55306923,
-     "money"
-    ],
-    [
-     "",
-     0.159523957676399,
-     "per_million"
-    ]
-   ]
-  },
-  {
    "name": "Ivan Romero",
    "pos": "DEL",
    "what": "buy",
@@ -144,7 +101,7 @@
    "step": "bid up to",
    "amount": 8094581.0,
    "done": false,
-   "gain": 6.69426530381688,
+   "gain": 6.93937881008297,
    "per": "season",
    "facts": [
     [
@@ -164,12 +121,12 @@
     ],
     [
      "chance of first",
-     1.53,
+     1.5,
      "first"
     ],
     [
      "chance of helping",
-     0.622,
+     0.627,
      "chance"
     ],
     [
@@ -184,13 +141,69 @@
     ],
     [
      "",
-     0.779026325419662,
+     0.80930751060591,
      "per_million"
     ]
    ],
    "asking": 8094581.0,
    "win": 0.983,
    "asking_win": 0.983
+  },
+  {
+   "name": "Filip Ugrinic",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Filip Ugrinic",
+   "step": "bid up to",
+   "amount": 1814727.0,
+   "done": false,
+   "gain": 1.73959830877538,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     1814727.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "chance of first",
+     0.37,
+     "first"
+    ],
+    [
+     "chance of helping",
+     0.508,
+     "chance"
+    ],
+    [
+     "",
+     -20.5192322984197,
+     "trend"
+    ],
+    [
+     "money",
+     -189670.328480001,
+     "money"
+    ],
+    [
+     "",
+     0.122462321294259,
+     "per_million"
+    ]
+   ],
+   "asking": 1814727.0,
+   "win": 1.0,
+   "asking_win": 1.0
   },
   {
    "name": "Alvaro Odriozola",
@@ -345,62 +358,6 @@
    ]
   },
   {
-   "name": "Filip Ugrinic",
-   "pos": "MED",
-   "what": "buy",
-   "label": "buy Filip Ugrinic",
-   "step": "bid up to",
-   "amount": 1814727.0,
-   "done": false,
-   "gain": 1.02181618074395,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     1814727.0,
-     "money"
-    ],
-    [
-     "bids",
-     "none yet",
-     "count"
-    ],
-    [
-     "chance to win",
-     1.0,
-     "chance"
-    ],
-    [
-     "chance of first",
-     0.23,
-     "first"
-    ],
-    [
-     "chance of helping",
-     0.481,
-     "chance"
-    ],
-    [
-     "",
-     -20.5192322984197,
-     "trend"
-    ],
-    [
-     "money",
-     -189670.328480001,
-     "money"
-    ],
-    [
-     "",
-     -0.273069418758891,
-     "per_million"
-    ]
-   ],
-   "asking": 1814727.0,
-   "win": 1.0,
-   "asking_win": 1.0
-  },
-  {
    "name": "Iñigo Vicente",
    "pos": "DEL",
    "what": "sell",
@@ -408,7 +365,7 @@
    "step": "take offer",
    "amount": 24700827.0,
    "done": false,
-   "gain": -15.2852367281106,
+   "gain": -15.8855589647513,
    "per": "season",
    "facts": [
     [
@@ -418,7 +375,7 @@
     ],
     [
      "chance of first",
-     -3.43,
+     -3.31,
      "first"
     ],
     [
@@ -453,16 +410,16 @@
     ],
     [
      "",
-     -0.458930134672533,
+     -0.4832338649339,
      "per_million"
     ]
    ]
   }
  ],
- "plan_gain": 32.0495357373625,
+ "plan_gain": 25.0091120892785,
  "cash_after": 4725451.82239637,
- "can_bid": 89754386.2223964,
- "ping": "field Matias Dituro, Martin Satriano, Thomas Lemar; buy Matias Dituro; sell Pablo Fornals; buy Ivan Romero; sell Alvaro Odriozola; buy Marcao; sell Manu Bueno; buy Filip Ugrinic; sell Iñigo Vicente",
+ "can_bid": 81571167.6223964,
+ "ping": "field Matias Dituro, Martin Satriano; buy Matias Dituro; buy Ivan Romero; buy Filip Ugrinic; sell Alvaro Odriozola; buy Marcao; sell Manu Bueno; sell Iñigo Vicente",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -478,11 +435,6 @@
    "name": "Georges Mikautadze",
    "pos": "DEL",
    "clause": 42016585.0
-  },
-  {
-   "name": "Pablo Fornals",
-   "pos": "MED",
-   "clause": 58220110.0
   },
   {
    "name": "Natan",
@@ -595,16 +547,16 @@
    "hi": 2393.94785333157,
    "cash": 1097131.0,
    "estimated": true,
-   "p_above": 0.604699614781406
+   "p_above": 0.682679496272253
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 523.0,
-   "mean": 2186.12816946974,
-   "lo": 2036.0700593485,
-   "hi": 2336.18627959099,
-   "cash": -40251621.0,
+   "mean": 2150.77330069327,
+   "lo": 2003.83038640431,
+   "hi": 2297.71621498224,
+   "cash": 3882337.0,
    "estimated": false,
    "p_above": null
   },
@@ -617,7 +569,7 @@
    "hi": 2044.05345307451,
    "cash": 61555056.0,
    "estimated": true,
-   "p_above": 0.0390262444483489
+   "p_above": 0.0594217328375302
   },
   {
    "manager": "SusoGattuso",
@@ -628,7 +580,7 @@
    "hi": 1942.79760207813,
    "cash": 21618534.0,
    "estimated": true,
-   "p_above": 0.00806607925411973
+   "p_above": 0.013719360815946
   },
   {
    "manager": "Magic Mike 333",
@@ -639,7 +591,7 @@
    "hi": 1750.32371669038,
    "cash": 58193671.0,
    "estimated": true,
-   "p_above": 0.000102329075689078
+   "p_above": 0.00021475712360397
   }
  ]
 }
