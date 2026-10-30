@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-10-30T05:03Z",
+ "generated_at": "2026-10-30T05:19Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": -40351621.0,
+ "cash": -40251621.0,
  "cash_locked": 0.0,
  "finish": 1.65,
  "p_win": 0.393,
@@ -457,30 +457,12 @@
      "per_million"
     ]
    ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Thomas Lemar, Dani Martinez, Robin Le Normand, Augusto Batalla",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Thomas Lemar, Dani Martinez",
-     "names"
-    ]
-   ]
   }
  ],
  "plan_gain": 32.0495357373625,
- "cash_after": 4625451.82239637,
- "can_bid": 89014155.2223964,
- "ping": "field Matias Dituro, Martin Satriano, Thomas Lemar; buy Matias Dituro; sell Pablo Fornals; buy Ivan Romero; sell Alvaro Odriozola; buy Marcao; sell Manu Bueno; buy Filip Ugrinic; sell Iñigo Vicente; list Thomas Lemar, Dani Martinez, Robin Le Normand, Augusto Batalla",
+ "cash_after": 4725451.82239637,
+ "can_bid": 89754386.2223964,
+ "ping": "field Matias Dituro, Martin Satriano, Thomas Lemar; buy Matias Dituro; sell Pablo Fornals; buy Ivan Romero; sell Alvaro Odriozola; buy Marcao; sell Manu Bueno; buy Filip Ugrinic; sell Iñigo Vicente",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -611,7 +593,7 @@
    "mean": 2231.88970336422,
    "lo": 2069.83155339687,
    "hi": 2393.94785333157,
-   "cash": 997131.0,
+   "cash": 1097131.0,
    "estimated": true,
    "p_above": 0.604699614781406
   },
@@ -622,7 +604,7 @@
    "mean": 2186.12816946974,
    "lo": 2036.0700593485,
    "hi": 2336.18627959099,
-   "cash": -40351621.0,
+   "cash": -40251621.0,
    "estimated": false,
    "p_above": null
   },
@@ -633,7 +615,7 @@
    "mean": 1902.27488022028,
    "lo": 1760.49630736606,
    "hi": 2044.05345307451,
-   "cash": 61455056.0,
+   "cash": 61555056.0,
    "estimated": true,
    "p_above": 0.0390262444483489
   },
@@ -644,7 +626,7 @@
    "mean": 1810.23047063037,
    "lo": 1677.6633391826,
    "hi": 1942.79760207813,
-   "cash": 21518534.0,
+   "cash": 21618534.0,
    "estimated": true,
    "p_above": 0.00806607925411973
   },
@@ -655,7 +637,7 @@
    "mean": 1631.44715913852,
    "lo": 1512.57060158666,
    "hi": 1750.32371669038,
-   "cash": 58093671.0,
+   "cash": 58193671.0,
    "estimated": true,
    "p_above": 0.000102329075689078
   }
