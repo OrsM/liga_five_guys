@@ -1,5 +1,6 @@
 """Act on the board: place the bid a board line says, list its list line,
-or take the offer its sell line takes, when you accept it on the phone
+take the offer its sell line takes, or field its eleven, when you accept it
+on the phone
 (lfg-watch hands the request here).
 
 The request names the board it was made on (generated_at), the player and
@@ -25,6 +26,7 @@ from typing import Any
 
 from ffcore import db as lfg
 from ffcore.auth import API_BASE, TokenStore
+from ffcore.rules import XI_SIZE
 from ffcore.laliga_api import API_LEAGUES_URL, API_MARKET_URL, API_OFFER_URL, parse_api_leagues
 from ingest import HEADERS, TIMEOUT
 
@@ -35,6 +37,10 @@ BID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid?x-lang=es
 SELL_URL = "{base}/v1/competition/1/league/{league}/market/sell?x-lang=es"
 REBID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid/{bid}?x-lang=es"
 PLAYER_URL = "{base}/v1/competition/1/player/{player}/league/{league}?x-lang=es"
+LINEUP_URL = "{base}/v1/competition/1/teams/{team}/lineup?x-lang=es"
+TEAM_URL = "{base}/v1/competition/1/leagues/{league}/teams/{team}?x-lang=es"
+# The app's line-up, slot by position.
+SLOTS = {"POR": "goalkeeper", "DEF": "defender", "MED": "midfield", "DEL": "striker"}
 ACCEPT_URL = "{base}/v1/competition/1/league/{league}/market/{market}/offer/{offer}/accept?x-lang=es"
 
 REPORT = Path("reports/decisions.json")
@@ -77,13 +83,75 @@ def owned(name: str) -> dict[str, Any] | None:
         if row and row[2] else None
 
 
+def home(call: Call, base: str) -> tuple[str, str] | str:
+    """Your league's id in the app and your team's in it, or "!" and why not."""
+    status, leagues = call("GET", API_LEAGUES_URL.format(base=base), None)
+    got = [(r["league_id"], r["team_id"]) for r in parse_api_leagues(json.dumps(leagues), "")] \
+        if status == 200 else []
+    if len(got) != 1:
+        return "!the app's leagues: %s" % (status if status != 200 else "%d, not one" % len(got))
+    return got[0]
+
+
 def league_of(call: Call, base: str) -> str:
     """Your league's id in the app, or "!" and why not."""
-    status, leagues = call("GET", API_LEAGUES_URL.format(base=base), None)
-    ids = [r["league_id"] for r in parse_api_leagues(json.dumps(leagues), "")] if status == 200 else []
-    if len(ids) != 1:
-        return "!the app's leagues: %s" % (status if status != 200 else "%d, not one" % len(ids))
-    return ids[0]
+    h = home(call, base)
+    return h if isinstance(h, str) else h[0]
+
+
+def eleven() -> list[dict[str, Any]]:
+    """The eleven the board fields, each by his place in your team
+    (board_eleven)."""
+    with closing(lfg.connect()) as db:
+        return [{"name": n, "pos": p, "player_team_id": t}
+                for n, p, t in db.execute("SELECT name, pos, player_team_id FROM board_eleven ORDER BY -next")]
+
+
+def field(req: dict[str, Any], board: dict[str, Any], xi: Callable[[], list[dict[str, Any]]],
+          call: Call, base: str, nap: Callable[[float], None] = time.sleep) -> dict[str, Any]:
+    """The board's eleven set as your line-up in the app, and read back, or
+    why not: only while every one of them is still yours."""
+    out = {"requested_at": req.get("requested_at"), "what": "field", "name": req.get("name")}
+
+    def done(ok: bool, message: str) -> dict[str, Any]:
+        return {**out, "state": "placed" if ok else "failed", "message": message, "at": _now()}
+
+    if req.get("generated_at") != board.get("generated_at"):
+        return done(False, "the board has changed since: refresh and accept again")
+    if not any(d.get("what") == "field" for d in board.get("do", [])):
+        return done(False, "nothing for this board to field")
+    them = xi()
+    if len(them) != XI_SIZE or any(p["pos"] not in SLOTS for p in them):
+        return done(False, "the board's eleven is %d players, not a line-up" % len(them))
+    h = home(call, base)
+    if isinstance(h, str):
+        return done(False, h[1:])
+    league, team = h
+    status, squad = call("GET", TEAM_URL.format(base=base, league=league, team=team), None)
+    ours = {str(p.get("playerTeamId")) for p in (squad.get("players") or [])} \
+        if status == 200 and isinstance(squad, dict) else set()
+    gone = [p["name"] for p in them if p["player_team_id"] not in ours]
+    if gone:
+        return done(False, "no longer yours: %s; refresh the board first" % ", ".join(gone))
+    slot = {s: [int(p["player_team_id"]) for p in them if SLOTS[p["pos"]] == s] for s in SLOTS.values()}
+    if len(slot["goalkeeper"]) != 1:
+        return done(False, "the board's eleven has %d goalkeepers" % len(slot["goalkeeper"]))
+    shape = [len(slot[s]) for s in ("defender", "midfield", "striker")]
+    status, reply = call("PUT", LINEUP_URL.format(base=base, team=team),
+                         {**slot, "goalkeeper": slot["goalkeeper"][0], "tactical_formation": shape})
+    if status not in (200, 201, 204):
+        return done(False, "the app said %d: %s" % (status, json.dumps(reply)[:200]))
+    want = {str(i) for ids in slot.values() for i in ids}
+    got: set[str] = set()
+    for i in range(READS):
+        if i:
+            nap(READ_WAIT)
+        status, lineup = call("GET", LINEUP_URL.format(base=base, team=team), None)
+        form = (lineup.get("formation") or {}) if status == 200 and isinstance(lineup, dict) else {}
+        got = {str((p or {}).get("playerTeamId")) for s in SLOTS.values() for p in (form.get(s) or [])}
+        if got == want:
+            return done(True, "fielded %s, read back from the app" % "-".join(map(str, shape)))
+    return done(False, "sent, but the app's line-up shows %d of the eleven" % len(got & want))
 
 
 def list_all(req: dict[str, Any], board: dict[str, Any], own: Callable[[str], dict[str, Any] | None],
@@ -359,6 +427,53 @@ def _selftest() -> None:
                      ({**ask, "name": "Thomas Lemar"}, "not a sale of the board")):
         assert take(bad, offers, fornals.get, call, base)["state"] == "failed" and sent == [], why
     assert take(ask, offers, lambda _n: None, call, base)["state"] == "failed" and sent == [], "not yours"
+    xi = [{"name": "k%d" % i, "pos": pos, "player_team_id": str(100 + i)}
+          for i, pos in enumerate(["POR"] + ["DEF"] * 3 + ["MED"] * 4 + ["DEL"] * 3)]
+    lined = {"generated_at": board["generated_at"], "do": [{"what": "field", "label": "field k1"}]}
+    ask_xi = {"requested_at": "t", "generated_at": board["generated_at"], "what": "field"}
+
+    def coach(squad: list[str], answer: int = 200, shown_after: int = 0) -> tuple[Call, list[tuple[str, str, Any]]]:
+        sent: list[tuple[str, str, Any]] = []
+        state: dict[str, Any] = {"lineup": {}, "hidden": 0}
+
+        def call(method: str, url: str, body: dict[str, Any] | None) -> tuple[int, Any]:
+            sent.append((method, url, body))
+            if "/leagues?" in url:
+                return 200, [{"id": 77, "name": "five guys", "team": {"id": 9}}]
+            if method == "GET" and "/teams/9?" in url:
+                return 200, {"players": [{"playerTeamId": t} for t in squad]}
+            if method == "GET":
+                state["hidden"] -= 1
+                return 200, {"formation": state["lineup"] if state["hidden"] < 0 else {}}
+            if answer == 200 and body:
+                state["lineup"] = {s: [{"playerTeamId": str(i)} for i in (v if isinstance(v, list) else [v])]
+                                   for s, v in body.items() if s in SLOTS.values()}
+                state["hidden"] = shown_after
+            return answer, {}
+        return call, sent
+
+    every = [p["player_team_id"] for p in xi] + ["999"]
+    call, sent = coach(every)
+    got = field(ask_xi, lined, lambda: xi, call, base)
+    assert got["state"] == "placed" and got["message"] == "fielded 3-4-3, read back from the app", got
+    assert [(m, u, b) for m, u, b in sent if m == "PUT"] == [
+        ("PUT", base + "/v1/competition/1/teams/9/lineup?x-lang=es",
+         {"goalkeeper": 100, "defender": [101, 102, 103], "midfield": [104, 105, 106, 107],
+          "striker": [108, 109, 110], "tactical_formation": [3, 4, 3]})], \
+        ("the eleven by their places in your team, slot by position, as the app lines them up", sent)
+    call, sent = coach(every, shown_after=2)
+    assert field(ask_xi, lined, lambda: xi, call, base, naps.append)["state"] == "placed", "read again if late"
+    call, sent = coach(every[1:])
+    got = field(ask_xi, lined, lambda: xi, call, base)
+    assert got["state"] == "failed" and "k0" in got["message"] and not [m for m, _u, _b in sent if m == "PUT"], \
+        "one sold since the board (Fornals, 2026-10-30): nothing set, refresh first"
+    call, sent = coach(every, answer=400)
+    assert field(ask_xi, lined, lambda: xi, call, base)["state"] == "failed", "the app refuses: said so"
+    call, sent = coach(every)
+    men: list[dict[str, Any]]
+    for r, bd, men, why in (({**ask_xi, "generated_at": "older"}, lined, xi, "a board since"),
+                            (ask_xi, board, xi, "no field line"), (ask_xi, lined, xi[:10], "not eleven")):
+        assert field(r, bd, lambda: men, call, base)["state"] == "failed" and sent == [], why
     print("act self-test OK")
 
 
@@ -370,6 +485,7 @@ if __name__ == "__main__":
         board, call = json.loads(REPORT.read_text()), http_call()
         print(json.dumps([list_all(r, board, owned, call, API_BASE) if r.get("what") == "list"
                           else take(r, board, owned, call, API_BASE) if r.get("what") == "sell"
+                          else field(r, board, eleven, call, API_BASE) if r.get("what") == "field"
                           else accept(r, board, target, call, API_BASE)
                           for r in (asked if isinstance(asked, list) else [asked])]))
     else:

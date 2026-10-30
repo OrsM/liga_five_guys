@@ -1483,6 +1483,20 @@ SELECT l.basis, 'out', f.i, b.player, b.name, b.next, l.ok
 FROM fielded f JOIN board_players b USING (player), legal l
 WHERE l.ok AND f.player NOT IN (SELECT player FROM eleven e WHERE e.basis = l.basis);
 
+-- The eleven to field at the lock: the plan's, its buys in, while an
+-- auction still closes before it (nights_left); after the last, the
+-- squad's now (its buys cannot play: Dituro, 2026-10-30). Each with his
+-- place in your team, as the app lines him up (board_eleven).
+DROP VIEW IF EXISTS field_basis;
+CREATE VIEW field_basis AS
+SELECT CASE WHEN coalesce((SELECT nights FROM nights_left), 0) > 0 THEN 'plan' ELSE 'now' END AS basis;
+
+DROP VIEW IF EXISTS board_eleven;
+CREATE VIEW board_eleven AS
+SELECT p.name, p.pos, t.player_team_id, p.next FROM board_players p
+JOIN current_api_teams t ON t.player = p.player
+WHERE CASE (SELECT basis FROM field_basis) WHEN 'plan' THEN p.plan_xi ELSE p.xi END;
+
 -- The plan's moves, in its order, each by its funnel rank, and what it
 -- spends (a sale's is negative).
 DROP VIEW IF EXISTS board_plan;
@@ -1551,9 +1565,9 @@ FROM ranked JOIN took USING (n) WHERE taken;
 DROP VIEW IF EXISTS board_moves;
 DROP VIEW IF EXISTS board_rows;
 CREATE VIEW board_rows AS
-WITH ins AS (SELECT * FROM lineup_gap WHERE basis = 'plan' AND side = 'in'),
-outs AS (SELECT * FROM lineup_gap WHERE basis = 'plan' AND side = 'out'),
-legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap WHERE basis = 'plan'),
+WITH ins AS (SELECT * FROM lineup_gap WHERE basis = (SELECT basis FROM field_basis) AND side = 'in'),
+outs AS (SELECT * FROM lineup_gap WHERE basis = (SELECT basis FROM field_basis) AND side = 'out'),
+legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap WHERE basis = (SELECT basis FROM field_basis)),
 field AS (
     SELECT -1 AS ord, 'field' AS what,
            'field ' || (SELECT group_concat(name, ', ' ORDER BY -next, player) FROM ins) AS label,

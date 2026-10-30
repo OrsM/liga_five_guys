@@ -159,7 +159,7 @@ def _selftest_board() -> None:
             return board_doc()
 
     ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
-    doc = report(ub, b)
+    doc = report(ub, b, nights=1)
     after = ub.after(*(r.action for r in b.plan))
     field = doc["do"][0]
     gone = {k for r in b.plan for k in r.action.sell}
@@ -173,12 +173,14 @@ def _selftest_board() -> None:
     assert (field["step"], field["gain"], field["per"]) == ("check line-up", None, "next"), \
         "a line-up the app has not given is a step to take, in the row"
     now = list(ub.outlook.xi.ranked())
-    known = report(ub, b, now)["do"][0]
+    known = report(ub, b, now, nights=1)["do"][0]
     came = set(after.outlook.xi.players) - set(now)
     left = set(now) - set(after.outlook.xi.players) - gone
     assert {n.lower() for n in known["label"].removeprefix("field ").split(", ")} == came \
         and {n.lower() for f in known["facts"] for n in f[1].split(", ")} == left, known
     assert known["step"] is None and known["gain"] is not None, known
+    assert not [d for d in report(ub, b, now)["do"] if d["what"] == "field"], \
+        "no auction closes before the lock: its buys cannot play, the eleven is the squad's now (Dituro, 2026-10-30)"
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()), d
