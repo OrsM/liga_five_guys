@@ -1,131 +1,35 @@
 {
- "generated_at": "2026-10-30T21:09Z",
+ "generated_at": "2026-10-30T21:38Z",
  "lock_at": "2026-10-31T13:00:00+00:00",
  "cash": 5079381.0,
  "cash_locked": 0.0,
- "finish": 1.87,
- "p_win": 0.247,
- "p_win_after": 0.247,
+ "finish": 1.94,
+ "p_win": 0.232,
+ "p_win_after": 0.232,
  "blocks": {
   "buys": 0.0,
   "sales": 0.0
  },
  "lam": 0.0,
  "band": [
-  1931.59378227974,
-  2206.68324522773
+  1919.01423880155,
+  2190.95884825159
  ],
- "do": [
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan, Iñigo Vicente, Mathew Ryan, Yeray Alvarez, Miguel Roman",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan",
-     "names"
-    ]
-   ],
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 50145529.0
-    },
-    {
-     "player_team": "95426553",
-     "player": "2771",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 37050871.0
-    },
-    {
-     "player_team": "44068749",
-     "player": "2639",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 10737413.0
-    },
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": null,
-     "bid": null,
-     "pos": "POR",
-     "value": 20512914.0
-    },
-    {
-     "player_team": "67102630",
-     "player": "77",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 3618125.0
-    },
-    {
-     "player_team": "24338726",
-     "player": "2464",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 34129784.0
-    },
-    {
-     "player_team": "37280098",
-     "player": "3123",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 23509761.0
-    },
-    {
-     "player_team": "24338723",
-     "player": "3002",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 25872201.0
-    },
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 17539463.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "plan_gain": 0.0,
  "cash_after": null,
  "can_bid": 81689838.6,
- "ping": "list Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan, Iñigo Vicente, Mathew Ryan, Yeray Alvarez, Miguel Roman",
+ "ping": "",
  "exposed": [
-  {
-   "name": "Mathew Ryan",
-   "pos": "POR",
-   "clause": 21511188.0
-  },
   {
    "name": "Fernando Niño",
    "pos": "DEL",
    "clause": 45723831.0
+  },
+  {
+   "name": "Mathew Ryan",
+   "pos": "POR",
+   "clause": 21511188.0
   },
   {
    "name": "Georges Mikautadze",
@@ -133,14 +37,19 @@
    "clause": 42016585.0
   },
   {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "clause": 31271675.0
+  },
+  {
    "name": "Natan",
    "pos": "DEF",
    "clause": 50145529.0
   },
   {
-   "name": "Iñigo Vicente",
+   "name": "Martin Satriano",
    "pos": "DEL",
-   "clause": 31271675.0
+   "clause": 17220303.0
   },
   {
    "name": "Gerard Martin",
@@ -153,11 +62,6 @@
    "clause": 34129784.0
   },
   {
-   "name": "Martin Satriano",
-   "pos": "DEL",
-   "clause": 17220303.0
-  },
-  {
    "name": "Marcos Alonso",
    "pos": "DEF",
    "clause": 28589508.0
@@ -168,14 +72,14 @@
    "clause": 17539463.0
   },
   {
-   "name": "Miguel Roman",
-   "pos": "MED",
-   "clause": 10737413.0
-  },
-  {
    "name": "Bil Nsongo",
    "pos": "DEL",
    "clause": 9993887.0
+  },
+  {
+   "name": "Miguel Roman",
+   "pos": "MED",
+   "clause": 10737413.0
   },
   {
    "name": "Alvaro Garcia",
@@ -193,14 +97,14 @@
    "clause": 5505499.0
   },
   {
-   "name": "Robin Le Normand",
-   "pos": "DEF",
-   "clause": 6865304.0
-  },
-  {
    "name": "Alvaro F. Carreras",
    "pos": "DEF",
    "clause": 5634247.0
+  },
+  {
+   "name": "Robin Le Normand",
+   "pos": "DEF",
+   "clause": 6865304.0
   },
   {
    "name": "Jon Moncayola",
@@ -227,21 +131,21 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 494.0,
-   "mean": 2175.64710332272,
-   "lo": 2025.40500443075,
-   "hi": 2325.88920221469,
+   "now": 500.0,
+   "mean": 2166.27832423576,
+   "lo": 2017.36743492727,
+   "hi": 2315.18921354426,
    "cash": 1097131.0,
    "estimated": true,
-   "p_above": 0.748604397049205
+   "p_above": 0.760308062114104
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 523.0,
-   "mean": 2069.13851375373,
-   "lo": 1931.59378227974,
-   "hi": 2206.68324522773,
+   "now": 525.0,
+   "mean": 2054.98654352657,
+   "lo": 1919.01423880155,
+   "hi": 2190.95884825159,
    "cash": 5079381.0,
    "estimated": false,
    "p_above": null
@@ -250,34 +154,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 391.0,
-   "mean": 1865.06157065393,
-   "lo": 1729.02629994313,
-   "hi": 2001.09684136472,
-   "cash": 61555056.0,
+   "mean": 1892.96655645622,
+   "lo": 1756.66888366371,
+   "hi": 2029.26422924873,
+   "cash": 35699315.0,
    "estimated": true,
-   "p_above": 0.0881989248010894
+   "p_above": 0.140405639126589
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 366.0,
-   "mean": 1792.45440139604,
-   "lo": 1665.02702923253,
-   "hi": 1919.88177355955,
+   "now": 368.0,
+   "mean": 1787.94336987372,
+   "lo": 1661.06336996304,
+   "hi": 1914.82336978441,
    "cash": 21618534.0,
    "estimated": true,
-   "p_above": 0.0293042476236989
+   "p_above": 0.0328706587983111
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 389.0,
-   "mean": 1642.14860710861,
-   "lo": 1518.81905775312,
-   "hi": 1765.4781564641,
+   "mean": 1631.96116928021,
+   "lo": 1509.85289708072,
+   "hi": 1754.06944147969,
    "cash": 58193671.0,
    "estimated": true,
-   "p_above": 0.00152794880131568
+   "p_above": 0.00150631665257894
   }
  ]
 }
