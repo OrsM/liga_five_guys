@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
+__all__ = ["XI_SIZE", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -56,6 +56,13 @@ def position(raw: str | None) -> str:
 
 MATCH_LEN = 90.0
 XI_SIZE = 11  # players a side fields
+
+# What the plan considers: our choices, not the game's rules, each lifted
+# here, in one place, if the league turns nasty. The code each one narrows
+# fails loudly when it is lifted (NotImplementedError), where the plan must
+# first learn the move, rather than go on silently without it.
+CLAUSE_BUYS = False     # a rival's player bought by paying his clause: you do not shoot first
+MANAGER_TRADES = False  # offers to or from another manager: only the game's market and its offers
 
 
 def _selftest() -> None:

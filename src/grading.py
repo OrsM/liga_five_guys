@@ -757,15 +757,17 @@ if __name__ == "__main__":
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
     if sys.argv[1:2] == ["money"]:
-        # money [RATES [HORIZONS]]: the phantom deciding daily with money at each rate and horizon
+        # money [RATES [HORIZONS [KAPPAS]]]: the phantom deciding daily with money at each rate and
+        # horizon, the plan made at each of these appetites for variance (decide.KAPPAS by default)
         rates = [float(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,3,5,8,12").split(",")]
         hs = [int(x) for x in (sys.argv[3] if len(sys.argv) > 3 else "7,14").split(",")]
+        kappas = tuple(float(x) for x in sys.argv[4].split(",")) if len(sys.argv) > 4 else decide.KAPPAS
         print("%5s %3s %6s %5s %8s %8s %9s %9s" % ("rate", "h", "moves", "lost", "points", "standpat",
                                                  "cash(M)", "value(M)"))
         for rate in rates:
             for h in hs:
                 decide.MONEY_RATE, pricing.MONEY_H = rate, h
-                got = phantom_path(daily=True)
+                got = phantom_path(daily=True, kappas=kappas)
                 print("%5.1f %3d %6d %5d %+8.0f %+8.0f %+9.1f %+9.1f" % (
                     rate, h, sum(len(g["moves"].split("; ")) for g in got if g["moves"]),
                     sum(g["lost"] for g in got),
@@ -787,5 +789,5 @@ if __name__ == "__main__":
                     pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
                     100 * sum(x > 0 for x in pnl) / len(pnl)))
         raise SystemExit(0)
-    print("grading.py --selftest | money [RATES [HORIZONS]] | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money [RATES [HORIZONS [KAPPAS]]] | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

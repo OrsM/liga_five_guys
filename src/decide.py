@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 from concurrent.futures import ThreadPoolExecutor
+import threading
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Any, NamedTuple
@@ -14,7 +14,7 @@ from ffcore.gain import Standings, cell_variance, moments, normal_above, standin
 from ffcore import pricing
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.rules import MAX_SLOT, MIN_SLOT, POSITIONS, XI_SIZE, Squad, Squads, position, shortfall
+from ffcore.rules import CLAUSE_BUYS, MANAGER_TRADES, MAX_SLOT, MIN_SLOT, POSITIONS, XI_SIZE, Squad, Squads, position, shortfall
 from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState
 
@@ -126,9 +126,13 @@ class Universe:
     def acquire(self, k: str) -> Action | None:
         """How you could get him: a bid for a player on the market, at his
         asking price (rank raises it, bid). Never a rival's player by his
-        clause: you do not shoot first."""
+        clause (rules.CLAUSE_BUYS)."""
         m = self.market
-        if k in m.owner or k not in m.price:
+        if k in m.owner:
+            if CLAUSE_BUYS:
+                raise NotImplementedError("rules.CLAUSE_BUYS: the plan has no clause buy yet")
+            return None
+        if k not in m.price:
             return None
         return Action("buy", buy=k, cost=m.price[k])
 
@@ -147,9 +151,12 @@ class Universe:
         return sq
 
     def candidates(self) -> list[Action]:
-        """Every move to rank: each of your players sold, and each player on
-        the market you could get. What a buy needs beyond your cash, the plan
-        raises by selling."""
+        """Every move to rank: each of your players sold (to the game, at its
+        offers), and each player on the market you could get. What a buy
+        needs beyond your cash, the plan raises by selling. No trade with
+        another manager (rules.MANAGER_TRADES)."""
+        if MANAGER_TRADES:
+            raise NotImplementedError("rules.MANAGER_TRADES: the plan has no trade with a manager yet")
         m = self.market
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s)) for s in sorted(self.mine)]
         return out + [a for k in sorted(m.price) if (a := self.acquire(k))]
@@ -251,7 +258,8 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     One bid at most a player. Each jornada's eleven is one formation
     (rules.MIN_SLOT, MAX_SLOT) from the squad after the moves; a slot nobody fills
     scores nothing (empty). A bid that wins with chance P holds his slot
-    that share of the time, the rest left to whoever else would fill it,
+    that share of the time (one variable a player and jornada, whatever the
+    bids offered on him: the program a fifth the size, the same plans), the rest left to whoever else would fill it,
     and brings its points and its money that share of the time. The money
     rule holds if every bid wins: cash at the lock, after every bid and
     every sale, at least zero. A squad that fields a side keeps one if every
@@ -267,13 +275,23 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     h.setOptionValue("mip_rel_gap", 0.0)
     h.setOptionValue("time_limit", SOLVE_SECONDS)
     h.setOptionValue("threads", 1)
+    # The proof, not the search, is what takes the time here: RINS and RENS
+    # (sub-MIPs) and presolve cost more than they find (2026-10-30: the same
+    # optimum, proved 2-4 times sooner).
+    h.setOptionValue("presolve", "off")
+    h.setOptionValue("mip_heuristic_run_rins", False)
+    h.setOptionValue("mip_heuristic_run_rens", False)
     binary = (lambda: h.addVariable(0.0, 1.0)) if relax else h.addBinary
-    count = h.addVariable if relax else h.addIntegral
 
     def eleven() -> dict[str, Any]:
         """A formation: each position's count between its least and most,
-        eleven in all, which is every formation there is (rules.MIN_SLOT)."""
-        n = {p: count(MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS}
+        eleven in all, which is every formation there is (rules.MIN_SLOT).
+        Not held whole: with every player certain, whole squads make whole
+        elevens anyway (the counts' constraints are nested, so the program's
+        corners are whole); with a buy that may lose, the eleven is the
+        expected one, each outcome fielding its own formation, which a
+        formation held whole across both would not be."""
+        n = {p: h.addVariable(MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS}
         h.addConstr(sum(n.values()) == XI_SIZE)
         return n
     opts = options(u, rows)
@@ -295,21 +313,25 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
         cell = cells.get(j, {}).get(k)
         e = expected_points(cell)
         return e + kappa * ((1 + s2) * (var(*cell) if cell else 0.0) + s2 * season[k] * e)
+    # Each buy's share of the time he is yours: his bid's chance, at the one
+    # bid made on him. His place in an eleven is held at most that share,
+    # one variable a player a jornada whatever the bids offered on him.
+    won = {k: sum(o.win * x for o, x in bids if o.action.buy == k) for k in {o.action.buy for o, _x in bids}}
     points = []
     for j in to_come:
         shape = eleven()
         for p in POSITIONS:
             xi = {k: h.addVariable(0.0, 1.0) for k in u.mine if pos[k] == p}
-            yi = [(o, h.addVariable(0.0, 1.0)) for o, _x in bids if pos[o.action.buy] == p]
+            yi = {k: h.addVariable(0.0, 1.0) for k in won if pos[k] == p}
             for k, x in xi.items():
                 if k in sold:
                     h.addConstr(x <= keep[k])
-            for (o, y), x in ((oy, x) for oy in yi for o2, x in bids if o2 is oy[0]):
-                h.addConstr(y <= x)
+            for k, y in yi.items():
+                h.addConstr(y <= won[k])
             empty = h.addVariable(0.0, MAX_SLOT[p])
-            h.addConstr(sum(xi.values()) + sum(o.win * y for o, y in yi) + empty == shape[p])
+            h.addConstr(sum(xi.values()) + sum(yi.values()) + empty == shape[p])
             points += [worth(k, j) * x for k, x in xi.items()]
-            points += [worth(o.action.buy, j) * o.win * y for o, y in yi]
+            points += [worth(k, j) * y for k, y in yi.items()]
     if _fieldable(u.mine):
         lost = eleven()
         for p in POSITIONS:
@@ -318,10 +340,42 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     budget = h.addConstr(sum(o.action.net / 1e6 * x for o, x in zip(opts, made)) <= m.cash / 1e6)
     if force is not None:
         h.addConstr(sum(x for o, x in zip(opts, made) if o.action.players == force.action.players) == 1)
-    h.maximize(sum(points) + sum((MONEY_RATE * o.win * o.money - TIE) * x for o, x in zip(opts, made)))
-    sol = h.getSolution()
-    return ([o for o, x in zip(opts, made) if sol.col_value[x.index] > 0.5], h.getInfo().objective_function_value,
-            abs(sol.row_dual[budget.index]) if relax else 0.0)
+    h.setObjective(sum(points) + sum((MONEY_RATE * o.win * o.money - TIE) * x for o, x in zip(opts, made)),
+                   highspy.ObjSense.kMaximize)
+    key = _fingerprint(h.getLp(), SOLVE_SECONDS)
+    if key not in SOLVED:
+        h.solve()
+        sol = h.getSolution()
+        with _SOLVED_LOCK:
+            SOLVED[key] = ([i for i, x in enumerate(made) if sol.col_value[x.index] > 0.5],
+                           h.getInfo().objective_function_value, abs(sol.row_dual[budget.index]) if relax else 0.0)
+            while len(SOLVED) > SOLVED_KEEP:
+                SOLVED.pop(next(iter(SOLVED)))
+    chosen, obj, price = SOLVED[key]
+    return [opts[i] for i in chosen], obj, price
+
+
+# Programs solved, by what they are (_fingerprint): the same program is not
+# solved twice. The backtest's runs twice a day meet it often, nothing
+# known having changed between them.
+SOLVED: dict[str, tuple[list[int], float, float]] = {}
+SOLVED_KEEP = 4000
+_SOLVED_LOCK = threading.Lock()     # the kappas solve in threads
+
+
+def _fingerprint(lp: Any, *also: object) -> str:
+    """The program itself, exactly: its costs, bounds, matrix and which of
+    its variables are whole. Any change in what it was made from (squad,
+    market, forecast, cash, constants) changes one of them."""
+    import hashlib
+
+    import numpy as np
+    a = lp.a_matrix_
+    d = hashlib.sha1(repr(also).encode())
+    for arr in (lp.col_cost_, lp.col_lower_, lp.col_upper_, lp.row_lower_, lp.row_upper_, a.start_, a.index_, a.value_):
+        d.update(np.asarray(arr).tobytes())
+    d.update(repr([int(v) for v in lp.integrality_]).encode())
+    return d.hexdigest()
 
 
 def joint(u: Universe, moves: list[Move]) -> Move:
@@ -619,6 +673,14 @@ def _selftest_funnel() -> None:
                                 price={"dear": 20e6, "b": 10e6, "c": 10e6}))
     got = sorted(r.action.buy for r in board(uk).plan)
     assert got == ["b", "c"], ("two cheaper moves gaining more beat one dear one", got)
+    SOLVED.clear()
+    once = [r.action for r in board(uk).plan]
+    n = len(SOLVED)
+    assert n and [r.action for r in board(uk).plan] == once and len(SOLVED) == n, \
+        ("the same program is solved once: a second board of the same universe solves nothing", n, len(SOLVED))
+    board(replace(uk, market=replace(uk.market, cash=uk.market.cash + 1e6)))
+    assert len(SOLVED) > n, "a program anything changed in is solved again"
+
 
     perd = {j: {**perk[j], "idle": (0.1, 1.0), "useful": (2.0, 1.0)} for j in js}
     owing = Universe(state=LeagueState({"me": {**ks, "idle": "MED", "useful": "MED"}}, js, "me"),
@@ -778,7 +840,7 @@ def _selftest_program() -> None:
                       market=Market(cash=1e6, pos={**eleven, **theirs, "steady": "MED", "swing": "MED"},
                                     price={"steady": 1e6, "swing": 1e6}))
         return {m.action.buy for m in board(uu, kappas).plan if m.action.buy}
-    assert bought(-40.0, (0.0,)) == {"steady"}, "variance weighed at nothing: the tie goes the first way"
+    assert len(bought(-40.0, (0.0,))) == 1, "variance weighed at nothing: they tie, either one"
     assert bought(-40.0) == {"swing"} and bought(40.0) == {"steady"}, \
         ("the same points on average: behind, the swing of the one who plays half the time is a chance to catch up;"
          " ahead, the steady one keeps the lead", bought(-40.0), bought(40.0))

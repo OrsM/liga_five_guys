@@ -21,7 +21,11 @@ from typing import Any
 
 from ffcore import clock
 
-KEEP = 6000                     # entries; the oldest made go beyond it
+# Entries; the oldest made go beyond it. A daily backtest keeps ~580 a
+# run (~20 kB each) at ~140 runs: below that it evicts its own answers
+# before the next backtest can read them (2026-10-30).
+KEEP = 150000
+_PUTS = [0]                     # entries put since the store was last counted
 _BASE: list[str] = []           # the key of the scope in force
 _CON: list[sqlite3.Connection] = []     # its store, open for the scope
 _RAW = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+)")
@@ -90,7 +94,8 @@ def put(db: Path, sql: str, params: object, value: Any) -> None:
     with _CON[0] as con:
         con.execute("INSERT OR REPLACE INTO kept VALUES (?, ?, ?)",
                     (_key(sql, params), time.time(), pickle.dumps(value)))
-        if con.execute("SELECT count(*) FROM kept").fetchone()[0] > KEEP:
+        _PUTS[0] += 1
+        if _PUTS[0] % 500 == 0 and con.execute("SELECT count(*) FROM kept").fetchone()[0] > KEEP:
             con.execute("DELETE FROM kept WHERE key IN (SELECT key FROM kept ORDER BY made LIMIT ?)", (KEEP // 6,))
 
 
