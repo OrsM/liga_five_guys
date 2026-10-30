@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-30T05:42Z",
+ "generated_at": "2026-10-30T09:04Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 5079381.0,
  "cash_locked": 21233464.0,
@@ -312,12 +312,24 @@
      "per_million"
     ]
    ]
+  },
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Alvaro Garcia, Gerard Martin",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": []
   }
  ],
  "plan_gain": 24.9160202486618,
  "cash_after": 4725451.82239637,
  "can_bid": 81335909.4223964,
- "ping": "field Martin Satriano; buy Matias Dituro; buy Filip Ugrinic; buy Marcao; sell Iñigo Vicente",
+ "ping": "field Martin Satriano; buy Matias Dituro; buy Filip Ugrinic; buy Marcao; sell Iñigo Vicente; list Alvaro Garcia, Gerard Martin",
  "exposed": [
   {
    "name": "Mathew Ryan",
