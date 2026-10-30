@@ -182,7 +182,7 @@ def _selftest_board() -> None:
     assert not [d for d in report(ub, b, now)["do"] if d["what"] == "field"], \
         "no auction closes before the lock: its buys cannot play, the eleven is the squad's now (Dituro, 2026-10-30)"
     for d in doc["do"]:
-        assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act"} - (
+        assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert all(len(d["act"]) == 1 for d in doc["do"] if d["what"] in ("buy", "sell")) \
