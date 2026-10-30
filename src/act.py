@@ -1,5 +1,6 @@
-"""Act on the board: place the bid a board line says, when you accept it on
-the phone (lfg-watch hands the request here).
+"""Act on the board: place the bid a board line says, list its list line,
+or take the offer its sell line takes, when you accept it on the phone
+(lfg-watch hands the request here).
 
 The request names the board it was made on (generated_at), the player and
 the amount. The bid is placed only if that is still the board, the line is
@@ -24,7 +25,7 @@ from typing import Any
 
 from ffcore import db as lfg
 from ffcore.auth import API_BASE, TokenStore
-from ffcore.laliga_api import API_LEAGUES_URL, API_MARKET_URL, parse_api_leagues
+from ffcore.laliga_api import API_LEAGUES_URL, API_MARKET_URL, API_OFFER_URL, parse_api_leagues
 from ingest import HEADERS, TIMEOUT
 
 # One call to the app: (method, url, JSON body or None) to (status, JSON reply).
@@ -33,6 +34,7 @@ Call = Callable[[str, str, dict[str, Any] | None], tuple[int, Any]]
 BID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid?x-lang=es"
 SELL_URL = "{base}/v1/competition/1/league/{league}/market/sell?x-lang=es"
 REBID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid/{bid}?x-lang=es"
+ACCEPT_URL = "{base}/v1/competition/1/league/{league}/market/{market}/offer/{offer}/accept?x-lang=es"
 
 REPORT = Path("reports/decisions.json")
 
@@ -60,15 +62,18 @@ def target(name: str) -> dict[str, str] | None:
 
 
 def owned(name: str) -> dict[str, Any] | None:
-    """A player of yours the board would list, as the app knows him: his
-    place in your team (the id the app lists him by), his id, his value
-    (board_mine, current_api_teams, player_facts)."""
+    """A player of yours the board would list or sell, as the app knows him:
+    his place in your team (the id the app lists him by), his id, his value,
+    and his market line if listed (board_mine, current_api_teams,
+    player_facts, current_api_market)."""
     with closing(lfg.connect()) as db:
         row = db.execute(
-            "SELECT t.player_team_id, t.player_id, f.value FROM board_mine m"
+            "SELECT t.player_team_id, t.player_id, f.value, k.market_id FROM board_mine m"
             " JOIN current_api_teams t ON t.player = m.player JOIN player_facts f ON f.player = m.player"
+            " LEFT JOIN current_api_market k ON k.player = m.player"
             " WHERE m.name = ?", (name,)).fetchone()
-    return {"player_team_id": row[0], "player_id": row[1], "value": row[2]} if row and row[2] else None
+    return {"player_team_id": row[0], "player_id": row[1], "value": row[2], "market_id": row[3]} \
+        if row and row[2] else None
 
 
 def league_of(call: Call, base: str) -> str:
@@ -113,6 +118,42 @@ def list_all(req: dict[str, Any], board: dict[str, Any], own: Callable[[str], di
     if failed:
         return done(False, "listed %s; not %s" % (", ".join(listed) or "none", "; ".join(failed)))
     return done(True, "listed %s at their value, the app took each" % ", ".join(listed))
+
+
+def take(req: dict[str, Any], board: dict[str, Any], own: Callable[[str], dict[str, Any] | None],
+         call: Call, base: str) -> dict[str, Any]:
+    """The game's offer the board's sell line takes, accepted, or why not:
+    read from the app first, and accepted only while it stands at the
+    board's amount."""
+    out = {"requested_at": req.get("requested_at"), "what": "sell", "name": req.get("name"),
+           "amount": req.get("amount")}
+
+    def done(ok: bool, message: str) -> dict[str, Any]:
+        return {**out, "state": "placed" if ok else "failed", "message": message, "at": _now()}
+
+    if req.get("generated_at") != board.get("generated_at"):
+        return done(False, "the board has changed since: refresh and accept again")
+    line = next((d for d in board.get("do", []) if d.get("what") == "sell" and d.get("step") == "take offer"
+                 and d.get("name") == req.get("name")), None)
+    if line is None or round(line["amount"]) != round(req.get("amount") or -1):
+        return done(False, "not an offer of this board at this amount")
+    t = own(line["name"])
+    if t is None or not t.get("market_id"):
+        return done(False, "not yours on the market as the last run saw it")
+    league = league_of(call, base)
+    if league.startswith("!"):
+        return done(False, league[1:])
+    status, standing = call("GET", API_OFFER_URL.format(base=base, league=league, ptid=t["player_team_id"]), None)
+    offer = next((o for o in standing if o.get("status") == "pending"
+                  and round(o.get("money") or -1) == round(line["amount"])), None) \
+        if status == 200 and isinstance(standing, list) else None
+    if offer is None:
+        return done(False, "the app shows no offer of %d on him now" % round(line["amount"]))
+    status, reply = call("POST", ACCEPT_URL.format(base=base, league=league, market=t["market_id"],
+                                                   offer=offer["id"]), {"offerMoney": offer["money"]})
+    if status not in (200, 201, 204):
+        return done(False, "the app said %d: %s" % (status, json.dumps(reply)[:200]))
+    return done(True, "sold for %d, the app took it" % offer["money"])
 
 
 def accept(req: dict[str, Any], board: dict[str, Any], where: Callable[[str], dict[str, str] | None],
@@ -275,6 +316,41 @@ def _selftest() -> None:
     call, sent = app(None, answer=400)
     assert list_all({"generated_at": board["generated_at"], "what": "list"}, listing, mine.get, call, base)["state"] \
         == "failed", "the app refuses: said so"
+    offers = {"generated_at": board["generated_at"],
+              "do": [{"what": "sell", "name": "Pablo Fornals", "step": "take offer", "amount": 44133958.0}]}
+    fornals = {"Pablo Fornals": {"player_team_id": "32308191", "player_id": "3099", "value": 40916093.0,
+                                 "market_id": "50121357"}}
+    ask = {"requested_at": "t", "generated_at": board["generated_at"], "what": "sell", "name": "Pablo Fornals",
+           "amount": 44133958.0}
+
+    def seller(standing: list[dict[str, Any]], answer: int = 200) -> tuple[Call, list[tuple[str, str, Any]]]:
+        sent: list[tuple[str, str, Any]] = []
+
+        def call(method: str, url: str, body: dict[str, Any] | None) -> tuple[int, Any]:
+            sent.append((method, url, body))
+            if "/leagues?" in url:
+                return 200, [{"id": 77, "name": "five guys", "team": {"id": 9}}]
+            if method == "GET":
+                return 200, standing
+            return answer, {}
+        return call, sent
+
+    call, sent = seller([{"id": 197765870, "money": 44133958, "status": "pending"}])
+    got = take(ask, offers, fornals.get, call, base)
+    assert got["state"] == "placed" and got["message"] == "sold for 44133958, the app took it", got
+    assert [(m, u, b) for m, u, b in sent if m != "GET"] == [
+        ("POST", base + "/v1/competition/1/league/77/market/50121357/offer/197765870/accept?x-lang=es",
+         {"offerMoney": 44133958})], ("the offer the app shows standing, by his market line", sent)
+    call, sent = seller([{"id": 1, "money": 39000000, "status": "pending"}])
+    assert take(ask, offers, fornals.get, call, base)["state"] == "failed" and \
+        all(m == "GET" for m, _u, _b in sent), "no longer at the board's amount: nothing accepted"
+    call, sent = seller([{"id": 197765870, "money": 44133958, "status": "pending"}], answer=400)
+    assert take(ask, offers, fornals.get, call, base)["state"] == "failed", "the app refuses: said so"
+    call, sent = seller([])
+    for bad, why in (({**ask, "generated_at": "older"}, "a board since"), ({**ask, "amount": 4e7}, "another amount"),
+                     ({**ask, "name": "Thomas Lemar"}, "not a sale of the board")):
+        assert take(bad, offers, fornals.get, call, base)["state"] == "failed" and sent == [], why
+    assert take(ask, offers, lambda _n: None, call, base)["state"] == "failed" and sent == [], "not yours"
     print("act self-test OK")
 
 
@@ -285,6 +361,7 @@ if __name__ == "__main__":
         asked = json.loads(Path(sys.argv[2]).read_text())
         board, call = json.loads(REPORT.read_text()), http_call()
         print(json.dumps([list_all(r, board, owned, call, API_BASE) if r.get("what") == "list"
+                          else take(r, board, owned, call, API_BASE) if r.get("what") == "sell"
                           else accept(r, board, target, call, API_BASE)
                           for r in (asked if isinstance(asked, list) else [asked])]))
     else:
