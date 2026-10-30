@@ -3,7 +3,7 @@ to the cut, the schema and the constants, so a replay that has been built
 before reads its views' answers back instead of deriving them again (a
 board's universe is a dozen views of 0.2-0.6 s each). Only a cut that was
 set (a replay, not the live run), only inside scope(). The key is the cut,
-the schema version, the constants the views read (not the variant's name:
+the definitions each answer reads (deps), the constants the views read (not the variant's name:
 two variants alike to the views share their answers) and what each raw
 table held up to the cut, so a changed schema, constant or fetch is a
 miss, never a stale hit.
@@ -73,8 +73,11 @@ def scope(db: Path, raw_sql: Path, constants: str) -> Iterator[None]:
         cut = clock.cut()
         tables = [t for t in _RAW.findall(raw_sql.read_text(encoding="utf-8"))
                   if any(c[1] == "observed_at" for c in lfg.execute('PRAGMA table_info("%s")' % t))]
-        _BASE[:] = ["|".join((cut, str(lfg.execute("PRAGMA user_version").fetchone()[0]),
-                              hashlib.sha1(constants.encode()).hexdigest(), _fingerprint(lfg, tables, cut)))]
+        _BASE[:] = ["|".join((cut, hashlib.sha1(constants.encode()).hexdigest(), _fingerprint(lfg, tables, cut)))]
+        _DEFS.clear()
+        _DEFS.update(dict(lfg.execute("SELECT name, sql FROM sqlite_master WHERE type IN ('view', 'table')"
+                                      " AND sql IS NOT NULL")))
+        _DEPS.clear()
     _CON[:] = [_open(db)]
     try:
         yield
@@ -83,8 +86,30 @@ def scope(db: Path, raw_sql: Path, constants: str) -> Iterator[None]:
         _CON.pop().close()
 
 
+_DEFS: dict[str, str] = {}      # each view's and table's definition, as lfg.db holds them
+_DEPS: dict[str, str] = {}      # each statement's: the definitions it reads, hashed
+_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def deps(sql: str) -> str:
+    """The definitions sql reads, through every view it reads, hashed: what
+    its answer depends on of the schema. A view changed elsewhere leaves it
+    a hit (2026-10-30: keyed on the whole schema's version, any view's edit
+    made every universe of a backtest cold again)."""
+    if sql not in _DEPS:
+        seen: set[str] = set()
+        todo = [n for n in set(_NAME.findall(sql)) if n in _DEFS]
+        while todo:
+            n = todo.pop()
+            if n not in seen:
+                seen.add(n)
+                todo.extend(m for m in set(_NAME.findall(_DEFS[n])) if m in _DEFS and m not in seen)
+        _DEPS[sql] = hashlib.sha1("\0".join(_DEFS[n] for n in sorted(seen)).encode()).hexdigest()
+    return _DEPS[sql]
+
+
 def _key(name: str, params: object = ()) -> str:
-    return hashlib.sha1((_BASE[0] + "\0" + name + "\0" + repr(params)).encode()).hexdigest()
+    return hashlib.sha1((_BASE[0] + "\0" + deps(name) + "\0" + name + "\0" + repr(params)).encode()).hexdigest()
 
 
 def get(db: Path, sql: str, params: object) -> Any:
@@ -105,10 +130,11 @@ def put(db: Path, sql: str, params: object, value: Any) -> None:
             con.execute("DELETE FROM kept WHERE key IN (SELECT key FROM kept ORDER BY made LIMIT ?)", (KEEP // 6,))
 
 
-def written(db: Path, name: str) -> bool:
-    """Is what the named write left in lfg.db this scope's? One write a
-    name and cut is held, the last, since a later variant overwrites it."""
-    return bool(_BASE) and _latest(db, name) == _BASE[0]
+def written(db: Path, name: str, sql: str = "") -> bool:
+    """Is what the named write left in lfg.db this scope's, made by sql as
+    it reads now (deps)? One write a name and cut is held, the last, since
+    a later variant overwrites it."""
+    return bool(_BASE) and _latest(db, name) == _BASE[0] + deps(sql)
 
 
 def _latest(db: Path, name: str) -> str | None:
@@ -116,11 +142,11 @@ def _latest(db: Path, name: str) -> str | None:
     return pickle.loads(got[0]) if got else None
 
 
-def mark(db: Path, name: str) -> None:
+def mark(db: Path, name: str, sql: str = "") -> None:
     if _BASE:
         with _CON[0] as con:
             con.execute("INSERT OR REPLACE INTO kept VALUES (?, ?, ?)",
-                        ("write|%s|%s" % (name, clock.cut()), time.time(), pickle.dumps(_BASE[0])))
+                        ("write|%s|%s" % (name, clock.cut()), time.time(), pickle.dumps(_BASE[0] + deps(sql))))
 
 
 def _selftest() -> None:
@@ -163,6 +189,19 @@ def _selftest() -> None:
                 con.execute("INSERT INTO season_points VALUES ('2025-26', '1', 9, 9)")
             with scope(db, raw, "A=1"):
                 assert get(db, "q", ()) is None, "last season's points changed: a miss"
+            with closing(sqlite3.connect(db)) as con, con:
+                con.executescript("CREATE VIEW inner_v AS SELECT v FROM t; CREATE VIEW outer_v AS SELECT v FROM inner_v;"
+                                  "CREATE VIEW other_v AS SELECT 1;")
+            with scope(db, raw, "A=1"):
+                put(db, "SELECT * FROM outer_v", (), [(1,)])
+            with closing(sqlite3.connect(db)) as con, con:
+                con.executescript("DROP VIEW other_v; CREATE VIEW other_v AS SELECT 2;")
+            with scope(db, raw, "A=1"):
+                assert get(db, "SELECT * FROM outer_v", ()) == [(1,)], "a view it does not read changed: still a hit"
+            with closing(sqlite3.connect(db)) as con, con:
+                con.executescript("DROP VIEW inner_v; CREATE VIEW inner_v AS SELECT v + 1 AS v FROM t;")
+            with scope(db, raw, "A=1"):
+                assert get(db, "SELECT * FROM outer_v", ()) is None, "a view it reads through another changed: a miss"
         finally:
             clock.set_now(None)
 

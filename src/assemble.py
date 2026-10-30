@@ -176,14 +176,18 @@ def fits_in_place() -> bool:
             " AND (SELECT count(*) FROM price_error_fit WHERE as_of = cut()) > 0").fetchone()[0])
 
 
+# What the fits are made from (price_momentum, record_trend): kept while these read as they did.
+FITS = "momentum price_error_now price_trend_now"
+
+
 def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
-    if not (kept.written(lfgdb.DB, "fits") and fits_in_place()):
+    if not (kept.written(lfgdb.DB, "fits", FITS) and fits_in_place()):
         _keep("momentum_fit", "SELECT cut(), h, slope FROM momentum")
         _keep("price_error_fit", "SELECT cut(), h, rmse FROM price_error_now")
         record_trend()
-        kept.mark(lfgdb.DB, "fits")
+        kept.mark(lfgdb.DB, "fits", FITS)
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
                   dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1),
