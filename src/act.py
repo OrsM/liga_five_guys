@@ -34,6 +34,7 @@ Call = Callable[[str, str, dict[str, Any] | None], tuple[int, Any]]
 BID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid?x-lang=es"
 SELL_URL = "{base}/v1/competition/1/league/{league}/market/sell?x-lang=es"
 REBID_URL = "{base}/v1/competition/1/league/{league}/market/{market}/bid/{bid}?x-lang=es"
+PLAYER_URL = "{base}/v1/competition/1/player/{player}/league/{league}?x-lang=es"
 ACCEPT_URL = "{base}/v1/competition/1/league/{league}/market/{market}/offer/{offer}/accept?x-lang=es"
 
 REPORT = Path("reports/decisions.json")
@@ -111,8 +112,12 @@ def list_all(req: dict[str, Any], board: dict[str, Any], own: Callable[[str], di
     failed: list[str] = []
     for n, t in them.items():
         assert t is not None
+        # Never under his value now: it moves overnight, and a board from
+        # the night before has the old one (the app refuses a price under it).
+        status, now = call("GET", PLAYER_URL.format(base=base, player=t["player_id"], league=league), None)
+        live = ((now.get("playerMaster") or {}).get("marketValue") or 0) if status == 200 and isinstance(now, dict) else 0
         status, reply = call("POST", SELL_URL.format(base=base, league=league),
-                             {"playerId": int(t["player_team_id"]), "salePrice": int(round(t["value"]))})
+                             {"playerId": int(t["player_team_id"]), "salePrice": int(round(max(t["value"], live)))})
         (listed if status in (200, 201) else failed).append(
             n if status in (200, 201) else "%s (the app said %d: %s)" % (n, status, json.dumps(reply)[:120]))
     if failed:
@@ -248,6 +253,8 @@ def _selftest() -> None:
             sent.append((method, url, body))
             if "/leagues?" in url:
                 return 200, [{"id": 77, "name": "five guys", "team": {"id": 9}}]
+            if method == "GET" and "/player/" in url:
+                return 200, {"playerMaster": {"marketValue": 600000 if "/player/2687/" in url else None}}
             if method == "GET":
                 shown = state["bid"] if state["hidden"] <= 0 else None
                 state["hidden"] -= 1
@@ -306,8 +313,9 @@ def _selftest() -> None:
     assert got["state"] == "placed" and got["message"].startswith("listed Bil Nsongo, Manu Bueno"), got
     assert [(m, u, b) for m, u, b in sent if m != "GET"] == [
         ("POST", base + "/v1/competition/1/league/77/market/sell?x-lang=es", {"playerId": 108468054, "salePrice": 9697829}),
-        ("POST", base + "/v1/competition/1/league/77/market/sell?x-lang=es", {"playerId": 108468059, "salePrice": 592909})], \
-        ("each player of the board's list line, by his place in your team, at his value", sent)
+        ("POST", base + "/v1/competition/1/league/77/market/sell?x-lang=es", {"playerId": 108468059, "salePrice": 600000})], \
+        ("each player of the board's list line, by his place in your team, at his value: the app's now if"
+         " it has risen since the board (Lemar, 2026-10-30: listed at the night before's, refused)", sent)
     call, sent = app(None)
     assert list_all({"generated_at": "older", "what": "list"}, listing, mine.get, call, base)["state"] == "failed" \
         and sent == [], "a board since: nothing sent"
