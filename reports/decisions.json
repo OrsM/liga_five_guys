@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-30T21:02Z",
+ "generated_at": "2026-10-30T21:09Z",
  "lock_at": "2026-10-31T13:00:00+00:00",
  "cash": 5079381.0,
- "cash_locked": 23048191.0,
+ "cash_locked": 0.0,
  "finish": 1.87,
  "p_win": 0.247,
  "p_win_after": 0.247,
@@ -16,81 +16,6 @@
   2206.68324522773
  ],
  "do": [
-  {
-   "name": "Filip Ugrinic",
-   "pos": "MED",
-   "what": "withdraw",
-   "label": "withdraw bid on Filip Ugrinic",
-   "step": "withdraw bid",
-   "amount": 1814727.0,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [],
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": null,
-     "player": "2612",
-     "market": "532765568",
-     "bid": "54383387",
-     "pos": "MED",
-     "value": 1790434.0
-    }
-   ]
-  },
-  {
-   "name": "Ivan Romero",
-   "pos": "DEL",
-   "what": "withdraw",
-   "label": "withdraw bid on Ivan Romero",
-   "step": "withdraw bid",
-   "amount": 8094581.0,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [],
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": null,
-     "player": "2303",
-     "market": "532765551",
-     "bid": "54329086",
-     "pos": "DEL",
-     "value": 8094435.0
-    }
-   ]
-  },
-  {
-   "name": "Matias Dituro",
-   "pos": "POR",
-   "what": "withdraw",
-   "label": "withdraw bid on Matias Dituro",
-   "step": "withdraw bid",
-   "amount": 13138883.0,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [],
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": null,
-     "player": "2613",
-     "market": "532765525",
-     "bid": "54328279",
-     "pos": "POR",
-     "value": 13138883.0
-    }
-   ]
-  },
   {
    "name": null,
    "pos": null,
@@ -189,8 +114,8 @@
  ],
  "plan_gain": 0.0,
  "cash_after": null,
- "can_bid": 58641647.6,
- "ping": "withdraw bid on Filip Ugrinic; withdraw bid on Ivan Romero; withdraw bid on Matias Dituro; list Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan, Iñigo Vicente, Mathew Ryan, Yeray Alvarez, Miguel Roman",
+ "can_bid": 81689838.6,
+ "ping": "list Pepelu, German Valera, Marcos Alonso, Georges Mikautadze, Natan, Iñigo Vicente, Mathew Ryan, Yeray Alvarez, Miguel Roman",
  "exposed": [
   {
    "name": "Mathew Ryan",
