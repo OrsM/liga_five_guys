@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-10-30T18:09Z",
+ "generated_at": "2026-10-30T18:26Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 5079381.0,
  "cash_locked": 23048191.0,
@@ -26,7 +26,20 @@
    "done": false,
    "gain": null,
    "per": "season",
-   "facts": []
+   "facts": [],
+   "accepts": [
+    null
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2612",
+     "market": "532765568",
+     "bid": "54383387",
+     "pos": "MED",
+     "value": 1790434.0
+    }
+   ]
   },
   {
    "name": "Ivan Romero",
@@ -38,7 +51,20 @@
    "done": false,
    "gain": null,
    "per": "season",
-   "facts": []
+   "facts": [],
+   "accepts": [
+    null
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2303",
+     "market": "532765551",
+     "bid": "54329086",
+     "pos": "DEL",
+     "value": 8094435.0
+    }
+   ]
   },
   {
    "name": "Matias Dituro",
@@ -50,7 +76,20 @@
    "done": false,
    "gain": null,
    "per": "season",
-   "facts": []
+   "facts": [],
+   "accepts": [
+    null
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2613",
+     "market": "532765525",
+     "bid": "54328279",
+     "pos": "POR",
+     "value": 13138883.0
+    }
+   ]
   }
  ],
  "plan_gain": 0.0,
