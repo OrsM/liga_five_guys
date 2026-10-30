@@ -6,7 +6,7 @@ import os
 import sqlite3
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
 from statistics import NormalDist
@@ -21,7 +21,7 @@ from ffcore.pricing import RESALE_MARGIN
 
 from assemble import applied, built, forecast_cells, price_change, price_momentum, universe
 import decide
-from decide import Action, Universe, board, plan
+from decide import Action, Universe, board, chosen, moves
 from ffcore import pricing
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
@@ -49,6 +49,34 @@ def universe_when(t: dt.datetime, also: frozenset[str] = frozenset()) -> Univers
             print("%s: no board (%s)" % (t.isoformat(), e), file=sys.stderr)
             _AT[t, also] = None
     return _AT[t, also]
+
+
+def on_market_by(t: dt.datetime) -> frozenset[str]:
+    """Every player listed on the game's market up to t: whom a replay's
+    phantom can hold then (whatever he bought, he bought from it)."""
+    set_now(t)
+    return frozenset(k for (k,) in rows("SELECT DISTINCT ff_id FROM market WHERE ff_id <> ''"
+                                        " AND observed_at <= (SELECT cut())"))
+
+
+def _built_at(job: tuple[dt.datetime, frozenset[str]]) -> tuple[dt.datetime, Universe | None]:
+    t, also = job
+    return t, universe_when(t, also)
+
+
+def warm(times: list[dt.datetime], also: Callable[[dt.datetime], frozenset[str]]) -> None:
+    """The universe at each of these times built ahead, WARM_JOBS at a time
+    in their own processes, each forecasting also(t): a phantom's decisions
+    then wait on nothing but his plans. A universe depends on nothing he
+    did as long as also(t) holds whoever he can hold (on_market_by)."""
+    import multiprocessing
+    jobs = [(t, also(t)) for t in times if (t, also(t)) not in _AT]
+    with multiprocessing.get_context("fork").Pool(WARM_JOBS) as pool:
+        for t, u in pool.imap_unordered(_built_at, jobs):
+            _AT[t, also(t)] = u
+
+
+WARM_JOBS = 4
 
 
 def universe_at(jornada: int, locks: dict[int, dt.datetime]) -> Universe | None:
@@ -302,7 +330,7 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
     after = with_squad(up, up.squad_after(*(Action("buy", buy=k) for k in won)),
                        up.market.cash - sum(closing[k] for k in won))
     sales = list(day.pending) if len(won) == len(closing) else [
-        r.action for r in plan(after, [r for r in after.rank(after.candidates()) if not r.action.buy])[0]]
+        o.action for o in chosen(after, [r for r in after.rank(after.candidates(), scored=False) if not r.action.buy])[0]]
     return (Day(after.squad_after(*sales), after.market.left(sales),
                 {k: b for k, b in day.bids.items() if k not in closing}),
             sales, len(closing) - len(won))
@@ -339,12 +367,20 @@ def phantom_path(daily: bool = False, kappas: tuple[float, ...] = decide.KAPPAS)
     lost = 0
     last: Universe | None = None
     out = []
+    ever: dict[dt.datetime, frozenset[str]] = {}
+
+    def held(t: dt.datetime) -> frozenset[str]:
+        """Whom the phantom can hold at t: who was listed by then, and the squad he started with."""
+        if t not in ever:
+            ever[t] = on_market_by(t) | frozenset(hold)
+        return ever[t]
     try:
         for t in sorted(set(played) | set(runs) | closes):
             if squad is None:
                 if t not in played or (start := universe_when(t)) is None:
                     continue
                 squad, hold, cash = dict(start.mine), dict(start.mine), start.market.cash
+                warm([r for r in sorted(set(played) | set(runs)) if r > t], held)
             if t in closes:
                 if last is not None:
                     day, sold, n = closed(with_squad(last, squad, cash), Day(squad, cash, bids, pending), bars, t)
@@ -353,12 +389,13 @@ def phantom_path(daily: bool = False, kappas: tuple[float, ...] = decide.KAPPAS)
                     lost += n
                 if t not in played and t not in runs:
                     continue
-            u = universe_when(t, frozenset(squad) | frozenset(hold) | frozenset(bids))
+            assert hold and frozenset(squad) | frozenset(bids) <= held(t), "the phantom holds a player never listed"
+            u = universe_when(t, held(t) if hold else frozenset(squad))
             if u is None:
                 continue
             up = with_squad(u, squad, cash, bids)
             if t in runs or not daily:
-                acts = [r.action for r in board(up, kappas).plan]
+                acts = moves(up, kappas)
                 if daily:
                     (squad, cash, bids, pending), acts = acted(up, bids, acts)
                     up = with_squad(u, squad, cash, bids)
@@ -757,15 +794,20 @@ if __name__ == "__main__":
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
     if sys.argv[1:2] == ["money"]:
-        # money [RATES [HORIZONS]]: the phantom deciding daily with money at each rate and horizon
+        # money [RATES [HORIZONS [KAPPAS]]]: the phantom deciding daily with money at each rate and
+        # horizon, the plan made at each of these appetites for variance (decide.KAPPAS by default)
         rates = [float(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,3,5,8,12").split(",")]
         hs = [int(x) for x in (sys.argv[3] if len(sys.argv) > 3 else "7,14").split(",")]
+        kappas = tuple(float(x) for x in sys.argv[4].split(",")) if len(sys.argv) > 4 else decide.KAPPAS
+        # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
+        held = applied(os.environ.get("LFG_VARIANT", "live"))
+        held.__enter__()
         print("%5s %3s %6s %5s %8s %8s %9s %9s" % ("rate", "h", "moves", "lost", "points", "standpat",
                                                  "cash(M)", "value(M)"))
         for rate in rates:
             for h in hs:
                 decide.MONEY_RATE, pricing.MONEY_H = rate, h
-                got = phantom_path(daily=True)
+                got = phantom_path(daily=True, kappas=kappas)
                 print("%5.1f %3d %6d %5d %+8.0f %+8.0f %+9.1f %+9.1f" % (
                     rate, h, sum(len(g["moves"].split("; ")) for g in got if g["moves"]),
                     sum(g["lost"] for g in got),
@@ -787,5 +829,5 @@ if __name__ == "__main__":
                     pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
                     100 * sum(x > 0 for x in pnl) / len(pnl)))
         raise SystemExit(0)
-    print("grading.py --selftest | money [RATES [HORIZONS]] | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money [RATES [HORIZONS [KAPPAS]]] (LFG_VARIANT=name) | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

@@ -4,6 +4,7 @@ state and the forecast — so the model modules never read a table
 themselves."""
 from __future__ import annotations
 
+import re
 import statistics
 import sys
 from contextlib import closing, contextmanager
@@ -42,7 +43,7 @@ APP_FRESH_HOURS = 14.4
 # The constants a run is built with, by module: what params records as such,
 # and what a variant may set (variants).
 NAMES: dict[str, tuple[str, ...]] = {
-    "assemble": ("APP_FRESH_HOURS",),
+    "assemble": ("APP_FRESH_HOURS", "PRICE_BLEND"),
     "decide": ("MONEY_RATE", "TIE"),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
@@ -118,6 +119,15 @@ def fixture_ratings(market: Rows) -> Ratings:
     return difficulty_ratings(market, current("results_history"))
 
 
+def read_by_views() -> dict[str, float]:
+    """The constants the views read (model_constants, by name in
+    schema.sql): what a kept answer depends on. One read in Python alone
+    (decide.TIE, PRICE_BLEND) changes no view's answer, and keyed on it
+    every such change rebuilt each universe cold (2026-10-30)."""
+    names = set(re.findall(r"model_constants WHERE name = '(\w+)'", lfgdb.SCHEMA.read_text(encoding="utf-8")))
+    return {n: v for m in constants().values() for n, v in m.items() if n in names}
+
+
 def write_constants() -> None:
     """constants() into lfg.db under the variant in force, for the views."""
     with closing(connect()) as db, db:
@@ -140,9 +150,20 @@ class Prices(NamedTuple):
 def record_trend() -> None:
     """Each player's price trend as of the model's cut, kept (price_trend_fit)
     for the views that read it; the momentum it rests on kept first."""
-    with closing(connect()) as db, db:
-        db.execute("DELETE FROM price_trend_fit WHERE as_of = cut()")
-        db.execute("INSERT INTO price_trend_fit SELECT cut(), ff_id, trend FROM price_trend_now")
+    _keep("price_trend_fit", "SELECT cut(), ff_id, trend FROM price_trend_now")
+
+
+def _keep(table: str, select: str) -> None:
+    """The cut's rows of a fit table replaced by what select makes: worked
+    out first, the write after, so a universe built beside others (a
+    backtest builds them side by side) holds lfg.db's one writer's lock for
+    the write alone, not for the fit."""
+    with closing(connect()) as db:
+        got = db.execute(select).fetchall()
+        with db:
+            db.execute("DELETE FROM %s WHERE as_of = cut()" % table)
+            if got:
+                db.executemany("INSERT INTO %s VALUES (%s)" % (table, ", ".join("?" * len(got[0]))), got)
 
 
 def fits_in_place() -> bool:
@@ -159,11 +180,8 @@ def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
     if not (kept.written(lfgdb.DB, "fits") and fits_in_place()):
-        with closing(connect()) as db, db:
-            db.execute("DELETE FROM momentum_fit WHERE as_of = cut()")
-            db.execute("INSERT INTO momentum_fit SELECT cut(), h, slope FROM momentum")
-            db.execute("DELETE FROM price_error_fit WHERE as_of = cut()")
-            db.execute("INSERT INTO price_error_fit SELECT cut(), h, rmse FROM price_error_now")
+        _keep("momentum_fit", "SELECT cut(), h, slope FROM momentum")
+        _keep("price_error_fit", "SELECT cut(), h, rmse FROM price_error_now")
         record_trend()
         kept.mark(lfgdb.DB, "fits")
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
@@ -237,12 +255,18 @@ class Built(NamedTuple):
 def forecast_cells() -> tuple[PerJornada, set[str]]:
     """Every player's forecast cell by jornada as of cut(), and who is listed
     injured, doubtful or suspended then; a past cut's answers kept (kept.py)."""
-    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(constants())):
+    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
         market = current("market")
         sc = scorer(market, current("lineups", LINEUP_SOURCE))
         per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
                              current("matches"), rounds()).per_j
         return per_j, {k for k in sc.lookup if sc.starts.status_of(k)}
+
+
+# The forecast's weight against its price's (forecast.price_blend); 1, the
+# forecast alone. At a move cost of 10 (decide.TIE), 0.5 made +5 to 1's +4
+# against standing still, and less than 1 at every move cost tried (2026-10-30).
+PRICE_BLEND = 0.5
 
 
 def universe(also: frozenset[str] = frozenset()) -> Universe:
@@ -254,7 +278,7 @@ def built(also: frozenset[str] = frozenset()) -> Built:
     """The universe, and the parameters it was built with. Its forecast
     covers every player in a squad or on the market, and also these (a
     replay's squads hold players nobody holds now)."""
-    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(constants())):
+    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
         return _built(also)
 
 
@@ -279,7 +303,8 @@ def _built(also: frozenset[str]) -> Built:
               for mgr in lg.managers}
     ratings = fixture_ratings(mkt_rows)
     left = rounds()
-    ex = expectations(sc, ratings, set(price).union(*squads.values(), also), m, left)
+    base = set(price).union(*squads.values())
+    ex = expectations(sc, ratings, base | also, m, left)
     per_j, rem, played = ex.per_j, ex.rem, ex.played
     ahead = [j for j in rem if j not in left.behind]
     market = Market(
@@ -294,7 +319,8 @@ def _built(also: frozenset[str]) -> Built:
     for k, j in rows("SELECT player, jornada FROM late_arrivals"):
         if k in per_j.get(j, {}):
             per_j[j][k] = (per_j[j][k][0], 0.0)     # bought tonight, he joins after that match
-    squads, per_j = phantom_fill(squads, per_j, pos)
+    per_j = forecast.price_blend(per_j, pos, column("value"), PRICE_BLEND)
+    squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
     assert all(_fieldable(sq) for sq in squads.values()), squads
     # The jornada each player's next line-up is for: his first to play of
     # those not behind (a match put back from one behind is not picked for).

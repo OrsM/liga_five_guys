@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import math
 from concurrent.futures import ThreadPoolExecutor
+import threading
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from functools import cached_property
 from typing import Any, NamedTuple
@@ -14,7 +14,7 @@ from ffcore.gain import Standings, cell_variance, moments, normal_above, standin
 from ffcore import pricing
 from ffcore.market import Market
 from ffcore.outlook import Outlook
-from ffcore.rules import MAX_SLOT, MIN_SLOT, POSITIONS, XI_SIZE, Squad, Squads, position, shortfall
+from ffcore.rules import CLAUSE_BUYS, MANAGER_TRADES, MAX_SLOT, MIN_SLOT, POSITIONS, SQUAD_MAX, XI_SIZE, Squad, Squads, position, shortfall
 from ffcore.schedule import PerJornadaFactors, phantom_topup
 from ffcore.season import LeagueState
 
@@ -29,19 +29,26 @@ __all__ = ["Action", "Board", "FUNNEL", "Move", "Universe", "board", "joint", "o
 # 373M; points alone (0) 350 and 297M, overbidding for certainty
 # (2026-10-20).
 MONEY_RATE = 8.0
-# What each move costs the plan by itself, in points: none worth making
-# that gains nothing (a tie goes to doing nothing).
-TIE = 1e-4
+# What each move costs the plan by itself, in season points: a move must
+# beat it to be made. The forecasts tell players apart too poorly for small
+# gains to be real: the daily backtest (2026-10-30, plan less standing
+# still) -51 at none, -74 at 5, +4 at 10, with a fifth of the moves.
+TIE = 10.0
 # How much a point of season variance is worth, in points, for each plan
 # the program makes (Hunter, Vielma and Zaman, arXiv 1604.01455): above 0 it
 # seeks variance, below it avoids it. Of the plans, the one that most
 # raises your chance of first (Move.d_first) is made: behind the leader a
 # riskier one, ahead a steadier one (docs/notes/plan.md).
-KAPPAS = (0.0, -0.05, -0.02, 0.02, 0.05)
+# One plan, at none (2026-10-30, the daily backtest, every solve proved:
+# 344 points at 0 alone, 323 at (0, -0.05, -0.02, 0.02, 0.05), in less than
+# half the time). Pass others to weigh them.
+KAPPAS: tuple[float, ...] = (0.0,)
 # The longest one program may take, in seconds: past it, the best plan
 # found so far (a board is built at every run, and rivals' too, within
-# lfg.service's ten minutes).
-SOLVE_SECONDS = 5.0
+# lfg.service's ten minutes). A net, not a cut: one proves in 1-3s, and a
+# cut at a time makes a replay depend on how busy the machine was
+# (2026-10-30: the same code 368 to 412 points at 5s).
+SOLVE_SECONDS = 30.0
 
 @dataclass(frozen=True)
 class Move:
@@ -126,9 +133,13 @@ class Universe:
     def acquire(self, k: str) -> Action | None:
         """How you could get him: a bid for a player on the market, at his
         asking price (rank raises it, bid). Never a rival's player by his
-        clause: you do not shoot first."""
+        clause (rules.CLAUSE_BUYS)."""
         m = self.market
-        if k in m.owner or k not in m.price:
+        if k in m.owner:
+            if CLAUSE_BUYS:
+                raise NotImplementedError("rules.CLAUSE_BUYS: the plan has no clause buy yet")
+            return None
+        if k not in m.price:
             return None
         return Action("buy", buy=k, cost=m.price[k])
 
@@ -147,9 +158,12 @@ class Universe:
         return sq
 
     def candidates(self) -> list[Action]:
-        """Every move to rank: each of your players sold, and each player on
-        the market you could get. What a buy needs beyond your cash, the plan
-        raises by selling."""
+        """Every move to rank: each of your players sold (to the game, at its
+        offers), and each player on the market you could get. What a buy
+        needs beyond your cash, the plan raises by selling. No trade with
+        another manager (rules.MANAGER_TRADES)."""
+        if MANAGER_TRADES:
+            raise NotImplementedError("rules.MANAGER_TRADES: the plan has no trade with a manager yet")
         m = self.market
         out = [Action("sell", sell=(s, ), proceeds=m.fetches(s)) for s in sorted(self.mine)]
         return out + [a for k in sorted(m.price) if (a := self.acquire(k))]
@@ -162,15 +176,18 @@ class Universe:
             return "%s's player" % owner if owner else "nobody's, and not on the market now"
         return None
 
-    def rank(self, acts: list[Action]) -> list[Move]:
+    def rank(self, acts: list[Action], scored: bool = True) -> list[Move]:
         """Each move, scored against doing nothing (score), best first; a buy
         at its cost, with its auction's chance at the lowest bid it offers
         (the plan chooses the bid: options); a sale marked if it leaves no
-        side to field (Move.alone)."""
+        side to field (Move.alone). Not scored: its money alone, all the
+        program reads of it (what a replay decides by: moves)."""
         odds = self.market.odds
+        got = score(self, [[a] for a in acts]) if scored else [
+            (0.0, 1.0, self.market.money([a], pricing.MONEY_H)[0], 0.0) for a in acts]
         return sorted((Move(a, g, p, c, (odds.get(a.buy) or ((1.0, 1.0),))[0][1] if a.buy else 1.0,
                             bool(a.buy) or _fieldable(self.squad_after(a)), f)
-                       for a, (g, p, c, f) in zip(acts, score(self, [[a] for a in acts]))),
+                       for a, (g, p, c, f) in zip(acts, got)),
                       key=lambda mv: (-mv.d_pts, mv.action.net))
 
 
@@ -212,17 +229,33 @@ def plan(u: Universe, rows: list[Move], kappas: tuple[float, ...] = KAPPAS) -> t
     relaxation, in points a million. The program is solved at each of
     KAPPAS, a weight on the season's variance, and the plan that most raises
     your chance of first is the one made."""
-    best: tuple[float, list[Move], float] | None = None
+    picked, kappa = chosen(u, rows, kappas)
+    _x, _v, lam = program(u, rows, relax=True, kappa=kappa)
+    return [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in picked], lam
+
+
+def chosen(u: Universe, rows: list[Move], kappas: tuple[float, ...] = KAPPAS) -> tuple[list[Move], float]:
+    """The options the plan makes (plan), and the kappa it made them at:
+    the program at each of kappas, the one that most raises your chance of
+    first kept (one kappa: no choice, nothing to score)."""
     with ThreadPoolExecutor(len(kappas)) as pool:
         solved = list(pool.map(lambda kappa: program(u, rows, relax=False, kappa=kappa)[0], kappas))
-    for kappa, chosen in zip(kappas, solved):
-        moves = [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in chosen]
-        first = joint(u, moves).d_first if moves else 0.0
+    if len(kappas) == 1:
+        return solved[0], kappas[0]
+    best: tuple[float, list[Move], float] | None = None
+    for kappa, made in zip(kappas, solved):
+        first = joint(u, made).d_first if made else 0.0
         if best is None or first > best[0] + 1e-9:
-            best = (first, moves, kappa)
+            best = (first, made, kappa)
     assert best is not None
-    _x, _v, lam = program(u, rows, relax=True, kappa=best[2])
-    return best[1], lam
+    return best[1], best[2]
+
+
+def moves(u: Universe, kappas: tuple[float, ...] = KAPPAS) -> list[Action]:
+    """The plan's moves and nothing a report shows worked out (no move
+    scored, no price of a million): what a replay acts on, as board(u).plan
+    would make them."""
+    return [o.action for o in chosen(u, u.rank(u.candidates(), scored=False), kappas)[0]]
 
 
 def options(u: Universe, rows: list[Move]) -> list[Move]:
@@ -251,10 +284,11 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     One bid at most a player. Each jornada's eleven is one formation
     (rules.MIN_SLOT, MAX_SLOT) from the squad after the moves; a slot nobody fills
     scores nothing (empty). A bid that wins with chance P holds his slot
-    that share of the time, the rest left to whoever else would fill it,
+    that share of the time (one variable a player and jornada, whatever the
+    bids offered on him: the program a fifth the size, the same plans), the rest left to whoever else would fill it,
     and brings its points and its money that share of the time. The money
     rule holds if every bid wins: cash at the lock, after every bid and
-    every sale, at least zero. A squad that fields a side keeps one if every
+    every sale, at least zero. The squad, its bids in, at most SQUAD_MAX. A squad that fields a side keeps one if every
     bid that can lose does. Objective: the elevens' expected points and the moves'
     money at MONEY_RATE, less TIE a move, and kappa times the elevens'
     season variance (gain.py's: each cell's match variance and the
@@ -267,13 +301,23 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     h.setOptionValue("mip_rel_gap", 0.0)
     h.setOptionValue("time_limit", SOLVE_SECONDS)
     h.setOptionValue("threads", 1)
+    # The proof, not the search, is what takes the time here: RINS and RENS
+    # (sub-MIPs) and presolve cost more than they find (2026-10-30: the same
+    # optimum, proved 2-4 times sooner).
+    h.setOptionValue("presolve", "off")
+    h.setOptionValue("mip_heuristic_run_rins", False)
+    h.setOptionValue("mip_heuristic_run_rens", False)
     binary = (lambda: h.addVariable(0.0, 1.0)) if relax else h.addBinary
-    count = h.addVariable if relax else h.addIntegral
 
     def eleven() -> dict[str, Any]:
         """A formation: each position's count between its least and most,
-        eleven in all, which is every formation there is (rules.MIN_SLOT)."""
-        n = {p: count(MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS}
+        eleven in all, which is every formation there is (rules.MIN_SLOT).
+        Not held whole: with every player certain, whole squads make whole
+        elevens anyway (the counts' constraints are nested, so the program's
+        corners are whole); with a buy that may lose, the eleven is the
+        expected one, each outcome fielding its own formation, which a
+        formation held whole across both would not be."""
+        n = {p: h.addVariable(MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS}
         h.addConstr(sum(n.values()) == XI_SIZE)
         return n
     opts = options(u, rows)
@@ -295,33 +339,70 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
         cell = cells.get(j, {}).get(k)
         e = expected_points(cell)
         return e + kappa * ((1 + s2) * (var(*cell) if cell else 0.0) + s2 * season[k] * e)
+    # Each buy's share of the time he is yours: his bid's chance, at the one
+    # bid made on him. His place in an eleven is held at most that share,
+    # one variable a player a jornada whatever the bids offered on him.
+    won = {k: sum(o.win * x for o, x in bids if o.action.buy == k) for k in {o.action.buy for o, _x in bids}}
     points = []
     for j in to_come:
         shape = eleven()
         for p in POSITIONS:
             xi = {k: h.addVariable(0.0, 1.0) for k in u.mine if pos[k] == p}
-            yi = [(o, h.addVariable(0.0, 1.0)) for o, _x in bids if pos[o.action.buy] == p]
+            yi = {k: h.addVariable(0.0, 1.0) for k in won if pos[k] == p}
             for k, x in xi.items():
                 if k in sold:
                     h.addConstr(x <= keep[k])
-            for (o, y), x in ((oy, x) for oy in yi for o2, x in bids if o2 is oy[0]):
-                h.addConstr(y <= x)
+            for k, y in yi.items():
+                h.addConstr(y <= won[k])
             empty = h.addVariable(0.0, MAX_SLOT[p])
-            h.addConstr(sum(xi.values()) + sum(o.win * y for o, y in yi) + empty == shape[p])
+            h.addConstr(sum(xi.values()) + sum(yi.values()) + empty == shape[p])
             points += [worth(k, j) * x for k, x in xi.items()]
-            points += [worth(o.action.buy, j) * o.win * y for o, y in yi]
+            points += [worth(k, j) * y for k, y in yi.items()]
     if _fieldable(u.mine):
         lost = eleven()
         for p in POSITIONS:
             h.addConstr(sum(keep[k] for k in u.mine if pos[k] == p)
                         + sum(x for o, x in bids if o.win >= 1.0 and pos[o.action.buy] == p) >= lost[p])
+    h.addConstr(sum(keep.values()) + sum(x for _o, x in bids) <= SQUAD_MAX)
     budget = h.addConstr(sum(o.action.net / 1e6 * x for o, x in zip(opts, made)) <= m.cash / 1e6)
     if force is not None:
         h.addConstr(sum(x for o, x in zip(opts, made) if o.action.players == force.action.players) == 1)
-    h.maximize(sum(points) + sum((MONEY_RATE * o.win * o.money - TIE) * x for o, x in zip(opts, made)))
-    sol = h.getSolution()
-    return ([o for o, x in zip(opts, made) if sol.col_value[x.index] > 0.5], h.getInfo().objective_function_value,
-            abs(sol.row_dual[budget.index]) if relax else 0.0)
+    h.setObjective(sum(points) + sum((MONEY_RATE * o.win * o.money - TIE) * x for o, x in zip(opts, made)),
+                   highspy.ObjSense.kMaximize)
+    key = _fingerprint(h.getLp(), SOLVE_SECONDS)
+    if key not in SOLVED:
+        h.solve()
+        sol = h.getSolution()
+        with _SOLVED_LOCK:
+            SOLVED[key] = ([i for i, x in enumerate(made) if sol.col_value[x.index] > 0.5],
+                           h.getInfo().objective_function_value, abs(sol.row_dual[budget.index]) if relax else 0.0)
+            while len(SOLVED) > SOLVED_KEEP:
+                SOLVED.pop(next(iter(SOLVED)))
+    chosen, obj, price = SOLVED[key]
+    return [opts[i] for i in chosen], obj, price
+
+
+# Programs solved, by what they are (_fingerprint): the same program is not
+# solved twice. The backtest's runs twice a day meet it often, nothing
+# known having changed between them.
+SOLVED: dict[str, tuple[list[int], float, float]] = {}
+SOLVED_KEEP = 4000
+_SOLVED_LOCK = threading.Lock()     # the kappas solve in threads
+
+
+def _fingerprint(lp: Any, *also: object) -> str:
+    """The program itself, exactly: its costs, bounds, matrix and which of
+    its variables are whole. Any change in what it was made from (squad,
+    market, forecast, cash, constants) changes one of them."""
+    import hashlib
+
+    import numpy as np
+    a = lp.a_matrix_
+    d = hashlib.sha1(repr(also).encode())
+    for arr in (lp.col_cost_, lp.col_lower_, lp.col_upper_, lp.row_lower_, lp.row_upper_, a.start_, a.index_, a.value_):
+        d.update(np.asarray(arr).tobytes())
+    d.update(repr([int(v) for v in lp.integrality_]).encode())
+    return d.hexdigest()
 
 
 def joint(u: Universe, moves: list[Move]) -> Move:
@@ -363,13 +444,30 @@ def apply(u: Universe, *acts: Action) -> Squads:
 
 def _selftest() -> None:
     """The funnel's tests run with money at no value but where a test sets
-    MONEY_RATE: their players have no market value to count."""
-    was = globals()["MONEY_RATE"]
+    MONEY_RATE: their players have no market value to count; and each move
+    at no cost but a tie's, their gains a few points (TIE's own test is
+    _selftest_tie)."""
+    was, tie = globals()["MONEY_RATE"], globals()["TIE"]
     try:
-        globals()["MONEY_RATE"] = 0.0
+        globals()["MONEY_RATE"], globals()["TIE"] = 0.0, 1e-4
         _selftest_funnel()
     finally:
-        globals()["MONEY_RATE"] = was
+        globals()["MONEY_RATE"], globals()["TIE"] = was, tie
+    _selftest_tie()
+
+
+def _selftest_tie() -> None:
+    js = list(range(1, 11))
+    ks = {"k": "POR", **{"d%d" % i: "DEF" for i in range(1, 5)},
+          **{"m%d" % i: "MED" for i in range(1, 5)}, "f1": "DEL", "f2": "DEL"}
+
+    def bought(gain: float) -> list[str]:
+        per = {j: {**{k: (3.0, 1.0) for k in ks}, "new": (3.0 + gain / len(js), 1.0)} for j in js}
+        u = Universe(state=LeagueState({"me": dict(ks)}, js, "me"), forecaster=Bootstrap(per),
+                     market=Market(cash=10e6, pos={**ks, "new": "MED"}, price={"new": 1e6}))
+        return [a.buy for a in moves(u) if a.buy]
+    assert bought(2 * TIE) == ["new"] and bought(TIE / 2) == [], \
+        ("a move is made only if it gains more than it costs (TIE)", bought(2 * TIE), bought(TIE / 2))
 
 
 def _selftest_funnel() -> None:
@@ -619,6 +717,23 @@ def _selftest_funnel() -> None:
                                 price={"dear": 20e6, "b": 10e6, "c": 10e6}))
     got = sorted(r.action.buy for r in board(uk).plan)
     assert got == ["b", "c"], ("two cheaper moves gaining more beat one dear one", got)
+    was = globals()["SQUAD_MAX"]
+    try:
+        globals()["SQUAD_MAX"] = len(ks) + 1
+        plan_ = board(uk).plan
+        assert sum(1 for r in plan_ if r.action.buy) - sum(len(r.action.sell) for r in plan_) <= 1, \
+            ("a squad one short of full: one more player, its bids in, at most", [r.action.label() for r in plan_])
+    finally:
+        globals()["SQUAD_MAX"] = was
+    assert moves(uk) == [r.action for r in board(uk).plan], "the plan's moves, unscored: the board's"
+    SOLVED.clear()
+    once = [r.action for r in board(uk).plan]
+    n = len(SOLVED)
+    assert n and [r.action for r in board(uk).plan] == once and len(SOLVED) == n, \
+        ("the same program is solved once: a second board of the same universe solves nothing", n, len(SOLVED))
+    board(replace(uk, market=replace(uk.market, cash=uk.market.cash + 1e6)))
+    assert len(SOLVED) > n, "a program anything changed in is solved again"
+
 
     perd = {j: {**perk[j], "idle": (0.1, 1.0), "useful": (2.0, 1.0)} for j in js}
     owing = Universe(state=LeagueState({"me": {**ks, "idle": "MED", "useful": "MED"}}, js, "me"),
@@ -778,10 +893,11 @@ def _selftest_program() -> None:
                       market=Market(cash=1e6, pos={**eleven, **theirs, "steady": "MED", "swing": "MED"},
                                     price={"steady": 1e6, "swing": 1e6}))
         return {m.action.buy for m in board(uu, kappas).plan if m.action.buy}
-    assert bought(-40.0, (0.0,)) == {"steady"}, "variance weighed at nothing: the tie goes the first way"
-    assert bought(-40.0) == {"swing"} and bought(40.0) == {"steady"}, \
+    assert len(bought(-40.0, (0.0,))) == 1, "variance weighed at nothing: they tie, either one"
+    sweep = (0.0, -0.05, -0.02, 0.02, 0.05)
+    assert bought(-40.0, sweep) == {"swing"} and bought(40.0, sweep) == {"steady"}, \
         ("the same points on average: behind, the swing of the one who plays half the time is a chance to catch up;"
-         " ahead, the steady one keeps the lead", bought(-40.0), bought(40.0))
+         " ahead, the steady one keeps the lead", bought(-40.0, sweep), bought(40.0, sweep))
 
 
 if __name__ == "__main__":

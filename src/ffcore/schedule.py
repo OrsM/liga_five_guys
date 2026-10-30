@@ -116,8 +116,11 @@ def phantom_topup(sq: Squad) -> Squad:
     return {**sq, **{"__phantom_%s_%d" % (p, i): p for p, n in short.items() for i in range(n)}}
 
 
-def phantom_fill(squads: Squads, per_jornada: PerJornada, pos: dict[str, str]
-                 ) -> tuple[Squads, PerJornada]:
+def phantom_fill(squads: Squads, per_jornada: PerJornada, pos: dict[str, str],
+                 pool: set[str] | None = None) -> tuple[Squads, PerJornada]:
+    """Each squad topped up to a formation with stand-ins, each stand-in
+    the average forecast of its position over the pool (every player
+    forecast, if none given)."""
 
     squads = {m: dict(sq) for m, sq in squads.items()}
     per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}
@@ -126,7 +129,7 @@ def phantom_fill(squads: Squads, per_jornada: PerJornada, pos: dict[str, str]
         by_pos: dict[str, list[tuple[float, float]]] = {}
         for k, (pts, p) in layer.items():
             s = pos.get(k)
-            if s:
+            if s and (pool is None or k in pool):
                 by_pos.setdefault(s, []).append((pts, p))
         avg[j] = {s: (sum(v[0] for v in vs) / len(vs),
                      sum(v[1] for v in vs) / len(vs))
@@ -206,6 +209,10 @@ def _selftest() -> None:
     assert new_per[1]["__phantom_DEF_0"] == (4.0, (1.0 + 0.5 + 0.5) / 3)
     assert "__phantom_DEF_0" not in ph_sq["m"] and \
         "__phantom_DEF_0" not in ph_per[1], "inputs must not be mutated"
+    _sq, pooled = phantom_fill(ph_sq, {1: {**ph_per[1], "extra": (40.0, 1.0)}}, {**ph_pos, "extra": "DEF"},
+                               pool={"d1", "d2", "other_def", "x1"})
+    assert pooled[1]["__phantom_DEF_0"] == new_per[1]["__phantom_DEF_0"], \
+        "a stand-in is the pool's average: players forecast beside it (a replay's) do not move it"
 
     eleven = {"p1": "POR", **{"d%d" % i: "DEF" for i in range(4)},
               **{"x%d" % i: "MED" for i in range(4)}, "f1": "DEL", "f2": "DEL"}

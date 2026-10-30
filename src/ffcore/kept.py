@@ -3,8 +3,10 @@ to the cut, the schema and the constants, so a replay that has been built
 before reads its views' answers back instead of deriving them again (a
 board's universe is a dozen views of 0.2-0.6 s each). Only a cut that was
 set (a replay, not the live run), only inside scope(). The key is the cut,
-the schema version, the constants and what each raw table held up to the
-cut, so a changed schema, constant or fetch is a miss, never a stale hit.
+the schema version, the constants the views read (not the variant's name:
+two variants alike to the views share their answers) and what each raw
+table held up to the cut, so a changed schema, constant or fetch is a
+miss, never a stale hit.
 The store is a file beside lfg.db that can be deleted at any time."""
 from __future__ import annotations
 
@@ -21,7 +23,11 @@ from typing import Any
 
 from ffcore import clock
 
-KEEP = 6000                     # entries; the oldest made go beyond it
+# Entries; the oldest made go beyond it. A daily backtest keeps ~580 a
+# run (~20 kB each) at ~140 runs: below that it evicts its own answers
+# before the next backtest can read them (2026-10-30).
+KEEP = 150000
+_PUTS = [0]                     # entries put since the store was last counted
 _BASE: list[str] = []           # the key of the scope in force
 _CON: list[sqlite3.Connection] = []     # its store, open for the scope
 _RAW = re.compile(r"CREATE TABLE IF NOT EXISTS (\w+)")
@@ -34,7 +40,11 @@ def _store(db: Path) -> Path:
 
 
 def _open(db: Path) -> sqlite3.Connection:
-    con = sqlite3.connect(_store(db))
+    con = sqlite3.connect(_store(db), timeout=120)     # a backtest's builds write it from several processes
+    # A cache, deletable at any time: no wait on the disk at each of the
+    # ~80,000 answers a cold backtest keeps, and readers beside the writer.
+    con.execute("PRAGMA journal_mode = WAL")
+    con.execute("PRAGMA synchronous = OFF")
     con.execute("CREATE TABLE IF NOT EXISTS kept (key TEXT PRIMARY KEY, made REAL, val BLOB) WITHOUT ROWID")
     return con
 
@@ -63,7 +73,7 @@ def scope(db: Path, raw_sql: Path, constants: str) -> Iterator[None]:
         cut = clock.cut()
         tables = [t for t in _RAW.findall(raw_sql.read_text(encoding="utf-8"))
                   if any(c[1] == "observed_at" for c in lfg.execute('PRAGMA table_info("%s")' % t))]
-        _BASE[:] = ["|".join((cut, clock.variant(), str(lfg.execute("PRAGMA user_version").fetchone()[0]),
+        _BASE[:] = ["|".join((cut, str(lfg.execute("PRAGMA user_version").fetchone()[0]),
                               hashlib.sha1(constants.encode()).hexdigest(), _fingerprint(lfg, tables, cut)))]
     _CON[:] = [_open(db)]
     try:
@@ -90,7 +100,8 @@ def put(db: Path, sql: str, params: object, value: Any) -> None:
     with _CON[0] as con:
         con.execute("INSERT OR REPLACE INTO kept VALUES (?, ?, ?)",
                     (_key(sql, params), time.time(), pickle.dumps(value)))
-        if con.execute("SELECT count(*) FROM kept").fetchone()[0] > KEEP:
+        _PUTS[0] += 1
+        if _PUTS[0] % 500 == 0 and con.execute("SELECT count(*) FROM kept").fetchone()[0] > KEEP:
             con.execute("DELETE FROM kept WHERE key IN (SELECT key FROM kept ORDER BY made LIMIT ?)", (KEEP // 6,))
 
 

@@ -164,7 +164,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     it applied leaves the views other processes are using alone."""
     path = path or DB
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path)
+    db = sqlite3.connect(path, timeout=120)     # a backtest builds its universes in several processes, each writing its fits
     functions(db)
     db.execute("PRAGMA synchronous = NORMAL")      # WAL: a commit need not wait for the disk
     db.execute("PRAGMA temp_store = MEMORY")
