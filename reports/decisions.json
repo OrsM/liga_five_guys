@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-30T09:04Z",
+ "generated_at": "2026-10-30T10:20Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
  "cash": 5079381.0,
- "cash_locked": 21233464.0,
+ "cash_locked": 23048191.0,
  "finish": 1.76,
  "p_win": 0.314,
  "p_win_after": 0.358,
@@ -16,16 +16,6 @@
   2297.71621498224
  ],
  "do": [
-  {
-   "what": "field",
-   "label": "field Martin Satriano",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": 2.29586301403442,
-   "per": "next",
-   "facts": []
-  },
   {
    "name": "Matias Dituro",
    "pos": "POR",
@@ -148,9 +138,9 @@
    "pos": "MED",
    "what": "buy",
    "label": "buy Filip Ugrinic",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 1814727.0,
-   "done": false,
+   "done": true,
    "gain": 1.73959830877538,
    "per": "season",
    "facts": [
@@ -161,7 +151,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -312,24 +302,12 @@
      "per_million"
     ]
    ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Alvaro Garcia, Gerard Martin",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": []
   }
  ],
  "plan_gain": 24.9160202486618,
  "cash_after": 4725451.82239637,
  "can_bid": 81335909.4223964,
- "ping": "field Martin Satriano; buy Matias Dituro; buy Filip Ugrinic; buy Marcao; sell Iñigo Vicente; list Alvaro Garcia, Gerard Martin",
+ "ping": "buy Matias Dituro; buy Marcao; sell Iñigo Vicente",
  "exposed": [
   {
    "name": "Mathew Ryan",
