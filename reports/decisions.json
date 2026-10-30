@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-10-30T05:31Z",
+ "generated_at": "2026-10-30T05:42Z",
  "lock_at": "2026-10-30T20:00:00+00:00",
- "cash": 3882337.0,
- "cash_locked": 13138883.0,
+ "cash": 5079381.0,
+ "cash_locked": 21233464.0,
  "finish": 1.76,
  "p_win": 0.314,
  "p_win_after": 0.358,
@@ -18,19 +18,13 @@
  "do": [
   {
    "what": "field",
-   "label": "field Matias Dituro, Martin Satriano",
+   "label": "field Martin Satriano",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 4.76381947943705,
+   "gain": 2.29586301403442,
    "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Mathew Ryan",
-     "names"
-    ]
-   ]
+   "facts": []
   },
   {
    "name": "Matias Dituro",
@@ -98,9 +92,9 @@
    "pos": "DEL",
    "what": "buy",
    "label": "buy Ivan Romero",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 8094581.0,
-   "done": false,
+   "done": true,
    "gain": 6.93937881008297,
    "per": "season",
    "facts": [
@@ -111,7 +105,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -206,54 +200,6 @@
    "asking_win": 1.0
   },
   {
-   "name": "Alvaro Odriozola",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Alvaro Odriozola",
-   "step": "take offer",
-   "amount": 595284.0,
-   "done": false,
-   "gain": 0.0,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     582905.0,
-     "money"
-    ],
-    [
-     "chance of first",
-     0.0,
-     "first"
-    ],
-    [
-     "the game's recent offers",
-     0.6,
-     "beats"
-    ],
-    [
-     "more offers before the lock",
-     0,
-     "count"
-    ],
-    [
-     "",
-     2.21231786739427,
-     "trend"
-    ],
-    [
-     "money",
-     6574.00493483385,
-     "money"
-    ],
-    [
-     "",
-     0.0525920394786708,
-     "per_million"
-    ]
-   ]
-  },
-  {
    "name": "Marcao",
    "pos": "DEF",
    "what": "buy",
@@ -308,54 +254,6 @@
    "asking": 584723.0,
    "win": 0.883,
    "asking_win": 0.883
-  },
-  {
-   "name": "Manu Bueno",
-   "pos": "MED",
-   "what": "sell",
-   "label": "sell Manu Bueno",
-   "step": "take offer",
-   "amount": 601760.0,
-   "done": false,
-   "gain": 0.0,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     593386.0,
-     "money"
-    ],
-    [
-     "chance of first",
-     0.0,
-     "first"
-    ],
-    [
-     "the game's recent offers",
-     0.56,
-     "beats"
-    ],
-    [
-     "more offers before the lock",
-     0,
-     "count"
-    ],
-    [
-     "",
-     1.23975016953687,
-     "trend"
-    ],
-    [
-     "money",
-     5062.47514225589,
-     "money"
-    ],
-    [
-     "",
-     0.0404998011380471,
-     "per_million"
-    ]
-   ]
   },
   {
    "name": "Iñigo Vicente",
@@ -416,10 +314,10 @@
    ]
   }
  ],
- "plan_gain": 25.0091120892785,
+ "plan_gain": 24.9160202486618,
  "cash_after": 4725451.82239637,
- "can_bid": 81571167.6223964,
- "ping": "field Matias Dituro, Martin Satriano; buy Matias Dituro; buy Ivan Romero; buy Filip Ugrinic; sell Alvaro Odriozola; buy Marcao; sell Manu Bueno; sell Iñigo Vicente",
+ "can_bid": 81335909.4223964,
+ "ping": "field Martin Satriano; buy Matias Dituro; buy Filip Ugrinic; buy Marcao; sell Iñigo Vicente",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -522,17 +420,7 @@
    "clause": 6931556.0
   },
   {
-   "name": "Manu Bueno",
-   "pos": "MED",
-   "clause": 1000000.0
-  },
-  {
    "name": "Dani Martinez",
-   "pos": "DEF",
-   "clause": 1000000.0
-  },
-  {
-   "name": "Alvaro Odriozola",
    "pos": "DEF",
    "clause": 1000000.0
   }
@@ -556,7 +444,7 @@
    "mean": 2150.77330069327,
    "lo": 2003.83038640431,
    "hi": 2297.71621498224,
-   "cash": 3882337.0,
+   "cash": 5079381.0,
    "estimated": false,
    "p_above": null
   },
