@@ -38,7 +38,7 @@ def _store(db: Path) -> Path:
 
 
 def _open(db: Path) -> sqlite3.Connection:
-    con = sqlite3.connect(_store(db))
+    con = sqlite3.connect(_store(db), timeout=120)     # a backtest's builds write it from several processes
     con.execute("CREATE TABLE IF NOT EXISTS kept (key TEXT PRIMARY KEY, made REAL, val BLOB) WITHOUT ROWID")
     return con
 

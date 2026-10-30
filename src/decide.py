@@ -37,11 +37,16 @@ TIE = 1e-4
 # seeks variance, below it avoids it. Of the plans, the one that most
 # raises your chance of first (Move.d_first) is made: behind the leader a
 # riskier one, ahead a steadier one (docs/notes/plan.md).
-KAPPAS = (0.0, -0.05, -0.02, 0.02, 0.05)
+# One plan, at none (2026-10-30, the daily backtest, every solve proved:
+# 344 points at 0 alone, 323 at (0, -0.05, -0.02, 0.02, 0.05), in less than
+# half the time). Pass others to weigh them.
+KAPPAS: tuple[float, ...] = (0.0,)
 # The longest one program may take, in seconds: past it, the best plan
 # found so far (a board is built at every run, and rivals' too, within
-# lfg.service's ten minutes).
-SOLVE_SECONDS = 5.0
+# lfg.service's ten minutes). A net, not a cut: one proves in 1-3s, and a
+# cut at a time makes a replay depend on how busy the machine was
+# (2026-10-30: the same code 368 to 412 points at 5s).
+SOLVE_SECONDS = 30.0
 
 @dataclass(frozen=True)
 class Move:
@@ -169,15 +174,18 @@ class Universe:
             return "%s's player" % owner if owner else "nobody's, and not on the market now"
         return None
 
-    def rank(self, acts: list[Action]) -> list[Move]:
+    def rank(self, acts: list[Action], scored: bool = True) -> list[Move]:
         """Each move, scored against doing nothing (score), best first; a buy
         at its cost, with its auction's chance at the lowest bid it offers
         (the plan chooses the bid: options); a sale marked if it leaves no
-        side to field (Move.alone)."""
+        side to field (Move.alone). Not scored: its money alone, all the
+        program reads of it (what a replay decides by: moves)."""
         odds = self.market.odds
+        got = score(self, [[a] for a in acts]) if scored else [
+            (0.0, 1.0, self.market.money([a], pricing.MONEY_H)[0], 0.0) for a in acts]
         return sorted((Move(a, g, p, c, (odds.get(a.buy) or ((1.0, 1.0),))[0][1] if a.buy else 1.0,
                             bool(a.buy) or _fieldable(self.squad_after(a)), f)
-                       for a, (g, p, c, f) in zip(acts, score(self, [[a] for a in acts]))),
+                       for a, (g, p, c, f) in zip(acts, got)),
                       key=lambda mv: (-mv.d_pts, mv.action.net))
 
 
@@ -219,17 +227,33 @@ def plan(u: Universe, rows: list[Move], kappas: tuple[float, ...] = KAPPAS) -> t
     relaxation, in points a million. The program is solved at each of
     KAPPAS, a weight on the season's variance, and the plan that most raises
     your chance of first is the one made."""
-    best: tuple[float, list[Move], float] | None = None
+    picked, kappa = chosen(u, rows, kappas)
+    _x, _v, lam = program(u, rows, relax=True, kappa=kappa)
+    return [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in picked], lam
+
+
+def chosen(u: Universe, rows: list[Move], kappas: tuple[float, ...] = KAPPAS) -> tuple[list[Move], float]:
+    """The options the plan makes (plan), and the kappa it made them at:
+    the program at each of kappas, the one that most raises your chance of
+    first kept (one kappa: no choice, nothing to score)."""
     with ThreadPoolExecutor(len(kappas)) as pool:
         solved = list(pool.map(lambda kappa: program(u, rows, relax=False, kappa=kappa)[0], kappas))
-    for kappa, chosen in zip(kappas, solved):
-        moves = [replace(u.rank([o.action])[0], win=o.win) if o.action.buy else o for o in chosen]
-        first = joint(u, moves).d_first if moves else 0.0
+    if len(kappas) == 1:
+        return solved[0], kappas[0]
+    best: tuple[float, list[Move], float] | None = None
+    for kappa, made in zip(kappas, solved):
+        first = joint(u, made).d_first if made else 0.0
         if best is None or first > best[0] + 1e-9:
-            best = (first, moves, kappa)
+            best = (first, made, kappa)
     assert best is not None
-    _x, _v, lam = program(u, rows, relax=True, kappa=best[2])
-    return best[1], lam
+    return best[1], best[2]
+
+
+def moves(u: Universe, kappas: tuple[float, ...] = KAPPAS) -> list[Action]:
+    """The plan's moves and nothing a report shows worked out (no move
+    scored, no price of a million): what a replay acts on, as board(u).plan
+    would make them."""
+    return [o.action for o in chosen(u, u.rank(u.candidates(), scored=False), kappas)[0]]
 
 
 def options(u: Universe, rows: list[Move]) -> list[Move]:
@@ -673,6 +697,7 @@ def _selftest_funnel() -> None:
                                 price={"dear": 20e6, "b": 10e6, "c": 10e6}))
     got = sorted(r.action.buy for r in board(uk).plan)
     assert got == ["b", "c"], ("two cheaper moves gaining more beat one dear one", got)
+    assert moves(uk) == [r.action for r in board(uk).plan], "the plan's moves, unscored: the board's"
     SOLVED.clear()
     once = [r.action for r in board(uk).plan]
     n = len(SOLVED)
@@ -841,9 +866,10 @@ def _selftest_program() -> None:
                                     price={"steady": 1e6, "swing": 1e6}))
         return {m.action.buy for m in board(uu, kappas).plan if m.action.buy}
     assert len(bought(-40.0, (0.0,))) == 1, "variance weighed at nothing: they tie, either one"
-    assert bought(-40.0) == {"swing"} and bought(40.0) == {"steady"}, \
+    sweep = (0.0, -0.05, -0.02, 0.02, 0.05)
+    assert bought(-40.0, sweep) == {"swing"} and bought(40.0, sweep) == {"steady"}, \
         ("the same points on average: behind, the swing of the one who plays half the time is a chance to catch up;"
-         " ahead, the steady one keeps the lead", bought(-40.0), bought(40.0))
+         " ahead, the steady one keeps the lead", bought(-40.0, sweep), bought(40.0, sweep))
 
 
 if __name__ == "__main__":

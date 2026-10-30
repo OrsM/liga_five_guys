@@ -279,7 +279,8 @@ def _built(also: frozenset[str]) -> Built:
               for mgr in lg.managers}
     ratings = fixture_ratings(mkt_rows)
     left = rounds()
-    ex = expectations(sc, ratings, set(price).union(*squads.values(), also), m, left)
+    base = set(price).union(*squads.values())
+    ex = expectations(sc, ratings, base | also, m, left)
     per_j, rem, played = ex.per_j, ex.rem, ex.played
     ahead = [j for j in rem if j not in left.behind]
     market = Market(
@@ -294,7 +295,7 @@ def _built(also: frozenset[str]) -> Built:
     for k, j in rows("SELECT player, jornada FROM late_arrivals"):
         if k in per_j.get(j, {}):
             per_j[j][k] = (per_j[j][k][0], 0.0)     # bought tonight, he joins after that match
-    squads, per_j = phantom_fill(squads, per_j, pos)
+    squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
     assert all(_fieldable(sq) for sq in squads.values()), squads
     # The jornada each player's next line-up is for: his first to play of
     # those not behind (a match put back from one behind is not picked for).
