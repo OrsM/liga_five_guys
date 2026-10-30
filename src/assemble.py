@@ -4,6 +4,7 @@ state and the forecast — so the model modules never read a table
 themselves."""
 from __future__ import annotations
 
+import re
 import statistics
 import sys
 from contextlib import closing, contextmanager
@@ -42,7 +43,7 @@ APP_FRESH_HOURS = 14.4
 # The constants a run is built with, by module: what params records as such,
 # and what a variant may set (variants).
 NAMES: dict[str, tuple[str, ...]] = {
-    "assemble": ("APP_FRESH_HOURS",),
+    "assemble": ("APP_FRESH_HOURS", "PRICE_BLEND"),
     "decide": ("MONEY_RATE", "TIE"),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
@@ -116,6 +117,15 @@ def app_status() -> dict[str, str]:
 
 def fixture_ratings(market: Rows) -> Ratings:
     return difficulty_ratings(market, current("results_history"))
+
+
+def read_by_views() -> dict[str, float]:
+    """The constants the views read (model_constants, by name in
+    schema.sql): what a kept answer depends on. One read in Python alone
+    (decide.TIE, PRICE_BLEND) changes no view's answer, and keyed on it
+    every such change rebuilt each universe cold (2026-10-30)."""
+    names = set(re.findall(r"model_constants WHERE name = '(\w+)'", lfgdb.SCHEMA.read_text(encoding="utf-8")))
+    return {n: v for m in constants().values() for n, v in m.items() if n in names}
 
 
 def write_constants() -> None:
@@ -237,12 +247,16 @@ class Built(NamedTuple):
 def forecast_cells() -> tuple[PerJornada, set[str]]:
     """Every player's forecast cell by jornada as of cut(), and who is listed
     injured, doubtful or suspended then; a past cut's answers kept (kept.py)."""
-    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(constants())):
+    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
         market = current("market")
         sc = scorer(market, current("lineups", LINEUP_SOURCE))
         per_j = expectations(sc, fixture_ratings(market), set(sc.lookup),
                              current("matches"), rounds()).per_j
         return per_j, {k for k in sc.lookup if sc.starts.status_of(k)}
+
+
+# The forecast's weight against its price's (forecast.price_blend); 1, the forecast alone.
+PRICE_BLEND = 1.0
 
 
 def universe(also: frozenset[str] = frozenset()) -> Universe:
@@ -254,7 +268,7 @@ def built(also: frozenset[str] = frozenset()) -> Built:
     """The universe, and the parameters it was built with. Its forecast
     covers every player in a squad or on the market, and also these (a
     replay's squads hold players nobody holds now)."""
-    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(constants())):
+    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
         return _built(also)
 
 
@@ -295,6 +309,7 @@ def _built(also: frozenset[str]) -> Built:
     for k, j in rows("SELECT player, jornada FROM late_arrivals"):
         if k in per_j.get(j, {}):
             per_j[j][k] = (per_j[j][k][0], 0.0)     # bought tonight, he joins after that match
+    per_j = forecast.price_blend(per_j, pos, column("value"), PRICE_BLEND)
     squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
     assert all(_fieldable(sq) for sq in squads.values()), squads
     # The jornada each player's next line-up is for: his first to play of

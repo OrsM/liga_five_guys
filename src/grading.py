@@ -799,6 +799,9 @@ if __name__ == "__main__":
         rates = [float(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,3,5,8,12").split(",")]
         hs = [int(x) for x in (sys.argv[3] if len(sys.argv) > 3 else "7,14").split(",")]
         kappas = tuple(float(x) for x in sys.argv[4].split(",")) if len(sys.argv) > 4 else decide.KAPPAS
+        # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
+        held = applied(os.environ.get("LFG_VARIANT", "live"))
+        held.__enter__()
         print("%5s %3s %6s %5s %8s %8s %9s %9s" % ("rate", "h", "moves", "lost", "points", "standpat",
                                                  "cash(M)", "value(M)"))
         for rate in rates:
@@ -826,5 +829,5 @@ if __name__ == "__main__":
                     pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
                     100 * sum(x > 0 for x in pnl) / len(pnl)))
         raise SystemExit(0)
-    print("grading.py --selftest | money [RATES [HORIZONS [KAPPAS]]] | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money [RATES [HORIZONS [KAPPAS]]] (LFG_VARIANT=name) | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)
