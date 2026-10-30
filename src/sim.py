@@ -25,14 +25,15 @@ Doc = dict[str, Any]  # a JSON object of decisions.json
 
 
 def _selftest() -> None:
-    """The board's tests, with money at no value (decide._selftest): their
-    players have no market value to count."""
-    was = decide.MONEY_RATE
+    """The board's tests, with money at no value and each move at no cost
+    but a tie's (decide._selftest): their players have no market value to
+    count, and their gains are a few points."""
+    was, tie = decide.MONEY_RATE, decide.TIE
     try:
-        decide.MONEY_RATE = 0.0
+        decide.MONEY_RATE, decide.TIE = 0.0, 1e-4
         _selftest_board()
     finally:
-        decide.MONEY_RATE = was
+        decide.MONEY_RATE, decide.TIE = was, tie
 
 
 def _selftest_board() -> None:

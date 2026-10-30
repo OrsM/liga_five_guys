@@ -273,7 +273,11 @@ def auction_bars() -> dict[tuple[str, dt.datetime], float | None]:
 # The runs a day the board is acted on, local time as the closes are
 # (lfg.timer at 10:00, lfg-flip.timer at 21:45, Europe/Madrid): bids placed
 # at one stand until the next, which sees them as yours.
-RUNS = ((10, 0), (21, 45))
+# When the phantom acts on the board: once a day, before the night's close,
+# where the bids it places are settled (2026-10-30: as good as twice a day,
+# 10:00 and 21:45, at every move cost tried, and at half the time; the
+# morning's moves the evening's run made again).
+RUNS = ((21, 45),)
 
 
 def run_times(closes: list[dt.datetime]) -> dict[dt.datetime, dt.datetime]:
@@ -606,8 +610,7 @@ def _selftest_phantom() -> None:
     from ffcore.fixtures import tiny_market_universe
     madrid = dt.timezone(dt.timedelta(hours=2))
     close = dt.datetime(2026, 10, 20, 22, 24, tzinfo=madrid)
-    assert run_times([close]) == {close.replace(hour=10, minute=0): close,
-                                  close.replace(hour=21, minute=45): close}, "the morning run and the flip"
+    assert run_times([close]) == {close.replace(hour=21, minute=45): close}, "the evening's run, before the close"
     u = with_squad(tiny_market_universe(), dict(tiny_market_universe().mine), 5.5e6)
     buy, sale = Action("buy", buy="cand_free", cost=5e6), Action("sell", sell=("bench_m",), proceeds=3e6)
     day, made = acted(u, {}, [buy, sale])

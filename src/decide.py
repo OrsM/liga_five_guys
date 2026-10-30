@@ -31,8 +31,9 @@ MONEY_RATE = 8.0
 # What each move costs the plan by itself, in season points: a move must
 # beat it to be made. The forecasts tell players apart too poorly for small
 # gains to be real: the daily backtest (2026-10-30, plan less standing
-# still) -51 at none, -74 at 5, +4 at 10, with a fifth of the moves.
-TIE = 10.0
+# still, deciding twice a day / once): -51 at none, -26 / -29 at 5,
+# +5 / +49 at 10, +38 / +42 at 15, with a tenth of the moves.
+TIE = 15.0
 # How much a point of season variance is worth, in points, for each plan
 # the program makes (Hunter, Vielma and Zaman, arXiv 1604.01455): above 0 it
 # seeks variance, below it avoids it. Of the plans, the one that most
