@@ -1,65 +1,25 @@
 {
- "generated_at": "2026-10-31T03:39Z",
+ "generated_at": "2026-10-31T09:03Z",
  "lock_at": "2026-10-31T13:00:00+00:00",
- "cash": 5079381.0,
+ "cash": 5179381.0,
  "cash_locked": 0.0,
- "finish": 1.93,
- "p_win": 0.219,
- "p_win_after": 0.219,
+ "finish": 1.85,
+ "p_win": 0.288,
+ "p_win_after": 0.288,
  "blocks": {
   "buys": 0.0,
   "sales": 0.0
  },
- "lam": 0.0,
+ "lam": 0.190561160987216,
  "band": [
-  1921.61685093876,
-  2194.44630227979
+  1993.26870973146,
+  2284.20644424437
  ],
- "do": [
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Fernando Niño, Alvaro F. Carreras",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Fernando Niño",
-     "names"
-    ]
-   ],
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "107909857",
-     "player": "2533",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 5252272.0
-    },
-    {
-     "player_team": "107909858",
-     "player": "3147",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 46896666.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "plan_gain": 0.0,
  "cash_after": null,
- "can_bid": 82463097.0,
- "ping": "list Fernando Niño, Alvaro F. Carreras",
+ "can_bid": 82563097.0,
+ "ping": "",
  "exposed": [
   {
    "name": "Mathew Ryan",
@@ -77,9 +37,9 @@
    "clause": 42016585.0
   },
   {
-   "name": "Natan",
-   "pos": "DEF",
-   "clause": 50603091.0
+   "name": "Martin Satriano",
+   "pos": "DEL",
+   "clause": 17220303.0
   },
   {
    "name": "Iñigo Vicente",
@@ -87,19 +47,14 @@
    "clause": 31271675.0
   },
   {
-   "name": "Gerard Martin",
-   "pos": "DEF",
-   "clause": 43516633.0
-  },
-  {
-   "name": "Martin Satriano",
-   "pos": "DEL",
-   "clause": 17220303.0
-  },
-  {
-   "name": "Pepelu",
+   "name": "German Valera",
    "pos": "MED",
-   "clause": 35299952.0
+   "clause": 17986350.0
+  },
+  {
+   "name": "Natan",
+   "pos": "DEF",
+   "clause": 50603091.0
   },
   {
    "name": "Marcos Alonso",
@@ -107,14 +62,19 @@
    "clause": 28589508.0
   },
   {
-   "name": "German Valera",
-   "pos": "MED",
-   "clause": 17986350.0
+   "name": "Gerard Martin",
+   "pos": "DEF",
+   "clause": 43516633.0
   },
   {
-   "name": "Bil Nsongo",
-   "pos": "DEL",
-   "clause": 10165933.0
+   "name": "Pepelu",
+   "pos": "MED",
+   "clause": 35299952.0
+  },
+  {
+   "name": "Thomas Lemar",
+   "pos": "MED",
+   "clause": 7341592.0
   },
   {
    "name": "Miguel Roman",
@@ -127,14 +87,14 @@
    "clause": 13097547.0
   },
   {
-   "name": "Thomas Lemar",
-   "pos": "MED",
-   "clause": 7341592.0
+   "name": "Bil Nsongo",
+   "pos": "DEL",
+   "clause": 10165933.0
   },
   {
-   "name": "Augusto Batalla",
-   "pos": "POR",
-   "clause": 5505499.0
+   "name": "Jon Moncayola",
+   "pos": "MED",
+   "clause": 4279563.0
   },
   {
    "name": "Alvaro F. Carreras",
@@ -147,9 +107,9 @@
    "clause": 6865304.0
   },
   {
-   "name": "Jon Moncayola",
-   "pos": "MED",
-   "clause": 4279563.0
+   "name": "Augusto Batalla",
+   "pos": "POR",
+   "clause": 5505499.0
   },
   {
    "name": "Adria Pedrosa",
@@ -172,21 +132,21 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 512.0,
-   "mean": 2177.10394955768,
-   "lo": 2027.37371417201,
-   "hi": 2326.83418494335,
-   "cash": 1097131.0,
+   "mean": 2227.53076370675,
+   "lo": 2068.40077416868,
+   "hi": 2386.66075324482,
+   "cash": 1197131.0,
    "estimated": true,
-   "p_above": 0.774385134135579
+   "p_above": 0.701179538796641
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 530.0,
-   "mean": 2058.03157660927,
-   "lo": 1921.61685093876,
-   "hi": 2194.44630227979,
-   "cash": 5079381.0,
+   "mean": 2138.73757698791,
+   "lo": 1993.26870973146,
+   "hi": 2284.20644424437,
+   "cash": 5179381.0,
    "estimated": false,
    "p_above": null
   },
@@ -194,34 +154,34 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 393.0,
-   "mean": 1888.90629284401,
-   "lo": 1752.64992150673,
-   "hi": 2025.16266418128,
-   "cash": 35699315.0,
+   "mean": 1964.56167230224,
+   "lo": 1819.66519654609,
+   "hi": 2109.45814805838,
+   "cash": 35799315.0,
    "estimated": true,
-   "p_above": 0.130476796425659
+   "p_above": 0.138483013679437
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 374.0,
-   "mean": 1774.16721152787,
-   "lo": 1646.84639439843,
-   "hi": 1901.48802865732,
-   "cash": 21618534.0,
+   "mean": 1786.60462606178,
+   "lo": 1655.68745655792,
+   "hi": 1917.52179556564,
+   "cash": 21718534.0,
    "estimated": true,
-   "p_above": 0.025614649028788
+   "p_above": 0.0105580984818467
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 389.0,
-   "mean": 1630.1036704139,
-   "lo": 1508.32589428087,
-   "hi": 1751.88144654693,
-   "cash": 58193671.0,
+   "mean": 1634.09675645604,
+   "lo": 1515.37429184257,
+   "hi": 1752.81922106952,
+   "cash": 58293671.0,
    "estimated": true,
-   "p_above": 0.00135418736599657
+   "p_above": 0.000286272969319823
   }
  ]
 }
