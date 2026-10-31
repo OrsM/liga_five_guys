@@ -1,8 +1,8 @@
 -- The decision (docs/notes/plan.md; the simplify map, step 3), every number
 -- in points, each a measured fact, a game rule, or the backtest's to settle:
 --
---   lam           what a million is worth: a million in an average player
---                 earns per_game points a game (players with 3+ games),
+--   lam           what a million is worth: what a million more in value
+--                 adds to a player's points a game (players with 3+ games),
 --                 for each jornada left (money_rate)
 --   f(S)          the points of squad S's best legal eleven, summed over
 --                 the jornadas left, each player at his forecast cell times
@@ -71,13 +71,17 @@ CREATE TABLE IF NOT EXISTS dec_plan (
 );
 
 -- What a million is worth, in points: per_game, the points a game a
--- million in an average player earns (mean points a game over mean value,
--- players with 3+ games), times the jornadas left.
+-- million more in value adds (the least-squares slope of points a game on
+-- value, players with 3+ games), times the jornadas left. Not mean points
+-- over mean value: a player worth nothing still scores about 3 a game, and
+-- that ratio priced a million 4 times over (2026-10-31: 0.255 vs 0.060).
 DROP VIEW IF EXISTS money_rate;
 CREATE VIEW money_rate AS
-WITH r AS (SELECT avg(s.pts / s.apps) / avg(f.value / 1e6) AS per_game
+WITH x AS (SELECT s.pts * 1.0 / s.apps AS y, f.value / 1e6 AS v
            FROM season_record s JOIN current_market f ON f.ff_id = s.player
            WHERE s.apps >= 3 AND f.value > 0),
+r AS (SELECT (count(*) * sum(v * y) - sum(v) * sum(y)) / (count(*) * sum(v * v) - sum(v) * sum(v)) AS per_game
+      FROM x),
 j AS (SELECT count(*) AS left FROM jornada_calendar WHERE state <> 'done')
 SELECT r.per_game, j.left AS jornadas, r.per_game * j.left AS lam FROM r, j;
 

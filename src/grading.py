@@ -63,8 +63,15 @@ def on_market_by(t: dt.datetime) -> frozenset[str]:
 @cache
 def _first_listed() -> dict[str, str]:
     """When each player was first on the market: one read for every t
-    on_market_by is asked (2026-10-31: a read a t was 9 of a backtest's 34 s)."""
-    return dict(rows("SELECT ff_id, min(observed_at) FROM market WHERE ff_id <> '' GROUP BY ff_id"))
+    on_market_by is asked (2026-10-31: a read a t was 9 of a backtest's 34 s).
+    His first listing (api_market, where buys come from) or his first value
+    (market), whichever is earlier: 9 players were listed before their first
+    value (2026-10-31)."""
+    return dict(rows("SELECT player, min(first) FROM ("
+                     " SELECT ff_id AS player, min(observed_at) AS first FROM market WHERE ff_id <> '' GROUP BY ff_id"
+                     " UNION ALL SELECT a.player, min(t.observed_at) FROM api_market t"
+                     " JOIN app_player a ON a.app_id = t.player_id GROUP BY a.player)"
+                     " GROUP BY player"))
 
 
 def _built_at(job: tuple[dt.datetime, frozenset[str]]) -> tuple[dt.datetime, Universe | None]:
