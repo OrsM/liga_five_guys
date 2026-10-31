@@ -80,8 +80,8 @@
           "sql": "SELECT coalesce(p.name, t.ff_id) AS player, round(t.trend, 1) AS trend_pct FROM price_trend t\nLEFT JOIN names p ON p.player = t.ff_id\nORDER BY t.trend DESC"
         },
         "price_change": {
-          "title": "Each player's value change in % over :h updates after his last one on or before :day (all time: what happened)",
-          "sql": "SELECT a.ff_id, coalesce(x.change, 0.0) AS change\nFROM (SELECT ff_id, max(i) AS i FROM price_series WHERE day <= :day GROUP BY ff_id) a\nLEFT JOIN price_ahead x ON x.ff_id = a.ff_id AND x.i = a.i AND x.h = CAST(:h AS INTEGER)"
+          "title": "Each player's value change in % over :h updates after his last one on or before :day (all time: what happened; empty where there are not :h more yet)",
+          "sql": "SELECT a.ff_id, x.change\nFROM (SELECT ff_id, max(i) AS i FROM price_series WHERE day <= :day GROUP BY ff_id) a\nLEFT JOIN price_ahead x ON x.ff_id = a.ff_id AND x.i = a.i AND x.h = CAST(:h AS INTEGER)"
         },
         "unmatched_players": {
           "title": "Players the crosswalk cannot join, the dearest first: with no app id he is never seen as owned, priced or bid on; with no line-up page he has no start odds",

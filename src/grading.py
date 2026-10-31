@@ -205,9 +205,14 @@ def decisions() -> list[dict[str, Any]]:
         per_j, m = u.forecaster.per_jornada, u.market
         later = sorted(j for j in done if j >= i and j in per_j)
 
-        def worth(a: Action, pct: Callable[[str], float]) -> float:
-            return (m.value.get(a.buy, 0.0) * pct(a.buy) - sum(
-                m.value.get(k, 0.0) * pct(k) for k in a.sell)) / 100e6
+        def worth(a: Action, pct: Callable[[str], float | None]) -> float | None:
+            """What the move's players were worth more (bought) or less
+            (sold) after the horizon, in millions; None until it has passed."""
+            got = {k: pct(k) for k in (*((a.buy, ) if a.buy else ()), *a.sell)}
+            if any(v is None for v in got.values()):
+                return None
+            return (m.value.get(a.buy, 0.0) * (got.get(a.buy) or 0.0) - sum(
+                m.value.get(k, 0.0) * (got[k] or 0.0) for k in a.sell)) / 100e6
 
         def change(a: Action, pts: Callable[[str, int], float]) -> float:
             return sum(pts(a.buy, j) for j in later) - sum(
@@ -222,7 +227,7 @@ def decisions() -> list[dict[str, Any]]:
                 "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
                 "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
                 "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
-                "value_real": worth(a, lambda k: rose.get(k, 0.0))})
+                "value_real": worth(a, lambda k: rose.get(k))})
     return out
 
 

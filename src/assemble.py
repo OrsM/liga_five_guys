@@ -194,10 +194,10 @@ def price_momentum() -> Prices:
                   tuple(v for (v,) in rows("SELECT rmse FROM price_error ORDER BY h")))
 
 
-def price_change(day: str, h: int) -> dict[str, float]:
+def price_change(day: str, h: int) -> dict[str, float | None]:
     """Each player's change in % over the h updates after his last one on or
-    before day, all time (0 where there are not h more): what a replay
-    looks back on."""
+    before day, all time (None where there are not h more: not known yet):
+    what a replay looks back on."""
     return dict(named("price_change", {"day": day, "h": h})[1])
 
 
