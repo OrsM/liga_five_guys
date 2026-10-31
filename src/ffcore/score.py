@@ -248,7 +248,7 @@ def _selftest() -> None:
     susp = typed("lineups", [{"player": "p0", "player_name": "p0", "start_pct": "0", "status": "suspended"}])
     back = Scorer(market, StartOdds(susp, history={"p0": (1.8, 2.0)}, later={"p0": 0.7}), hist,
                   current={"p0": {"pts": 30.0, "pj": 2.0}}).rates(dict(row, name="p0", ff_id="p0"))
-    assert back.p_rest == 0.7, "after his next match: pick_later's"
+    assert back.p_rest == 0.7, "after his next match: season_record's pick"
     assert back.p_now == back.p_rest, "the suspension is the fit factor's, not selection's"
 
     print("ffcore.score self-test OK")

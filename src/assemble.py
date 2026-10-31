@@ -103,11 +103,11 @@ def scorer(market: Rows, xi_rows: Rows) -> Scorer:
     return Scorer(
         market, StartOdds(xi_rows, Calibration(*cal),
                           fit_availability(rows("SELECT * FROM availability_tally")),
-                          {k: (apps, squads) for k, (_pts, apps, squads) in season.items()},
+                          {k: (r.apps, r.squads) for k, r in season.items()},
                           dict(rows("SELECT player, pct FROM last_fit")), app_status(),
-                          dict(rows("SELECT player, p FROM pick_later"))),
+                          {k: r.pick for k, r in season.items() if r.pick is not None}),
         last_season,
-        current={k: {"pts": pts, "pj": apps} for k, (pts, apps, _n) in season.items()},
+        current={k: {"pts": r.pts, "pj": r.apps} for k, r in season.items()},
         promoted_discount=fit_promoted_discount(market, last_season, scored(), priors),
         priors=priors)
 

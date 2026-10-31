@@ -1186,19 +1186,24 @@ WHERE s.role IN ('starter', 'sub') AND s.player_slug <> '';
 -- Each scoring player's jornadas: his points (scored) and minutes.
 DROP VIEW IF EXISTS player_jornadas;
 CREATE VIEW player_jornadas AS
+WITH s AS MATERIALIZED (SELECT player, jornada, pts FROM scored)
 SELECT player, jornada, sum(pts) AS pts, sum(mins) AS mins FROM (
-    SELECT player, jornada, pts, 0.0 AS mins FROM scored
+    SELECT player, jornada, pts, 0.0 AS mins FROM s
     UNION ALL
     SELECT player, jornada, 0.0, mins FROM squad_minutes
-    WHERE player IN (SELECT player FROM scored))
+    WHERE player IN (SELECT player FROM s))
 GROUP BY player, jornada;
 
 -- His season so far: points, appearances, and matchday squads (jornadas
--- he scored or was in the squad).
+-- he scored or was in the squad); and pick, the chance he is picked if fit
+-- after his next match: that record (appearances over matchday squads)
+-- pulled toward NEUTRAL_START, which is worth PICK_K matches. In one view,
+-- so the forecast derives the season once a moment.
 DROP VIEW IF EXISTS season_record;
 CREATE VIEW season_record AS
-SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
-FROM player_jornadas GROUP BY player;
+WITH r AS (SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
+           FROM player_jornadas GROUP BY player)
+SELECT r.*, (k.pick_k * k.neutral_start / 100.0 + apps) / (k.pick_k + squads) AS pick FROM r, k;
 
 -- Each app id's player: the futbolfantasy player whose value it equalled
 -- at the most market snapshots (an all-players row holds until his next),
@@ -1287,14 +1292,8 @@ SELECT m.player, coalesce(max(f.my + f.b * coalesce(m.x - f.mx, 0.0), 0.0),
                           (SELECT median(y) FROM s)) AS prior
 FROM m LEFT JOIN f USING (pos);
 
--- The chance he is picked if fit, after his next match: his record this
--- season (appearances over matchday squads) pulled toward NEUTRAL_START,
--- which is worth PICK_K matches. No squads, no row.
 DROP VIEW IF EXISTS pick_prior;
 DROP VIEW IF EXISTS pick_later;
-CREATE VIEW pick_later AS
-SELECT player, (k.pick_k * k.neutral_start / 100.0 + apps) / (k.pick_k + squads) AS p
-FROM season_record, k WHERE squads > 0;
 
 -- Starts: each matchday squad (starters) against the club's last
 -- futbolfantasy listing before the jornada locked. Each player in either,

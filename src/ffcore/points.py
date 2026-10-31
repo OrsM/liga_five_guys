@@ -2,12 +2,21 @@
 change in a player's season total, by jornada, and his season so far."""
 from __future__ import annotations
 
-
+from typing import NamedTuple
 
 from ffcore.db import rows
 from ffcore.score import Scored
 
-__all__ = ["done_jornadas", "jornada_points", "scored", "season_record"]
+__all__ = ["Record", "done_jornadas", "jornada_points", "scored", "season_record"]
+
+
+class Record(NamedTuple):
+    """A scoring player's season so far: points, appearances, matchday
+    squads, and the chance he is picked if fit after his next match."""
+    pts: float
+    apps: float
+    squads: float
+    pick: float | None
 
 
 def scored() -> list[Scored]:
@@ -22,9 +31,9 @@ def jornada_points() -> dict[tuple[str, int], float]:
         "SELECT player, jornada, sum(pts) FROM scored GROUP BY player, jornada")}
 
 
-def season_record() -> dict[str, tuple[float, float, float]]:
-    """Each scoring player's season so far: (points, appearances, matchday squads)."""
-    return {k: (pts, apps, n) for k, pts, apps, n in rows("SELECT player, pts, apps, squads FROM season_record")}
+def season_record() -> dict[str, Record]:
+    """Each scoring player's season so far (schema.sql's season_record)."""
+    return {k: Record(*r) for k, *r in rows("SELECT player, pts, apps, squads, pick FROM season_record")}
 
 
 def done_jornadas() -> set[int]:
@@ -81,7 +90,7 @@ def _selftest() -> None:
                                    ("tres", "3", "sub", ""), ("uno-coach", "1", "coach", "")]] + [
                 {"observed_at": later, "match_id": "m2", "team_slug": "x", "player_slug": "uno",
                  "player_name": "1", "role": "starter", "minute": "45"}])
-            assert season_record() == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0)}, \
+            assert {k: r[:3] for k, r in season_record().items()} == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0)}, \
                 "a starter the match unless he came off, a sub from when he came on"
         finally:
             set_now(None)
