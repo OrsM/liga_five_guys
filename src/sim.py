@@ -108,7 +108,7 @@ def _selftest_board() -> None:
                resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0,
                waits: Sequence[tuple[str, float]] = (), nights: int = 0,
                listings: Sequence[tuple[str, str]] = (), money_rate: float | None = None,
-               bids: Sequence[tuple[str, int]] = ()) -> Doc:
+               bids: Sequence[tuple[str, int]] = (), names: dict[str, str] | None = None) -> Doc:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
         past offers, resale for what waiting sells the game's market players
@@ -116,7 +116,8 @@ def _selftest_board() -> None:
         what turning down an offer on a player of yours is worth, nights the
         game's offers still to come before the lock (the first a day after
         2026-08-01), listings when each of yours ends, bids how many bids
-        each on the game's market has (yours among them, if you have one)."""
+        each on the game's market has (yours among them, if you have one),
+        names the names shown where they are not the player's key."""
         m = u.market
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             with closing(connect()) as db, db:
@@ -124,7 +125,7 @@ def _selftest_board() -> None:
                 db.execute("CREATE TABLE player_facts (player, name, pos, value, owner, clause,"
                            " price, route, my_bid, offer, paid, trend)")
                 db.executemany("INSERT INTO player_facts VALUES (%s)" % ", ".join("?" * 12), [
-                    (k, k, m.pos.get(k), m.value.get(k), m.owner.get(k), m.clause.get(k),
+                    (k, (names or {}).get(k, k), m.pos.get(k), m.value.get(k), m.owner.get(k), m.clause.get(k),
                      m.price.get(k), m.route.get(k), m.my_bid.get(k), m.offer.get(k),
                      m.paid.get(k), m.trend.get(k)) for k in set(m.pos) | set(u.mine)])
                 db.execute("DROP VIEW sale_odds")
@@ -161,27 +162,20 @@ def _selftest_board() -> None:
 
     ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
     doc = report(ub, b, nights=1)
-    after = ub.after(*(r.action for r in b.plan))
+    alike = [d for d in report(ub, b, nights=1, names={"cand": "Pablo", "twin": "Pablo"})["do"]
+             if d["what"] == "buy"]
+    assert len(alike) == len(bought) == 2, \
+        ("a buy's asking and odds are his, not those of whoever shares his name", alike)
     field = doc["do"][0]
-    gone = {k for r in b.plan for k in r.action.sell}
+    now = list(ub.outlook.xi.ranked())
     on = field["label"].removeprefix("field ").split(", ")
-    benched = dict((f[0], f[1]) for f in field["facts"]).get("bench", "")
-    assert field["what"] == "field" and {n.lower() for n in on} == set(after.outlook.xi.ranked()) \
-        and on[0].lower() == after.outlook.xi.ranked()[0], \
-        "the line-up is the plan's: the squad after its moves"
-    assert not gone & {n.lower() for n in on + benched.split(", ")}, \
-        "a sold player is neither fielded nor benched"
+    assert field["what"] == "field" and {n.lower() for n in on} == set(now) and on[0].lower() == now[0], \
+        "the line-up is of the squad you hold now: tonight's buys are not yours until their auction closes"
     assert (field["step"], field["gain"], field["per"]) == ("check line-up", None, "next"), \
         "a line-up the app has not given is a step to take, in the row"
-    now = list(ub.outlook.xi.ranked())
-    known = report(ub, b, now, nights=1)["do"][0]
-    came = set(after.outlook.xi.players) - set(now)
-    left = set(now) - set(after.outlook.xi.players) - gone
-    assert {n.lower() for n in known["label"].removeprefix("field ").split(", ")} == came \
-        and {n.lower() for f in known["facts"] for n in f[1].split(", ")} == left, known
-    assert known["step"] is None and known["gain"] is not None, known
-    assert not [d for d in report(ub, b, now)["do"] if d["what"] == "field"], \
-        "no auction closes before the lock: its buys cannot play, the eleven is the squad's now (Dituro, 2026-10-30)"
+    for nights in (0, 1):
+        assert not [d for d in report(ub, b, now, nights=nights)["do"] if d["what"] == "field"], \
+            "set as the best eleven now: nothing to field, before the auctions or after (Dituro, 2026-10-30)"
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()), d
@@ -471,9 +465,8 @@ def _selftest_board() -> None:
 
 
 def _selftest_lineup() -> None:
-    """schema.sql's lineup_gap: the app's line-up against your best eleven now
-    ('now') and once the plan is made ('plan'), as board_moves and the
-    reminder read it."""
+    """schema.sql's lineup_gap: the app's line-up against your best eleven now,
+    as the board's field line and the reminder both read it."""
     import tempfile
     from contextlib import closing
     from pathlib import Path
@@ -482,29 +475,26 @@ def _selftest_lineup() -> None:
     from ffcore.fixtures import lineup_board
     from ffcore.tidy import tables_in
 
-    def gap(app: list[tuple[str, str]], ids: dict[str, str]) -> list[tuple[str, str, str, int]]:
+    def gap(app: list[tuple[str, str]], ids: dict[str, str]) -> list[tuple[str, str, int]]:
         """The app line-up as (app id, name) rows, with these players' app ids."""
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             lineup_board(app, ids)
             with closing(connect()) as db:
                 return [tuple(r) for r in db.execute(
-                    "SELECT basis, side, player, legal FROM lineup_gap ORDER BY basis, side, player")]
+                    "SELECT side, player, legal FROM lineup_gap ORDER BY side, player")]
 
     lineup = [("1070", "Ionut Radu"), ("2464", "Pepelu")]
-    got = gap(lineup, {"ionut radu": "1070"})
-    assert got == [("plan", "in", "cai coro", 1), ("plan", "out", "pepelu", 1)], \
-        "set as the best eleven now; the plan, which buys cai for pepelu, wants it changed"
-    assert gap(lineup + [("999", "Nobody")], {"ionut radu": "1070"}) == [
-        ("now", "in", "ionut radu", 0), ("now", "in", "pepelu", 0),
-        ("plan", "in", "cai coro", 0), ("plan", "in", "ionut radu", 0)], \
+    assert gap(lineup, {"ionut radu": "1070"}) == [], \
+        "set as the best eleven now: nothing to change, though the plan buys cai coro tonight " \
+        "(a line-up is of players you hold)"
+    whole = [("in", "ionut radu", 0), ("in", "pepelu", 0)]
+    assert gap(lineup + [("999", "Nobody")], {"ionut radu": "1070"}) == whole, \
         "a line-up naming a player you do not own is unknown: the whole eleven to set"
-    assert gap(lineup, {"ionut radu": "1070", "someone else": "2464"}) == [
-        ("now", "in", "ionut radu", 0), ("now", "in", "pepelu", 0),
-        ("plan", "in", "cai coro", 0), ("plan", "in", "ionut radu", 0)], \
+    assert gap(lineup, {"ionut radu": "1070", "someone else": "2464"}) == whole, \
         "an app id that is another's player is the same"
-    assert gap([], {}) == [("now", "in", "ionut radu", 0), ("now", "in", "pepelu", 0),
-                           ("plan", "in", "cai coro", 0), ("plan", "in", "ionut radu", 0)], \
-        "no line-up given: the whole eleven"
+    assert gap([("1070", "Ionut Radu"), ("3", "Bench Boy")], {"ionut radu": "1070", "bench boy": "3"}) == [
+        ("in", "pepelu", 1), ("out", "bench boy", 1)], "bench boy fielded for pepelu: swap them"
+    assert gap([], {}) == whole, "no line-up given: the whole eleven"
 
 
 def funnel(u: Universe, b: Board, run: int) -> list[Doc]:

@@ -190,30 +190,64 @@ CREATE TABLE IF NOT EXISTS grade_forecast (
     PRIMARY KEY (run_id, from_j, jornada, player)
 );
 
--- The forecast of the next jornada replayed at every line-up snapshot
--- (grading.replay), for one variant of the model: how far from the lock the
--- error is acceptable. The same outcomes as grade_forecast, forecast again
--- under the information of each moment, so it says how early a forecast is
--- good, not which model is (paired_gain).
--- The moments replay has tried for a variant, kept or found empty
--- (grading.TODO): so a moment that forecasts nobody is not tried again.
-CREATE TABLE IF NOT EXISTS replay_tried (
-    variant TEXT NOT NULL,
-    as_of   TEXT NOT NULL,
-    PRIMARY KEY (variant, as_of)
+-- The forecast (assemble.forecast), made once a moment and kept: every
+-- player's cell a jornada as of the moment (pts if he plays, p the chance he
+-- plays; for a rated player the factors they are the products of), and who
+-- was listed injured, doubtful or suspended then. A moment is the code the
+-- forecast is made by and its constants, each a fingerprint
+-- (assemble.forecast_key), and the cut: changing either is another moment,
+-- never a stale one. The board, the backtests and the replays all read it.
+CREATE TABLE IF NOT EXISTS forecast_moment (
+    moment    INTEGER PRIMARY KEY,
+    code      TEXT NOT NULL,
+    constants TEXT NOT NULL,
+    as_of     TEXT NOT NULL,
+    made      INTEGER NOT NULL DEFAULT 0,   -- every player's cells in
+    UNIQUE (code, constants, as_of)
 );
 
-CREATE TABLE IF NOT EXISTS replay_forecast (
-    variant   TEXT NOT NULL,
-    as_of     TEXT NOT NULL,       -- the snapshot replayed
-    jornada   INTEGER NOT NULL,    -- the next one then
-    player    TEXT NOT NULL,
-    predicted REAL NOT NULL,
-    actual    REAL NOT NULL,       -- 0 if he scored nothing
-    flagged   INTEGER NOT NULL,    -- injured, doubtful or suspended then
-    lead_h    REAL NOT NULL,       -- hours from the snapshot to the lock
-    PRIMARY KEY (variant, as_of, jornada, player)
+CREATE TABLE IF NOT EXISTS forecast_player (
+    moment  INTEGER NOT NULL REFERENCES forecast_moment(moment),
+    player  TEXT NOT NULL,
+    flagged INTEGER NOT NULL,
+    PRIMARY KEY (moment, player)
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS forecast_cell (
+    moment  INTEGER NOT NULL REFERENCES forecast_moment(moment),
+    player  TEXT NOT NULL,
+    jornada INTEGER NOT NULL,
+    pts     REAL NOT NULL,
+    p       REAL NOT NULL,
+    ppm     REAL,
+    fixture REAL,
+    picked  REAL,
+    fit     REAL,
+    PRIMARY KEY (moment, player, jornada)
+) WITHOUT ROWID;
+
+-- The values the moment's forecast fitted (assemble.forecast_fits), as the
+-- run's params records them.
+CREATE TABLE IF NOT EXISTS forecast_fit (
+    moment    INTEGER NOT NULL REFERENCES forecast_moment(moment),
+    component TEXT NOT NULL,
+    term      TEXT NOT NULL,
+    value     REAL NOT NULL,
+    UNIQUE (moment, component, term)
+);
+
+-- The code and constants each variant of the model was last forecast with
+-- (grading.replay): its replayed forecasts are the moments of those.
+CREATE TABLE IF NOT EXISTS forecast_variant (
+    variant   TEXT PRIMARY KEY,
+    code      TEXT NOT NULL,
+    constants TEXT NOT NULL
+);
+
+-- Kept by variant name, not by code: a changed model kept the old one's
+-- forecasts for ever (2026-10-31). Now the view replayed, over forecast_cell.
+DROP TABLE IF EXISTS replay_tried;
+DROP TABLE IF EXISTS replay_forecast;
 
 -- Is each source still arriving, and whole? Per source that stores a whole
 -- snapshot each fetch (not the keyed tables, which keep only changes) (a page that parsed to nothing stores no snapshot at all),
@@ -259,6 +293,7 @@ CREATE TABLE IF NOT EXISTS sim_calibration (
     diff_pit    REAL,
     PRIMARY KEY (run_id, jornada, manager)
 );
+
 
 -- The phantom manager (grading.phantom_season): the points of his eleven
 -- each jornada, beside the same squad never moved, what he did, and his
@@ -361,6 +396,29 @@ w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS open
 SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens AND s.at < w.lock
 ORDER BY w.lock, s.at;
 
+-- The forecast of the next jornada at every replay moment, for each variant
+-- as last forecast (forecast_variant; grading.replay makes the moments), a
+-- row a player, with what he scored (0 if nothing) and how many hours
+-- before the lock: how far from the lock the error is acceptable. The same
+-- outcomes as grade_forecast, forecast again under the information of each
+-- moment, so it says how early a forecast is good, not which model is
+-- (paired_gain).
+DROP VIEW IF EXISTS replayed;
+CREATE VIEW replayed AS
+WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
+SELECT v.variant, r.as_of, r.jornada, c.player, c.pts * c.p AS predicted,
+       coalesce(a.pts, 0.0) AS actual, f.flagged,
+       24 * (julianday(substr(r.lock, 1, 10) || ' ' || substr(r.lock, 12, 2) || ':' || substr(r.lock, 14, 2))
+           - julianday(substr(r.as_of, 1, 10) || ' ' || substr(r.as_of, 12, 2) || ':' || substr(r.as_of, 14, 2)))
+           AS lead_h
+FROM forecast_variant v
+JOIN forecast_moment m ON m.code = v.code AND m.constants = v.constants AND m.made
+JOIN replay_moments r ON r.as_of = m.as_of
+JOIN forecast_cell c ON c.moment = m.moment AND c.jornada = r.jornada
+JOIN forecast_player f ON f.moment = m.moment AND f.player = c.player
+LEFT JOIN pts a ON a.player = c.player AND a.jornada = r.jornada
+WHERE r.jornada IN (SELECT jornada FROM jornadas_done);
+
 -- How far from the lock a replayed forecast was made, in buckets.
 DROP VIEW IF EXISTS lead_buckets;
 CREATE VIEW lead_buckets AS
@@ -378,7 +436,7 @@ SELECT variant, b.from_h, b.lead,
        sqrt(avg((predicted - actual) * (predicted - actual))) AS rmse,
        avg(predicted - actual) AS bias,
        sqrt(avg(CASE WHEN flagged = 1 THEN (predicted - actual) * (predicted - actual) END)) AS flagged_rmse
-FROM replay_forecast f JOIN lead_buckets b ON f.lead_h >= b.from_h AND f.lead_h < b.to_h
+FROM replayed f JOIN lead_buckets b ON f.lead_h >= b.from_h AND f.lead_h < b.to_h
 GROUP BY variant, b.from_h, b.lead;
 
 -- What forecasting earlier costs: the same player-jornadas forecast at each
@@ -386,12 +444,12 @@ GROUP BY variant, b.from_h, b.lead;
 -- earlier minus last (positive: earlier is worse) with its interval (claim).
 DROP VIEW IF EXISTS replay_gap;
 CREATE VIEW replay_gap AS
-WITH fin AS (SELECT variant, jornada, max(as_of) AS at FROM replay_forecast GROUP BY variant, jornada),
+WITH fin AS (SELECT variant, jornada, max(as_of) AS at FROM replayed GROUP BY variant, jornada),
 d AS (SELECT f.variant, f.lead_h, f.flagged,
              (f.predicted - f.actual) * (f.predicted - f.actual)
            - (g.predicted - g.actual) * (g.predicted - g.actual) AS d
-      FROM replay_forecast f JOIN fin ON fin.variant = f.variant AND fin.jornada = f.jornada
-      JOIN replay_forecast g ON g.variant = f.variant AND g.jornada = f.jornada
+      FROM replayed f JOIN fin ON fin.variant = f.variant AND fin.jornada = f.jornada
+      JOIN replayed g ON g.variant = f.variant AND g.jornada = f.jornada
                             AND g.as_of = fin.at AND g.player = f.player
       WHERE f.as_of < fin.at),
 s AS (SELECT d.variant, b.from_h, b.lead, sc.scope, count(*) AS n, avg(d.d) AS m,
@@ -1455,13 +1513,22 @@ SELECT row_number() OVER (ORDER BY -s.mean, s.manager) - 1 AS ord, s.manager, s.
        s.finish, s.p_first
 FROM sim_standings s JOIN board_run USING (run_id);
 
--- Your line-up in the app against the best eleven: of your squad now
--- (basis 'now', sim_players.xi) and of the squad once the plan is made
--- ('plan', plan_xi). The app's line-up is its players, each by its player
--- else by name within your squad, and counts only if every one is yours
--- and there are as many as the eleven; otherwise it is unknown (legal 0)
--- and the whole eleven is to set. 'in' are the eleven's players not in it,
--- 'out' (i, its order in the app) those in it that are not in the eleven.
+-- The eleven to field at the lock: the best of your squad now, each with his
+-- place in your team, as the app lines him up. The line-up reminder and the
+-- board's field line both read it.
+DROP VIEW IF EXISTS field_basis;
+DROP VIEW IF EXISTS board_eleven;
+CREATE VIEW board_eleven AS
+SELECT p.player, p.name, p.pos, p.next FROM board_players p WHERE p.xi;
+
+-- Your line-up in the app against the best eleven of your squad now
+-- (sim_players.xi): a line-up is of players you hold, so a buy is in it only
+-- once he is yours, at the run after his auction closes. The app's line-up
+-- is its players, each by its player else by name within your squad, and
+-- counts only if every one is yours and there are as many as the eleven;
+-- otherwise it is unknown (legal 0) and the whole eleven is to set. 'in'
+-- are the eleven's players not in it, 'out' (i, its order in the app) those
+-- in it that are not in the eleven.
 DROP VIEW IF EXISTS lineup_gap;
 CREATE VIEW lineup_gap AS
 WITH app AS (
@@ -1475,32 +1542,15 @@ WITH app AS (
 fielded AS (SELECT i, player FROM app
             WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN board_players b
                               ON b.player = a.player AND b.mine WHERE b.player IS NULL)),
-bases(basis) AS (VALUES ('now'), ('plan')),
-eleven AS (SELECT b.basis, p.player, p.name, p.next FROM bases b
-           JOIN board_players p ON (b.basis = 'now' AND p.xi) OR (b.basis = 'plan' AND p.plan_xi)),
-legal AS (SELECT basis, (SELECT count(*) FROM fielded) > 0
-                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM eleven e WHERE e.basis = bases.basis)
-                 AS ok FROM bases)
-SELECT e.basis, 'in' AS side, NULL AS i, e.player, e.name, e.next, l.ok AS legal
-FROM eleven e JOIN legal l USING (basis)
+legal AS (SELECT (SELECT count(*) FROM fielded) > 0
+                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM board_eleven) AS ok)
+SELECT 'in' AS side, NULL AS i, e.player, e.name, e.next, l.ok AS legal
+FROM board_eleven e, legal l
 WHERE NOT l.ok OR e.player NOT IN (SELECT player FROM fielded)
 UNION ALL
-SELECT l.basis, 'out', f.i, b.player, b.name, b.next, l.ok
+SELECT 'out', f.i, b.player, b.name, b.next, l.ok
 FROM fielded f JOIN board_players b USING (player), legal l
-WHERE l.ok AND f.player NOT IN (SELECT player FROM eleven e WHERE e.basis = l.basis);
-
--- The eleven to field at the lock: the plan's, its buys in, while an
--- auction still closes before it (nights_left); after the last, the
--- squad's now (its buys cannot play: Dituro, 2026-10-30). Each with his
--- place in your team, as the app lines him up (board_eleven).
-DROP VIEW IF EXISTS field_basis;
-CREATE VIEW field_basis AS
-SELECT CASE WHEN coalesce((SELECT nights FROM nights_left), 0) > 0 THEN 'plan' ELSE 'now' END AS basis;
-
-DROP VIEW IF EXISTS board_eleven;
-CREATE VIEW board_eleven AS
-SELECT p.player, p.name, p.pos, p.next FROM board_players p
-WHERE CASE (SELECT basis FROM field_basis) WHEN 'plan' THEN p.plan_xi ELSE p.xi END;
+WHERE l.ok AND f.player NOT IN (SELECT player FROM board_eleven);
 
 -- The plan's moves, in its order, each by its funnel rank, and what it
 -- spends (a sale's is negative).
@@ -1570,9 +1620,9 @@ FROM ranked JOIN took USING (n) WHERE taken;
 DROP VIEW IF EXISTS board_moves;
 DROP VIEW IF EXISTS board_rows;
 CREATE VIEW board_rows AS
-WITH ins AS (SELECT * FROM lineup_gap WHERE basis = (SELECT basis FROM field_basis) AND side = 'in'),
-outs AS (SELECT * FROM lineup_gap WHERE basis = (SELECT basis FROM field_basis) AND side = 'out'),
-legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap WHERE basis = (SELECT basis FROM field_basis)),
+WITH ins AS (SELECT * FROM lineup_gap WHERE side = 'in'),
+outs AS (SELECT * FROM lineup_gap WHERE side = 'out'),
+legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap),
 field AS (
     SELECT -1 AS ord, 'field' AS what,
            'field ' || (SELECT group_concat(name, ', ' ORDER BY -next, player) FROM ins) AS label,
@@ -1727,7 +1777,8 @@ WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
                                  FROM json_each(r.players) e LEFT JOIN player_facts f ON f.player = e.value
                                  LEFT JOIN current_api_teams t ON t.player = e.value
                                  LEFT JOIN current_api_market m ON m.player = e.value)) AS o
-                     FROM board_rows r LEFT JOIN board_buys b ON r.what = 'buy' AND b.in_plan AND b.name = r.name))
+                     FROM board_rows r LEFT JOIN board_buys b ON r.what = 'buy' AND b.in_plan
+                                                     AND b.player = json_extract(r.players, '$[0]')))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
     'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win, 'p_win_after', h.p_win_after,
@@ -1768,7 +1819,7 @@ WHERE opens <= (SELECT cut())
 -- best eleven. No row when the line-up set is that eleven.
 DROP VIEW IF EXISTS lineup_alert;
 CREATE VIEW lineup_alert AS
-WITH g AS (SELECT * FROM lineup_gap WHERE basis = 'now'),
+WITH g AS (SELECT * FROM lineup_gap),
 ins AS (SELECT group_concat(name, ', ' ORDER BY -next, player) AS names FROM g WHERE side = 'in'),
 outs AS (SELECT group_concat(name, ', ' ORDER BY i) AS names FROM g WHERE side = 'out'),
 left AS (SELECT CAST(round((

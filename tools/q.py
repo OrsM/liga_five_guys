@@ -215,6 +215,7 @@ def _selftest_variant_gap() -> None:
 
     from ffcore.db import record
     from ffcore.tidy import tables_in
+    from grading import replayed_table
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         def row(v: str, at: str, j: int, k: str, pred: float, fl: int, h: float) -> dict[str, Any]:
@@ -230,7 +231,7 @@ def _selftest_variant_gap() -> None:
                 # jornada 3: only a moment inside the window: nothing to compare
                 row("live", "m4", 3, "a", 0, 0, 5), row("slow", "m4", 3, "a", 3, 0, 5),
                 # jornada 4: a moment exactly :hours out counts (same error either way)
-                row("live", "m5", 4, "z", 1, 0, 24), row("slow", "m5", 4, "z", 1, 0, 24)], "replay_forecast")
+                row("live", "m5", 4, "z", 1, 0, 24), row("slow", "m5", 4, "z", 1, 0, 24)], replayed_table())
         got = {r[0]: r for r in named("variant_gap", {"old": "live", "new": "slow", "hours": 24})[1]}
         assert set(got) == {"all", "flagged", "not flagged"}, got
         # old - new squared error: a 4 - 1 = 3, b 1 - 4 = -3, c 0 - 0 = 0

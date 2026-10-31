@@ -63,6 +63,38 @@ reads, one copy of each fact, and nothing the board does not need.
     to settle such a sale (a seller's choice, not the game's auction): tried
     2026-10-31, it read them as free wins (351 moves, 180 points).
 
+## Step 1 done (2026-10-31, branch simplify)
+
+- Bug 1 was narrower than written: the two builders gave identical cells
+  for every player (jornadas 8-10 checked) but late arrivals, whose chance
+  the board sets to 0. That is about owning him, not about him: it stays
+  on the board's side. One builder now (assemble.player_forecast), its
+  moments kept in forecast_moment / forecast_player / forecast_cell /
+  forecast_fit, keyed by the forecast's own code (src less NOT_FORECAST)
+  and its constants (FORECAST_MODULES); another code's moments are deleted
+  once the new one makes one. Cells, factors and fits match the old
+  builders exactly at every lock checked.
+- Bug 2: the replay reads that store (view replayed, forecast_variant);
+  replay_forecast and replay_tried dropped. The replay of every snapshot
+  is off the run (grading.py replay JOBS): ~550 moments made again at each
+  forecast change.
+- Bug 3: one eleven for the field line and the reminder, the squad's now
+  (board_eleven); field_basis gone. sim_players.plan_xi is written and
+  read by no view: it goes with the program (step 4).
+- Bug 4: a file a press (server accept/, renamed in whole), taken by
+  renaming into taken/ (tools/lfg-watch), the old accept.json too until
+  the phone runs the new server.
+- Bug 5: board_json joins a buy line's asking and odds by player.
+- Measured: backtest money 8 7, 506 vs 451 standing, 25 moves, as main on
+  the same data (not the 516 / 22 of an older copy). perf.py 17.7 s to
+  10.6 s. A cold universe is now 4.1 s of which the forecast is 0.14 s:
+  the rest is the market's per-cut views (price_momentum 1.4, League 0.7,
+  bid_odds 0.6, market_facts 0.5). After a decision edit the backtest
+  stays ~50 s until those are kept the same way.
+- Next: the forecast's history views (start_calibration, season_record,
+  pick_later, availability_tally, ppm_prior, scored, last_fit: 2.2 s a
+  moment) for all moments in one pass; then the market's.
+
 ## Dead or idle
 
 - lfg-publish's markdown reports branch and its comments; .runtime/ and
