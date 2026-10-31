@@ -15,9 +15,7 @@ from stats import shrink
 __all__ = ["Rating", "Rates", "Scored", "Scorer", "Tally", "fit_promoted_discount"]
 
 
-SHRINK_K = 8.0    # 4 and 8 not told apart (variant_ahead, finished jornadas only, 0-4 ahead); 2 is clearly worse
-
-PPM_BANDS = 4.0  # ppm_prior: his position's median in his quarter of value (was 0, position only: variant_ahead, better at 0-4 jornadas ahead, every interval above 0)
+SHRINK_K = 16.0  # with the prior a line on log value (2026-10-31, daily backtest less standing still): 8 +42, 16 +65, 30 +55; the price blend it replaced +78, its weight tuned on that backtest
 
 PROMOTED_DISCOUNT = 0.70
 
@@ -137,40 +135,40 @@ class Scorer:
 
 def _selftest_prior() -> None:
     """schema.sql's last_season and ppm_prior on season_points and
-    current_market as tables: the median of last season's points per match
-    (10+ matches) in his position, or with PPM_BANDS in his position and
-    value band; a position with none, everyone's."""
+    current_market as tables: in his position, the least-squares line of
+    last season's points per match (10+ matches) on log value, at his value;
+    a position with fewer than three, its mean; no position, everyone's
+    median."""
+    import math
     import sqlite3
     from ffcore.db import SCHEMA, functions
 
-    def prior(bands: float) -> dict[str, float]:
-        db = sqlite3.connect(":memory:")
-        functions(db)
-        db.execute("CREATE TABLE model_constants (variant, name, value)")
-        db.execute("INSERT INTO model_constants VALUES ('live', 'PPM_BANDS', ?)", (bands,))
-        db.execute("CREATE TABLE season_points (season, ff_id, points, games)")
-        db.execute("CREATE TABLE current_market (ff_id, position, value)")
-        db.executemany("INSERT INTO season_points VALUES (?, ?, ?, ?)", [
-            ("2024-25", "a", 999.0, 30.0),                        # an older season: not read
-            ("2025-26", "a", 60.0, 30.0), ("2025-26", "b", 90.0, 30.0),
-            ("2025-26", "c", 150.0, 30.0), ("2025-26", "d", 210.0, 30.0),
-            ("2025-26", "e", 300.0, 9.0), ("2025-26", "f", 40.0, 10.0)])
-        db.executemany("INSERT INTO current_market VALUES (?, ?, ?)", [
-            ("a", "DEF", 1e6), ("b", "DEF", 2e6), ("c", "DEF", 50e6), ("d", "DEF", 60e6),
-            ("e", "DEF", 70e6), ("f", "portero", 3e6), ("x", "", 5e6)])
-        sql = SCHEMA.read_text()
-        for view in ("k", "last_season", "ppm_prior"):
-            i = sql.index("CREATE VIEW %s AS" % view)
-            db.execute(sql[i:sql.index(";\n", i)])
-        return dict(db.execute("SELECT player, prior FROM ppm_prior"))
-
-    flat = prior(0)
-    assert flat["a"] == flat["e"] == 4.0 and flat["f"] == 4.0, \
-        "DEF: the median of 2, 3, 5, 7 (e's 9 matches are too few); POR: f's 4"
-    assert flat["x"] == 4.0, "no position: the median of everyone's (2, 3, 4, 5, 7)"
-    two = prior(2)
-    assert (two["a"], two["c"]) == (2.5, 6.0), \
-        "two bands by value: DEF's cheaper (a, b) and dearer (c, d)"
+    db = sqlite3.connect(":memory:")
+    functions(db)
+    db.execute("CREATE TABLE season_points (season, ff_id, points, games)")
+    db.execute("CREATE TABLE current_market (ff_id, position, value)")
+    db.executemany("INSERT INTO season_points VALUES (?, ?, ?, ?)", [
+        ("2024-25", "a", 999.0, 30.0),                        # an older season: not read
+        ("2025-26", "a", 60.0, 30.0), ("2025-26", "b", 90.0, 30.0),
+        ("2025-26", "c", 150.0, 30.0), ("2025-26", "d", 210.0, 30.0),
+        ("2025-26", "e", 300.0, 9.0), ("2025-26", "f", 40.0, 10.0)])
+    db.executemany("INSERT INTO current_market VALUES (?, ?, ?)", [
+        ("a", "DEF", 1e6), ("b", "DEF", 2e6), ("c", "DEF", 50e6), ("d", "DEF", 60e6),
+        ("e", "DEF", 70e6), ("f", "portero", 3e6), ("x", "", 5e6), ("z", "DEF", 0.0)])
+    sql = SCHEMA.read_text()
+    for view in ("last_season", "ppm_prior"):
+        i = sql.index("CREATE VIEW %s AS" % view)
+        db.execute(sql[i:sql.index(";\n", i)])
+    got = dict(db.execute("SELECT player, prior FROM ppm_prior"))
+    xs, ys = [math.log(v) for v in (1e6, 2e6, 50e6, 60e6)], [2.0, 3.0, 5.0, 7.0]
+    mx, my = sum(xs) / 4, sum(ys) / 4
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+    line = {k: my + slope * (math.log(v) - mx) for k, v in (("a", 1e6), ("d", 60e6), ("e", 70e6))}
+    assert all(abs(got[k] - line[k]) < 1e-9 for k in line), \
+        ("DEF: the line on log value through a-d (e's 9 matches are too few), at each one's value", got, line)
+    assert got["f"] == 4.0, "POR: one player, his mean"
+    assert got["x"] == 4.0, "no position: the median of everyone's (2, 3, 4, 5, 7)"
+    assert got["z"] == my, "no value: his position's mean"
 
 
 def _selftest() -> None:

@@ -729,7 +729,6 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
     (SELECT value FROM model_constants WHERE name = 'FALLBACK_K' AND variant = (SELECT variant())) AS fallback_k,
     (SELECT value FROM model_constants WHERE name = 'PICK_K' AND variant = (SELECT variant())) AS pick_k,
-    (SELECT value FROM model_constants WHERE name = 'PPM_BANDS' AND variant = (SELECT variant())) AS ppm_bands,
     (SELECT value FROM model_constants WHERE name = 'REMIND_HOURS' AND variant = (SELECT variant())) AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
     (SELECT printf('%.9g|%.9g|%.9g|%.9g', c.value, w0.value, w1.value, w2.value)
@@ -1210,22 +1209,25 @@ CREATE VIEW last_season AS
 SELECT ff_id, points AS pts, games AS pj FROM season_points
 WHERE season = (SELECT max(season) FROM season_points);
 
--- What a player's points per match is pulled toward: the median of last
--- season's (10+ matches) in his position, or with PPM_BANDS in his
--- position and band of value (that many, cheapest first, as of cut());
--- a band with none, his position's; no position, everyone's.
+-- What a player's points per match is pulled toward (score.Scorer): what
+-- his price says, the least-squares line of last season's points per match
+-- (10+ matches) on log value in his position, at his value (never below
+-- 0); a position with fewer than three, or a player with no value, his
+-- position's mean; no position, everyone's median.
 DROP VIEW IF EXISTS ppm_prior;
 CREATE VIEW ppm_prior AS
 WITH m AS (SELECT ff_id AS player, slot(position) AS pos,
-                  ntile(max(1, CAST((SELECT ppm_bands FROM k) AS INTEGER)))
-                      OVER (ORDER BY value, ff_id) AS band
+                  CASE WHEN value > 0 THEN ln(value) END AS x
            FROM current_market WHERE ff_id <> ''),
-s AS (SELECT m.pos, m.band, l.pts / l.pj AS ppm FROM m JOIN last_season l ON l.ff_id = m.player
-      WHERE m.pos <> '' AND l.pj >= 10),
-b AS (SELECT pos, band, median(ppm) AS prior FROM s GROUP BY pos, band),
-p AS (SELECT pos, median(ppm) AS prior FROM s GROUP BY pos)
-SELECT m.player, coalesce(b.prior, p.prior, (SELECT median(ppm) FROM s)) AS prior
-FROM m LEFT JOIN b USING (pos, band) LEFT JOIN p USING (pos);
+s AS (SELECT m.pos, m.x, l.pts / l.pj AS y FROM m JOIN last_season l ON l.ff_id = m.player
+      WHERE m.pos <> '' AND m.x IS NOT NULL AND l.pj >= 10),
+f AS (SELECT pos, avg(y) AS my, avg(x) AS mx,
+             CASE WHEN count(x) >= 3 AND avg(x * x) > avg(x) * avg(x)
+                  THEN (avg(x * y) - avg(x) * avg(y)) / (avg(x * x) - avg(x) * avg(x)) ELSE 0.0 END AS b
+      FROM s GROUP BY pos)
+SELECT m.player, coalesce(max(f.my + f.b * coalesce(m.x - f.mx, 0.0), 0.0),
+                          (SELECT median(y) FROM s)) AS prior
+FROM m LEFT JOIN f USING (pos);
 
 -- The chance he is picked if fit, after his next match: his record this
 -- season (appearances over matchday squads) pulled toward NEUTRAL_START,
