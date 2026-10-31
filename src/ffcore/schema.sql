@@ -554,6 +554,15 @@ JOIN kickoffs k ON m.club IN (k.home, k.away)
 JOIN jornada_calendar c ON c.jornada = k.jornada AND c.state IN ('under way', 'ahead')
 WHERE k.t < l.close;
 
+-- Each moment's forecast (forecast_cell) as a decision made at cut() uses
+-- it: points if he plays, and the chance he plays, none in a jornada he
+-- would join after his club's match (late_arrivals). The universe reads
+-- its cells here and decide.sql its dec_xp.
+DROP VIEW IF EXISTS forecast_used;
+CREATE VIEW forecast_used AS
+SELECT c.moment, c.player, c.jornada, c.pts, CASE WHEN l.player IS NULL THEN c.p ELSE 0.0 END AS p
+FROM forecast_cell c LEFT JOIN late_arrivals l ON l.player = c.player AND l.jornada = c.jornada;
+
 -- The game's nightly offers still to come before the next match locks: one
 -- as each standing offer expires, then one a day (0 with none standing),
 -- and when the first of them comes (first, a julian day).

@@ -263,6 +263,7 @@ class Forecast(NamedTuple):
     factors: Mapping[int, Mapping[str, Factors]]
     flagged: frozenset[str]
     fits: list[dict[str, Any]]
+    moment: int
 
 
 def player_forecast(players: Iterable[str] | None = None) -> Forecast:
@@ -391,7 +392,7 @@ def _read(moment: int, players: set[str] | None) -> Forecast:
         "SELECT player FROM forecast_player WHERE moment = ?1 AND flagged AND " + which, (moment, _json(players))))
     fits = [_param(c, t, v) for c, t, v in rows(
         "SELECT component, term, value FROM forecast_fit WHERE moment = ? ORDER BY rowid", (moment, ))]
-    return Forecast(per_j, StoredFactors(moment, players), flagged, fits)
+    return Forecast(per_j, StoredFactors(moment, players), flagged, fits, moment)
 
 
 def universe(also: frozenset[str] = frozenset()) -> Universe:
@@ -458,7 +459,11 @@ def _built(also: frozenset[str]) -> Built:
     asked = base | also
     fc = player_forecast(asked)
     rem, played = left.rem, left.played
-    per_j = {j: dict(fc.per_j.get(j, {})) for j in rem}
+    per_j: PerJornada = {j: {} for j in rem}
+    for k, j, pts, p in rows("SELECT player, jornada, pts, p FROM forecast_used WHERE moment = ?1"
+                             " AND player IN (SELECT value FROM json_each(?2))", (fc.moment, _json(asked))):
+        if j in per_j:
+            per_j[j][k] = (pts, p)
     first_of: dict[str, int] = {}
     for jornada in rem:
         for k in per_j[jornada]:
@@ -473,9 +478,6 @@ def _built(also: frozenset[str]) -> Built:
         trend=prices.trend, clause=column("clause"),
         fetch=dict(rows("SELECT player, fetches FROM sale_odds")),
         carry=prices.carry)
-    for k, j in rows("SELECT player, jornada FROM late_arrivals"):
-        if k in per_j.get(j, {}):
-            per_j[j][k] = (per_j[j][k][0], 0.0)     # bought tonight, he joins after that match
     squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
     assert all(_fieldable(sq) for sq in squads.values()), squads
     # The jornada each player's next line-up is for: his first to play of

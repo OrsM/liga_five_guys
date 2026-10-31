@@ -34,6 +34,7 @@ def inputs(u: Universe, lam: float | None = None) -> None:
         + [(k, position(m.pos.get(k)), 0, m.later(k, h) if k in m.value else m.price[k], m.price[k], None)
            for k in buys]
     keys = {p[0] for p in players}
+    # the universe's cells: its forecast as used (forecast_used), read once when it was built
     xp = [(k, j, expected_points(cell)) for j in u.state.jornadas
           for k, cell in u.forecaster.per_jornada.get(j, {}).items() if k in keys]
     if lam is None:

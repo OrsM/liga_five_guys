@@ -123,6 +123,14 @@ def _selftest() -> None:
             assert sorted(rows("SELECT player, jornada FROM late_arrivals")) == [("late", 3), ("late", 4)], \
                 ("his auction closes after rayo kick off in jornadas 3 (under way) and 4: he plays neither; "
                  "elche's man joins the night before; a manager's player plays for him till sold")
+            with closing(connect()) as db, db:
+                db.execute("INSERT INTO forecast_moment (moment, code, constants, as_of, made) VALUES (1, '', '', '', 1)")
+                db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (1, ?, ?, 5.0, 0.8)",
+                               [(k, j) for k in ("late", "early") for j in (3, 4, 5)])
+            assert rows("SELECT player, jornada, pts, p FROM forecast_used WHERE moment = 1 ORDER BY player, jornada") \
+                == [("early", j, 5.0, 0.8) for j in (3, 4, 5)] + [("late", 3, 5.0, 0.0), ("late", 4, 5.0, 0.0),
+                                                                  ("late", 5, 5.0, 0.8)], \
+                "the forecast as the decision uses it: a late arrival plays none of a jornada he joins after"
             assert rows("SELECT kick FROM next_kickoff") == [("2026-08-30T1700Z",)], \
                 "once jornada 3 locks, jornada 2's match put back locks nothing"
             assert rows("SELECT jornada, state FROM jornada_calendar ORDER BY jornada") == [
