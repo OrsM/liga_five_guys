@@ -1,5 +1,5 @@
 """Season points in SQL: each forecast cell's mean and variance as the
-Bootstrap defines them, each squad's eleven a jornada (ELEVEN), and their
+Bootstrap defines them, each squad's eleven a jornada (rules.ELEVEN), and their
 sums. Why not simulated: docs/notes/gain.md."""
 from __future__ import annotations
 
@@ -11,37 +11,18 @@ from dataclasses import dataclass
 from statistics import NormalDist
 
 from ffcore.forecast import Bootstrap
-from ffcore.rules import SHAPES, Squad, Squads
+from ffcore.rules import ELEVEN, MAX_SLOT, MIN_SLOT, Squad, Squads
 
 __all__ = ["Standings", "cell_variance", "eleven", "gains", "standings"]
 
 SCHEMA = """
 CREATE TABLE cell (jornada INTEGER, player TEXT, e REAL, m REAL, v REAL,
                    PRIMARY KEY (jornada, player)) WITHOUT ROWID;
-CREATE TABLE shape (shape INTEGER, slot TEXT, n INTEGER);
+CREATE TABLE bounds (slot TEXT PRIMARY KEY, lo INTEGER, hi INTEGER);
 CREATE TABLE scored (jornada INTEGER PRIMARY KEY);
 CREATE TABLE squad (id INTEGER, ord INTEGER, player TEXT, slot TEXT);
 CREATE TABLE valued (player TEXT PRIMARY KEY, e REAL) WITHOUT ROWID;
 """
-
-# The eleven rule, per (id, jornada) of pick: the formation whose top n a
-# slot by e sum most; formations within 1e-9 tie (the first wins), players
-# level in a slot keep the squad's order.
-ELEVEN = """
-ranked AS MATERIALIZED (
-    SELECT id, jornada, player, slot, row_number() OVER w AS r,
-           sum(e) OVER (w ROWS UNBOUNDED PRECEDING) AS top
-    FROM pick WINDOW w AS (PARTITION BY id, jornada, slot ORDER BY e DESC, ord)),
-totals AS (
-    SELECT x.id, x.jornada, sh.shape, sum(x.top) AS total
-    FROM shape sh JOIN ranked x ON x.slot = sh.slot AND x.r = sh.n
-    GROUP BY x.id, x.jornada, sh.shape
-    HAVING count(*) = (SELECT count(*) FROM shape t WHERE t.shape = sh.shape)),
-best AS MATERIALIZED (SELECT id, jornada, shape FROM (
-             SELECT *, row_number() OVER (PARTITION BY id, jornada ORDER BY round(total, 9) DESC, shape) AS b
-             FROM totals) WHERE b = 1),
-xi AS MATERIALIZED (SELECT x.id, x.jornada, x.player FROM best b JOIN shape sh ON sh.shape = b.shape
-       JOIN ranked x ON x.id = b.id AND x.jornada = b.jornada AND x.slot = sh.slot AND x.r <= sh.n)"""
 
 XI = "WITH pick AS (SELECT 1 AS id, 0 AS jornada, s.player, s.slot, s.ord, coalesce(v.e, 0.0) AS e" \
      " FROM squad s LEFT JOIN valued v USING (player))," + ELEVEN + "\nSELECT player FROM xi"
@@ -82,8 +63,7 @@ def _con() -> sqlite3.Connection:
         db = sqlite3.connect(":memory:")
         db.create_function("normal_above", 2, normal_above, deterministic=True)
         db.executescript(SCHEMA)
-        db.executemany("INSERT INTO shape VALUES (?, ?, ?)",
-                       [(i, slot, n) for i, s in enumerate(SHAPES) for slot, n in s.items()])
+        db.executemany("INSERT INTO bounds VALUES (?, ?, ?)", [(p, MIN_SLOT[p], MAX_SLOT[p]) for p in MIN_SLOT])
         _CON.append(db)
     return _CON[0]
 
@@ -110,7 +90,7 @@ def _db(fc: Bootstrap) -> sqlite3.Connection:
 
 
 def eleven(squad: Squad, value: dict[str, float]) -> list[str]:
-    """Squad's (player: slot) eleven by value (missing: 0), ELEVEN; [] if none fits."""
+    """Squad's (player: slot) eleven by value (missing: 0), rules.ELEVEN."""
     db = _con()
     with db:
         db.execute("DELETE FROM squad")
@@ -215,15 +195,19 @@ def _selftest() -> None:
     val.update({"f1": 9.0, "f2": 9.0, "f3": 9.0})
     got = eleven(squad, val)
     assert len(got) == XI_SIZE and {"f1", "f2", "f3"} <= set(got), got
-    assert eleven({"d1": "DEF"}, {"d1": 1.0}) == [], "no formation fits: no eleven"
-    # 5-4-1 (DEF4 at 2.0) and 4-5-1 (MED3 at 2.0) sum the same, added in
-    # different orders: found by checking against the old best_xi
+    assert set(eleven({"d1": "DEF", "m1": "MED"}, {"d1": 1.0, "m1": 2.0})) == {"d1", "m1"}, \
+        "short of a formation: who it has plays, an empty slot scores nothing (the game's rule)"
+    assert set(eleven(squad, {**val, "d4": 5.0, "d5": 5.0, "m4": 5.0, "m5": 5.0})) == {
+        "k", "d1", "d4", "d5", "m4", "m5", "m1", "f1", "f2", "f3", "d2"}, \
+        "each position's least best first (POR 1, DEF 3, MED 3, DEL 1), then the best of the rest within the most"
+    # 5-4-1 (DEF4 at 2.0) and 4-5-1 (MED3 at 2.0) sum the same: level, the
+    # earlier in the squad plays
     tv = {"DEF4": 2.0, "DEF0": 8.491227695871778, "MED0": 2.5, "MED2": 7.411348877403508, "MED5": 0.0,
           "POR0": 2.5, "DEF2": 2.0, "POR1": 2.5, "DEF6": 1.0, "DEL0": 3.0, "MED4": 3.0, "DEF5": 2.5,
           "MED1": 2.0, "DEF1": 2.5, "MED3": 2.0, "DEF3": 2.10641317928871}
     tie = {k: k[:3] for k in tv}
     assert "DEF4" in eleven(tie, tv) and "MED3" not in eleven(tie, tv), \
-        "a tie between formations is the first (5-4-1), whatever the rounding"
+        "level players: the earlier in the squad"
 
     xi = {"k": "POR", **{"d%d" % i: "DEF" for i in range(4)}, **{"m%d" % i: "MED" for i in range(4)},
           "f0": "DEL", "f1": "DEL"}

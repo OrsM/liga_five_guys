@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "shortfall",
+__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "shortfall",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -31,6 +31,7 @@ MAX_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(max, zip(*FREE_FORMATIONS)))
 MIN_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(min, zip(*FREE_FORMATIONS))))}
 
 
+
 def shortfall(squad: Squad) -> dict[str, int]:
     """The players a squad (player: position) is short of the nearest
     formation, by position: empty when it can field one. On a tie, the
@@ -56,6 +57,27 @@ def position(raw: str | None) -> str:
 
 MATCH_LEN = 90.0
 XI_SIZE = 11  # players a side fields
+
+# The eleven, as SQL (the CTEs after a WITH that defines pick(id, jornada,
+# player, slot, ord, e) and bounds(slot, lo, hi), MIN_SLOT and MAX_SLOT):
+# for each id and jornada, each position's lo best, then the best of the
+# rest within each position's hi, to eleven; xi(id, jornada, player, slot,
+# e). As the formations are every count between lo and hi that makes eleven,
+# this is the best eleven of any formation; short of a position, its empty
+# slot scores nothing (the game's rule). Level players: the lower ord plays.
+# gain.py's and decide.sql's eleven both are this.
+ELEVEN = """
+ranked AS MATERIALIZED (
+    SELECT p.*, b.lo, b.hi,
+           row_number() OVER (PARTITION BY p.id, p.jornada, p.slot ORDER BY p.e DESC, p.ord) AS n
+    FROM pick p JOIN bounds b USING (slot)),
+rest AS (SELECT *, row_number() OVER (PARTITION BY id, jornada ORDER BY e DESC, ord) AS m
+         FROM ranked WHERE n > lo AND n <= hi),
+xi AS MATERIALIZED (
+    SELECT id, jornada, player, slot, e FROM ranked WHERE n <= lo
+    UNION ALL
+    SELECT id, jornada, player, slot, e FROM rest WHERE m <= %d - (SELECT sum(lo) FROM bounds))""" % XI_SIZE
+
 DEBT_SHARE = 0.2  # bids may take you this share of your squad's value into debt (cash at the lock must be 0 or more)
 # Players a squad may hold, its bids in counted: the app refuses a bid past
 # it ("Bid or offer for more players is not allowed", 23 and a bid, 2026-10-30).

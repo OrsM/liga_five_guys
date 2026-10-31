@@ -19,7 +19,7 @@ from ffcore import kept
 from ffcore.clock import cut, variant
 from ffcore.facts import ensure
 from ffcore.names import Name
-from ffcore.rules import position, slot
+from ffcore.rules import ELEVEN, position, slot
 from ffcore.text import stems_meet
 from ffcore.startprob import platt, prognosis_bucket
 
@@ -181,8 +181,8 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
-            texts = [sql.read_text(encoding="utf-8") for sql in (IDENTITY, TABLES_SQL, schema)
-                     + ((DECIDE_SQL, ) if schema == SCHEMA else ())]
+            texts = [sql.read_text(encoding="utf-8").replace("/* rules.ELEVEN */", ELEVEN)
+                     for sql in (IDENTITY, TABLES_SQL, schema) + ((DECIDE_SQL, ) if schema == SCHEMA else ())]
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
             if db.execute("PRAGMA user_version").fetchone()[0] != version:   # else it is applied: leave the views
                 db.execute("PRAGMA journal_mode=WAL")                       # other processes are using

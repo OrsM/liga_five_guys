@@ -130,21 +130,18 @@ sells AS (SELECT player AS s FROM sq WHERE player IN (SELECT player FROM dec_pla
 SELECT b, '' AS s FROM buys UNION ALL SELECT '', s FROM sells
 UNION ALL SELECT b, s FROM buys, sells WHERE top > (SELECT free FROM dec_cash);
 
--- The squad's best legal eleven each jornada: each position's lo best, then
--- the best of the rest within each position's hi, to eleven. The formations
--- are every count between lo and hi that makes eleven, so this is the best
--- of any formation. A slot nobody can fill scores nothing.
+-- The squad's best legal eleven each jornada: the game's eleven rule
+-- (rules.ELEVEN, put in where it is named below as connect() applies this
+-- file): each position's lo best, then the best of the rest within each
+-- position's hi, to eleven; the best of any formation. A slot nobody can
+-- fill scores nothing. Level players: the first by key.
 DROP VIEW IF EXISTS dec_eleven;
 CREATE VIEW dec_eleven AS
-WITH r AS (SELECT x.jornada, q.player, q.pos, x.xp,
-                  row_number() OVER (PARTITION BY x.jornada, q.pos ORDER BY x.xp DESC, q.player) AS n
-           FROM dec_squad q JOIN dec_xp x USING (player)),
-c AS (SELECT r.*, h.lo, h.hi FROM r JOIN dec_shape h USING (pos)),
-e AS (SELECT c.*, row_number() OVER (PARTITION BY jornada ORDER BY xp DESC, player) AS m
-      FROM c WHERE n > lo AND n <= hi)
-SELECT jornada, player, pos, xp FROM c WHERE n <= lo
-UNION ALL
-SELECT jornada, player, pos, xp FROM e WHERE m <= 11 - (SELECT sum(lo) FROM dec_shape);
+WITH pick AS (SELECT 1 AS id, x.jornada, q.player, q.pos AS slot, q.player AS ord, x.xp AS e
+              FROM dec_squad q JOIN dec_xp x USING (player)),
+bounds AS (SELECT pos AS slot, lo, hi FROM dec_shape),
+/* rules.ELEVEN */
+SELECT jornada, player, slot AS pos, e AS xp FROM xi;
 
 -- Each position, each jornada, in the eleven now: how many play (cnt), the
 -- weakest (low, lowp) and next weakest (low2) of them, the best of the
