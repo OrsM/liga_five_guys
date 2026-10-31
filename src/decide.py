@@ -266,20 +266,9 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
     import highspy
 
     m = u.market
-    h = highspy.Highs()
-    h.setOptionValue("output_flag", False)
-    h.setOptionValue("mip_rel_gap", 0.0)
-    h.setOptionValue("time_limit", SOLVE_SECONDS)
-    h.setOptionValue("threads", 1)
-    # The proof, not the search, is what takes the time here: RINS and RENS
-    # (sub-MIPs) and presolve cost more than they find (2026-10-30: the same
-    # optimum, proved 2-4 times sooner).
-    h.setOptionValue("presolve", "off")
-    h.setOptionValue("mip_heuristic_run_rins", False)
-    h.setOptionValue("mip_heuristic_run_rens", False)
-    binary = (lambda: h.addVariable(0.0, 1.0)) if relax else h.addBinary
+    lp = _Program()
 
-    def eleven() -> dict[str, Any]:
+    def eleven() -> dict[str, int]:
         """A formation: each position's count between its least and most,
         eleven in all, which is every formation there is (rules.MIN_SLOT).
         Not held whole: with every player certain, whole squads make whole
@@ -287,51 +276,115 @@ def program(u: Universe, rows: list[Move], relax: bool, force: Move | None = Non
         corners are whole); with a buy that may lose, the eleven is the
         expected one, each outcome fielding its own formation, which a
         formation held whole across both would not be."""
-        n = {p: h.addVariable(MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS}
-        h.addConstr(sum(n.values()) == XI_SIZE)
+        n = {p: lp.var(MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS}
+        lp.row({c: 1.0 for c in n.values()}, XI_SIZE, XI_SIZE)
         return n
     opts = options(u, rows)
-    made = [binary() for _o in opts]
+    made = [lp.var(0.0, 1.0, whole=not relax) for _o in opts]
     sold = {o.action.sell[0]: x for o, x in zip(opts, made) if not o.action.buy}
-    keep = {k: 1 - sold[k] if k in sold else 1 for k in u.mine}
     bids = [(o, x) for o, x in zip(opts, made) if o.action.buy]
     for k in {o.action.buy for o, _x in bids}:
-        h.addConstr(sum(x for o, x in bids if o.action.buy == k) <= 1)
+        lp.row({x: 1.0 for o, x in bids if o.action.buy == k}, -INF, 1.0)
     pos = {k: position(m.pos.get(k)) for k in [*u.mine, *(o.action.buy for o, _x in bids)]}
     to_come = [j for j in u.state.jornadas if j not in u.part_played]
     cells = u.forecaster.per_jornada
     # Each buy's share of the time he is yours: his bid's chance, at the one
     # bid made on him. His place in an eleven is held at most that share,
     # one variable a player a jornada whatever the bids offered on him.
-    won = {k: sum(o.win * x for o, x in bids if o.action.buy == k) for k in {o.action.buy for o, _x in bids}}
-    points = []
+    won = {k: [(o.win, x) for o, x in bids if o.action.buy == k] for k in {o.action.buy for o, _x in bids}}
     for j in to_come:
         shape = eleven()
         for p in POSITIONS:
-            xi = {k: h.addVariable(0.0, 1.0) for k in u.mine if pos[k] == p}
-            yi = {k: h.addVariable(0.0, 1.0) for k in won if pos[k] == p}
+            xi = {k: lp.var(0.0, 1.0) for k in u.mine if pos[k] == p}
+            yi = {k: lp.var(0.0, 1.0) for k in won if pos[k] == p}
             for k, x in xi.items():
                 if k in sold:
-                    h.addConstr(x <= keep[k])
+                    lp.row({x: 1.0, sold[k]: 1.0}, -INF, 1.0)       # x <= 1 - sold
             for k, y in yi.items():
-                h.addConstr(y <= won[k])
-            empty = h.addVariable(0.0, MAX_SLOT[p])
-            h.addConstr(sum(xi.values()) + sum(yi.values()) + empty == shape[p])
-            points += [expected_points(cells.get(j, {}).get(k)) * x for k, x in xi.items()]
-            points += [expected_points(cells.get(j, {}).get(k)) * y for k, y in yi.items()]
+                lp.row({y: 1.0, **{x: -w for w, x in won[k]}}, -INF, 0.0)
+            empty = lp.var(0.0, MAX_SLOT[p])
+            lp.row({**{x: 1.0 for x in xi.values()}, **{y: 1.0 for y in yi.values()}, empty: 1.0,
+                    shape[p]: -1.0}, 0.0, 0.0)
+            for k, x in [*xi.items(), *yi.items()]:
+                lp.cost[x] = expected_points(cells.get(j, {}).get(k))
     if _fieldable(u.mine):
         lost = eleven()
         for p in POSITIONS:
-            h.addConstr(sum(keep[k] for k in u.mine if pos[k] == p)
-                        + sum(x for o, x in bids if o.win >= 1.0 and pos[o.action.buy] == p) >= lost[p])
-    h.addConstr(sum(keep.values()) + sum(x for _o, x in bids) <= SQUAD_MAX)
-    budget = h.addConstr(sum(o.action.net / 1e6 * x for o, x in zip(opts, made)) <= m.cash / 1e6)
+            mine_p = [k for k in u.mine if pos[k] == p]
+            lp.row({**{sold[k]: -1.0 for k in mine_p if k in sold},
+                    **{x: 1.0 for o, x in bids if o.win >= 1.0 and pos[o.action.buy] == p}, lost[p]: -1.0},
+                   -len(mine_p), INF)
+    lp.row({**{x: -1.0 for x in sold.values()}, **{x: 1.0 for _o, x in bids}}, -INF, SQUAD_MAX - len(u.mine))
+    budget = lp.row({x: o.action.net / 1e6 for o, x in zip(opts, made)}, -INF, m.cash / 1e6)
     if force is not None:
-        h.addConstr(sum(x for o, x in zip(opts, made) if o.action.players == force.action.players) == 1)
-    h.maximize(sum(points) + sum(o.win * (MONEY_RATE * o.money - TIE) * x for o, x in zip(opts, made)))
+        lp.row({x: 1.0 for o, x in zip(opts, made) if o.action.players == force.action.players}, 1.0, 1.0)
+    for o, x in zip(opts, made):
+        lp.cost[x] = o.win * (MONEY_RATE * o.money - TIE)
+    h = lp.solve(highspy)
     sol = h.getSolution()
-    return ([o for o, x in zip(opts, made) if sol.col_value[x.index] > 0.5], h.getInfo().objective_function_value,
-            abs(sol.row_dual[budget.index]) if relax else 0.0)
+    return ([o for o, x in zip(opts, made) if sol.col_value[x] > 0.5], h.getInfo().objective_function_value,
+            abs(sol.row_dual[budget]) if relax else 0.0)
+
+
+INF = float("inf")
+
+
+class _Program:
+    """A program's columns and rows as they are added, passed to HiGHS at
+    once: one call each, where its Python API takes several a variable and
+    a row (2026-10-31: building cost as much as solving, 9 s a backtest)."""
+
+    def __init__(self) -> None:
+        self.lower: list[float] = []
+        self.upper: list[float] = []
+        self.whole: list[int] = []
+        self.cost: dict[int, float] = {}
+        self.rows: list[tuple[dict[int, float], float, float]] = []
+
+    def var(self, lower: float, upper: float, whole: bool = False) -> int:
+        self.lower.append(lower)
+        self.upper.append(upper)
+        if whole:
+            self.whole.append(len(self.lower) - 1)
+        return len(self.lower) - 1
+
+    def row(self, coef: dict[int, float], lower: float, upper: float) -> int:
+        self.rows.append((coef, lower, upper))
+        return len(self.rows) - 1
+
+    def solve(self, highspy: Any) -> Any:
+        import numpy as np
+
+        h = highspy.Highs()
+        h.setOptionValue("output_flag", False)
+        h.setOptionValue("mip_rel_gap", 0.0)
+        h.setOptionValue("time_limit", SOLVE_SECONDS)
+        h.setOptionValue("threads", 1)
+        # The proof, not the search, is what takes the time here: RINS and RENS
+        # (sub-MIPs) and presolve cost more than they find (2026-10-30: the same
+        # optimum, proved 2-4 times sooner).
+        h.setOptionValue("presolve", "off")
+        h.setOptionValue("mip_heuristic_run_rins", False)
+        h.setOptionValue("mip_heuristic_run_rens", False)
+        n = len(self.lower)
+        h.addVars(n, np.array(self.lower), np.array(self.upper))
+        idx = np.array(sorted(self.cost), dtype=np.int32)
+        h.changeColsCost(len(idx), idx, np.array([self.cost[i] for i in idx]))
+        if self.whole:
+            h.changeColsIntegrality(len(self.whole), np.array(self.whole, dtype=np.int32),
+                                    np.array([highspy.HighsVarType.kInteger] * len(self.whole)))
+        starts: list[int] = []
+        index: list[int] = []
+        value: list[float] = []
+        for coef, _lo, _hi in self.rows:
+            starts.append(len(index))
+            index += list(coef)
+            value += list(coef.values())
+        h.addRows(len(self.rows), np.array([r[1] for r in self.rows]), np.array([r[2] for r in self.rows]),
+                  len(index), np.array(starts, dtype=np.int32), np.array(index, dtype=np.int32), np.array(value))
+        h.changeObjectiveSense(highspy.ObjSense.kMaximize)
+        h.run()
+        return h
 
 
 def joint(u: Universe, moves: list[Move]) -> Move:

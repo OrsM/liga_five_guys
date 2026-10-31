@@ -10,6 +10,7 @@ miss, never a stale hit.
 The store is a file beside lfg.db that can be deleted at any time."""
 from __future__ import annotations
 
+import bisect
 import hashlib
 import os
 import pickle
@@ -49,17 +50,41 @@ def _open(db: Path) -> sqlite3.Connection:
     return con
 
 
-def _fingerprint(lfg: sqlite3.Connection, tables: Sequence[str], cut: str) -> str:
-    """What each raw table held up to the cut, the registry, and last
-    season's points (season_points: no observed_at, refilled whole)."""
+def _fingerprint(lfg: sqlite3.Connection, tables: Sequence[str], cut: str, db: Path) -> str:
+    """What each raw table held up to the cut (its rows' count and last
+    rowid), the registry, and last season's points (season_points: no
+    observed_at, refilled whole)."""
     parts = []
     for t in tables:
-        parts.append("%s:%s" % (t, lfg.execute(
-            'SELECT count(*) || "/" || coalesce(max(rowid), 0) FROM "%s" WHERE observed_at <= ?' % t, (cut,)).fetchone()[0]))
+        stamps, counts, last = _snapshots(lfg, db, t)
+        i = bisect.bisect_right(stamps, cut)
+        parts.append("%s:%d/%d" % (t, counts[i - 1] if i else 0, last[i - 1] if i else 0))
     parts.append(repr(lfg.execute("SELECT * FROM crosswalk ORDER BY 1").fetchall()))
     parts.append(repr(lfg.execute("SELECT * FROM league_config").fetchall()))
     parts.append(repr(lfg.execute("SELECT * FROM season_points ORDER BY 1, 2").fetchall()))
     return hashlib.sha1("|".join(parts).encode()).hexdigest()
+
+
+_SNAPS: dict[tuple[str, str], tuple[int, list[str], list[int], list[int]]] = {}
+
+
+def _snapshots(lfg: sqlite3.Connection, db: Path, table: str) -> tuple[list[str], list[int], list[int]]:
+    """A raw table's observed_at stamps in order, with the count of rows and
+    the last rowid up to each: read once a process while no row is added
+    (rowids only grow), so each cut's fingerprint is a lookup (2026-10-31:
+    counting at each cut was most of the 0.16 s a kept universe took to find)."""
+    top = lfg.execute('SELECT coalesce(max(rowid), 0) FROM "%s"' % table).fetchone()[0]
+    key = (str(db), table)
+    if key not in _SNAPS or _SNAPS[key][0] != top:
+        stamps, counts, last, n, high = [], [], [], 0, 0
+        for at, k, m in lfg.execute('SELECT observed_at, count(*), max(rowid) FROM "%s" WHERE observed_at IS NOT NULL'
+                                    ' GROUP BY observed_at ORDER BY observed_at' % table):
+            n, high = n + k, max(high, m)
+            stamps.append(at)
+            counts.append(n)
+            last.append(high)
+        _SNAPS[key] = (top, stamps, counts, last)
+    return _SNAPS[key][1:]
 
 
 @contextmanager
@@ -73,7 +98,7 @@ def scope(db: Path, raw_sql: Path, constants: str) -> Iterator[None]:
         cut = clock.cut()
         tables = [t for t in _RAW.findall(raw_sql.read_text(encoding="utf-8"))
                   if any(c[1] == "observed_at" for c in lfg.execute('PRAGMA table_info("%s")' % t))]
-        _BASE[:] = ["|".join((cut, hashlib.sha1(constants.encode()).hexdigest(), _fingerprint(lfg, tables, cut)))]
+        _BASE[:] = ["|".join((cut, hashlib.sha1(constants.encode()).hexdigest(), _fingerprint(lfg, tables, cut, db)))]
         _DEFS.clear()
         _DEFS.update(dict(lfg.execute("SELECT name, sql FROM sqlite_master WHERE type IN ('view', 'table')"
                                       " AND sql IS NOT NULL")))

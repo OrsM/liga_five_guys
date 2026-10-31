@@ -1,14 +1,14 @@
 {
  "2026-08-25": {
-  "universe": 3.16,
-  "board": 0.72
+  "universe": 3.15,
+  "board": 0.59
  },
  "2026-09-20": {
-  "universe": 6.0,
-  "board": 0.77
+  "universe": 6.08,
+  "board": 0.64
  },
  "2026-10-20": {
-  "universe": 6.47,
-  "board": 0.85
+  "universe": 6.55,
+  "board": 0.67
  }
 }

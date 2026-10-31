@@ -8,6 +8,7 @@ import sys
 import time
 from collections.abc import Callable
 from contextlib import closing
+from functools import cache
 from pathlib import Path
 from statistics import NormalDist
 from typing import Any, NamedTuple
@@ -19,12 +20,12 @@ from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
 from ffcore.pricing import RESALE_MARGIN
 
-from assemble import applied, built, forecast_cells, price_change, price_momentum, universe
+from assemble import applied, built, forecast_cells, kept_built, price_change, price_momentum, universe
 import decide
 from decide import Action, Universe, board, moves, program
 from ffcore import pricing
 from sim import with_squad
-from ffcore.clock import set_now, snapshot_stamp
+from ffcore.clock import set_now, snapshot_stamp, stamp
 from ffcore.db import connect, query, record, rows, this_run
 __all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "replay_rows", "decision_rows", "decisions", "phantom_path", "resales", "forecast_rows", "superseded",
            "record_grades"]
@@ -54,9 +55,15 @@ def universe_when(t: dt.datetime, also: frozenset[str] = frozenset()) -> Univers
 def on_market_by(t: dt.datetime) -> frozenset[str]:
     """Every player listed on the game's market up to t: whom a replay's
     phantom can hold then (whatever he bought, he bought from it)."""
-    set_now(t)
-    return frozenset(k for (k,) in rows("SELECT DISTINCT ff_id FROM market WHERE ff_id <> ''"
-                                        " AND observed_at <= (SELECT cut())"))
+    cut = stamp(t)
+    return frozenset(k for k, first in _first_listed().items() if first <= cut)
+
+
+@cache
+def _first_listed() -> dict[str, str]:
+    """When each player was first on the market: one read for every t
+    on_market_by is asked (2026-10-31: a read a t was 9 of a backtest's 34 s)."""
+    return dict(rows("SELECT ff_id, min(observed_at) FROM market WHERE ff_id <> '' GROUP BY ff_id"))
 
 
 def _built_at(job: tuple[dt.datetime, frozenset[str]]) -> tuple[dt.datetime, Universe | None]:
@@ -70,7 +77,17 @@ def warm(times: list[dt.datetime], also: Callable[[dt.datetime], frozenset[str]]
     then wait on nothing but his plans. A universe depends on nothing he
     did as long as also(t) holds whoever he can hold (on_market_by)."""
     import multiprocessing
-    jobs = [(t, also(t)) for t in times if (t, also(t)) not in _AT]
+    jobs = []
+    for t in times:
+        if (t, also(t)) in _AT:
+            continue
+        set_now(t)
+        if (hit := kept_built(also(t))) is not None:     # kept: read here, no process to send it back
+            _AT[t, also(t)] = hit.universe
+        else:
+            jobs.append((t, also(t)))
+    if not jobs:
+        return
     with multiprocessing.get_context("fork").Pool(WARM_JOBS) as pool:
         for t, u in pool.imap_unordered(_built_at, jobs):
             _AT[t, also(t)] = u
@@ -819,7 +836,9 @@ if __name__ == "__main__":
                     sum(g["lost"] for g in got),
                     sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
                     got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0), flush=True)
-        raise SystemExit(0)
+        # Out without freeing the universes one object at a time: ~8 s of a
+        # backtest's exit (2026-10-31), every file already closed and written.
+        os._exit(0)
     if sys.argv[1:2] == ["resales"]:
         # resales: each past night's buys to resell, forecast against what selling paid
         got = resales()

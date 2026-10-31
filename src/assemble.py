@@ -4,11 +4,13 @@ state and the forecast — so the model modules never read a table
 themselves."""
 from __future__ import annotations
 
+import hashlib
 import re
 import statistics
 import sys
 from contextlib import closing, contextmanager
 from functools import cache
+from pathlib import Path
 from collections.abc import Iterator, Sequence
 from typing import Any, NamedTuple
 
@@ -277,7 +279,37 @@ def built(also: frozenset[str] = frozenset()) -> Built:
     covers every player in a squad or on the market, and also these (a
     replay's squads hold players nobody holds now)."""
     with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
-        return _built(also)
+        if (hit := _kept_built(also)) is not None:
+            return hit
+        got = _built(also)
+        kept.put(lfgdb.DB, "built", _built_key(also), got)
+        return got
+
+
+def kept_built(also: frozenset[str] = frozenset()) -> Built | None:
+    """The universe built at the cut as built() keeps it, if it is kept;
+    None, nothing built, if not."""
+    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
+        return _kept_built(also)
+
+
+def _kept_built(also: frozenset[str]) -> Built | None:
+    return kept.get(lfgdb.DB, "built", _built_key(also))      # type: ignore[no-any-return]
+
+
+def _built_key(also: frozenset[str]) -> tuple[str, str, list[str]]:
+    return _code(), repr(sorted(constants().items())), sorted(also)
+
+
+@cache
+def _code() -> str:
+    """The source a universe is built by, hashed: every module and the
+    schema. A built universe is kept under it with the scope's key (the cut,
+    the data up to it), every constant and also: a backtest's second run
+    loads its universes instead of assembling them again (2026-10-31: 61 of
+    a warm run's 82 seconds)."""
+    src = Path(__file__).resolve().parent
+    return hashlib.sha1(b"".join(f.read_bytes() for f in sorted(src.rglob("*.py")) + sorted(src.rglob("*.sql")))).hexdigest()
 
 
 def _built(also: frozenset[str]) -> Built:
