@@ -1,16 +1,11 @@
 {
- "generated_at": "2026-10-31T20:45Z",
+ "generated_at": "2026-10-31T20:49Z",
  "lock_at": "2026-11-01T13:00:00+00:00",
  "cash": 5179381.0,
  "cash_locked": 0.0,
  "finish": 1.94,
  "p_win": 0.245,
- "p_win_after": 0.245,
- "blocks": {
-  "buys": 0.0,
-  "sales": 0.0
- },
- "lam": 0.268710016851969,
+ "lam": 1.72954040266687,
  "band": [
   1982.53011293239,
   2272.84174071011
@@ -24,13 +19,7 @@
    "done": false,
    "gain": 3.53286086356678,
    "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Alvaro Garcia",
-     "names"
-    ]
-   ],
+   "facts": [],
    "accepts": [
     null
    ],
@@ -124,12 +113,531 @@
      "value": 4236677.0
     }
    ]
+  },
+  {
+   "name": "Lucien Agoume",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Lucien Agoume",
+   "step": "bid up to",
+   "amount": 22045471.7120303,
+   "done": false,
+   "gain": 15.2286414466295,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     20305222.0,
+     "money"
+    ],
+    [
+     "bids",
+     "1",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.867,
+     "chance"
+    ],
+    [
+     "points",
+     13.2314569578343,
+     "points"
+    ],
+    [
+     "money",
+     4.34005240366128,
+     "points"
+    ],
+    [
+     "",
+     20.9286910036241,
+     "trend"
+    ]
+   ],
+   "asking": 20305222.0,
+   "win": 0.867,
+   "asking_win": 0.333,
+   "accepts": [
+    20305222.0,
+    22045471.7120303
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2453",
+     "market": "540234464",
+     "bid": "",
+     "pos": "MED",
+     "value": 20305222.0
+    }
+   ]
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Iñigo Vicente",
+   "step": "wait",
+   "amount": 25478056.7255032,
+   "done": true,
+   "gain": -12.817059915306,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     25677986.0,
+     "money"
+    ],
+    [
+     "offer",
+     24093729.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.14,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     25478056.7255032,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "only pays if you win",
+     "Lucien Agoume, Pablo Ibañez, Lucas Cepeda, Angel Ortiz, Jiri Letacek",
+     "names"
+    ],
+    [
+     "chance of winning them",
+     0.461,
+     "chance"
+    ],
+    [
+     "points",
+     -17.7882673429475,
+     "points"
+    ],
+    [
+     "money",
+     4.97120742764147,
+     "points"
+    ],
+    [
+     "",
+     -11.9722129827554,
+     "trend"
+    ]
+   ],
+   "accepts": [],
+   "act": [
+    {
+     "player_team": "24338723",
+     "player": "3002",
+     "market": "54752103",
+     "bid": "",
+     "pos": "DEL",
+     "value": 25677986.0
+    }
+   ]
+  },
+  {
+   "name": "Pablo Ibañez",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Pablo Ibañez",
+   "step": "bid up to",
+   "amount": 22057449.0,
+   "done": false,
+   "gain": 10.997056270862,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     22057449.0,
+     "money"
+    ],
+    [
+     "bids",
+     "1",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.867,
+     "chance"
+    ],
+    [
+     "points",
+     10.5805772411338,
+     "points"
+    ],
+    [
+     "money",
+     2.10833384063001,
+     "points"
+    ],
+    [
+     "",
+     5.52654084535372,
+     "trend"
+    ]
+   ],
+   "asking": 22057449.0,
+   "win": 0.867,
+   "asking_win": 0.867,
+   "accepts": [
+    22057449.0
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2569",
+     "market": "540234454",
+     "bid": "",
+     "pos": "MED",
+     "value": 22057449.0
+    }
+   ]
+  },
+  {
+   "name": "Alvaro Garcia",
+   "pos": "MED",
+   "what": "sell",
+   "label": "sell Alvaro Garcia",
+   "step": "sell after the auctions",
+   "amount": 12655203.7671177,
+   "done": true,
+   "gain": -1.68934170471165,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     12637210.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.9,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     12655203.7671177,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "only pays if you win",
+     "Lucien Agoume, Pablo Ibañez, Lucas Cepeda, Angel Ortiz, Jiri Letacek",
+     "names"
+    ],
+    [
+     "chance of winning them",
+     0.461,
+     "chance"
+    ],
+    [
+     "waiting for them",
+     0.170036863741339,
+     "points"
+    ],
+    [
+     "points",
+     -3.01470939828983,
+     "points"
+    ],
+    [
+     "money",
+     1.32536769357818,
+     "points"
+    ],
+    [
+     "",
+     1.41282708513684,
+     "trend"
+    ]
+   ],
+   "accepts": [],
+   "act": [
+    {
+     "player_team": "107331404",
+     "player": "1029",
+     "market": "61356791",
+     "bid": "",
+     "pos": "MED",
+     "value": 12637210.0
+    }
+   ]
+  },
+  {
+   "name": "Lucas Cepeda",
+   "pos": "DEL",
+   "what": "buy",
+   "label": "buy Lucas Cepeda",
+   "step": "bid up to",
+   "amount": 4023570.18532604,
+   "done": false,
+   "gain": 4.20294675166925,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     3236904.0,
+     "money"
+    ],
+    [
+     "bids",
+     "1",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.967,
+     "chance"
+    ],
+    [
+     "points",
+     3.48637839514728,
+     "points"
+    ],
+    [
+     "money",
+     0.861497554855396,
+     "points"
+    ],
+    [
+     "",
+     39.6914452659109,
+     "trend"
+    ]
+   ],
+   "asking": 3236904.0,
+   "win": 0.967,
+   "asking_win": 0.267,
+   "accepts": [
+    3236904.0,
+    4023570.18532604
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2933",
+     "market": "540234447",
+     "bid": "",
+     "pos": "DEL",
+     "value": 3236904.0
+    }
+   ]
+  },
+  {
+   "name": "Alvaro F. Carreras",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Alvaro F. Carreras",
+   "step": "wait",
+   "amount": 5181509.88927967,
+   "done": true,
+   "gain": -2.98705235776803,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     5252272.0,
+     "money"
+    ],
+    [
+     "offer",
+     5098820.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.26,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     5181509.88927967,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "only pays if you win",
+     "Lucien Agoume, Pablo Ibañez, Lucas Cepeda, Angel Ortiz, Jiri Letacek",
+     "names"
+    ],
+    [
+     "chance of winning them",
+     0.461,
+     "chance"
+    ],
+    [
+     "points",
+     -4.70298144890913,
+     "points"
+    ],
+    [
+     "money",
+     1.7159290911411,
+     "points"
+    ],
+    [
+     "",
+     -20.2368081821884,
+     "trend"
+    ]
+   ],
+   "accepts": [],
+   "act": [
+    {
+     "player_team": "107909857",
+     "player": "2533",
+     "market": "61763298",
+     "bid": "",
+     "pos": "DEF",
+     "value": 5252272.0
+    }
+   ]
+  },
+  {
+   "name": "Angel Ortiz",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Angel Ortiz",
+   "step": "bid up to",
+   "amount": 686587.0,
+   "done": false,
+   "gain": 0.0404357703633471,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     686587.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.733,
+     "chance"
+    ],
+    [
+     "points",
+     0.0,
+     "points"
+    ],
+    [
+     "money",
+     0.0551396868591097,
+     "points"
+    ],
+    [
+     "",
+     4.64342042657666,
+     "trend"
+    ]
+   ],
+   "asking": 686587.0,
+   "win": 0.733,
+   "asking_win": 0.733,
+   "accepts": [
+    686587.0
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2711",
+     "market": "540234459",
+     "bid": "",
+     "pos": "DEF",
+     "value": 686587.0
+    }
+   ]
+  },
+  {
+   "name": "Jiri Letacek",
+   "pos": "POR",
+   "what": "buy",
+   "label": "buy Jiri Letacek",
+   "step": "bid up to",
+   "amount": 589151.0,
+   "done": false,
+   "gain": 0.0180442190287272,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     589151.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.867,
+     "chance"
+    ],
+    [
+     "points",
+     0.0,
+     "points"
+    ],
+    [
+     "money",
+     0.0208202527254545,
+     "points"
+    ],
+    [
+     "",
+     2.0432836786412,
+     "trend"
+    ]
+   ],
+   "asking": 589151.0,
+   "win": 0.867,
+   "asking_win": 0.867,
+   "accepts": [
+    589151.0
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2363",
+     "market": "540234450",
+     "bid": "",
+     "pos": "POR",
+     "value": 589151.0
+    }
+   ]
   }
  ],
- "plan_gain": 0.0,
- "cash_after": null,
- "can_bid": 82563097.0,
- "ping": "field Jon Moncayola",
+ "plan_gain": 17.9306810123376,
+ "cash_after": 18782.717426477,
+ "can_bid": 77402498.7174265,
+ "ping": "field Jon Moncayola; buy Lucien Agoume; buy Pablo Ibañez; buy Lucas Cepeda; buy Angel Ortiz; buy Jiri Letacek",
  "exposed": [
   {
    "name": "Fernando Niño",
