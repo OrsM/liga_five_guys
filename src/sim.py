@@ -15,10 +15,9 @@ from assemble import built
 import decision
 from decide import Action, Universe
 from ffcore.db import connect, record, rows, this_run
-from ffcore.forecast import expected_points
 from ffcore.tidy import REPORTS
 
-__all__ = ["with_squad", "board_doc", "forecast", "players", "record_run", "standings"]
+__all__ = ["with_squad", "board_doc", "players", "record_run", "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
 
@@ -352,16 +351,17 @@ def _selftest() -> None:
                     " ORDER BY player") == sorted(
             (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetch.get(k))
             for k in set(m.name) | set(m.pos)), "the facts the decision was made on, as its universe holds them"
-        (gain, lam), = rows("SELECT plan_gain, lam FROM sim_runs WHERE run_id = 7")
-        assert lam == 0.0 and abs(gain - sum(w for w, in rows(
-            "SELECT worth FROM decision_plan WHERE run_id = 7"))) < 1e-9, "what the plan gains: its steps' worth"
-
-    from ffcore.schedule import Factors
-    star = Factors(6.0, 1.1, 0.9, 0.5)
-    fc = forecast(replace(ub, factors={3: {"star": star}}), 7)
-    assert fc == [{"run_id": 7, "jornada": 3, "player": "star", "ppm": 6.0, "fixture": 1.1,
-                   "picked": 0.9, "fit": 0.5, "points": star.cell[0], "plays": star.cell[1],
-                   "expected": expected_points(star.cell)}], fc
+        assert rows("SELECT lam, moment FROM sim_runs WHERE run_id = 7") == [(0.0, None)]
+        with closing(connect()) as db, db:
+            db.execute("INSERT INTO forecast_moment VALUES (5, 'c', 'k', 't', 1)")
+            db.executemany("INSERT INTO forecast_cell VALUES (5, ?, 3, ?, ?, ?, ?, ?, ?)",
+                           [("star", 6.6, 0.45, 6.0, 1.1, 0.9, 0.5), ("plain", 4.0, 0.8, None, None, None, None)])
+            db.execute("UPDATE sim_runs SET moment = 5 WHERE run_id = 7")
+        got_fc, = rows("SELECT player, ppm, fixture, picked, fit, points, plays, expected FROM run_forecast"
+                       " WHERE run_id = 7")
+        assert got_fc[:5] == ("star", 6.0, 1.1, 0.9, 0.5) and abs(got_fc[5] - 6.6) < 1e-9 \
+            and abs(got_fc[6] - 0.45) < 1e-9 and abs(got_fc[7] - 6.6 * 0.45) < 1e-9, \
+            "a run's forecast is its moment's cells with factors, their products"
 
     base = ub.standings
     sim = standings(ub, 7)
@@ -424,15 +424,6 @@ def _selftest_lineup() -> None:
 
 
 
-def forecast(u: Universe, run: int) -> list[Doc]:
-    """Every forecast cell that has factors, factor by factor
-    (ffcore.schedule.Factors), with the expected points they make."""
-    return [{"run_id": run, "jornada": j, "player": k, "ppm": f.ppm, "fixture": f.fixture,
-             "picked": f.picked, "fit": f.fit, "points": f.cell[0], "plays": f.cell[1],
-             "expected": expected_points(f.cell)}
-            for j, layer in u.factors.items() for k, f in layer.items()]
-
-
 def standings(u: Universe, run: int) -> list[Doc]:
     """Each manager's season if you do nothing (Universe.standings): mean
     points and their 10th-90th percentile band, expected final position,
@@ -473,11 +464,11 @@ def facts(u: Universe, run: int) -> list[Doc]:
             for k in sorted(set(m.name) | set(m.pos))]
 
 
-def record_run(u: Universe, run: int, params: Sequence[Doc] = ()) -> list[Action]:
+def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | None = None) -> list[Action]:
     """The decision (decision.plan) and everything the run saw, into its
-    tables: the board views read them. The plan's moves."""
+    tables: the board views read them; the forecast moment it was built on.
+    The plan's moves."""
     acts = decision.plan(u)
-    record(forecast(u, run), "forecast")
     record([{"run_id": run, **r} for r in params], "params")
     record(standings(u, run), "sim_standings")
     record(players(u, acts, run), "sim_players")
@@ -486,8 +477,7 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = ()) -> list[Action
         db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, money, worth, in_plan"
                    " FROM dec_rows", (run,))
         db.execute("INSERT INTO decision_plan SELECT ?, step, kind, player, amount, win, worth FROM dec_plan", (run,))
-        db.execute("INSERT INTO sim_runs SELECT ?, (SELECT total(w) FROM (SELECT max(worth) AS w FROM dec_plan"
-                   " GROUP BY step)), lam FROM dec_money", (run,))
+        db.execute("INSERT INTO sim_runs SELECT ?, lam, ? FROM dec_money", (run, moment))
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
     return acts
 
@@ -519,7 +509,7 @@ def main() -> None:
     run = this_run()
     if run is None:
         raise SystemExit("sim: the board is the views over a run's rows; run it as run.py sim")
-    record_run(u, run, b.params)
+    record_run(u, run, b.params, b.moment)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
         board_doc(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

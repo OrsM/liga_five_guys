@@ -252,6 +252,7 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
 class Built(NamedTuple):
     universe: Universe
     params: list[dict[str, Any]]
+    moment: int
 
 
 class Forecast(NamedTuple):
@@ -348,11 +349,12 @@ def _moment(db: sqlite3.Connection) -> tuple[int, bool]:
     code, consts, at = forecast_key()
     if db.execute("INSERT OR IGNORE INTO forecast_moment (code, constants, as_of) VALUES (?, ?, ?)",
                   (code, consts, at)).rowcount:
-        # Another code's moments are never read again: gone once this code makes one.
-        old = "SELECT moment FROM forecast_moment WHERE code <> ?"
-        for t in ("forecast_cell", "forecast_player", "forecast_fit"):
+        # Another code's moments are never made again: gone once this code
+        # makes one, but for those a run was built on (its record).
+        old = ("SELECT moment FROM forecast_moment WHERE code <> ?"
+               " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL)")
+        for t in ("forecast_cell", "forecast_player", "forecast_fit", "forecast_moment"):
             db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old), (code, ))
-        db.execute("DELETE FROM forecast_moment WHERE code <> ?", (code, ))
     (moment, made), = db.execute("SELECT moment, made FROM forecast_moment"
                                  " WHERE (code, constants, as_of) = (?, ?, ?)", (code, consts, at)).fetchall()
     return int(moment), bool(made)
@@ -498,7 +500,7 @@ def _built(also: frozenset[str]) -> Built:
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
         part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors,
         lam=rows("SELECT coalesce(lam, 0) FROM money_rate")[0][0]),
-        params(fc.fits, market_offer_ratios(), prices.carry))
+        params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 
 def _selftest() -> None:
@@ -585,9 +587,18 @@ def _selftest_forecast() -> None:
             with mock.patch.object(pricing, "RESALE_MARGIN", pricing.RESALE_MARGIN + 1):
                 player_forecast()
             assert len(made) == 4, "another cut and another forecast constant: made again; a decision's: not"
+            ran = rows("SELECT min(moment) FROM forecast_moment")[0][0]
+            with closing(connect()) as db, db:
+                db.execute("INSERT INTO sim_runs (run_id, moment) VALUES (1, ?)", (ran, ))
             with mock.patch(__name__ + "._forecast_code", lambda: "newcode"):
                 player_forecast()
-            assert rows("SELECT DISTINCT code FROM forecast_moment") == [("newcode", )] \
+            assert rows("SELECT moment FROM forecast_moment WHERE code <> 'newcode'") == [(ran, )], \
+                "a run's moment kept, its record"
+            with closing(connect()) as db, db:
+                db.execute("DELETE FROM sim_runs")
+            with mock.patch(__name__ + "._forecast_code", lambda: "newer"):
+                player_forecast()
+            assert rows("SELECT DISTINCT code FROM forecast_moment") == [("newer", )] \
                 and rows("SELECT count(*) FROM forecast_cell WHERE moment NOT IN"
                          " (SELECT moment FROM forecast_moment)") == [(0, )], \
                 "another code's moments gone once this one makes one"

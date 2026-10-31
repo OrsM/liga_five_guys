@@ -116,15 +116,18 @@ def _selftest_changes() -> None:
                                  (3, "2026-10-14T11:00:00Z"))], "runs")
             record([{"player_id": k, "name": k.upper()} for k in "abcdef"], "crosswalk")
 
+            record([{"moment": i, "code": "c", "constants": "k", "as_of": str(i), "made": 1} for i in (1, 3)],
+                   "forecast_moment")
+            record([{"run_id": i, "moment": i} for i in (1, 3)], "sim_runs")
+
             def cell(run: int, j: int, k: str, ppm: float, picked: float, fit: float) -> dict[str, Any]:
-                return {"run_id": run, "jornada": j, "player": k, "ppm": ppm, "fixture": 1.0,
-                        "picked": picked, "fit": fit, "points": ppm, "plays": picked * fit,
-                        "expected": ppm * picked * fit}
+                return {"moment": run, "jornada": j, "player": k, "ppm": ppm, "fixture": 1.0,
+                        "picked": picked, "fit": fit, "pts": ppm, "p": picked * fit}
             record([cell(1, 9, "a", 4, .5, 1), cell(1, 9, "b", 4, .5, 1), cell(1, 9, "c", 4, 1.0, 1),
                     cell(1, 9, "e", 3, 1.0, 1), cell(1, 10, "a", 9, 1, 1),
                     cell(3, 9, "a", 5, .5, 1), cell(3, 9, "b", 4, 1.0, 1), cell(3, 9, "c", 4, 1.0, .5),
                     cell(3, 9, "d", 2, 1.0, 1), cell(3, 10, "a", 1, 1, 1),
-                    cell(1, 9, "f", 4, .5, 1.0), cell(3, 9, "f", 4, 1.0, .8)], "forecast")
+                    cell(1, 9, "f", 4, .5, 1.0), cell(3, 9, "f", 4, 1.0, .8)], "forecast_cell")
             # run 3 against the latest run at least 12 hours before it (run 1): the next jornada, 9
             got = {r["name"]: r for r in asked("what_changed")}
             assert set(got) == {"A", "B", "C", "D", "E", "F"}, got.keys()
@@ -151,7 +154,7 @@ def _selftest_changes() -> None:
         try:
             set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "service", "commit_sha": "c"}], "runs")
-            record([{"run_id": 1, "plan_gain": 0.0}], "sim_runs")
+            record([{"run_id": 1}], "sim_runs")
             record([{"run_id": 1, "manager": m, "me": 0, "now": 0.0, "mean": 0.0, "cash": c}
                     for m, c in (("debtor", -5e6), ("fine", 4e6), ("nearly", -1e6))], "sim_standings")
             store_sql("api_teams", [{"observed_at": "2026-10-14T1000Z", "player_id": a, "manager": m,
@@ -385,7 +388,7 @@ def _selftest_queries() -> None:
 
             # rivals: riv bought one player and sold another this week and an old one a month ago
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-            record([{"run_id": 1, "plan_gain": 0.0}], "sim_runs")
+            record([{"run_id": 1}], "sim_runs")
             record([{"run_id": 1, "manager": m, "me": me, "now": 100.0 * i, "mean": 1000.0 * i,
                      "finish": float(i), "p_above": None if me else 0.25, "cash": 5e6 * i}
                     for i, (m, me) in enumerate((("me", 1), ("riv", 0)), 1)], "sim_standings")

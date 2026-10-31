@@ -62,22 +62,9 @@ DROP VIEW IF EXISTS board_plans;
 DROP TABLE IF EXISTS sim_plans;
 DROP TABLE IF EXISTS sim_plan_heads;
 
--- Every forecast cell with factors (ffcore.schedule.Factors): points =
--- ppm x fixture, plays = picked x fit, expected from the two. Squads and
--- the market only, ~2.8k rows a run.
-CREATE TABLE IF NOT EXISTS forecast (
-    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
-    jornada  INTEGER NOT NULL,
-    player   TEXT NOT NULL,
-    ppm      REAL NOT NULL,
-    fixture  REAL NOT NULL,
-    picked   REAL NOT NULL,
-    fit      REAL NOT NULL,
-    points   REAL NOT NULL,
-    plays    REAL NOT NULL,
-    expected REAL NOT NULL,
-    PRIMARY KEY (run_id, jornada, player)
-);
+-- Each run's forecast copied a run (2026-11-01): now the run's moment
+-- (sim_runs.moment), read through run_forecast.
+DROP TABLE IF EXISTS forecast;
 
 -- Every constant and fitted value a run was built with (assemble.params),
 -- broom's tidy(): drift and "what changed" are queries over this.
@@ -163,12 +150,12 @@ CREATE TABLE IF NOT EXISTS sim_waiting (
     PRIMARY KEY (run_id, player, kind)
 );
 
--- What the plan gains (its steps' worth, in points) and what a million
--- was worth (money_rate's lam).
+-- What a million was worth (money_rate's lam), and the forecast moment
+-- the run was built on (forecast_cell keeps it while a run points to it).
 CREATE TABLE IF NOT EXISTS sim_runs (
-    run_id    INTEGER PRIMARY KEY REFERENCES runs(run_id),
-    plan_gain REAL,
-    lam       REAL
+    run_id INTEGER PRIMARY KEY REFERENCES runs(run_id),
+    lam    REAL,
+    moment INTEGER REFERENCES forecast_moment(moment)
 );
 
 -- grading, when run.py grade finds something new: each past lock replayed
@@ -558,6 +545,15 @@ WHERE k.t < l.close;
 -- it: points if he plays, and the chance he plays, none in a jornada he
 -- would join after his club's match (late_arrivals). The universe reads
 -- its cells here and decide.sql its dec_xp.
+-- Each run's forecast, every cell with factors (ffcore.schedule.Factors):
+-- points = ppm x fixture, plays = picked x fit, expected from the two.
+DROP VIEW IF EXISTS run_forecast;
+CREATE VIEW run_forecast AS
+SELECT r.run_id, c.jornada, c.player, c.ppm, c.fixture, c.picked, c.fit,
+       max(0.0, c.ppm * c.fixture) AS points, c.picked * c.fit AS plays,
+       max(0.0, c.ppm * c.fixture) * c.picked * c.fit AS expected
+FROM sim_runs r JOIN forecast_cell c ON c.moment = r.moment WHERE c.ppm IS NOT NULL;
+
 DROP VIEW IF EXISTS forecast_used;
 CREATE VIEW forecast_used AS
 SELECT c.moment, c.player, c.jornada, c.pts, CASE WHEN l.player IS NULL THEN c.p ELSE 0.0 END AS p
@@ -1692,7 +1688,8 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
        (SELECT lam FROM sim_runs JOIN board_run USING (run_id)) AS lam,
        me.lo AS band_lo, me.hi AS band_hi,
-       (SELECT plan_gain FROM sim_runs JOIN board_run USING (run_id)) AS plan_gain,
+       (SELECT total(w) FROM (SELECT max(worth) AS w FROM decision_plan JOIN board_run USING (run_id)
+                              GROUP BY step)) AS plan_gain,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
        (SELECT max(0.0, left + debt) - held FROM board_money) AS can_bid,
        (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
