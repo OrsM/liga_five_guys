@@ -21,7 +21,7 @@ from ffcore.pricing import RESALE_MARGIN
 
 from assemble import applied, built, forecast_cells, price_change, price_momentum, universe
 import decide
-from decide import Action, Universe, board, chosen, moves
+from decide import Action, Universe, board, moves, program
 from ffcore import pricing
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp
@@ -194,7 +194,7 @@ def decisions() -> list[dict[str, Any]]:
             u = universe_at(i, locks)
             if u is None:
                 continue
-            boards.append((i, u, board(u, kappas=(0.0,)), price_momentum().horizon))
+            boards.append((i, u, board(u), price_momentum().horizon))
     finally:
         set_now(None)
         built.cache_clear()
@@ -334,13 +334,13 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
     after = with_squad(up, up.squad_after(*(Action("buy", buy=k) for k in won)),
                        up.market.cash - sum(closing[k] for k in won))
     sales = list(day.pending) if len(won) == len(closing) else [
-        o.action for o in chosen(after, [r for r in after.rank(after.candidates(), scored=False) if not r.action.buy])[0]]
+        o.action for o in program(after, [r for r in after.rank(after.candidates(), scored=False) if not r.action.buy], relax=False)[0]]
     return (Day(after.squad_after(*sales), after.market.left(sales),
                 {k: b for k, b in day.bids.items() if k not in closing}),
             sales, len(closing) - len(won))
 
 
-def phantom_path(daily: bool = False, kappas: tuple[float, ...] = decide.KAPPAS) -> list[dict[str, Any]]:
+def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
     """The league's sixth manager: your squad and cash at the first lock,
     then the plan (every player he or the manager beside him holds
     forecast, though nobody may hold him now) this code makes for the squad
@@ -399,7 +399,7 @@ def phantom_path(daily: bool = False, kappas: tuple[float, ...] = decide.KAPPAS)
                 continue
             up = with_squad(u, squad, cash, bids)
             if t in runs or not daily:
-                acts = moves(up, kappas)
+                acts = moves(up)
                 if daily:
                     (squad, cash, bids, pending), acts = acted(up, bids, acts)
                     up = with_squad(u, squad, cash, bids)
@@ -433,7 +433,7 @@ def phantom_season() -> list[dict[str, Any]]:
     variance weighed at nothing: the grade is the forecasts' and the
     moves', the plan's appetite for variance the backtest's (money)."""
     return [{k: v for k, v in r.items() if k not in ("lost", "expected", "standpat_expected")}
-            for r in phantom_path(kappas=(0.0,))]
+            for r in phantom_path()]
 
 
 def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datetime]]
@@ -797,11 +797,9 @@ if __name__ == "__main__":
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
     if sys.argv[1:2] == ["money"]:
-        # money [RATES [HORIZONS [KAPPAS]]]: the phantom deciding daily with money at each rate and
-        # horizon, the plan made at each of these appetites for variance (decide.KAPPAS by default)
+        # money [RATES [HORIZONS]]: the phantom deciding daily with money at each rate and horizon
         rates = [float(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,3,5,8,12").split(",")]
         hs = [int(x) for x in (sys.argv[3] if len(sys.argv) > 3 else "7,14").split(",")]
-        kappas = tuple(float(x) for x in sys.argv[4].split(",")) if len(sys.argv) > 4 else decide.KAPPAS
         # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
@@ -810,7 +808,7 @@ if __name__ == "__main__":
         for rate in rates:
             for h in hs:
                 decide.MONEY_RATE, pricing.MONEY_H = rate, h
-                got = phantom_path(daily=True, kappas=kappas)
+                got = phantom_path(daily=True)
                 print("%5.1f %3d %6d %5d %+8.0f %+8.0f %+9.1f %+9.1f" % (
                     rate, h, sum(len(g["moves"].split("; ")) for g in got if g["moves"]),
                     sum(g["lost"] for g in got),
@@ -832,5 +830,5 @@ if __name__ == "__main__":
                     pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
                     100 * sum(x > 0 for x in pnl) / len(pnl)))
         raise SystemExit(0)
-    print("grading.py --selftest | money [RATES [HORIZONS [KAPPAS]]] (LFG_VARIANT=name) | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money [RATES [HORIZONS]] (LFG_VARIANT=name) | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

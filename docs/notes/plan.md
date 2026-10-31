@@ -115,7 +115,9 @@ Zaman, "Picking winners in daily fantasy sports using integer programming",
 arXiv 1604.01455) is then a sweep: solve for mean + kappa x variance at a few
 kappa, compute each plan's chance of first (`Standings.position`), keep the
 best. Behind the leader the best plan takes more variance; ahead, less.
-This replaces the 70% bar, which only avoids losing ground.
+This replaces the 70% bar, which only avoids losing ground. Removed
+2026-10-31: the daily backtest scored kappa 0 alone best (344 points, 323
+with the sweep), so the plan ran at 0 and the sweep was code doing nothing.
 
 ## Paths: the nights before the lock
 
@@ -141,7 +143,8 @@ them, evidence growing a jornada a week.
 2. Bids as levels with their odds; the money rule on every outcome. Done
    (decide.options): a bid holds his slot the share of the time it wins,
    the budget holds if every bid wins, the squad if every one loses.
-3. The chance of first by the variance sweep. Done (decide.KAPPAS).
+3. The chance of first by the variance sweep. Done (decide.KAPPAS), then
+   removed (2026-10-31: kappa 0 alone scored best).
    Backtest of 2 and 3 together, jornadas 2-9: 414 points, no jornada
    scoring nothing, 374M of squad value: the first plan to beat never
    moving (395); the one-night program alone made 352.
