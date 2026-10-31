@@ -86,6 +86,10 @@ def _selftest() -> None:
         names the names shown where they are not the player's key; plan, a
         plan of these moves (each its own step) in place of the decision's,
         options, moves valued in place of the decision's, lam the run's."""
+        from ffcore.names import Name
+        u = replace(u, market=replace(u.market, name={
+            **{k: Name(k) for k in set(u.market.pos) | set(u.mine)}, **u.market.name,
+            **{k: Name(v) for k, v in (names or {}).items()}}))
         m = u.market
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             with closing(connect()) as db, db:
@@ -93,7 +97,7 @@ def _selftest() -> None:
                 db.execute("CREATE TABLE player_facts (player, name, pos, value, owner, clause,"
                            " price, route, my_bid, offer, paid, trend)")
                 db.executemany("INSERT INTO player_facts VALUES (%s)" % ", ".join("?" * 12), [
-                    (k, (names or {}).get(k, k), m.pos.get(k), m.value.get(k), m.owner.get(k), m.clause.get(k),
+                    (k, m.shown(k), m.pos.get(k), m.value.get(k), m.owner.get(k), m.clause.get(k),
                      m.price.get(k), m.route.get(k), m.my_bid.get(k), m.offer.get(k),
                      m.paid.get(k), m.trend.get(k)) for k in set(m.pos) | set(u.mine)])
                 db.execute("DROP VIEW sale_odds")
@@ -343,6 +347,11 @@ def _selftest() -> None:
         assert rows("SELECT kind, player, in_plan FROM decision_option WHERE run_id = 7 AND in_plan") \
             == [("buy", k, 1) for k in sorted(bought)], "each move alone, the plan's marked"
         assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'sell'") == [(len(sqb), )]
+        m = ub.market
+        assert rows("SELECT player, pos, value, price, offer, fetches FROM sim_facts WHERE run_id = 7"
+                    " ORDER BY player") == sorted(
+            (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetch.get(k))
+            for k in set(m.name) | set(m.pos)), "the facts the decision was made on, as its universe holds them"
         (gain, lam), = rows("SELECT plan_gain, lam FROM sim_runs WHERE run_id = 7")
         assert lam == 0.0 and abs(gain - sum(w for w, in rows(
             "SELECT worth FROM decision_plan WHERE run_id = 7"))) < 1e-9, "what the plan gains: its steps' worth"
@@ -451,6 +460,19 @@ def players(u: Universe, acts: Sequence[Action], run: int) -> list[Doc]:
             for k in keys]
 
 
+def facts(u: Universe, run: int) -> list[Doc]:
+    """Every player the universe knows, with the facts the decision was
+    made on: his name as shown, position, value, trend, what was paid, the
+    offer on him, his clause, price and route on the market, your bid, and
+    what a sale of him gets."""
+    m = u.market
+    return [{"run_id": run, "player": k, "name": m.shown(k), "pos": m.pos.get(k, ""),
+             "value": m.value.get(k), "trend": m.trend.get(k), "paid": m.paid.get(k),
+             "offer": m.offer.get(k), "clause": m.clause.get(k), "price": m.price.get(k),
+             "route": m.route.get(k), "my_bid": m.my_bid.get(k), "fetches": m.fetch.get(k)}
+            for k in sorted(set(m.name) | set(m.pos))]
+
+
 def record_run(u: Universe, run: int, params: Sequence[Doc] = ()) -> list[Action]:
     """The decision (decision.plan) and everything the run saw, into its
     tables: the board views read them. The plan's moves."""
@@ -459,13 +481,13 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = ()) -> list[Action
     record([{"run_id": run, **r} for r in params], "params")
     record(standings(u, run), "sim_standings")
     record(players(u, acts, run), "sim_players")
+    record(facts(u, run), "sim_facts")
     with closing(connect()) as db, db:
         db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, money, worth, in_plan"
                    " FROM dec_rows", (run,))
         db.execute("INSERT INTO decision_plan SELECT ?, step, kind, player, amount, win, worth FROM dec_plan", (run,))
         db.execute("INSERT INTO sim_runs SELECT ?, (SELECT total(w) FROM (SELECT max(worth) AS w FROM dec_plan"
                    " GROUP BY step)), lam FROM dec_money", (run,))
-        db.execute("INSERT INTO sim_facts SELECT ?, * FROM sim_facts_now", (run,))
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
     return acts
 

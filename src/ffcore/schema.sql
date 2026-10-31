@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS sim_players (
 -- The market's and the league's facts as the run saw them (player_facts and
 -- sale_odds as of its cut), every player: the board shows these, and a
 -- past run's board is these and its decisions. fetches is what a sale gets
--- (NULL with no offer standing on him). sim_facts_now is what is inserted.
+-- (NULL with no offer standing on him), as the run's universe held them (sim.facts).
 CREATE TABLE IF NOT EXISTS sim_facts (
     run_id  INTEGER NOT NULL REFERENCES runs(run_id),
     player  TEXT NOT NULL,
@@ -1368,13 +1368,7 @@ SELECT CASE WHEN better THEN best.alpha ELSE 0.0 END AS alpha,
        fall.neutral AS neutral_start, fall.absent AS absent_start
 FROM fits, fall LEFT JOIN best;
 
--- What a run records of the facts (sim_facts): every player_facts column
--- with his name as shown, and what a sale of him gets.
 DROP VIEW IF EXISTS sim_facts_now;
-CREATE VIEW sim_facts_now AS
-SELECT f.player, coalesce(name_shown(f.name), f.player) AS name, f.pos, f.value, f.trend, f.paid,
-       f.offer, f.clause, f.price, f.route, f.my_bid, o.fetches
-FROM player_facts f LEFT JOIN sale_odds o USING (player);
 
 -- The board: the last run's decisions and the facts it saw (sim_*,
 -- decision_option, decision_plan), the app's line-up and the next kickoff
@@ -1725,7 +1719,7 @@ WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
                          'act', (SELECT json_group_array(json_object(
                                      'player_team', t.player_team_id, 'player', coalesce(t.player_id, m.player_id),
                                      'market', m.market_id, 'bid', m.bid_id, 'pos', f.pos, 'value', f.value))
-                                 FROM json_each(r.players) e LEFT JOIN player_facts f ON f.player = e.value
+                                 FROM json_each(r.players) e LEFT JOIN sim_facts f ON f.run_id = (SELECT run_id FROM board_run) AND f.player = e.value
                                  LEFT JOIN current_api_teams t ON t.player = e.value
                                  LEFT JOIN current_api_market m ON m.player = e.value)) AS o
                      FROM board_rows r LEFT JOIN board_buys b ON r.what = 'buy' AND b.in_plan
