@@ -150,20 +150,21 @@ class Prices(NamedTuple):
 def record_trend() -> None:
     """Each player's price trend as of the model's cut, kept (price_trend_fit)
     for the views that read it; the momentum it rests on kept first."""
-    _keep("price_trend_fit", "SELECT cut(), ff_id, trend FROM price_trend_now")
+    _keep("SELECT cut(), ff_id, trend FROM price_trend_now", "price_trend_fit")
 
 
-def _keep(table: str, select: str) -> None:
-    """The cut's rows of a fit table replaced by what select makes: worked
-    out first, the write after, so a universe built beside others (a
-    backtest builds them side by side) holds lfg.db's one writer's lock for
-    the write alone, not for the fit."""
+def _keep(select: str, *tables: str) -> None:
+    """The cut's rows of fit tables replaced by what select makes: its first
+    column, the cut, and its second, the key, in each table, with the next
+    column for each table in turn. Worked out first, the write after, so a
+    universe built beside others (a backtest builds them side by side) holds
+    lfg.db's one writer's lock for the write alone, not for the fit."""
     with closing(connect()) as db:
         got = db.execute(select).fetchall()
         with db:
-            db.execute("DELETE FROM %s WHERE as_of = cut()" % table)
-            if got:
-                db.executemany("INSERT INTO %s VALUES (%s)" % (table, ", ".join("?" * len(got[0]))), got)
+            for i, table in enumerate(tables):
+                db.execute("DELETE FROM %s WHERE as_of = cut()" % table)
+                db.executemany("INSERT INTO %s VALUES (?, ?, ?)" % table, [(r[0], r[1], r[2 + i]) for r in got])
 
 
 def fits_in_place() -> bool:
@@ -177,15 +178,14 @@ def fits_in_place() -> bool:
 
 
 # What the fits are made from (price_momentum, record_trend): kept while these read as they did.
-FITS = "momentum price_error_now price_trend_now"
+FITS = "momentum price_trend_now"
 
 
 def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
     if not (kept.written(lfgdb.DB, "fits", FITS) and fits_in_place()):
-        _keep("momentum_fit", "SELECT cut(), h, slope FROM momentum")
-        _keep("price_error_fit", "SELECT cut(), h, rmse FROM price_error_now")
+        _keep("SELECT cut(), h, slope, rmse FROM momentum", "momentum_fit", "price_error_fit")
         record_trend()
         kept.mark(lfgdb.DB, "fits", FITS)
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))

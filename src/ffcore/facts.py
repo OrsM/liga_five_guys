@@ -45,7 +45,8 @@ FROM base b LEFT JOIN changes c ON c.ff_id = b.ff_id AND c.n = b.n
 MOMENTUM_DAY = """
 DELETE FROM momentum_day WHERE ckey = (SELECT ckey FROM k);
 INSERT INTO momentum_day
-SELECT (SELECT ckey FROM k), h, end_day, sum(x * y), sum(x * x) FROM momentum_pairs GROUP BY h, end_day
+SELECT (SELECT ckey FROM k), h, end_day, sum(x * y), sum(x * x), sum(y * y), count(*)
+FROM momentum_pairs GROUP BY h, end_day
 """
 FAR = "9999-12-31T2359Z"
 PAD = 2
@@ -220,6 +221,19 @@ def _selftest() -> None:
                 set_now(None)
             assert kept_fit.keys() == direct.keys() and all(abs(kept_fit[h] - direct[h]) < 1e-9 for h in direct), \
                 (cut, kept_fit, direct)
+            try:
+                set_now(datetime.strptime(cut, "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc))
+                with closing(connect()) as db, db:
+                    db.execute("DELETE FROM momentum_fit WHERE as_of = cut()")
+                    db.execute("INSERT INTO momentum_fit SELECT cut(), h, slope FROM momentum")
+                kept_err = dict(rows("SELECT h, rmse FROM momentum"))
+                direct_err = dict(rows("SELECT p.h, sqrt(avg((m.slope * p.x - p.y) * (m.slope * p.x - p.y)))"
+                                       " FROM momentum_pairs p JOIN fitted m USING (h) GROUP BY p.h"))
+            finally:
+                set_now(None)
+            assert kept_err.keys() == direct_err.keys() and all(
+                abs(kept_err[h] - direct_err[h]) < 1e-6 for h in direct_err), \
+                ("the error from the days' sums is the error over every pair", cut, kept_err, direct_err)
         def series_at(cut: str) -> list[tuple[object, ...]]:
             from datetime import datetime, timezone
 

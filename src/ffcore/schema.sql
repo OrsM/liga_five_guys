@@ -814,8 +814,8 @@ SELECT p.h, p.ff_id, p.i, p.end_day, p.x,
        max(-k.clip * p.h, min(k.clip * p.h, p.change)) AS y
 FROM price_ahead p, k WHERE p.end_at <= (SELECT cut());
 
--- What each closed day adds to the momentum fit, per horizon: the sums of x*y
--- and x*x over the pairs that end that day, written once (facts.MOMENTUM_DAY)
+-- What each closed day adds to the momentum fit, per horizon: the sums of x*y,
+-- x*x and y*y and the count of the pairs that end that day, written once (facts.MOMENTUM_DAY)
 -- for the constants they were made with (ckey).
 CREATE TABLE IF NOT EXISTS momentum_day (
     ckey    TEXT NOT NULL,
@@ -823,21 +823,33 @@ CREATE TABLE IF NOT EXISTS momentum_day (
     end_day TEXT NOT NULL,
     sxy     REAL NOT NULL,
     sxx     REAL NOT NULL,
+    syy     REAL NOT NULL DEFAULT 0,
+    n       INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (ckey, h, end_day)
 ) WITHOUT ROWID;
 
--- One least-squares slope through the origin per horizon: the closed days
--- kept in momentum_day, and the pairs ending on the day of the cut.
-DROP VIEW IF EXISTS momentum;
-CREATE VIEW momentum AS
+-- The momentum fit's sums per horizon, as of cut(): the closed days kept in
+-- momentum_day, and the pairs ending on the day of the cut.
+DROP VIEW IF EXISTS momentum_sums;
+CREATE VIEW momentum_sums AS
 WITH parts AS (
-    SELECT h, sxy, sxx FROM momentum_day
+    SELECT h, sxy, sxx, syy, n FROM momentum_day
     WHERE ckey = (SELECT ckey FROM k) AND end_day < (SELECT d FROM price_day_now)
       AND h <= (SELECT hmax FROM price_hmax)
     UNION ALL
-    SELECT h, sum(x * y), sum(x * x) FROM momentum_pairs
+    SELECT h, sum(x * y), sum(x * x), sum(y * y), count(*) FROM momentum_pairs
     WHERE end_day = (SELECT d FROM price_day_now) GROUP BY h)
-SELECT h, sum(sxy) / sum(sxx) AS slope FROM parts GROUP BY h HAVING sum(sxx) <> 0;
+SELECT h, sum(sxy) AS sxy, sum(sxx) AS sxx, sum(syy) AS syy, sum(n) AS n FROM parts GROUP BY h;
+
+-- One least-squares slope through the origin per horizon, and how far a
+-- value forecast at it is off: the root mean square of its error over every
+-- pair it is fitted on (in % of value, each move clipped as the fit clips
+-- it), sum (b x - y)^2 = syy - sxy^2 / sxx at b = sxy / sxx. Prices have fat
+-- tails: it is well over the mean absolute error.
+DROP VIEW IF EXISTS momentum;
+CREATE VIEW momentum AS
+SELECT h, sxy / sxx AS slope, sqrt(max((syy - sxy * sxy / sxx) / n, 0.0)) AS rmse
+FROM momentum_sums WHERE sxx <> 0;
 
 -- Momentum as fitted at a cut, kept: fitting costs seconds, and carry and
 -- trend read it (assemble.price_momentum fits at the model's cut; Datasette
@@ -853,15 +865,7 @@ CREATE VIEW fitted AS
 SELECT h, slope FROM momentum_fit
 WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut()));
 
--- How far a value forecast is off, as of cut(): per horizon, the root mean
--- square of momentum's error over every pair it is fitted on (in % of
--- value, each move clipped as the fit clips it). Prices have fat tails: it
--- is well over the mean absolute error. Kept a run (price_error_fit), as
--- momentum is: it walks every pair (~5s).
 DROP VIEW IF EXISTS price_error_now;
-CREATE VIEW price_error_now AS
-SELECT p.h, sqrt(avg((m.slope * p.x - p.y) * (m.slope * p.x - p.y))) AS rmse
-FROM momentum_pairs p JOIN fitted m USING (h) GROUP BY p.h;
 
 CREATE TABLE IF NOT EXISTS price_error_fit (
     as_of TEXT NOT NULL,
