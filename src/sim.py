@@ -544,14 +544,15 @@ def standings(u: Universe, b: Board, run: int) -> list[Doc]:
 
 
 def players(u: Universe, b: Board, run: int) -> list[Doc]:
-    """Your squad and the plan's buys as the model sees them: the chance he
-    plays next, his expected points next and over the season, whether he is
-    in the best eleven now and once the plan is made, and, if yours, the
-    points his sale costs per million."""
+    """Your squad and every player on the market as the model sees them:
+    the chance he plays next, his expected points next and over the
+    season, whether he is in the best eleven now and once the plan is
+    made, and, if yours, the points his sale costs per million. What a
+    query weighs one against another by (season, sim_facts' value)."""
     o = u.outlook
     exp, xi = o.xi
     plan_xi = u.after(*(r.action for r in b.plan)).outlook.xi.players
-    keys = list(u.mine) + [r.action.buy for r in b.plan if r.action.buy and r.action.buy not in u.mine]
+    keys = list(dict.fromkeys([*u.mine, *sorted(u.market.price), *(r.action.buy for r in b.plan if r.action.buy)]))
     return [{"run_id": run, "player": k, "start": o.next_up.get(k, (0.0, 0.0))[1],
              "next": exp.get(k, 0.0), "season": o.season.get(k, 0.0),
              "mine": int(k in u.mine), "xi": int(k in xi), "plan_xi": int(k in plan_xi),
