@@ -5,14 +5,15 @@ themselves."""
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sqlite3
 import statistics
 import sys
 from contextlib import closing, contextmanager
-from functools import cache
+from functools import cache, cached_property
 from pathlib import Path
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import Any, NamedTuple
 
 import decide
@@ -268,30 +269,65 @@ class Built(NamedTuple):
 
 
 class Forecast(NamedTuple):
-    """Every player's cell by jornada as of cut() (points if he plays, the
-    chance he plays), the factors of each rated one's, who is listed
+    """The players' cells by jornada as of cut() (points if he plays, the
+    chance he plays), their factors (StoredFactors), who of them is listed
     injured, doubtful or suspended then, and the values the forecast fitted
     (params rows)."""
     per_j: PerJornada
-    factors: PerJornadaFactors
+    factors: Mapping[int, Mapping[str, Factors]]
     flagged: frozenset[str]
     fits: list[dict[str, Any]]
 
 
-def player_forecast(also: Iterable[str] = ()) -> Forecast:
+def player_forecast(players: Iterable[str] | None = None) -> Forecast:
     """The forecast as of cut(), the one the board, the backtests and the
-    replays all read: every player the scorer knows, and also these. Made
-    once a moment (forecast_key) into forecast_cell, and read from there.
-    Each player's cell is his alone (the players asked for change none), so
-    a moment kept without someone asked for adds just him."""
+    replays all read: of these players, or of every player the scorer knows.
+    Made once a moment (forecast_key) into forecast_cell, every player the
+    scorer knows, and read from there. Each player's cell is his alone (the
+    players asked for change none), so a moment made without someone asked
+    for adds just him."""
+    asked = None if players is None else set(players)
     with closing(connect()) as db, db:
         moment, made = _moment(db)
         have = {k for (k, ) in db.execute("SELECT player FROM forecast_player WHERE moment = ?", (moment, ))}
     if not made:
-        _make(moment, set(also), every=True)
-    elif missing := set(also) - have:
+        _make(moment, asked or set(), every=True)
+    elif asked and (missing := asked - have):
         _make(moment, missing, every=False)
-    return _read(moment)
+    return _read(moment, asked)
+
+
+class StoredFactors(Mapping[int, Mapping[str, Factors]]):
+    """The factors of a moment's cells (forecast_cell), of these players or
+    every one, by jornada: read when first looked at (the board's record and
+    ask.py do; no backtest does)."""
+
+    def __init__(self, moment: int, players: set[str] | None) -> None:
+        self.moment, self.players = moment, players
+
+    @cached_property
+    def _got(self) -> PerJornadaFactors:
+        out: PerJornadaFactors = {}
+        for k, j, ppm, fx, picked, fit in rows(
+                "SELECT player, jornada, ppm, fixture, picked, fit FROM forecast_cell WHERE moment = ?1"
+                " AND ppm IS NOT NULL AND (?2 IS NULL OR player IN (SELECT value FROM json_each(?2)))"
+                " ORDER BY jornada, player",
+                (self.moment, _json(self.players))):
+            out.setdefault(j, {})[k] = Factors(ppm, fx, picked, fit)
+        return out
+
+    def __getitem__(self, j: int) -> Mapping[str, Factors]:
+        return self._got[j]
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._got)
+
+    def __len__(self) -> int:
+        return len(self._got)
+
+
+def _json(players: set[str] | None) -> str | None:
+    return None if players is None else json.dumps(sorted(players))
 
 
 def forecast_key() -> tuple[str, str, str]:
@@ -358,21 +394,18 @@ def _make(moment: int, also: set[str], every: bool) -> None:
                 for r in forecast_fits(sc.starts.cal, sc.starts.avail, sc.promoted_discount, ratings)])
 
 
-def _read(moment: int) -> Forecast:
+def _read(moment: int, players: set[str] | None) -> Forecast:
+    """The moment's forecast of these players, or of every one."""
+    which = "(?2 IS NULL OR player IN (SELECT value FROM json_each(?2)))"
     per_j: PerJornada = {}
-    factors: PerJornadaFactors = {}
-    for k, j, pts, p, ppm, fx, picked, fit in rows(
-            "SELECT player, jornada, pts, p, ppm, fixture, picked, fit FROM forecast_cell"
-            " WHERE moment = ? ORDER BY jornada, player", (moment, )):
+    for k, j, pts, p in rows("SELECT player, jornada, pts, p FROM forecast_cell WHERE moment = ?1 AND "
+                             + which + " ORDER BY jornada, player", (moment, _json(players))):
         per_j.setdefault(j, {})[k] = (pts, p)
-        factors.setdefault(j, {})
-        if ppm is not None:
-            factors[j][k] = Factors(ppm, fx, picked, fit)
-    flagged = frozenset(k for (k, ) in rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged",
-                                            (moment, )))
+    flagged = frozenset(k for (k, ) in rows(
+        "SELECT player FROM forecast_player WHERE moment = ?1 AND flagged AND " + which, (moment, _json(players))))
     fits = [_param(c, t, v) for c, t, v in rows(
         "SELECT component, term, value FROM forecast_fit WHERE moment = ? ORDER BY rowid", (moment, ))]
-    return Forecast(per_j, factors, flagged, fits)
+    return Forecast(per_j, StoredFactors(moment, players), flagged, fits)
 
 
 def universe(also: frozenset[str] = frozenset()) -> Universe:
@@ -439,7 +472,7 @@ def _built(also: frozenset[str]) -> Built:
     asked = base | also
     fc = player_forecast(asked)
     rem, played = left.rem, left.played
-    per_j = {j: {k: c for k, c in fc.per_j.get(j, {}).items() if k in asked} for j in rem}
+    per_j = {j: dict(fc.per_j.get(j, {})) for j in rem}
     first_of: dict[str, int] = {}
     for jornada in rem:
         for k in per_j[jornada]:
@@ -475,8 +508,7 @@ def _built(also: frozenset[str]) -> Built:
         state=LeagueState(squads, rem, me, carried), forecaster=boot,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of,
-        factors={j: {k: f for k, f in layer.items() if k in asked} for j, layer in fc.factors.items()}),
+        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors),
         params(fc.fits, market_offer_ratios(), prices.carry))
 
 
@@ -555,6 +587,8 @@ def _selftest_forecast() -> None:
             assert made[1:] == [{"c"}], "only the one not made"
             assert got.per_j[3]["c"] == (4.0, 0.5) and "c" not in got.factors[3] and "c" not in got.flagged, \
                 "an unrated player's cell without factors"
+            assert set(got.per_j[3]) == {"a", "c"} and set(got.factors[3]) == {"a"} and not got.flagged, \
+                "the players asked for, and no others"
             set_now(dt.datetime(2026, 9, 2, 8, 0, tzinfo=dt.timezone.utc))
             player_forecast()
             with mock.patch.object(score, "SHRINK_K", score.SHRINK_K + 1):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 import sys
 from dataclasses import dataclass, field, replace
 from functools import cached_property
@@ -13,7 +14,7 @@ from ffcore import pricing
 from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.rules import CLAUSE_BUYS, MANAGER_TRADES, MAX_SLOT, MIN_SLOT, POSITIONS, SQUAD_MAX, XI_SIZE, Squad, Squads, position, shortfall
-from ffcore.schedule import PerJornadaFactors, phantom_topup
+from ffcore.schedule import Factors, phantom_topup
 from ffcore.season import LeagueState
 
 __all__ = ["Action", "Board", "FUNNEL", "Move", "Universe", "board", "joint", "options", "plan", "program"]
@@ -99,7 +100,7 @@ class Universe:
     rival_cash: dict[str, float] = field(default_factory=dict)
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
-    factors: PerJornadaFactors = field(default_factory=dict)
+    factors: Mapping[int, Mapping[str, Factors]] = field(default_factory=dict)
 
     @property
     def me(self) -> str:
