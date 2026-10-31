@@ -23,7 +23,7 @@ from ffcore.rules import position, slot
 from ffcore.text import stems_meet
 from ffcore.startprob import platt, prognosis_bucket
 
-__all__ = ["DB", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
+__all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
            "record", "rows", "this_run"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
@@ -31,6 +31,7 @@ DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
 SCHEMA = Path(__file__).with_name("schema.sql")
 IDENTITY = Path(__file__).with_name("identity.sql")
 TABLES_SQL = Path(__file__).with_name("tables.sql")
+DECIDE_SQL = Path(__file__).with_name("decide.sql")     # the decision: its views read schema.sql's
 RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
 
@@ -172,7 +173,8 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
-            texts = [sql.read_text(encoding="utf-8") for sql in (IDENTITY, TABLES_SQL, schema)]
+            texts = [sql.read_text(encoding="utf-8") for sql in (IDENTITY, TABLES_SQL, schema)
+                     + ((DECIDE_SQL, ) if schema == SCHEMA else ())]
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
             if db.execute("PRAGMA user_version").fetchone()[0] != version:   # else it is applied: leave the views
                 db.execute("PRAGMA journal_mode=WAL")                       # other processes are using

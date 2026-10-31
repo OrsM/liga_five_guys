@@ -342,7 +342,7 @@ def forecast_key() -> tuple[str, str, str]:
 # decide, grade or show (an edit to them keeps every forecast made), and the
 # constants of these modules. A file wrongly left in costs a forecast made
 # again; one wrongly left out would keep a stale one: only these are.
-NOT_FORECAST = ("act.py", "decide.py", "grading.py", "health.py", "publish.py", "remind.py", "run.py",
+NOT_FORECAST = ("act.py", "decide.py", "decision.py", "ffcore/decide.sql", "grading.py", "health.py", "publish.py", "remind.py", "run.py",
                 "sim.py", "ffcore/action.py", "ffcore/forecast.py", "ffcore/gain.py", "ffcore/market.py",
                 "ffcore/outlook.py", "ffcore/pricing.py", "ffcore/season.py")
 FORECAST_MODULES = ("fixture", "rules", "score", "startprob")
