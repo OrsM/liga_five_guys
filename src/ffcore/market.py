@@ -21,10 +21,8 @@ class Market:
     or what waiting is worth, whichever is more). odds, for each player on
     the game's market, the bids over his asking price to choose from and
     each one's chance of winning his auction (schema.sql's bid_odds),
-    lowest first. carry is the share
-    of a trend made after each price update and error how far a value
-    forecast is off then (rmse, % of value); offer_sd the spread of the
-    game's offers as a share of value.
+    lowest first. carry is the share of a trend made after each price
+    update.
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
     name: dict[str, Name] = field(default_factory=dict)
@@ -40,8 +38,6 @@ class Market:
     offer: dict[str, float] = field(default_factory=dict)
     fetch: dict[str, float] = field(default_factory=dict)
     carry: tuple[float, ...] = ()
-    error: tuple[float, ...] = ()
-    offer_sd: float = 0.0
     odds: dict[str, tuple[tuple[float, float], ...]] = field(default_factory=dict)
 
     def shown(self, k: str) -> str:
@@ -74,26 +70,6 @@ class Market:
             return v
         return v * (1 + self.trend.get(k, 0.0) / 100 * self.carry[min(h, len(self.carry)) - 1])
 
-    def money(self, acts: Iterable[Action], h: int) -> tuple[float, float]:
-        """What these moves do to your money h price updates on, in millions:
-        its mean and variance. A buy pays its cost for a player then worth
-        later(); a sale gets its proceeds for players who would then have
-        been worth later(). Each player's value h updates on is off by error
-        (rmse), and a sale with no offer standing gets the game's offer, off
-        his value by offer_sd."""
-        sd = self.error[min(h, len(self.error)) - 1] / 100 if self.error and h > 0 else 0.0
-        mean = var = 0.0
-        for a in acts:
-            if a.buy:
-                mean += self.later(a.buy, h) - a.cost
-                var += (self.value.get(a.buy, 0.0) * sd) ** 2
-            if a.sell:
-                mean += a.proceeds - sum(self.later(k, h) for k in a.sell)
-                var += sum((self.value.get(k, 0.0) * sd) ** 2
-                           + (0.0 if k in self.offer else (self.value.get(k, 0.0) * self.offer_sd) ** 2)
-                           for k in a.sell)
-        return mean / 1e6, var / 1e12
-
 
 def _selftest() -> None:
     odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, fetch={"s": 10.5e6})
@@ -111,19 +87,9 @@ def _selftest() -> None:
     assert Market(cash=2e6).left([buy, sale]) == 2e6 - 1e6 + 3e6
 
 
-    moves = Market(value={"b": 10e6, "s": 20e6, "o": 5e6}, trend={"b": 10.0, "s": -20.0},
-                   carry=(0.5, 1.0), error=(5.0, 10.0), offer_sd=0.05, offer={"o": 5.1e6})
+    moves = Market(value={"b": 10e6}, trend={"b": 10.0}, carry=(0.5, 1.0))
     assert moves.later("b", 1) == 10.5e6 and moves.later("b", 9) == 11e6 and moves.later("b", 0) == 10e6
     assert Market(value={"b": 10e6}, trend={"b": 10.0}).later("b", 3) == 10e6, "no carry: as he is"
-    buy, sell = Action("buy", buy="b", cost=10.2e6), Action("sell", sell=("s",), proceeds=19.8e6)
-    m, v = moves.money([buy], 2)
-    assert abs(m - 0.8) < 1e-9 and abs(v - 1.0) < 1e-9, "worth 11M for 10.2M; 10% of 10M off"
-    m, v = moves.money([sell], 2)
-    assert abs(m - 3.8) < 1e-9 and abs(v - (4.0 + 1.0)) < 1e-9, \
-        "19.8M for one who would be worth 16M; off by 10% of 20M, and by the offers' 5%"
-    m, v = moves.money([Action("sell", sell=("o",), proceeds=5.1e6)], 2)
-    assert abs(m - 0.1) < 1e-9 and abs(v - 0.25) < 1e-9, "an offer standing: no spread on what it gets"
-    assert moves.money([], 2) == (0.0, 0.0)
 
     named = Market(name={"k": Name("iñigo vicente")})
     assert named.shown("k") == "Iñigo Vicente" and named.shown("unknown") == "unknown", \

@@ -1,8 +1,7 @@
-"""Draw the code as it is: module dependencies, domain classes and the
-decision funnel, as Mermaid, generated from src/ so the pictures cannot
-drift from the code.
+"""Draw the code as it is: module dependencies and domain classes, as
+Mermaid, generated from src/ so the pictures cannot drift from the code.
 
-    python tools/uml.py [outdir]     # writes modules.mmd, classes.mmd, funnel.mmd
+    python tools/uml.py [outdir]     # writes modules.mmd, classes.mmd
 
 Render with any Mermaid viewer (mermaid-cli: mmdc -i modules.mmd -o m.png).
 Layers come from tools/structure.py; an arrow from the model into the data
@@ -153,39 +152,12 @@ def class_diagram() -> str:
     return "\n".join(out + sorted(links)) + "\n"
 
 
-def funnel_diagram() -> str:
-    """decide.FUNNEL, step by step, each with the first sentence of its
-    docstring: the steps tools/ask.py names when it explains a board."""
-    tree = ast.parse((SRC / "decide.py").read_text(encoding="utf-8"))
-    defs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))}
-    steps = next(n.value.elts for n in tree.body if isinstance(n, ast.Assign)
-                 and isinstance(n.value, ast.Tuple)
-                 and any(getattr(t, "id", "") == "FUNNEL" for t in n.targets))
-    out = ["flowchart LR"]
-    fn: ast.FunctionDef | ast.ClassDef
-    for i, step in enumerate(steps):
-        if isinstance(step, ast.Attribute) and isinstance(step.value, ast.Name):
-            owner, name = defs[step.value.id], step.attr
-            fn = next(n for n in owner.body if isinstance(n, ast.FunctionDef) and n.name == name)
-        else:
-            assert isinstance(step, ast.Name), ast.dump(step)
-            name = step.id
-            fn = defs[name]
-        first = " ".join((ast.get_docstring(fn) or "").split(". ")[0].split())
-        out.append('    s%d["<b>%s</b><br/>%s"]' % (i, name, first.replace('"', "'")))
-        if i:
-            out.append("    s%d --> s%d" % (i - 1, i))
-    out.append('    s%d --> board(["the board"])' % (len(steps) - 1))
-    return "\n".join(out) + "\n"
-
-
 def main(argv: list[str]) -> int:
     outdir = Path(argv[0]) if argv else SRC.parent / "docs"
     outdir.mkdir(exist_ok=True)
     (outdir / "modules.mmd").write_text(module_diagram(), encoding="utf-8")
     (outdir / "classes.mmd").write_text(class_diagram(), encoding="utf-8")
-    (outdir / "funnel.mmd").write_text(funnel_diagram(), encoding="utf-8")
-    print("wrote %s/modules.mmd, classes.mmd and funnel.mmd" % outdir)
+    print("wrote %s/modules.mmd and classes.mmd" % outdir)
     return 0
 
 

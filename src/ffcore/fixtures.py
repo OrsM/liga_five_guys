@@ -135,16 +135,8 @@ def _selftest() -> None:
     mu = tiny_market_universe()
     assert _fieldable(mu.state.squads["me"]), mu.state.squads["me"]
 
-    exp = mu.outlook.xi.expected
-    acts = mu.candidates()
-    assert acts, "tiny_market_universe() must produce real candidate actions"
-    targets = {a.buy for a in acts if a.buy}
-    assert "cand_free" in targets, targets
-    assert "cand_rival" not in targets, targets
-
-    rows = mu.rank(acts)
-    assert rows, "rank() must return at least one row for a real market"
-    assert any(r.action.buy == "cand_free" for r in rows), rows
+    targets = {k for k in mu.market.price if mu.acquire(k)}
+    assert targets == {"cand_free"}, ("a player on the market, never a rival's", targets)
 
     print("ffcore.fixtures self-test OK")
 
@@ -155,10 +147,9 @@ if __name__ == "__main__":
 
 def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
     """Into the current tables (tidy.tables_in), the rows the board views
-    read: one run whose best eleven now is ionut radu and pepelu, and, once
-    its plan buys cai coro for pepelu, ionut radu and cai coro (bench boy
-    is yours and in neither); and the app's line-up as (app id, name) rows,
-    with these players' app ids."""
+    read: one run whose best eleven now is ionut radu and pepelu (cai coro,
+    better, is on the market; bench boy is yours and not in it); and the
+    app's line-up as (app id, name) rows, with these players' app ids."""
     from contextlib import closing
 
     from ffcore.db import connect
@@ -168,10 +159,10 @@ def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
         db.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha)"
                    " VALUES (1, 't', 't', 'test', 'c')")
         db.execute("INSERT INTO sim_runs (run_id, plan_gain) VALUES (1, 0.0)")
-        db.executemany("INSERT INTO sim_players (run_id, player, mine, xi, plan_xi, next)"
-                       " VALUES (1, ?, ?, ?, ?, ?)",
-                       [("ionut radu", 1, 1, 1, 3.0), ("pepelu", 1, 1, 0, 2.0),
-                        ("cai coro", 0, 0, 1, 5.0), ("bench boy", 1, 0, 0, 0.5)])
+        db.executemany("INSERT INTO sim_players (run_id, player, mine, xi, next)"
+                       " VALUES (1, ?, ?, ?, ?)",
+                       [("ionut radu", 1, 1, 3.0), ("pepelu", 1, 1, 2.0),
+                        ("cai coro", 0, 0, 5.0), ("bench boy", 1, 0, 0.5)])
         db.executemany("INSERT INTO sim_facts (run_id, player, name, pos) VALUES (1, ?, ?, '')",
                        [("ionut radu", "Ionut Radu"), ("pepelu", "Pepelu"),
                         ("cai coro", "Cai Coro"), ("bench boy", "Bench Boy")])

@@ -20,7 +20,7 @@
           "sql": "SELECT persistent_share FROM persistence_by_run\nWHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_forecast))"
         },
         "decisions_graded": {
-          "title": "Replayed boards: each funnel outcome's forecast against what happened",
+          "title": "Replayed decisions: each move valued alone, in the plan or left out, its forecast against what happened",
           "sql": "SELECT reached, kind, count(*) AS n,\n       round(avg(CASE WHEN jornadas > 0 THEN pred / jornadas END), 2) AS forecast_per_jornada,\n       round(avg(CASE WHEN jornadas > 0 THEN real / jornadas END), 2) AS happened_per_jornada,\n       round(100 * avg(CASE WHEN jornadas > 0 THEN real > 0 END)) AS happened_up_pct,\n       round(100 * avg(chance)) AS forecast_chance_pct,\n       round(avg(value_pred), 2) AS value_forecast_m, round(avg(value_real), 2) AS value_happened_m\nFROM grade_decisions WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_decisions))\nGROUP BY reached, kind\nORDER BY reached <> 'plan', reached, kind"
         },
         "plan_moves_graded": {
@@ -35,21 +35,17 @@
           "title": "Runs: seconds by stage, rows parsed, memory",
           "sql": "SELECT r.run_id, r.started, r.trigger, r.commit_sha, r.ok, round(r.peak_mb) AS peak_mb,\n       round(max(CASE WHEN m.stage = 'parse' AND m.measure = 'seconds' THEN m.value END), 1) AS parse_s,\n       max(CASE WHEN m.stage = 'parse' AND m.measure = 'snapshots' THEN m.value END) AS snapshots,\n       round(max(CASE WHEN m.stage = 'crosswalk' AND m.measure = 'seconds' THEN m.value END), 1) AS crosswalk_s,\n       round(max(CASE WHEN m.stage = 'sim' AND m.measure = 'seconds' THEN m.value END), 1) AS sim_s,\n       round(max(CASE WHEN m.stage = 'grade' AND m.measure = 'seconds' THEN m.value END), 1) AS grade_s\nFROM runs r LEFT JOIN run_measures m USING (run_id)\nGROUP BY r.run_id ORDER BY r.run_id DESC LIMIT 100"
         },
-        "funnel": {
-          "title": "Every move the latest board ranked: gain, confidence, verdict, plan",
-          "sql": "SELECT rank, label, round(gain, 1) AS gain, round(100 * p_better) AS better_pct,\n       round(per_million, 2) AS per_million, round(cost / 1e6, 2) AS cost_m, verdict, in_plan\nFROM funnel WHERE run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM funnel))\n  AND (nullif(:name, '') IS NULL OR label LIKE '%' || :name || '%') ORDER BY rank"
+        "decision": {
+          "title": "Every move the latest decision valued alone (decision_option): its points, its money at lam, its worth, the bid and its chance, and whether the plan makes it",
+          "sql": "SELECT o.kind, coalesce(s.name, o.player) AS name, round(o.amount / 1e6, 2) AS amount_m, round(o.win, 2) AS win,\n       round(o.gain, 1) AS points, round(o.money, 1) AS money_pts, round(o.worth, 1) AS worth, o.in_plan\nFROM decision_option o LEFT JOIN sim_facts s USING (run_id, player)\nWHERE o.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM decision_option))\n  AND (nullif(:name, '') IS NULL OR coalesce(s.name, o.player) LIKE '%' || :name || '%') ORDER BY o.worth DESC"
         },
         "offers": {
           "title": "The game's offers for your players (latest run), the best price first: the offer against his value, the share of the game's last offers it beats, what selling him does to your season in points, and whether the plan sells him",
           "sql": "SELECT name, pos, round(offer / 1e6, 2) AS offer_m, round(value / 1e6, 2) AS value_m,\n       round(100 * (offer / value - 1), 1) AS vs_value_pct, round(100 * beats) AS beats_pct,\n       round(gain, 1) AS season_points, sell\nFROM board_mine WHERE offer IS NOT NULL AND value > 0 ORDER BY offer / value DESC, player"
         },
         "market": {
-          "title": "The market as the latest run ranked it: every player on sale whose purchase gains you season points, the bid it takes, the share of seasons you are better off, and why it fails the bar (empty: worth buying)",
-          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m,\n       round(gain, 1) AS season_points, round(100 * p_better) AS better_pct, in_plan AS plan,\n       round(trend, 1) AS trend_pct, round(resale / 1e6, 2) AS resale_m\nFROM board_buys WHERE gain > 0 ORDER BY rank"
-        },
-        "why_sell": {
-          "title": "Why these sales: every sale of yours, as ranked from your squad as it is, by what it costs per million it raises, its season points and its money (what the player would gain or lose in value, counted at MONEY_RATE points a million) apart; the plan sells those whose points a million are under what a million is worth now (lam)",
-          "sql": "WITH r AS (SELECT coalesce(nullif(:run, ''), (SELECT max(run_id) FROM sim_runs)) AS run_id),\nme AS (SELECT max(0.0, -cash) AS debt FROM sim_standings JOIN r USING (run_id) WHERE me),\ns AS (SELECT f.rank, substr(f.label, 6) AS player, f.proceeds AS raises,\n             f.gain - (SELECT money_rate FROM k) * f.money AS points, f.money, f.gain, f.per_million, f.in_plan\n      FROM funnel f JOIN r USING (run_id) WHERE f.kind = 'sell')\nSELECT player, round((SELECT debt FROM me) / 1e6, 1) AS debt_m, round(raises / 1e6, 1) AS raises_m,\n       round(points, 1) AS points, round(money, 1) AS money_m, round(gain, 1) AS season_points,\n       round(per_million, 2) AS points_per_m, round(points / max(raises / 1e6, 1.0), 2) AS points_alone_per_m,\n       round(sum(raises) OVER w / 1e6, 1) AS raised_so_far_m,\n       round(max(0.0, (SELECT debt FROM me) - sum(raises) OVER w) / 1e6, 1) AS debt_left_m,\n       (SELECT debt FROM me) > 0 AND raises >= (SELECT debt FROM me) AS covers_alone, in_plan\nFROM s WINDOW w AS (ORDER BY per_million DESC, rank) ORDER BY per_million DESC, rank"
+          "title": "The market as the latest run valued it: every player on sale whose purchase gains you season points, the bid, its chance, his points and money alone, whether the plan buys him",
+          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m, round(win, 2) AS win,\n       round(gain, 1) AS season_points, round(money, 1) AS money_pts, round(worth, 1) AS worth, in_plan AS plan,\n       round(trend, 1) AS trend_pct, round(resale / 1e6, 2) AS resale_m\nFROM board_buys WHERE gain > 0 ORDER BY worth DESC"
         },
         "forecast": {
           "title": "A player's forecast, factor by factor (latest run)",
@@ -126,10 +122,6 @@
         "phantom_coach": {
           "title": "The phantom manager (:run, default the latest graded): your squad at the first lock, then at each lock the plan this code makes for the squad and cash he has, his eleven picked from that lock's forecast and scored on what they got, jornada by jornada, beside the same squad never moved and picked the same way. gain = phantom minus never moved. Bids win at the model's price and rivals do not react; the code was written knowing these weeks, so read a gain as an upper bound",
           "sql": "WITH r AS (SELECT coalesce(nullif(:run, ''), (SELECT max(run_id) FROM phantom_jornadas)) AS run_id),\nj AS (SELECT p.jornada, p.phantom, p.standpat, p.phantom - p.standpat AS gain, p.moves, p.cash,\n             row_number() OVER (ORDER BY p.jornada) AS n\n      FROM phantom_jornadas p, r WHERE p.run_id = r.run_id)\nSELECT jornada, phantom, standpat, gain, total_gain, moves FROM (\n  SELECT jornada, phantom, standpat, gain, sum(gain) OVER (ORDER BY n) AS total_gain, moves, 0 AS tail FROM j\n  UNION ALL\n  SELECT 'total', sum(phantom), sum(standpat), sum(gain), sum(gain), '', 1 FROM j)\nORDER BY tail, jornada"
-        },
-        "rival_boards": {
-          "title": "What each rival's board would do for him (:run, default the latest that has them): the same funnel with him as the manager, his cash our estimate and his pending bids invisible to us. His cash, what his plan gains over the season in points, and his planned moves in order",
-          "sql": "WITH r AS (SELECT coalesce(nullif(:run, ''), (SELECT max(run_id) FROM rival_boards)) AS run_id)\nSELECT b.manager, round(b.cash / 1e6, 1) AS cash_m, round(b.plan_gain, 1) AS plan_gain,\n       (SELECT group_concat(label, '; ') FROM (SELECT label FROM rival_moves m\n                                               WHERE m.run_id = b.run_id AND m.manager = b.manager ORDER BY ord)) AS moves\nFROM rival_boards b, r WHERE b.run_id = r.run_id ORDER BY b.plan_gain DESC"
         },
         "board_history": {
           "title": "How long each move stayed on the published board (boards since 2026-09-27, from git; earlier shapes stay in git): the boards it was on, first and last seen, its average points gain, and whether it is on the latest board",

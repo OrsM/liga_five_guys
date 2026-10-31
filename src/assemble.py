@@ -8,7 +8,6 @@ import hashlib
 import json
 import re
 import sqlite3
-import statistics
 import sys
 from contextlib import closing, contextmanager
 from functools import cache, cached_property
@@ -16,9 +15,8 @@ from pathlib import Path
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from typing import Any, NamedTuple
 
-import decide
 import remind
-from decide import MONEY_RATE, Universe, _fieldable
+from decide import Universe, _fieldable
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import cut, set_variant
 from ffcore import db as lfgdb, kept
@@ -48,17 +46,16 @@ APP_FRESH_HOURS = 14.4
 # and what a variant may set (variants).
 NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS", ),
-    "decide": ("MONEY_RATE", "TIE"),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
-    "pricing": ("BID_NEIGHBOURS", "CLIP", "MONEY_H", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW",
+    "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW",
                 "RESALE_MARGIN"),
     "remind": ("REMIND_HOURS",),
-    "rules": ("MATCH_LEN",),
+    "rules": ("DEBT_SHARE", "MATCH_LEN"),
     "score": ("PROMOTED_DISCOUNT_K", "SHRINK_K"),
     "startprob": ("ABSENT_START", "AVAIL_K", "FALLBACK_K", "NEUTRAL_START", "PICK_K"),
 }
-MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "decide": decide, "fixture": fixture,
+MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "fixture": fixture,
                            "forecast": forecast, "pricing": pricing, "remind": remind,
                            "rules": rules, "score": score, "startprob": startprob}
 
@@ -126,7 +123,7 @@ def fixture_ratings(market: Rows) -> Ratings:
 def read_by_views() -> dict[str, float]:
     """The constants the views read (model_constants, by name in
     schema.sql): what a kept answer depends on. One read in Python alone
-    (decide.TIE, score.SHRINK_K) changes no view's answer, and keyed on it
+    (score.SHRINK_K) changes no view's answer, and keyed on it
     every such change rebuilt each universe cold (2026-10-30)."""
     names = set(re.findall(r"model_constants WHERE name = '(\w+)'", lfgdb.SCHEMA.read_text(encoding="utf-8")))
     return {n: v for m in constants().values() for n, v in m.items() if n in names}
@@ -142,13 +139,11 @@ def write_constants() -> None:
 
 class Prices(NamedTuple):
     """Momentum as schema.sql fits it: a slope per horizon, the share of a
-    trend made after each update, each player's trend in %, the horizon, and
-    how far a value forecast is off after each update (rmse, % of value)."""
+    trend made after each update, each player's trend in %, and the horizon."""
     slope: dict[int, float]
     carry: tuple[float, ...]
     trend: dict[str, float]
     horizon: int
-    error: tuple[float, ...] = ()
 
 
 def record_trend() -> None:
@@ -177,8 +172,7 @@ def fits_in_place() -> bool:
     with closing(connect()) as db:
         return bool(db.execute(
             "SELECT (SELECT count(*) FROM momentum_fit WHERE as_of = cut()) > 0"
-            " AND (SELECT count(*) FROM price_trend_fit WHERE as_of = cut()) > 0"
-            " AND (SELECT count(*) FROM price_error_fit WHERE as_of = cut()) > 0").fetchone()[0])
+            " AND (SELECT count(*) FROM price_trend_fit WHERE as_of = cut()) > 0").fetchone()[0])
 
 
 # What the fits are made from (price_momentum, record_trend): kept while these read as they did.
@@ -189,13 +183,12 @@ def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
     if not (kept.written(lfgdb.DB, "fits", FITS) and fits_in_place()):
-        _keep("SELECT cut(), h, slope, rmse FROM momentum", "momentum_fit", "price_error_fit")
+        _keep("SELECT cut(), h, slope FROM momentum", "momentum_fit")
         record_trend()
         kept.mark(lfgdb.DB, "fits", FITS)
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
-                  dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1),
-                  tuple(v for (v,) in rows("SELECT rmse FROM price_error ORDER BY h")))
+                  dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
 
 
 def price_change(day: str, h: int) -> dict[str, float | None]:
@@ -219,13 +212,6 @@ def bid_odds() -> dict[str, tuple[tuple[float, float], ...]]:
     for k, ratio, p in rows("SELECT player, ratio, p_win FROM bid_odds ORDER BY player, ratio"):
         out.setdefault(k, []).append((ratio, p))
     return {k: tuple(v) for k, v in out.items()}
-
-
-def offer_spread() -> float:
-    """How far the game's recent offers (recent_offers) are spread, as a
-    share of value: their standard deviation (0 with fewer than two)."""
-    got = [r for (r,) in rows("SELECT ratio FROM recent_offers")]
-    return statistics.pstdev(got) if len(got) > 1 else 0.0
 
 
 def market_offer_ratios() -> list[float]:
@@ -486,7 +472,7 @@ def _built(also: frozenset[str]) -> Built:
         value=column("value"), my_bid=column("my_bid"),
         trend=prices.trend, clause=column("clause"),
         fetch=dict(rows("SELECT player, fetches FROM sale_odds")),
-        carry=prices.carry, error=prices.error, offer_sd=offer_spread())
+        carry=prices.carry)
     for k, j in rows("SELECT player, jornada FROM late_arrivals"):
         if k in per_j.get(j, {}):
             per_j[j][k] = (per_j[j][k][0], 0.0)     # bought tonight, he joins after that match
@@ -508,7 +494,8 @@ def _built(also: frozenset[str]) -> Built:
         state=LeagueState(squads, rem, me, carried), forecaster=boot,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors),
+        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors,
+        lam=rows("SELECT coalesce(lam, 0) FROM money_rate")[0][0]),
         params(fc.fits, market_offer_ratios(), prices.carry))
 
 
@@ -531,10 +518,10 @@ def _selftest() -> None:
                        (("fixture.difficulty", "a"), 1.1),
                        (("fixture.scored", "a"), 1.2),
                        (("fixture.conceded", "a"), 0.8),
-                       (("decide", "MONEY_RATE"), MONEY_RATE)]:
+                       (("rules", "DEBT_SHARE"), rules.DEBT_SHARE)]:
         assert got[key]["value"] == value, (key, got.get(key))
     assert got[("pricing.offer_ratios", "median")]["n"] == 3
-    assert got[("decide", "MONEY_RATE")]["kind"] == "constant"
+    assert got[("rules", "DEBT_SHARE")]["kind"] == "constant"
     assert got[("startprob.availability", "doubt_for:at")]["kind"] == "fitted", \
         "a bucket with no data keeps its prior, and is still what the run used"
     _selftest_market()
@@ -593,7 +580,7 @@ def _selftest_forecast() -> None:
             player_forecast()
             with mock.patch.object(score, "SHRINK_K", score.SHRINK_K + 1):
                 player_forecast()
-            with mock.patch.object(decide, "MONEY_RATE", decide.MONEY_RATE + 1):
+            with mock.patch.object(pricing, "RESALE_MARGIN", pricing.RESALE_MARGIN + 1):
                 player_forecast()
             assert len(made) == 4, "another cut and another forecast constant: made again; a decision's: not"
             with mock.patch(__name__ + "._forecast_code", lambda: "newcode"):

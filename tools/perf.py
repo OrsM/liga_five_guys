@@ -5,7 +5,7 @@ before a commit, and a slowdown shows up like a failing test.
     python tools/perf.py --save   # the same, and keep these times as the ones to compare with
 
 Each date's universe is built cold (LFG_KEPT=off: nothing read back from
-kept.py), then its board (decide.board, every kappa), on the dry-run copy
+kept.py), then its decision (decision.plan), on the dry-run copy
 of the data (FF_ROOT, as the backtests use it). The backtest is about 140
 of these, so a second here is two minutes there (2026-10-30: backtests had
 crept from minutes to over an hour, commit by commit, unseen).
@@ -22,7 +22,7 @@ from pathlib import Path
 os.environ["LFG_KEPT"] = "off"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import decide  # noqa: E402
+import decision  # noqa: E402
 import grading  # noqa: E402
 
 DATES = (dt.datetime(2026, 8, 25, 8, 0, tzinfo=dt.timezone.utc),
@@ -43,7 +43,7 @@ def measure() -> dict[str, dict[str, float]]:
         built = time.perf_counter() - s
         assert u is not None, t
         s = time.perf_counter()
-        decide.board(u)
+        decision.plan(u)
         out[t.date().isoformat()] = {"universe": round(built, 2), "board": round(time.perf_counter() - s, 2)}
     return out
 

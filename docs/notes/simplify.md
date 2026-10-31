@@ -95,6 +95,24 @@ reads, one copy of each fact, and nothing the board does not need.
   pick_later, availability_tally, ppm_prior, scored, last_fit: 2.2 s a
   moment) for all moments in one pass; then the market's.
 
+## Step 4 done (2026-10-31, branch simplify, not live)
+
+- The decision is decide.sql's, on the board and in every replay; the
+  program, its scoring and funnel, MONEY_RATE, TIE, Board.lam, the rival
+  boards, ask.py, funnel.mmd and the money variance (Market.money, MONEY_H,
+  price_error) are gone. One debt constant (rules.DEBT_SHARE).
+- money_rate is the slope of points a game on value (0.060 points a game a
+  million), not the ratio of means (0.255): a player worth nothing scores
+  about 3 a game. The ratio had the SQL rule ahead (2961 vs 2757); on the
+  slope the program leads, 1098 vs 1058, all of it the program's luck
+  (+28 points over its forecast; both forecast 478.1) and 6M of money.
+- A move's points come from the eleven now by the slots it changes
+  (dec_slots: a sale's replacement, a buy's bar), equal to building every
+  squad's eleven on three dates checked. Backtest 3.6 min to 31 s warm, a
+  board decision 0.24-0.41 s (the program's 0.6 s).
+- Still slower than the program's backtest (17 s): the rule makes 224 moves
+  (92 of 121 buys sold again), each run about ten steps.
+
 ## Dead or idle
 
 - lfg-publish's markdown reports branch and its comments; .runtime/ and

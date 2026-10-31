@@ -15,7 +15,7 @@ from decide import Universe
 
 __all__ = ["plan", "inputs"]
 
-INPUTS = ("dec_player", "dec_xp", "dec_odds", "dec_money", "dec_shape", "dec_plan")
+INPUTS = ("dec_player", "dec_xp", "dec_odds", "dec_money", "dec_shape", "dec_plan", "dec_start")
 
 
 def inputs(u: Universe, lam: float | None = None) -> None:
@@ -25,7 +25,7 @@ def inputs(u: Universe, lam: float | None = None) -> None:
     expected points a jornada left as yours (a stand-in fills no slot), his
     value once his price trend has run (Market.later over the longest horizon
     the fits reach: what he is worth as money), a buy's bids, your money, and
-    lam: the money rate (money_rate) unless given."""
+    lam: the universe's money rate (Universe.lam) unless given."""
     m = u.market
     buys = [k for k in sorted(m.price) if k not in u.mine and u.acquire(k) is not None]
     h = len(m.carry)     # the longest horizon the price fits reach
@@ -37,7 +37,7 @@ def inputs(u: Universe, lam: float | None = None) -> None:
     xp = [(k, j, expected_points(cell)) for j in u.state.jornadas
           for k, cell in u.forecaster.per_jornada.get(j, {}).items() if k in keys]
     if lam is None:
-        (lam, ), = rows("SELECT coalesce(lam, 0) FROM money_rate")
+        lam = u.lam
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
@@ -54,12 +54,15 @@ def inputs(u: Universe, lam: float | None = None) -> None:
 def plan(u: Universe, lam: float | None = None, sales_only: bool = False) -> list[Action]:
     """The plan decide.sql makes for this universe, its moves in order: a
     buy at its bid, a sale at what it gets (a swap's buy, then its sale). With
-    sales_only, only sales (what clearing a debt takes)."""
+    sales_only, only sales (what clearing a debt takes). Every single move
+    as valued before the first is kept beside it (dec_start, dec_rows)."""
     inputs(u, lam)
     out: list[Action] = []
     with closing(connect()) as db, db:
         if sales_only:
             db.execute("DELETE FROM dec_player WHERE NOT mine")
+        db.execute("INSERT INTO dec_start SELECT b, s, bid, win, proceeds, gain, money, worth FROM dec_options"
+                   " WHERE b = '' OR s = ''")
         for step in range(SQUAD_MAX * 2):
             got = db.execute("SELECT b, s, bid, win, proceeds, worth FROM dec_next").fetchone()
             if got is None:
@@ -108,7 +111,7 @@ def _selftest() -> None:
         inputs(universe(10e6, {"star": 8e6}), lam=1.0)
         assert rows("SELECT gain, money FROM dec_options WHERE b = 'star' AND s = ''") == [(12.0, 0.0)], \
             "star (8) for m4 (2), two jornadas; bought at his value: no money lost"
-        assert rows("SELECT jornada, count(*), total(xp) FROM dec_eleven WHERE b = '' AND s = ''"
+        assert rows("SELECT jornada, count(*), total(xp) FROM dec_eleven"
                     " GROUP BY jornada") == [(1, 11, 42.0), (2, 11, 42.0)]
         assert labels(plan(universe(10e6, {"star": 8e6}), lam=1.0)) == ["buy star"]
         dear = {**{k: 5e6 for k in squad}, "star": 4e6}
@@ -125,6 +128,15 @@ def _selftest() -> None:
             "at asking a quarter of 12 (3); at 1.25 sure, 12 - 2 = 10: the sure bid"
         assert labels(plan(universe(30e6, {"star": 8e6, "keeper": 6e6}), lam=0.0)) == ["buy star"], \
             "a second keeper, worse than k, plays for nobody: money at nothing, still not bought"
+        plan(universe(4e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0))}), lam=1.0)
+        assert rows("SELECT kind, player, amount, win, gain, money, in_plan FROM dec_rows"
+                    " WHERE player IN ('star', 'bench', 'k') ORDER BY player") == [
+            ("sell", "bench", 5e6, 1.0, 0.0, 0.0, 1), ("sell", "k", 5e6, 1.0, -8.0, 0.0, 0),
+            ("buy", "star", 8e6, 0.25, 12.0, 0.0, 1)], \
+            "each move alone from the squad as it is, a buy at the plan's bid (at 4M and a sale, his asking)"
+        plan(universe(30e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0))}, value=dear), lam=100.0)
+        assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(8e6, 0.25, 0)], \
+            "one the plan leaves out at the lowest bid offered"
         assert labels(plan(universe(-3e6, {}), lam=1.0)) == ["sell bench"], "in debt: the least bad sale"
         assert labels(plan(universe(-12e6, {}), lam=1.0)) == ["sell bench", "sell m4", "sell d1"], \
             "until clear: bench (0), m4 (-4: his place empty), then a slot each, by name"

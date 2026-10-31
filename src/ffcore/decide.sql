@@ -6,7 +6,8 @@
 --                 for each jornada left (money_rate)
 --   f(S)          the points of squad S's best legal eleven, summed over
 --                 the jornadas left, each player at his forecast cell times
---                 whether he is yours by then (dec_xp)
+--                 whether he is yours by then (dec_xp); a move's, from the
+--                 eleven now by the slots it changes (dec_slots, dec_gain)
 --   a buy p at b  win(b) x (f(S + p) - f(S) - lam x (b - value_p) / 1M),
 --                 value his once his price trend has run (pricing's fits)
 --   a sale q      f(S - q) - f(S) + lam x (proceeds_q - value_q) / 1M
@@ -70,6 +71,20 @@ CREATE TABLE IF NOT EXISTS dec_plan (
     PRIMARY KEY (step, kind)
 );
 
+-- Every single move valued from the squad as it is, before the plan's
+-- first (dec_options then: a buy at each bid, a sale): what the board shows
+-- beside the plan, and what the plan's moves are graded by.
+CREATE TABLE IF NOT EXISTS dec_start (
+    b        TEXT NOT NULL,
+    s        TEXT NOT NULL,
+    bid      REAL,
+    win      REAL,
+    proceeds REAL,
+    gain     REAL NOT NULL,          -- points
+    money    REAL NOT NULL,          -- points: money gone or made, at lam
+    worth    REAL NOT NULL
+);
+
 -- What a million is worth, in points: per_game, the points a game a
 -- million more in value adds (the least-squares slope of points a game on
 -- value, players with 3+ games), times the jornadas left. Not mean points
@@ -101,47 +116,116 @@ SELECT m.cash - coalesce((SELECT total(CASE kind WHEN 'buy' THEN amount ELSE -am
        coalesce((SELECT total(amount) FROM dec_plan WHERE kind = 'buy'), 0) AS bids
 FROM dec_money m;
 
--- Each squad a next move would make, by the buy (b) and the sale (s) it
--- holds ('' for none): the squad as it is, each buy, each sale of a player
--- held now, and each buy with each such sale where his highest bid is more
--- than the cash left (a sale is what pays for him).
+-- Each next move, by the buy (b) and the sale (s) it holds ('' for none):
+-- each buy, each sale of a player held now, and each buy with each such sale
+-- where his highest bid is more than the cash left (a sale is what pays for
+-- him).
 DROP VIEW IF EXISTS dec_variant;
 CREATE VIEW dec_variant AS
 WITH sq AS MATERIALIZED (SELECT * FROM dec_squad),
 buys AS (SELECT p.player AS b, p.asking * coalesce((SELECT max(ratio) FROM dec_odds o WHERE o.player = p.player), 1.0)
                 AS top
          FROM dec_player p WHERE p.asking IS NOT NULL AND p.player NOT IN (SELECT player FROM sq)),
-sells AS (SELECT player AS s FROM sq WHERE player IN (SELECT player FROM dec_player WHERE mine)),
-keys AS (SELECT '' AS b, '' AS s UNION ALL SELECT b, '' FROM buys UNION ALL SELECT '', s FROM sells
-         UNION ALL SELECT b, s FROM buys, sells WHERE top > (SELECT free FROM dec_cash))
-SELECT k.b, k.s, q.player, q.pos FROM keys k, sq q WHERE q.player <> k.s
-UNION ALL
-SELECT k.b, k.s, p.player, p.pos FROM keys k JOIN dec_player p ON p.player = k.b;
+sells AS (SELECT player AS s FROM sq WHERE player IN (SELECT player FROM dec_player WHERE mine))
+SELECT b, '' AS s FROM buys UNION ALL SELECT '', s FROM sells
+UNION ALL SELECT b, s FROM buys, sells WHERE top > (SELECT free FROM dec_cash);
 
--- Each such squad's best legal eleven each jornada: each position's lo
--- best, then the best of the rest within each position's hi, to eleven.
--- The formations are every count between lo and hi that makes eleven, so
--- this is the best of any formation. A slot nobody can fill scores nothing.
+-- The squad's best legal eleven each jornada: each position's lo best, then
+-- the best of the rest within each position's hi, to eleven. The formations
+-- are every count between lo and hi that makes eleven, so this is the best
+-- of any formation. A slot nobody can fill scores nothing.
 DROP VIEW IF EXISTS dec_eleven;
 CREATE VIEW dec_eleven AS
-WITH r AS (SELECT v.b, v.s, x.jornada, v.player, v.pos, x.xp,
-                  row_number() OVER (PARTITION BY v.b, v.s, x.jornada, v.pos ORDER BY x.xp DESC, v.player) AS n
-           FROM dec_variant v JOIN dec_xp x USING (player)),
+WITH r AS (SELECT x.jornada, q.player, q.pos, x.xp,
+                  row_number() OVER (PARTITION BY x.jornada, q.pos ORDER BY x.xp DESC, q.player) AS n
+           FROM dec_squad q JOIN dec_xp x USING (player)),
 c AS (SELECT r.*, h.lo, h.hi FROM r JOIN dec_shape h USING (pos)),
-e AS (SELECT c.*, row_number() OVER (PARTITION BY b, s, jornada ORDER BY xp DESC, player) AS m
+e AS (SELECT c.*, row_number() OVER (PARTITION BY jornada ORDER BY xp DESC, player) AS m
       FROM c WHERE n > lo AND n <= hi)
-SELECT b, s, jornada, player, xp FROM c WHERE n <= lo
+SELECT jornada, player, pos, xp FROM c WHERE n <= lo
 UNION ALL
-SELECT b, s, jornada, player, xp FROM e WHERE m <= 11 - (SELECT sum(lo) FROM dec_shape);
+SELECT jornada, player, pos, xp FROM e WHERE m <= 11 - (SELECT sum(lo) FROM dec_shape);
 
--- Each next move's points on the squad it makes: f(squad) - f(as it is).
+-- Each position, each jornada, in the eleven now: how many play (cnt), the
+-- weakest (low, lowp) and next weakest (low2) of them, the best of the
+-- position on the bench (bench), and fill, max(cnt, lo) summed over the
+-- positions. Eleven players can play together when no position has more
+-- than hi and fill is no more than eleven: so a starter can make way for a
+-- player of another position only while his own stays above lo and the
+-- other's below hi.
+DROP VIEW IF EXISTS dec_slots;
+CREATE VIEW dec_slots AS
+WITH xi AS MATERIALIZED (SELECT * FROM dec_eleven),
+w AS (SELECT jornada, pos, count(*) AS cnt,
+             max(CASE k WHEN 1 THEN xp END) AS low, max(CASE k WHEN 1 THEN player END) AS lowp,
+             max(CASE k WHEN 2 THEN xp END) AS low2
+      FROM (SELECT *, row_number() OVER (PARTITION BY jornada, pos ORDER BY xp, player DESC) AS k FROM xi)
+      GROUP BY jornada, pos),
+bn AS (SELECT x.jornada, q.pos, max(x.xp) AS bench
+       FROM dec_squad q JOIN dec_xp x USING (player)
+       WHERE NOT EXISTS (SELECT 1 FROM xi WHERE xi.jornada = x.jornada AND xi.player = q.player)
+       GROUP BY x.jornada, q.pos)
+SELECT j.jornada, h.pos, h.lo, h.hi, coalesce(w.cnt, 0) AS cnt, w.low, w.lowp, w.low2, bn.bench,
+       sum(max(coalesce(w.cnt, 0), h.lo)) OVER (PARTITION BY j.jornada) AS fill
+FROM (SELECT DISTINCT jornada FROM dec_xp) j CROSS JOIN dec_shape h
+LEFT JOIN w ON w.jornada = j.jornada AND w.pos = h.pos
+LEFT JOIN bn ON bn.jornada = j.jornada AND bn.pos = h.pos;
+
+-- Each next move's points over the jornadas left, from the eleven now (no
+-- squad's eleven built again: a move changes it by at most one player each
+-- way, the formations being a matroid's bases), a jornada at a time:
+--   a sale     a starter leaves; his replacement is the best on the bench
+--              whose position can legally take his slot, or nobody: it
+--              costs his points less his replacement's (nothing if he does
+--              not play)
+--   a buy      against the eleven that leaves, his bar: the weakest starter
+--              whose slot he can legally take (his own position's, or
+--              another's while his has room), or an empty slot (0); he adds
+--              his points over the bar, or nothing below it
 DROP VIEW IF EXISTS dec_gain;
 CREATE VIEW dec_gain AS
 WITH v AS MATERIALIZED (SELECT * FROM dec_variant),
-f AS MATERIALIZED (SELECT b, s, total(xp) AS pts FROM dec_eleven GROUP BY b, s),
-base AS (SELECT coalesce((SELECT pts FROM f WHERE b = '' AND s = ''), 0) AS pts)
-SELECT k.b, k.s, coalesce(f.pts, 0) - base.pts AS gain
-FROM (SELECT DISTINCT b, s FROM v) k LEFT JOIN f USING (b, s), base WHERE k.b <> '' OR k.s <> '';
+st AS MATERIALIZED (SELECT * FROM dec_slots),
+sales AS (SELECT DISTINCT s FROM v),
+starts AS (SELECT d.s, x.jornada, p.pos, x.xp FROM sales d JOIN dec_player p ON p.player = d.s
+           JOIN dec_xp x ON x.player = d.s
+           WHERE EXISTS (SELECT 1 FROM dec_eleven e WHERE e.jornada = x.jornada AND e.player = d.s)),
+-- a sale: what each jornada he starts in loses (out) and the position of his replacement (r)
+rm AS MATERIALIZED (
+    SELECT s, jornada, q, out, r FROM (
+        SELECT c.*, row_number() OVER (PARTITION BY s, jornada ORDER BY out DESC, r IS NULL, r) AS k FROM (
+            SELECT a.s, a.jornada, a.pos AS q, -a.xp AS out, NULL AS r FROM starts a
+            UNION ALL
+            SELECT a.s, a.jornada, a.pos, g.bench - a.xp, g.pos
+            FROM starts a JOIN st g ON g.jornada = a.jornada AND g.bench IS NOT NULL
+            JOIN st o ON o.jornada = a.jornada AND o.pos = a.pos
+            WHERE g.pos = a.pos
+               OR (g.cnt + 1 <= g.hi AND g.fill - (o.cnt > o.lo) + (g.cnt >= g.lo) <= 11)) c)
+    WHERE k = 1),
+-- the slots once he has left: each position's count and weakest starter (low1), fill1
+st1 AS MATERIALIZED (
+    SELECT d.s, t.jornada, t.pos, t.lo, t.hi,
+           t.cnt - (t.pos IS m.q) + (t.pos IS m.r) AS cnt1,
+           nullif(min(coalesce(CASE WHEN t.pos IS m.q AND d.s = t.lowp THEN t.low2 ELSE t.low END, 1e9),
+                      coalesce(CASE WHEN t.pos IS m.r THEN t.bench END, 1e9)), 1e9) AS low1
+    FROM sales d CROSS JOIN st t
+    LEFT JOIN rm m ON m.s = d.s AND m.jornada = t.jornada),
+f1 AS MATERIALIZED (SELECT s, jornada, sum(max(cnt1, lo)) AS fill1 FROM st1 GROUP BY s, jornada),
+-- a buy: his bar each jornada in the slots the sale leaves
+bar AS (
+    SELECT v.b, v.s, x.jornada, x.xp, min(
+        CASE WHEN p.cnt1 + 1 <= p.hi AND f.fill1 + (p.cnt1 >= p.lo) <= 11 THEN 0.0 ELSE 1e9 END,
+        coalesce((SELECT min(o.low1) FROM st1 o
+                  WHERE o.s = v.s AND o.jornada = x.jornada AND o.cnt1 >= 1
+                    AND (o.pos = p.pos OR (p.cnt1 + 1 <= p.hi
+                                           AND f.fill1 - (o.cnt1 > o.lo) + (p.cnt1 >= p.lo) <= 11))), 1e9)) AS bar
+    FROM v JOIN dec_player bp ON bp.player = v.b JOIN dec_xp x ON x.player = v.b
+    JOIN st1 p ON p.s = v.s AND p.jornada = x.jornada AND p.pos = bp.pos
+    JOIN f1 f ON f.s = v.s AND f.jornada = x.jornada
+    WHERE v.b <> '')
+SELECT v.b, v.s, coalesce((SELECT total(out) FROM rm WHERE rm.s = v.s), 0.0)
+                 + coalesce((SELECT total(max(xp - bar, 0.0)) FROM bar a WHERE a.b = v.b AND a.s = v.s), 0.0) AS gain
+FROM v;
 
 -- Every next move, at each bid its odds offer (at asking, sure, with
 -- none), worth its points and its money at lam, a bid's by its chance of
@@ -149,6 +233,7 @@ FROM (SELECT DISTINCT b, s FROM v) k LEFT JOIN f USING (b, s), base WHERE k.b <>
 DROP VIEW IF EXISTS dec_options;
 CREATE VIEW dec_options AS
 WITH m AS (SELECT * FROM dec_money),
+g AS MATERIALIZED (SELECT * FROM dec_gain),
 bid AS (SELECT p.player, p.value, p.asking * coalesce(o.ratio, 1.0) AS amount, coalesce(o.p_win, 1.0) AS win
         FROM dec_player p LEFT JOIN dec_odds o USING (player) WHERE p.asking IS NOT NULL),
 sale AS (SELECT player, value, proceeds FROM dec_player WHERE mine)
@@ -160,7 +245,7 @@ SELECT g.b, g.s, b.amount AS bid, b.win, sa.proceeds,
            AS worth,
        (g.b <> '') - (g.s <> '') AS size,
        coalesce(sa.proceeds, 0) - coalesce(b.amount, 0) AS cash
-FROM dec_gain g LEFT JOIN bid b ON b.player = g.b LEFT JOIN sale sa ON sa.player = g.s
+FROM g LEFT JOIN bid b ON b.player = g.b LEFT JOIN sale sa ON sa.player = g.s
 WHERE g.b = '' OR b.player IS NOT NULL;
 
 -- The plan's next move: the best worth more than nothing that keeps the
@@ -177,3 +262,19 @@ WHERE CASE WHEN c.free < 0 THEN o.b = '' AND o.s <> ''
                 AND c.bids + coalesce(o.bid, 0) <= m.cash + m.debt * m.team_value END
 ORDER BY o.worth DESC, o.b, o.s, o.bid
 LIMIT 1;
+
+-- The board's moves: each of your players sold, each buy at the plan's bid
+-- (or, not in the plan, the lowest bid his odds offer), valued alone from
+-- the squad as it is (dec_start), and whether the plan makes it.
+DROP VIEW IF EXISTS dec_rows;
+CREATE VIEW dec_rows AS
+SELECT 'sell' AS kind, s AS player, proceeds AS amount, 1.0 AS win, gain, money, worth,
+       s IN (SELECT player FROM dec_plan WHERE kind = 'sell') AS in_plan
+FROM dec_start WHERE b = ''
+UNION ALL
+SELECT 'buy', b, bid, win, gain, money, worth, in_plan FROM (
+    SELECT d.*, p.player IS NOT NULL AS in_plan,
+           row_number() OVER (PARTITION BY d.b ORDER BY p.player IS NULL, d.bid) AS n
+    FROM dec_start d LEFT JOIN dec_plan p ON p.kind = 'buy' AND p.player = d.b AND p.amount = d.bid
+    WHERE d.s = '' AND d.b <> '')
+WHERE n = 1;

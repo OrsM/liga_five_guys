@@ -134,10 +134,12 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     db.create_function("prognosis_bucket", 6, prognosis_bucket, deterministic=True)
 
 
-def add_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
+def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
     """The columns these schema texts give a table that db's copy of it lacks,
-    added (CREATE TABLE IF NOT EXISTS leaves a kept table as it was made). A
-    column a table cannot gain (NOT NULL without a default) raises."""
+    added, and those it has that they no longer give, dropped (CREATE TABLE
+    IF NOT EXISTS leaves a kept table as it was made; a drop drops every
+    view first, a view the texts no longer make with it). A column a table
+    cannot gain (NOT NULL without a default) raises."""
     with closing(sqlite3.connect(":memory:")) as want:
         functions(want)
         for sql in texts:
@@ -146,6 +148,12 @@ def add_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
             have = {r[1] for r in db.execute('PRAGMA table_info("%s")' % t)}
             if not have:
                 continue
+            gone = have - {r[1] for r in want.execute('PRAGMA table_info("%s")' % t)}
+            if gone:    # a view on the column would stop the drop: the texts make every view again
+                for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
+                    db.execute('DROP VIEW "%s"' % v)
+            for col in sorted(gone):
+                db.execute('ALTER TABLE "%s" DROP COLUMN "%s"' % (t, col))
             for _cid, col, typ, notnull, dflt, _pk in want.execute('PRAGMA table_info("%s")' % t).fetchall():
                 if col in have:
                     continue
@@ -178,7 +186,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
             if db.execute("PRAGMA user_version").fetchone()[0] != version:   # else it is applied: leave the views
                 db.execute("PRAGMA journal_mode=WAL")                       # other processes are using
-                add_columns(db, texts)
+                fit_columns(db, texts)
                 for sql in texts:
                     db.executescript(sql)
                 db.execute("PRAGMA user_version = %d" % version)
@@ -325,6 +333,12 @@ def _selftest() -> None:
             pass
         else:
             raise AssertionError("a NOT NULL column with no default cannot be added to kept rows")
+        schema.write_text("CREATE TABLE IF NOT EXISTS kept (a INTEGER NOT NULL, c TEXT NOT NULL DEFAULT '');"
+                          " DROP VIEW IF EXISTS kb;")
+        _APPLIED.clear()
+        with closing(connect(path, schema)) as db:
+            assert db.execute("SELECT * FROM kept").fetchall() == [(1, "")], \
+                "a column the schema no longer gives is dropped, the rows kept"
 
     mem = sqlite3.connect(":memory:")
     functions(mem)

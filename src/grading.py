@@ -19,12 +19,11 @@ from ffcore.gain import Standings, standings
 from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
 from ffcore.pricing import RESALE_MARGIN
+from ffcore.rules import DEBT_SHARE
 
 from assemble import applied, built, forecast_key, kept_built, player_forecast, price_change, price_momentum, universe
-import decide
 import decision
-from decide import Action, Universe, board, moves, program
-from ffcore import pricing
+from decide import Action, Universe
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp, stamp
 from ffcore.db import connect, query, record, rows, this_run
@@ -183,27 +182,28 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
 
 
 def decisions() -> list[dict[str, Any]]:
-    """Rebuild each past lock's board with this code (variance weighed at
-    nothing, as phantom_season) and set every ranked
-    move against what its players then scored: the change in points it
-    forecast (players got minus players sold) over the jornadas played
-    since, and the change that happened; and the value its players were
-    to gain (bought) or lose (sold) over the price horizon, in millions,
-    against what they did."""
+    """Make each past lock's decision again with this code (decision.plan)
+    and set every move it valued alone (dec_rows) against what its players
+    then scored: the change in points it forecast (players got minus players
+    sold) over the jornadas played since, and the change that happened; and
+    the value its players were to gain (bought) or lose (sold) over the
+    price horizon, in millions, against what they did."""
     locks, actual = round_locks(), jornada_points()
     done = done_jornadas()
-    boards: list[tuple[int, Universe, Any, int]] = []
+    made: list[tuple[int, Universe, list[tuple[Any, ...]], int]] = []
     try:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
             u = universe_at(i, locks)
             if u is None:
                 continue
-            boards.append((i, u, board(u), price_momentum().horizon))
+            decision.plan(u)
+            made.append((i, u, rows("SELECT kind, player, amount, in_plan FROM dec_rows"),
+                         price_momentum().horizon))
     finally:
         set_now(None)
         built.cache_clear()
     out = []
-    for i, u, b, horizon in boards:
+    for i, u, moved, horizon in made:
         # what happened is read with the clock let go: as of the lock, no later price is seen
         rose = price_change(locks[i].strftime("%Y-%m-%d"), horizon)
         per_j, m = u.forecaster.per_jornada, u.market
@@ -221,13 +221,13 @@ def decisions() -> list[dict[str, Any]]:
         def change(a: Action, pts: Callable[[str, int], float]) -> float:
             return sum(pts(a.buy, j) for j in later) - sum(
                 pts(k, j) for k in a.sell for j in later)
-        for r in b.rows:
-            a = r.action
+        for kind, k, amount, in_plan in moved:
+            a = Action("buy", buy=k, cost=amount) if kind == "buy" else Action("sell", sell=(k, ), proceeds=amount)
             out.append({
                 "lock": i, "jornadas": len(later), "move": a.label(u.market.names),
-                "group": "plan" if r in b.plan else "left out",
+                "group": "plan" if in_plan else "left out",
                 "kind": "sell" if not a.buy else "get",
-                "chance": r.p_better,
+                "chance": None,
                 "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
                 "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
                 "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
@@ -304,27 +304,6 @@ class Day(NamedTuple):
     pending: tuple[Action, ...] = ()
 
 
-# Which rule a replay decides by: the program (decide.moves), or with
-# LFG_RULE=sql the decision in SQL (decision.plan: ffcore/decide.sql), until
-# the backtest settles which (the simplify map, step 4).
-RULE = os.environ.get("LFG_RULE", "program")
-
-
-def rule_moves(u: Universe) -> list[Action]:
-    """The moves the rule makes of this universe, as of the clock's cut."""
-    return decision.plan(u) if RULE == "sql" else moves(u)
-
-
-def rule_sales(u: Universe, at: dt.datetime) -> list[Action]:
-    """The sales alone the rule makes of this universe at this moment: what
-    a debt left by a lost bid's sale not made takes."""
-    if RULE == "sql":
-        set_now(at)
-        return decision.plan(u, sales_only=True)
-    return [o.action for o in program(u, [r for r in u.rank(u.candidates(), scored=False) if not r.action.buy],
-                                      relax=False)[0]]
-
-
 def acted(up: Universe, bids: dict[str, float], acts: list[Action]) -> tuple[Day, list[Action]]:
     """A run's plan, made: its buys bid at its amounts (a bid already in
     set to the plan's, one the plan does not make taken back: the plan
@@ -340,7 +319,7 @@ def acted(up: Universe, bids: dict[str, float], acts: list[Action]) -> tuple[Day
         if a.sell:
             sales.append(a)
             continue
-        room = m.cash + 0.2 * sum(m.value.get(k, 0.0) for k in up.mine) - sum(bids.values())
+        room = m.cash + DEBT_SHARE * sum(m.value.get(k, 0.0) for k in up.mine) - sum(bids.values())
         if a.cost > room:
             continue
         bids[a.buy] = a.cost
@@ -356,14 +335,14 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
     (auction_bars) wins if it reaches what it had to and is paid, the player
     yours; otherwise it is lost. Bids on the others stand. The sales left for
     after the auctions are made if none was lost; with one lost, only those
-    the money rule then needs (decide.plan over the sales alone: those clearing a debt at fewest
-    points), the rest the next run decides again. The day after, the sales
+    the money rule then needs (decision.plan over the sales alone: those
+    clearing a debt at fewest points), the rest the next run decides again. The day after, the sales
     made and how many bids were lost."""
     closing = {k: b for k, b in day.bids.items() if (k, close) in bars}
     won = [k for k, b in closing.items() if (bar := bars[k, close]) is not None and b >= bar]
     after = with_squad(up, up.squad_after(*(Action("buy", buy=k) for k in won)),
                        up.market.cash - sum(closing[k] for k in won))
-    sales = list(day.pending) if len(won) == len(closing) else rule_sales(after, close)
+    sales = list(day.pending) if len(won) == len(closing) else decision.plan(after, sales_only=True)
     return (Day(after.squad_after(*sales), after.market.left(sales),
                 {k: b for k, b in day.bids.items() if k not in closing}),
             sales, len(closing) - len(won))
@@ -429,7 +408,7 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
                 continue
             up = with_squad(u, squad, cash, bids)
             if t in runs or not daily:
-                acts = rule_moves(up)
+                acts = decision.plan(up)
                 if daily:
                     (squad, cash, bids, pending), acts = acted(up, bids, acts)
                     up = with_squad(u, squad, cash, bids)
@@ -450,7 +429,7 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
                             "moves": "; ".join(made), "lost": lost, "cash": cash,
                             "value": sum(u.market.value.get(k, 0.0) for k in squad),
                             "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold),
-                            "lam": rows("SELECT coalesce(lam, 0) FROM money_rate")[0][0]})
+                            "lam": u.lam})
                 made, lost = [], 0
     finally:
         set_now(None)
@@ -830,29 +809,23 @@ if __name__ == "__main__":
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
     if sys.argv[1:2] == ["money"]:
-        # money [RATES [HORIZONS]]: the phantom deciding daily with money at each rate and horizon
-        rates = [float(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,3,5,8,12").split(",")]
-        hs = [int(x) for x in (sys.argv[3] if len(sys.argv) > 3 else "7,14").split(",")]
+        # money: the phantom deciding daily (decision.plan), beside standing still
         # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
-        print("%5s %3s %6s %5s %8s %8s %9s %9s %8s %8s" % ("rate", "h", "moves", "lost", "points", "standpat",
-                                                           "cash(M)", "value(M)", "score", "standpat"))
-        for rate in rates:
-            for h in hs:
-                decide.MONEY_RATE, pricing.MONEY_H = rate, h
-                got = phantom_path(daily=True)
-                # The scoreboard: points, and money (cash and squad value) at the
-                # last jornada's money rate (decide.sql money_rate), for both.
-                lam = got[-1]["lam"] if got else 0.0
-                print("%5.1f %3d %6d %5d %+8.0f %+8.0f %+9.1f %+9.1f %+8.0f %+8.0f" % (
-                    rate, h, sum(len(g["moves"].split("; ")) for g in got if g["moves"]),
-                    sum(g["lost"] for g in got),
-                    sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
-                    got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0,
-                    sum(g["phantom"] for g in got) + lam * (got[-1]["cash"] + got[-1]["value"]) / 1e6 if got else 0.0,
-                    sum(g["standpat"] for g in got) + lam * got[-1]["standpat_money"] / 1e6 if got else 0.0),
-                    flush=True)
+        got = phantom_path(daily=True)
+        # The scoreboard: points, and money (cash and squad value) at the
+        # last jornada's money rate (decide.sql money_rate), for both.
+        lam = got[-1]["lam"] if got else 0.0
+        print("%6s %5s %8s %8s %9s %9s %8s %8s" % ("moves", "lost", "points", "standpat",
+                                                 "cash(M)", "value(M)", "score", "standpat"))
+        print("%6d %5d %+8.0f %+8.0f %+9.1f %+9.1f %+8.0f %+8.0f" % (
+            sum(len(g["moves"].split("; ")) for g in got if g["moves"]), sum(g["lost"] for g in got),
+            sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
+            got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0,
+            sum(g["phantom"] for g in got) + lam * (got[-1]["cash"] + got[-1]["value"]) / 1e6 if got else 0.0,
+            sum(g["standpat"] for g in got) + lam * got[-1]["standpat_money"] / 1e6 if got else 0.0),
+            flush=True)
         # Out without freeing the universes one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
@@ -871,5 +844,5 @@ if __name__ == "__main__":
                     pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
                     100 * sum(x > 0 for x in pnl) / len(pnl)))
         raise SystemExit(0)
-    print("grading.py --selftest | money [RATES [HORIZONS]] (LFG_VARIANT=name) | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money (LFG_VARIANT=name) | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)
