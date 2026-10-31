@@ -670,7 +670,7 @@ SELECT w.player, coalesce(nullif(w.name, ''), w.player) AS name,
        position(upper(w.position)) AS pos, nullif(w.value, 0) AS value,
        o.manager AS owner, c.clause, s.price, s.route, b.my_bid,
        CASE WHEN o.manager = (SELECT me FROM league_config) THEN f.offer END AS offer,
-       p.paid, t.trend
+       p.paid, t.trend, nullif(w.value, 0) * (1 + coalesce(t.trend, 0.0) / 100) AS ahead
 FROM who w LEFT JOIN owners o USING (player) LEFT JOIN clause c USING (player)
 LEFT JOIN sale s USING (player) LEFT JOIN bid b USING (player)
 LEFT JOIN offer f USING (player) LEFT JOIN price_paid p USING (player)

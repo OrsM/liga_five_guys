@@ -21,8 +21,8 @@ class Market:
     or what waiting is worth, whichever is more). odds, for each player on
     the game's market, the bids over his asking price to choose from and
     each one's chance of winning his auction (schema.sql's bid_odds),
-    lowest first. carry is the share of a trend made after each price
-    update.
+    lowest first. ahead is his value once his price trend has run
+    (schema.sql's player_facts), for players with a value.
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
     name: dict[str, Name] = field(default_factory=dict)
@@ -37,7 +37,7 @@ class Market:
     paid: dict[str, float] = field(default_factory=dict)
     offer: dict[str, float] = field(default_factory=dict)
     fetch: dict[str, float] = field(default_factory=dict)
-    carry: tuple[float, ...] = ()
+    ahead: dict[str, float] = field(default_factory=dict)
     odds: dict[str, tuple[tuple[float, float], ...]] = field(default_factory=dict)
 
     def shown(self, k: str) -> str:
@@ -62,14 +62,6 @@ class Market:
         """Your cash once these moves are made."""
         return self.cash - sum(a.net for a in acts)
 
-    def later(self, k: str, h: int) -> float:
-        """His value h price updates on: his trend, the share carry says is
-        made by then (his value now with no carry or h of 0)."""
-        v = self.value.get(k, 0.0)
-        if not self.carry or h <= 0:
-            return v
-        return v * (1 + self.trend.get(k, 0.0) / 100 * self.carry[min(h, len(self.carry)) - 1])
-
 
 def _selftest() -> None:
     odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, fetch={"s": 10.5e6})
@@ -85,11 +77,6 @@ def _selftest() -> None:
     sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)
     assert debt.left([sale]) == -2e6
     assert Market(cash=2e6).left([buy, sale]) == 2e6 - 1e6 + 3e6
-
-
-    moves = Market(value={"b": 10e6}, trend={"b": 10.0}, carry=(0.5, 1.0))
-    assert moves.later("b", 1) == 10.5e6 and moves.later("b", 9) == 11e6 and moves.later("b", 0) == 10e6
-    assert Market(value={"b": 10e6}, trend={"b": 10.0}).later("b", 3) == 10e6, "no carry: as he is"
 
     named = Market(name={"k": Name("iñigo vicente")})
     assert named.shown("k") == "Iñigo Vicente" and named.shown("unknown") == "unknown", \

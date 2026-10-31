@@ -23,15 +23,14 @@ def inputs(u: Universe, lam: float | None = None) -> None:
     players and every player on the market you could buy (one the squad
     holds is its, not a buy: a replay's squad holds players listed now), each one's
     expected points a jornada left as yours (a stand-in fills no slot), his
-    value once his price trend has run (Market.later over the longest horizon
-    the fits reach: what he is worth as money), a buy's bids, your money, and
+    value once his price trend has run (Market.ahead: what he is worth as
+    money; a buy without a value his price), a buy's bids, your money, and
     lam: the universe's money rate (Universe.lam) unless given."""
     m = u.market
     buys = [k for k in sorted(m.price) if k not in u.mine and u.acquire(k) is not None]
-    h = len(m.carry)     # the longest horizon the price fits reach
-    players = [(k, position(m.pos.get(k)) or u.mine.get(k, ""), 1, m.later(k, h), None, m.fetches(k))
+    players = [(k, position(m.pos.get(k)) or u.mine.get(k, ""), 1, m.ahead.get(k, 0.0), None, m.fetches(k))
                for k in sorted(u.mine) if not k.startswith("__phantom_")] \
-        + [(k, position(m.pos.get(k)), 0, m.later(k, h) if k in m.value else m.price[k], m.price[k], None)
+        + [(k, position(m.pos.get(k)), 0, m.ahead.get(k, m.price[k]), m.price[k], None)
            for k in buys]
     keys = {p[0] for p in players}
     # the universe's cells: its forecast as used (forecast_used), read once when it was built
@@ -98,10 +97,11 @@ def _selftest() -> None:
 
     def universe(cash: float, price: dict[str, float], odds: Any = None, value: Any = None) -> Universe:
         pos = {**squad, "star": "MED", "keeper": "POR"}
+        value = value or {**{k: 5e6 for k in squad}, **price}
         return Universe(state=LeagueState({"me": dict(squad)}, js, "me"),
                         forecaster=Bootstrap({j: dict(cells) for j in js}),
                         market=Market(cash=cash, pos=pos, price=price, odds=odds or {},
-                                      value=value or {**{k: 5e6 for k in squad}, **price}))
+                                      value=value, ahead=value))     # no trend: worth his value
 
     def labels(acts: list[Action]) -> list[str]:
         return [a.label() for a in acts]
