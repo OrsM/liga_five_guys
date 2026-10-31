@@ -11,7 +11,7 @@ from contextlib import closing
 from dataclasses import replace
 from typing import Any
 
-from assemble import built, universe
+from assemble import built
 import decision
 from decide import Action, Universe
 from ffcore.db import connect, record, rows, this_run
@@ -488,7 +488,8 @@ def board_doc() -> Doc:
 
 
 def main() -> None:
-    u = universe()
+    b = built()     # once: universe() calls built(frozenset()), which @cache keys apart from built()
+    u = b.universe
     if len(u.state.squads) < 2 or not u.state.jornadas:
         print("sim: nothing to decide (%d squads, %d jornadas left)"
               % (len(u.state.squads), len(u.state.jornadas)))
@@ -496,7 +497,7 @@ def main() -> None:
     run = this_run()
     if run is None:
         raise SystemExit("sim: the board is the views over a run's rows; run it as run.py sim")
-    record_run(u, run, built().params)
+    record_run(u, run, b.params)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
         board_doc(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

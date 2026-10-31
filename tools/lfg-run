@@ -30,27 +30,43 @@ mark() { local now; now=$(date +%s)
 # In this shell, not a pipe: journald tags a line by the process that wrote it.
 indent() { while IFS= read -r line; do printf '  %s\n' "$line"; done; }
 
-log "self-tests"
-ST_OUT="$(mktemp)"
-trap 'rm -f "$ST_OUT"' EXIT
-bash tools/selftests.sh >"$ST_OUT" 2>&1 &
-ST_PID=$!
+# The self-tests test the code, so they run once a code passes them: the
+# code is every tracked path but what a run commits (data, reports,
+# inputs), and a change not committed always runs them.
+ST_OK="$HOME/.local/state/lfg/selftests.ok"
+ST_KEY=""
+if [ -z "$(git status --porcelain --untracked-files=no -- . ':!data' ':!reports' ':!inputs')" ]; then
+    ST_KEY="$(git ls-tree HEAD | grep -vP '\t(data|reports|inputs)$' | git hash-object --stdin)"
+fi
+ST_PID=""
+if [ -n "$ST_KEY" ] && [ "$(cat "$ST_OK" 2>/dev/null)" = "$ST_KEY" ]; then
+    log "self-tests: passed on this code"
+else
+    log "self-tests"
+    ST_OUT="$(mktemp)"
+    trap 'rm -f "$ST_OUT"' EXIT
+    bash tools/selftests.sh >"$ST_OUT" 2>&1 &
+    ST_PID=$!
+fi
 
 log "fetch"
 "$UV" run --frozen python src/ingest.py fetch || { log "FAILED: fetch"; exit 1; }
 mark fetch
 
 # Both touch data/: a failure beside the fetch is re-run alone before it counts.
-if wait "$ST_PID"; then
-    indent < "$ST_OUT"
-else
-    log "  self-tests failed alongside the fetch -- re-running alone to confirm"
-    if ! bash tools/selftests.sh 2>&1 | indent; then
-        log "self-tests failed — refusing to build a report"
-        exit 1
+if [ -n "$ST_PID" ]; then
+    if wait "$ST_PID"; then
+        indent < "$ST_OUT"
+    else
+        log "  self-tests failed alongside the fetch -- re-running alone to confirm"
+        if ! bash tools/selftests.sh 2>&1 | indent; then
+            log "self-tests failed — refusing to build a report"
+            exit 1
+        fi
     fi
+    [ -z "$ST_KEY" ] || echo "$ST_KEY" >"$ST_OK"
+    mark self-tests
 fi
-mark self-tests
 
 log "run"
 "$UV" run --frozen python src/run.py || { log "FAILED: run"; exit 1; }

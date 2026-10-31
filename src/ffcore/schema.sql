@@ -601,14 +601,15 @@ CREATE VIEW waiting AS
 WITH RECURSIVE
 r AS MATERIALIZED (SELECT ratio FROM recent_offers),
 c AS MATERIALIZED (SELECT h, carry FROM price_carry),
+f AS MATERIALIZED (SELECT player, value, trend, offer, route, owner, price FROM player_facts),
 s AS MATERIALIZED (
     SELECT player, 'sale' AS kind, value, coalesce(trend, 0.0) AS trend,
            (SELECT nights FROM nights_left) AS nights
-    FROM player_facts WHERE offer IS NOT NULL
+    FROM f WHERE offer IS NOT NULL
   UNION ALL
     SELECT player, kind, value, CASE kind WHEN 'flat' THEN 0.0 ELSE coalesce(trend, 0.0) END,
            (SELECT nights FROM resale_nights)
-    FROM player_facts, (SELECT 'resale' AS kind UNION ALL SELECT 'flat')
+    FROM f, (SELECT 'resale' AS kind UNION ALL SELECT 'flat')
     WHERE route = 'free' AND owner IS NULL AND price IS NOT NULL),
 w(player, kind, night, later) AS (
     SELECT player, kind, nights, 0.0 FROM s

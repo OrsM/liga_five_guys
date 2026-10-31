@@ -30,7 +30,6 @@ STAGES: list[tuple[str, str, bool]] = [
     ("sim", "sim:main", True),
     ("publish", "publish:main", False),
     ("grade", "grading:record_grades", False),
-    ("queries", "ffcore.db:time_queries", False),
     ("health", "health:main", False),
 ]
 

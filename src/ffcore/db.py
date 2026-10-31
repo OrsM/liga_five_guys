@@ -256,18 +256,6 @@ def timed(path: Path | None = None, meta: Path = META, limit: float = SLOW_S
     return out
 
 
-def time_queries(path: Path | None = None, meta: Path = META, limit: float = SLOW_S
-                 ) -> dict[str, float]:
-    """The run.py queries stage: each saved query timed on the real database
-    (timed), recorded with the stage as its seconds, and `over`, how many are
-    near Datasette's limit (named in the log)."""
-    got = timed(path, meta, limit)
-    for name, secs, ok in got:
-        if not ok:
-            print("  SLOW saved query %s: %.1fs (Datasette cuts at 10s)" % (name, secs))
-    return {**{name: secs for name, secs, _ in got}, "over": sum(not ok for _, _, ok in got)}
-
-
 def rows(sql: str, params: Sequence[object] | Mapping[str, object] = (),
          path: Path | None = None) -> list[Any]:
     return query(sql, params, path)[1]
@@ -367,9 +355,6 @@ def _selftest() -> None:
         got = {name: (ok, secs) for name, secs, ok in timed(path, meta, limit=0.3)}
         assert got["quick"][0] and not got["slow"][0], got
         assert got["slow"][1] < 3.0, "a query over the limit is cut off, not waited for"
-
-        first = time_queries(path, meta, limit=0.3)
-        assert set(first) == {"quick", "slow", "over"} and first["over"] == 1, first
 
     with tempfile.TemporaryDirectory() as tmp:
         schema = Path(tmp) / "schema.sql"
