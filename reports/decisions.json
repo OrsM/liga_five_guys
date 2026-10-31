@@ -1,35 +1,145 @@
 {
- "generated_at": "2026-10-31T09:03Z",
- "lock_at": "2026-10-31T13:00:00+00:00",
+ "generated_at": "2026-10-31T20:45Z",
+ "lock_at": "2026-11-01T13:00:00+00:00",
  "cash": 5179381.0,
  "cash_locked": 0.0,
- "finish": 1.85,
- "p_win": 0.288,
- "p_win_after": 0.288,
+ "finish": 1.94,
+ "p_win": 0.245,
+ "p_win_after": 0.245,
  "blocks": {
   "buys": 0.0,
   "sales": 0.0
  },
- "lam": 0.190561160987216,
+ "lam": 0.268710016851969,
  "band": [
-  1993.26870973146,
-  2284.20644424437
+  1982.53011293239,
+  2272.84174071011
  ],
- "do": [],
+ "do": [
+  {
+   "what": "field",
+   "label": "field Jon Moncayola",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": 3.53286086356678,
+   "per": "next",
+   "facts": [
+    [
+     "bench",
+     "Alvaro Garcia",
+     "names"
+    ]
+   ],
+   "accepts": [
+    null
+   ],
+   "act": [
+    {
+     "player_team": "47459928",
+     "player": "2543",
+     "market": "51255271",
+     "bid": "",
+     "pos": "DEF",
+     "value": 50603091.0
+    },
+    {
+     "player_team": "37280098",
+     "player": "3123",
+     "market": "51255255",
+     "bid": "",
+     "pos": "DEF",
+     "value": 24000691.0
+    },
+    {
+     "player_team": "107909858",
+     "player": "3147",
+     "market": "61763382",
+     "bid": "",
+     "pos": "DEL",
+     "value": 46896666.0
+    },
+    {
+     "player_team": "95426553",
+     "player": "2771",
+     "market": "51255290",
+     "bid": "",
+     "pos": "DEL",
+     "value": 37793288.0
+    },
+    {
+     "player_team": "109094608",
+     "player": "3137",
+     "market": "62681662",
+     "bid": "",
+     "pos": "DEL",
+     "value": 17217619.0
+    },
+    {
+     "player_team": "24338726",
+     "player": "2464",
+     "market": "54752027",
+     "bid": "",
+     "pos": "MED",
+     "value": 35299952.0
+    },
+    {
+     "player_team": "90937863",
+     "player": "3074",
+     "market": "50121325",
+     "bid": "",
+     "pos": "MED",
+     "value": 17986350.0
+    },
+    {
+     "player_team": "109094606",
+     "player": "3182",
+     "market": "62682352",
+     "bid": "",
+     "pos": "MED",
+     "value": 7341592.0
+    },
+    {
+     "player_team": "64086240",
+     "player": "2755",
+     "market": "54892898",
+     "bid": "",
+     "pos": "POR",
+     "value": 20271021.0
+    },
+    {
+     "player_team": "107331405",
+     "player": "2757",
+     "market": "61356752",
+     "bid": "",
+     "pos": "DEF",
+     "value": 42056820.0
+    },
+    {
+     "player_team": "109094610",
+     "player": "637",
+     "market": "62681663",
+     "bid": "",
+     "pos": "MED",
+     "value": 4236677.0
+    }
+   ]
+  }
+ ],
  "plan_gain": 0.0,
  "cash_after": null,
  "can_bid": 82563097.0,
- "ping": "",
+ "ping": "field Jon Moncayola",
  "exposed": [
-  {
-   "name": "Mathew Ryan",
-   "pos": "POR",
-   "clause": 21511188.0
-  },
   {
    "name": "Fernando Niño",
    "pos": "DEL",
    "clause": 46896666.0
+  },
+  {
+   "name": "Mathew Ryan",
+   "pos": "POR",
+   "clause": 21511188.0
   },
   {
    "name": "Georges Mikautadze",
@@ -82,11 +192,6 @@
    "clause": 10494790.0
   },
   {
-   "name": "Alvaro Garcia",
-   "pos": "MED",
-   "clause": 13097547.0
-  },
-  {
    "name": "Bil Nsongo",
    "pos": "DEL",
    "clause": 10165933.0
@@ -102,14 +207,19 @@
    "clause": 5634247.0
   },
   {
+   "name": "Augusto Batalla",
+   "pos": "POR",
+   "clause": 5505499.0
+  },
+  {
    "name": "Robin Le Normand",
    "pos": "DEF",
    "clause": 6865304.0
   },
   {
-   "name": "Augusto Batalla",
-   "pos": "POR",
-   "clause": 5505499.0
+   "name": "Alvaro Garcia",
+   "pos": "MED",
+   "clause": 13097547.0
   },
   {
    "name": "Adria Pedrosa",
@@ -131,21 +241,21 @@
   {
    "manager": "BurtonGM89",
    "me": false,
-   "now": 512.0,
-   "mean": 2227.53076370675,
-   "lo": 2068.40077416868,
-   "hi": 2386.66075324482,
+   "now": 529.0,
+   "mean": 2237.73715360515,
+   "lo": 2078.44168024553,
+   "hi": 2397.03262696477,
    "cash": 1197131.0,
    "estimated": true,
-   "p_above": 0.701179538796641
+   "p_above": 0.743581178736639
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 530.0,
-   "mean": 2138.73757698791,
-   "lo": 1993.26870973146,
-   "hi": 2284.20644424437,
+   "now": 542.0,
+   "mean": 2127.68592682125,
+   "lo": 1982.53011293239,
+   "hi": 2272.84174071011,
    "cash": 5179381.0,
    "estimated": false,
    "p_above": null
@@ -153,35 +263,35 @@
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 393.0,
-   "mean": 1964.56167230224,
-   "lo": 1819.66519654609,
-   "hi": 2109.45814805838,
+   "now": 411.0,
+   "mean": 1978.16417345414,
+   "lo": 1833.40044589268,
+   "hi": 2122.92790101559,
    "cash": 35799315.0,
    "estimated": true,
-   "p_above": 0.138483013679437
+   "p_above": 0.174968503649112
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 374.0,
-   "mean": 1786.60462606178,
-   "lo": 1655.68745655792,
-   "hi": 1917.52179556564,
+   "now": 385.0,
+   "mean": 1799.73357347386,
+   "lo": 1667.57388378179,
+   "hi": 1931.89326316593,
    "cash": 21718534.0,
    "estimated": true,
-   "p_above": 0.0105580984818467
+   "p_above": 0.0161380857402766
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 389.0,
-   "mean": 1634.09675645604,
-   "lo": 1515.37429184257,
-   "hi": 1752.81922106952,
+   "now": 413.0,
+   "mean": 1657.51759986631,
+   "lo": 1539.00566895686,
+   "hi": 1776.02953077576,
    "cash": 58293671.0,
    "estimated": true,
-   "p_above": 0.000286272969319823
+   "p_above": 0.000651208021893224
   }
  ]
 }
