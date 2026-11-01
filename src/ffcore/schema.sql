@@ -1652,26 +1652,34 @@ FROM me;
 -- and the two rankings each move of the plan is chosen from, valued alone
 -- from the squad as it is (decision_option.gain, the eleven's points
 -- week by week): every buy that adds points, most first, and every sale,
--- the fewest points lost first; each a line as the plan's are, to accept
--- on the phone (a bid; the game's offer on him taken, or he listed).
+-- the fewest points lost first (more: past the first three of each and not
+-- the plan's, to fold away); each a line as the plan's are, to accept on
+-- the phone (a bid; the game's offer on him taken, or he listed). A move of the plan is drawn in its ranking,
+-- as the plan's line says it (ranked, on that line of do).
 DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
-WITH rows AS (
+WITH br AS MATERIALIZED (SELECT * FROM board_rows),
+rows AS (
     SELECT 'do' AS list, ord, what, label, name, pos, step, amount, done, gain, per, facts, players,
-           NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan
-    FROM board_rows
+           NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan, what IN ('buy', 'sell') AS fold
+    FROM br
     UNION ALL
-    SELECT 'buys', row_number() OVER (ORDER BY -gain, player), 'buy', 'buy ' || name, name, pos,
-           CASE WHEN my_bid = cost THEN 'bid in' ELSE 'bid up to' END, cost, coalesce(my_bid = cost, 0),
-           gain, 'season', '[]', json_array(player), asking, NULL, trend, in_plan
-    FROM board_buys WHERE gain > 0
+    SELECT 'buys', row_number() OVER (ORDER BY -b.gain, b.player), 'buy', coalesce(p.label, 'buy ' || b.name), b.name, b.pos,
+           coalesce(p.step, CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END),
+           coalesce(p.amount, b.cost), coalesce(p.done, b.my_bid = b.cost, 0),
+           b.gain, 'season', coalesce(p.facts, '[]'), json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
+           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan
+    FROM board_buys b LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
+    WHERE b.gain > 0
     UNION ALL
-    SELECT 'sells', row_number() OVER (ORDER BY -gain, -raises, player),
-           CASE WHEN listed THEN 'sell' ELSE 'list' END, CASE WHEN listed THEN 'sell ' ELSE 'list ' END || name,
-           name, pos, CASE WHEN takes THEN 'take offer' WHEN offer IS NOT NULL THEN 'wait' END,
-           CASE WHEN takes THEN offer ELSE waiting END, 0,
-           gain, 'season', '[]', json_array(player), offer, waiting, trend, sell
-    FROM board_mine),
+    SELECT 'sells', row_number() OVER (ORDER BY -s.gain, -s.raises, s.player),
+           CASE WHEN s.listed OR p.label IS NOT NULL THEN 'sell' ELSE 'list' END,
+           coalesce(p.label, CASE WHEN s.listed THEN 'sell ' ELSE 'list ' END || s.name),
+           s.name, s.pos, coalesce(p.step, CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait' END),
+           CASE WHEN p.label IS NOT NULL THEN p.amount WHEN s.takes THEN s.offer ELSE s.waiting END, coalesce(p.done, 0),
+           s.gain, 'season', coalesce(p.facts, '[]'), json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
+           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell
+    FROM board_mine s LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
 lines AS MATERIALIZED (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
                                       WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
           FROM (SELECT list, ord, json(CASE WHEN what = 'field'
@@ -1684,6 +1692,8 @@ lines AS MATERIALIZED (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remo
                          'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
                          'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')),
+                         CASE r.list WHEN 'do' THEN 'ranked' ELSE 'more' END,
+                         json(CASE WHEN r.fold THEN 'true' ELSE 'false' END),
                          'asking', b.asking, 'win', round(b.win, 3),
                          'asking_win', CASE WHEN b.player IS NOT NULL THEN round(coalesce(
                              (SELECT o.p_win FROM bid_odds o WHERE o.player = b.player AND o.ratio = 1.0), 1.0), 3)

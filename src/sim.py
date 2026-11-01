@@ -143,7 +143,7 @@ def _selftest() -> None:
     def facts(d: Doc) -> dict[str, Any]:
         return {f[0]: f[1] for f in d["facts"]}
 
-    ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts"}
+    ROW = {"what", "label", "step", "amount", "done", "gain", "per", "facts", "ranked"}
     doc = report(ub, nights=1)
     alike = [d for d in report(ub, nights=1, names={"cand": "Pablo", "twin": "Pablo"})["do"]
              if d["what"] == "buy"]
@@ -205,13 +205,25 @@ def _selftest() -> None:
     assert {s["name"].lower() for s in doc["sells"]} == set(ub.state.squads[ub.me]) \
         and [s["gain"] for s in doc["sells"]] == sorted((s["gain"] for s in doc["sells"]), reverse=True), \
         "every player of yours ranked, the fewest points lost first"
+    plan_lines = {d["label"]: d for d in doc["do"] if d["ranked"]}
+    assert {d["what"] for d in plan_lines.values()} <= {"buy", "sell"} \
+        and all(d["ranked"] == (d["what"] in ("buy", "sell")) for d in doc["do"]), \
+        "the plan's buys and sales are drawn in their rankings; the rest of the plan stands alone"
+    assert all({k: r[k] for k in ("step", "amount", "facts", "accepts")}
+               == {k: plan_lines[r["label"]][k] for k in ("step", "amount", "facts", "accepts")}
+               for r in doc["buys"] + doc["sells"] if r["plan"]) \
+        and sum(r["plan"] for r in doc["buys"] + doc["sells"]) == len(plan_lines), \
+        "a move of the plan in its ranking as the plan's line says it"
+    assert all([r["more"] for r in doc[k]] == [i >= 3 and not r["plan"] for i, r in enumerate(doc[k])]
+               for k in ("buys", "sells")) and any(r["more"] for r in doc["sells"]), \
+        "past the first three of each ranking, the moves not the plan's fold away"
     assert {b["name"].lower() for b in doc["buys"] if b["plan"]} == set(bought), \
         "the plan's buys are marked in the ranking"
     assert all(b["what"] == "buy" and b["accepts"] and len(b["act"]) == 1 for b in doc["buys"]), \
         "each buy ranked is a bid to place on the phone, as the plan's are"
     assert all(len(s["act"]) == 1 and s["accepts"] == ([s["amount"]] if s["step"] == "take offer" else
                                                        [None] if s["what"] == "list" else [])
-               for s in doc["sells"]), "each player ranked: his offer to take, or he listed"
+               for s in doc["sells"]), "each player ranked: his offer to take, or he listed, or as the plan says"
     assert "market" not in doc and "offers" not in doc, \
         "one list of lines, not a section per source"
     listing = doc["do"][-1]
