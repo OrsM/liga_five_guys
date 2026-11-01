@@ -24,19 +24,19 @@ reads, one copy of each fact, and nothing the board does not need.
 |---|---|
 | What money is worth | gone (2026-11-01): the decision is points only, money a limit (cash at the lock, the debt rule); money_rate, lam and player_facts.ahead deleted |
 | The eleven | gain.ELEVEN (gain.py:30-44, via Outlook.xi), the program's own formation LP (decide.py:271-315), board_eleven / field_basis / lineup_gap (schema.sql:1466-1506); shortfall vs _fieldable |
-| Debt room, 20% of team value | grading.acted (grading.py:326-335), board_money (schema.sql:1517-1532), board_resale.can_spend, board_head.can_bid; not a constant; the program plans with no debt at all |
-| A sale's proceeds with no offer | value (market.py:59), recent offer ratio (waiting, schema.sql:586-588), avg ratio (grading.py:270, 283) |
+| Debt room, 20% of team value | once (2026-11-01): decide.sql dec_room; a run keeps it (sim_runs.cash_after, can_bid), board_head reads it; board_money gone |
+| A sale's proceeds with no offer | once (2026-11-01): Market.fetches, stored as sim_facts.fetches, the board's raises |
 | Selling to clear a debt | grading.closed via program (board_resale deleted); when a sale is made: decide.sql dec_when, board and backtest |
 | Resale picks | deleted (2026-11-01): never shown on 60 boards; a buy is listed and sold like any other |
-| The accept rule for a board line | board_json accepts (SQL), server/index.js:160-169, act.py:200-220 (+ kind/ACTS), Fantasy.jsx BUTTON (which win goes with which amount, also in SQL) |
+| The accept rule for a board line | once: board_json accepts, for the plan's lines and the rankings' alike; act.py and the server match a line by label and an accepted amount |
 | The board itself | Python Board + sim docs, then SQL board_json, then server notify text, then Fantasy.jsx formatting (two number formatters in one file) |
-| The line-up message | lineup_alert (basis 'now'), board_rows field line (basis 'plan' before the last auction), board_head.ping |
-| Shrink toward a prior | stats.shrink, pick_later and start_calibration in SQL, a test restating it |
+| The line-up message | once (2026-11-01): lineup_names, read by the field line and lineup_alert |
+| Shrink toward a prior | once (2026-11-01): stats.shrink, SQL's shrink() |
 | Matches played | scored.games vs season_record.apps |
 | The forecast at a past moment | forecast_cells (backtest, replay) and _built (board, decisions), built twice a lock with different results |
 | A past moment replayed | phantom_path, phantom_season, decisions, replay, backtest, sim_calibration |
 | Caches | kept answers, kept built universes, built @cache, grading._AT, _first_listed, facts (price_step, momentum_day), fit tables (momentum_fit, price_error_fit, price_trend_fit) + the "fits" marker; momentum is held four ways |
-| Player identity | crosswalk / ff_identity views, attach_slugs' second pass, app_links value matching, lineup_gap matching by name inline; club names matched three ways |
+| Player identity | crosswalk / ff_identity views, attach_slugs' second pass, app_links value matching; lineup_gap by app id else name_player (2026-11-01); a match path's clubs by club_slug |
 | A player's value at one instant | market, api_market, api_players_all, api_teams |
 | Explaining the board | ask.py (reruns the program), q.py / datasette board views |
 
@@ -53,11 +53,16 @@ reads, one copy of each fact, and nothing the board does not need.
    them is lost; the server's queue write is read-modify-write.
 5. board_json joins a buy's asking and win by name, not player.
 6. league_sources keys (api_market, api_teams, api_activity_N) carry no
-   league id: a second league overwrites the first.
+   league id: a second league overwrites the first. It now refuses a
+   second league (2026-11-01).
 7. Grading values money over hmax updates, the plan over MONEY_H (7).
 8. p_now may land on a jornada already behind (schedule.py:72-86 vs
-   assemble.py:356-360); unconfirmed.
+   assemble.py:356-360). Possible: rem orders a jornada by any club's next
+   kickoff, so a postponed match can sort before the club's real next one.
+   None on the data (2026-11-01: no jornada behind); it moves only the first
+   jornada's chance. Left until one shows.
 9. ruff is configured and never run; the auth.py suite may test nothing.
+   ruff now runs in selftests (2026-11-01).
 10. Players a manager lists for sale (route 'listed') are never offered:
     acquire() drops every owned player. Letting them in needs the backtest
     to settle such a sale (a seller's choice, not the game's auction): tried
@@ -152,6 +157,19 @@ Kept, and why:
   universes back.
 - The accept rule: already once, board_json's accepts, which act.py, the
   website's server and its page read.
+
+## Step 6: the rankings and the last copies (2026-11-01)
+
+- The board ranks every buy that adds points and every sale (decision_option.gain,
+  the eleven week by week over the formations), the plan's marked; each line
+  is acted on like a plan line (bid, take an offer, list).
+- One phantom (daily); stamps parsed once (stamp_jd); the copies in the table
+  above. Backtest money unchanged: 560 points vs 451 standing, 124 moves,
+  7 lost; 30 s warm, 4 min cold. Board 1.09 s to 1.02 s.
+- Not done: the forecast's history views in one pass (2.2 s a moment, only
+  when a forecast change is replayed).
+- Kept: the fetch's double parse (~2 s a run); momentum and price_trend_now's
+  caches (0.8 s and 0.55 s a board without).
 
 ## Dead or idle (cleared 2026-11-01)
 

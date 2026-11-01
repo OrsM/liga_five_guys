@@ -23,7 +23,7 @@ import decision
 from decide import Action, Universe
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp, stamp
-from ffcore.db import connect, query, record, rows, this_run
+from ffcore.db import connect, record, rows, this_run
 __all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "superseded", "view_table",
            "record_grades"]
 

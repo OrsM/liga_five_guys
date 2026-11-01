@@ -149,7 +149,8 @@ def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
     """Into the current tables (tidy.tables_in), the rows the board views
     read: one run whose best eleven now is ionut radu and pepelu (cai coro,
     better, is on the market; bench boy is yours and not in it); and the
-    app's line-up as (app id, name) rows, with these players' app ids."""
+    app's line-up as (app id, name) rows; the registry holds every player,
+    these with their app ids."""
     from contextlib import closing
 
     from ffcore.db import connect
@@ -167,6 +168,7 @@ def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
                        [("ionut radu", "Ionut Radu"), ("pepelu", "Pepelu"),
                         ("cai coro", "Cai Coro"), ("bench boy", "Bench Boy")])
         db.executemany("INSERT INTO crosswalk (player_id, name, app_id) VALUES (?, ?, ?)",
-                       [(k, k, v) for k, v in ids.items()])
+                       [(k, k, ids.get(k, "")) for k in dict.fromkeys(
+                           ["ionut radu", "pepelu", "cai coro", "bench boy", *ids])])
     store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": i,
                               "player_name": n, "player_name_full": n} for i, n in app])

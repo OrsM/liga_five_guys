@@ -320,8 +320,14 @@ def _offers_for(league: str) -> Callable[[str, dict[str, str]], list[Source]]:
 
 
 def league_sources(leagues_json: str, observed_at: str = "") -> list[Source]:
+    """Your league's feeds. Their keys (api_market, api_teams, ...) carry no
+    league id, so a second league would overwrite the first: more than one
+    raises (act.home refuses it too); none read, no feeds."""
+    leagues = parse_api_leagues(leagues_json, observed_at)
+    if len(leagues) > 1:
+        raise ValueError("the app's leagues: %d, not one (the feeds' keys carry no league id)" % len(leagues))
     out = []
-    for r in parse_api_leagues(leagues_json, observed_at):
+    for r in leagues:
         lg = r["league_id"]
         out.append(Source("api_market", "api_market",
                           API_MARKET_URL.format(base="{base}", league=lg),
@@ -534,6 +540,12 @@ def _selftest() -> None:
     assert all(s.cadence == "every_run" for s in disc if s.key == "api_teams")
     assert "017998544" in disc[0].url and "{base}" in disc[0].url
     assert league_sources("<html>") == []
+    two = _API_LEAGUES_FIXTURE.replace('[{"id":"017998544"', '[{"id":"1"},{"id":"017998544"')
+    try:
+        league_sources(two)
+        raise AssertionError("two leagues: the second would overwrite the first")
+    except ValueError:
+        pass
     follow = next(s for s in disc if s.key == "api_teams").follow
     assert follow is not None
     assert [s.key for s in follow(_API_TEAMS_FIXTURE, {"me": "miguel_autentico"})] \

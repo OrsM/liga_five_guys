@@ -1465,21 +1465,23 @@ SELECT p.player, p.name, p.pos, p.next FROM board_players p WHERE p.xi;
 -- Your line-up in the app against the best eleven of your squad now
 -- (sim_players.xi): a line-up is of players you hold, so a buy is in it only
 -- once he is yours, at the run after his auction closes. The app's line-up
--- is its players, each by its player else by name within your squad, and
--- counts only if every one is yours and there are as many as the eleven;
+-- is its players, each by its app id else by the name one player has
+-- (identity.sql), and counts only if every one is yours and there are as many as the eleven;
 -- otherwise it is unknown (legal 0) and the whole eleven is to set. 'in'
 -- are the eleven's players not in it, 'out' (i, its order in the app) those
 -- in it that are not in the eleven.
 DROP VIEW IF EXISTS lineup_gap;
 CREATE VIEW lineup_gap AS
-WITH app AS (
-    SELECT t.rowid AS i, coalesce(a.player, (
-               SELECT b.player FROM board_players b WHERE b.mine
-               AND name_key(b.name) IN (name_key(t.player_name), name_key(t.player_name_full))
-               ORDER BY b.player LIMIT 1)) AS player
-    FROM api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
-    WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
-                                        WHERE observed_at <= (SELECT cut()) GROUP BY source)),
+WITH t AS MATERIALIZED (
+    SELECT rowid AS i, player_id, name_key(player_name) AS short, name_key(player_name_full) AS full
+    FROM api_lineup
+    WHERE (source, observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
+                                    WHERE observed_at <= (SELECT cut()) GROUP BY source)),
+app AS MATERIALIZED (
+    SELECT t.i, coalesce(a.player, n.player, f.player) AS player
+    FROM t LEFT JOIN app_player a ON a.app_id = t.player_id
+    LEFT JOIN name_player n ON n.name_key = t.short
+    LEFT JOIN name_player f ON f.name_key = t.full),
 fielded AS (SELECT i, player FROM app
             WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN board_players b
                               ON b.player = a.player AND b.mine WHERE b.player IS NULL)),

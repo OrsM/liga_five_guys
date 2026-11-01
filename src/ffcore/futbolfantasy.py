@@ -365,12 +365,12 @@ MATCH_MINUTE_CAPTURE_RE = re.compile(r"(\d+)\s*'\s*$")
 
 
 def _match_sides(slug: str) -> tuple[str, str] | None:
-    known = {t: t for t in TEAMS}
-    known.update(CLUB_ALIASES)
-    for head in known:
-        tail = slug[len(head) + 1:]
-        if slug.startswith(head + "-") and tail in known:
-            return known[head], known[tail]
+    """A match path's two clubs (real-madrid-real-sociedad), each as club_slug reads it."""
+    parts = slug.split("-")
+    for i in range(1, len(parts)):
+        home, away = club_slug(" ".join(parts[:i])), club_slug(" ".join(parts[i:]))
+        if home and away:
+            return home, away
     return None
 
 
