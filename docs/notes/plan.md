@@ -165,3 +165,12 @@ Sources: Ramezani & Dinh, FPL team selection as a mixed-integer program
 (arXiv 2505.02170); Beal, Norman & Ramchurn, daily fantasy NFL by integer
 programming (IJCSS 2020); Hunter, Vielma & Zaman (arXiv 1604.01455); a
 chance-constrained model for football transfer decisions (arXiv 1911.04689).
+
+## Tried and not taken: a buy funded by several sales (2026-11-01)
+
+A buy the cash left does not pay for, funded by selling several of yours
+(fewest points lost a million raised, or the one sale that covers it).
+Backtest, points: 560 without; 476 costing the sales one by one (two sales
+lean on one bench player, so the sum flatters); 550 with each funded buy
+tried and kept only if the eleven's points rose. Not taken: consolidating
+the bench into a star wins no points on these forecasts.
