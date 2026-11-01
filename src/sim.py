@@ -214,6 +214,7 @@ def _selftest() -> None:
                for r in doc["buys"] + doc["sells"] if r["plan"]) \
         and sum(r["plan"] for r in doc["buys"] + doc["sells"]) == len(plan_lines), \
         "a move of the plan in its ranking as the plan's line says it"
+    assert all(r["facts"] for r in doc["buys"] + doc["sells"]), "every ranked move says what it is, the plan's or not"
     assert all([r["more"] for r in doc[k]] == [i >= 3 and not r["plan"] for i, r in enumerate(doc[k])]
                for k in ("buys", "sells")) and any(r["more"] for r in doc["sells"]), \
         "past the first three of each ranking, the moves not the plan's fold away"

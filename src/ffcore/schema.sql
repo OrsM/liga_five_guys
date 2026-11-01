@@ -1438,6 +1438,47 @@ LEFT JOIN sim_waiting w ON w.run_id = b.run_id AND w.player = b.player AND w.kin
 LEFT JOIN listing_ends l ON l.player = b.player
 WHERE b.mine;
 
+-- Each buy (board_buys) and each of your players (board_mine) with what the
+-- board says of him, for the plan's
+-- line on him and his row in the rankings alike: a buy's asking price,
+-- your bid, how many bid, the chance to win, his points and trend; a
+-- sale's value, the offer standing (when not taken), how it ranks among
+-- the game's recent offers, what waiting is worth and how many offers come
+-- before the lock, his points and trend.
+DROP VIEW IF EXISTS board_buy_facts;
+CREATE VIEW board_buy_facts AS
+SELECT b.*,
+       (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
+                SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
+                UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
+                UNION ALL SELECT 0.45, 'bids', CASE WHEN n.bids = 0 THEN 'none yet'
+                                                   WHEN b.my_bid IS NULL THEN CAST(n.bids AS TEXT)
+                                                   WHEN n.bids = 1 THEN 'only yours'
+                                                   ELSE n.bids || ', yours among them' END, 'count'
+                    FROM (SELECT CAST(max(m.bids) AS INTEGER) AS bids FROM current_api_market m
+                          WHERE m.player = b.player AND m.bids <> '') n WHERE n.bids IS NOT NULL
+                UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
+                UNION ALL SELECT 3, 'points', b.gain, 'points'
+                UNION ALL SELECT 4, '', b.trend, 'trend')
+            WHERE v IS NOT NULL) AS facts
+FROM board_buys b;
+
+DROP VIEW IF EXISTS board_sell_facts;
+CREATE VIEW board_sell_facts AS
+SELECT s.*,
+       (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
+                SELECT 0 AS n, 'value' AS l, s.value AS v, 'money' AS u
+                UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
+                UNION ALL SELECT 2, 'the game''s recent offers', round(s.beats, 3), 'beats'
+                UNION ALL SELECT 2.2, 'waiting is worth', s.waiting, 'money'
+                    WHERE s.offer IS NOT NULL AND s.nights > 0
+                UNION ALL SELECT 2.4, 'more offers before the lock', s.nights, 'count'
+                    WHERE s.offer IS NOT NULL
+                UNION ALL SELECT 3, 'points', s.gain, 'points'
+                UNION ALL SELECT 4, '', s.trend, 'trend')
+            WHERE v IS NOT NULL) AS facts
+FROM board_mine s;
+
 -- Your players a rival can take now by paying their clause (any can: a sale
 -- to the game pays at once, so cash is no limit), most valuable first.
 DROP VIEW IF EXISTS board_clauses;
@@ -1555,21 +1596,9 @@ buys AS (
     SELECT p.ord, 'buy', 'buy ' || b.name, b.name, b.pos,
            CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END, b.cost, coalesce(b.my_bid = b.cost, 0),
            b.worth, 'season',
-           (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
-                SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
-                UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
-                UNION ALL SELECT 0.45, 'bids', CASE WHEN n.bids = 0 THEN 'none yet'
-                                                   WHEN b.my_bid IS NULL THEN CAST(n.bids AS TEXT)
-                                                   WHEN n.bids = 1 THEN 'only yours'
-                                                   ELSE n.bids || ', yours among them' END, 'count'
-                    FROM (SELECT CAST(max(m.bids) AS INTEGER) AS bids FROM current_api_market m
-                          WHERE m.player = b.player AND m.bids <> '') n WHERE n.bids IS NOT NULL
-                UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
-                UNION ALL SELECT 3, 'points', b.gain, 'points'
-                UNION ALL SELECT 4, '', b.trend, 'trend')
-            WHERE v IS NOT NULL),
+           b.facts,
            json_array(b.player)
-    FROM board_buys b JOIN board_plan p ON p.kind = 'buy' AND p.player = b.player
+    FROM board_buy_facts b JOIN board_plan p ON p.kind = 'buy' AND p.player = b.player
     WHERE b.in_plan),
 sells AS (
     SELECT p.ord, 'sell',
@@ -1579,19 +1608,9 @@ sells AS (
                 WHEN s.listed THEN 'listed' ELSE 'list' END,
            CASE WHEN p.after THEN s.value WHEN s.offer IS NOT NULL THEN s.raises END,
            s.listed AND NOT s.takes AND NOT p.after, s.worth, 'season',
-           (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
-                SELECT 0 AS n, 'value' AS l, s.value AS v, 'money' AS u
-                UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
-                UNION ALL SELECT 2, 'the game''s recent offers', round(s.beats, 3), 'beats'
-                UNION ALL SELECT 2.2, 'waiting is worth', s.waiting, 'money'
-                    WHERE s.offer IS NOT NULL AND s.nights > 0
-                UNION ALL SELECT 2.4, 'more offers before the lock', s.nights, 'count'
-                    WHERE s.offer IS NOT NULL
-                UNION ALL SELECT 3, 'points', s.gain, 'points'
-                UNION ALL SELECT 4, '', s.trend, 'trend')
-            WHERE v IS NOT NULL),
+           s.facts,
            json_array(s.player)
-    FROM board_mine s JOIN board_plan p ON p.kind = 'sell' AND p.player = s.player
+    FROM board_sell_facts s JOIN board_plan p ON p.kind = 'sell' AND p.player = s.player
     WHERE s.sell),
 pulled AS (
     SELECT 900 + row_number() OVER (ORDER BY f.player), 'withdraw', 'withdraw bid on ' || f.name, f.name, f.pos,
@@ -1667,9 +1686,10 @@ rows AS (
     SELECT 'buys', row_number() OVER (ORDER BY -b.gain, b.player), 'buy', coalesce(p.label, 'buy ' || b.name), b.name, b.pos,
            coalesce(p.step, CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END),
            coalesce(p.amount, b.cost), coalesce(p.done, b.my_bid = b.cost, 0),
-           b.gain, 'season', coalesce(p.facts, '[]'), json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
+           b.gain, 'season', b.facts, json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
            row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan
-    FROM board_buys b LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
+    FROM board_buy_facts b
+    LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
     WHERE b.gain > 0
     UNION ALL
     SELECT 'sells', row_number() OVER (ORDER BY -s.gain, -s.raises, s.player),
@@ -1677,9 +1697,10 @@ rows AS (
            coalesce(p.label, CASE WHEN s.listed THEN 'sell ' ELSE 'list ' END || s.name),
            s.name, s.pos, coalesce(p.step, CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait' END),
            CASE WHEN p.label IS NOT NULL THEN p.amount WHEN s.takes THEN s.offer ELSE s.waiting END, coalesce(p.done, 0),
-           s.gain, 'season', coalesce(p.facts, '[]'), json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
+           s.gain, 'season', s.facts, json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
            row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell
-    FROM board_mine s LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
+    FROM board_sell_facts s
+    LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
 lines AS MATERIALIZED (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
                                       WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
           FROM (SELECT list, ord, json(CASE WHEN what = 'field'
