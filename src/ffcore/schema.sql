@@ -1644,7 +1644,11 @@ FROM me;
 
 -- decisions.json: the board as one JSON document, the phone's copy: its
 -- lines (board_rows), as the phone draws them; a bid's also at its asking
--- price, with the chance of winning at each (bid_odds; sure with no past).
+-- price, with the chance of winning at each (bid_odds; sure with no past);
+-- and the two rankings each move of the plan is chosen from, valued alone
+-- from the squad as it is (decision_option.gain, the eleven's points
+-- week by week): every buy that adds points, most first, and every sale,
+-- the fewest points lost first.
 DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
 WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
@@ -1683,6 +1687,14 @@ SELECT json_object(
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines),
     'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
+    'buys', (SELECT json_group_array(json_object(
+                 'name', name, 'pos', pos, 'gain', gain, 'price', asking, 'trend', trend,
+                 'plan', json(CASE WHEN in_plan THEN 'true' ELSE 'false' END)) ORDER BY -gain, player)
+             FROM board_buys WHERE gain > 0),
+    'sells', (SELECT json_group_array(json_object(
+                  'name', name, 'pos', pos, 'gain', gain, 'raises', raises, 'trend', trend,
+                  'plan', json(CASE WHEN sell THEN 'true' ELSE 'false' END)) ORDER BY -gain, -raises, player)
+              FROM board_mine),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
     'standings', (SELECT json_group_array(json_object(

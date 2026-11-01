@@ -197,6 +197,16 @@ def _selftest() -> None:
                                                          round(won.expected_position(ub.me), 2)), \
         "your chance of first and finish once the plan is made, every bid won: the same standings, on points"
     assert "lam" not in doc, "no money rate: money is a limit, not points"
+    assert doc["buys"] and all(b["gain"] > 0 for b in doc["buys"]) \
+        and [b["gain"] for b in doc["buys"]] == sorted((b["gain"] for b in doc["buys"]), reverse=True), \
+        "the buys ranked: each that adds points, most first"
+    assert {b["name"].lower() for b in doc["buys"]} <= set(ub.market.price) - set(ub.market.owner), \
+        "only players you can buy: the game's market, never a rival's listing"
+    assert {s["name"].lower() for s in doc["sells"]} == set(ub.state.squads[ub.me]) \
+        and [s["gain"] for s in doc["sells"]] == sorted((s["gain"] for s in doc["sells"]), reverse=True), \
+        "every player of yours ranked, the fewest points lost first"
+    assert {b["name"].lower() for b in doc["buys"] if b["plan"]} == set(bought), \
+        "the plan's buys are marked in the ranking"
     assert "market" not in doc and "offers" not in doc, \
         "one list of lines, not a section per source"
     listing = doc["do"][-1]
