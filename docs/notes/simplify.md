@@ -113,6 +113,46 @@ reads, one copy of each fact, and nothing the board does not need.
 - Still slower than the program's backtest (17 s): the rule makes 224 moves
   (92 of 121 buys sold again), each run about ten steps.
 
+## Step 5: one copy of each fact (2026-11-01)
+
+The rule: a fact is stored once, by what produces it (ingest's tables, the
+Python forecast's forecast_cell, a run's decisions); a run records
+references (its cut, its moment) and what it decided, never a copy of what
+it read; everything else is a view; Python reads views and works out no
+rule a view has. Each copy found, and what became of it:
+
+- forecast, a run's forecast cells: the run's moment (sim_runs.moment),
+  run_forecast a view; a retired code's moments kept while a run points to
+  them. plan_gain: the board sums decision_plan.
+- grade_forecast, 1.26M rows of which 84k distinct (runs of one forecast
+  code kept identical copies): grade_moment, the moments graded, and a view
+  over forecast_cell and today's scores. Old grades: 528 locks into 64
+  moments. Monitoring queries 1-2 s slower (forecast_error 1.4 to 3.0 s).
+- Market.later and Market.carry, the value-after-trend rule in Python:
+  player_facts.ahead.
+- acted's debt room: the decision's (dec_next) alone.
+- Forecast.per_j and flagged, a second read of the cells _built reads as
+  used: the record is its moment.
+- The past-lock loop four times over: before_locks and at_locks.
+- built()'s @cache (keyed without the clock) and _first_listed's: gone;
+  each is made once where needed.
+- Five views nothing reads.
+
+Kept, and why:
+
+- sim_facts, sim_waiting: the one evaluation of player_facts, sale_odds
+  and waiting at the run's cut, which the universe read and the board
+  shows. As views the board would work them out again (1-2 s a publish,
+  and sim 8-10 s to 20 s): a stored evaluation, not a second rule.
+- dec_* (decide.sql's inputs) and gain.py's cell table: a universe loaded
+  for SQL. A replay's universe is a hypothetical squad at a past moment;
+  reading forecast_used directly doubled the backtest (64 s vs 32 s).
+- Kept universes (on disk) and _AT (in memory): a past universe built once
+  for every replay and run that asks; _AT is how the warm pool hands its
+  universes back.
+- The accept rule: already once, board_json's accepts, which act.py, the
+  website's server and its page read.
+
 ## Dead or idle
 
 - lfg-publish's markdown reports branch and its comments; .runtime/ and
@@ -121,8 +161,6 @@ reads, one copy of each fact, and nothing the board does not need.
   ~/.cache; .claude/RESUME.md; the fixture's `backup` key in
   fantasyBoard.test.js; schema.sql's verdict column; KAPPAS mentions
   (tools/perf.py:8).
-- Views nobody reads: current_api_lineup, names, history_points,
-  history_matches, history_market, history_api_activity.
 - Constants written to model_constants that no view reads (SHRINK_K,
   AVAIL_K, PROMOTED_*, FIX_BAND, MIN_POOL, PERSISTENT_SHARE, ...);
   PROMOTED_DISCOUNT cannot be varied.
