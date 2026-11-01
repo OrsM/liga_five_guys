@@ -1686,7 +1686,7 @@ FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM p
 
 -- The board's headline: when the next match locks, your money, where you
 -- are expected to finish and your chance of first, your season's points
--- band, what a million is worth, what the plan gains and leaves you, what more you could bid after
+-- band, what a million is worth, what the plan leaves you, what more you could bid after
 -- it and your bids it does not make (into the debt the game allows, to
 -- clear by selling before the lock), and what is still to do.
 DROP VIEW IF EXISTS board_head;
@@ -1700,8 +1700,6 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
        (SELECT lam FROM sim_runs JOIN board_run USING (run_id)) AS lam,
        me.lo AS band_lo, me.hi AS band_hi,
-       (SELECT total(w) FROM (SELECT max(worth) AS w FROM decision_plan JOIN board_run USING (run_id)
-                              GROUP BY step)) AS plan_gain,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
        (SELECT max(0.0, left + debt) - held FROM board_money) AS can_bid,
        (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
@@ -1748,12 +1746,12 @@ SELECT json_object(
     'lam', h.lam,
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines),
-    'plan_gain', h.plan_gain, 'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
+    'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
     'standings', (SELECT json_group_array(json_object(
                       'manager', manager, 'me', json(CASE WHEN me THEN 'true' ELSE 'false' END),
-                      'now', now, 'mean', mean, 'lo', lo, 'hi', hi, 'cash', cash,
+                      'now', now, 'lo', lo, 'hi', hi, 'cash', cash,
                       'estimated', json(CASE WHEN estimated THEN 'true' ELSE 'false' END),
                       'p_above', p_above) ORDER BY ord) FROM board_league)) AS json
 FROM board_head h;
