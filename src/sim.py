@@ -207,6 +207,11 @@ def _selftest() -> None:
         "every player of yours ranked, the fewest points lost first"
     assert {b["name"].lower() for b in doc["buys"] if b["plan"]} == set(bought), \
         "the plan's buys are marked in the ranking"
+    assert all(b["what"] == "buy" and b["accepts"] and len(b["act"]) == 1 for b in doc["buys"]), \
+        "each buy ranked is a bid to place on the phone, as the plan's are"
+    assert all(len(s["act"]) == 1 and s["accepts"] == ([s["amount"]] if s["step"] == "take offer" else
+                                                       [None] if s["what"] == "list" else [])
+               for s in doc["sells"]), "each player ranked: his offer to take, or he listed"
     assert "market" not in doc and "offers" not in doc, \
         "one list of lines, not a section per source"
     listing = doc["do"][-1]

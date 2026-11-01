@@ -1648,15 +1648,35 @@ FROM me;
 -- and the two rankings each move of the plan is chosen from, valued alone
 -- from the squad as it is (decision_option.gain, the eleven's points
 -- week by week): every buy that adds points, most first, and every sale,
--- the fewest points lost first.
+-- the fewest points lost first; each a line as the plan's are, to accept
+-- on the phone (a bid; the game's offer on him taken, or he listed).
 DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
-WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
+WITH rows AS (
+    SELECT 'do' AS list, ord, what, label, name, pos, step, amount, done, gain, per, facts, players,
+           NULL AS money, NULL AS trend, NULL AS plan
+    FROM board_rows
+    UNION ALL
+    SELECT 'buys', row_number() OVER (ORDER BY -gain, player), 'buy', 'buy ' || name, name, pos,
+           CASE WHEN my_bid = cost THEN 'bid in' ELSE 'bid up to' END, cost, coalesce(my_bid = cost, 0),
+           gain, 'season', '[]', json_array(player), asking, trend, in_plan
+    FROM board_buys WHERE gain > 0
+    UNION ALL
+    SELECT 'sells', row_number() OVER (ORDER BY -gain, -raises, player),
+           CASE WHEN listed THEN 'sell' ELSE 'list' END, CASE WHEN listed THEN 'sell ' ELSE 'list ' END || name,
+           name, pos, CASE WHEN offer IS NOT NULL THEN 'take offer' END, offer, 0,
+           gain, 'season', '[]', json_array(player), raises, trend, sell
+    FROM board_mine),
+lines AS MATERIALIZED (SELECT list, ord, json(CASE WHEN list = 'do' THEN json_remove(o, '$.price', '$.raises', '$.trend', '$.plan')
+                                      ELSE o END) AS o
+          FROM (SELECT list, ord, json(CASE WHEN what = 'field'
                                              THEN json_remove(o, '$.name', '$.pos', '$.asking', '$.win', '$.asking_win')
                                              WHEN what <> 'buy' THEN json_remove(o, '$.asking', '$.win', '$.asking_win')
                                              ELSE o END) AS o
-               FROM (SELECT r.ord, r.what, json_object(
+               FROM (SELECT r.list, r.ord, r.what, json_object(
                          'name', r.name, 'pos', r.pos, 'what', r.what, 'label', r.label, 'step', r.step,
+                         CASE r.list WHEN 'buys' THEN 'price' ELSE 'raises' END, r.money, 'trend', r.trend,
+                         'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
                          'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')),
                          'asking', b.asking, 'win', round(b.win, 3),
@@ -1678,23 +1698,17 @@ WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
                                  FROM json_each(r.players) e LEFT JOIN sim_facts f ON f.run_id = (SELECT run_id FROM board_run) AND f.player = e.value
                                  LEFT JOIN current_api_teams t ON t.player = e.value
                                  LEFT JOIN current_api_market m ON m.player = e.value)) AS o
-                     FROM board_rows r LEFT JOIN board_buys b ON r.what = 'buy' AND b.in_plan
-                                                     AND b.player = json_extract(r.players, '$[0]')))
+                     FROM rows r LEFT JOIN board_buys b ON r.what = 'buy'
+                                                AND b.player = json_extract(r.players, '$[0]'))))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
     'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,
     'finish_after', h.finish_after, 'p_win_after', h.p_win_after,
     'band', json_array(h.band_lo, h.band_hi),
-    'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines),
+    'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'do'),
     'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
-    'buys', (SELECT json_group_array(json_object(
-                 'name', name, 'pos', pos, 'gain', gain, 'price', asking, 'trend', trend,
-                 'plan', json(CASE WHEN in_plan THEN 'true' ELSE 'false' END)) ORDER BY -gain, player)
-             FROM board_buys WHERE gain > 0),
-    'sells', (SELECT json_group_array(json_object(
-                  'name', name, 'pos', pos, 'gain', gain, 'raises', raises, 'trend', trend,
-                  'plan', json(CASE WHEN sell THEN 'true' ELSE 'false' END)) ORDER BY -gain, -raises, player)
-              FROM board_mine),
+    'buys', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'buys'),
+    'sells', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'sells'),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
     'standings', (SELECT json_group_array(json_object(

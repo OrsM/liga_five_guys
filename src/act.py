@@ -190,6 +190,10 @@ ACTS: dict[str, Callable[[App, dict[str, Any], Any], tuple[bool, str]]] = {
     "buy": bid, "withdraw": withdraw, "take offer": take, "list": list_all, "field": field}
 
 
+# Where the board's lines are: the plan's (do), and the rankings' (buys, sells).
+LISTS = ("do", "buys", "sells")
+
+
 def kind(line: dict[str, Any]) -> str:
     """What the app is to do for a line: its what, a sale's its step (only an offer to take is done here)."""
     if line.get("what") == "sell":
@@ -207,11 +211,12 @@ def accept(req: dict[str, Any], board: dict[str, Any], call: Call, base: str,
 
     if req.get("generated_at") != board.get("generated_at"):
         return done(False, "the board has changed since: refresh and accept again")
-    line = next((d for d in board.get("do", []) if d.get("label") == req.get("label")), None)
-    if line is None or kind(line) not in ACTS or not line.get("act") or not line.get("accepts"):
+    lines = [d for k in LISTS for d in board.get(k) or [] if d.get("label") == req.get("label")
+             and kind(d) in ACTS and d.get("act") and d.get("accepts")]
+    if not lines:
         return done(False, "not a line of this board the app can do")
-    amount = next((a for a in line["accepts"] if (a is None) == (req.get("amount") is None)
-                   and (a is None or round(a) == round(req["amount"]))), -1.0)
+    line, amount = next(((d, a) for d in lines for a in d["accepts"] if (a is None) == (req.get("amount") is None)
+                         and (a is None or round(a) == round(req["amount"]))), (lines[0], -1.0))
     if amount == -1.0:
         return done(False, "not at an amount this line is accepted at")
     h = home(call, base)
@@ -350,6 +355,13 @@ def _selftest() -> None:
     call, sent = app(offers=[{"id": 1, "money": 39000000, "status": "pending"}])
     assert accept(ask("sell Pablo Fornals", 44133958.0), board, call, base)["state"] == "failed" and \
         not changes(sent), "no longer at the board's amount: nothing accepted"
+    mantilla = {**board["do"][3], "step": "take offer", "amount": 2e6, "accepts": [2e6]}
+    ranked = {**board, "sells": [mantilla]}
+    call, sent = app(offers=[{"id": 5, "money": 2000000, "status": "pending"}])
+    assert accept(ask("sell Alvaro Mantilla", 2e6), ranked, call, base)["state"] == "placed", \
+        "a ranking's line is accepted too: the offer on a player the plan keeps, taken"
+    assert accept(ask("sell Alvaro Mantilla", 2e6), board, call, base)["state"] == "failed", \
+        "not without the ranking's line"
     # list
     call, sent = app()
     got = accept(ask("list Bil Nsongo, Manu Bueno"), board, call, base)
