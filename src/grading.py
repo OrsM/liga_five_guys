@@ -140,7 +140,7 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
             set_now(t)
             fc = player_forecast()
             out += [{"from_j": i, "jornada": j, "moment": fc.moment}
-                    for j in range(i, i + ahead + 1) if j in done and j in fc.per_j]
+                    for j in range(i, i + ahead + 1) if j in done and j in fc.jornadas]
     finally:
         set_now(None)
     return out

@@ -256,15 +256,13 @@ class Built(NamedTuple):
 
 
 class Forecast(NamedTuple):
-    """The players' cells by jornada as of cut() (points if he plays, the
-    chance he plays), their factors (StoredFactors), who of them is listed
-    injured, doubtful or suspended then, and the values the forecast fitted
-    (params rows)."""
-    per_j: PerJornada
-    factors: Mapping[int, Mapping[str, Factors]]
-    flagged: frozenset[str]
-    fits: list[dict[str, Any]]
+    """The forecast as of cut(): its moment (its cells are forecast_cell's,
+    as used forecast_used's), the jornadas it has cells for, the players'
+    factors (StoredFactors) and the values it fitted (params rows)."""
     moment: int
+    jornadas: frozenset[int]
+    factors: Mapping[int, Mapping[str, Factors]]
+    fits: list[dict[str, Any]]
 
 
 def player_forecast(players: Iterable[str] | None = None) -> Forecast:
@@ -386,16 +384,11 @@ def _make(moment: int, also: set[str], every: bool) -> None:
 
 def _read(moment: int, players: set[str] | None) -> Forecast:
     """The moment's forecast of these players, or of every one."""
-    which = "(?2 IS NULL OR player IN (SELECT value FROM json_each(?2)))"
-    per_j: PerJornada = {}
-    for k, j, pts, p in rows("SELECT player, jornada, pts, p FROM forecast_cell WHERE moment = ?1 AND "
-                             + which + " ORDER BY jornada, player", (moment, _json(players))):
-        per_j.setdefault(j, {})[k] = (pts, p)
-    flagged = frozenset(k for (k, ) in rows(
-        "SELECT player FROM forecast_player WHERE moment = ?1 AND flagged AND " + which, (moment, _json(players))))
+    jornadas = frozenset(j for (j, ) in rows("SELECT DISTINCT jornada FROM forecast_cell WHERE moment = ?",
+                                             (moment, )))
     fits = [_param(c, t, v) for c, t, v in rows(
         "SELECT component, term, value FROM forecast_fit WHERE moment = ? ORDER BY rowid", (moment, ))]
-    return Forecast(per_j, StoredFactors(moment, players), flagged, fits, moment)
+    return Forecast(moment, jornadas, StoredFactors(moment, players), fits)
 
 
 def universe(also: frozenset[str] = frozenset()) -> Universe:
@@ -569,16 +562,20 @@ def _selftest_forecast() -> None:
             set_now(dt.datetime(2026, 9, 1, 8, 0, tzinfo=dt.timezone.utc))
             first = player_forecast()
             assert made == [{"a", "b"}], "every player the scorer knows"
-            assert first.per_j == {3: {"a": (4.0, 0.5), "b": (4.0, 0.5)}, 4: {"a": (5.0, 0.5)}}, first.per_j
-            assert first.flagged == {"b"} and set(first.factors[3]) == {"a", "b"}
+            def cells(fc: Forecast) -> list[tuple[Any, ...]]:
+                return rows("SELECT jornada, player, pts, p FROM forecast_cell WHERE moment = ?"
+                            " ORDER BY jornada, player", (fc.moment, ))
+            assert cells(first) == [(3, "a", 4.0, 0.5), (3, "b", 4.0, 0.5), (4, "a", 5.0, 0.5)], cells(first)
+            assert first.jornadas == {3, 4} and set(first.factors[3]) == {"a", "b"}
+            assert rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged",
+                        (first.moment, )) == [("b", )], "who was listed doubtful then"
             assert ("fixture.difficulty", "x") in {(r["component"], r["term"]) for r in first.fits}
             assert player_forecast() == first and len(made) == 1, "read back as made, not made again"
             got = player_forecast({"a", "c"})
             assert made[1:] == [{"c"}], "only the one not made"
-            assert got.per_j[3]["c"] == (4.0, 0.5) and "c" not in got.factors[3] and "c" not in got.flagged, \
+            assert (3, "c", 4.0, 0.5) in cells(got) and "c" not in got.factors[3], \
                 "an unrated player's cell without factors"
-            assert set(got.per_j[3]) == {"a", "c"} and set(got.factors[3]) == {"a"} and not got.flagged, \
-                "the players asked for, and no others"
+            assert set(got.factors[3]) == {"a"}, "the factors of the players asked for, and no others"
             set_now(dt.datetime(2026, 9, 2, 8, 0, tzinfo=dt.timezone.utc))
             player_forecast()
             with mock.patch.object(score, "SHRINK_K", score.SHRINK_K + 1):
