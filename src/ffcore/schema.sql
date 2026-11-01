@@ -1658,28 +1658,29 @@ DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
 WITH rows AS (
     SELECT 'do' AS list, ord, what, label, name, pos, step, amount, done, gain, per, facts, players,
-           NULL AS money, NULL AS trend, NULL AS plan
+           NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan
     FROM board_rows
     UNION ALL
     SELECT 'buys', row_number() OVER (ORDER BY -gain, player), 'buy', 'buy ' || name, name, pos,
            CASE WHEN my_bid = cost THEN 'bid in' ELSE 'bid up to' END, cost, coalesce(my_bid = cost, 0),
-           gain, 'season', '[]', json_array(player), asking, trend, in_plan
+           gain, 'season', '[]', json_array(player), asking, NULL, trend, in_plan
     FROM board_buys WHERE gain > 0
     UNION ALL
     SELECT 'sells', row_number() OVER (ORDER BY -gain, -raises, player),
            CASE WHEN listed THEN 'sell' ELSE 'list' END, CASE WHEN listed THEN 'sell ' ELSE 'list ' END || name,
-           name, pos, CASE WHEN offer IS NOT NULL THEN 'take offer' END, offer, 0,
-           gain, 'season', '[]', json_array(player), raises, trend, sell
+           name, pos, CASE WHEN takes THEN 'take offer' WHEN offer IS NOT NULL THEN 'wait' END,
+           CASE WHEN takes THEN offer ELSE waiting END, 0,
+           gain, 'season', '[]', json_array(player), offer, waiting, trend, sell
     FROM board_mine),
-lines AS MATERIALIZED (SELECT list, ord, json(CASE WHEN list = 'do' THEN json_remove(o, '$.price', '$.raises', '$.trend', '$.plan')
-                                      ELSE o END) AS o
+lines AS MATERIALIZED (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
+                                      WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
           FROM (SELECT list, ord, json(CASE WHEN what = 'field'
                                              THEN json_remove(o, '$.name', '$.pos', '$.asking', '$.win', '$.asking_win')
                                              WHEN what <> 'buy' THEN json_remove(o, '$.asking', '$.win', '$.asking_win')
                                              ELSE o END) AS o
                FROM (SELECT r.list, r.ord, r.what, json_object(
                          'name', r.name, 'pos', r.pos, 'what', r.what, 'label', r.label, 'step', r.step,
-                         CASE r.list WHEN 'buys' THEN 'price' ELSE 'raises' END, r.money, 'trend', r.trend,
+                         CASE r.list WHEN 'buys' THEN 'price' ELSE 'offer' END, r.money, 'waiting', r.waiting, 'trend', r.trend,
                          'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
                          'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')),

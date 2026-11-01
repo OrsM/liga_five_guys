@@ -278,12 +278,19 @@ def _selftest() -> None:
     unlisted = report(replace(ub, market=replace(ub.market, route={})), plan=sell_dead, options=[dead_alone])
     assert [(d["step"], d["done"]) for d in unlisted["do"] if d["what"] == "sell"] == [("list", False)]
 
-    def sale(offer: float, nights: int = 0) -> tuple[Doc, list[str]]:
+    def offered_doc(offer: float, nights: int = 0) -> Doc:
         mk = replace(ub.market, offer={"dead": offer}, fetch={"dead": max(offer, 1.0e6)})
-        doc = report(replace(ub, market=mk), plan=sell_dead, options=[dead_alone],
-                     waits=[("dead", 1.0e6)], nights=nights)
+        return report(replace(ub, market=mk), plan=sell_dead, options=[dead_alone],
+                      waits=[("dead", 1.0e6)], nights=nights)
+
+    def sale(offer: float, nights: int = 0) -> tuple[Doc, list[str]]:
+        doc = offered_doc(offer, nights)
         return (next(d for d in doc["do"] if d["what"] == "sell"), doc["ping"].split("; "))
     (take, said), (wait, quiet) = sale(1.1e6), sale(0.9e6)
+    assert [(s["step"], s["amount"], s["accepts"], s["offer"], s["waiting"])
+            for o in (1.1e6, 0.9e6) for s in offered_doc(o)["sells"] if s["name"] == "Dead"] \
+        == [("take offer", 1.1e6, [1.1e6], 1.1e6, 1.0e6), ("wait", 1.0e6, [], 0.9e6, 1.0e6)], \
+        "the ranking's sale as the plan's: the offer taken only when it beats waiting, both shown"
     assert (take["step"], take["amount"], take["done"]) == ("take offer", 1.1e6, False)
     assert facts(take)["value"] == 1e6 and "raises" not in facts(take), \
         "his value beside the offer; what it raises is the step's amount, not said twice"
