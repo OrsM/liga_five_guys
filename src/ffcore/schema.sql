@@ -1533,14 +1533,17 @@ SELECT row_number() OVER (ORDER BY p.step, p.kind) - 1 AS ord, p.step, p.kind, p
 FROM decision_plan p JOIN board_run USING (run_id);
 
 -- Your cash once the plan is made, how far below zero the game lets
--- bids take you before the lock (rules.DEBT_SHARE of your team value), and
--- your bids in that the plan does not make (held: money no other bid can use).
+-- bids take you before the lock (rules.DEBT_SHARE of your players' values,
+-- the sum the decision's debt is of), and your bids in that the plan does
+-- not make (held: money no other bid can use).
 DROP VIEW IF EXISTS board_money;
 CREATE VIEW board_money AS
-SELECT b.cash - (SELECT total(net) FROM board_plan) AS left, (SELECT debt_share FROM k) * s.team_value AS debt,
+SELECT b.cash - (SELECT total(net) FROM board_plan) AS left,
+       (SELECT debt_share FROM k) * (SELECT total(f.value) FROM sim_facts f JOIN board_run USING (run_id)
+                                     JOIN sim_players p USING (run_id, player) WHERE p.mine) AS debt,
        (SELECT total(f.my_bid) FROM sim_facts f JOIN board_run USING (run_id)
         WHERE f.my_bid > 0 AND f.player NOT IN (SELECT player FROM board_plan WHERE kind = 'buy')) AS held
-FROM board_league b JOIN current_api_standings s USING (manager) WHERE b.me;
+FROM board_league b WHERE b.me;
 
 -- Players on the game's market worth buying tonight to sell before the
 -- next match locks, of those the plan does not buy: what selling him on

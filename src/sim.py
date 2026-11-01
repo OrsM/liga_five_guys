@@ -69,7 +69,7 @@ def _selftest() -> None:
 
     def report(u: Universe, fielded: Sequence[str] = (),
                ratios: Sequence[float] = (),
-               resale: Sequence[tuple[str, float, float]] = (), team_value: float = 0.0,
+               resale: Sequence[tuple[str, float, float]] = (),
                waits: Sequence[tuple[str, float]] = (), nights: int = 0,
                listings: Sequence[tuple[str, str]] = (), lam: float | None = None,
                bids: Sequence[tuple[str, int]] = (), names: dict[str, str] | None = None,
@@ -77,7 +77,7 @@ def _selftest() -> None:
         """The board the views make of this universe's run, its market's
         facts standing in for player_facts and cash, ratios for the game's
         past offers, resale for what waiting sells the game's market players
-        for, rising and flat (assemble tests those), team_value yours, waits
+        for, rising and flat (assemble tests those), waits
         what turning down an offer on a player of yours is worth, nights the
         game's offers still to come before the lock (the first a day after
         2026-08-01), listings when each of yours ends, bids how many bids
@@ -119,8 +119,7 @@ def _selftest() -> None:
                            " julianday('2026-08-02T20:24:00Z') AS first", (nights,))
                 db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
                     ("RESALE_MARGIN", 0.05), ("PRICE_WINDOW", 50.0), ("DEBT_SHARE", DEBT_SHARE)])
-            store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me,
-                                         "team_value": str(team_value)}])
+            store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me}])
             store_sql("api_market", [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerTeam",
                                       "expires_at": e} for k, e in listings]
                       + [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerLeague",
@@ -204,16 +203,22 @@ def _selftest() -> None:
     assert doc["ping"] == "; ".join(d["label"] for d in doc["do"]), \
         "the ping is each move's Action.label, not words of its own"
 
-    rich_doc = report(ub, team_value=100e6)
+    def valued(u: Universe, total: float) -> Universe:
+        """Your players worth total between them: the team value the debt is a share of."""
+        return replace(u, market=replace(u.market, value={**u.market.value,
+                                                          **{k: total / len(u.mine) for k in u.mine}}))
+
+    rich = valued(ub, 100e6)
+    rich_doc = report(rich)
     assert rich_doc["can_bid"] == max(0.0, rich_doc["cash_after"] + DEBT_SHARE * 100e6), \
         "what you can bid: your cash after the plan and the debt the game allows (rules.DEBT_SHARE)"
-    stray = replace(ub.market, pos={**ub.market.pos, "ghost": "DEF"}, my_bid={"ghost": 3e6})
-    assert abs(report(replace(ub, market=stray), team_value=100e6)["can_bid"]
+    stray = replace(rich.market, pos={**rich.market.pos, "ghost": "DEF"}, my_bid={"ghost": 3e6})
+    assert abs(report(replace(rich, market=stray))["can_bid"]
                - (rich_doc["can_bid"] - 3e6)) < 1, \
         "a bid of yours the plan does not make is money you cannot bid again"
     cost = next(a.cost for a in acts if a.buy == bought[0])
-    in_plan = replace(ub.market, my_bid={bought[0]: cost})
-    assert report(replace(ub, market=in_plan), team_value=100e6)["can_bid"] == rich_doc["can_bid"], \
+    in_plan = replace(rich.market, my_bid={bought[0]: cost})
+    assert report(replace(rich, market=in_plan))["can_bid"] == rich_doc["can_bid"], \
         "the plan's own bid is counted once, in the plan"
     pulled = [(d["what"], d["label"], d["step"], d["amount"], d["done"])
               for d in report(replace(ub, market=stray))["do"] if d["what"] == "withdraw"]
@@ -320,10 +325,10 @@ def _selftest() -> None:
 
     def resold(cash: float, team_value: float, bids: dict[str, float] | None = None,
                **flat: float) -> list[tuple[str, float, Any]]:
-        u = replace(free, market=replace(free.market, cash=cash, my_bid=bids or {},
-                                         pos={**free.market.pos, "ghost": "DEF"}))
+        u = valued(replace(free, market=replace(free.market, cash=cash, my_bid=bids or {},
+                                                pos={**free.market.pos, "ghost": "DEF"})), team_value)
         doc = report(u, plan=[], resale=[("up", 2.4e6, flat.get("up", 2e6)), ("thin", 2.06e6, 2e6),
-                                         ("dear", 9e6, flat.get("dear", 8e6))], team_value=team_value)
+                                         ("dear", 9e6, flat.get("dear", 8e6))])
         return [(d["name"].lower(), d["amount"], round(facts(d)["profit"]))
                 for d in doc["do"] if d["what"] == "resale"]
     assert resold(1e6, 50e6) == [("dear", 8e6, 1e6), ("up", 2e6, 0.4e6)], \
