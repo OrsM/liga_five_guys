@@ -8,7 +8,6 @@ import sys
 import time
 from collections.abc import Callable, Iterator
 from contextlib import closing
-from functools import cache
 from pathlib import Path
 from statistics import NormalDist
 from typing import Any, NamedTuple
@@ -21,7 +20,7 @@ from ffcore.points import done_jornadas, jornada_points
 from ffcore.pricing import RESALE_MARGIN
 from ffcore.rules import DEBT_SHARE
 
-from assemble import applied, built, forecast_key, kept_built, player_forecast, price_change, price_momentum, universe
+from assemble import applied, forecast_key, kept_built, player_forecast, price_change, price_momentum, universe
 import decision
 from decide import Action, Universe
 from sim import with_squad
@@ -43,7 +42,6 @@ def universe_when(t: dt.datetime, also: frozenset[str] = frozenset()) -> Univers
     once however many of the replays ask: a universe costs ~10s cold."""
     set_now(t)
     if (t, also) not in _AT:
-        built.cache_clear()
         try:
             _AT[t, also] = universe(also)
         except SystemExit as e:
@@ -52,20 +50,20 @@ def universe_when(t: dt.datetime, also: frozenset[str] = frozenset()) -> Univers
     return _AT[t, also]
 
 
-def on_market_by(t: dt.datetime) -> frozenset[str]:
-    """Every player listed on the game's market up to t: whom a replay's
-    phantom can hold then (whatever he bought, he bought from it)."""
+def on_market_by(t: dt.datetime, listed: dict[str, str]) -> frozenset[str]:
+    """Every player listed on the game's market up to t (listed: when each
+    first was, first_listed): whom a replay's phantom can hold then
+    (whatever he bought, he bought from it)."""
     cut = stamp(t)
-    return frozenset(k for k, first in _first_listed().items() if first <= cut)
+    return frozenset(k for k, first in listed.items() if first <= cut)
 
 
-@cache
-def _first_listed() -> dict[str, str]:
-    """When each player was first on the market: one read for every t
-    on_market_by is asked (2026-10-31: a read a t was 9 of a backtest's 34 s).
-    His first listing (api_market, where buys come from) or his first value
-    (market), whichever is earlier: 9 players were listed before their first
-    value (2026-10-31)."""
+def first_listed() -> dict[str, str]:
+    """When each player was first on the market, read once a replay (a read
+    a time was 9 of a backtest's 34 s, 2026-10-31). His first listing
+    (api_market, where buys come from) or his first value (market),
+    whichever is earlier: 9 players were listed before their first value
+    (2026-10-31)."""
     return dict(rows("SELECT player, min(first) FROM ("
                      " SELECT ff_id AS player, min(observed_at) AS first FROM market WHERE ff_id <> '' GROUP BY ff_id"
                      " UNION ALL SELECT a.player, min(t.observed_at) FROM api_market t"
@@ -120,7 +118,6 @@ def at_locks(only: set[int] | None = None) -> Iterator[tuple[int, Universe]]:
                 yield j, u
     finally:
         set_now(None)
-        built.cache_clear()
 
 
 def auction_closes() -> list[dt.datetime]:
@@ -381,11 +378,12 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
     last: Universe | None = None
     out = []
     ever: dict[dt.datetime, frozenset[str]] = {}
+    listed = first_listed()
 
     def held(t: dt.datetime) -> frozenset[str]:
         """Whom the phantom can hold at t: who was listed by then, and the squad he started with."""
         if t not in ever:
-            ever[t] = on_market_by(t) | frozenset(hold)
+            ever[t] = on_market_by(t, listed) | frozenset(hold)
         return ever[t]
     try:
         for t in sorted(set(played) | set(runs) | closes):
@@ -434,7 +432,6 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
                 made, lost = [], 0
     finally:
         set_now(None)
-        built.cache_clear()
     return out
 
 

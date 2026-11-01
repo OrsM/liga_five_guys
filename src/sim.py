@@ -500,7 +500,7 @@ def board_doc() -> Doc:
 
 
 def main() -> None:
-    b = built()     # once: universe() calls built(frozenset()), which @cache keys apart from built()
+    b = built()
     u = b.universe
     if len(u.state.squads) < 2 or not u.state.jornadas:
         print("sim: nothing to decide (%d squads, %d jornadas left)"

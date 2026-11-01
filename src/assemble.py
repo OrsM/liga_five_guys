@@ -402,7 +402,6 @@ def universe(also: frozenset[str] = frozenset()) -> Universe:
     return built(also).universe
 
 
-@cache
 def built(also: frozenset[str] = frozenset()) -> Built:
     """The universe, and the parameters it was built with. Its forecast
     covers every player in a squad or on the market, and also these (a
