@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-01T20:00Z",
+ "generated_at": "2026-11-01T20:23Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 5279381.0,
  "cash_locked": 60656568.0,
@@ -327,7 +327,33 @@
    "done": false,
    "gain": 75.341684757202,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     99550233.0,
+     "money"
+    ],
+    [
+     "bids",
+     "1",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.6,
+     "chance"
+    ],
+    [
+     "points",
+     75.341684757202,
+     "points"
+    ],
+    [
+     "",
+     9.99864623099189,
+     "trend"
+    ]
+   ],
    "more": false,
    "asking": 99550233.0,
    "win": 0.6,
@@ -359,7 +385,33 @@
    "done": false,
    "gain": 44.0317326527244,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     74536722.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.733,
+     "chance"
+    ],
+    [
+     "points",
+     44.0317326527244,
+     "points"
+    ],
+    [
+     "",
+     3.93450892465793,
+     "trend"
+    ]
+   ],
    "more": false,
    "asking": 74536722.0,
    "win": 0.733,
@@ -391,7 +443,33 @@
    "done": true,
    "gain": 29.7039806918706,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     53582476.0,
+     "money"
+    ],
+    [
+     "bids",
+     "only yours",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.2,
+     "chance"
+    ],
+    [
+     "points",
+     29.7039806918706,
+     "points"
+    ],
+    [
+     "",
+     54.3755374506742,
+     "trend"
+    ]
+   ],
    "more": false,
    "asking": 53582476.0,
    "win": 0.2,
@@ -423,7 +501,33 @@
    "done": false,
    "gain": 24.9709997353283,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     40756250.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.633,
+     "chance"
+    ],
+    [
+     "points",
+     24.9709997353283,
+     "points"
+    ],
+    [
+     "",
+     8.72165532432249,
+     "trend"
+    ]
+   ],
    "more": true,
    "asking": 40756250.0,
    "win": 0.633,
@@ -455,7 +559,33 @@
    "done": false,
    "gain": 22.4069940852985,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     67211962.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.733,
+     "chance"
+    ],
+    [
+     "points",
+     22.4069940852985,
+     "points"
+    ],
+    [
+     "",
+     4.63481454752428,
+     "trend"
+    ]
+   ],
    "more": true,
    "asking": 67211962.0,
    "win": 0.733,
@@ -487,7 +617,33 @@
    "done": false,
    "gain": 2.85193859732869,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     10811477.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points",
+     2.85193859732869,
+     "points"
+    ],
+    [
+     "",
+     -32.6097728146277,
+     "trend"
+    ]
+   ],
    "more": true,
    "asking": 10811477.0,
    "win": 1.0,
@@ -519,7 +675,33 @@
    "done": false,
    "gain": 2.65605588804989,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     7038663.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points",
+     2.65605588804989,
+     "points"
+    ],
+    [
+     "",
+     -21.7555655245585,
+     "trend"
+    ]
+   ],
    "more": true,
    "asking": 7038663.0,
    "win": 1.0,
@@ -551,7 +733,33 @@
    "done": true,
    "gain": 2.37237058188109,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     6123634.0,
+     "money"
+    ],
+    [
+     "bids",
+     "only yours",
+     "count"
+    ],
+    [
+     "chance to win",
+     0.2,
+     "chance"
+    ],
+    [
+     "points",
+     2.37237058188109,
+     "points"
+    ],
+    [
+     "",
+     56.9731193650428,
+     "trend"
+    ]
+   ],
    "more": true,
    "asking": 6123634.0,
    "win": 0.2,
@@ -641,7 +849,33 @@
    "done": false,
    "gain": 0.310654085527865,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     5778287.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points",
+     0.310654085527865,
+     "points"
+    ],
+    [
+     "",
+     -11.6454356269085,
+     "trend"
+    ]
+   ],
    "more": true,
    "asking": 5778287.0,
    "win": 1.0,
@@ -676,7 +910,43 @@
    "done": false,
    "gain": 0.0,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     596094.0,
+     "money"
+    ],
+    [
+     "offer",
+     603321.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.48,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     635010.221433268,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     0.0,
+     "points"
+    ],
+    [
+     "",
+     4.94326213322568,
+     "trend"
+    ]
+   ],
    "more": false,
    "accepts": [],
    "act": [
@@ -704,7 +974,38 @@
    "done": false,
    "gain": -3.12711043544938,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     12522041.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.92,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     13147068.0198581,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -3.12711043544938,
+     "points"
+    ],
+    [
+     "",
+     -2.9201963722675,
+     "trend"
+    ]
+   ],
    "more": false,
    "accepts": [
     13454917.0
@@ -734,7 +1035,38 @@
    "done": false,
    "gain": -5.8645970144551,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     5146990.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.94,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     5249435.88361828,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -5.8645970144551,
+     "points"
+    ],
+    [
+     "",
+     -21.5552969739104,
+     "trend"
+    ]
+   ],
    "more": false,
    "accepts": [
     5588842.0
@@ -764,7 +1096,43 @@
    "done": false,
    "gain": -5.92020657313382,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     10372596.0,
+     "money"
+    ],
+    [
+     "offer",
+     9672114.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.06,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     11640278.4297659,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -5.92020657313382,
+     "points"
+    ],
+    [
+     "",
+     28.2714672073557,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -792,7 +1160,38 @@
    "done": false,
    "gain": -6.10319018369551,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     3484081.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.88,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     3543546.01972042,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -6.10319018369551,
+     "points"
+    ],
+    [
+     "",
+     -23.6242765599654,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [
     3720670.0
@@ -822,7 +1221,38 @@
    "done": false,
    "gain": -6.75564281628476,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     4950167.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.94,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     4979657.37959239,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -6.75564281628476,
+     "points"
+    ],
+    [
+     "",
+     -32.8407014429855,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [
     5379185.0
@@ -852,7 +1282,38 @@
    "done": false,
    "gain": -7.01959617394818,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     6438528.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     1.0,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     6578467.97969888,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -7.01959617394818,
+     "points"
+    ],
+    [
+     "",
+     -20.2462762410288,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [
     7134737.0
@@ -882,7 +1343,43 @@
    "done": false,
    "gain": -7.56548829279349,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     3143832.0,
+     "money"
+    ],
+    [
+     "offer",
+     3018662.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.22,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     3231933.19291295,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -7.56548829279349,
+     "points"
+    ],
+    [
+     "",
+     -15.9711780202162,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -910,7 +1407,43 @@
    "done": false,
    "gain": -10.0487672363833,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     4182942.0,
+     "money"
+    ],
+    [
+     "offer",
+     4302449.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.62,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     4362250.05046328,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -10.0487672363833,
+     "points"
+    ],
+    [
+     "",
+     -6.86987632197752,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -938,7 +1471,43 @@
    "done": false,
    "gain": -11.4582781467825,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     25482327.0,
+     "money"
+    ],
+    [
+     "offer",
+     24023758.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.08,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     26433245.0248193,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -11.4582781467825,
+     "points"
+    ],
+    [
+     "",
+     -10.1545515587173,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -966,7 +1535,38 @@
    "done": false,
    "gain": -23.0525603300176,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     10273946.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.62,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     10391149.9178953,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -23.0525603300176,
+     "points"
+    ],
+    [
+     "",
+     -28.006228254144,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [
     10603207.0
@@ -996,7 +1596,43 @@
    "done": false,
    "gain": -23.3079727656623,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     17137752.0,
+     "money"
+    ],
+    [
+     "offer",
+     17607642.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.62,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     18020172.1413342,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -23.3079727656623,
+     "points"
+    ],
+    [
+     "",
+     -2.08609651179928,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1024,7 +1660,43 @@
    "done": false,
    "gain": -28.3357848684185,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     7637471.0,
+     "money"
+    ],
+    [
+     "offer",
+     7512689.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.3,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     9224979.51737338,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -28.3357848684185,
+     "points"
+    ],
+    [
+     "",
+     57.1755636810032,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1052,7 +1724,43 @@
    "done": false,
    "gain": -30.228449470103,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     24426031.0,
+     "money"
+    ],
+    [
+     "offer",
+     23483698.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.22,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     27215680.3998403,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -30.228449470103,
+     "points"
+    ],
+    [
+     "",
+     25.3678494694302,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1080,7 +1788,43 @@
    "done": false,
    "gain": -33.3872649346778,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     38843329.0,
+     "money"
+    ],
+    [
+     "offer",
+     38130075.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.28,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     43685324.4877835,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -33.3872649346778,
+     "points"
+    ],
+    [
+     "",
+     29.1435166885269,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1108,7 +1852,38 @@
    "done": false,
    "gain": -36.4989345949955,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     41616515.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.94,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     43343333.9204592,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -36.4989345949955,
+     "points"
+    ],
+    [
+     "",
+     -7.66668898998443,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [
     44846043.0
@@ -1138,7 +1913,43 @@
    "done": false,
    "gain": -37.7865281256647,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     51002239.0,
+     "money"
+    ],
+    [
+     "offer",
+     52922422.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.68,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     54930877.1619992,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -37.7865281256647,
+     "points"
+    ],
+    [
+     "",
+     10.4714026176549,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1166,7 +1977,43 @@
    "done": false,
    "gain": -38.5996554636573,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     36490731.0,
+     "money"
+    ],
+    [
+     "offer",
+     37587160.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.62,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     42384197.4073297,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -38.5996554636573,
+     "points"
+    ],
+    [
+     "",
+     41.9592258530594,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1194,7 +2041,43 @@
    "done": false,
    "gain": -41.7574870245345,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     48179948.0,
+     "money"
+    ],
+    [
+     "offer",
+     47371618.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.28,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     54763806.1106913,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -41.7574870245345,
+     "points"
+    ],
+    [
+     "",
+     33.4090404567569,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1222,7 +2105,43 @@
    "done": false,
    "gain": -41.806300183995,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     18385303.0,
+     "money"
+    ],
+    [
+     "offer",
+     17507108.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.18,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     20777928.4142506,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -41.806300183995,
+     "points"
+    ],
+    [
+     "",
+     31.0960203578917,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [],
    "act": [
@@ -1250,7 +2169,38 @@
    "done": false,
    "gain": -84.8602835513209,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "value",
+     20014428.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.9,
+     "beats"
+    ],
+    [
+     "waiting is worth",
+     20592451.524564,
+     "money"
+    ],
+    [
+     "more offers before the lock",
+     5,
+     "count"
+    ],
+    [
+     "points",
+     -84.8602835513209,
+     "points"
+    ],
+    [
+     "",
+     -15.4278928688652,
+     "trend"
+    ]
+   ],
    "more": true,
    "accepts": [
     21436041.0
