@@ -180,6 +180,7 @@ def _selftest_paired() -> None:
 
     from ffcore.db import record
     from ffcore.tidy import tables_in
+    from grading import view_table
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         record([{"run_id": i, "started": "t", "as_of": "t", "trigger": "service", "commit_sha": "c"}
@@ -193,7 +194,7 @@ def _selftest_paired() -> None:
                 row(1, 9, "p2", 2, 0, 0), row(2, 9, "p2", 1, 0, 0),
                 row(1, 9, "p3", 5, 5, 1), row(2, 9, "p3", 3, 5, 1),
                 row(1, 9, "p4", 1, 1, 0),                       # only in the old run: not paired
-                row(1, 10, "p5", 0, 9, 0), row(2, 10, "p5", 9, 9, 0)], "grade_forecast")
+                row(1, 10, "p5", 0, 9, 0), row(2, 10, "p5", 9, 9, 0)], view_table("grade_forecast"))
         got = {r[0]: dict(zip(("scope", "n", "gain", "se", "lo", "hi", "verdict"), r))
                for r in named("paired_gain", {"old": 1, "new": 2, "ahead": 1})[1]}
         assert set(got) == {"all", "flagged", "not flagged"}, got
@@ -218,7 +219,7 @@ def _selftest_variant_gap() -> None:
 
     from ffcore.db import record
     from ffcore.tidy import tables_in
-    from grading import replayed_table
+    from grading import view_table
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         def row(v: str, at: str, j: int, k: str, pred: float, fl: int, h: float) -> dict[str, Any]:
@@ -234,7 +235,7 @@ def _selftest_variant_gap() -> None:
                 # jornada 3: only a moment inside the window: nothing to compare
                 row("live", "m4", 3, "a", 0, 0, 5), row("slow", "m4", 3, "a", 3, 0, 5),
                 # jornada 4: a moment exactly :hours out counts (same error either way)
-                row("live", "m5", 4, "z", 1, 0, 24), row("slow", "m5", 4, "z", 1, 0, 24)], replayed_table())
+                row("live", "m5", 4, "z", 1, 0, 24), row("slow", "m5", 4, "z", 1, 0, 24)], view_table("replayed"))
         got = {r[0]: r for r in named("variant_gap", {"old": "live", "new": "slow", "hours": 24})[1]}
         assert set(got) == {"all", "flagged", "not flagged"}, got
         # old - new squared error: a 4 - 1 = 3, b 1 - 4 = -3, c 0 - 0 = 0
@@ -331,6 +332,7 @@ def _selftest_queries() -> None:
     from ffcore.clock import set_now
     from ffcore.db import record
     from ffcore.tidy import store_sql, tables_in
+    from grading import view_table
 
     def asked(name: str, given: dict[str, object] | None = None) -> list[tuple[Any, ...]]:
         return [tuple(r) for r in named(name, given or {})[1]]
@@ -352,7 +354,7 @@ def _selftest_queries() -> None:
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
             record([{"run_id": 1, "from_j": j, "jornada": j, "player": k, "predicted": 2.0,
                      "actual": a, "flagged": 0} for j in (1, 2) for k, a in (("a", 3.0), ("b", 1.0))],
-                   "grade_forecast")
+                   view_table("grade_forecast"))
             record([{"run_id": 1, "ord": i, "lock": 1, "move": m, "reached": r, "kind": "get", "real": v}
                     for i, (m, r, v) in enumerate([("x", "plan", 3.0), ("y", "cleared", -1.0),
                                                    ("z", "rejected", 5.0)])], "grade_decisions")

@@ -350,9 +350,10 @@ def _moment(db: sqlite3.Connection) -> tuple[int, bool]:
     if db.execute("INSERT OR IGNORE INTO forecast_moment (code, constants, as_of) VALUES (?, ?, ?)",
                   (code, consts, at)).rowcount:
         # Another code's moments are never made again: gone once this code
-        # makes one, but for those a run was built on (its record).
+        # makes one, but for those a run was built on or a grade graded (their record).
         old = ("SELECT moment FROM forecast_moment WHERE code <> ?"
-               " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL)")
+               " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL"
+               " UNION SELECT moment FROM grade_moment)")
         for t in ("forecast_cell", "forecast_player", "forecast_fit", "forecast_moment"):
             db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old), (code, ))
     (moment, made), = db.execute("SELECT moment, made FROM forecast_moment"

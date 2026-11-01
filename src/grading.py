@@ -27,7 +27,7 @@ from decide import Action, Universe
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp, stamp
 from ffcore.db import connect, query, record, rows, this_run
-__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "resales", "forecast_rows", "superseded",
+__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "resales", "superseded", "view_table",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -120,10 +120,9 @@ def auction_closes() -> list[dt.datetime]:
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
-    """Rebuild the forecast at each past lock: every player's forecast cell
-    (points if he plays, chance he plays) for the jornada it locks and, with
-    ahead, the next ones too, and who was listed injured, doubtful or
-    suspended then. Scored in SQL (grade_error)."""
+    """The forecast at each past lock, made with this code if not made yet
+    (player_forecast): its moment, for the jornada it locks and, with ahead,
+    the next ones too, each one done. Graded in SQL (grade_forecast)."""
     locks = round_locks()
     done = done_jornadas()
     out = []
@@ -131,12 +130,8 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
         for i in sorted(done & set(locks), key=lambda j: locks[j]):
             set_now(locks[i] - dt.timedelta(minutes=1))
             fc = player_forecast()
-            per_j, flagged = fc.per_j, fc.flagged
-            for j in range(i, i + ahead + 1):
-                if j not in done or j not in per_j:
-                    continue
-                out.append({"jornada": j, "from": i, "pred": dict(per_j[j]),
-                            "hurt": sorted(k for k in per_j[j] if k in flagged)})
+            out += [{"from_j": i, "jornada": j, "moment": fc.moment}
+                    for j in range(i, i + ahead + 1) if j in done and j in fc.per_j]
     finally:
         set_now(None)
     return out
@@ -527,16 +522,6 @@ def sim_calibration() -> list[dict[str, Any]]:
     return out
 
 
-def forecast_rows(runs: list[dict[str, Any]], actual: dict[tuple[str, int], float]) -> list[dict[str, Any]]:
-    """backtest's forecast cells, one row a player: what was forecast at the
-    lock (from_j) for a jornada and his chance of playing, and what he
-    scored (0 if nothing)."""
-    return [{"from_j": r["from"], "jornada": r["jornada"], "player": k,
-             "predicted": expected_points(cell), "plays": cell[1],
-             "actual": actual.get((k, r["jornada"]), 0.0), "flagged": int(k in r["hurt"])}
-            for r in runs for k, cell in r["pred"].items()]
-
-
 def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """decisions' moves as rows: group (a SQL word) becomes reached."""
     return [{"ord": i, **{k: v for k, v in m.items() if k != "group"}, "reached": m["group"]}
@@ -544,7 +529,7 @@ def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 # What the grade stage keeps, a set a run.
-GRADED = ("grade_forecast", "grade_decisions", "phantom_jornadas", "sim_calibration")
+GRADED = ("grade_moment", "grade_decisions", "phantom_jornadas", "sim_calibration")
 
 
 def superseded(run: int, path: Path | None = None) -> None:
@@ -562,7 +547,7 @@ def graded(run: int, last: int, path: Path | None = None) -> bool:
     past locks on every jornada done up to last: its grades stand, and
     nothing would change them."""
     with closing(connect(path)) as db:
-        return db.execute("SELECT 1 FROM grade_forecast g JOIN runs e ON e.run_id = g.run_id"
+        return db.execute("SELECT 1 FROM grade_moment g JOIN runs e ON e.run_id = g.run_id"
                           " JOIN runs r ON r.run_id = ? AND e.commit_sha = r.commit_sha AND e.run_id < r.run_id"
                           " GROUP BY g.run_id HAVING max(g.jornada) >= ? LIMIT 1", (run, last)).fetchone() is not None
 
@@ -574,7 +559,6 @@ def record_grades() -> dict[str, int]:
     on every jornada done (graded). The replay of every snapshot is not
     run here: monitoring, ~550 moments made again at each forecast change
     (grading.py replay JOBS)."""
-    actual = jornada_points()
     done = done_jornadas()
     resolved = len(done)
     run = this_run()
@@ -583,9 +567,9 @@ def record_grades() -> dict[str, int]:
         return {"resolved": resolved, "forecasts": 0, "moves": 0}
     _AT.clear()
     try:
-        fc, moves = forecast_rows(backtest(GRADE_AHEAD), actual), decision_rows(decisions())
+        fc, moves = backtest(GRADE_AHEAD), decision_rows(decisions())
         if run is not None:
-            record([{"run_id": run, **r} for r in fc], "grade_forecast")
+            record([{"run_id": run, **r} for r in fc], "grade_moment")
             record([{"run_id": run, **r} for r in moves], "grade_decisions")
             record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
             record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
@@ -593,16 +577,17 @@ def record_grades() -> dict[str, int]:
     finally:
         _AT.clear()
     print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
-    return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}
+    return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}     # forecasts: lock moments a jornada
 
 
-def replayed_table() -> str:
-    """The view replayed made a table in the current tables (tidy.tables_in),
-    for its readers' tests to fill."""
-    with closing(connect()) as db, db:
-        db.execute("DROP VIEW replayed")
-        db.execute("CREATE TABLE replayed (variant, as_of, jornada, player, predicted, actual, flagged, lead_h)")
-    return "replayed"
+def view_table(view: str, path: Path | None = None) -> str:
+    """A view (replayed, grade_forecast) made a table of its columns in the
+    current tables (tidy.tables_in), for its readers' tests to fill."""
+    with closing(connect(path)) as db, db:
+        cols = ['"%s" %s' % (r[1], r[2]) for r in db.execute('PRAGMA table_info("%s")' % view)]
+        db.execute('DROP VIEW "%s"' % view)
+        db.execute('CREATE TABLE "%s" (%s)' % (view, ", ".join(cols)))
+    return view
 
 
 def _selftest_todo() -> None:
@@ -669,18 +654,23 @@ def _selftest_phantom() -> None:
 
 def _selftest() -> None:
     _selftest_phantom()
-    bt = [{"from": 7, "jornada": 8, "pred": {"a": (6.0, 0.5), "b": (2.0, 0.5)}, "hurt": ["b"]}]
-    assert forecast_rows(bt, {("a", 8): 5.0}) == [
-        {"from_j": 7, "jornada": 8, "player": "a", "predicted": 3.0, "plays": 0.5, "actual": 5.0, "flagged": 0},
-        {"from_j": 7, "jornada": 8, "player": "b", "predicted": 1.0, "plays": 0.5, "actual": 0.0, "flagged": 1}], \
-        "one row a player forecast, with his chance of playing; no points scored is 0"
+    import tempfile
+    from ffcore.tidy import store_sql, tables_in
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        record([{"moment": 3, "code": "c", "constants": "k", "as_of": "t", "made": 1}], "forecast_moment")
+        record([{"moment": 3, "player": k, "jornada": j, "pts": pts, "p": 0.5}
+                for k, pts in (("a", 6.0), ("b", 2.0)) for j in (8, 9)], "forecast_cell")
+        record([{"moment": 3, "player": "a", "flagged": 0}, {"moment": 3, "player": "b", "flagged": 1}],
+               "forecast_player")
+        record([{"run_id": 1, "from_j": 7, "jornada": 8, "moment": 3}], "grade_moment")
+        assert rows("SELECT from_j, jornada, player, predicted, plays, actual, flagged FROM grade_forecast"
+                    " ORDER BY player") == [(7, 8, "a", 3.0, 0.5, 0.0, 0), (7, 8, "b", 1.0, 0.5, 0.0, 1)], \
+            "a grade's moment, a row a player of the jornadas graded; no points scored is 0"
     moves = decision_rows([{"lock": 7, "move": "buy X", "group": "plan", "kind": "get"},
                            {"lock": 7, "move": "sell Y", "group": "left out", "kind": "sell"}])
     assert [(m["ord"], m["reached"], "group" in m) for m in moves] \
         == [(0, "plan", False), (1, "left out", False)], moves
 
-    import tempfile
-    from ffcore.tidy import store_sql, tables_in
     with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
         path = Path(tmp) / "lfg.db"
         def run(commit: str) -> int:
@@ -691,8 +681,7 @@ def _selftest() -> None:
             return cur.lastrowid
         old, other, now = run("a"), run("b"), run("a")
         for r in (old, other, now):
-            record([{"run_id": r, "from_j": 7, "jornada": 7, "player": "p", "predicted": 1.0, "actual": 0.0,
-                     "flagged": 0}], "grade_forecast", path)
+            record([{"run_id": r, "from_j": 7, "jornada": 7, "moment": 1}], "grade_moment", path)
             record([{"run_id": r, "ord": 0, "lock": 7, "move": "m", "reached": "plan", "kind": "get"}],
                    "grade_decisions", path)
         superseded(now, path)
@@ -734,7 +723,7 @@ def _selftest() -> None:
                  "actual": ac, "flagged": fl, "lead_h": h}
                 for i, (k, pr, ac, fl, h) in enumerate([("a", 1, 0, 0, 1.0), ("b", 0, 2, 1, 1.0),
                                                         ("a", 3, 0, 0, 2.0), ("b", 2, 2, 0, 2.0),
-                                                        ("a", 4, 0, 0, 30.0)])], replayed_table())
+                                                        ("a", 4, 0, 0, 30.0)])], view_table("replayed"))
         lead = {r[0]: r for r in connect().execute(
             "SELECT lead, n, moments, rmse, flagged_rmse FROM replay_lead WHERE variant = 'v'")}
         assert lead["0-3h"][1:4] == (4, 2, (14 / 4) ** 0.5), lead
@@ -750,7 +739,7 @@ def _selftest() -> None:
                     ("e", 2, "a", 2, 0, 0, 30.0), ("l", 2, "a", 0, 0, 0, 1.0),
                     ("e", 2, "b", 4, 1, 1, 30.0), ("l", 2, "b", 1, 1, 1, 1.0),
                     ("e", 2, "c", 1, 0, 0, 30.0), ("l", 2, "c", 2, 0, 0, 1.0),
-                    ("x", 3, "a", 9, 0, 0, 30.0)]], replayed_table())
+                    ("x", 3, "a", 9, 0, 0, 30.0)]], view_table("replayed"))
         gap = {(r[0], r[1]): r for r in connect().execute(
             "SELECT lead, scope, n, extra_mse, se, claim FROM replay_gap")}
         assert set(gap) == {("24-48h", "all"), ("24-48h", "flagged")}, \

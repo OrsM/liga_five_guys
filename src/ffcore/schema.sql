@@ -158,19 +158,16 @@ CREATE TABLE IF NOT EXISTS sim_runs (
     moment INTEGER REFERENCES forecast_moment(moment)
 );
 
--- grading, when run.py grade finds something new: each past lock replayed
--- with the run's code. A player forecast a row (backtest, GRADE_AHEAD
--- jornadas past each lock); error and calibration are queries over it.
-CREATE TABLE IF NOT EXISTS grade_forecast (
-    run_id    INTEGER NOT NULL REFERENCES runs(run_id),
-    from_j    INTEGER NOT NULL,    -- the lock forecast from
-    jornada   INTEGER NOT NULL,
-    player    TEXT NOT NULL,
-    predicted REAL NOT NULL,
-    actual    REAL NOT NULL,       -- 0 if he scored nothing
-    flagged   INTEGER NOT NULL,    -- injured, doubtful or suspended then
-    plays     REAL,                -- his chance of playing (NULL in runs graded before 2026-10-17)
-    PRIMARY KEY (run_id, from_j, jornada, player)
+-- grading, when run.py grade finds something new: each past lock forecast
+-- with the run's code (grading.backtest), the moment of it graded on each
+-- jornada done up to GRADE_AHEAD past the lock (forecast_cell keeps it
+-- while a grade points to it).
+CREATE TABLE IF NOT EXISTS grade_moment (
+    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
+    from_j  INTEGER NOT NULL,      -- the lock forecast from
+    jornada INTEGER NOT NULL,
+    moment  INTEGER NOT NULL REFERENCES forecast_moment(moment),
+    PRIMARY KEY (run_id, from_j, jornada)
 );
 
 -- The forecast (assemble.forecast), made once a moment and kept: every
@@ -333,6 +330,21 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
 -- what the 50 forecast highest then scored, and the same for the players
 -- flagged then. No window over the table: a run asked for (WHERE run_id)
 -- reads only its rows.
+-- A grade's forecasts, a player a row: what was expected of him at the
+-- lock (from_j) for a jornada, against what he scored (0 if nothing); his
+-- chance of playing (NULL in grades kept before 2026-10-17), and whether he
+-- was listed injured, doubtful or suspended then. Error and calibration
+-- are queries over it.
+DROP VIEW IF EXISTS grade_forecast;
+CREATE VIEW grade_forecast AS
+WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
+SELECT g.run_id, g.from_j, g.jornada, c.player, c.pts * c.p AS predicted, coalesce(a.pts, 0.0) AS actual,
+       coalesce(f.flagged, 0) AS flagged, CASE WHEN m.code <> 'graded before 2026-10-17' THEN c.p END AS plays
+FROM grade_moment g JOIN forecast_moment m ON m.moment = g.moment
+JOIN forecast_cell c ON c.moment = g.moment AND c.jornada = g.jornada
+LEFT JOIN forecast_player f ON f.moment = g.moment AND f.player = c.player
+LEFT JOIN pts a ON a.player = c.player AND a.jornada = g.jornada;
+
 DROP VIEW IF EXISTS grade_error;
 CREATE VIEW grade_error AS
 SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,

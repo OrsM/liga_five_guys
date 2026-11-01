@@ -14,19 +14,18 @@ from contextlib import closing
 
 from assemble import applied
 from ffcore.db import connect, named, record
-from ffcore.points import jornada_points
-from grading import GRADE_AHEAD, backtest, forecast_rows
+from grading import GRADE_AHEAD, backtest
 
 
 def graded(variant: str) -> int:
-    """The backtest under variant, recorded as a run of grade_forecast rows."""
+    """The backtest under variant, recorded as a run of grade_moment rows."""
     with closing(connect()) as db, db:
         run = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
                          " VALUES ('', '', ?, '', 1)", ("variant:" + variant,)).lastrowid
     assert run is not None
     with applied(variant):
-        fc = forecast_rows(backtest(GRADE_AHEAD), jornada_points())
-    record([{"run_id": run, **r} for r in fc], "grade_forecast")
+        fc = backtest(GRADE_AHEAD)
+    record([{"run_id": run, **r} for r in fc], "grade_moment")
     print("%s: run %d, %d forecasts" % (variant, run, len(fc)), flush=True)
     return run
 
