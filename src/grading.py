@@ -18,7 +18,6 @@ from ffcore.gain import Standings, standings
 from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
 from ffcore.pricing import RESALE_MARGIN
-from ffcore.rules import DEBT_SHARE
 
 from assemble import applied, forecast_key, kept_built, player_forecast, price_change, price_momentum, universe
 import decision
@@ -307,21 +306,14 @@ def acted(up: Universe, bids: dict[str, float], acts: list[Action]) -> tuple[Day
     set to the plan's, one the plan does not make taken back: the plan
     weighs every bid, yours in or not), and its sales made at once, or, with
     any bid placed, left for after the auctions (they pay for those bids or
-    make room for them: closed). The app refuses a bid that takes your bids
-    in past your cash and the debt it allows, 20% of your squad's value. And
-    the moves made."""
+    make room for them: closed). The plan's bids are within what the app
+    takes (decide.sql dec_next: your cash and the debt it allows). And the
+    moves made."""
     m = up.market
-    was, bids = {k: b for k, b in bids.items() if k in m.price}, {}
-    made, sales = [], []
-    for a in acts:
-        if a.sell:
-            sales.append(a)
-            continue
-        room = m.cash + DEBT_SHARE * sum(m.value.get(k, 0.0) for k in up.mine) - sum(bids.values())
-        if a.cost > room:
-            continue
-        bids[a.buy] = a.cost
-        made.append(a)
+    was = {k: b for k, b in bids.items() if k in m.price}
+    sales = [a for a in acts if a.sell]
+    made = [a for a in acts if not a.sell]
+    bids = {a.buy: a.cost for a in made if a.buy}
     if any(was.get(k) != b for k, b in bids.items()):
         return Day(dict(up.mine), m.cash, bids, tuple(sales)), made
     return Day(up.squad_after(*sales), m.left(sales), bids), made + sales
@@ -630,8 +622,6 @@ def _selftest_phantom() -> None:
         "a bid in that the plan does not make is taken back: it would win beside the plan's"
     assert acted(held, day.bids, [Action("withdraw", sell=("cand_free",), proceeds=5e6)])[0].bids == {}, \
         "withdrawn"
-    broke = with_squad(u, dict(u.mine), -1e6)
-    assert acted(broke, {}, [buy])[0].bids == {}, "5M of bids on -1M and 1M of allowed debt: the app refuses it"
     gone = replace(held, market=replace(held.market, price={}))
     assert acted(gone, day.bids, [])[0].bids == {}, "off the market: the bid is gone"
     won, sold, n = closed(held, day, {("cand_free", close): 4.9e6}, close)
