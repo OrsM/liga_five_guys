@@ -40,21 +40,27 @@ Everything else comes from the app's API and public pages.
    pages.
 2. **crosswalk** (`crosswalk.py`): the registry, lfg.db's `crosswalk` table,
    one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
-3. **sim** (`sim.py`, `decide.py`): builds the board the phone draws.
-4. **publish** (`publish.py`): the board to the phone, and its ping.
-5. **rivals**, **grade** (`grading.py`: each past lock replayed with this
-   code, one set kept a code version), **queries** (every saved query
-   timed), **health** (`health.py`). A failure from here on is noted and the
-   run goes on; before it, the run stops.
+3. **sim** (`sim.py`, `decision.py`, `ffcore/decide.sql`): the decision,
+   and what the board reads: the run's moves, the facts it saw (`sim_facts`,
+   `sim_waiting`), its forecast moment (`sim_runs.moment`).
+4. **publish** (`publish.py`): the board (`board_json`) to the phone, and its ping.
+5. **grade** (`grading.py`: each past lock forecast and decided again with
+   this code, one set kept a code version; the forecasts graded are the
+   lock moments, `grade_moment`, read through `grade_forecast`), **health**
+   (`health.py`). A failure from here on is noted and the run goes on;
+   before it, the run stops.
 
-Past cuts read their view answers back (`ffcore/kept.py`), so the live
-grade, variant backtests (`tools/analyses/variant_ahead.py`), replays and
-golden boards all share one cache keyed on what the answer depends on.
+One copy of each fact: what is fetched is ingest's tables; the forecast is
+`forecast_cell`, made once a moment (the forecast's code, its constants and
+the cut) and kept while a run or a grade points to it; a run records what
+it decided and what it read by reference. Everything else is a view.
+A past universe is built once and kept (`ffcore/kept.py`), so the live
+grade, the backtests, the replays and golden boards share it.
 
 ## The model
 
-Every forecast is the same product, for every player and jornada, and
-`python tools/ask.py forecast <player>` prints it factor by factor:
+Every forecast is the same product, for every player and jornada
+(`forecast_cell` keeps each factor):
 
     expected points = points per match x fixture x chance he is picked if fit x chance he is fit
 
@@ -74,26 +80,29 @@ Every forecast is the same product, for every player and jornada, and
   availability table, fitted from past prognoses: appearances under that
   prognosis over appearances when listed fit. The LaLiga app adds only who
   has left the league (out for good); its injury flags lag futbolfantasy's.
-- One table, `per_j[jornada][player] = (points, p)`, feeds the board and
-  the backtest.
+- One table, `forecast_cell` (points if he plays, the chance he plays, a
+  moment's every player and jornada left), feeds the board and every
+  backtest; `forecast_used` is it as used (no chance for a player who
+  arrives at a club after its match).
 - **Points history** (`ffcore/points.py`, `scored()`): each change in a player's points
   total, given to the latest match his club had played.
 - **Uncertainty** (`ffcore/forecast.py`): match-level points as the pool
   of real single-match scores, and one persistent per-player error
   (`PERSISTENT_SHARE`, measured by the backtest). A move's expected gain
-  and its chance of helping are worked out from them in SQL
-  (`ffcore/gain.py`, docs/notes/gain.md); the standings if nobody moves
-  are simulated (`ffcore/season.py`). A jornada under way keeps the elevens
-  that fielded it.
+  and its chance of helping, and the standings if nobody moves, are
+  worked out from them in SQL (`ffcore/gain.py`, docs/notes/gain.md). A
+  jornada under way keeps the elevens that fielded it.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one, h being the longest
   horizon the data can fit (a rise was still carrying there), not the
   lock: a buy pays its premium once and keeps rising after it. A bid's
-  chance of winning is read off the 60 past auctions of the players nearest
+  chance of winning is read off the 30 past auctions of the players nearest
   in price trend (schema.sql's `bid_odds`, from `auction_results`: what the
   winner paid, or asking if nobody bought): rising players draw rivals'
   bids, falling ones almost never. A buy bids the level whose chance times
-  what the move is then worth is greatest (`Universe.bid`).
+  what the move is then worth is greatest (decide.sql's `dec_options`).
+  A player's worth as money is his value once his trend has run
+  (`player_facts.ahead`).
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more
@@ -113,46 +122,32 @@ Every forecast is the same product, for every player and jornada, and
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.
-- **Moves** (`decide.py`): the `Universe` joins an `Outlook`
-  (`ffcore/outlook.py`: expected points and the best eleven, no money) to
-  a `Market` (`ffcore/market.py`: names, prices, values, your cash, bids
-  and debt, no points). A player comes from the market, at the bid it takes
-  to win the auction; never from a rival by his release clause (you do
-  not shoot first). Every
-  recommendation passes the same three steps, `decide.FUNNEL`, drawn in
-  `docs/funnel.mmd` (the design: `docs/notes/plan.md`):
-  1. **candidates**: every sale of yours, and every player on the market
-     you could get.
-  2. **rank**: each move alone against doing nothing: the points it adds
-     (with its money at `MONEY_RATE`), the chance it helps, what it adds to
-     your chance of first (`Move.d_first`), and per million it spends or
-     raises (`Move.per_million`). Shown on each line; not what the plan is
-     chosen by.
-  3. **plan**: one integer program (`decide.program`, HiGHS): which of
-     yours to keep, which buys to make, and the eleven each jornada to come
-     fields from the squad that leaves, so moves are valued as a set
-     against the slots (two forwards sold together cost more than each
-     alone). The game's money rule, cash at the lock at least zero (below
-     it you score nothing), is its one constraint; in debt, the sales that
-     clear it are among its moves. Objective: the elevens' expected points
-     and the moves' money at `MONEY_RATE`. What a million is worth now
-     (`Board.lam`, the headline) is the budget's price in the program's
-     linear relaxation: a move is worth making while its points a million
-     beat it.
+- **Moves** (`ffcore/decide.sql`, its maths at the top of the file): every
+  move in points. A buy is its chance of winning times the points it adds
+  to the best eleven of each jornada left, less the money over his value at
+  what a million is worth (`money_rate`: the slope of points a game on
+  value); a sale the points it costs plus the money it makes; a swap both,
+  on the squad they make together. The plan takes the best move worth more
+  than nothing, then again on the squad and cash it leaves, while the squad
+  fits, cash at the lock stays at zero or more and bids stay within cash
+  and the game's debt; in debt, the least bad sale until clear.
+  `decision.py` writes the universe's squad, market and forecast as its
+  inputs (`dec_*`) and reads the moves back. A player comes from the
+  market, at the bid it takes to win the auction; never from a rival by his
+  release clause (you do not shoot first). The `Universe` (`decide.py`)
+  joins an `Outlook` (`ffcore/outlook.py`: expected points and the best
+  eleven, no money) to a `Market` (`ffcore/market.py`: names, prices,
+  values, your cash and bids, no points).
 
-  `python tools/ask.py why <player>` says whether the plan makes his move
-  and, if not, what making it would cost the plan (the program with it
-  forced in), `ask.py whatif buy X sell Y` scores a move of your own the same way, and
-  `ask.py forecast <player>` prints his forecast factor by factor. The
-  board also lists your players a rival can take by clause now (`decide.at_risk`):
-  all of them, since a sale to the game pays at once and any rival can raise
-  a clause that way.
   Each line of the board is one row of `board_rows` (schema.sql), worded
   there once: the move, the step it takes in the app and its amount,
-  whether it is done, its points and the numbers that made it. They come
-  from what the run recorded (funnel, sim_facts, sim_waiting) through one
-  view for every buy the funnel ranked (`board_buys`) and one for every
-  player of yours (`board_mine`). The page lays rows out and decides nothing.
+  whether it is done, its points and the numbers that made it, and the
+  amounts it is accepted at (`accepts`, which act.py, the server and the
+  page read). They come from what the run recorded (`decision_option`,
+  `decision_plan`, `sim_facts`, `sim_waiting`). The board also lists your
+  players a rival can take by clause now (`board_clauses`): all of them,
+  since a sale to the game pays at once and any rival can raise a clause
+  that way. The page lays rows out and decides nothing.
 - **The ledger** (`ffcore/league.py`, `ledger`): the activity feed read
   once, each event keyed like every other table. Rival cash and the price
   paid (each owned player's last buy or transfer to his owner) are both
@@ -176,7 +171,7 @@ which move wins.
 
 - **Clauses are paid at once, with no approval, and the money goes to the
   owner.** The board never pays one; it lists your players a rival can
-  take now (`decide.at_risk`). The feed records any move between
+  take now (`board_clauses`). The feed records any move between
   two managers alike, clause or accepted offer ("transfer"); every raid
   in it paid exactly the clause the feed showed.
 - **A clause defaults to purchase price +50%, market value if higher, 1M
@@ -186,15 +181,15 @@ which move wins.
   feed gives each clause, and a raid pays exactly that.
 - **No protection after a transfer in this league.** The feed's
   `buyoutClauseLockedEndTime` is not one: Luismi Cruz was taken 6 days and
-  Yamal 13 days before it. Every clause counts as payable (`open_clauses`).
+  Yamal 13 days before it. Every clause counts as payable.
 - **Clause buys close before the matchday** (24h by default; 24–72h per
   league). Not modelled: ours paid one 9h before kickoff, and the app
   refuses a closed one anyway.
 - **A negative balance at the matchday's start scores 0 points; debt is
-  capped at 20% of team value.** Enforced by the plan (`decide.program`'s
-  one constraint, cash at the lock at least zero) and by the app (bids).
-  Not modelled for rivals: the simulated seasons ignore every manager's
-  cash, so a rival below zero at the lock still scores.
+  capped at 20% of team value.** Enforced by the plan (decide.sql's
+  `dec_next`: cash at the lock at least zero, bids within the debt) and by
+  the app (bids). Not modelled for rivals: the standings ignore every
+  manager's cash, so a rival below zero at the lock still scores.
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
   the board lists who is at risk, not what protecting them would cost.
 - **Blindaje:** one player per matchday is shielded from clauses for 24h
@@ -209,11 +204,10 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
 
 ## Checking it
 
-    python src/grading.py --backtest [--ahead H] [out.json]  # rebuild each past lock's forecast: rmse, bias, top-50,
-                                                  # persistence; with --ahead, also H jornadas on, flagged players apart
-    python src/grading.py --compare a.json b.json # two backtests, jornada by jornada
-    python src/grading.py --decisions             # each past lock's board, rebuilt: its moves' forecast vs what happened
-    python src/grading.py --prices                # price model walk-forward vs "no change"
+    python src/grading.py money                   # the backtest: a phantom deciding daily since the first lock,
+                                                  # points and money against standing still (LFG_VARIANT=name)
+    python src/grading.py variant NAME K=V ...    # a challenger's constants, for money and replay
+    python src/grading.py replay [JOBS]           # the forecast at every past line-up snapshot (view replayed)
     python src/grading.py resales                 # each past night's buys to resell vs what selling paid
     bash tools/selftests.sh                       # every module's self-test
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
@@ -222,7 +216,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
     python tools/uml.py docs                      # regenerate docs/*.mmd from the code
-    python tools/ask.py why|whatif|forecast ...   # questions, answered by the code that makes the board
+    python tools/q.py --time                      # every saved Datasette query, timed
 
 Run them with `PYTHONPATH=src FF_ROOT=<a copy of data>`; rehearse boards on a
 copy of `data/`, never the live one. A change goes in when the backtest
@@ -234,20 +228,24 @@ rather than reaching through them; ruff flags reads of private members.
 
 ## Layout
 
-    src/            run, ingest, sources, crosswalk, assemble, decide, sim,
-                    grading, stats
-    src/ffcore/     tidy (paths, CSVs, current/history: rows with their numbers
+    src/            run, ingest, sources, crosswalk, assemble, decide (Universe),
+                    decision (decide.sql's inputs and moves), sim, publish,
+                    grading, act, remind, health, stats
+    src/ffcore/     schema.sql (the views), decide.sql (the decision),
+                    tables.sql and identity.sql (what parse fills), db, kept,
+                    tidy (paths, current/history: rows with their numbers
                     parsed, per Table.numbers), clock (now, stamps),
-                    jornadas (locks), points (points history), players,
-                    rules (positions, formations, shortfall),
+                    jornadas (locks), points (points history),
+                    rules (positions, formations, the eleven, the debt),
                     names (Name, PlayerKey, AppId: who a player is),
                     source, futbolfantasy, footballdata, laliga_api, parse,
-                    text, auth, crosswalk, league, score, startprob, fixture,
-                    schedule, forecast, season, outlook, market, pricing,
-                    action, fixtures (test data)
+                    facts, text, auth, crosswalk, league, score, startprob,
+                    fixture, schedule, forecast, season, outlook, gain,
+                    market, pricing, action, fixtures (test data)
     inputs/         league.ini
     data/raw/       archived pages, append-only
-    data/tidy/      parse caches (lfg.db and everything in it is rebuilt from
-                    raw: the registry each run, last season from
-                    raw/season=<season>.tar.xz)
+    data/tidy/      parse caches (what parse fills is rebuilt from raw: the
+                    registry each run, last season from
+                    raw/season=<season>.tar.xz; runs, their decisions,
+                    forecasts and grades are records, kept)
     reports/        decisions.json, what the phone draws
