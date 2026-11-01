@@ -100,13 +100,13 @@ def _selftest() -> None:
             assert jornada_of_match() == {"b1": 1, "b2": 1, "m1": 2, "m2": 2, "m4": 4}
             assert rounds_ahead() == {1: utc(14, 19, 30), 2: utc(18, 17), 4: utc(30, 17)}, \
                 "jornada 2 by its match still to play"
-            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-30T1700Z",)]
+            assert rows("SELECT lock FROM next_lock") == [("2026-08-30T1700Z",)]
             set_now(utc(17, 20))
-            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-18T1700Z",)], \
-                "the rest of a jornada under way"
+            assert rows("SELECT lock FROM next_lock") == [("2026-08-30T1700Z",)], \
+                "the rest of a jornada under way locks nothing: the next jornada's lock"
             set_now(utc(22, 0))
             assert 3 in round_locks(), "set_now clears the cache"
-            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-23T1700Z",)], \
+            assert rows("SELECT lock FROM next_lock") == [("2026-08-23T1700Z",)], \
                 "jornada 3's lock comes before jornada 2's match put back"
             set_now(utc(24, 0))
             store_sql("market", [{"observed_at": "2026-08-23T0900Z", "ff_id": k, "club": c, "value": "1"}
@@ -131,7 +131,7 @@ def _selftest() -> None:
                 == [("early", j, 5.0, 0.8) for j in (3, 4, 5)] + [("late", 3, 5.0, 0.0), ("late", 4, 5.0, 0.0),
                                                                   ("late", 5, 5.0, 0.8)], \
                 "the forecast as the decision uses it: a late arrival plays none of a jornada he joins after"
-            assert rows("SELECT kick FROM next_kickoff") == [("2026-08-30T1700Z",)], \
+            assert rows("SELECT lock FROM next_lock") == [("2026-08-30T1700Z",)], \
                 "once jornada 3 locks, jornada 2's match put back locks nothing"
             assert rows("SELECT jornada, state FROM jornada_calendar ORDER BY jornada") == [
                 (1, "behind"), (2, "behind"), (3, "under way"), (4, "ahead")], \
@@ -145,7 +145,7 @@ def _selftest() -> None:
                  "score": "1-1", "kickoff": ""} for m, h, a in (("m2", "elche", "levante"),
                                                                 ("m5", "celta", "getafe"))])
             set_now(utc(31, 0))
-            assert rows("SELECT kick FROM next_kickoff") == [(None,)], "none left to play"
+            assert rows("SELECT lock FROM next_lock") == [(None,)], "none left to play"
             assert rows("SELECT jornada FROM jornadas_done") == [(2,)], \
                 "done: every match has a score (jornada 1 still has one to play, 3 and 4 theirs)"
         finally:

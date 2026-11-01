@@ -528,14 +528,19 @@ SELECT player, amount AS paid FROM (
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
--- When the next match kicks off after cut(): each player locks at his own
--- match's kickoff, of the jornada under way or one to come (jornada_calendar;
--- NULL once none is left to play).
+-- The lock: the next jornada to lock after cut(), at its first kickoff
+-- (round_locks), as a stamp and a julian day (t); NULL once none is left.
+-- One for everything: the board, the nights before it, the reminder. A
+-- jornada under way locks nothing the market's moves reach (bought tonight,
+-- a player plays none of what is left of it: late_arrivals).
 DROP VIEW IF EXISTS behind_jornadas;
 DROP VIEW IF EXISTS next_kickoff;
-CREATE VIEW next_kickoff AS
-SELECT min(k.kick) AS kick, min(k.t) AS t FROM kickoffs k JOIN jornada_calendar c USING (jornada)
-WHERE k.kick > (SELECT cut()) AND c.state IN ('under way', 'ahead');
+DROP VIEW IF EXISTS next_round_lock;
+DROP VIEW IF EXISTS next_lock;
+CREATE VIEW next_lock AS
+SELECT min(lock) AS lock,
+       julianday(substr(min(lock), 1, 10) || ' ' || substr(min(lock), 12, 2) || ':' || substr(min(lock), 14, 2)) AS t
+FROM round_locks WHERE lock > (SELECT cut());
 
 -- The players on the game's market who could not play a jornada's match
 -- for whoever buys them: his auction closes after his club's kickoff in it
@@ -571,14 +576,14 @@ CREATE VIEW forecast_used AS
 SELECT c.moment, c.player, c.jornada, c.pts, CASE WHEN l.player IS NULL THEN c.p ELSE 0.0 END AS p
 FROM forecast_cell c LEFT JOIN late_arrivals l ON l.player = c.player AND l.jornada = c.jornada;
 
--- The game's nightly offers still to come before the next match locks: one
+-- The game's nightly offers still to come before the lock (next_lock): one
 -- as each standing offer expires, then one a day (0 with none standing),
 -- and when the first of them comes (first, a julian day).
 DROP VIEW IF EXISTS nights_left;
 CREATE VIEW nights_left AS
 WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_offers
            WHERE status = 'pending' AND expires_at <> ''),
-l AS (SELECT t AS lock FROM next_kickoff)
+l AS (SELECT t AS lock FROM next_lock)
 SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights,
        ends AS first
 FROM e, l;
@@ -594,13 +599,13 @@ WHERE player IS NOT NULL AND seller = 'marketPlayerTeam' AND expires_at <> ''
 GROUP BY player;
 
 -- The nights the game will offer for a player bought at tonight's auctions
--- before the next match locks: one a day after the auctions close (0 with
+-- before the lock (next_lock): one a day after the auctions close (0 with
 -- none open).
 DROP VIEW IF EXISTS resale_nights;
 CREATE VIEW resale_nights AS
 WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_market
            WHERE seller = 'marketPlayerLeague' AND coalesce(expires_at, '') <> ''),
-l AS (SELECT t AS lock FROM next_kickoff)
+l AS (SELECT t AS lock FROM next_lock)
 SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) ELSE 0 END AS nights
 FROM e, l;
 
@@ -1546,7 +1551,7 @@ SELECT b.cash - (SELECT total(net) FROM board_plan) AS left,
 FROM board_league b WHERE b.me;
 
 -- Players on the game's market worth buying tonight to sell before the
--- next match locks, of those the plan does not buy: what selling him on
+-- lock (next_lock), of those the plan does not buy: what selling him on
 -- gets (board_buys.resale) over the bid it takes (or yours, if it is in),
 -- when that beats the bid by RESALE_MARGIN, most profit first. Each is
 -- taken if, with those taken before it, the bids stay within your cash
@@ -1687,7 +1692,7 @@ SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name,
 FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM pulled UNION ALL SELECT * FROM sells
       UNION ALL SELECT * FROM unlisted UNION ALL SELECT * FROM relist);
 
--- The board's headline: when the next match locks, your money, where you
+-- The board's headline: when the next jornada locks (next_lock), your money, where you
 -- are expected to finish and your chance of first, your season's points
 -- band, what a million is worth, what the plan leaves you, what more you could bid after
 -- it and your bids it does not make (into the debt the game allows, to
@@ -1695,7 +1700,7 @@ FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM p
 DROP VIEW IF EXISTS board_head;
 CREATE VIEW board_head AS
 WITH me AS (SELECT * FROM board_league WHERE me),
-lock AS (SELECT kick FROM next_kickoff)
+lock AS (SELECT lock AS kick FROM next_lock)
 SELECT (SELECT run_id FROM board_run) AS run_id,
        substr(cut(), 1, 13) || ':' || substr(cut(), 14) AS generated_at,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
@@ -1759,10 +1764,6 @@ SELECT json_object(
                       'p_above', p_above) ORDER BY ord) FROM board_league)) AS json
 FROM board_head h;
 
--- The next jornada to lock after cut(): its first kickoff (round_locks).
-DROP VIEW IF EXISTS next_round_lock;
-CREATE VIEW next_round_lock AS SELECT min(lock) AS lock FROM round_locks WHERE lock > (SELECT cut());
-
 -- A run to remind you of your line-up is due once the next jornada's lock is
 -- within REMIND_HOURS, and only once: not if a run was asked for it
 -- (trigger 'reminder', as_of the window's opening or later).
@@ -1772,7 +1773,7 @@ WITH w AS (
     SELECT lock, strftime('%Y-%m-%dT%H%MZ', datetime(
                substr(lock, 1, 10) || ' ' || substr(lock, 12, 2) || ':' || substr(lock, 14, 2),
                '-' || (SELECT remind_hours FROM k) || ' hours')) AS opens
-    FROM next_round_lock WHERE lock IS NOT NULL)
+    FROM next_lock WHERE lock IS NOT NULL)
 SELECT lock FROM w
 WHERE opens <= (SELECT cut())
   AND NOT EXISTS (SELECT 1 FROM runs WHERE trigger = 'reminder' AND as_of >= w.opens);
@@ -1788,7 +1789,7 @@ outs AS (SELECT group_concat(name, ', ' ORDER BY i) AS names FROM g WHERE side =
 left AS (SELECT CAST(round((
              julianday(substr(lock, 1, 10) || 'T' || substr(lock, 12, 2) || ':' || substr(lock, 14, 2) || 'Z')
              - julianday(substr(cut(), 1, 10) || 'T' || substr(cut(), 12, 2) || ':' || substr(cut(), 14, 2) || 'Z')
-         ) * 1440) AS INTEGER) AS minutes FROM next_round_lock)
+         ) * 1440) AS INTEGER) AS minutes FROM next_lock)
 SELECT CASE WHEN (SELECT max(legal) FROM g)
             THEN 'Change your line-up: field ' || ins.names || ' for ' || outs.names
             ELSE 'Set your line-up: ' || ins.names END

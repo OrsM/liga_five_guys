@@ -237,7 +237,7 @@ def resales() -> list[dict[str, Any]]:
     'resale' and 'flat') at the bid worth most in money (bid_odds: its
     chance times the resale over it), as the views priced them ten minutes before that
     night's auctions closed, set against what selling then paid: his last
-    value before the next match locked, at the offer share (recent_offers)
+    value before the next jornada locked, at the offer share (recent_offers)
     the view used. Every player on the game's market, not only those taken,
     so the bar can be read off it."""
     picks: list[dict[str, Any]] = []
@@ -249,7 +249,7 @@ def resales() -> list[dict[str, Any]]:
                 "SELECT f.player, f.price * coalesce((SELECT o.ratio FROM bid_odds o WHERE o.player = f.player"
                 " ORDER BY o.p_win * (r.later - f.price * o.ratio) DESC, o.ratio LIMIT 1), 1.0) AS cost,"
                 " r.later AS resale,"
-                " l.later AS flat, (SELECT kick FROM next_kickoff) AS lock,"
+                " l.later AS flat, (SELECT lock FROM next_lock) AS lock,"
                 " (SELECT nights FROM resale_nights) AS nights,"
                 " (SELECT avg(ratio) FROM recent_offers) AS ratio"
                 " FROM player_facts f JOIN waiting r ON r.player = f.player AND r.kind = 'resale'"
