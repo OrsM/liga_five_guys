@@ -17,7 +17,6 @@ from ffcore.forecast import expected_points
 from ffcore.gain import Standings, standings
 from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
-from ffcore.pricing import RESALE_MARGIN
 
 from assemble import applied, forecast_key, kept_built, player_forecast, price_change, price_momentum, universe
 import decision
@@ -25,7 +24,7 @@ from decide import Action, Universe
 from sim import with_squad
 from ffcore.clock import set_now, snapshot_stamp, stamp
 from ffcore.db import connect, query, record, rows, this_run
-__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "resales", "superseded", "view_table",
+__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "superseded", "view_table",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -232,42 +231,6 @@ def decisions() -> list[dict[str, Any]]:
     return out
 
 
-def resales() -> list[dict[str, Any]]:
-    """Every past night's buys to resell (schema.sql's waiting, kinds
-    'resale' and 'flat') at the bid worth most in money (bid_odds: its
-    chance times the resale over it), as the views priced them ten minutes before that
-    night's auctions closed, set against what selling then paid: his last
-    value before the next jornada locked, at the offer share (recent_offers)
-    the view used. Every player on the game's market, not only those taken,
-    so the bar can be read off it."""
-    picks: list[dict[str, Any]] = []
-    try:
-        for close in auction_closes():
-            c = close.isoformat()
-            set_now(close - dt.timedelta(minutes=10))
-            cols, got = query(
-                "SELECT f.player, f.price * coalesce((SELECT o.ratio FROM bid_odds o WHERE o.player = f.player"
-                " ORDER BY o.p_win * (r.later - f.price * o.ratio) DESC, o.ratio LIMIT 1), 1.0) AS cost,"
-                " r.later AS resale,"
-                " l.later AS flat, (SELECT lock FROM next_lock) AS lock,"
-                " (SELECT nights FROM resale_nights) AS nights,"
-                " (SELECT avg(ratio) FROM recent_offers) AS ratio"
-                " FROM player_facts f JOIN waiting r ON r.player = f.player AND r.kind = 'resale'"
-                " JOIN waiting l ON l.player = f.player AND l.kind = 'flat'")
-            picks += [{"close": c, **dict(zip(cols, r))} for r in got]
-    finally:
-        set_now(None)
-    out = []
-    for pk in picks:
-        if not pk["nights"]:
-            continue
-        last = rows("SELECT value FROM price_obs WHERE ff_id = ? AND observed_at < ?"
-                    " ORDER BY observed_at DESC LIMIT 1", (pk["player"], pk["lock"]))
-        if last:
-            out.append({**pk, "real": pk["ratio"] * last[0][0]})
-    return out
-
-
 def auction_bars() -> dict[tuple[str, dt.datetime], float | None]:
     """What a bid had to reach at each past close for each player listed
     then, keyed by player and close (auction_results' bar, in money; None:
@@ -301,22 +264,21 @@ class Day(NamedTuple):
     pending: tuple[Action, ...] = ()
 
 
-def acted(up: Universe, bids: dict[str, float], acts: list[Action]) -> tuple[Day, list[Action]]:
+def acted(up: Universe, bids: dict[str, float], acts: list[Action],
+          later: frozenset[str] = frozenset()) -> tuple[Day, list[Action]]:
     """A run's plan, made: its buys bid at its amounts (a bid already in
     set to the plan's, one the plan does not make taken back: the plan
-    weighs every bid, yours in or not), and its sales made at once, or, with
-    any bid placed, left for after the auctions (they pay for those bids or
-    make room for them: closed). The plan's bids are within what the app
-    takes (decide.sql dec_next: your cash and the debt it allows). And the
-    moves made."""
-    m = up.market
-    was = {k: b for k, b in bids.items() if k in m.price}
+    weighs every bid, yours in or not), and its sales made at once, but
+    those of players in later (the plan's to make after the auctions,
+    decision.after_auctions), left for after them (closed). The plan's bids
+    are within what the app takes (decide.sql dec_next: your cash and the
+    debt it allows). And the moves made."""
     sales = [a for a in acts if a.sell]
     made = [a for a in acts if not a.sell]
     bids = {a.buy: a.cost for a in made if a.buy}
-    if any(was.get(k) != b for k, b in bids.items()):
-        return Day(dict(up.mine), m.cash, bids, tuple(sales)), made
-    return Day(up.squad_after(*sales), m.left(sales), bids), made + sales
+    now = [a for a in sales if not set(a.sell) & later]
+    return (Day(up.squad_after(*now), up.market.left(now), bids, tuple(a for a in sales if a not in now)),
+            made + now)
 
 
 def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | None],
@@ -401,7 +363,7 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
             if t in runs or not daily:
                 acts = decision.plan(up)
                 if daily:
-                    (squad, cash, bids, pending), acts = acted(up, bids, acts)
+                    (squad, cash, bids, pending), acts = acted(up, bids, acts, decision.after_auctions())
                     up = with_squad(u, squad, cash, bids)
                 else:
                     squad, cash = up.squad_after(*acts), up.market.left(acts)
@@ -603,21 +565,18 @@ def _selftest_phantom() -> None:
     assert run_times([close]) == {close.replace(hour=21, minute=45): close}, "the evening's run, before the close"
     u = with_squad(tiny_market_universe(), dict(tiny_market_universe().mine), 5.5e6)
     buy, sale = Action("buy", buy="cand_free", cost=5e6), Action("sell", sell=("bench_m",), proceeds=3e6)
-    day, made = acted(u, {}, [buy, sale])
+    day, made = acted(u, {}, [buy, sale], frozenset({"bench_m"}))
     assert (day.bids, day.cash, "bench_m" in day.squad, day.pending, made) \
         == ({"cand_free": 5e6}, 5.5e6, True, (sale,), [buy]), \
         "a buy is a bid in, paid only if it wins; the sale beside it waits for the auction"
     alone, made = acted(u, {}, [sale])
     assert (alone.cash, "bench_m" in alone.squad, alone.pending, made) == (8.5e6, False, (), [sale]), \
-        "a sale with no bid placed is made at once"
+        "a sale the plan makes at once"
     held = with_squad(u, day.squad, day.cash, day.bids)
     assert held.market.my_bid == {"cand_free": 5e6}, "the next run sees it as your bid in"
-    again, made = acted(held, day.bids, [Action("buy", buy="cand_free", cost=6e6), sale])
+    again, made = acted(held, day.bids, [Action("buy", buy="cand_free", cost=6e6), sale], frozenset({"bench_m"}))
     assert (again.bids, again.pending) == ({"cand_free": 6e6}, (sale,)), \
-        "a bid already in, raised to the plan's amount: a bid to win again, the sale beside it waits for it"
-    same, made = acted(held, day.bids, [Action("buy", buy="cand_free", cost=5e6), sale])
-    assert (same.bids, same.pending, made[-1:]) == ({"cand_free": 5e6}, (), [sale]), \
-        "the plan keeps your bid as it is: no bid placed, the sale is made"
+        "a bid already in, raised to the plan's amount: the sale beside it waits for it"
     assert acted(held, day.bids, [sale])[0].bids == {}, \
         "a bid in that the plan does not make is taken back: it would win beside the plan's"
     assert acted(held, day.bids, [Action("withdraw", sell=("cand_free",), proceeds=5e6)])[0].bids == {}, \
@@ -803,20 +762,5 @@ if __name__ == "__main__":
         # Out without freeing the universes one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
-    if sys.argv[1:2] == ["resales"]:
-        # resales: each past night's buys to resell, forecast against what selling paid
-        got = resales()
-        print("%d priced, over %d nights" % (len(got), len({g["close"] for g in got})))
-        for name, keep in (("every player", lambda g: True),
-                           ("forecast profit", lambda g: g["resale"] > g["cost"]),
-                           ("over the margin", lambda g: g["resale"] >= g["cost"] * (1 + RESALE_MARGIN))):
-            sel = [g for g in got if keep(g)]
-            if sel:
-                pnl = sorted(g["real"] - g["cost"] for g in sel)
-                print("%-17s %4d  forecast %+6.0fk  real median %+6.0fk mean %+6.0fk  made money %3.0f%%" % (
-                    name, len(sel), sum(g["resale"] - g["cost"] for g in sel) / len(sel) / 1e3,
-                    pnl[len(pnl) // 2] / 1e3, sum(pnl) / len(pnl) / 1e3,
-                    100 * sum(x > 0 for x in pnl) / len(pnl)))
-        raise SystemExit(0)
-    print("grading.py --selftest | money (LFG_VARIANT=name) | resales | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

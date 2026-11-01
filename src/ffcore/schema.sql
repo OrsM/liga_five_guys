@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS decision_plan (
     amount REAL NOT NULL,
     win    REAL NOT NULL,
     worth  REAL NOT NULL,            -- the step's, in points
+    after  INTEGER NOT NULL DEFAULT 0, -- a sale made after the auctions (decide.sql dec_when)
     PRIMARY KEY (run_id, step, kind)
 );
 
@@ -141,7 +142,7 @@ CREATE TABLE IF NOT EXISTS sim_facts (
 );
 
 -- What waiting to sell was worth as the run saw it (waiting as of its cut),
--- a row a player and kind: the board's buys to resell read it.
+-- a row a player of yours with an offer standing (kind 'sale'): the board's sales read it.
 CREATE TABLE IF NOT EXISTS sim_waiting (
     run_id INTEGER NOT NULL REFERENCES runs(run_id),
     player TEXT NOT NULL,
@@ -598,41 +599,25 @@ FROM current_api_market
 WHERE player IS NOT NULL AND seller = 'marketPlayerTeam' AND expires_at <> ''
 GROUP BY player;
 
--- The nights the game will offer for a player bought at tonight's auctions
--- before the lock (next_lock): one a day after the auctions close (0 with
--- none open).
 DROP VIEW IF EXISTS resale_nights;
-CREATE VIEW resale_nights AS
-WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM current_api_market
-           WHERE seller = 'marketPlayerLeague' AND coalesce(expires_at, '') <> ''),
-l AS (SELECT t AS lock FROM next_lock)
-SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) ELSE 0 END AS nights
-FROM e, l;
 
--- What waiting to sell is worth, over the nights before the next match
--- locks: each night's offer to come taken only when it beats waiting on
--- (the last before the lock always). An offer to come is a past one's
--- share of value (recent_offers) of the value he will
--- have that night: his value moved by his trend, the share carry says is
--- made by then (price_carry). For a player of yours with an offer standing
--- (kind 'sale', nights_left), and for one on the game's market bought
--- tonight and sold before the lock (kind 'resale', resale_nights; 'flat',
--- the same with his value standing still). NULL without a value or past offers.
+-- What waiting to sell a player of yours with an offer standing is worth,
+-- over the nights before the lock (next_lock, nights_left): each night's
+-- offer to come taken only when it beats waiting on (the last before the
+-- lock always). An offer to come is a past one's share of value
+-- (recent_offers) of the value he will have that night: his value moved by
+-- his trend, the share carry says is made by then (price_carry). NULL
+-- without a value or past offers.
 DROP VIEW IF EXISTS waiting;
 CREATE VIEW waiting AS
 WITH RECURSIVE
 r AS MATERIALIZED (SELECT ratio FROM recent_offers),
 c AS MATERIALIZED (SELECT h, carry FROM price_carry),
-f AS MATERIALIZED (SELECT player, value, trend, offer, route, owner, price FROM player_facts),
+f AS MATERIALIZED (SELECT player, value, trend, offer FROM player_facts),
 s AS MATERIALIZED (
     SELECT player, 'sale' AS kind, value, coalesce(trend, 0.0) AS trend,
            (SELECT nights FROM nights_left) AS nights
-    FROM f WHERE offer IS NOT NULL
-  UNION ALL
-    SELECT player, kind, value, CASE kind WHEN 'flat' THEN 0.0 ELSE coalesce(trend, 0.0) END,
-           (SELECT nights FROM resale_nights)
-    FROM f, (SELECT 'resale' AS kind UNION ALL SELECT 'flat')
-    WHERE route = 'free' AND owner IS NULL AND price IS NOT NULL),
+    FROM f WHERE offer IS NOT NULL),
 w(player, kind, night, later) AS (
     SELECT player, kind, nights, 0.0 FROM s
     WHERE value IS NOT NULL AND EXISTS (SELECT 1 FROM r)
@@ -778,7 +763,6 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'PRICE_W1' AND variant = (SELECT variant())) AS price_w1,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W2' AND variant = (SELECT variant())) AS price_w2,
     (SELECT value FROM model_constants WHERE name = 'DEBT_SHARE' AND variant = (SELECT variant())) AS debt_share,
-    (SELECT value FROM model_constants WHERE name = 'RESALE_MARGIN' AND variant = (SELECT variant())) AS resale_margin,
     (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
     (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
     (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
@@ -1414,20 +1398,15 @@ FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN sim_facts f USING (ru
 -- market you could get), with what the run saw of him: what he is listed at
 -- (asking), the bid (the plan's, or the lowest his odds offer) and its
 -- chance of winning (win), your bid if it is in, what you pay (cost), his
--- value and trend, his points and money alone, whether the plan buys him,
--- and what selling him on before the lock would get (sim_waiting: resale,
--- and flat, his value standing still).
+-- value and trend, his points and money alone, and whether the plan buys him.
 DROP VIEW IF EXISTS board_market;
 DROP VIEW IF EXISTS board_buys;
 CREATE VIEW board_buys AS
 SELECT o.player, coalesce(s.name, o.player) AS name, coalesce(s.pos, '') AS pos,
        coalesce(s.price, o.amount) AS asking, o.amount AS bid, s.my_bid, o.amount AS cost,
-       s.value, s.trend, o.gain, o.money, o.worth, o.in_plan, o.win,
-       r.later AS resale, l.later AS flat
+       s.value, s.trend, o.gain, o.money, o.worth, o.in_plan, o.win
 FROM decision_option o JOIN board_run USING (run_id)
 LEFT JOIN sim_facts s ON s.run_id = o.run_id AND s.player = o.player
-LEFT JOIN sim_waiting r ON r.run_id = o.run_id AND r.player = o.player AND r.kind = 'resale'
-LEFT JOIN sim_waiting l ON l.run_id = o.run_id AND l.player = o.player AND l.kind = 'flat'
 WHERE o.kind = 'buy';
 
 -- Each of your players: his facts (board_players), whether he is listed,
@@ -1437,42 +1416,25 @@ WHERE o.kind = 'buy';
 -- him, and what turning the offer down is worth (waiting: the best of the
 -- game's offers still to come before the lock, sim_waiting).
 -- relist_after: when his listing ends, if before the last of those offers.
--- A sale the plan makes that is worth nothing alone pays only with the
--- plan's buys at auction (with_bids: their names and the chance all are
--- won, bids_p). They close as the next offer comes, so if one comes before
--- the lock the sale can wait for them; wait_bids is what waiting is worth
--- in points against taking tonight's offer: if won, the money waiting
--- loses (at the run's lam), if lost, the sale not made.
 DROP VIEW IF EXISTS board_holdings;
 DROP VIEW IF EXISTS board_offers;
 DROP VIEW IF EXISTS board_mine;
 CREATE VIEW board_mine AS
 WITH r AS (SELECT ratio FROM recent_offers),
-n AS (SELECT nights, first FROM nights_left),
-bids AS (SELECT exp(total(ln(max(p.win, 1e-9)))) AS p, count(*) AS n,
-                group_concat(coalesce(s.name, p.player), ', ' ORDER BY p.ord) AS names
-         FROM board_plan p JOIN board_run x
-         LEFT JOIN sim_facts s ON s.run_id = x.run_id AND s.player = p.player
-         WHERE p.kind = 'buy' AND p.win < 1),
-m AS (SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.takes,
-             b.route IS 'listed' AS listed,
-             CASE WHEN b.offer IS NOT NULL AND b.value > 0
-                  THEN (SELECT avg(r.ratio < b.offer / b.value) FROM r) END AS beats,
-             f.gain, f.money, f.worth, coalesce(f.in_plan, 0) AS sell,
-             w.later AS waiting,
-             CASE WHEN b.route IS 'listed' AND l.t < n.first + n.nights - 1 THEN l.ends END AS relist_after,
-             coalesce(f.in_plan AND f.worth <= 0 AND bids.n > 0, 0) AS with_bids,
-             bids.p AS bids_p, bids.names AS bids_names, n.nights
-      FROM board_players b JOIN board_run USING (run_id) CROSS JOIN n CROSS JOIN bids
-      LEFT JOIN decision_option f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.player = b.player
-      LEFT JOIN sim_waiting w ON w.run_id = b.run_id AND w.player = b.player AND w.kind = 'sale'
-      LEFT JOIN listing_ends l ON l.player = b.player
-      WHERE b.mine)
-SELECT m.*,
-       CASE WHEN with_bids AND nights > 0 AND offer IS NOT NULL
-            THEN bids_p * -(SELECT lam FROM sim_runs JOIN board_run USING (run_id)) * (offer - coalesce(waiting, 0.0)) / 1e6
-                 + (1 - bids_p) * -worth END AS wait_bids
-FROM m;
+n AS (SELECT nights, first FROM nights_left)
+SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.takes,
+       b.route IS 'listed' AS listed,
+       CASE WHEN b.offer IS NOT NULL AND b.value > 0
+            THEN (SELECT avg(r.ratio < b.offer / b.value) FROM r) END AS beats,
+       f.gain, f.money, f.worth, coalesce(f.in_plan, 0) AS sell,
+       w.later AS waiting,
+       CASE WHEN b.route IS 'listed' AND l.t < n.first + n.nights - 1 THEN l.ends END AS relist_after,
+       n.nights
+FROM board_players b JOIN board_run USING (run_id) CROSS JOIN n
+LEFT JOIN decision_option f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.player = b.player
+LEFT JOIN sim_waiting w ON w.run_id = b.run_id AND w.player = b.player AND w.kind = 'sale'
+LEFT JOIN listing_ends l ON l.player = b.player
+WHERE b.mine;
 
 -- Your players a rival can take now by paying their clause (any can: a sale
 -- to the game pays at once, so cash is no limit), most valuable first.
@@ -1534,7 +1496,7 @@ WHERE l.ok AND f.player NOT IN (SELECT player FROM board_eleven);
 DROP VIEW IF EXISTS board_plan;
 CREATE VIEW board_plan AS
 SELECT row_number() OVER (ORDER BY p.step, p.kind) - 1 AS ord, p.step, p.kind, p.player, p.amount,
-       CASE p.kind WHEN 'buy' THEN p.amount ELSE -p.amount END AS net, p.win, p.worth
+       CASE p.kind WHEN 'buy' THEN p.amount ELSE -p.amount END AS net, p.win, p.worth, p.after
 FROM decision_plan p JOIN board_run USING (run_id);
 
 -- Your cash once the plan is made, how far below zero the game lets
@@ -1550,33 +1512,7 @@ SELECT b.cash - (SELECT total(net) FROM board_plan) AS left,
         WHERE f.my_bid > 0 AND f.player NOT IN (SELECT player FROM board_plan WHERE kind = 'buy')) AS held
 FROM board_league b WHERE b.me;
 
--- Players on the game's market worth buying tonight to sell before the
--- lock (next_lock), of those the plan does not buy: what selling him on
--- gets (board_buys.resale) over the bid it takes (or yours, if it is in),
--- when that beats the bid by RESALE_MARGIN, most profit first. Each is
--- taken if, with those taken before it, the bids stay within your cash
--- after the plan plus the debt the game allows, less your bids in on
--- players neither the plan nor this list buys, and, every price standing
--- still (flat), the sales would still leave you at least zero at the lock.
 DROP VIEW IF EXISTS board_resale;
-CREATE VIEW board_resale AS
-WITH pick AS MATERIALIZED (
-    SELECT b.*, b.resale - b.cost AS profit FROM board_buys b
-    WHERE NOT b.in_plan AND b.resale >= b.cost * (1 + (SELECT resale_margin FROM k))),
-ranked AS MATERIALIZED (
-    SELECT p.*, row_number() OVER (ORDER BY p.profit DESC, p.player) AS n,
-           m.left + m.debt - m.held + (SELECT total(my_bid) FROM pick) AS can_spend, m.left AS can_lose
-    FROM pick p, board_money m),
-took(n, spent, lost, taken) AS (
-    SELECT 0, 0.0, 0.0, 0
-  UNION ALL
-    SELECT r.n,
-           t.spent + iif(t.spent + r.cost <= r.can_spend AND t.lost + r.cost - r.flat <= r.can_lose, r.cost, 0),
-           t.lost + iif(t.spent + r.cost <= r.can_spend AND t.lost + r.cost - r.flat <= r.can_lose, r.cost - r.flat, 0),
-           t.spent + r.cost <= r.can_spend AND t.lost + r.cost - r.flat <= r.can_lose
-    FROM took t JOIN ranked r ON r.n = t.n + 1)
-SELECT row_number() OVER (ORDER BY n) - 1 AS ord, player, profit
-FROM ranked JOIN took USING (n) WHERE taken;
 
 -- Every line of the board, each once: what to do now, each with the step
 -- it takes in the app and the amount that step names, whether it is done,
@@ -1587,11 +1523,10 @@ FROM ranked JOIN took USING (n) WHERE taken;
 --   bid up to the plan's bid, yours shown if it is another, or yours is
 --   in at it); each bid of yours the plan does not make, to withdraw (it
 --   would win beside the plan's: the plan weighs every bid, yours or not);
---   (a sale: take tonight's offer, or
---   wait for what waiting is worth, or sell after the auctions when it pays
---   only with the plan's buys and waiting for them is worth more
---   (board_mine.wait_bids), or it is listed, or list it); the buys to
---   resell (board_resale); your players not listed, rising first: the game
+--   (a sale: after the auctions when the plan bids (dec_when: once you
+--   know they are won, to the game at his value), else take tonight's
+--   offer, or wait for what waiting is worth, or it is listed, or list
+--   it); your players not listed, rising first: the game
 --   offers only for those listed, listing costs nothing and a listed player
 --   still plays for you; and those whose listing ends before the last
 --   offer before the lock, to relist once it does.
@@ -1616,10 +1551,9 @@ field AS (
     FROM legal
     WHERE EXISTS (SELECT 1 FROM ins) OR EXISTS (SELECT 1 FROM outs)),
 buys AS (
-    SELECT coalesce(p.ord, 1000 + r.ord), CASE WHEN r.player IS NULL THEN 'buy' ELSE 'resale' END,
-           CASE WHEN r.player IS NULL THEN 'buy ' ELSE 'buy to resell ' END || b.name, b.name, b.pos,
+    SELECT p.ord, 'buy', 'buy ' || b.name, b.name, b.pos,
            CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END, b.cost, coalesce(b.my_bid = b.cost, 0),
-           CASE WHEN r.player IS NULL THEN b.worth END, 'season',
+           b.worth, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
                 UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
@@ -1630,24 +1564,21 @@ buys AS (
                     FROM (SELECT CAST(max(m.bids) AS INTEGER) AS bids FROM current_api_market m
                           WHERE m.player = b.player AND m.bids <> '') n WHERE n.bids IS NOT NULL
                 UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
-                UNION ALL SELECT 1, 'sell before the lock for', b.resale, 'money' WHERE r.player IS NOT NULL
-                UNION ALL SELECT 2, 'profit', r.profit, 'money'
-                UNION ALL SELECT 3, 'points', b.gain, 'points' WHERE r.player IS NULL
-                UNION ALL SELECT 3.5, 'money', b.money, 'points' WHERE r.player IS NULL
+                UNION ALL SELECT 3, 'points', b.gain, 'points'
+                UNION ALL SELECT 3.5, 'money', b.money, 'points'
                 UNION ALL SELECT 4, '', b.trend, 'trend')
             WHERE v IS NOT NULL),
            json_array(b.player)
-    FROM board_buys b LEFT JOIN board_plan p ON p.kind = 'buy' AND p.player = b.player
-    LEFT JOIN board_resale r USING (player)
-    WHERE b.in_plan OR r.player IS NOT NULL),
+    FROM board_buys b JOIN board_plan p ON p.kind = 'buy' AND p.player = b.player
+    WHERE b.in_plan),
 sells AS (
     SELECT p.ord, 'sell',
            'sell ' || s.name, s.name, s.pos,
-           CASE WHEN s.takes AND s.wait_bids > 0 THEN 'sell after the auctions'
+           CASE WHEN p.after THEN 'sell after the auctions'
                 WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait'
                 WHEN s.listed THEN 'listed' ELSE 'list' END,
-           CASE WHEN s.takes AND s.wait_bids > 0 THEN s.waiting WHEN s.offer IS NOT NULL THEN s.raises END,
-           s.listed AND (NOT s.takes OR coalesce(s.wait_bids > 0, 0)), s.worth, 'season',
+           CASE WHEN p.after THEN s.value WHEN s.offer IS NOT NULL THEN s.raises END,
+           s.listed AND NOT s.takes AND NOT p.after, s.worth, 'season',
            (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
                 SELECT 0 AS n, 'value' AS l, s.value AS v, 'money' AS u
                 UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
@@ -1656,9 +1587,6 @@ sells AS (
                     WHERE s.offer IS NOT NULL AND s.nights > 0
                 UNION ALL SELECT 2.4, 'more offers before the lock', s.nights, 'count'
                     WHERE s.offer IS NOT NULL
-                UNION ALL SELECT 2.6, 'only pays if you win', s.bids_names, 'names' WHERE s.with_bids
-                UNION ALL SELECT 2.7, 'chance of winning them', round(s.bids_p, 3), 'chance' WHERE s.with_bids
-                UNION ALL SELECT 2.8, 'waiting for them', s.wait_bids, 'points' WHERE s.takes
                 UNION ALL SELECT 3, 'points', s.gain, 'points'
                 UNION ALL SELECT 3.5, 'money', s.money, 'points'
                 UNION ALL SELECT 4, '', s.trend, 'trend')

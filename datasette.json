@@ -45,7 +45,7 @@
         },
         "market": {
           "title": "The market as the latest run valued it: every player on sale whose purchase gains you season points, the bid, its chance, his points and money alone, whether the plan buys him",
-          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m, round(win, 2) AS win,\n       round(gain, 1) AS season_points, round(money, 1) AS money_pts, round(worth, 1) AS worth, in_plan AS plan,\n       round(trend, 1) AS trend_pct, round(resale / 1e6, 2) AS resale_m\nFROM board_buys WHERE gain > 0 ORDER BY worth DESC"
+          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m, round(win, 2) AS win,\n       round(gain, 1) AS season_points, round(money, 1) AS money_pts, round(worth, 1) AS worth, in_plan AS plan,\n       round(trend, 1) AS trend_pct\nFROM board_buys WHERE gain > 0 ORDER BY worth DESC"
         },
         "forecast": {
           "title": "A player's forecast, factor by factor (latest run)",

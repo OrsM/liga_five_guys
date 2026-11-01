@@ -109,16 +109,12 @@ Every forecast is the same product, for every player and jornada
   (`Market.fetches`; schema.sql's `waiting`: each later night's offer, at
   his value then (`price_carry`), taken when it beats waiting on, the last
   before the lock always); with no offer yet, his value.
-- **Buys to resell** (`board_resale`): a player on the game's market bought
-  at tonight's auctions and sold before the next lock, priced by the same
-  `waiting` over the nights left after the auctions close. Shown, after the
-  plan's moves, when the sale beats the bid by `RESALE_MARGIN` (5%: past
-  nights' picks over it made money 76% of the time, those under it lost on
-  average; `grading.py resales`), most profit first, each while the bids
-  stay within cash after the plan plus the game's 20% debt and, every
-  price standing still, you end the lock at zero or more. No points: a
-  player resold before the lock never plays for you. Not yet: holding one
-  over the lock, a manager's listing, and whether you win the auction.
+- **When a sale is made** (decide.sql `dec_when`): at once, but when the
+  plan bids, after the auctions, once you know the bids are won (a sale
+  made for a bid then lost is a player gone for nobody; after the auctions
+  the game still buys him at his value). The board says it, the backtest
+  does it. A player bought is listed and sold like any other when an offer
+  beats waiting: there is no separate buy to resell.
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.
@@ -154,7 +150,7 @@ Every forecast is the same product, for every player and jornada
   read from it (`price_paid` on the box).
 - **What the board says** (`board_rows`), one list: the line-up, the
   plan's moves (a buy: what he is listed at and the bid to make; a sale:
-  take the offer, wait, or list him), the buys to resell, and your players
+  after the auctions, take the offer, wait, or list him), and your players
   not listed, rising first: the game offers only for listed players,
   listing costs nothing and a listed player still plays. No line shows a
   move the plan does not make. Every ranked buy and offer is on the box
@@ -208,7 +204,6 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
                                                   # points and money against standing still (LFG_VARIANT=name)
     python src/grading.py variant NAME K=V ...    # a challenger's constants, for money and replay
     python src/grading.py replay [JOBS]           # the forecast at every past line-up snapshot (view replayed)
-    python src/grading.py resales                 # each past night's buys to resell vs what selling paid
     bash tools/selftests.sh                       # every module's self-test
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
     python tools/golden.py freeze|check           # a refactor must rebuild the same board

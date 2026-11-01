@@ -48,8 +48,7 @@ NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS", ),
     "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
     "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
-    "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW",
-                "RESALE_MARGIN"),
+    "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "remind": ("REMIND_HOURS",),
     "rules": ("DEBT_SHARE", "MATCH_LEN"),
     "score": ("PROMOTED_DISCOUNT_K", "SHRINK_K"),
@@ -580,7 +579,7 @@ def _selftest_forecast() -> None:
             player_forecast()
             with mock.patch.object(score, "SHRINK_K", score.SHRINK_K + 1):
                 player_forecast()
-            with mock.patch.object(pricing, "RESALE_MARGIN", pricing.RESALE_MARGIN + 1):
+            with mock.patch.object(pricing, "PRICE_WINDOW", pricing.PRICE_WINDOW + 1):
                 player_forecast()
             assert len(made) == 4, "another cut and another forecast constant: made again; a decision's: not"
             ran = rows("SELECT min(moment) FROM forecast_moment")[0][0]
@@ -729,20 +728,8 @@ def _selftest_sale() -> None:
             assert rows("SELECT ahead FROM player_facts WHERE player = 'p1'") == [(value * (1 + trend / 100), )], \
                 "his value once his trend has run: the whole of it (the longest horizon's carry is 1)"
 
-            # p3 (rising as p1 is) on the game's market, its auction closing 09-04 18:00 UTC, a day before
-            # the lock: bought, he has one night's offer to be sold on
-            assert rows("SELECT nights FROM resale_nights") == [(0,)], "no auction open: no nights"
-            record([{"player_id": "p3", "app_id": "3"}], "crosswalk")
-            store_sql("api_market", [{"observed_at": at(3), "player_id": "3", "sale_price": "11025000",
-                                      "seller": "marketPlayerLeague",
-                                      "expires_at": "2026-09-04T20:00:00+02:00"}])
-            assert rows("SELECT nights FROM resale_nights") == [(1,)]
-            odds: dict[tuple[str, str], float] = dict(((k, kind), v) for k, kind, v in rows("SELECT player, kind, later FROM waiting"))
-            share = sum((0.9, 1.0, 1.1)) / 3
-            assert abs(odds["p3", "resale"] - share * value * (1 + trend / 100 * carry[0])) < 1e-6, odds
-            assert abs(odds["p3", "flat"] - share * value) < 1e-6, "flat: his value standing still"
-            assert {k for k, _ in odds} == {"p1", "p3"} and ("p1", "resale") not in odds, \
-                "a sale for yours with an offer, a resale for the game's market"
+            assert [k for k, _kind in rows("SELECT player, kind FROM waiting")] == ["p1"], \
+                "waiting is a sale's: yours, with an offer standing"
             assert [r[0] for r in rows("SELECT player FROM sale_odds")] == ["p1"]
         finally:
             set_now(None)

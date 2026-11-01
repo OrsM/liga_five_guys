@@ -26,8 +26,8 @@ reads, one copy of each fact, and nothing the board does not need.
 | The eleven | gain.ELEVEN (gain.py:30-44, via Outlook.xi), the program's own formation LP (decide.py:271-315), board_eleven / field_basis / lineup_gap (schema.sql:1466-1506); shortfall vs _fieldable |
 | Debt room, 20% of team value | grading.acted (grading.py:326-335), board_money (schema.sql:1517-1532), board_resale.can_spend, board_head.can_bid; not a constant; the program plans with no debt at all |
 | A sale's proceeds with no offer | value (market.py:59), recent offer ratio (waiting, schema.sql:586-588), avg ratio (grading.py:270, 283) |
-| Selling to clear a debt | grading.closed via program, board_resale greedy, why_sell, cash_cliffs |
-| Resale picks | grading.resales (cost = a bid) vs board_resale (cost = asking), one RESALE_MARGIN |
+| Selling to clear a debt | grading.closed via program (board_resale deleted); when a sale is made: decide.sql dec_when, board and backtest |
+| Resale picks | deleted (2026-11-01): never shown on 60 boards; a buy is listed and sold like any other |
 | The accept rule for a board line | board_json accepts (SQL), server/index.js:160-169, act.py:200-220 (+ kind/ACTS), Fantasy.jsx BUTTON (which win goes with which amount, also in SQL) |
 | The board itself | Python Board + sim docs, then SQL board_json, then server notify text, then Fantasy.jsx formatting (two number formatters in one file) |
 | The line-up message | lineup_alert (basis 'now'), board_rows field line (basis 'plan' before the last auction), board_head.ping |

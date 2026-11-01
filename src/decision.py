@@ -13,7 +13,7 @@ from ffcore.rules import DEBT_SHARE, MAX_SLOT, MIN_SLOT, SQUAD_MAX, XI_SIZE, pos
 
 from decide import Universe
 
-__all__ = ["plan", "inputs"]
+__all__ = ["plan", "inputs", "after_auctions"]
 
 INPUTS = ("dec_player", "dec_xp", "dec_odds", "dec_money", "dec_shape", "dec_plan", "dec_start")
 
@@ -50,6 +50,11 @@ def inputs(u: Universe, lam: float | None = None) -> None:
                     XI_SIZE))
         db.executemany("INSERT INTO dec_shape VALUES (?, ?, ?)",
                        [(p, MIN_SLOT[p], MAX_SLOT[p]) for p in MIN_SLOT])
+
+
+def after_auctions() -> frozenset[str]:
+    """The last plan's sales to make after the auctions (decide.sql dec_when)."""
+    return frozenset(k for (k,) in rows("SELECT player FROM dec_when WHERE after"))
 
 
 def plan(u: Universe, lam: float | None = None, sales_only: bool = False) -> list[Action]:
@@ -124,6 +129,7 @@ def _selftest() -> None:
         got = plan(universe(4e6, {"star": 8e6}), lam=1.0)
         assert [a.kind for a in got] == ["buy", "sell"] and got[1].sell[0] in ("bench", "m4"), \
             "4M short of a lock at zero: paid for by a sale of 5M of one he leaves out of the eleven"
+        assert after_auctions() == set(got[1].sell), "a sale beside a bid: made once the bid is won"
         assert plan(universe(2e6, {"star": 8e6}), lam=1.0) == [], "no one sale pays for him"
         got = plan(universe(10e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0))}), lam=1.0)
         assert [(a.buy, a.cost) for a in got] == [("star", 10e6)], \
@@ -140,6 +146,7 @@ def _selftest() -> None:
         assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(8e6, 0.25, 0)], \
             "one the plan leaves out at the lowest bid offered"
         assert labels(plan(universe(-3e6, {}), lam=1.0)) == ["sell bench"], "in debt: the least bad sale"
+        assert after_auctions() == set(), "no bid: the sale at once"
         assert labels(plan(universe(-12e6, {}), lam=1.0)) == ["sell bench", "sell m4", "sell d1"], \
             "until clear: bench (0), m4 (-4: his place empty), then a slot each, by name"
         assert labels(plan(universe(10e6, {"star": 8e6}), lam=1.0, sales_only=True)) == [], \

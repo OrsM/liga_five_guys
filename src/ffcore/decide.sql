@@ -261,6 +261,15 @@ WHERE CASE WHEN c.free < 0 THEN o.b = '' AND o.s <> ''
 ORDER BY o.worth DESC, o.b, o.s, o.bid
 LIMIT 1;
 
+-- When each of the plan's sales is made: at once, or, when the plan bids,
+-- after the auctions, once you know they are won (a sale made for a bid
+-- that is then lost is a player gone for nobody; after the auctions the
+-- game still buys him at his value).
+DROP VIEW IF EXISTS dec_when;
+CREATE VIEW dec_when AS
+SELECT d.*, d.kind = 'sell' AND EXISTS (SELECT 1 FROM dec_plan b WHERE b.kind = 'buy') AS after
+FROM dec_plan d;
+
 -- The board's moves: each of your players sold, each buy at the plan's bid
 -- (or, not in the plan, the lowest bid his odds offer), valued alone from
 -- the squad as it is (dec_start), and whether the plan makes it.
