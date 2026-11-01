@@ -1,134 +1,25 @@
 {
- "generated_at": "2026-11-01T16:27Z",
+ "generated_at": "2026-11-01T17:07Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 5279381.0,
- "cash_locked": 7433141.0,
- "finish": 2.06,
- "p_win": 0.15,
- "finish_after": 2.06,
- "p_win_after": 0.151,
+ "cash_locked": 60656568.0,
+ "finish": 2.02,
+ "p_win": 0.174,
+ "finish_after": 2.02,
+ "p_win_after": 0.176,
  "band": [
-  1985.36215943429,
-  2273.70169085184
+  1981.14613953049,
+  2272.62656448577
  ],
  "do": [
-  {
-   "what": "field",
-   "label": "field Miguel Roman, Gerard Martin",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": 1.89535051965952,
-   "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Adria Pedrosa, Jon Moncayola",
-     "names"
-    ]
-   ],
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "107909858",
-     "player": "3147",
-     "market": "61763382",
-     "bid": "",
-     "pos": "DEL",
-     "value": 48179948.0
-    },
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": "54892898",
-     "bid": "",
-     "pos": "POR",
-     "value": 20014428.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": "62681662",
-     "bid": "",
-     "pos": "DEL",
-     "value": 17137752.0
-    },
-    {
-     "player_team": "24338726",
-     "player": "2464",
-     "market": "54752027",
-     "bid": "",
-     "pos": "MED",
-     "value": 36490731.0
-    },
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": "50121325",
-     "bid": "",
-     "pos": "MED",
-     "value": 18385303.0
-    },
-    {
-     "player_team": "95426553",
-     "player": "2771",
-     "market": "51255290",
-     "bid": "",
-     "pos": "DEL",
-     "value": 38843329.0
-    },
-    {
-     "player_team": "44068749",
-     "player": "2639",
-     "market": "50121404",
-     "bid": "",
-     "pos": "MED",
-     "value": 10273946.0
-    },
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": "51255271",
-     "bid": "",
-     "pos": "DEF",
-     "value": 51002239.0
-    },
-    {
-     "player_team": "109094606",
-     "player": "3182",
-     "market": "62682352",
-     "bid": "",
-     "pos": "MED",
-     "value": 7637471.0
-    },
-    {
-     "player_team": "37280098",
-     "player": "3123",
-     "market": "51255255",
-     "bid": "",
-     "pos": "DEF",
-     "value": 24426031.0
-    },
-    {
-     "player_team": "107331405",
-     "player": "2757",
-     "market": "61356752",
-     "bid": "",
-     "pos": "DEF",
-     "value": 41616515.0
-    }
-   ]
-  },
   {
    "name": "Raul Garcia",
    "pos": "DEL",
    "what": "buy",
    "label": "buy Raul Garcia",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 950458.0,
-   "done": false,
+   "done": true,
    "gain": 0.806224401558682,
    "per": "season",
    "facts": [
@@ -139,7 +30,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -169,9 +60,34 @@
      "player_team": null,
      "player": "2339",
      "market": "547717363",
-     "bid": "",
+     "bid": "55197655",
      "pos": "DEL",
      "value": 940421.0
+    }
+   ]
+  },
+  {
+   "name": "Julian Alvarez",
+   "pos": "DEL",
+   "what": "withdraw",
+   "label": "withdraw bid on Julian Alvarez",
+   "step": "withdraw bid",
+   "amount": 53582476.0,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": [],
+   "accepts": [
+    null
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "3088",
+     "market": "547717373",
+     "bid": "55200970",
+     "pos": "DEL",
+     "value": 53582476.0
     }
    ]
   },
@@ -181,7 +97,7 @@
    "what": "withdraw",
    "label": "withdraw bid on Javi Rodriguez",
    "step": "withdraw bid",
-   "amount": 7433141.0,
+   "amount": 6123634.0,
    "done": false,
    "gain": null,
    "per": "season",
@@ -391,8 +307,8 @@
   }
  ],
  "cash_after": 4328923.0,
- "can_bid": 74961240.2,
- "ping": "field Miguel Roman, Gerard Martin; buy Raul Garcia; withdraw bid on Javi Rodriguez; relist Bil Nsongo, Martin Satriano, Jon Moncayola, Adria Pedrosa, Thomas Lemar, Dani Martinez, Robin Le Normand, Augusto Batalla, Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras",
+ "can_bid": 22688271.2,
+ "ping": "withdraw bid on Julian Alvarez; withdraw bid on Javi Rodriguez; relist Bil Nsongo, Martin Satriano, Jon Moncayola, Adria Pedrosa, Thomas Lemar, Dani Martinez, Robin Le Normand, Augusto Batalla, Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras",
  "buys": [
   {
    "name": "Fermin Lopez",
@@ -436,7 +352,7 @@
    "plan": false,
    "amount": 74536722.0,
    "done": false,
-   "gain": 43.4796710953655,
+   "gain": 44.0317326527244,
    "per": "season",
    "facts": [],
    "asking": 74536722.0,
@@ -461,13 +377,13 @@
    "pos": "DEL",
    "what": "buy",
    "label": "buy Julian Alvarez",
-   "step": "bid up to",
+   "step": "bid in",
    "price": 53582476.0,
    "trend": 54.3755374506742,
    "plan": false,
    "amount": 53582476.0,
-   "done": false,
-   "gain": 28.7902821890236,
+   "done": true,
+   "gain": 29.7039806918706,
    "per": "season",
    "facts": [],
    "asking": 53582476.0,
@@ -481,7 +397,7 @@
      "player_team": null,
      "player": "3088",
      "market": "547717373",
-     "bid": "",
+     "bid": "55200970",
      "pos": "DEL",
      "value": 53582476.0
     }
@@ -550,37 +466,6 @@
    ]
   },
   {
-   "name": "Javi Rodriguez",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Javi Rodriguez",
-   "step": "bid up to",
-   "price": 6123634.0,
-   "trend": 56.9731193650428,
-   "plan": false,
-   "amount": 6123634.0,
-   "done": false,
-   "gain": 2.37237058188109,
-   "per": "season",
-   "facts": [],
-   "asking": 6123634.0,
-   "win": 0.2,
-   "asking_win": 0.2,
-   "accepts": [
-    6123634.0
-   ],
-   "act": [
-    {
-     "player_team": null,
-     "player": "2074",
-     "market": "547717378",
-     "bid": "54996339",
-     "pos": "DEF",
-     "value": 6123634.0
-    }
-   ]
-  },
-  {
    "name": "Miguel Sierra",
    "pos": "DEL",
    "what": "buy",
@@ -591,7 +476,7 @@
    "plan": false,
    "amount": 10811477.0,
    "done": false,
-   "gain": 2.36317370749791,
+   "gain": 2.85193859732869,
    "per": "season",
    "facts": [],
    "asking": 10811477.0,
@@ -622,7 +507,7 @@
    "plan": false,
    "amount": 7038663.0,
    "done": false,
-   "gain": 2.28639234059485,
+   "gain": 2.65605588804989,
    "per": "season",
    "facts": [],
    "asking": 7038663.0,
@@ -643,16 +528,47 @@
    ]
   },
   {
+   "name": "Javi Rodriguez",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Javi Rodriguez",
+   "step": "bid in",
+   "price": 6123634.0,
+   "trend": 56.9731193650428,
+   "plan": false,
+   "amount": 6123634.0,
+   "done": true,
+   "gain": 2.37237058188109,
+   "per": "season",
+   "facts": [],
+   "asking": 6123634.0,
+   "win": 0.2,
+   "asking_win": 0.2,
+   "accepts": [
+    6123634.0
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "2074",
+     "market": "547717378",
+     "bid": "54996339",
+     "pos": "DEF",
+     "value": 6123634.0
+    }
+   ]
+  },
+  {
    "name": "Raul Garcia",
    "pos": "DEL",
    "what": "buy",
    "label": "buy Raul Garcia",
-   "step": "bid up to",
+   "step": "bid in",
    "price": 950458.0,
    "trend": -10.2302817883786,
    "plan": true,
    "amount": 950458.0,
-   "done": false,
+   "done": true,
    "gain": 0.806224401558682,
    "per": "season",
    "facts": [],
@@ -667,7 +583,7 @@
      "player_team": null,
      "player": "2339",
      "market": "547717363",
-     "bid": "",
+     "bid": "55197655",
      "pos": "DEL",
      "value": 940421.0
     }
@@ -711,18 +627,17 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Dani Martinez",
-   "step": "take offer",
-   "raises": 635010.221433268,
+   "step": "wait",
+   "offer": 603321.0,
+   "waiting": 635010.221433268,
    "trend": 4.94326213322568,
    "plan": false,
-   "amount": 603321.0,
+   "amount": 635010.221433268,
    "done": false,
    "gain": 0.0,
    "per": "season",
    "facts": [],
-   "accepts": [
-    603321.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "109094611",
@@ -740,7 +655,8 @@
    "what": "sell",
    "label": "sell Alvaro Garcia",
    "step": "take offer",
-   "raises": 13454917.0,
+   "offer": 13454917.0,
+   "waiting": 13147068.0198581,
    "trend": -2.9201963722675,
    "plan": false,
    "amount": 13454917.0,
@@ -763,40 +679,13 @@
    ]
   },
   {
-   "name": "Bil Nsongo",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Bil Nsongo",
-   "step": "take offer",
-   "raises": 11640278.4297659,
-   "trend": 28.2714672073557,
-   "plan": false,
-   "amount": 9672114.0,
-   "done": false,
-   "gain": -5.57972811828614,
-   "per": "season",
-   "facts": [],
-   "accepts": [
-    9672114.0
-   ],
-   "act": [
-    {
-     "player_team": "108468054",
-     "player": "2973",
-     "market": "62601563",
-     "bid": "",
-     "pos": "DEL",
-     "value": 10372596.0
-    }
-   ]
-  },
-  {
    "name": "Alvaro F. Carreras",
    "pos": "DEF",
    "what": "sell",
    "label": "sell Alvaro F. Carreras",
    "step": "take offer",
-   "raises": 5588842.0,
+   "offer": 5588842.0,
+   "waiting": 5249435.88361828,
    "trend": -21.5552969739104,
    "plan": false,
    "amount": 5588842.0,
@@ -819,12 +708,40 @@
    ]
   },
   {
+   "name": "Bil Nsongo",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Bil Nsongo",
+   "step": "wait",
+   "offer": 9672114.0,
+   "waiting": 11640278.4297659,
+   "trend": 28.2714672073557,
+   "plan": false,
+   "amount": 11640278.4297659,
+   "done": false,
+   "gain": -5.92020657313382,
+   "per": "season",
+   "facts": [],
+   "accepts": [],
+   "act": [
+    {
+     "player_team": "108468054",
+     "player": "2973",
+     "market": "62601563",
+     "bid": "",
+     "pos": "DEL",
+     "value": 10372596.0
+    }
+   ]
+  },
+  {
    "name": "Yeray Alvarez",
    "pos": "DEF",
    "what": "sell",
    "label": "sell Yeray Alvarez",
    "step": "take offer",
-   "raises": 3720670.0,
+   "offer": 3720670.0,
+   "waiting": 3543546.01972042,
    "trend": -23.6242765599654,
    "plan": false,
    "amount": 3720670.0,
@@ -852,7 +769,8 @@
    "what": "sell",
    "label": "sell Augusto Batalla",
    "step": "take offer",
-   "raises": 5379185.0,
+   "offer": 5379185.0,
+   "waiting": 4979657.37959239,
    "trend": -32.8407014429855,
    "plan": false,
    "amount": 5379185.0,
@@ -880,7 +798,8 @@
    "what": "sell",
    "label": "sell Robin Le Normand",
    "step": "take offer",
-   "raises": 7134737.0,
+   "offer": 7134737.0,
+   "waiting": 6578467.97969888,
    "trend": -20.2462762410288,
    "plan": false,
    "amount": 7134737.0,
@@ -907,18 +826,17 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Adria Pedrosa",
-   "step": "take offer",
-   "raises": 3231933.19291295,
+   "step": "wait",
+   "offer": 3018662.0,
+   "waiting": 3231933.19291295,
    "trend": -15.9711780202162,
    "plan": false,
-   "amount": 3018662.0,
+   "amount": 3231933.19291295,
    "done": false,
    "gain": -7.56548829279349,
    "per": "season",
    "facts": [],
-   "accepts": [
-    3018662.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "109094607",
@@ -935,18 +853,17 @@
    "pos": "MED",
    "what": "sell",
    "label": "sell Jon Moncayola",
-   "step": "take offer",
-   "raises": 4362250.05046328,
+   "step": "wait",
+   "offer": 4302449.0,
+   "waiting": 4362250.05046328,
    "trend": -6.86987632197752,
    "plan": false,
-   "amount": 4302449.0,
+   "amount": 4362250.05046328,
    "done": false,
    "gain": -10.0487672363833,
    "per": "season",
    "facts": [],
-   "accepts": [
-    4302449.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "109094610",
@@ -963,18 +880,17 @@
    "pos": "DEL",
    "what": "sell",
    "label": "sell Iñigo Vicente",
-   "step": "take offer",
-   "raises": 26433245.0248193,
+   "step": "wait",
+   "offer": 24023758.0,
+   "waiting": 26433245.0248193,
    "trend": -10.1545515587173,
    "plan": false,
-   "amount": 24023758.0,
+   "amount": 26433245.0248193,
    "done": false,
-   "gain": -17.3266703190485,
+   "gain": -11.4582781467825,
    "per": "season",
    "facts": [],
-   "accepts": [
-    24023758.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "24338723",
@@ -987,40 +903,13 @@
    ]
   },
   {
-   "name": "Martin Satriano",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Martin Satriano",
-   "step": "take offer",
-   "raises": 18020172.1413342,
-   "trend": -2.08609651179928,
-   "plan": false,
-   "amount": 17607642.0,
-   "done": false,
-   "gain": -18.9659019093445,
-   "per": "season",
-   "facts": [],
-   "accepts": [
-    17607642.0
-   ],
-   "act": [
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": "62681662",
-     "bid": "",
-     "pos": "DEL",
-     "value": 17137752.0
-    }
-   ]
-  },
-  {
    "name": "Miguel Roman",
    "pos": "MED",
    "what": "sell",
    "label": "sell Miguel Roman",
    "step": "take offer",
-   "raises": 10603207.0,
+   "offer": 10603207.0,
+   "waiting": 10391149.9178953,
    "trend": -28.006228254144,
    "plan": false,
    "amount": 10603207.0,
@@ -1043,22 +932,48 @@
    ]
   },
   {
+   "name": "Martin Satriano",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Martin Satriano",
+   "step": "wait",
+   "offer": 17607642.0,
+   "waiting": 18020172.1413342,
+   "trend": -2.08609651179928,
+   "plan": false,
+   "amount": 18020172.1413342,
+   "done": false,
+   "gain": -23.3079727656623,
+   "per": "season",
+   "facts": [],
+   "accepts": [],
+   "act": [
+    {
+     "player_team": "109094608",
+     "player": "3137",
+     "market": "62681662",
+     "bid": "",
+     "pos": "DEL",
+     "value": 17137752.0
+    }
+   ]
+  },
+  {
    "name": "Thomas Lemar",
    "pos": "MED",
    "what": "sell",
    "label": "sell Thomas Lemar",
-   "step": "take offer",
-   "raises": 9224979.51737338,
+   "step": "wait",
+   "offer": 7512689.0,
+   "waiting": 9224979.51737338,
    "trend": 57.1755636810032,
    "plan": false,
-   "amount": 7512689.0,
+   "amount": 9224979.51737338,
    "done": false,
    "gain": -28.3357848684185,
    "per": "season",
    "facts": [],
-   "accepts": [
-    7512689.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "109094606",
@@ -1075,18 +990,17 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Marcos Alonso",
-   "step": "take offer",
-   "raises": 27215680.3998403,
+   "step": "wait",
+   "offer": 23483698.0,
+   "waiting": 27215680.3998403,
    "trend": 25.3678494694302,
    "plan": false,
-   "amount": 23483698.0,
+   "amount": 27215680.3998403,
    "done": false,
    "gain": -30.228449470103,
    "per": "season",
    "facts": [],
-   "accepts": [
-    23483698.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "37280098",
@@ -1103,18 +1017,17 @@
    "pos": "DEL",
    "what": "sell",
    "label": "sell Georges Mikautadze",
-   "step": "take offer",
-   "raises": 43685324.4877835,
+   "step": "wait",
+   "offer": 38130075.0,
+   "waiting": 43685324.4877835,
    "trend": 29.1435166885269,
    "plan": false,
-   "amount": 38130075.0,
+   "amount": 43685324.4877835,
    "done": false,
-   "gain": -32.8747162374668,
+   "gain": -33.3872649346778,
    "per": "season",
    "facts": [],
-   "accepts": [
-    38130075.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "95426553",
@@ -1132,7 +1045,8 @@
    "what": "sell",
    "label": "sell Gerard Martin",
    "step": "take offer",
-   "raises": 44846043.0,
+   "offer": 44846043.0,
+   "waiting": 43343333.9204592,
    "trend": -7.66668898998443,
    "plan": false,
    "amount": 44846043.0,
@@ -1159,18 +1073,17 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Natan",
-   "step": "take offer",
-   "raises": 54930877.1619992,
+   "step": "wait",
+   "offer": 52922422.0,
+   "waiting": 54930877.1619992,
    "trend": 10.4714026176549,
    "plan": false,
-   "amount": 52922422.0,
+   "amount": 54930877.1619992,
    "done": false,
    "gain": -37.7865281256647,
    "per": "season",
    "facts": [],
-   "accepts": [
-    52922422.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "47459928",
@@ -1187,18 +1100,17 @@
    "pos": "MED",
    "what": "sell",
    "label": "sell Pepelu",
-   "step": "take offer",
-   "raises": 42384197.4073297,
+   "step": "wait",
+   "offer": 37587160.0,
+   "waiting": 42384197.4073297,
    "trend": 41.9592258530594,
    "plan": false,
-   "amount": 37587160.0,
+   "amount": 42384197.4073297,
    "done": false,
    "gain": -38.5996554636573,
    "per": "season",
    "facts": [],
-   "accepts": [
-    37587160.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "24338726",
@@ -1215,18 +1127,17 @@
    "pos": "DEL",
    "what": "sell",
    "label": "sell Fernando Niño",
-   "step": "take offer",
-   "raises": 54763806.1106913,
+   "step": "wait",
+   "offer": 47371618.0,
+   "waiting": 54763806.1106913,
    "trend": 33.4090404567569,
    "plan": false,
-   "amount": 47371618.0,
+   "amount": 54763806.1106913,
    "done": false,
-   "gain": -40.7713475390112,
+   "gain": -41.7574870245345,
    "per": "season",
    "facts": [],
-   "accepts": [
-    47371618.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "107909858",
@@ -1243,18 +1154,17 @@
    "pos": "MED",
    "what": "sell",
    "label": "sell German Valera",
-   "step": "take offer",
-   "raises": 20777928.4142506,
+   "step": "wait",
+   "offer": 17507108.0,
+   "waiting": 20777928.4142506,
    "trend": 31.0960203578917,
    "plan": false,
-   "amount": 17507108.0,
+   "amount": 20777928.4142506,
    "done": false,
    "gain": -41.806300183995,
    "per": "season",
    "facts": [],
-   "accepts": [
-    17507108.0
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "90937863",
@@ -1272,7 +1182,8 @@
    "what": "sell",
    "label": "sell Mathew Ryan",
    "step": "take offer",
-   "raises": 21436041.0,
+   "offer": 21436041.0,
+   "waiting": 20592451.524564,
    "trend": -15.4278928688652,
    "plan": false,
    "amount": 21436041.0,
@@ -1317,11 +1228,6 @@
    "clause": 17220303.0
   },
   {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
-   "clause": 31271675.0
-  },
-  {
    "name": "German Valera",
    "pos": "MED",
    "clause": 18385303.0
@@ -1340,6 +1246,11 @@
    "name": "Gerard Martin",
    "pos": "DEF",
    "clause": 43516633.0
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "clause": 31271675.0
   },
   {
    "name": "Thomas Lemar",
@@ -1407,18 +1318,18 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 560.0,
-   "lo": 2138.98264668339,
-   "hi": 2460.59404247086,
+   "lo": 2119.02239537275,
+   "hi": 2443.18305468911,
    "cash": -45053177.0,
    "estimated": true,
-   "p_above": 0.843820954266383
+   "p_above": 0.817722419853715
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 557.0,
-   "lo": 1985.36215943429,
-   "hi": 2273.70169085184,
+   "lo": 1981.14613953049,
+   "hi": 2272.62656448577,
    "cash": 5279381.0,
    "estimated": false,
    "p_above": null
@@ -1427,31 +1338,31 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 437.0,
-   "lo": 1846.67960791767,
-   "hi": 2136.83460465405,
+   "lo": 1839.23670272832,
+   "hi": 2132.46626493118,
    "cash": 41766083.0,
    "estimated": true,
-   "p_above": 0.193992941187131
+   "p_above": 0.19097490548982
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 390.0,
-   "lo": 1686.98024453569,
-   "hi": 1951.57592911522,
+   "now": 391.0,
+   "lo": 1656.35440178989,
+   "hi": 1921.79979498955,
    "cash": 6671834.0,
    "estimated": true,
-   "p_above": 0.0210767702599219
+   "p_above": 0.0140371231444202
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 429.0,
-   "lo": 1531.31392343785,
-   "hi": 1769.13321300056,
+   "lo": 1526.83579104276,
+   "hi": 1768.6430818373,
    "cash": 58393671.0,
    "estimated": true,
-   "p_above": 0.000506484491840764
+   "p_above": 0.000591927524497327
   }
  ]
 }
