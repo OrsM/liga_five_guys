@@ -406,13 +406,14 @@ def _selftest_views() -> None:
 def _selftest_pick_later() -> None:
     """schema.sql's season_record pick on player_jornadas as a table."""
     import sqlite3
-    from ffcore.db import SCHEMA
+    from ffcore.clock import variant
+    from ffcore.db import SCHEMA, functions
 
     db = sqlite3.connect(":memory:")
-    db.create_function("variant", 0, lambda: "live")
+    functions(db)
     db.execute("CREATE TABLE model_constants (variant, name, value)")
-    db.executemany("INSERT INTO model_constants VALUES ('live', ?, ?)",
-                   [("NEUTRAL_START", 60.0), ("PICK_K", 4.0)])
+    db.executemany("INSERT INTO model_constants VALUES (?, ?, ?)",
+                   [(variant(), "NEUTRAL_START", 60.0), (variant(), "PICK_K", 4.0)])
     db.execute("CREATE TABLE player_jornadas (player, jornada, pts, mins)")
     db.executemany("INSERT INTO player_jornadas VALUES (?, ?, 0, ?)",
                    [(k, j, mins) for k, mins in (("star", 90.0), ("poor", 0.0)) for j in range(8)])

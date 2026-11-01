@@ -300,28 +300,26 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
             sales, len(closing) - len(won))
 
 
-def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
+def phantom_path() -> list[dict[str, Any]]:
     """The league's sixth manager: your squad and cash at the first lock,
     then the plan (every player he or the manager beside him holds
     forecast, though nobody may hold him now) this code makes for the squad
-    and cash he has, made: at each lock (bids win at the model's price), or
-    with daily at each run the board is acted on (run_times), his bids
-    standing from one run to the next as yours do (acted) and settled at
-    each close against what the real auction took (closed). At each lock his
+    and cash he has, made at each run the board is acted on (run_times),
+    his bids standing from one run to the next as yours do (acted) and
+    settled at each close against what the real auction took (closed). At each lock his
     eleven picked from that lock's forecast from the squad he holds and
     scored on what they got (nothing in debt, the game's rule), beside a
     manager who never moves, picked the same way. One row a played jornada:
-    both elevens' points and what the lock's forecast expected of them, the
-    moves made since the last, the bids lost, his cash and his squad's worth
+    both elevens' points, the moves made since the last, the bids lost, his cash and his squad's worth
     after them."""
     set_now(None)
     actual = jornada_points()
     played = before_locks()
     first = min(played, default=None)
-    runs = run_times([c for c in auction_closes() if first is not None and c > first]) if daily else {}
+    runs = run_times([c for c in auction_closes() if first is not None and c > first])
     runs = {r: c for r, c in runs.items() if first is not None and r > first}
     closes = set(runs.values())
-    bars = auction_bars() if daily else {}
+    bars = auction_bars()
     squad: dict[str, str] | None = None
     hold: dict[str, str] = {}
     bids: dict[str, float] = {}
@@ -360,14 +358,10 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
             if u is None:
                 continue
             up = with_squad(u, squad, cash, bids)
-            if t in runs or not daily:
+            if t in runs:
                 acts = decision.plan(up)
-                if daily:
-                    (squad, cash, bids, pending), acts = acted(up, bids, acts, decision.after_auctions())
-                    up = with_squad(u, squad, cash, bids)
-                else:
-                    squad, cash = up.squad_after(*acts), up.market.left(acts)
-                    up = up.after(*acts)
+                (squad, cash, bids, pending), acts = acted(up, bids, acts, decision.after_auctions())
+                up = with_squad(u, squad, cash, bids)
                 made += [a.label(up.market.names) for a in acts]
                 last = u
             if t in played:
@@ -377,8 +371,6 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
                 out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in fielded.players)
                             if cash >= 0 else 0.0,
                             "standpat": sum(actual.get((k, i), 0.0) for k in still.players),
-                            "expected": sum(fielded.expected.get(k, 0.0) for k in fielded.players),
-                            "standpat_expected": sum(still.expected.get(k, 0.0) for k in still.players),
                             "moves": "; ".join(made), "lost": lost, "cash": cash,
                             "value": sum(u.market.value.get(k, 0.0) for k in squad),
                             "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold)})
@@ -389,12 +381,9 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
 
 
 def phantom_season() -> list[dict[str, Any]]:
-    """The phantom manager deciding at each lock (phantom_path): what the
-    grade stage keeps (phantom_jornadas: no bid is settled there, so no
-    lost, and the forecasts are the grade's own business), its plans with
-    variance weighed at nothing: the grade is the forecasts' and the
-    moves', the plan's appetite for variance the backtest's (money)."""
-    return [{k: v for k, v in r.items() if k not in ("lost", "expected", "standpat_expected", "standpat_money")}
+    """The phantom (phantom_path) as the grade stage keeps it
+    (phantom_jornadas): the forecasts are the grade's own business."""
+    return [{k: v for k, v in r.items() if k not in ("lost", "standpat_money")}
             for r in phantom_path()]
 
 
@@ -745,7 +734,7 @@ if __name__ == "__main__":
         # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
-        got = phantom_path(daily=True)
+        got = phantom_path()
         # The scoreboard: points, for both, what finishing first is won on;
         # and the cash and squad value the phantom ends with, and standing still.
         print("%6s %5s %8s %8s %9s %9s %9s" % ("moves", "lost", "points", "standpat",

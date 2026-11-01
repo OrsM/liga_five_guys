@@ -118,7 +118,7 @@ def _selftest() -> None:
                 db.execute("CREATE TABLE nights_left AS SELECT ? AS nights,"
                            " julianday('2026-08-02T20:24:00Z') AS first", (nights,))
                 db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
-                    ("PRICE_WINDOW", 50.0), ("DEBT_SHARE", DEBT_SHARE)])
+                    ("PRICE_WINDOW", 50.0)])
             store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me}])
             store_sql("api_market", [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerTeam",
                                       "expires_at": e} for k, e in listings]
@@ -229,8 +229,10 @@ def _selftest() -> None:
 
     rich = valued(ub, 100e6)
     rich_doc = report(rich)
-    assert rich_doc["can_bid"] == max(0.0, rich_doc["cash_after"] + DEBT_SHARE * 100e6), \
-        "what you can bid: your cash after the plan and the debt the game allows (rules.DEBT_SHARE)"
+    assert rich_doc["can_bid"] == max(0.0, rich.market.cash + DEBT_SHARE * 100e6
+                                      - sum(d["amount"] for d in rich_doc["do"] if d["what"] == "buy")), \
+        ("what you can bid: your cash and the debt the game allows (rules.DEBT_SHARE) less the plan's bids;"
+         " sales do not count, made after the auctions")
     stray = replace(rich.market, pos={**rich.market.pos, "ghost": "DEF"}, my_bid={"ghost": 3e6})
     assert abs(report(replace(rich, market=stray))["can_bid"]
                - (rich_doc["can_bid"] - 3e6)) < 1, \
@@ -339,7 +341,7 @@ def _selftest() -> None:
         m = ub.market
         assert rows("SELECT player, pos, value, price, offer, fetches FROM sim_facts WHERE run_id = 7"
                     " ORDER BY player") == sorted(
-            (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetch.get(k))
+            (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetches(k) if k in ub.mine else None)
             for k in set(m.name) | set(m.pos)), "the facts the decision was made on, as its universe holds them"
         assert rows("SELECT moment FROM sim_runs WHERE run_id = 7") == [(None,)]
         with closing(connect()) as db, db:
@@ -450,7 +452,8 @@ def facts(u: Universe, run: int) -> list[Doc]:
     return [{"run_id": run, "player": k, "name": m.shown(k), "pos": m.pos.get(k, ""),
              "value": m.value.get(k), "trend": m.trend.get(k), "paid": m.paid.get(k),
              "offer": m.offer.get(k), "clause": m.clause.get(k), "price": m.price.get(k),
-             "route": m.route.get(k), "my_bid": m.my_bid.get(k), "fetches": m.fetch.get(k)}
+             "route": m.route.get(k), "my_bid": m.my_bid.get(k),
+             "fetches": m.fetches(k) if k in u.mine else None}
             for k in sorted(set(m.name) | set(m.pos))]
 
 
@@ -469,7 +472,7 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | 
         db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, worth, in_plan"
                    " FROM dec_rows", (run,))
         db.execute(KEEP_PLAN, (run,))
-        db.execute("INSERT INTO sim_runs VALUES (?, ?, ?, ?)",
+        db.execute("INSERT INTO sim_runs SELECT ?, ?, ?, ?, c.free, r.room FROM dec_cash c, dec_room r",
                    (run, moment, won.position(u.me).get(1, 0.0), won.expected_position(u.me)))
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
     return acts

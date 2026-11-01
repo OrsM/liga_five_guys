@@ -120,8 +120,9 @@ CREATE TABLE IF NOT EXISTS sim_players (
 
 -- The market's and the league's facts as the run saw them (player_facts and
 -- sale_odds as of its cut), every player: the board shows these, and a
--- past run's board is these and its decisions. fetches is what a sale gets
--- (NULL with no offer standing on him), as the run's universe held them (sim.facts).
+-- past run's board is these and its decisions. fetches is what a sale of
+-- yours gets (Market.fetches; NULL if not yours), as the run's universe held
+-- them (sim.facts).
 CREATE TABLE IF NOT EXISTS sim_facts (
     run_id  INTEGER NOT NULL REFERENCES runs(run_id),
     player  TEXT NOT NULL,
@@ -156,7 +157,9 @@ CREATE TABLE IF NOT EXISTS sim_runs (
     run_id        INTEGER PRIMARY KEY REFERENCES runs(run_id),
     moment        INTEGER REFERENCES forecast_moment(moment),
     p_first_after REAL,
-    finish_after  REAL
+    finish_after  REAL,
+    cash_after    REAL,
+    can_bid       REAL
 );
 
 -- grading, when run.py grade finds something new: each past lock forecast
@@ -245,7 +248,7 @@ WITH snaps AS (
   UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
   UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
   UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
-r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, julianday(substr(at, 1, 10) || 'T' || substr(at, 12, 2) || ':' || substr(at, 14, 2) || 'Z') AS jd FROM snaps),
+r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, stamp_jd(at) AS jd FROM snaps),
 usual AS (SELECT src, avg(n) AS usual_rows, (max(jd) - min(jd)) * 24 / (count(*) - 1) AS gap_h
           FROM r WHERE k BETWEEN 2 AND 21 GROUP BY src HAVING count(*) >= 5),
 now AS (SELECT julianday(substr((SELECT cut()), 1, 10) || 'T' || substr((SELECT cut()), 12, 2) || ':' || substr((SELECT cut()), 14, 2) || 'Z') AS jd)
@@ -382,8 +385,8 @@ CREATE VIEW replayed AS
 WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
 SELECT v.variant, r.as_of, r.jornada, c.player, c.pts * c.p AS predicted,
        coalesce(a.pts, 0.0) AS actual, f.flagged,
-       24 * (julianday(substr(r.lock, 1, 10) || ' ' || substr(r.lock, 12, 2) || ':' || substr(r.lock, 14, 2))
-           - julianday(substr(r.as_of, 1, 10) || ' ' || substr(r.as_of, 12, 2) || ':' || substr(r.as_of, 14, 2)))
+       24 * (stamp_jd(r.lock)
+           - stamp_jd(r.as_of))
            AS lead_h
 FROM forecast_variant v
 JOIN forecast_moment m ON m.code = v.code AND m.constants = v.constants AND m.made
@@ -540,7 +543,7 @@ DROP VIEW IF EXISTS next_round_lock;
 DROP VIEW IF EXISTS next_lock;
 CREATE VIEW next_lock AS
 SELECT min(lock) AS lock,
-       julianday(substr(min(lock), 1, 10) || ' ' || substr(min(lock), 12, 2) || ':' || substr(min(lock), 14, 2)) AS t
+       stamp_jd(min(lock)) AS t
 FROM round_locks WHERE lock > (SELECT cut());
 
 -- The players on the game's market who could not play a jornada's match
@@ -762,7 +765,6 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'PRICE_W0' AND variant = (SELECT variant())) AS price_w0,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W1' AND variant = (SELECT variant())) AS price_w1,
     (SELECT value FROM model_constants WHERE name = 'PRICE_W2' AND variant = (SELECT variant())) AS price_w2,
-    (SELECT value FROM model_constants WHERE name = 'DEBT_SHARE' AND variant = (SELECT variant())) AS debt_share,
     (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
     (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
     (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
@@ -1171,7 +1173,7 @@ DROP VIEW IF EXISTS season_record;
 CREATE VIEW season_record AS
 WITH r AS (SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
            FROM player_jornadas GROUP BY player)
-SELECT r.*, (k.pick_k * k.neutral_start / 100.0 + apps) / (k.pick_k + squads) AS pick FROM r, k;
+SELECT r.*, shrink(k.neutral_start / 100.0, k.pick_k, apps, squads) AS pick FROM r, k;
 
 -- Each app id's player: the futbolfantasy player whose value it equalled
 -- at the most market snapshots (an all-players row holds until his next),
@@ -1339,8 +1341,8 @@ WITH RECURSIVE n(v) AS (SELECT 0 UNION ALL SELECT v + 1 FROM n WHERE v < 14),
 o AS MATERIALIZED (SELECT grp, listed, ff, mins > 0 AS y FROM start_outcomes
                    WHERE status IN ('', 'ok')),
 fall AS MATERIALIZED (
-    SELECT 100 * (k.fallback_k * k.neutral_start / 100 + vague_played) / (k.fallback_k + vague) AS neutral,
-           100 * (k.fallback_k * k.absent_start / 100 + absent_played) / (k.fallback_k + absent) AS absent
+    SELECT 100 * shrink(k.neutral_start / 100.0, k.fallback_k, vague_played, vague) AS neutral,
+           100 * shrink(k.absent_start / 100.0, k.fallback_k, absent_played, absent) AS absent
     FROM k, (SELECT count(*) FILTER (WHERE listed AND ff IS NULL) AS vague,
                     coalesce(sum(y) FILTER (WHERE listed AND ff IS NULL), 0) AS vague_played,
                     count(*) FILTER (WHERE NOT listed) AS absent,
@@ -1390,7 +1392,7 @@ DROP VIEW IF EXISTS board_players;
 CREATE VIEW board_players AS
 SELECT p.*, coalesce(f.name, p.player) AS name, coalesce(f.pos, '') AS pos,
        f.value, f.trend, f.paid, f.offer, f.clause, f.price, f.route, f.my_bid,
-       CASE WHEN p.mine THEN coalesce(f.fetches, f.value, 0.0) END AS raises,
+       CASE WHEN p.mine THEN coalesce(f.fetches, 0.0) END AS raises,
        coalesce(f.fetches = f.offer, 0) AS takes
 FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN sim_facts f USING (run_id, player);
 
@@ -1491,6 +1493,14 @@ SELECT 'out', f.i, b.player, b.name, b.next, l.ok
 FROM fielded f JOIN board_players b USING (player), legal l
 WHERE l.ok AND f.player NOT IN (SELECT player FROM board_eleven);
 
+-- The players of each side of lineup_gap as named in one line: those to
+-- field, the best first, and those to take out, as the app has them.
+DROP VIEW IF EXISTS lineup_names;
+CREATE VIEW lineup_names AS
+SELECT 'in' AS side, group_concat(name, ', ' ORDER BY -next, player) AS names FROM lineup_gap WHERE side = 'in'
+UNION ALL
+SELECT 'out', group_concat(name, ', ' ORDER BY i) FROM lineup_gap WHERE side = 'out';
+
 -- The plan's moves, in its order (a swap's buy, then its sale), and what
 -- each spends (a sale's is negative).
 DROP VIEW IF EXISTS board_plan;
@@ -1499,18 +1509,7 @@ SELECT row_number() OVER (ORDER BY p.step, p.kind) - 1 AS ord, p.step, p.kind, p
        CASE p.kind WHEN 'buy' THEN p.amount ELSE -p.amount END AS net, p.win, p.worth, p.after
 FROM decision_plan p JOIN board_run USING (run_id);
 
--- Your cash once the plan is made, how far below zero the game lets
--- bids take you before the lock (rules.DEBT_SHARE of your players' values,
--- the sum the decision's debt is of), and your bids in that the plan does
--- not make (held: money no other bid can use).
 DROP VIEW IF EXISTS board_money;
-CREATE VIEW board_money AS
-SELECT b.cash - (SELECT total(net) FROM board_plan) AS left,
-       (SELECT debt_share FROM k) * (SELECT total(f.value) FROM sim_facts f JOIN board_run USING (run_id)
-                                     JOIN sim_players p USING (run_id, player) WHERE p.mine) AS debt,
-       (SELECT total(f.my_bid) FROM sim_facts f JOIN board_run USING (run_id)
-        WHERE f.my_bid > 0 AND f.player NOT IN (SELECT player FROM board_plan WHERE kind = 'buy')) AS held
-FROM board_league b WHERE b.me;
 
 DROP VIEW IF EXISTS board_resale;
 
@@ -1538,7 +1537,7 @@ outs AS (SELECT * FROM lineup_gap WHERE side = 'out'),
 legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap),
 field AS (
     SELECT -1 AS ord, 'field' AS what,
-           'field ' || (SELECT group_concat(name, ', ' ORDER BY -next, player) FROM ins) AS label,
+           'field ' || (SELECT names FROM lineup_names WHERE side = 'in') AS label,
            NULL AS name, NULL AS pos,
            CASE WHEN legal.ok THEN NULL ELSE 'check line-up' END AS step, NULL AS amount,
            0 AS done,
@@ -1636,8 +1635,11 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        (SELECT round(finish_after, 2) FROM sim_runs JOIN board_run USING (run_id)) AS finish_after,
        (SELECT round(p_first_after, 3) FROM sim_runs JOIN board_run USING (run_id)) AS p_win_after,
        me.lo AS band_lo, me.hi AS band_hi,
-       CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
-       (SELECT max(0.0, left + debt) - held FROM board_money) AS can_bid,
+       CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT cash_after FROM sim_runs JOIN board_run USING (run_id)) END
+           AS cash_after,
+       (SELECT max(0.0, can_bid) FROM sim_runs JOIN board_run USING (run_id))
+       - (SELECT total(f.my_bid) FROM sim_facts f JOIN board_run USING (run_id)
+          WHERE f.my_bid > 0 AND f.player NOT IN (SELECT player FROM board_plan WHERE kind = 'buy')) AS can_bid,
        (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
         WHERE NOT done) AS ping
 FROM me;
@@ -1724,9 +1726,7 @@ FROM board_head h;
 DROP VIEW IF EXISTS lock_due;
 CREATE VIEW lock_due AS
 WITH w AS (
-    SELECT lock, strftime('%Y-%m-%dT%H%MZ', datetime(
-               substr(lock, 1, 10) || ' ' || substr(lock, 12, 2) || ':' || substr(lock, 14, 2),
-               '-' || (SELECT remind_hours FROM k) || ' hours')) AS opens
+    SELECT lock, strftime('%Y-%m-%dT%H%MZ', stamp_jd(lock) - (SELECT remind_hours FROM k) / 24.0) AS opens
     FROM next_lock WHERE lock IS NOT NULL)
 SELECT lock FROM w
 WHERE opens <= (SELECT cut())
@@ -1738,11 +1738,11 @@ WHERE opens <= (SELECT cut())
 DROP VIEW IF EXISTS lineup_alert;
 CREATE VIEW lineup_alert AS
 WITH g AS (SELECT * FROM lineup_gap),
-ins AS (SELECT group_concat(name, ', ' ORDER BY -next, player) AS names FROM g WHERE side = 'in'),
-outs AS (SELECT group_concat(name, ', ' ORDER BY i) AS names FROM g WHERE side = 'out'),
+ins AS (SELECT names FROM lineup_names WHERE side = 'in'),
+outs AS (SELECT names FROM lineup_names WHERE side = 'out'),
 left AS (SELECT CAST(round((
-             julianday(substr(lock, 1, 10) || 'T' || substr(lock, 12, 2) || ':' || substr(lock, 14, 2) || 'Z')
-             - julianday(substr(cut(), 1, 10) || 'T' || substr(cut(), 12, 2) || ':' || substr(cut(), 14, 2) || 'Z')
+             stamp_jd(lock)
+             - stamp_jd(cut())
          ) * 1440) AS INTEGER) AS minutes FROM next_lock)
 SELECT CASE WHEN (SELECT max(legal) FROM g)
             THEN 'Change your line-up: field ' || ins.names || ' for ' || outs.names

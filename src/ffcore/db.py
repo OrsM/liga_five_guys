@@ -19,6 +19,8 @@ from ffcore import kept
 from ffcore.clock import cut, variant
 from ffcore.facts import ensure
 from ffcore.names import Name
+from ffcore.parse import snapshot_stamp
+from stats import shrink
 from ffcore.rules import ELEVEN, position, slot
 from ffcore.text import stems_meet
 from ffcore.startprob import platt, prognosis_bucket
@@ -111,13 +113,21 @@ class _Corr:
         return (self.sxy - self.sx * self.sy / self.n) / (vx * vy) ** 0.5
 
 
+def stamp_jd(s: str | None) -> float | None:
+    """A stamp (2026-11-01T2224Z, or with seconds or a zone as snapshot_stamp
+    reads them) as julianday() gives it, None if it is not one."""
+    t = snapshot_stamp(s) if s else None
+    return None if t is None else t.timestamp() / 86400.0 + 2440587.5
+
+
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (now, as a stamp: the model's
-    clock unless told otherwise), variant() (the constants in force), name_key() and name_shown() (Name's),
-    platt() and prognosis_bucket() (startprob's), position() (rules'),
+    clock unless told otherwise), stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
+    platt() and prognosis_bucket() (startprob's), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'),
     lo95(), hi95() and claim() (an estimate and its standard error), and
     the aggregates median(), quantile(x, p) and corr(x, y)."""
     db.create_function("cut", 0, now)
+    db.create_function("stamp_jd", 1, stamp_jd, deterministic=True)
     db.create_function("variant", 0, variant)
     db.create_function("hpad", 0, lambda: 0)
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
@@ -128,6 +138,8 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     for fn in (lo95, hi95, claim):
         db.create_function(fn.__name__, 2, fn, deterministic=True)
     db.create_function("platt", 3, platt, deterministic=True)
+    db.create_function("shrink", 4, lambda prior, k, total, n: None if None in (prior, k, total, n) or k + n == 0
+                       else shrink(prior, k, total, n), deterministic=True)
     db.create_function("position", 1, position, deterministic=True)
     db.create_function("slot", 1, slot, deterministic=True)
     db.create_function("stems_meet", 3, stems_meet, deterministic=True)

@@ -100,6 +100,13 @@ SELECT m.cash - coalesce((SELECT total(CASE kind WHEN 'buy' THEN amount ELSE -am
        coalesce((SELECT total(amount) FROM dec_plan WHERE kind = 'buy'), 0) AS bids
 FROM dec_money m;
 
+-- What more you can bid once the plan's bids are in: the game takes bids up
+-- to your cash and the debt it allows (DEBT_SHARE of your team's value);
+-- sales do not count, made after the auctions or not at all.
+DROP VIEW IF EXISTS dec_room;
+CREATE VIEW dec_room AS
+SELECT m.cash + m.debt * m.team_value - c.bids AS room FROM dec_money m, dec_cash c;
+
 -- Each next move, by the buy (b) and the sale (s) it holds ('' for none):
 -- each buy, each sale of a player held now, and each buy with each such sale
 -- where his highest bid is more than the cash left or the squad is full (a
@@ -230,12 +237,12 @@ WHERE g.b = '' OR b.player IS NOT NULL;
 DROP VIEW IF EXISTS dec_next;
 CREATE VIEW dec_next AS
 WITH n AS (SELECT count(*) AS size FROM dec_squad)
-SELECT o.* FROM dec_options o, dec_cash c, dec_money m, n
+SELECT o.* FROM dec_options o, dec_cash c, dec_money m, dec_room r, n
 WHERE CASE WHEN c.free < 0 THEN o.b = '' AND o.s <> ''
            ELSE o.worth > 0
                 AND n.size + o.size <= m.squad_max
                 AND c.free + o.cash >= 0
-                AND c.bids + coalesce(o.bid, 0) <= m.cash + m.debt * m.team_value END
+                AND coalesce(o.bid, 0) <= r.room END
 ORDER BY o.worth DESC, o.b, o.s, o.bid
 LIMIT 1;
 
