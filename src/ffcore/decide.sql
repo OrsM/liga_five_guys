@@ -1,16 +1,15 @@
--- The decision (docs/notes/plan.md; the simplify map, step 3), every number
--- in points, each a measured fact, a game rule, or the backtest's to settle:
+-- The decision (docs/notes/plan.md; the simplify map, step 3). The aim is
+-- to finish first, so every move is worth its points and nothing else;
+-- money is a limit, never a goal:
 --
---   lam           what a million is worth: what a million more in value
---                 adds to a player's points a game (players with 3+ games),
---                 for each jornada left (money_rate)
 --   f(S)          the points of squad S's best legal eleven, summed over
 --                 the jornadas left, each player at his forecast cell times
 --                 whether he is yours by then (dec_xp); a move's, from the
 --                 eleven now by the slots it changes (dec_slots, dec_gain)
---   a buy p at b  win(b) x (f(S + p) - f(S) - lam x (b - value_p) / 1M),
---                 value his once his price trend has run (pricing's fits)
---   a sale q      f(S - q) - f(S) + lam x (proceeds_q - value_q) / 1M
+--   a buy p at b  win(b) x (f(S + p) - f(S)); of bids as likely to win,
+--                 the least
+--   a sale q      f(S - q) - f(S): never more than nothing alone, so made
+--                 only to pay for a buy (a swap) or to clear a debt
 --   a swap        a buy with the sale that pays for it, its points on the
 --                 squad they make together
 --
@@ -22,16 +21,15 @@
 -- clear. src/decision.py writes the inputs and adds the moves.
 
 -- The inputs, one decision's (decision.py inputs): the players it can
--- move, yours (mine) and the market's (asking), his position, his value
--- (money he is worth) and what a sale of him gets; each one's expected
--- points a jornada left as yours; each buy's bids and their chance of
--- winning; your cash, squad value, the money rate, the game's debt share
--- and squad cap, the eleven's size; the formations' bounds.
+-- move, yours (mine) and the market's (asking), his position and what a
+-- sale of him gets; each one's expected points a jornada left as yours;
+-- each buy's bids and their chance of winning; your cash, squad value, the
+-- game's debt share and squad cap, the eleven's size; the formations'
+-- bounds.
 CREATE TABLE IF NOT EXISTS dec_player (
     player   TEXT PRIMARY KEY,
     pos      TEXT NOT NULL,
     mine     INTEGER NOT NULL,
-    value    REAL NOT NULL,          -- his value once his price trend has run
     asking   REAL,
     proceeds REAL
 );
@@ -50,7 +48,6 @@ CREATE TABLE IF NOT EXISTS dec_odds (
 CREATE TABLE IF NOT EXISTS dec_money (
     cash       REAL NOT NULL,
     team_value REAL NOT NULL,
-    lam        REAL NOT NULL,
     debt       REAL NOT NULL,
     squad_max  INTEGER NOT NULL,
     xi_size    INTEGER NOT NULL
@@ -82,24 +79,10 @@ CREATE TABLE IF NOT EXISTS dec_start (
     win      REAL,
     proceeds REAL,
     gain     REAL NOT NULL,          -- points
-    money    REAL NOT NULL,          -- points: money gone or made, at lam
     worth    REAL NOT NULL
 );
 
--- What a million is worth, in points: per_game, the points a game a
--- million more in value adds (the least-squares slope of points a game on
--- value, players with 3+ games), times the jornadas left. Not mean points
--- over mean value: a player worth nothing still scores about 3 a game, and
--- that ratio priced a million 4 times over (2026-10-31: 0.255 vs 0.060).
 DROP VIEW IF EXISTS money_rate;
-CREATE VIEW money_rate AS
-WITH x AS (SELECT s.pts * 1.0 / s.apps AS y, f.value / 1e6 AS v
-           FROM season_record s JOIN current_market f ON f.ff_id = s.player
-           WHERE s.apps >= 3 AND f.value > 0),
-r AS (SELECT (count(*) * sum(v * y) - sum(v) * sum(y)) / (count(*) * sum(v * v) - sum(v) * sum(v)) AS per_game
-      FROM x),
-j AS (SELECT count(*) AS left FROM jornada_calendar WHERE state <> 'done')
-SELECT r.per_game, j.left AS jornadas, r.per_game * j.left AS lam FROM r, j;
 
 -- The squad once the plan's moves are made, every bid won.
 DROP VIEW IF EXISTS dec_squad;
@@ -119,8 +102,8 @@ FROM dec_money m;
 
 -- Each next move, by the buy (b) and the sale (s) it holds ('' for none):
 -- each buy, each sale of a player held now, and each buy with each such sale
--- where his highest bid is more than the cash left (a sale is what pays for
--- him).
+-- where his highest bid is more than the cash left or the squad is full (a
+-- sale is what pays for him, or makes room for him).
 DROP VIEW IF EXISTS dec_variant;
 CREATE VIEW dec_variant AS
 WITH sq AS MATERIALIZED (SELECT * FROM dec_squad),
@@ -129,7 +112,8 @@ buys AS (SELECT p.player AS b, p.asking * coalesce((SELECT max(ratio) FROM dec_o
          FROM dec_player p WHERE p.asking IS NOT NULL AND p.player NOT IN (SELECT player FROM sq)),
 sells AS (SELECT player AS s FROM sq WHERE player IN (SELECT player FROM dec_player WHERE mine))
 SELECT b, '' AS s FROM buys UNION ALL SELECT '', s FROM sells
-UNION ALL SELECT b, s FROM buys, sells WHERE top > (SELECT free FROM dec_cash);
+UNION ALL SELECT b, s FROM buys, sells
+WHERE top > (SELECT free FROM dec_cash) OR (SELECT count(*) FROM sq) >= (SELECT squad_max FROM dec_money);
 
 -- The squad's best legal eleven each jornada: the game's eleven rule
 -- (rules.ELEVEN, put in where it is named below as connect() applies this
@@ -226,21 +210,15 @@ SELECT v.b, v.s, coalesce((SELECT total(out) FROM rm WHERE rm.s = v.s), 0.0)
 FROM v;
 
 -- Every next move, at each bid its odds offer (at asking, sure, with
--- none), worth its points and its money at lam, a bid's by its chance of
--- winning; with what it does to the squad's size and the cash at the lock.
+-- none), worth its points, a bid's by its chance of winning; with what it
+-- does to the squad's size and the cash at the lock.
 DROP VIEW IF EXISTS dec_options;
 CREATE VIEW dec_options AS
-WITH m AS (SELECT * FROM dec_money),
-g AS MATERIALIZED (SELECT * FROM dec_gain),
-bid AS (SELECT p.player, p.value, p.asking * coalesce(o.ratio, 1.0) AS amount, coalesce(o.p_win, 1.0) AS win
+WITH g AS MATERIALIZED (SELECT * FROM dec_gain),
+bid AS (SELECT p.player, p.asking * coalesce(o.ratio, 1.0) AS amount, coalesce(o.p_win, 1.0) AS win
         FROM dec_player p LEFT JOIN dec_odds o USING (player) WHERE p.asking IS NOT NULL),
-sale AS (SELECT player, value, proceeds FROM dec_player WHERE mine)
-SELECT g.b, g.s, b.amount AS bid, b.win, sa.proceeds,
-       g.gain, (SELECT lam FROM m) * ((coalesce(sa.proceeds, 0) - coalesce(sa.value, 0))
-                                       - (coalesce(b.amount, 0) - coalesce(b.value, 0))) / 1e6 AS money,
-       coalesce(b.win, 1.0) * (g.gain + (SELECT lam FROM m) * ((coalesce(sa.proceeds, 0) - coalesce(sa.value, 0))
-                                                              - (coalesce(b.amount, 0) - coalesce(b.value, 0))) / 1e6)
-           AS worth,
+sale AS (SELECT player, proceeds FROM dec_player WHERE mine)
+SELECT g.b, g.s, b.amount AS bid, b.win, sa.proceeds, g.gain, coalesce(b.win, 1.0) * g.gain AS worth,
        (g.b <> '') - (g.s <> '') AS size,
        coalesce(sa.proceeds, 0) - coalesce(b.amount, 0) AS cash
 FROM g LEFT JOIN bid b ON b.player = g.b LEFT JOIN sale sa ON sa.player = g.s
@@ -275,11 +253,11 @@ FROM dec_plan d;
 -- the squad as it is (dec_start), and whether the plan makes it.
 DROP VIEW IF EXISTS dec_rows;
 CREATE VIEW dec_rows AS
-SELECT 'sell' AS kind, s AS player, proceeds AS amount, 1.0 AS win, gain, money, worth,
+SELECT 'sell' AS kind, s AS player, proceeds AS amount, 1.0 AS win, gain, worth,
        s IN (SELECT player FROM dec_plan WHERE kind = 'sell') AS in_plan
 FROM dec_start WHERE b = ''
 UNION ALL
-SELECT 'buy', b, bid, win, gain, money, worth, in_plan FROM (
+SELECT 'buy', b, bid, win, gain, worth, in_plan FROM (
     SELECT d.*, p.player IS NOT NULL AS in_plan,
            row_number() OVER (PARTITION BY d.b ORDER BY p.player IS NULL, d.bid) AS n
     FROM dec_start d LEFT JOIN dec_plan p ON p.kind = 'buy' AND p.player = d.b AND p.amount = d.bid

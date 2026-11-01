@@ -22,7 +22,7 @@ reads, one copy of each fact, and nothing the board does not need.
 
 | Fact | Copies |
 |---|---|
-| What money is worth | MONEY_RATE (decide.py:29), k.money_rate (schema.sql:725), Board.lam (LP dual, decide.py:221), Market.money / later (market.py:69-95), the waiting view (schema.sql:568-594), board_rows and board_mine.wait_bids re-deriving points - rate x money (schema.sql:1438, 1594, 1624), why_sell (datasette.json) |
+| What money is worth | gone (2026-11-01): the decision is points only, money a limit (cash at the lock, the debt rule); money_rate, lam and player_facts.ahead deleted |
 | The eleven | gain.ELEVEN (gain.py:30-44, via Outlook.xi), the program's own formation LP (decide.py:271-315), board_eleven / field_basis / lineup_gap (schema.sql:1466-1506); shortfall vs _fieldable |
 | Debt room, 20% of team value | grading.acted (grading.py:326-335), board_money (schema.sql:1517-1532), board_resale.can_spend, board_head.can_bid; not a constant; the program plans with no debt at all |
 | A sale's proceeds with no offer | value (market.py:59), recent offer ratio (waiting, schema.sql:586-588), avg ratio (grading.py:270, 283) |

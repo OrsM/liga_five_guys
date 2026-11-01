@@ -18,36 +18,30 @@ __all__ = ["plan", "inputs", "after_auctions"]
 INPUTS = ("dec_player", "dec_xp", "dec_odds", "dec_money", "dec_shape", "dec_plan", "dec_start")
 
 
-def inputs(u: Universe, lam: float | None = None) -> None:
+def inputs(u: Universe) -> None:
     """The universe's squad, cash and market as the decision's inputs: your
     players and every player on the market you could buy (one the squad
     holds is its, not a buy: a replay's squad holds players listed now), each one's
-    expected points a jornada left as yours (a stand-in fills no slot), his
-    value once his price trend has run (Market.ahead: what he is worth as
-    money; a buy without a value his price), a buy's bids, your money, and
-    lam: the universe's money rate (Universe.lam) unless given."""
+    expected points a jornada left as yours (a stand-in fills no slot), what
+    a sale of yours gets, a buy's bids, and your money."""
     m = u.market
     buys = [k for k in sorted(m.price) if k not in u.mine and u.acquire(k) is not None]
-    players = [(k, position(m.pos.get(k)) or u.mine.get(k, ""), 1, m.ahead.get(k, 0.0), None, m.fetches(k))
+    players = [(k, position(m.pos.get(k)) or u.mine.get(k, ""), 1, None, m.fetches(k))
                for k in sorted(u.mine) if not k.startswith("__phantom_")] \
-        + [(k, position(m.pos.get(k)), 0, m.ahead.get(k, m.price[k]), m.price[k], None)
-           for k in buys]
+        + [(k, position(m.pos.get(k)), 0, m.price[k], None) for k in buys]
     keys = {p[0] for p in players}
     # the universe's cells: its forecast as used (forecast_used), read once when it was built
     xp = [(k, j, expected_points(cell)) for j in u.state.jornadas
           for k, cell in u.forecaster.per_jornada.get(j, {}).items() if k in keys]
-    if lam is None:
-        lam = u.lam
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
-        db.executemany("INSERT INTO dec_player VALUES (?, ?, ?, ?, ?, ?)", players)
+        db.executemany("INSERT INTO dec_player VALUES (?, ?, ?, ?, ?)", players)
         db.executemany("INSERT INTO dec_xp VALUES (?, ?, ?)", xp)
         db.executemany("INSERT INTO dec_odds VALUES (?, ?, ?)",
                        [(k, r, p) for k in buys for r, p in m.odds.get(k, ())])
-        db.execute("INSERT INTO dec_money VALUES (?, ?, ?, ?, ?, ?)",
-                   (m.cash, sum(m.value.get(k, 0.0) for k in u.mine), lam, DEBT_SHARE, SQUAD_MAX,
-                    XI_SIZE))
+        db.execute("INSERT INTO dec_money VALUES (?, ?, ?, ?, ?)",
+                   (m.cash, sum(m.value.get(k, 0.0) for k in u.mine), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
         db.executemany("INSERT INTO dec_shape VALUES (?, ?, ?)",
                        [(p, MIN_SLOT[p], MAX_SLOT[p]) for p in MIN_SLOT])
 
@@ -57,17 +51,17 @@ def after_auctions() -> frozenset[str]:
     return frozenset(k for (k,) in rows("SELECT player FROM dec_when WHERE after"))
 
 
-def plan(u: Universe, lam: float | None = None, sales_only: bool = False) -> list[Action]:
+def plan(u: Universe, sales_only: bool = False) -> list[Action]:
     """The plan decide.sql makes for this universe, its moves in order: a
     buy at its bid, a sale at what it gets (a swap's buy, then its sale). With
     sales_only, only sales (what clearing a debt takes). Every single move
     as valued before the first is kept beside it (dec_start, dec_rows)."""
-    inputs(u, lam)
+    inputs(u)
     out: list[Action] = []
     with closing(connect()) as db, db:
         if sales_only:
             db.execute("DELETE FROM dec_player WHERE NOT mine")
-        db.execute("INSERT INTO dec_start SELECT b, s, bid, win, proceeds, gain, money, worth FROM dec_options"
+        db.execute("INSERT INTO dec_start SELECT b, s, bid, win, proceeds, gain, worth FROM dec_options"
                    " WHERE b = '' OR s = ''")
         for step in range(SQUAD_MAX * 2):
             got = db.execute("SELECT b, s, bid, win, proceeds, worth FROM dec_next").fetchone()
@@ -101,13 +95,14 @@ def _selftest() -> None:
     cells: dict[str, tuple[float, float]] = {k: (4.0, 1.0) for k in squad}
     cells.update({"m4": (2.0, 1.0), "bench": (1.0, 1.0), "star": (8.0, 1.0), "keeper": (3.0, 1.0)})
 
-    def universe(cash: float, price: dict[str, float], odds: Any = None, value: Any = None) -> Universe:
-        pos = {**squad, "star": "MED", "keeper": "POR"}
-        value = value or {**{k: 5e6 for k in squad}, **price}
-        return Universe(state=LeagueState({"me": dict(squad)}, js, "me"),
-                        forecaster=Bootstrap({j: dict(cells) for j in js}),
-                        market=Market(cash=cash, pos=pos, price=price, odds=odds or {},
-                                      value=value, ahead=value))     # no trend: worth his value
+    def universe(cash: float, price: dict[str, float], odds: Any = None, extra: int = 0) -> Universe:
+        """The squad (and extra bench players scoring nothing), and price on the market."""
+        sq = {**squad, **{"x%02d" % i: "DEF" for i in range(extra)}}
+        cs = {**cells, **{"x%02d" % i: (0.0, 1.0) for i in range(extra)}}
+        return Universe(state=LeagueState({"me": sq}, js, "me"),
+                        forecaster=Bootstrap({j: dict(cs) for j in js}),
+                        market=Market(cash=cash, pos={**sq, "star": "MED", "keeper": "POR"}, price=price,
+                                      odds=odds or {}, value={**{k: 5e6 for k in sq}, **price}))
 
     def labels(acts: list[Action]) -> list[str]:
         return [a.label() for a in acts]
@@ -115,41 +110,43 @@ def _selftest() -> None:
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         # The eleven: k, d1-d3, m1-m3, f1 (each position's least), then the best three of the rest:
         # f2, f3 and m4 (2 points); bench (1) plays for nobody. 42 points a jornada.
-        inputs(universe(10e6, {"star": 8e6}), lam=1.0)
-        assert rows("SELECT gain, money FROM dec_options WHERE b = 'star' AND s = ''") == [(12.0, 0.0)], \
-            "star (8) for m4 (2), two jornadas; bought at his value: no money lost"
+        inputs(universe(10e6, {"star": 8e6}))
+        assert rows("SELECT gain, worth FROM dec_options WHERE b = 'star' AND s = ''") == [(12.0, 12.0)], \
+            "star (8) for m4 (2), two jornadas: his points, and nothing for his price"
         assert rows("SELECT jornada, count(*), total(xp) FROM dec_eleven"
                     " GROUP BY jornada") == [(1, 11, 42.0), (2, 11, 42.0)]
-        assert labels(plan(universe(10e6, {"star": 8e6}), lam=1.0)) == ["buy star"]
-        dear = {**{k: 5e6 for k in squad}, "star": 4e6}
-        assert labels(plan(universe(10e6, {"star": 8e6}, value=dear), lam=1.0)) == ["buy star"], \
-            "a 4M premium at 1 point a million: 12 - 4"
-        assert plan(universe(10e6, {"star": 8e6}, value=dear), lam=3.0) == [], \
-            "at 3 points a million the premium costs all he adds: 12 - 12 is not worth more than nothing"
-        got = plan(universe(4e6, {"star": 8e6}), lam=1.0)
+        assert labels(plan(universe(10e6, {"star": 8e6}))) == ["buy star"]
+        assert labels(plan(universe(10e6, {"star": 10e6}))) == ["buy star"], \
+            "his price is a limit, not a cost: within cash, the points decide"
+        got = plan(universe(4e6, {"star": 8e6}))
         assert [a.kind for a in got] == ["buy", "sell"] and got[1].sell[0] in ("bench", "m4"), \
             "4M short of a lock at zero: paid for by a sale of 5M of one he leaves out of the eleven"
         assert after_auctions() == set(got[1].sell), "a sale beside a bid: made once the bid is won"
-        assert plan(universe(2e6, {"star": 8e6}), lam=1.0) == [], "no one sale pays for him"
-        got = plan(universe(10e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0))}), lam=1.0)
+        assert plan(universe(2e6, {"star": 8e6})) == [], "no one sale pays for him"
+        assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(8e6, 1.0, 0)], \
+            "one the plan leaves out, at the lowest bid offered"
+        got = plan(universe(10e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0), (1.3, 1.0))}))
         assert [(a.buy, a.cost) for a in got] == [("star", 10e6)], \
-            "at asking a quarter of 12 (3); at 1.25 sure, 12 - 2 = 10: the sure bid"
-        assert labels(plan(universe(30e6, {"star": 8e6, "keeper": 6e6}), lam=0.0)) == ["buy star"], \
-            "a second keeper, worse than k, plays for nobody: money at nothing, still not bought"
-        plan(universe(4e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0))}), lam=1.0)
-        assert rows("SELECT kind, player, amount, win, gain, money, in_plan FROM dec_rows"
+            "at asking a quarter of 12 (3); at 1.25 sure (12): the sure bid, the least of those as sure"
+        assert labels(plan(universe(30e6, {"star": 8e6, "keeper": 6e6}))) == ["buy star"], \
+            "a second keeper, worse than k, plays for nobody: not bought, however much cash"
+        plan(universe(4e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0))}))
+        assert rows("SELECT kind, player, amount, win, gain, in_plan FROM dec_rows"
                     " WHERE player IN ('star', 'bench', 'k') ORDER BY player") == [
-            ("sell", "bench", 5e6, 1.0, 0.0, 0.0, 1), ("sell", "k", 5e6, 1.0, -8.0, 0.0, 0),
-            ("buy", "star", 8e6, 0.25, 12.0, 0.0, 1)], \
+            ("sell", "bench", 5e6, 1.0, 0.0, 1), ("sell", "k", 5e6, 1.0, -8.0, 0),
+            ("buy", "star", 8e6, 0.25, 12.0, 1)], \
             "each move alone from the squad as it is, a buy at the plan's bid (at 4M and a sale, his asking)"
-        plan(universe(30e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0))}, value=dear), lam=100.0)
-        assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(8e6, 0.25, 0)], \
-            "one the plan leaves out at the lowest bid offered"
-        assert labels(plan(universe(-3e6, {}), lam=1.0)) == ["sell bench"], "in debt: the least bad sale"
+        full = plan(universe(30e6, {"star": 8e6}, extra=SQUAD_MAX - len(squad)))
+        assert [a.kind for a in full] == ["buy", "sell"] and (full[1].sell[0] == "bench"
+                                                               or full[1].sell[0].startswith("x")), \
+            "a full squad: a sale of one who plays for nobody makes room for him"
+        assert plan(universe(30e6, {}, extra=SQUAD_MAX - len(squad))) == [], \
+            "a player who scores nothing is not sold for his money: money is no goal"
+        assert labels(plan(universe(-3e6, {}))) == ["sell bench"], "in debt: the least bad sale"
         assert after_auctions() == set(), "no bid: the sale at once"
-        assert labels(plan(universe(-12e6, {}), lam=1.0)) == ["sell bench", "sell m4", "sell d1"], \
+        assert labels(plan(universe(-12e6, {}))) == ["sell bench", "sell m4", "sell d1"], \
             "until clear: bench (0), m4 (-4: his place empty), then a slot each, by name"
-        assert labels(plan(universe(10e6, {"star": 8e6}), lam=1.0, sales_only=True)) == [], \
+        assert labels(plan(universe(10e6, {"star": 8e6}), sales_only=True)) == [], \
             "sales only: no buy, and no sale worth more than nothing"
     print("decision self-test OK")
 

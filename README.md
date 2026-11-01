@@ -100,9 +100,8 @@ Every forecast is the same product, for every player and jornada
   in price trend (schema.sql's `bid_odds`, from `auction_results`: what the
   winner paid, or asking if nobody bought): rising players draw rivals'
   bids, falling ones almost never. A buy bids the level whose chance times
-  what the move is then worth is greatest (decide.sql's `dec_options`).
-  A player's worth as money is his value once his trend has run
-  (`player_facts.ahead`).
+  the points the move adds is greatest, the least of those as likely
+  (decide.sql's `dec_options`).
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more
@@ -118,12 +117,13 @@ Every forecast is the same product, for every player and jornada
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.
-- **Moves** (`ffcore/decide.sql`, its maths at the top of the file): every
-  move in points. A buy is its chance of winning times the points it adds
-  to the best eleven of each jornada left, less the money over his value at
-  what a million is worth (`money_rate`: the slope of points a game on
-  value); a sale the points it costs plus the money it makes; a swap both,
-  on the squad they make together. The plan takes the best move worth more
+- **Moves** (`ffcore/decide.sql`, its maths at the top of the file): the
+  aim is to finish first, so every move is worth its points and nothing
+  else; money is a limit, never a goal. A buy is its chance of winning
+  times the points it adds to the best eleven of each jornada left; a sale
+  the points it costs (never more than nothing, so made only to pay for a
+  buy, make room for one, or clear a debt); a swap both, on the squad they
+  make together. The plan takes the best move worth more
   than nothing, then again on the squad and cash it leaves, while the squad
   fits, cash at the lock stays at zero or more and bids stay within cash
   and the game's debt; in debt, the least bad sale until clear.

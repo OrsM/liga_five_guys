@@ -36,16 +36,16 @@
           "sql": "SELECT r.run_id, r.started, r.trigger, r.commit_sha, r.ok, round(r.peak_mb) AS peak_mb,\n       round(max(CASE WHEN m.stage = 'parse' AND m.measure = 'seconds' THEN m.value END), 1) AS parse_s,\n       max(CASE WHEN m.stage = 'parse' AND m.measure = 'snapshots' THEN m.value END) AS snapshots,\n       round(max(CASE WHEN m.stage = 'crosswalk' AND m.measure = 'seconds' THEN m.value END), 1) AS crosswalk_s,\n       round(max(CASE WHEN m.stage = 'sim' AND m.measure = 'seconds' THEN m.value END), 1) AS sim_s,\n       round(max(CASE WHEN m.stage = 'grade' AND m.measure = 'seconds' THEN m.value END), 1) AS grade_s\nFROM runs r LEFT JOIN run_measures m USING (run_id)\nGROUP BY r.run_id ORDER BY r.run_id DESC LIMIT 100"
         },
         "decision": {
-          "title": "Every move the latest decision valued alone (decision_option): its points, its money at lam, its worth, the bid and its chance, and whether the plan makes it",
-          "sql": "SELECT o.kind, coalesce(s.name, o.player) AS name, round(o.amount / 1e6, 2) AS amount_m, round(o.win, 2) AS win,\n       round(o.gain, 1) AS points, round(o.money, 1) AS money_pts, round(o.worth, 1) AS worth, o.in_plan\nFROM decision_option o LEFT JOIN sim_facts s USING (run_id, player)\nWHERE o.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM decision_option))\n  AND (nullif(:name, '') IS NULL OR coalesce(s.name, o.player) LIKE '%' || :name || '%') ORDER BY o.worth DESC"
+          "title": "Every move the latest decision valued alone (decision_option): its points, its worth, the bid and its chance, and whether the plan makes it",
+          "sql": "SELECT o.kind, coalesce(s.name, o.player) AS name, round(o.amount / 1e6, 2) AS amount_m, round(o.win, 2) AS win,\n       round(o.gain, 1) AS points, round(o.worth, 1) AS worth, o.in_plan\nFROM decision_option o LEFT JOIN sim_facts s USING (run_id, player)\nWHERE o.run_id = coalesce(nullif(:run, ''), (SELECT max(run_id) FROM decision_option))\n  AND (nullif(:name, '') IS NULL OR coalesce(s.name, o.player) LIKE '%' || :name || '%') ORDER BY o.worth DESC"
         },
         "offers": {
           "title": "The game's offers for your players (latest run), the best price first: the offer against his value, the share of the game's last offers it beats, what selling him does to your season in points, and whether the plan sells him",
           "sql": "SELECT name, pos, round(offer / 1e6, 2) AS offer_m, round(value / 1e6, 2) AS value_m,\n       round(100 * (offer / value - 1), 1) AS vs_value_pct, round(100 * beats) AS beats_pct,\n       round(gain, 1) AS season_points, sell\nFROM board_mine WHERE offer IS NOT NULL AND value > 0 ORDER BY offer / value DESC, player"
         },
         "market": {
-          "title": "The market as the latest run valued it: every player on sale whose purchase gains you season points, the bid, its chance, his points and money alone, whether the plan buys him",
-          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m, round(win, 2) AS win,\n       round(gain, 1) AS season_points, round(money, 1) AS money_pts, round(worth, 1) AS worth, in_plan AS plan,\n       round(trend, 1) AS trend_pct\nFROM board_buys WHERE gain > 0 ORDER BY worth DESC"
+          "title": "The market as the latest run valued it: every player on sale whose purchase gains you season points, the bid, its chance, his points alone, whether the plan buys him",
+          "sql": "SELECT name, pos, round(asking / 1e6, 2) AS asking_m, round(bid / 1e6, 2) AS bid_m, round(win, 2) AS win,\n       round(gain, 1) AS season_points, round(worth, 1) AS worth, in_plan AS plan,\n       round(trend, 1) AS trend_pct\nFROM board_buys WHERE gain > 0 ORDER BY worth DESC"
         },
         "forecast": {
           "title": "A player's forecast, factor by factor (latest run)",

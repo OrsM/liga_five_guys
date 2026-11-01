@@ -31,7 +31,6 @@ class Universe:
     part_played: dict[int, set[str]] = field(default_factory=dict)
     first_jornada_of: dict[str, int] = field(default_factory=dict)
     factors: Mapping[int, Mapping[str, Factors]] = field(default_factory=dict)
-    lam: float = 0.0        # what a million is worth now, in points (decide.sql money_rate)
 
     @property
     def me(self) -> str:

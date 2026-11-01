@@ -381,8 +381,7 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
                             "standpat_expected": sum(still.expected.get(k, 0.0) for k in still.players),
                             "moves": "; ".join(made), "lost": lost, "cash": cash,
                             "value": sum(u.market.value.get(k, 0.0) for k in squad),
-                            "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold),
-                            "lam": u.lam})
+                            "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold)})
                 made, lost = [], 0
     finally:
         set_now(None)
@@ -395,7 +394,7 @@ def phantom_season() -> list[dict[str, Any]]:
     lost, and the forecasts are the grade's own business), its plans with
     variance weighed at nothing: the grade is the forecasts' and the
     moves', the plan's appetite for variance the backtest's (money)."""
-    return [{k: v for k, v in r.items() if k not in ("lost", "expected", "standpat_expected", "standpat_money", "lam")}
+    return [{k: v for k, v in r.items() if k not in ("lost", "expected", "standpat_expected", "standpat_money")}
             for r in phantom_path()]
 
 
@@ -747,18 +746,15 @@ if __name__ == "__main__":
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
         got = phantom_path(daily=True)
-        # The scoreboard: points, and money (cash and squad value) at the
-        # last jornada's money rate (decide.sql money_rate), for both.
-        lam = got[-1]["lam"] if got else 0.0
-        print("%6s %5s %8s %8s %9s %9s %8s %8s" % ("moves", "lost", "points", "standpat",
-                                                 "cash(M)", "value(M)", "score", "standpat"))
-        print("%6d %5d %+8.0f %+8.0f %+9.1f %+9.1f %+8.0f %+8.0f" % (
+        # The scoreboard: points, for both, what finishing first is won on;
+        # and the cash and squad value the phantom ends with, and standing still.
+        print("%6s %5s %8s %8s %9s %9s %9s" % ("moves", "lost", "points", "standpat",
+                                              "cash(M)", "value(M)", "standpat(M)"))
+        print("%6d %5d %+8.0f %+8.0f %+9.1f %+9.1f %+9.1f" % (
             sum(len(g["moves"].split("; ")) for g in got if g["moves"]), sum(g["lost"] for g in got),
             sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
             got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0,
-            sum(g["phantom"] for g in got) + lam * (got[-1]["cash"] + got[-1]["value"]) / 1e6 if got else 0.0,
-            sum(g["standpat"] for g in got) + lam * got[-1]["standpat_money"] / 1e6 if got else 0.0),
-            flush=True)
+            got[-1]["standpat_money"] / 1e6 if got else 0.0), flush=True)
         # Out without freeing the universes one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)

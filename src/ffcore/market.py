@@ -21,8 +21,7 @@ class Market:
     or what waiting is worth, whichever is more). odds, for each player on
     the game's market, the bids over his asking price to choose from and
     each one's chance of winning his auction (schema.sql's bid_odds),
-    lowest first. ahead is his value once his price trend has run
-    (schema.sql's player_facts), for players with a value.
+    lowest first.
     No points: what anyone will score is the outlook's business."""
     cash: float = 0.0
     name: dict[str, Name] = field(default_factory=dict)
@@ -37,7 +36,6 @@ class Market:
     paid: dict[str, float] = field(default_factory=dict)
     offer: dict[str, float] = field(default_factory=dict)
     fetch: dict[str, float] = field(default_factory=dict)
-    ahead: dict[str, float] = field(default_factory=dict)
     odds: dict[str, tuple[tuple[float, float], ...]] = field(default_factory=dict)
 
     def shown(self, k: str) -> str:

@@ -469,7 +469,7 @@ def _built(also: frozenset[str]) -> Built:
         pos=pos, price=price, route=column("route"), owner=column("owner"),
         paid=column("paid"), offer=column("offer"),
         value=column("value"), my_bid=column("my_bid"),
-        trend=prices.trend, clause=column("clause"), ahead=column("ahead"),
+        trend=prices.trend, clause=column("clause"),
         fetch=dict(rows("SELECT player, fetches FROM sale_odds")))
     squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
     assert all(_fieldable(sq) for sq in squads.values()), squads
@@ -489,8 +489,7 @@ def _built(also: frozenset[str]) -> Built:
         state=LeagueState(squads, rem, me, carried), forecaster=boot,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors,
-        lam=rows("SELECT coalesce(lam, 0) FROM money_rate")[0][0]),
+        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors),
         params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 
@@ -725,8 +724,6 @@ def _selftest_sale() -> None:
                 later = sum(max(x * then, later) for x in (0.9, 1.0, 1.1)) / 3
             (waiting, fetches), = rows("SELECT waiting, fetches FROM sale_odds")
             assert abs(waiting - later) < 1e-6 and fetches == max(10.5e6, later), (waiting, later)
-            assert rows("SELECT ahead FROM player_facts WHERE player = 'p1'") == [(value * (1 + trend / 100), )], \
-                "his value once his trend has run: the whole of it (the longest horizon's carry is 1)"
 
             assert [k for k, _kind in rows("SELECT player, kind FROM waiting")] == ["p1"], \
                 "waiting is a sale's: yours, with an offer standing"
@@ -792,7 +789,7 @@ def _selftest_facts() -> None:
         "listed under his value: the game takes no bid under it (2026-10-29, D. Martinez), so that is what he costs"
     assert got["p1"] == {"name": "ana uno", "pos": "DEF", "value": 5e6, "owner": "me",
                          "clause": 9e6, "price": None, "route": None, "my_bid": None,
-                         "offer": 6e6, "paid": None, "trend": None, "ahead": 5e6}, got["p1"]
+                         "offer": 6e6, "paid": None, "trend": None}, got["p1"]
     assert (got["p2"]["value"], got["p2"]["price"], got["p2"]["route"], got["p2"]["my_bid"]) \
         == (None, 2e6, "listed", 2.5e6), "a value of 0 is none; a manager's listing; your bid"
     assert (got["p5"]["route"], got["p5"]["pos"]) == ("free", "MED"), \

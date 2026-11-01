@@ -24,8 +24,7 @@ CREATE TABLE IF NOT EXISTS run_measures (
 
 -- The decision a run made (decision.plan, ffcore/decide.sql): every single
 -- move valued from the squad as it is (dec_rows), and the plan's moves in
--- order (dec_plan; a swap is a buy and a sale of one step). Points, money
--- at the run's lam (sim_runs).
+-- order (dec_plan; a swap is a buy and a sale of one step), in points.
 CREATE TABLE IF NOT EXISTS decision_option (
     run_id  INTEGER NOT NULL REFERENCES runs(run_id),
     kind    TEXT NOT NULL,           -- buy, sell
@@ -33,7 +32,6 @@ CREATE TABLE IF NOT EXISTS decision_option (
     amount  REAL,                    -- the bid, or what the sale gets
     win     REAL NOT NULL,
     gain    REAL NOT NULL,           -- points
-    money   REAL NOT NULL,           -- points: money gone or made, at lam
     worth   REAL NOT NULL,
     in_plan INTEGER NOT NULL,
     PRIMARY KEY (run_id, kind, player)
@@ -151,12 +149,14 @@ CREATE TABLE IF NOT EXISTS sim_waiting (
     PRIMARY KEY (run_id, player, kind)
 );
 
--- What a million was worth (money_rate's lam), and the forecast moment
--- the run was built on (forecast_cell keeps it while a run points to it).
+-- The forecast moment the run was built on (forecast_cell keeps it while a
+-- run points to it), and your chance of first and expected finish once the
+-- plan is made, every bid won (Universe.standings on its squad).
 CREATE TABLE IF NOT EXISTS sim_runs (
-    run_id INTEGER PRIMARY KEY REFERENCES runs(run_id),
-    lam    REAL,
-    moment INTEGER REFERENCES forecast_moment(moment)
+    run_id        INTEGER PRIMARY KEY REFERENCES runs(run_id),
+    moment        INTEGER REFERENCES forecast_moment(moment),
+    p_first_after REAL,
+    finish_after  REAL
 );
 
 -- grading, when run.py grade finds something new: each past lock forecast
@@ -672,7 +672,7 @@ SELECT w.player, coalesce(nullif(w.name, ''), w.player) AS name,
        position(upper(w.position)) AS pos, nullif(w.value, 0) AS value,
        o.manager AS owner, c.clause, s.price, s.route, b.my_bid,
        CASE WHEN o.manager = (SELECT me FROM league_config) THEN f.offer END AS offer,
-       p.paid, t.trend, nullif(w.value, 0) * (1 + coalesce(t.trend, 0.0) / 100) AS ahead
+       p.paid, t.trend
 FROM who w LEFT JOIN owners o USING (player) LEFT JOIN clause c USING (player)
 LEFT JOIN sale s USING (player) LEFT JOIN bid b USING (player)
 LEFT JOIN offer f USING (player) LEFT JOIN price_paid p USING (player)
@@ -1398,13 +1398,13 @@ FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN sim_facts f USING (ru
 -- market you could get), with what the run saw of him: what he is listed at
 -- (asking), the bid (the plan's, or the lowest his odds offer) and its
 -- chance of winning (win), your bid if it is in, what you pay (cost), his
--- value and trend, his points and money alone, and whether the plan buys him.
+-- value and trend, his points alone, and whether the plan buys him.
 DROP VIEW IF EXISTS board_market;
 DROP VIEW IF EXISTS board_buys;
 CREATE VIEW board_buys AS
 SELECT o.player, coalesce(s.name, o.player) AS name, coalesce(s.pos, '') AS pos,
        coalesce(s.price, o.amount) AS asking, o.amount AS bid, s.my_bid, o.amount AS cost,
-       s.value, s.trend, o.gain, o.money, o.worth, o.in_plan, o.win
+       s.value, s.trend, o.gain, o.worth, o.in_plan, o.win
 FROM decision_option o JOIN board_run USING (run_id)
 LEFT JOIN sim_facts s ON s.run_id = o.run_id AND s.player = o.player
 WHERE o.kind = 'buy';
@@ -1412,7 +1412,7 @@ WHERE o.kind = 'buy';
 -- Each of your players: his facts (board_players), whether he is listed,
 -- the game's offer standing on him and the share of its recent offers
 -- (recent_offers), as a share of value, it beats; what selling him alone
--- does (decision_option: points, money, worth), whether the plan sells
+-- does (decision_option: points, worth), whether the plan sells
 -- him, and what turning the offer down is worth (waiting: the best of the
 -- game's offers still to come before the lock, sim_waiting).
 -- relist_after: when his listing ends, if before the last of those offers.
@@ -1426,7 +1426,7 @@ SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.t
        b.route IS 'listed' AS listed,
        CASE WHEN b.offer IS NOT NULL AND b.value > 0
             THEN (SELECT avg(r.ratio < b.offer / b.value) FROM r) END AS beats,
-       f.gain, f.money, f.worth, coalesce(f.in_plan, 0) AS sell,
+       f.gain, f.worth, coalesce(f.in_plan, 0) AS sell,
        w.later AS waiting,
        CASE WHEN b.route IS 'listed' AND l.t < n.first + n.nights - 1 THEN l.ends END AS relist_after,
        n.nights
@@ -1565,7 +1565,6 @@ buys AS (
                           WHERE m.player = b.player AND m.bids <> '') n WHERE n.bids IS NOT NULL
                 UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
                 UNION ALL SELECT 3, 'points', b.gain, 'points'
-                UNION ALL SELECT 3.5, 'money', b.money, 'points'
                 UNION ALL SELECT 4, '', b.trend, 'trend')
             WHERE v IS NOT NULL),
            json_array(b.player)
@@ -1588,7 +1587,6 @@ sells AS (
                 UNION ALL SELECT 2.4, 'more offers before the lock', s.nights, 'count'
                     WHERE s.offer IS NOT NULL
                 UNION ALL SELECT 3, 'points', s.gain, 'points'
-                UNION ALL SELECT 3.5, 'money', s.money, 'points'
                 UNION ALL SELECT 4, '', s.trend, 'trend')
             WHERE v IS NOT NULL),
            json_array(s.player)
@@ -1621,8 +1619,9 @@ FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM p
       UNION ALL SELECT * FROM unlisted UNION ALL SELECT * FROM relist);
 
 -- The board's headline: when the next jornada locks (next_lock), your money, where you
--- are expected to finish and your chance of first, your season's points
--- band, what a million is worth, what the plan leaves you, what more you could bid after
+-- are expected to finish and your chance of first, now and once the plan
+-- is made (every bid won), your season's points band, what the plan
+-- leaves you, what more you could bid after
 -- it and your bids it does not make (into the debt the game allows, to
 -- clear by selling before the lock), and what is still to do.
 DROP VIEW IF EXISTS board_head;
@@ -1634,7 +1633,8 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
        me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
-       (SELECT lam FROM sim_runs JOIN board_run USING (run_id)) AS lam,
+       (SELECT round(finish_after, 2) FROM sim_runs JOIN board_run USING (run_id)) AS finish_after,
+       (SELECT round(p_first_after, 3) FROM sim_runs JOIN board_run USING (run_id)) AS p_win_after,
        me.lo AS band_lo, me.hi AS band_hi,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT left FROM board_money) END AS cash_after,
        (SELECT max(0.0, left + debt) - held FROM board_money) AS can_bid,
@@ -1679,7 +1679,7 @@ WITH lines AS (SELECT ord, json(CASE WHEN what = 'field'
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
     'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,
-    'lam', h.lam,
+    'finish_after', h.finish_after, 'p_win_after', h.p_win_after,
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines),
     'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
