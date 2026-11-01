@@ -252,6 +252,7 @@ def _selftest_tables() -> None:
     import tempfile
 
     from ffcore.clock import set_now
+    from ffcore.db import rows
 
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
@@ -278,7 +279,7 @@ def _selftest_tables() -> None:
                     == now, source
             stats = {(r["activity_id"], r["kind"]) for r in current("api_activity")}
             assert stats == {("1", "1"), ("2", "5")}, stats
-            assert current("market") == [] and history("market") == []
+            assert current("market") == []
             store_sql("matches", [
                 {"observed_at": a, "match_id": "m1", "jornada": "8", "home": "x", "score": "2-0"},
                 {"observed_at": a, "match_id": "m2", "jornada": "", "home": "y", "score": ""}])
@@ -289,7 +290,6 @@ def _selftest_tables() -> None:
             assert (ms["m1"]["jornada"], ms["m2"]["jornada"]) == (8, None), \
                 "numbers are parsed once, where the table is read"
             assert ms["m1"]["home"] == "x" and ms["m1"]["score"] == "2-0", "text stays text"
-            assert [r["jornada"] for r in history("matches")] == [8, None]
             mk = current("api_market")[0]
             assert (mk["sale_price"], mk["bids"], mk["bid_money"], mk["player_id"]) \
                 == (5e6, 2, None, "7"), mk
@@ -308,7 +308,7 @@ def _selftest_tables() -> None:
             store_sql("api_activity", [
                 {"observed_at": "2026-08-03T1000Z", "activity_id": "9", "kind": "3"},
                 {"observed_at": "2026-08-03T1100Z", "activity_id": "9", "kind": "2"}])
-            assert [(r["activity_id"], r["kind"]) for r in history("api_activity")] == [
+            assert rows("SELECT activity_id, kind FROM api_activity ORDER BY rowid") == [
                 ("1", "0"), ("1", "1"), ("2", "5"), ("9", "2"), ("9", "3"), ("9", "2")], \
                 "a keyed row is kept once, and again only when it changes (back included)"
         finally:

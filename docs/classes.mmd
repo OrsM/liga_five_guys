@@ -1,5 +1,17 @@
 classDiagram
     direction LR
+    class App {
+        act
+        +call: Call
+        +base: str
+        +league: str
+        +team: str
+        +nap: Nap
+        +url()
+        +get()
+        +send()
+        +until()
+    }
     class Prices {
         <<NamedTuple>>
         assemble
@@ -7,36 +19,27 @@ classDiagram
         +carry: tuple~float ...~
         +trend: dict~str float~
         +horizon: int
-        +error: tuple~float ...~
     }
     class Built {
         <<NamedTuple>>
         assemble
         +universe: Universe
         +params: list~dict~str Any~~
+        +moment: int
     }
-    class Move {
-        <<frozen dataclass>>
-        decide
-        +action: Action
-        +d_pts: float
-        +p_better: float
-        +money: float
-        +win: float
-        +alone: bool
-        +d_first: float
-        +per_million()
-    }
-    class Board {
+    class Forecast {
         <<NamedTuple>>
-        decide
-        +plan: list~Move~
-        +gain: float
-        +rows: list~Move~
-        +start: Universe
-        +lam: float
-        +base()
-        +sale()
+        assemble
+        +per_j: PerJornada
+        +factors
+        +flagged: frozenset~str~
+        +fits: list~dict~str Any~~
+        +moment: int
+    }
+    class StoredFactors {
+        assemble
+        +moment: int
+        +players: set~str~ | None
     }
     class Universe {
         <<frozen dataclass>>
@@ -47,18 +50,15 @@ classDiagram
         +rival_cash: dict~str float~
         +part_played: dict~int set~str~~
         +first_jornada_of: dict~str int~
-        +factors: PerJornadaFactors
+        +factors
+        +lam: float
         +me()
         +mine()
         +standings()
         +outlook()
         +acquire()
-        +bid()
         +after()
         +squad_after()
-        +candidates()
-        +why_not()
-        +rank()
     }
     class Action {
         <<frozen dataclass>>
@@ -157,14 +157,12 @@ classDiagram
         +owner: dict~str str~
         +value: dict~str float~
         +trend: dict~str float~
-        ...9 more fields
+        ...7 more fields
         +shown()
         +names()
         +fetches()
         +takes()
         +left()
-        +later()
-        +money()
     }
     class Name {
         ffcore.names
@@ -189,6 +187,14 @@ classDiagram
         +next_up()
         +xi()
         +season()
+    }
+    class Record {
+        <<NamedTuple>>
+        ffcore.points
+        +pts: float
+        +apps: float
+        +squads: float
+        +pick: float | None
     }
     class Rounds {
         <<NamedTuple>>
@@ -322,20 +328,18 @@ classDiagram
         ingest
         +of()
     }
-    Board *-- Move : plan
-    Board *-- Move : rows
-    Board *-- Universe : start
     Built *-- Universe : universe
     Day *-- Action : pending
     Expectations *-- Rates : rates
+    Forecast *-- Factors : factors
     League *-- Config : cfg
     Market *-- Name : name
-    Move *-- Action : action
     Outlook *-- Bootstrap : forecaster
     Outlook *-- LeagueState : state
     Scorer *-- StartOdds : starts
     StartOdds *-- Availability : avail
     StartOdds *-- Calibration : cal
     Universe *-- Bootstrap : forecaster
+    Universe *-- Factors : factors
     Universe *-- LeagueState : state
     Universe *-- Market : market

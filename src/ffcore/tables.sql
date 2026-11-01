@@ -26,10 +26,6 @@ CREATE TABLE IF NOT EXISTS market (
 );
 CREATE INDEX IF NOT EXISTS market_at ON market (source, observed_at);
 DROP VIEW IF EXISTS history_market;
-CREATE VIEW history_market AS
-SELECT t.observed_at, t.source, t.value, t.delta_1d, t.delta_pct_1d, t.ff_id, t.name, t.position, t.team_id, t.team, t.club
-FROM market t
-WHERE t.observed_at <= (SELECT cut()) ORDER BY t.rowid;
 DROP VIEW IF EXISTS current_market;
 CREATE VIEW current_market AS
 SELECT t.observed_at, t.source, t.value, t.delta_1d, t.delta_pct_1d, t.ff_id, t.name, t.position, t.team_id, t.team, t.club
@@ -93,10 +89,6 @@ WHEN EXISTS (SELECT 1 FROM matches o WHERE o.rowid = (SELECT max(rowid) FROM mat
          AND o.kickoff IS NEW.kickoff)
 BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS history_matches;
-CREATE VIEW history_matches AS
-SELECT t.observed_at, t.source, t.jornada, t.match_id, t.path, t.home, t.away, t.score, t.kickoff
-FROM matches t
-WHERE t.observed_at <= (SELECT cut()) ORDER BY t.rowid;
 DROP VIEW IF EXISTS current_matches;
 CREATE VIEW current_matches AS
 SELECT t.observed_at, t.source, t.jornada, t.match_id, t.path, t.home, t.away, t.score, t.kickoff
@@ -132,10 +124,6 @@ WHEN EXISTS (SELECT 1 FROM points o WHERE o.rowid = (SELECT max(rowid) FROM poin
          AND o.season IS NEW.season)
 BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS history_points;
-CREATE VIEW history_points AS
-SELECT t.observed_at, t.source, t.points, t.games, t.avg, t.ff_id, t.player_name, t.player_name_full, t.team, t.season
-FROM points t
-WHERE t.observed_at <= (SELECT cut()) ORDER BY t.rowid;
 
 -- api_teams: the app's squads: who owns whom, values and clauses, a snapshot each fetch.
 CREATE TABLE IF NOT EXISTS api_teams (
@@ -261,12 +249,6 @@ CREATE TABLE IF NOT EXISTS api_lineup (
 );
 CREATE INDEX IF NOT EXISTS api_lineup_at ON api_lineup (source, observed_at);
 DROP VIEW IF EXISTS current_api_lineup;
-CREATE VIEW current_api_lineup AS
-SELECT t.observed_at, t.source, t.week, t.market_value, t.points, t.player_id, t.slot, t.formation, t.player_name, t.player_name_full, t.position_id, t.snapshot_at, a.player
-FROM api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
-WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
-    WHERE observed_at <= (SELECT cut()) GROUP BY source)
-ORDER BY t.rowid;
 
 -- api_leagues: the leagues you are in, a snapshot each fetch.
 CREATE TABLE IF NOT EXISTS api_leagues (
@@ -423,10 +405,6 @@ WHEN EXISTS (SELECT 1 FROM api_activity o WHERE o.rowid = (SELECT max(rowid) FRO
          AND o.counterparty IS NEW.counterparty)
 BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS history_api_activity;
-CREATE VIEW history_api_activity AS
-SELECT t.observed_at, t.source, t.amount, t.week, t.player_id, t.activity_id, t.at, t.kind, t.user_id, t.counterparty, a.player
-FROM api_activity t LEFT JOIN app_player a ON a.app_id = t.player_id
-WHERE t.observed_at <= (SELECT cut()) ORDER BY t.rowid;
 DROP VIEW IF EXISTS current_api_activity;
 CREATE VIEW current_api_activity AS
 SELECT t.observed_at, t.source, t.amount, t.week, t.player_id, t.activity_id, t.at, t.kind, t.user_id, t.counterparty, a.player

@@ -2,13 +2,13 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 708<br/>in 2 · out 18"]:::hub
+        assemble["assemble 978<br/>in 2 · out 18"]:::hub
         crosswalk["crosswalk 106"]
-        decide["decide 672"]
-        grading["grading 766<br/>in 0 · out 10"]:::hub
+        decide["decide 90"]
+        grading["grading 822<br/>in 0 · out 11"]:::hub
         ingest["ingest 748"]
-        run["run 232"]
-        sim["sim 615"]
+        run["run 230"]
+        sim["sim 523"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 253"]
@@ -21,29 +21,31 @@ flowchart LR
     subgraph data["Tables and time"]
         clock["clock 113"]
         ff_crosswalk["ff_crosswalk 96"]
-        db["db 420<br/>in 11 · out 6"]:::hub
-        jornadas["jornadas 149"]
+        db["db 421<br/>in 12 · out 6"]:::hub
+        jornadas["jornadas 157"]
         league["league 148"]
-        points["points 93"]
+        points["points 102"]
         tidy["tidy 326"]
     end
     subgraph model["Model"]
         action["action 44"]
         fixture["fixture 170"]
         forecast["forecast 60"]
-        market["market 142"]
+        market["market 95"]
         outlook["outlook 88"]
-        pricing["pricing 32"]
-        rules["rules 78"]
-        schedule["schedule 230"]
-        score["score 260"]
+        pricing["pricing 33"]
+        rules["rules 119"]
+        schedule["schedule 237"]
+        score["score 258"]
         season["season 30"]
         startprob["startprob 429"]
     end
     subgraph util["Pure utilities"]
-        facts["facts 250"]:::leaf
-        gain["gain 263"]:::leaf
-        kept["kept 161"]:::leaf
+        act["act 384"]:::leaf
+        decision["decision 150"]:::leaf
+        facts["facts 251"]:::leaf
+        gain["gain 255"]:::leaf
+        kept["kept 236"]:::leaf
         names["names 81"]:::leaf
         parse["parse 158<br/>in 15 · out 0"]:::hub
         text["text 113"]:::leaf
@@ -55,6 +57,10 @@ flowchart LR
     run -. "by name" .-> ingest
     run -. "by name" .-> crosswalk
     run -. "by name" .-> sim
+    act --> auth
+    act --> laliga_api
+    act --> rules
+    act --> ingest
     assemble --> decide
     assemble --> clock
     assemble --> db
@@ -86,6 +92,11 @@ flowchart LR
     decide --> rules
     decide --> schedule
     decide --> season
+    decision --> decide
+    decision --> action
+    decision --> db
+    decision --> forecast
+    decision --> rules
     clock --> parse
     ff_crosswalk --> facts
     ff_crosswalk --> names
@@ -141,6 +152,7 @@ flowchart LR
     tidy --> parse
     grading --> assemble
     grading --> decide
+    grading --> decision
     grading --> clock
     grading --> db
     grading --> forecast
@@ -167,8 +179,8 @@ flowchart LR
     run --> parse
     sim --> assemble
     sim --> decide
+    sim --> decision
     sim --> db
-    sim --> forecast
     sim --> tidy
     sources --> footballdata
     sources --> futbolfantasy
