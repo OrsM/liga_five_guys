@@ -1,15 +1,15 @@
 {
- "generated_at": "2026-11-01T17:10Z",
+ "generated_at": "2026-11-01T20:00Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 5279381.0,
  "cash_locked": 60656568.0,
- "finish": 2.02,
- "p_win": 0.174,
- "finish_after": 2.02,
- "p_win_after": 0.176,
+ "finish": 2.0,
+ "p_win": 0.198,
+ "finish_after": 2.0,
+ "p_win_after": 0.2,
  "band": [
-  1981.14613953049,
-  2272.62656448577
+  1997.14613953049,
+  2288.62656448577
  ],
  "do": [
   {
@@ -49,6 +49,7 @@
      "trend"
     ]
    ],
+   "ranked": true,
    "asking": 950458.0,
    "win": 1.0,
    "asking_win": 1.0,
@@ -77,6 +78,7 @@
    "gain": null,
    "per": "season",
    "facts": [],
+   "ranked": false,
    "accepts": [
     null
    ],
@@ -102,6 +104,7 @@
    "gain": null,
    "per": "season",
    "facts": [],
+   "ranked": false,
    "accepts": [
     null
    ],
@@ -133,6 +136,7 @@
      "time"
     ]
    ],
+   "ranked": false,
    "accepts": [],
    "act": [
     {
@@ -324,6 +328,7 @@
    "gain": 75.341684757202,
    "per": "season",
    "facts": [],
+   "more": false,
    "asking": 99550233.0,
    "win": 0.6,
    "asking_win": 0.6,
@@ -355,6 +360,7 @@
    "gain": 44.0317326527244,
    "per": "season",
    "facts": [],
+   "more": false,
    "asking": 74536722.0,
    "win": 0.733,
    "asking_win": 0.733,
@@ -386,6 +392,7 @@
    "gain": 29.7039806918706,
    "per": "season",
    "facts": [],
+   "more": false,
    "asking": 53582476.0,
    "win": 0.2,
    "asking_win": 0.2,
@@ -417,6 +424,7 @@
    "gain": 24.9709997353283,
    "per": "season",
    "facts": [],
+   "more": true,
    "asking": 40756250.0,
    "win": 0.633,
    "asking_win": 0.633,
@@ -448,6 +456,7 @@
    "gain": 22.4069940852985,
    "per": "season",
    "facts": [],
+   "more": true,
    "asking": 67211962.0,
    "win": 0.733,
    "asking_win": 0.733,
@@ -479,6 +488,7 @@
    "gain": 2.85193859732869,
    "per": "season",
    "facts": [],
+   "more": true,
    "asking": 10811477.0,
    "win": 1.0,
    "asking_win": 1.0,
@@ -510,6 +520,7 @@
    "gain": 2.65605588804989,
    "per": "season",
    "facts": [],
+   "more": true,
    "asking": 7038663.0,
    "win": 1.0,
    "asking_win": 1.0,
@@ -541,6 +552,7 @@
    "gain": 2.37237058188109,
    "per": "season",
    "facts": [],
+   "more": true,
    "asking": 6123634.0,
    "win": 0.2,
    "asking_win": 0.2,
@@ -571,7 +583,34 @@
    "done": true,
    "gain": 0.806224401558682,
    "per": "season",
-   "facts": [],
+   "facts": [
+    [
+     "listed at",
+     950458.0,
+     "money"
+    ],
+    [
+     "bids",
+     "only yours",
+     "count"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points",
+     0.806224401558682,
+     "points"
+    ],
+    [
+     "",
+     -10.2302817883786,
+     "trend"
+    ]
+   ],
+   "more": false,
    "asking": 950458.0,
    "win": 1.0,
    "asking_win": 1.0,
@@ -603,6 +642,7 @@
    "gain": 0.310654085527865,
    "per": "season",
    "facts": [],
+   "more": true,
    "asking": 5778287.0,
    "win": 1.0,
    "asking_win": 1.0,
@@ -637,6 +677,7 @@
    "gain": 0.0,
    "per": "season",
    "facts": [],
+   "more": false,
    "accepts": [],
    "act": [
     {
@@ -664,6 +705,7 @@
    "gain": -3.12711043544938,
    "per": "season",
    "facts": [],
+   "more": false,
    "accepts": [
     13454917.0
    ],
@@ -693,6 +735,7 @@
    "gain": -5.8645970144551,
    "per": "season",
    "facts": [],
+   "more": false,
    "accepts": [
     5588842.0
    ],
@@ -722,6 +765,7 @@
    "gain": -5.92020657313382,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -749,6 +793,7 @@
    "gain": -6.10319018369551,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [
     3720670.0
    ],
@@ -778,6 +823,7 @@
    "gain": -6.75564281628476,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [
     5379185.0
    ],
@@ -807,6 +853,7 @@
    "gain": -7.01959617394818,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [
     7134737.0
    ],
@@ -836,6 +883,7 @@
    "gain": -7.56548829279349,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -863,6 +911,7 @@
    "gain": -10.0487672363833,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -890,6 +939,7 @@
    "gain": -11.4582781467825,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -917,6 +967,7 @@
    "gain": -23.0525603300176,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [
     10603207.0
    ],
@@ -946,6 +997,7 @@
    "gain": -23.3079727656623,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -973,6 +1025,7 @@
    "gain": -28.3357848684185,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -1000,6 +1053,7 @@
    "gain": -30.228449470103,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -1027,6 +1081,7 @@
    "gain": -33.3872649346778,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -1054,6 +1109,7 @@
    "gain": -36.4989345949955,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [
     44846043.0
    ],
@@ -1083,6 +1139,7 @@
    "gain": -37.7865281256647,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -1110,6 +1167,7 @@
    "gain": -38.5996554636573,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -1137,6 +1195,7 @@
    "gain": -41.7574870245345,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -1164,6 +1223,7 @@
    "gain": -41.806300183995,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [],
    "act": [
     {
@@ -1191,6 +1251,7 @@
    "gain": -84.8602835513209,
    "per": "season",
    "facts": [],
+   "more": true,
    "accepts": [
     21436041.0
    ],
@@ -1322,14 +1383,14 @@
    "hi": 2443.18305468911,
    "cash": -45053177.0,
    "estimated": true,
-   "p_above": 0.817722419853715
+   "p_above": 0.791789770673088
   },
   {
    "manager": "miguel_autentico",
    "me": true,
-   "now": 557.0,
-   "lo": 1981.14613953049,
-   "hi": 2272.62656448577,
+   "now": 573.0,
+   "lo": 1997.14613953049,
+   "hi": 2288.62656448577,
    "cash": 5279381.0,
    "estimated": false,
    "p_above": null
@@ -1337,32 +1398,32 @@
   {
    "manager": "Albert Laporta",
    "me": false,
-   "now": 437.0,
-   "lo": 1839.23670272832,
-   "hi": 2132.46626493118,
+   "now": 455.0,
+   "lo": 1857.23670272832,
+   "hi": 2150.46626493118,
    "cash": 41766083.0,
    "estimated": true,
-   "p_above": 0.19097490548982
+   "p_above": 0.194368285905407
   },
   {
    "manager": "SusoGattuso",
    "me": false,
-   "now": 391.0,
-   "lo": 1656.35440178989,
-   "hi": 1921.79979498955,
+   "now": 411.0,
+   "lo": 1676.35440178989,
+   "hi": 1941.79979498955,
    "cash": 6671834.0,
    "estimated": true,
-   "p_above": 0.0140371231444202
+   "p_above": 0.0149942760286851
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
-   "now": 429.0,
-   "lo": 1526.83579104276,
-   "hi": 1768.6430818373,
+   "now": 436.0,
+   "lo": 1533.83579104276,
+   "hi": 1775.6430818373,
    "cash": 58393671.0,
    "estimated": true,
-   "p_above": 0.000591927524497327
+   "p_above": 0.000477172259021552
   }
  ]
 }
