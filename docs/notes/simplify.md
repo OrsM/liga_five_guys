@@ -153,21 +153,18 @@ Kept, and why:
 - The accept rule: already once, board_json's accepts, which act.py, the
   website's server and its page read.
 
-## Dead or idle
+## Dead or idle (cleared 2026-11-01)
 
-- lfg-publish's markdown reports branch and its comments; .runtime/ and
-  src/.runtime/ (September); the zero-byte lfg.db at the root; data/tidy
-  parsed_points.jsonl, startcal.json, .parse_spill/; scratch copies under
-  ~/.cache; .claude/RESUME.md; the fixture's `backup` key in
-  fantasyBoard.test.js; schema.sql's verdict column; KAPPAS mentions
-  (tools/perf.py:8).
-- Constants written to model_constants that no view reads (SHRINK_K,
-  AVAIL_K, PROMOTED_*, FIX_BAND, MIN_POOL, PERSISTENT_SHARE, ...);
-  PROMOTED_DISCOUNT cannot be varied.
-- Board fields nothing reads on the phone: plan_gain, standings[].mean.
-- README: grading flags that do not exist, at_risk, Universe.bid,
-  open_clauses, "seasons are simulated", the module layout; stale diagrams
-  (funnel.mmd, modules.mmd).
+- Gone: lfg-publish's markdown branch and its comments; .runtime/; the
+  zero-byte lfg.db at the root; data/tidy parsed_points.jsonl,
+  startcal.json, .parse_spill/; stale scratch copies under ~/.cache;
+  .claude/RESUME.md; the fixture's plan_gain and backup and the page's
+  p_win_after (website); five views nothing read; the board's plan_gain
+  and standings[].mean; the README's funnel, program, ask.py, at_risk,
+  open_clauses, Universe.bid and grading flags; diagrams regenerated.
+- Not dead after all: the constants no view reads are what a variant sets
+  and a run records (assemble.NAMES), and Datasette's constants query reads
+  them from model_constants. The verdict column and KAPPAS were gone already.
 
 ## Where the time goes
 
