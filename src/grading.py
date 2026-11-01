@@ -6,7 +6,7 @@ import os
 import sqlite3
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import closing
 from functools import cache
 from pathlib import Path
@@ -103,10 +103,24 @@ def warm(times: list[dt.datetime], also: Callable[[dt.datetime], frozenset[str]]
 WARM_JOBS = 4
 
 
-def universe_at(jornada: int, locks: dict[int, dt.datetime]) -> Universe | None:
-    """The universe a minute before this jornada locked (universe_when):
-    decisions, phantom_season and sim_calibration all stand at the locks."""
-    return universe_when(locks[jornada] - dt.timedelta(minutes=1))
+def before_locks() -> dict[dt.datetime, int]:
+    """A minute before each finished jornada's lock, oldest first, and the
+    jornada: where every replay of a lock stands."""
+    locks = round_locks()
+    return {locks[j] - dt.timedelta(minutes=1): j for j in sorted(done_jornadas() & set(locks), key=locks.__getitem__)}
+
+
+def at_locks(only: set[int] | None = None) -> Iterator[tuple[int, Universe]]:
+    """Each finished jornada (of only, if given) and the universe a minute
+    before its lock (universe_when), where one could be built; the clock
+    let go after: decisions and sim_calibration stand there."""
+    try:
+        for t, j in before_locks().items():
+            if (only is None or j in only) and (u := universe_when(t)) is not None:
+                yield j, u
+    finally:
+        set_now(None)
+        built.cache_clear()
 
 
 def auction_closes() -> list[dt.datetime]:
@@ -123,12 +137,11 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     """The forecast at each past lock, made with this code if not made yet
     (player_forecast): its moment, for the jornada it locks and, with ahead,
     the next ones too, each one done. Graded in SQL (grade_forecast)."""
-    locks = round_locks()
     done = done_jornadas()
     out = []
     try:
-        for i in sorted(done & set(locks), key=lambda j: locks[j]):
-            set_now(locks[i] - dt.timedelta(minutes=1))
+        for t, i in before_locks().items():
+            set_now(t)
             fc = player_forecast()
             out += [{"from_j": i, "jornada": j, "moment": fc.moment}
                     for j in range(i, i + ahead + 1) if j in done and j in fc.per_j]
@@ -186,17 +199,10 @@ def decisions() -> list[dict[str, Any]]:
     locks, actual = round_locks(), jornada_points()
     done = done_jornadas()
     made: list[tuple[int, Universe, list[tuple[Any, ...]], int]] = []
-    try:
-        for i in sorted(done & set(locks), key=lambda j: locks[j]):
-            u = universe_at(i, locks)
-            if u is None:
-                continue
-            decision.plan(u)
-            made.append((i, u, rows("SELECT kind, player, amount, in_plan FROM dec_rows"),
-                         price_momentum().horizon))
-    finally:
-        set_now(None)
-        built.cache_clear()
+    for i, u in at_locks():
+        decision.plan(u)
+        made.append((i, u, rows("SELECT kind, player, amount, in_plan FROM dec_rows"),
+                     price_momentum().horizon))
     out = []
     for i, u, moved, horizon in made:
         # what happened is read with the clock let go: as of the lock, no later price is seen
@@ -358,8 +364,8 @@ def phantom_path(daily: bool = False) -> list[dict[str, Any]]:
     moves made since the last, the bids lost, his cash and his squad's worth
     after them."""
     set_now(None)
-    locks, actual = round_locks(), jornada_points()
-    played = {locks[j] - dt.timedelta(minutes=1): j for j in done_jornadas() & set(locks)}
+    actual = jornada_points()
+    played = before_locks()
     first = min(played, default=None)
     runs = run_times([c for c in auction_closes() if first is not None and c > first]) if daily else {}
     runs = {r: c for r, c in runs.items() if first is not None and r > first}
@@ -500,25 +506,17 @@ def sim_calibration() -> list[dict[str, Any]]:
                              " ORDER BY observed_at DESC LIMIT 1", (m, t.strftime("%Y-%m-%dT%H%MZ"))).fetchone()
             return None if got is None else float(got[0])
         out: list[dict[str, Any]] = []
-        try:
-            done = done_jornadas()
-            for j, (start, end) in sorted(clean_windows(locks, kicks).items()):
-                if j not in done:
-                    continue
-                u = universe_at(j, locks)
-                if u is None:
-                    continue
-                st = standings(u.forecaster, {m: sq for m, sq in u.state.squads.items()
-                                              if not m.startswith("__")}, [j], {}, u.me)
-                actual = {}
-                for m in st.dist:
-                    a0, a1 = points(m, start), points(m, end)
-                    if a0 is not None and a1 is not None:
-                        actual[m] = a1 - a0
-                out += calibration_rows(j, st, actual, u.me)
-        finally:
-            set_now(None)
-            built.cache_clear()
+        windows = clean_windows(locks, kicks)
+        for j, u in at_locks(set(windows)):
+            start, end = windows[j]
+            st = standings(u.forecaster, {m: sq for m, sq in u.state.squads.items()
+                                          if not m.startswith("__")}, [j], {}, u.me)
+            actual = {}
+            for m in st.dist:
+                a0, a1 = points(m, start), points(m, end)
+                if a0 is not None and a1 is not None:
+                    actual[m] = a1 - a0
+            out += calibration_rows(j, st, actual, u.me)
     return out
 
 
