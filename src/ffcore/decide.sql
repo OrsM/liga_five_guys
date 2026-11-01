@@ -26,7 +26,7 @@
 -- (money he is worth) and what a sale of him gets; each one's expected
 -- points a jornada left as yours; each buy's bids and their chance of
 -- winning; your cash, squad value, the money rate, the game's debt share
--- and squad cap; the formations' bounds.
+-- and squad cap, the eleven's size; the formations' bounds.
 CREATE TABLE IF NOT EXISTS dec_player (
     player   TEXT PRIMARY KEY,
     pos      TEXT NOT NULL,
@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS dec_money (
     team_value REAL NOT NULL,
     lam        REAL NOT NULL,
     debt       REAL NOT NULL,
-    squad_max  INTEGER NOT NULL
+    squad_max  INTEGER NOT NULL,
+    xi_size    INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS dec_shape (
     pos TEXT PRIMARY KEY,
@@ -197,7 +198,7 @@ rm AS MATERIALIZED (
             FROM starts a JOIN st g ON g.jornada = a.jornada AND g.bench IS NOT NULL
             JOIN st o ON o.jornada = a.jornada AND o.pos = a.pos
             WHERE g.pos = a.pos
-               OR (g.cnt + 1 <= g.hi AND g.fill - (o.cnt > o.lo) + (g.cnt >= g.lo) <= 11)) c)
+               OR (g.cnt + 1 <= g.hi AND g.fill - (o.cnt > o.lo) + (g.cnt >= g.lo) <= (SELECT xi_size FROM dec_money))) c)
     WHERE k = 1),
 -- the slots once he has left: each position's count and weakest starter (low1), fill1
 st1 AS MATERIALIZED (
@@ -211,11 +212,11 @@ f1 AS MATERIALIZED (SELECT s, jornada, sum(max(cnt1, lo)) AS fill1 FROM st1 GROU
 -- a buy: his bar each jornada in the slots the sale leaves
 bar AS (
     SELECT v.b, v.s, x.jornada, x.xp, min(
-        CASE WHEN p.cnt1 + 1 <= p.hi AND f.fill1 + (p.cnt1 >= p.lo) <= 11 THEN 0.0 ELSE 1e9 END,
+        CASE WHEN p.cnt1 + 1 <= p.hi AND f.fill1 + (p.cnt1 >= p.lo) <= (SELECT xi_size FROM dec_money) THEN 0.0 ELSE 1e9 END,
         coalesce((SELECT min(o.low1) FROM st1 o
                   WHERE o.s = v.s AND o.jornada = x.jornada AND o.cnt1 >= 1
                     AND (o.pos = p.pos OR (p.cnt1 + 1 <= p.hi
-                                           AND f.fill1 - (o.cnt1 > o.lo) + (p.cnt1 >= p.lo) <= 11))), 1e9)) AS bar
+                                           AND f.fill1 - (o.cnt1 > o.lo) + (p.cnt1 >= p.lo) <= (SELECT xi_size FROM dec_money)))), 1e9)) AS bar
     FROM v JOIN dec_player bp ON bp.player = v.b JOIN dec_xp x ON x.player = v.b
     JOIN st1 p ON p.s = v.s AND p.jornada = x.jornada AND p.pos = bp.pos
     JOIN f1 f ON f.s = v.s AND f.jornada = x.jornada

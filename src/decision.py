@@ -9,7 +9,7 @@ from typing import Any
 from ffcore.action import Action
 from ffcore.db import connect, rows
 from ffcore.forecast import expected_points
-from ffcore.rules import DEBT_SHARE, MAX_SLOT, MIN_SLOT, SQUAD_MAX, position
+from ffcore.rules import DEBT_SHARE, MAX_SLOT, MIN_SLOT, SQUAD_MAX, XI_SIZE, position
 
 from decide import Universe
 
@@ -45,8 +45,9 @@ def inputs(u: Universe, lam: float | None = None) -> None:
         db.executemany("INSERT INTO dec_xp VALUES (?, ?, ?)", xp)
         db.executemany("INSERT INTO dec_odds VALUES (?, ?, ?)",
                        [(k, r, p) for k in buys for r, p in m.odds.get(k, ())])
-        db.execute("INSERT INTO dec_money VALUES (?, ?, ?, ?, ?)",
-                   (m.cash, sum(m.value.get(k, 0.0) for k in u.mine), lam, DEBT_SHARE, SQUAD_MAX))
+        db.execute("INSERT INTO dec_money VALUES (?, ?, ?, ?, ?, ?)",
+                   (m.cash, sum(m.value.get(k, 0.0) for k in u.mine), lam, DEBT_SHARE, SQUAD_MAX,
+                    XI_SIZE))
         db.executemany("INSERT INTO dec_shape VALUES (?, ?, ?)",
                        [(p, MIN_SLOT[p], MAX_SLOT[p]) for p in MIN_SLOT])
 
