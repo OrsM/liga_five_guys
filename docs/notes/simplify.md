@@ -231,3 +231,19 @@ Kept, and why:
   the live board identical before and after. Kept, measured: facts.py's
   price_step and ff_identity_kept (as views, 0.8 s and 0.6 s a read, read
   many times a universe).
+
+## Step 8: one model layer (2026-11-02)
+
+- A squad's points are SQL over one forecast view, `cell` (look's moment:
+  p, e, v), through rules.ELEVEN: the decision (dec_gain), the standings
+  (league_xi, league_season, league_standings, league_jornada: the old
+  Standings and gain.py's private database gone; equal to them to 1e-15 on
+  7 past universes and live), and your eleven next (next_cell, my_xi,
+  look_players into sim_players; the backtest's phantom fields my_xi).
+  Outlook, gain.py, Universe.part_played/first_jornada_of and the one-off
+  tools/migrate_sim_facts.py gone. The live board's players identical
+  (66 rows, 3e-14).
+- Backtest unchanged: 560 vs 451, 124 moves, 7 lost; 15 min (9m46 before
+  the standings move: a decision.inputs per look). Speed no gate here.
+- Rollback note: the old code refuses a database the new has opened
+  (dec_state lost cut); drop the dec_* tables first.

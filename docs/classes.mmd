@@ -47,14 +47,11 @@ classDiagram
         +forecaster: Bootstrap
         +market: Market
         +rival_cash: dict~str float~
-        +part_played: dict~int set~str~~
-        +first_jornada_of: dict~str int~
         +factors
         +cut: str
-        ...1 more fields
+        +moment: int
         +me()
         +mine()
-        +outlook()
         +acquire()
         +after()
         +squad_after()
@@ -155,24 +152,6 @@ classDiagram
         +raw
         +key
         +shown()
-    }
-    class XI {
-        <<NamedTuple>>
-        ffcore.outlook
-        +expected: dict~str float~
-        +players: set~str~
-        +ranked()
-    }
-    class Outlook {
-        ffcore.outlook
-        +state: LeagueState
-        +forecaster: Bootstrap
-        +pos: Mapping~str str~ | None
-        +part_played: Mapping~int set~str~~ | None
-        +first_jornada_of: Mapping~str int~ | None
-        +next_up()
-        +xi()
-        +season()
     }
     class Record {
         <<NamedTuple>>
@@ -320,8 +299,6 @@ classDiagram
     Forecast *-- Factors : factors
     League *-- Config : cfg
     Market *-- Name : name
-    Outlook *-- Bootstrap : forecaster
-    Outlook *-- LeagueState : state
     Scorer *-- StartOdds : starts
     StartOdds *-- Availability : avail
     StartOdds *-- Calibration : cal

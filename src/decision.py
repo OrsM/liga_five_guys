@@ -177,7 +177,7 @@ def _selftest() -> None:
         st = {m: r for m, *r in rows("SELECT manager, mean, lo, hi, finish, p_first, p_above FROM league_standings")}
         assert abs(st["me"][0] - 2 * 42) < 1e-9 and abs(st["riv"][0] - (10 + 2 * (8 * 2 + 2 * 19 / 7 + 20 / 7))) < 1e-9, \
             "each one's eleven, a stand-in for each player short, and the points banked"
-        (mean, lo, hi, finish, first, _), (r_mean, r_lo, r_hi, r_finish, r_first, r_above) = st["me"], st["riv"]
+        (mean, lo, hi, finish, first, _), (r_mean, _, r_hi, _, r_first, r_above) = st["me"], st["riv"]
         z = NormalDist().inv_cdf(0.9)
         assert lo < mean < hi and abs(r_above - NormalDist().cdf(
             (r_mean - mean) / math.hypot((hi - mean) / z, (r_hi - r_mean) / z))) < 1e-12, \

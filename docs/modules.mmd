@@ -2,13 +2,13 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 915<br/>in 3 · out 18"]:::hub
+        assemble["assemble 903<br/>in 3 · out 18"]:::hub
         crosswalk["crosswalk 106"]
-        decide["decide 84"]
-        grading["grading 747"]
+        decide["decide 75"]
+        grading["grading 751"]
         ingest["ingest 748"]
         run["run 230"]
-        sim["sim 521"]
+        sim["sim 509"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 253"]
@@ -32,9 +32,8 @@ flowchart LR
         fixture["fixture 170"]
         forecast["forecast 60"]
         market["market 77"]
-        outlook["outlook 88"]
         pricing["pricing 29"]
-        rules["rules 124"]
+        rules["rules 148"]
         schedule["schedule 237"]
         score["score 258"]
         season["season 30"]
@@ -44,7 +43,6 @@ flowchart LR
         act["act 396"]:::leaf
         decision["decision 191"]:::leaf
         facts["facts 251"]:::leaf
-        gain["gain 74"]:::leaf
         names["names 81"]:::leaf
         parse["parse 158<br/>in 16 · out 0"]:::hub
         text["text 113"]:::leaf
@@ -86,7 +84,6 @@ flowchart LR
     decide --> action
     decide --> forecast
     decide --> market
-    decide --> outlook
     decide --> rules
     decide --> schedule
     decide --> season
@@ -115,7 +112,6 @@ flowchart LR
     futbolfantasy --> rules
     futbolfantasy --> source
     futbolfantasy --> text
-    gain --> rules
     jornadas --> clock
     jornadas --> db
     jornadas --> parse
@@ -129,9 +125,6 @@ flowchart LR
     market --> names
     names --> parse
     names --> text
-    outlook --> forecast
-    outlook --> gain
-    outlook --> season
     points --> db
     points --> score
     schedule --> fixture

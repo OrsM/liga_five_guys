@@ -17,7 +17,7 @@ from decide import Action, Universe
 from ffcore.db import connect, record, rows, this_run
 from ffcore.tidy import REPORTS
 
-__all__ = ["with_squad", "board_doc", "players", "record_run"]
+__all__ = ["with_squad", "board_doc", "record_run"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
 
@@ -157,7 +157,7 @@ def _selftest() -> None:
     assert len(alike) == len(bought) == 2, \
         ("a buy's asking and odds are his, not those of whoever shares his name", alike)
     field = doc["do"][0]
-    now = list(ub.outlook.xi.ranked())
+    now = ["star", *sorted(set(sqb) - {"star", "dead"})]       # 5.4 a jornada, then the 2.7s; dead 0.15 out
     on = field["label"].removeprefix("field ").split(", ")
     assert field["what"] == "field" and {n.lower() for n in on} == set(now) and on[0].lower() == now[0], \
         "the line-up is of the squad you hold now: tonight's buys are not yours until their auction closes"
@@ -394,12 +394,12 @@ def _selftest() -> None:
         assert rows("SELECT p_first_after, finish_after FROM sim_runs WHERE run_id = 7") == [(won_first, won_finish)] \
             and won_finish < finish, \
             "your chance of first and finish once the plan is made, every bid won (the star in): the same standings"
-
-    who = {r["player"]: r for r in players(ub, acts, 7)}
-    assert set(who) == set(ub.mine) | set(bought), "your squad and the plan's buys"
-    assert sum(r["xi"] for r in who.values()) == 11
-    assert who["star"]["next"] == ub.outlook.xi.expected["star"] \
-        and who["star"]["season"] == ub.outlook.season["star"]
+        who = {k: r for k, *r in rows("SELECT player, start, next, season, mine, xi FROM sim_players WHERE run_id = 7")}
+        assert set(who) == set(ub.mine) | set(bought), "your squad and the plan's buys"
+        assert sum(r[4] for r in who.values()) == 11 and not who["dead"][4] and not who["cand"][4], \
+            "your eleven next is of the squad you hold now"
+        assert max(abs(a - b) for a, b in zip(who["star"][:3], (0.9, 5.4, 54.0))) < 1e-9, \
+            "the chance he plays next, his expected points next and over the ten jornadas left"
 
     debt = replace(ub, market=replace(ub.market, cash=-5e6,
                                       value={**ub.market.value, "k": 4e6, "d1": 9e6, "m1": 1e6}))
@@ -445,19 +445,6 @@ def _selftest_lineup() -> None:
 
 
 
-def players(u: Universe, acts: Sequence[Action], run: int) -> list[Doc]:
-    """Your squad, every player on the market and the plan's buys as the
-    model sees them: the chance he plays next, his expected points next and
-    over the season, and whether he is in the best eleven now."""
-    o = u.outlook
-    exp, xi = o.xi
-    keys = list(dict.fromkeys([*u.mine, *sorted(u.market.price), *(a.buy for a in acts if a.buy)]))
-    return [{"run_id": run, "player": k, "start": o.next_up.get(k, (0.0, 0.0))[1],
-             "next": exp.get(k, 0.0), "season": o.season.get(k, 0.0),
-             "mine": int(k in u.mine), "xi": int(k in xi)}
-            for k in keys]
-
-
 def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | None = None) -> list[Action]:
     """The decision (decision.plan) and everything the run saw, into its
     tables: the board views read them; the forecast moment it was built on,
@@ -468,8 +455,9 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | 
         db.execute(STANDINGS, (run, ))
     acts = decision.plan(u)
     record([{"run_id": run, **r} for r in params], "params")
-    record(players(u, acts, run), "sim_players")
     with closing(connect()) as db, db:
+        db.execute("INSERT INTO sim_players (run_id, player, start, next, season, mine, xi)"
+                   " SELECT ?, player, start, next, season, mine, xi FROM look_players", (run, ))
         db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, worth, in_plan"
                    " FROM dec_rows", (run,))
         db.execute(KEEP_PLAN, (run,))

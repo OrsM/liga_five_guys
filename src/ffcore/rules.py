@@ -65,7 +65,7 @@ XI_SIZE = 11  # players a side fields
 # e). As the formations are every count between lo and hi that makes eleven,
 # this is the best eleven of any formation; short of a position, its empty
 # slot scores nothing (the game's rule). Level players: the lower ord plays.
-# gain.py's and decide.sql's eleven both are this.
+# decide.sql's elevens all are this.
 ELEVEN = """
 ranked AS MATERIALIZED (
     SELECT p.*, b.lo, b.hi,
@@ -117,6 +117,30 @@ def _selftest() -> None:
     assert shortfall(two_backs) == {"DEF": 1}, "the nearest formation, not the first"
     assert shortfall({}) == {"POR": 1, "DEF": 5, "MED": 4, "DEL": 1}, \
         "an empty squad: the first of the formations short of all eleven"
+
+    import sqlite3
+
+    def eleven(squad: dict[str, str], value: dict[str, float]) -> set[str]:
+        db = sqlite3.connect(":memory:")
+        db.execute("CREATE TABLE pick (id, jornada, player, slot, ord, e)")
+        db.execute("CREATE TABLE bounds (slot, lo, hi)")
+        db.executemany("INSERT INTO pick VALUES (1, 0, ?, ?, ?, ?)",
+                       [(k, p, k, value.get(k, 0.0)) for k, p in squad.items()])
+        db.executemany("INSERT INTO bounds VALUES (?, ?, ?)", [(p, MIN_SLOT[p], MAX_SLOT[p]) for p in POSITIONS])
+        return {k for k, in db.execute("WITH " + ELEVEN + "\nSELECT player FROM xi")}
+    squad = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 6)}, **{f"m{i}": "MED" for i in range(1, 6)},
+             **{f"f{i}": "DEL" for i in range(1, 4)}}
+    val = {**{k: 1.0 for k in squad}, "f1": 9.0, "f2": 9.0, "f3": 9.0}
+    assert len(eleven(squad, val)) == XI_SIZE and {"f1", "f2", "f3"} <= eleven(squad, val)
+    assert eleven({"d1": "DEF", "m1": "MED"}, {"d1": 1.0, "m1": 2.0}) == {"d1", "m1"}, \
+        "short of a formation: who it has plays, an empty slot scores nothing (the game's rule)"
+    assert eleven(squad, {**val, "d4": 5.0, "d5": 5.0, "m4": 5.0, "m5": 5.0}) == {
+        "k", "d1", "d4", "d5", "m4", "m5", "m1", "f1", "f2", "f3", "d2"}, \
+        "each position's least best first (POR 1, DEF 3, MED 3, DEL 1), then the best of the rest within the most"
+    tie = {"POR0": "POR", **{f"DEF{i}": "DEF" for i in range(3)}, **{f"MED{i}": "MED" for i in range(3)},
+           "DEL0": "DEL", "DEL1": "DEL", "DEL2": "DEL", "DEF4": "DEF", "MED3": "MED"}
+    level = eleven(tie, {**{k: 3.0 for k in tie}, "DEF4": 2.0, "MED3": 2.0})
+    assert "DEF4" in level and "MED3" not in level, "level players for the last place: the lower ord plays"
     print("ffcore.rules self-test OK")
 
 

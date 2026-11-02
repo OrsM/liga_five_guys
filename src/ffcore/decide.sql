@@ -261,6 +261,40 @@ UNION ALL
 SELECT s.manager, '__phantom_' || s.pos || '_' || i.i, s.pos, 1
 FROM short s JOIN best b USING (manager, f) JOIN i ON i.i < s.k;
 
+-- Each player's next cell: his first jornada left that is not behind, by
+-- when it next plays (a match put back from one behind is not picked for).
+DROP VIEW IF EXISTS next_cell;
+CREATE VIEW next_cell AS
+SELECT player, jornada, p, e FROM (
+    SELECT c.player, c.jornada, c.p, c.e,
+           row_number() OVER (PARTITION BY c.player ORDER BY j.next IS NULL, j.next, c.jornada) AS r
+    FROM cell c LEFT JOIN jornada_calendar j USING (jornada) WHERE j.state IS NOT 'behind')
+WHERE r = 1;
+
+-- Your eleven next (rules.ELEVEN): of the squad you hold now, each by his
+-- next cell; short of a formation, who it has plays.
+DROP VIEW IF EXISTS my_xi;
+CREATE VIEW my_xi AS
+WITH pick AS (SELECT 1 AS id, 0 AS jornada, m.player, m.pos AS slot, m.player AS ord, coalesce(n.e, 0.0) AS e
+              FROM dec_mine m LEFT JOIN next_cell n USING (player)),
+bounds AS (SELECT pos AS slot, lo, hi FROM slot_bounds),
+/* rules.ELEVEN */
+SELECT player, e FROM xi;
+
+-- Your squad, the market and the plan's buys as the model sees them: the
+-- chance he plays next, his expected points next and over the jornadas
+-- left, and whether he is in your eleven next (my_xi).
+DROP VIEW IF EXISTS look_players;
+CREATE VIEW look_players AS
+WITH k AS (SELECT player FROM dec_mine
+           UNION SELECT s.player FROM look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant
+                 WHERE s.price IS NOT NULL
+           UNION SELECT player FROM dec_plan WHERE kind = 'buy'),
+season AS (SELECT player, total(e) AS e FROM cell GROUP BY player)
+SELECT k.player, coalesce(n.p, 0.0) AS start, coalesce(n.e, 0.0) AS next, coalesce(s.e, 0.0) AS season,
+       k.player IN (SELECT player FROM dec_mine) AS mine, k.player IN (SELECT player FROM my_xi) AS xi
+FROM k LEFT JOIN next_cell n USING (player) LEFT JOIN season s USING (player);
+
 -- Every manager's eleven each jornada left (rules.ELEVEN), each player's
 -- expected points and their variance (a stand-in's his position's).
 DROP VIEW IF EXISTS league_xi;

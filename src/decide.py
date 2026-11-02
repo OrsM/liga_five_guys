@@ -5,12 +5,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from functools import cached_property
 
 from ffcore.action import Action
 from ffcore.forecast import Bootstrap
 from ffcore.market import Market
-from ffcore.outlook import Outlook
 from ffcore.rules import CLAUSE_BUYS, Squad, Squads, position, shortfall
 from ffcore.schedule import Factors, phantom_topup
 from ffcore.season import LeagueState
@@ -21,14 +19,12 @@ __all__ = ["Action", "Universe", "apply"]
 @dataclass(frozen=True)
 class Universe:
     """The decision: the league as it stands, what players will score and
-    what they cost. Frozen, so its cached outlook can never go stale; a
-    different universe is a new one (dataclasses.replace)."""
+    what they cost. Frozen: a different universe is a new one
+    (dataclasses.replace)."""
     state: LeagueState
     forecaster: Bootstrap
     market: Market = field(default_factory=Market)
     rival_cash: dict[str, float] = field(default_factory=dict)
-    part_played: dict[int, set[str]] = field(default_factory=dict)
-    first_jornada_of: dict[str, int] = field(default_factory=dict)
     factors: Mapping[int, Mapping[str, Factors]] = field(default_factory=dict)
     cut: str = ""          # the market as seen then (schema.sql seen); none: made by hand
     moment: int = 0        # the forecast then (forecast_cell); 0: made by hand
@@ -40,11 +36,6 @@ class Universe:
     @property
     def mine(self) -> Squad:
         return self.state.squads.get(self.me, {})
-
-    @cached_property
-    def outlook(self) -> Outlook:
-        return Outlook(self.state, self.forecaster, self.market.pos,
-                       self.part_played, self.first_jornada_of)
 
     def acquire(self, k: str) -> Action | None:
         """How you could get him: a bid for a player on the market, at his

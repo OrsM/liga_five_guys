@@ -319,8 +319,8 @@ def forecast_key() -> tuple[str, str, str]:
 # constants of these modules. A file wrongly left in costs a forecast made
 # again; one wrongly left out would keep a stale one: only these are.
 NOT_FORECAST = ("act.py", "decide.py", "decision.py", "ffcore/decide.sql", "grading.py", "health.py", "publish.py", "remind.py", "run.py",
-                "sim.py", "ffcore/action.py", "ffcore/forecast.py", "ffcore/gain.py", "ffcore/market.py",
-                "ffcore/outlook.py", "ffcore/pricing.py", "ffcore/season.py")
+                "sim.py", "ffcore/action.py", "ffcore/forecast.py", "ffcore/market.py",
+                "ffcore/pricing.py", "ffcore/season.py")
 FORECAST_MODULES = ("fixture", "rules", "score", "startprob")
 
 
@@ -408,17 +408,12 @@ def built(also: frozenset[str] = frozenset()) -> Built:
     base = set(price).union(*squads.values())
     asked = base | also
     fc = player_forecast(asked)
-    rem, played = left.rem, left.played
+    rem = left.rem
     per_j: PerJornada = {j: {} for j in rem}
     for k, j, pts, p in rows("SELECT player, jornada, pts, p FROM forecast_used WHERE moment = ?1"
                              " AND player IN (SELECT value FROM json_each(?2))", (fc.moment, _json(asked))):
         if j in per_j:
             per_j[j][k] = (pts, p)
-    first_of: dict[str, int] = {}
-    for jornada in rem:
-        for k in per_j[jornada]:
-            first_of.setdefault(k, jornada)
-    ahead = [j for j in rem if j not in left.behind]
     market = Market(
         cash=lg.cash[me], odds=bid_odds(c),
         name={k: Name(f["name"]) for k, f in facts.items()},
@@ -429,13 +424,6 @@ def built(also: frozenset[str] = frozenset()) -> Built:
         fetch=column("fetches"))
     squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
     assert all(_fieldable(sq) for sq in squads.values()), squads
-    # The jornada each player's next line-up is for: his first to play of
-    # those not behind (a match put back from one behind is not picked for).
-    first_jornada_of = {k: j for k in first_of
-                        if (j := next((j for j in ahead if k in per_j.get(j, {})), None)) is not None}
-    if ahead:
-        first_jornada_of.update({k: ahead[0] for layer in per_j.values()
-                                 for k in layer if k.startswith("__phantom_")})
 
     boot = Bootstrap(per_j, pool=[s.pts for s in scored() if s.games == 1])
 
@@ -445,7 +433,7 @@ def built(also: frozenset[str] = frozenset()) -> Built:
         state=LeagueState(squads, rem, me, carried), forecaster=boot,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors, cut=c, moment=fc.moment),
+        factors=fc.factors, cut=c, moment=fc.moment),
         params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 

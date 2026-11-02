@@ -628,12 +628,12 @@ m AS (SELECT avg(x * x) AS sq, avg(x) AS mean FROM pool)
 SELECT m.sq / (CASE WHEN abs(m.mean) > 1e-9 THEN m.mean * m.mean ELSE 1.0 END) AS m2, c.share FROM m, c;
 
 -- Each player's forecast for each jornada left, as the model looks (look's
--- moment: its cells are the jornadas left at its cut): his expected points
--- (e) and their variance (v: p pts^2 m2 - e^2, the game drawn from the pool
+-- moment: its cells are the jornadas left at its cut): the chance he plays
+-- (p), his expected points (e) and their variance (v: p pts^2 m2 - e^2, the game drawn from the pool
 -- scaled to his points if he plays).
 DROP VIEW IF EXISTS cell;
 CREATE VIEW cell AS
-SELECT f.jornada, f.player, f.pts * f.p AS e, f.p * f.pts * f.pts * w.m2 - (f.pts * f.p) * (f.pts * f.p) AS v
+SELECT f.jornada, f.player, f.p, f.pts * f.p AS e, f.p * f.pts * f.pts * w.m2 - (f.pts * f.p) * (f.pts * f.p) AS v
 FROM look l JOIN forecast_used f ON f.moment = l.moment CROSS JOIN score_spread w;
 
 -- Each position's stand-in each jornada left: the average of the points if

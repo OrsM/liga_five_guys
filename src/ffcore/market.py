@@ -23,7 +23,7 @@ class Market:
     the game's market, the bids over his asking price to choose from and
     each one's chance of winning his auction (schema.sql's bid_odds),
     lowest first.
-    No points: what anyone will score is the outlook's business."""
+    No points: what anyone will score is the forecast's business."""
     cash: float = 0.0
     name: dict[str, Name] = field(default_factory=dict)
     pos: dict[str, str] = field(default_factory=dict)

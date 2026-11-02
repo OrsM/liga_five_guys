@@ -295,6 +295,12 @@ def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | N
             sales, len(closing) - len(won))
 
 
+def eleven(u: Universe) -> list[str]:
+    """Your eleven next as the model sees it (decide.sql my_xi)."""
+    decision.inputs(u, buys=False)
+    return [k for k, in rows("SELECT player FROM my_xi")]
+
+
 def phantom_path() -> list[dict[str, Any]]:
     """The league's sixth manager: your squad and cash at the first lock,
     then the plan (every player he or the manager beside him holds
@@ -361,11 +367,9 @@ def phantom_path() -> list[dict[str, Any]]:
                 last = u
             if t in played:
                 i = played[t]
-                fielded = up.outlook.xi
-                still = with_squad(u, hold, cash).outlook.xi
-                out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in fielded.players)
+                out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in eleven(up))
                             if cash >= 0 else 0.0,
-                            "standpat": sum(actual.get((k, i), 0.0) for k in still.players),
+                            "standpat": sum(actual.get((k, i), 0.0) for k in eleven(with_squad(u, hold, cash))),
                             "moves": "; ".join(made), "lost": lost, "cash": cash,
                             "value": sum(u.market.value.get(k, 0.0) for k in squad),
                             "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold)})
