@@ -21,16 +21,6 @@ __all__ = ["with_squad", "board_doc", "players", "record_run", "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
 
-# Every player the run's universe knew, with the facts the decision was
-# made on (as seen at its cut, decide.sql dec_state): his name as shown,
-# position, value, trend, what was paid, the offer on him, his clause,
-# price and route on the market, your bid, and, yours, what a sale of him
-# gets (dec_player).
-FACTS = ("INSERT INTO sim_facts SELECT ?, s.player, name_shown(s.name), coalesce(s.pos, ''), s.value, s.trend,"
-         " s.paid, s.offer, s.clause, s.price, s.route, s.my_bid,"
-         " (SELECT p.proceeds FROM dec_player p WHERE p.player = s.player AND p.mine)"
-         " FROM seen s JOIN dec_state st ON s.cut = st.cut AND s.variant = st.variant")
-
 # The plan as the run keeps it: dec_plan's moves, each sale with when it is
 # made (decide.sql dec_when).
 KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
@@ -484,12 +474,12 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | 
     record(standings(u, run), "sim_standings")
     record(players(u, acts, run), "sim_players")
     with closing(connect()) as db, db:
-        db.execute(FACTS, (run, ))
         db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, worth, in_plan"
                    " FROM dec_rows", (run,))
         db.execute(KEEP_PLAN, (run,))
-        db.execute("INSERT INTO sim_runs SELECT ?, ?, ?, ?, c.free, r.room FROM dec_cash c, dec_room r",
-                   (run, moment, won.position(u.me).get(1, 0.0), won.expected_position(u.me)))
+        db.execute("INSERT INTO sim_runs (run_id, moment, cut, p_first_after, finish_after, cash_after, can_bid)"
+                   " SELECT ?, ?, ?, ?, ?, c.free, r.room FROM dec_cash c, dec_room r",
+                   (run, moment, u.cut, won.position(u.me).get(1, 0.0), won.expected_position(u.me)))
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
     return acts
 

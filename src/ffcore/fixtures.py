@@ -159,12 +159,12 @@ def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
     with closing(connect()) as db, db:
         db.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha)"
                    " VALUES (1, 't', 't', 'test', 'c')")
-        db.execute("INSERT INTO sim_runs (run_id) VALUES (1)")
+        db.execute("INSERT INTO sim_runs (run_id, cut) VALUES (1, 't')")
         db.executemany("INSERT INTO sim_players (run_id, player, mine, xi, next)"
                        " VALUES (1, ?, ?, ?, ?)",
                        [("ionut radu", 1, 1, 3.0), ("pepelu", 1, 1, 2.0),
                         ("cai coro", 0, 0, 5.0), ("bench boy", 1, 0, 0.5)])
-        db.executemany("INSERT INTO sim_facts (run_id, player, name, pos) VALUES (1, ?, ?, '')",
+        db.executemany("INSERT INTO seen (cut, variant, player, name) VALUES ('t', 'live', ?, ?)",
                        [("ionut radu", "Ionut Radu"), ("pepelu", "Pepelu"),
                         ("cai coro", "Cai Coro"), ("bench boy", "Bench Boy")])
         db.executemany("INSERT INTO crosswalk (player_id, name, app_id) VALUES (?, ?, ?)",

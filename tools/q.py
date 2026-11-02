@@ -154,7 +154,7 @@ def _selftest_changes() -> None:
         try:
             set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "service", "commit_sha": "c"}], "runs")
-            record([{"run_id": 1}], "sim_runs")
+            record([{"run_id": 1, "cut": "q"}], "sim_runs")
             record([{"run_id": 1, "manager": m, "me": 0, "now": 0.0, "mean": 0.0, "cash": c}
                     for m, c in (("debtor", -5e6), ("fine", 4e6), ("nearly", -1e6))], "sim_standings")
             store_sql("api_teams", [{"observed_at": "2026-10-14T1000Z", "player_id": a, "manager": m,
@@ -162,8 +162,8 @@ def _selftest_changes() -> None:
                                     for a, m in (("1", "debtor"), ("2", "debtor"), ("3", "debtor"),
                                                  ("4", "fine"), ("5", "nearly"))])
             record([{"player_id": k, "name": "P" + k, "app_id": k} for k in "12345"], "crosswalk")
-            record([{"run_id": 1, "player": k, "name": "P" + k, "pos": "", "value": v}
-                    for k, v in (("1", 1e6), ("2", 1e6), ("3", 6e6), ("4", 9e6), ("5", 1e6))], "sim_facts")
+            record([{"cut": "q", "variant": "live", "player": k, "name": "P" + k, "value": v}
+                    for k, v in (("1", 1e6), ("2", 1e6), ("3", 6e6), ("4", 9e6), ("5", 1e6))], "seen")
             got = {r["manager"]: r for r in asked("cash_cliffs")}
             assert set(got) == {"debtor", "nearly"}, "nobody in credit"
             assert (got["debtor"]["debt_m"], got["debtor"]["squad_value_m"], got["debtor"]["players"],
@@ -390,7 +390,7 @@ def _selftest_queries() -> None:
 
             # rivals: riv bought one player and sold another this week and an old one a month ago
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-            record([{"run_id": 1}], "sim_runs")
+            record([{"run_id": 1, "cut": "q"}], "sim_runs")
             record([{"run_id": 1, "manager": m, "me": me, "now": 100.0 * i, "mean": 1000.0 * i,
                      "finish": float(i), "p_above": None if me else 0.25, "cash": 5e6 * i}
                     for i, (m, me) in enumerate((("me", 1), ("riv", 0)), 1)], "sim_standings")
@@ -398,8 +398,8 @@ def _selftest_queries() -> None:
                                         for u, m in (("1", "me"), ("2", "riv"))])
             store_sql("api_teams", [{"observed_at": "2026-08-24T1000Z", "player_id": a, "manager": "riv",
                                      "player_team_id": "r" + a} for a in "56"])
-            record([{"run_id": 1, "player": k, "name": k, "pos": "", "value": v}
-                    for k, v in (("5", 2e6), ("6", 3e6))], "sim_facts")
+            record([{"cut": "q", "variant": "live", "player": k, "name": k, "value": v}
+                    for k, v in (("5", 2e6), ("6", 3e6))], "seen")
             record([{"player_id": k, "app_id": k} for k in "56"], "crosswalk")
             store_sql("api_activity", [
                 {"observed_at": "2026-08-24T1000Z", "activity_id": i, "kind": kind, "user_id": "2",

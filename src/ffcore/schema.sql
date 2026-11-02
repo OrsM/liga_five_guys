@@ -118,28 +118,6 @@ CREATE TABLE IF NOT EXISTS sim_players (
     PRIMARY KEY (run_id, player)
 );
 
--- The market's and the league's facts as the run saw them (player_facts and
--- sale_odds as of its cut), every player: the board shows these, and a
--- past run's board is these and its decisions. fetches is what a sale of
--- yours gets (Market.fetches; NULL if not yours), as the run's universe held
--- them (sim.facts).
-CREATE TABLE IF NOT EXISTS sim_facts (
-    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
-    player  TEXT NOT NULL,
-    name    TEXT NOT NULL,
-    pos     TEXT NOT NULL,
-    value   REAL,
-    trend   REAL,
-    paid    REAL,
-    offer   REAL,
-    clause  REAL,
-    price   REAL,
-    route   TEXT,
-    my_bid  REAL,
-    fetches REAL,
-    PRIMARY KEY (run_id, player)
-);
-
 -- The market and the league as a universe was built on them, a cut's and
 -- a variant's: player_facts with what a sale of each gets (sale_odds), and
 -- each buy's bids and their chance (bid_odds). Written by assemble.see,
@@ -187,11 +165,24 @@ CREATE TABLE IF NOT EXISTS sim_waiting (
 CREATE TABLE IF NOT EXISTS sim_runs (
     run_id        INTEGER PRIMARY KEY REFERENCES runs(run_id),
     moment        INTEGER REFERENCES forecast_moment(moment),
+    cut           TEXT,              -- the market as seen (seen)
     p_first_after REAL,
     finish_after  REAL,
     cash_after    REAL,
     can_bid       REAL
 );
+
+-- The market's and the league's facts as each run saw them (seen at its
+-- cut), every player: the board shows these, and a past run's board is
+-- these and its decisions. fetches is what a sale of one of yours gets
+-- (the offer or what waiting is worth, else his value; NULL if not yours).
+DROP VIEW IF EXISTS sim_facts;
+CREATE VIEW sim_facts AS
+SELECT r.run_id, s.player, name_shown(s.name) AS name, coalesce(s.pos, '') AS pos, s.value, s.trend, s.paid,
+       s.offer, s.clause, s.price, s.route, s.my_bid,
+       CASE WHEN p.mine THEN coalesce(s.fetches, s.value, 0.0) END AS fetches
+FROM sim_runs r JOIN seen s ON s.cut = r.cut AND s.variant = 'live'
+LEFT JOIN sim_players p ON p.run_id = r.run_id AND p.player = s.player;
 
 -- grading, when run.py grade finds something new: each past lock forecast
 -- with the run's code (grading.backtest), the moment of it graded on each
