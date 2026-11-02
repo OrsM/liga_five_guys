@@ -21,6 +21,16 @@ __all__ = ["with_squad", "board_doc", "players", "record_run", "standings"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
 
+# Every player the run's universe knew, with the facts the decision was
+# made on (as seen at its cut, decide.sql dec_state): his name as shown,
+# position, value, trend, what was paid, the offer on him, his clause,
+# price and route on the market, your bid, and, yours, what a sale of him
+# gets (dec_player).
+FACTS = ("INSERT INTO sim_facts SELECT ?, s.player, name_shown(s.name), coalesce(s.pos, ''), s.value, s.trend,"
+         " s.paid, s.offer, s.clause, s.price, s.route, s.my_bid,"
+         " (SELECT p.proceeds FROM dec_player p WHERE p.player = s.player AND p.mine)"
+         " FROM seen s JOIN dec_state st ON s.cut = st.cut AND s.variant = st.variant")
+
 # The plan as the run keeps it: dec_plan's moves, each sale with when it is
 # made (decide.sql dec_when).
 KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
@@ -361,7 +371,7 @@ def _selftest() -> None:
         m = ub.market
         assert rows("SELECT player, pos, value, price, offer, fetches FROM sim_facts WHERE run_id = 7"
                     " ORDER BY player") == sorted(
-            (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetches(k) if k in ub.mine else None)
+            (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetch.get(k, m.value.get(k, 0.0)) if k in ub.mine else None)
             for k in set(m.name) | set(m.pos)), "the facts the decision was made on, as its universe holds them"
         assert rows("SELECT moment FROM sim_runs WHERE run_id = 7") == [(None,)]
         with closing(connect()) as db, db:
@@ -463,20 +473,6 @@ def players(u: Universe, acts: Sequence[Action], run: int) -> list[Doc]:
             for k in keys]
 
 
-def facts(u: Universe, run: int) -> list[Doc]:
-    """Every player the universe knows, with the facts the decision was
-    made on: his name as shown, position, value, trend, what was paid, the
-    offer on him, his clause, price and route on the market, your bid, and
-    what a sale of him gets."""
-    m = u.market
-    return [{"run_id": run, "player": k, "name": m.shown(k), "pos": m.pos.get(k, ""),
-             "value": m.value.get(k), "trend": m.trend.get(k), "paid": m.paid.get(k),
-             "offer": m.offer.get(k), "clause": m.clause.get(k), "price": m.price.get(k),
-             "route": m.route.get(k), "my_bid": m.my_bid.get(k),
-             "fetches": m.fetches(k) if k in u.mine else None}
-            for k in sorted(set(m.name) | set(m.pos))]
-
-
 def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | None = None) -> list[Action]:
     """The decision (decision.plan) and everything the run saw, into its
     tables: the board views read them; the forecast moment it was built on,
@@ -487,8 +483,8 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | 
     record([{"run_id": run, **r} for r in params], "params")
     record(standings(u, run), "sim_standings")
     record(players(u, acts, run), "sim_players")
-    record(facts(u, run), "sim_facts")
     with closing(connect()) as db, db:
+        db.execute(FACTS, (run, ))
         db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, worth, in_plan"
                    " FROM dec_rows", (run,))
         db.execute(KEEP_PLAN, (run,))

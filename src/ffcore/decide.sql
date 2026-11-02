@@ -20,12 +20,26 @@
 -- (a bid won and its sale not made), the least bad sale, and again, until
 -- clear. src/decision.py writes the inputs and adds the moves.
 
--- The inputs, one decision's (decision.py inputs): the players it can
--- move, yours (mine) and the market's (asking), his position and what a
--- sale of him gets; each one's expected points a jornada left as yours;
--- each buy's bids and their chance of winning; your cash, squad value, the
--- game's debt share and squad cap, the eleven's size; the formations'
--- bounds.
+-- The inputs, one decision's (decision.py inputs): the market as seen at
+-- a cut (schema.sql seen), your squad and cash (yours, or a replay's), the
+-- game's debt share and squad cap, the eleven's size; each player's expected
+-- points a jornada left as yours; the formations' bounds.
+CREATE TABLE IF NOT EXISTS dec_state (
+    cut       TEXT NOT NULL,
+    variant   TEXT NOT NULL,
+    cash      REAL NOT NULL,
+    offers    INTEGER NOT NULL,      -- the offers seen are on this squad's players
+    buys      INTEGER NOT NULL,      -- 0: sales only
+    debt      REAL NOT NULL,
+    squad_max INTEGER NOT NULL,
+    xi_size   INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS dec_mine (
+    player TEXT PRIMARY KEY,
+    pos    TEXT NOT NULL
+);
+-- What the views below make of them, made once a decision (decision.py
+-- inputs; the plan reads them at every step).
 CREATE TABLE IF NOT EXISTS dec_player (
     player   TEXT PRIMARY KEY,
     pos      TEXT NOT NULL,
@@ -33,12 +47,6 @@ CREATE TABLE IF NOT EXISTS dec_player (
     asking   REAL,
     proceeds REAL
 );
-CREATE TABLE IF NOT EXISTS dec_xp (
-    player  TEXT NOT NULL,
-    jornada INTEGER NOT NULL,
-    xp      REAL NOT NULL,
-    PRIMARY KEY (player, jornada)
-) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS dec_odds (
     player TEXT NOT NULL,
     ratio  REAL NOT NULL,
@@ -52,6 +60,12 @@ CREATE TABLE IF NOT EXISTS dec_money (
     squad_max  INTEGER NOT NULL,
     xi_size    INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS dec_xp (
+    player  TEXT NOT NULL,
+    jornada INTEGER NOT NULL,
+    xp      REAL NOT NULL,
+    PRIMARY KEY (player, jornada)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS dec_shape (
     pos TEXT PRIMARY KEY,
     lo  INTEGER NOT NULL,
@@ -68,6 +82,34 @@ CREATE TABLE IF NOT EXISTS dec_plan (
     worth  REAL NOT NULL,            -- the step's, in points
     PRIMARY KEY (step, kind)
 );
+
+-- The players the decision can move: yours, at what a sale of each gets
+-- (with an offer on him seen, the offer or what waiting is worth; else his
+-- value), and the market's you could buy, at his asking price (not yours,
+-- nor any manager's).
+DROP VIEW IF EXISTS dec_player_seen;
+CREATE VIEW dec_player_seen AS
+SELECT m.player, m.pos, 1 AS mine, NULL AS asking,
+       coalesce(CASE WHEN st.offers THEN s.fetches END, s.value, 0.0) AS proceeds
+FROM dec_mine m CROSS JOIN dec_state st
+LEFT JOIN seen s ON s.cut = st.cut AND s.variant = st.variant AND s.player = m.player
+UNION ALL
+SELECT s.player, s.pos, 0, s.price, NULL
+FROM seen s JOIN dec_state st ON s.cut = st.cut AND s.variant = st.variant
+WHERE st.buys AND s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player FROM dec_mine);
+
+-- Each buy's bids and their chance of winning, as seen.
+DROP VIEW IF EXISTS dec_odds_seen;
+CREATE VIEW dec_odds_seen AS
+SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN dec_state st ON o.cut = st.cut AND o.variant = st.variant;
+
+-- Your cash, squad value (seen), the game's debt share and squad cap, the
+-- eleven's size.
+DROP VIEW IF EXISTS dec_money_seen;
+CREATE VIEW dec_money_seen AS
+SELECT st.cash, (SELECT total(s.value) FROM dec_mine m JOIN seen s ON s.cut = st.cut AND s.variant = st.variant
+                 AND s.player = m.player) AS team_value, st.debt, st.squad_max, st.xi_size
+FROM dec_state st;
 
 -- Every single move valued from the squad as it is, before the plan's
 -- first (dec_options then: a buy at each bid, a sale): what the board shows

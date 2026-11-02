@@ -205,3 +205,19 @@ Kept, and why:
   (no queries stage, no rival boards, no program, self-tests off the run
   path); a backtest of a decision rule seconds once each past day's forecast
   is a stored table; of a forecast change still ~5 min.
+
+## Step 7: SQL is the model, step 1 (2026-11-02)
+
+- The market and the league as a universe is built on them are stored
+  once a cut, by SQL (seen, seen_odds: player_facts, sale_odds, bid_odds);
+  Market, the decision's inputs (dec_player_seen, dec_odds_seen,
+  dec_money_seen, made into dec_player/dec_odds/dec_money once a decision)
+  and a run's sim_facts read them. Python writes only the squad and cash
+  (dec_state, dec_mine) and the forecast (dec_xp: reading forecast_used
+  directly doubled the backtest). Market.fetches and Market.takes gone.
+- The decision read straight from the views: 0.9-1.5 s a plan; made once a
+  decision, 0.33-0.46 s, as before.
+- Backtest unchanged: 560 vs 451, 124 moves, 7 lost; 35 s warm, 3.3 min
+  cold. Board 2.0 s before and after (same data).
+- Next: the board's views read seen (no sim_facts), then the backtest's
+  universes (kept pickles) and Universe, then the tests out of the modules.

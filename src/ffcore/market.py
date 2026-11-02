@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 
 from ffcore.action import Action
 from ffcore.names import Name
@@ -18,7 +18,8 @@ class Market:
     the player at once, the money going to his owner), paid only for
     players their owner bought, offer only for yours with an offer standing
     and fetch for those: what a sale gets (schema.sql's sale_odds: the offer
-    or what waiting is worth, whichever is more). odds, for each player on
+    or what waiting is worth, whichever is more; with none, his value, as
+    decide.sql's dec_player reads it). odds, for each player on
     the game's market, the bids over his asking price to choose from and
     each one's chance of winning his auction (schema.sql's bid_odds),
     lowest first.
@@ -48,29 +49,12 @@ class Market:
         """Every player as shown, for Action.label."""
         return {k: n.shown for k, n in self.name.items()}
 
-    def fetches(self, k: str) -> float:
-        """What selling him gets: with an offer standing, fetch; else his value."""
-        return self.fetch[k] if k in self.fetch else self.value.get(k, 0.0)
-
-    def takes(self, k: str) -> bool:
-        """Whether a sale takes his standing offer tonight rather than wait."""
-        return k in self.offer and self.fetches(k) == self.offer[k]
-
     def left(self, acts: Iterable[Action] = ()) -> float:
         """Your cash once these moves are made."""
         return self.cash - sum(a.net for a in acts)
 
 
 def _selftest() -> None:
-    odds = Market(value={"s": 10e6}, offer={"s": 10.5e6}, fetch={"s": 10.5e6})
-    low = replace(odds, offer={"s": 10.1e6}, fetch={"s": 10.2e6})
-    assert odds.takes("s") and not low.takes("s"), "waiting is worth more than this offer"
-    assert not odds.takes("nobody")
-    assert odds.fetches("s") == 10.5e6 and low.fetches("s") == 10.2e6, \
-        "a sale gets tonight's offer or what waiting is worth, whichever is more"
-    assert Market(value={"s": 4e6}).fetches("s") == 4e6, "no offer yet: his value"
-    assert Market().fetches("s") == 0.0
-
     debt = Market(cash=-5e6)
     sale, buy = Action("sell", sell=("s",), proceeds=3e6), Action("buy", buy="b", cost=1e6)
     assert debt.left([sale]) == -2e6

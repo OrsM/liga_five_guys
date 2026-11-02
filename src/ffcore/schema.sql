@@ -140,6 +140,37 @@ CREATE TABLE IF NOT EXISTS sim_facts (
     PRIMARY KEY (run_id, player)
 );
 
+-- The market and the league as a universe was built on them, a cut's and
+-- a variant's: player_facts with what a sale of each gets (sale_odds), and
+-- each buy's bids and their chance (bid_odds). Written by assemble.see,
+-- read by Market, the decision (decide.sql) and a run's facts.
+CREATE TABLE IF NOT EXISTS seen (
+    cut     TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    player  TEXT NOT NULL,
+    name    TEXT NOT NULL,
+    pos     TEXT,
+    owner   TEXT,
+    value   REAL,
+    trend   REAL,
+    paid    REAL,
+    offer   REAL,
+    clause  REAL,
+    price   REAL,
+    route   TEXT,
+    my_bid  REAL,
+    fetches REAL,
+    PRIMARY KEY (cut, variant, player)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS seen_odds (
+    cut     TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    player  TEXT NOT NULL,
+    ratio   REAL NOT NULL,
+    p_win   REAL NOT NULL,
+    PRIMARY KEY (cut, variant, player, ratio)
+) WITHOUT ROWID;
+
 -- What waiting to sell was worth as the run saw it (waiting as of its cut),
 -- a row a player of yours with an offer standing (kind 'sale'): the board's sales read it.
 CREATE TABLE IF NOT EXISTS sim_waiting (

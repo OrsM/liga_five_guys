@@ -197,18 +197,35 @@ def price_change(day: str, h: int) -> dict[str, float | None]:
     return dict(named("price_change", {"day": day, "h": h})[1])
 
 
-def market_facts() -> dict[str, dict[str, Any]]:
-    """player_facts as of cut(), by player."""
-    cols, got = query("SELECT * FROM player_facts")
+def see() -> str:
+    """The market and the league as of cut() into seen and seen_odds, made
+    again (player_facts, sale_odds, bid_odds): what a universe is built
+    from. The cut."""
+    with closing(connect()) as db, db:
+        (c, ), = db.execute("SELECT cut()").fetchall()
+        for t in ("seen", "seen_odds"):
+            db.execute("DELETE FROM %s WHERE cut = ? AND variant = variant()" % t, (c, ))
+        db.execute("INSERT INTO seen SELECT ?, variant(), f.player, f.name, f.pos, f.owner, f.value, f.trend, f.paid,"
+                   " f.offer, f.clause, f.price, f.route, f.my_bid, s.fetches"
+                   " FROM player_facts f LEFT JOIN sale_odds s USING (player)", (c, ))
+        db.execute("INSERT INTO seen_odds SELECT ?, variant(), player, ratio, p_win FROM bid_odds", (c, ))
+    return c
+
+
+def market_facts(c: str) -> dict[str, dict[str, Any]]:
+    """player_facts as seen at cut c, by player, and what a sale of each gets (fetches)."""
+    cols, got = query("SELECT player, name, pos, owner, value, trend, paid, offer, clause, price, route, my_bid,"
+                      " fetches FROM seen WHERE cut = ?1 AND variant = variant()", (c, ))
     return {r[0]: dict(zip(cols[1:], r[1:])) for r in got}
 
 
-def bid_odds() -> dict[str, tuple[tuple[float, float], ...]]:
+def bid_odds(c: str) -> dict[str, tuple[tuple[float, float], ...]]:
     """For each player on the game's market, the bids over asking to choose
-    from and each one's chance of winning (schema.sql's bid_odds), lowest
-    first."""
+    from and each one's chance of winning (schema.sql's bid_odds, as seen at
+    cut c), lowest first."""
     out: dict[str, list[tuple[float, float]]] = {}
-    for k, ratio, p in rows("SELECT player, ratio, p_win FROM bid_odds ORDER BY player, ratio"):
+    for k, ratio, p in rows("SELECT player, ratio, p_win FROM seen_odds WHERE cut = ? AND variant = variant()"
+                            " ORDER BY player, ratio", (c, )):
         out.setdefault(k, []).append((ratio, p))
     return {k: tuple(v) for k, v in out.items()}
 
@@ -439,8 +456,9 @@ def _built(also: frozenset[str]) -> Built:
                          "them" % ("unknown" if age is None else "%.0fh" % age))
     lg = League.load()
     me = lg.me
-    prices = price_momentum()          # first: it keeps the trend that market_facts and sale_odds read
-    facts = market_facts()
+    prices = price_momentum()          # first: it keeps the trend that player_facts and sale_odds read
+    c = see()
+    facts = market_facts(c)
 
     def column(c: str) -> dict[str, Any]:
         return {k: f[c] for k, f in facts.items() if f[c] is not None}
@@ -464,13 +482,13 @@ def _built(also: frozenset[str]) -> Built:
             first_of.setdefault(k, jornada)
     ahead = [j for j in rem if j not in left.behind]
     market = Market(
-        cash=lg.cash[me], odds=bid_odds(),
+        cash=lg.cash[me], odds=bid_odds(c),
         name={k: Name(f["name"]) for k, f in facts.items()},
         pos=pos, price=price, route=column("route"), owner=column("owner"),
         paid=column("paid"), offer=column("offer"),
         value=column("value"), my_bid=column("my_bid"),
         trend=prices.trend, clause=column("clause"),
-        fetch=dict(rows("SELECT player, fetches FROM sale_odds")))
+        fetch=column("fetches"))
     squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
     assert all(_fieldable(sq) for sq in squads.values()), squads
     # The jornada each player's next line-up is for: his first to play of
@@ -489,7 +507,7 @@ def _built(also: frozenset[str]) -> Built:
         state=LeagueState(squads, rem, me, carried), forecaster=boot,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors),
+        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors, cut=c),
         params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 
@@ -780,7 +798,7 @@ def _selftest_facts() -> None:
                                       ("t1", "pending", "5000000", "o2"),
                                       ("t1", "accepted", "9000000", "o3"),
                                       ("t3", "pending", "4000000", "o4")]])
-            got = market_facts()
+            got = market_facts(see())
         finally:
             set_now(None)
     assert set(got) == {"p1", "p2", "p3", "p4", "p5", "p7"}, \
@@ -789,7 +807,7 @@ def _selftest_facts() -> None:
         "listed under his value: the game takes no bid under it (2026-10-29, D. Martinez), so that is what he costs"
     assert got["p1"] == {"name": "ana uno", "pos": "DEF", "value": 5e6, "owner": "me",
                          "clause": 9e6, "price": None, "route": None, "my_bid": None,
-                         "offer": 6e6, "paid": None, "trend": None}, got["p1"]
+                         "offer": 6e6, "paid": None, "trend": None, "fetches": 6e6}, got["p1"]
     assert (got["p2"]["value"], got["p2"]["price"], got["p2"]["route"], got["p2"]["my_bid"]) \
         == (None, 2e6, "listed", 2.5e6), "a value of 0 is none; a manager's listing; your bid"
     assert (got["p5"]["route"], got["p5"]["pos"]) == ("free", "MED"), \
@@ -943,7 +961,7 @@ def _selftest_market() -> None:
                                + [("2026-09-05T0000Z", "p99", 5.0)])
             try:
                 set_now(datetime(2026, 9, 5, 12, tzinfo=timezone.utc))
-                return bid_odds()
+                return bid_odds(see())
             finally:
                 set_now(None)
 

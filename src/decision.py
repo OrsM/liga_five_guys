@@ -15,35 +15,51 @@ from decide import Universe
 
 __all__ = ["plan", "inputs", "after_auctions"]
 
-INPUTS = ("dec_player", "dec_xp", "dec_odds", "dec_money", "dec_shape", "dec_plan", "dec_start")
+INPUTS = ("dec_state", "dec_mine", "dec_player", "dec_odds", "dec_money", "dec_xp", "dec_shape", "dec_plan",
+          "dec_start")
 
 
-def inputs(u: Universe) -> None:
-    """The universe's squad, cash and market as the decision's inputs: your
-    players and every player on the market you could buy (one the squad
-    holds is its, not a buy: a replay's squad holds players listed now), each one's
-    expected points a jornada left as yours (a stand-in fills no slot), what
-    a sale of yours gets, a buy's bids, and your money."""
+def inputs(u: Universe, buys: bool = True) -> None:
+    """The universe's squad and cash as the decision's inputs, beside the
+    market as seen at its cut (decide.sql dec_player_seen, dec_odds_seen,
+    dec_money_seen),
+    and each player's expected points a jornada left as yours (a stand-in
+    fills no slot). The offers seen count only on the squad seen (a
+    replay's has none, sim.with_squad). A universe made by hand (no cut)
+    has its market written as seen first."""
     m = u.market
-    buys = [k for k in sorted(m.price) if k not in u.mine and u.acquire(k) is not None]
-    players = [(k, position(m.pos.get(k)) or u.mine.get(k, ""), 1, None, m.fetches(k))
-               for k in sorted(u.mine) if not k.startswith("__phantom_")] \
-        + [(k, position(m.pos.get(k)), 0, m.price[k], None) for k in buys]
-    keys = {p[0] for p in players}
-    # the universe's cells: its forecast as used (forecast_used), read once when it was built
-    xp = [(k, j, expected_points(cell)) for j in u.state.jornadas
-          for k, cell in u.forecaster.per_jornada.get(j, {}).items() if k in keys]
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
-        db.executemany("INSERT INTO dec_player VALUES (?, ?, ?, ?, ?)", players)
-        db.executemany("INSERT INTO dec_xp VALUES (?, ?, ?)", xp)
-        db.executemany("INSERT INTO dec_odds VALUES (?, ?, ?)",
-                       [(k, r, p) for k in buys for r, p in m.odds.get(k, ())])
-        db.execute("INSERT INTO dec_money VALUES (?, ?, ?, ?, ?)",
-                   (m.cash, sum(m.value.get(k, 0.0) for k in u.mine), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
+        if not u.cut:
+            _seen_by_hand(db, u)
+        db.execute("INSERT INTO dec_state VALUES (?, variant(), ?, ?, ?, ?, ?, ?)",
+                   (u.cut, m.cash, int(bool(m.fetch)), int(buys), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
+        db.executemany("INSERT INTO dec_mine VALUES (?, ?)",
+                       [(k, position(m.pos.get(k)) or p) for k, p in sorted(u.mine.items())
+                        if not k.startswith("__phantom_")])
+        for t in ("dec_player", "dec_odds", "dec_money"):
+            db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
+        keys = {k for (k, ) in db.execute("SELECT player FROM dec_player")}
+        # the universe's cells: its forecast as used (forecast_used), read once when it was built
+        db.executemany("INSERT INTO dec_xp VALUES (?, ?, ?)",
+                       [(k, j, expected_points(cell)) for j in u.state.jornadas
+                        for k, cell in u.forecaster.per_jornada.get(j, {}).items() if k in keys])
         db.executemany("INSERT INTO dec_shape VALUES (?, ?, ?)",
                        [(p, MIN_SLOT[p], MAX_SLOT[p]) for p in MIN_SLOT])
+
+
+def _seen_by_hand(db: Any, u: Universe) -> None:
+    """A self-test's market, as assemble.see writes one seen (cut '')."""
+    m = u.market
+    db.execute("DELETE FROM seen WHERE cut = ''")
+    db.execute("DELETE FROM seen_odds WHERE cut = ''")
+    db.executemany("INSERT INTO seen VALUES ('', variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   [(k, m.shown(k), m.pos.get(k), m.owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
+                     m.offer.get(k), m.clause.get(k), m.price.get(k), m.route.get(k), m.my_bid.get(k), m.fetch.get(k))
+                    for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine))])
+    db.executemany("INSERT INTO seen_odds VALUES ('', variant(), ?, ?, ?)",
+                   [(k, r, p) for k, odds in m.odds.items() for r, p in odds])
 
 
 def after_auctions() -> frozenset[str]:
@@ -56,11 +72,9 @@ def plan(u: Universe, sales_only: bool = False) -> list[Action]:
     buy at its bid, a sale at what it gets (a swap's buy, then its sale). With
     sales_only, only sales (what clearing a debt takes). Every single move
     as valued before the first is kept beside it (dec_start, dec_rows)."""
-    inputs(u)
+    inputs(u, buys=not sales_only)
     out: list[Action] = []
     with closing(connect()) as db, db:
-        if sales_only:
-            db.execute("DELETE FROM dec_player WHERE NOT mine")
         db.execute("INSERT INTO dec_start SELECT b, s, bid, win, proceeds, gain, worth FROM dec_options"
                    " WHERE b = '' OR s = ''")
         for step in range(SQUAD_MAX * 2):
