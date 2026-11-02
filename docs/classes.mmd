@@ -30,11 +30,10 @@ classDiagram
     class Forecast {
         <<NamedTuple>>
         assemble
-        +per_j: PerJornada
-        +factors
-        +flagged: frozenset~str~
-        +fits: list~dict~str Any~~
         +moment: int
+        +jornadas: frozenset~int~
+        +factors
+        +fits: list~dict~str Any~~
     }
     class StoredFactors {
         assemble
@@ -51,10 +50,10 @@ classDiagram
         +part_played: dict~int set~str~~
         +first_jornada_of: dict~str int~
         +factors
-        +lam: float
+        +cut: str
+        ...1 more fields
         +me()
         +mine()
-        +standings()
         +outlook()
         +acquire()
         +after()
@@ -117,17 +116,6 @@ classDiagram
         +pool_mean
         +expected()
     }
-    class Standings {
-        <<frozen dataclass>>
-        ffcore.gain
-        +dist
-        +me: str
-        +mean()
-        +band()
-        +beat()
-        +position()
-        +expected_position()
-    }
     class Config {
         <<dataclass>>
         ffcore.league
@@ -157,11 +145,9 @@ classDiagram
         +owner: dict~str str~
         +value: dict~str float~
         +trend: dict~str float~
-        ...7 more fields
+        ...6 more fields
         +shown()
         +names()
-        +fetches()
-        +takes()
         +left()
     }
     class Name {

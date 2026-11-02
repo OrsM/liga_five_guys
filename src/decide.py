@@ -9,7 +9,6 @@ from functools import cached_property
 
 from ffcore.action import Action
 from ffcore.forecast import Bootstrap
-from ffcore.gain import Standings, standings
 from ffcore.market import Market
 from ffcore.outlook import Outlook
 from ffcore.rules import CLAUSE_BUYS, Squad, Squads, position, shortfall
@@ -41,12 +40,6 @@ class Universe:
     @property
     def mine(self) -> Squad:
         return self.state.squads.get(self.me, {})
-
-    @cached_property
-    def standings(self) -> Standings:
-        """Every manager's season if nobody moves (ffcore.gain)."""
-        st = self.state
-        return standings(self.forecaster, apply(self), st.jornadas, st.carried, st.me)
 
     @cached_property
     def outlook(self) -> Outlook:

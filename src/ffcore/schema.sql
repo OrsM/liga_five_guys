@@ -155,7 +155,8 @@ CREATE TABLE IF NOT EXISTS seen_odds (
 CREATE TABLE IF NOT EXISTS look (
     cut     TEXT NOT NULL,
     variant TEXT NOT NULL,
-    moment  INTEGER NOT NULL
+    moment  INTEGER NOT NULL,
+    me      TEXT NOT NULL DEFAULT ''
 );
 
 -- What waiting to sell was worth as the run saw it (waiting as of its cut),
@@ -611,11 +612,42 @@ CREATE VIEW forecast_used AS
 SELECT c.moment, c.player, c.jornada, c.pts, CASE WHEN l.player IS NULL THEN c.p ELSE 0.0 END AS p
 FROM forecast_cell c LEFT JOIN late_arrivals l ON l.player = c.player AND l.jornada = c.jornada;
 
+-- How a jornada's points spread about a cell's: m2, the mean square of a
+-- single game's points over its mean squared (the season's games scored
+-- so far, or the seed pool before MIN_POOL of them), and the share of a
+-- player's form that persists from one jornada to the next (share).
+DROP VIEW IF EXISTS score_spread;
+CREATE VIEW score_spread AS
+WITH c AS (SELECT (SELECT value FROM model_constants WHERE name = 'MIN_POOL' AND variant = variant()) AS min_pool,
+                  (SELECT value FROM model_constants WHERE name = 'PERSISTENT_SHARE' AND variant = variant()) AS share),
+played AS (SELECT pts AS x FROM scored WHERE games = 1 AND pts IS NOT NULL),
+pool AS (SELECT x FROM played WHERE (SELECT count(*) FROM played) >= (SELECT min_pool FROM c)
+         UNION ALL
+         SELECT x FROM (/* forecast.SEED_POOL */) WHERE (SELECT count(*) FROM played) < (SELECT min_pool FROM c)),
+m AS (SELECT avg(x * x) AS sq, avg(x) AS mean FROM pool)
+SELECT m.sq / (CASE WHEN abs(m.mean) > 1e-9 THEN m.mean * m.mean ELSE 1.0 END) AS m2, c.share FROM m, c;
+
 -- Each player's forecast for each jornada left, as the model looks (look's
--- moment: its cells are the jornadas left at its cut): his expected points.
+-- moment: its cells are the jornadas left at its cut): his expected points
+-- (e) and their variance (v: p pts^2 m2 - e^2, the game drawn from the pool
+-- scaled to his points if he plays).
 DROP VIEW IF EXISTS cell;
 CREATE VIEW cell AS
-SELECT f.jornada, f.player, f.pts * f.p AS e FROM look l JOIN forecast_used f ON f.moment = l.moment;
+SELECT f.jornada, f.player, f.pts * f.p AS e, f.p * f.pts * f.pts * w.m2 - (f.pts * f.p) * (f.pts * f.p) AS v
+FROM look l JOIN forecast_used f ON f.moment = l.moment CROSS JOIN score_spread w;
+
+-- Each position's stand-in each jornada left: the average of the points if
+-- he plays and of the chance he plays of the players of that position in a
+-- squad or on the market, as seen; his e and v as a cell's.
+DROP VIEW IF EXISTS standin_cell;
+CREATE VIEW standin_cell AS
+WITH a AS (SELECT f.jornada, s.pos, avg(f.pts) AS pts, avg(f.p) AS p
+           FROM look l JOIN forecast_used f ON f.moment = l.moment
+           JOIN seen s ON s.cut = l.cut AND s.variant = l.variant AND s.player = f.player
+           WHERE s.pos IS NOT NULL AND (s.price IS NOT NULL OR s.owner IS NOT NULL)
+           GROUP BY f.jornada, s.pos)
+SELECT a.jornada, a.pos, a.pts * a.p AS e, a.p * a.pts * a.pts * w.m2 - (a.pts * a.p) * (a.pts * a.p) AS v
+FROM a CROSS JOIN score_spread w;
 
 -- The game's nightly offers still to come before the lock (next_lock): one
 -- as each standing offer expires, then one a day (0 with none standing),

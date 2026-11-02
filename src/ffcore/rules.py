@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "shortfall",
+__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "FORMATIONS", "shortfall",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -77,6 +77,11 @@ xi AS MATERIALIZED (
     SELECT id, jornada, player, slot, e FROM ranked WHERE n <= lo
     UNION ALL
     SELECT id, jornada, player, slot, e FROM rest WHERE m <= %d - (SELECT sum(lo) FROM bounds))""" % XI_SIZE
+
+# The formations as SQL rows (f, pos, n), f their order above: what the
+# views read where they name rules.FORMATIONS (db.connect puts it in).
+FORMATIONS = " UNION ALL ".join("SELECT %d AS f, '%s' AS pos, %d AS n" % (i, p, n)
+                                for i, shape in enumerate(SHAPES) for p, n in shape.items())
 
 DEBT_SHARE = 0.2  # bids may take you this share of your squad's value into debt (cash at the lock must be 0 or more)
 # Players a squad may hold, its bids in counted: the app refuses a bid past

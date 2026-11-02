@@ -2,26 +2,26 @@ flowchart LR
     classDef hub fill:#fee2e2,stroke:#b91c1c,color:#111
     classDef leaf fill:#f3f4f6,stroke:#6b7280,color:#111
     subgraph stages["Stages (src/)"]
-        assemble["assemble 978<br/>in 2 · out 18"]:::hub
+        assemble["assemble 915<br/>in 3 · out 18"]:::hub
         crosswalk["crosswalk 106"]
-        decide["decide 90"]
-        grading["grading 822<br/>in 0 · out 11"]:::hub
+        decide["decide 84"]
+        grading["grading 747"]
         ingest["ingest 748"]
         run["run 230"]
-        sim["sim 523"]
+        sim["sim 521"]
     end
     subgraph fetch["Fetch and parse"]
         auth["auth 253"]
         footballdata["footballdata 132"]
         futbolfantasy["futbolfantasy 761"]
-        laliga_api["laliga_api 592"]
+        laliga_api["laliga_api 604"]
         source["source 50"]
         sources["sources 130"]
     end
     subgraph data["Tables and time"]
         clock["clock 113"]
         ff_crosswalk["ff_crosswalk 96"]
-        db["db 421<br/>in 12 · out 6"]:::hub
+        db["db 440<br/>in 12 · out 9"]:::hub
         jornadas["jornadas 157"]
         league["league 148"]
         points["points 102"]
@@ -31,23 +31,22 @@ flowchart LR
         action["action 44"]
         fixture["fixture 170"]
         forecast["forecast 60"]
-        market["market 95"]
+        market["market 77"]
         outlook["outlook 88"]
-        pricing["pricing 33"]
-        rules["rules 119"]
+        pricing["pricing 29"]
+        rules["rules 124"]
         schedule["schedule 237"]
         score["score 258"]
         season["season 30"]
-        startprob["startprob 429"]
+        startprob["startprob 430"]
     end
     subgraph util["Pure utilities"]
-        act["act 384"]:::leaf
-        decision["decision 150"]:::leaf
+        act["act 396"]:::leaf
+        decision["decision 191"]:::leaf
         facts["facts 251"]:::leaf
-        gain["gain 255"]:::leaf
-        kept["kept 236"]:::leaf
+        gain["gain 74"]:::leaf
         names["names 81"]:::leaf
-        parse["parse 158<br/>in 15 · out 0"]:::hub
+        parse["parse 158<br/>in 16 · out 0"]:::hub
         text["text 113"]:::leaf
         health["health 93"]:::leaf
         publish["publish 114"]:::leaf
@@ -86,26 +85,28 @@ flowchart LR
     crosswalk --> tidy
     decide --> action
     decide --> forecast
-    decide --> gain
     decide --> market
     decide --> outlook
     decide --> rules
     decide --> schedule
     decide --> season
+    decision --> assemble
     decision --> decide
     decision --> action
     decision --> db
-    decision --> forecast
     decision --> rules
     clock --> parse
     ff_crosswalk --> facts
     ff_crosswalk --> names
     db --> clock
     db --> facts
+    db --> forecast
     db --> names
+    db --> parse
     db --> rules
     db --> startprob
     db --> text
+    db --> stats
     fixture --> parse
     footballdata --> futbolfantasy
     footballdata --> source
@@ -114,7 +115,6 @@ flowchart LR
     futbolfantasy --> rules
     futbolfantasy --> source
     futbolfantasy --> text
-    gain --> forecast
     gain --> rules
     jornadas --> clock
     jornadas --> db
@@ -156,10 +156,8 @@ flowchart LR
     grading --> clock
     grading --> db
     grading --> forecast
-    grading --> gain
     grading --> jornadas
     grading --> points
-    grading --> pricing
     grading --> sim
     health --> db
     health --> publish

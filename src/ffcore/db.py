@@ -10,6 +10,7 @@ import re
 import sqlite3
 import time
 import zlib
+from statistics import NormalDist
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
@@ -20,7 +21,8 @@ from ffcore.facts import ensure
 from ffcore.names import Name
 from ffcore.parse import snapshot_stamp
 from stats import shrink
-from ffcore.rules import ELEVEN, position, slot
+from ffcore.forecast import SEED_POOL
+from ffcore.rules import ELEVEN, FORMATIONS, position, slot
 from ffcore.text import stems_meet
 from ffcore.startprob import platt, prognosis_bucket
 
@@ -122,7 +124,7 @@ def stamp_jd(s: str | None) -> float | None:
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (now, as a stamp: the model's
     clock unless told otherwise), stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
-    platt() and prognosis_bucket() (startprob's), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'),
+    platt() and prognosis_bucket() (startprob's), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
     lo95(), hi95() and claim() (an estimate and its standard error), and
     the aggregates median(), quantile(x, p) and corr(x, y)."""
     db.create_function("cut", 0, now)
@@ -139,6 +141,8 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     db.create_function("platt", 3, platt, deterministic=True)
     db.create_function("shrink", 4, lambda prior, k, total, n: None if None in (prior, k, total, n) or k + n == 0
                        else shrink(prior, k, total, n), deterministic=True)
+    db.create_function("ncdf", 1, NormalDist().cdf, deterministic=True)
+    db.create_function("ninv", 1, NormalDist().inv_cdf, deterministic=True)
     db.create_function("position", 1, position, deterministic=True)
     db.create_function("slot", 1, slot, deterministic=True)
     db.create_function("stems_meet", 3, stems_meet, deterministic=True)
@@ -176,6 +180,17 @@ def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
                     "" if dflt is None else " DEFAULT %s" % dflt))
 
 
+# The Python constants the SQL names, put in where it names them.
+PUT = {"/* rules.ELEVEN */": ELEVEN, "/* rules.FORMATIONS */": FORMATIONS,
+       "/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x in SEED_POOL)}
+
+
+def _put(sql: str) -> str:
+    for name, text in PUT.items():
+        sql = sql.replace(name, text)
+    return sql
+
+
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
     cut() the model's clock as a stamp, which the tables' as-of views read.
@@ -192,7 +207,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
-            texts = [sql.read_text(encoding="utf-8").replace("/* rules.ELEVEN */", ELEVEN)
+            texts = [_put(sql.read_text(encoding="utf-8"))
                      for sql in (IDENTITY, TABLES_SQL, schema) + ((DECIDE_SQL, ) if schema == SCHEMA else ())]
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
             if db.execute("PRAGMA user_version").fetchone()[0] != version:   # else it is applied: leave the views

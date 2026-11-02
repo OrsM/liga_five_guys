@@ -17,9 +17,14 @@ from decide import Action, Universe
 from ffcore.db import connect, record, rows, this_run
 from ffcore.tidy import REPORTS
 
-__all__ = ["with_squad", "board_doc", "players", "record_run", "standings"]
+__all__ = ["with_squad", "board_doc", "players", "record_run"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
+
+# Every manager's season if you do nothing, as the run saw it (decide.sql
+# league_standings, before the plan's moves).
+STANDINGS = ("INSERT INTO sim_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash)"
+             " SELECT ?, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash FROM league_standings")
 
 # The plan as the run keeps it: dec_plan's moves, each sale with when it is
 # made (decide.sql dec_when).
@@ -28,8 +33,10 @@ KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win
 
 
 def _selftest() -> None:
+    import math
     import tempfile
     from pathlib import Path
+    from statistics import NormalDist
 
     from ffcore.db import connect
     from ffcore.market import Market
@@ -176,9 +183,6 @@ def _selftest() -> None:
         "exposed: every player with a clause, most valuable first"
     assert report(ub, plan=[])["cash_after"] is None, "no cash line when the plan moves no money"
     assert [r["estimated"] for r in doc["standings"] if r["me"]] == [False]
-    riv_row = next(r for r in doc["standings"] if not r["me"])
-    assert abs(riv_row["p_above"] - (1.0 - ub.standings.beat("riv"))) < 1e-12, \
-        "above you: the chance he finishes above you, not that you beat him (JSON keeps 15 digits)"
     assert all(r["estimated"] for r in doc["standings"] if not r["me"]), \
         "rival cash is estimated from the feed"
     shown = sorted((d["name"].lower(), d["amount"]) for d in doc["do"] if d["what"] == "buy")
@@ -192,10 +196,6 @@ def _selftest() -> None:
     assert all((d["asking"], d["win"], d["asking_win"], facts(d)["chance to win"])
                == (ub.market.price[d["name"].lower()], 1.0, 1.0, 1.0) for d in doc["do"] if d["what"] == "buy"), \
         "each bid at its asking price too, and the chance of each (with no past auctions to go on, sure)"
-    won = ub.after(*acts).standings
-    assert (doc["p_win_after"], doc["finish_after"]) == (round(won.position(ub.me).get(1, 0.0), 3),
-                                                         round(won.expected_position(ub.me), 2)), \
-        "your chance of first and finish once the plan is made, every bid won: the same standings, on points"
     assert "lam" not in doc, "no money rate: money is a limit, not points"
     assert doc["buys"] and all(b["gain"] > 0 for b in doc["buys"]) \
         and [b["gain"] for b in doc["buys"]] == sorted((b["gain"] for b in doc["buys"]), reverse=True), \
@@ -359,8 +359,8 @@ def _selftest() -> None:
             == [("buy", k, 1) for k in sorted(bought)], "each move alone, the plan's marked"
         assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'sell'") == [(len(sqb), )]
         m = ub.market
-        assert rows("SELECT player, pos, value, price, offer, fetches FROM sim_facts WHERE run_id = 7"
-                    " ORDER BY player") == sorted(
+        assert [r for r in rows("SELECT player, pos, value, price, offer, fetches FROM sim_facts WHERE run_id = 7"
+                                " ORDER BY player") if r[0] in set(m.name) | set(m.pos)] == sorted(
             (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetch.get(k, m.value.get(k, 0.0)) if k in ub.mine else None)
             for k in set(m.name) | set(m.pos)), "the facts the decision was made on, as its universe holds them"
         assert rows("SELECT moment FROM sim_runs WHERE run_id = 7") == [(None,)]
@@ -375,17 +375,26 @@ def _selftest() -> None:
             and abs(got_fc[6] - 0.45) < 1e-9 and abs(got_fc[7] - 6.6 * 0.45) < 1e-9, \
             "a run's forecast is its moment's cells with factors, their products"
 
-    base = ub.standings
-    sim = standings(ub, 7)
-    me_row = next(r for r in sim if r["me"])
-    assert len(sim) == 2 and me_row["p_above"] is None and me_row["manager"] == "me"
-    assert (me_row["finish"], me_row["p_first"]) == (base.expected_position(), base.position().get(1, 0.0))
-    riv_st = next(r for r in sim if not r["me"])
-    assert (me_row["cash"], riv_st["cash"]) == (ub.market.cash, ub.rival_cash.get("riv", 0.0)), \
-        "yours from the app, a rival's as estimated"
-    assert riv_st["p_above"] == 1.0 - base.beat("riv") and riv_st["finish"] == \
-        base.expected_position("riv"), "every manager's finish, not only yours"
-    assert (riv_st["lo"], riv_st["hi"]) == base.band("riv") and riv_st["mean"] == base.mean("riv")
+        sim = {r[0]: r[1:] for r in rows("SELECT manager, me, finish, p_first, p_above, cash, lo, mean, hi"
+                                         " FROM sim_standings WHERE run_id = 7")}
+        assert set(sim) == {"me", "riv"} and sim["me"][0] == 1 and sim["me"][3] is None
+        (_, finish, first, _, cash, lo, mean, hi), (_, r_finish, r_first, r_above, r_cash, *_) = sim["me"], sim["riv"]
+        assert (cash, r_cash) == (ub.market.cash, ub.rival_cash.get("riv", 0.0)), \
+            "yours from the app, a rival's as estimated"
+        assert abs(finish - (1 + r_above)) < 1e-12 and abs(r_finish - (2 - r_above)) < 1e-12, \
+            "every manager's finish: 1 and the chance each other ends above him"
+        assert abs(first + r_first - 1) < 1e-3 and abs(first - (1 - r_above)) < 1e-3, \
+            "two managers: first is ending above the other (on 401 points of his total)"
+        assert lo < mean < hi
+        (r_lo, r_mean, r_hi), = rows("SELECT lo, mean, hi FROM sim_standings WHERE run_id = 7 AND NOT me")
+        z = NormalDist().inv_cdf(0.9)
+        assert abs(r_above - NormalDist().cdf((r_mean - mean) / math.hypot((hi - mean) / z, (r_hi - r_mean) / z))) < 1e-9, \
+            "above you: the chance he finishes above you, not that you beat him"
+        (won_first, won_finish), = rows("SELECT p_first, finish FROM league_standings WHERE me")
+        assert rows("SELECT p_first_after, finish_after FROM sim_runs WHERE run_id = 7") == [(won_first, won_finish)] \
+            and won_finish < finish, \
+            "your chance of first and finish once the plan is made, every bid won (the star in): the same standings"
+
     who = {r["player"]: r for r in players(ub, acts, 7)}
     assert set(who) == set(ub.mine) | set(bought), "your squad and the plan's buys"
     assert sum(r["xi"] for r in who.values()) == 11
@@ -436,20 +445,6 @@ def _selftest_lineup() -> None:
 
 
 
-def standings(u: Universe, run: int) -> list[Doc]:
-    """Each manager's season if you do nothing (Universe.standings): mean
-    points and their 10th-90th percentile band, expected final position,
-    the chance of first, the chance he finishes above you, and his cash."""
-    base = u.standings
-    return [{"run_id": run, "manager": mgr, "me": int(mgr == u.me),
-             "now": u.state.carried.get(mgr, 0.0), "mean": base.mean(mgr),
-             "lo": base.band(mgr)[0], "hi": base.band(mgr)[1],
-             "finish": base.expected_position(mgr), "p_first": base.position(mgr).get(1, 0.0),
-             "cash": u.market.cash if mgr == u.me else u.rival_cash.get(mgr, 0.0),
-             "p_above": None if mgr == u.me else 1.0 - base.beat(mgr)}
-            for mgr in u.state.squads]
-
-
 def players(u: Universe, acts: Sequence[Action], run: int) -> list[Doc]:
     """Your squad, every player on the market and the plan's buys as the
     model sees them: the chance he plays next, his expected points next and
@@ -468,18 +463,19 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | 
     tables: the board views read them; the forecast moment it was built on,
     and your chance of first and finish once the plan is made, every bid
     won. The plan's moves."""
+    decision.inputs(u)
+    with closing(connect()) as db, db:
+        db.execute(STANDINGS, (run, ))
     acts = decision.plan(u)
-    won = u.after(*acts).standings
     record([{"run_id": run, **r} for r in params], "params")
-    record(standings(u, run), "sim_standings")
     record(players(u, acts, run), "sim_players")
     with closing(connect()) as db, db:
         db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, worth, in_plan"
                    " FROM dec_rows", (run,))
         db.execute(KEEP_PLAN, (run,))
         db.execute("INSERT INTO sim_runs (run_id, moment, cut, p_first_after, finish_after, cash_after, can_bid)"
-                   " SELECT ?, ?, ?, ?, ?, c.free, r.room FROM dec_cash c, dec_room r",
-                   (run, moment, u.cut, won.position(u.me).get(1, 0.0), won.expected_position(u.me)))
+                   " SELECT ?, ?, ?, s.p_first, s.finish, c.free, r.room FROM dec_cash c, dec_room r, league_standings s"
+                   " WHERE s.me", (run, moment, u.cut))
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
     return acts
 

@@ -8,14 +8,13 @@ from typing import Any
 
 from ffcore.action import Action
 from ffcore.db import connect, rows
-from ffcore.rules import DEBT_SHARE, MAX_SLOT, MIN_SLOT, SQUAD_MAX, XI_SIZE, position
+from ffcore.rules import DEBT_SHARE, SQUAD_MAX, XI_SIZE, position
 
 from decide import Universe
 
 __all__ = ["plan", "inputs", "after_auctions"]
 
-INPUTS = ("look", "dec_state", "dec_mine", "dec_player", "dec_odds", "dec_money", "dec_shape", "dec_plan",
-          "dec_start")
+INPUTS = ("look", "dec_state", "dec_mine", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
 
 def inputs(u: Universe, buys: bool = True) -> None:
@@ -26,12 +25,15 @@ def inputs(u: Universe, buys: bool = True) -> None:
     sim.with_squad). A universe made by hand (no cut) has its market and
     forecast written first."""
     m = u.market
+    if not u.cut:
+        from assemble import write_constants   # the model's constants the views read, as a forecast writes them
+        write_constants()
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
         if not u.cut:
             _by_hand(db, u)
-        db.execute("INSERT INTO look VALUES (?, variant(), ?)", (u.cut, u.moment))
+        db.execute("INSERT INTO look VALUES (?, variant(), ?, ?)", (u.cut, u.moment, u.me))
         db.execute("INSERT INTO dec_state VALUES (?, ?, ?, ?, ?, ?)",
                    (m.cash, int(bool(m.fetch)), int(buys), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
         db.executemany("INSERT INTO dec_mine VALUES (?, ?)",
@@ -39,21 +41,21 @@ def inputs(u: Universe, buys: bool = True) -> None:
                         if not k.startswith("__phantom_")])
         for t in ("dec_player", "dec_odds", "dec_money"):
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
-        db.executemany("INSERT INTO dec_shape VALUES (?, ?, ?)",
-                       [(p, MIN_SLOT[p], MAX_SLOT[p]) for p in MIN_SLOT])
 
 
 def _by_hand(db: Any, u: Universe) -> None:
     """A self-test's market and forecast, as assemble writes them (seen at
     cut '', forecast_cell at moment 0)."""
     m = u.market
+    owner = {**{k: mgr for mgr, sq in u.state.squads.items() for k in sq}, **m.owner}
+    pos = {**{k: p for sq in u.state.squads.values() for k, p in sq.items()}, **m.pos}
     db.execute("DELETE FROM seen WHERE cut = ''")
     db.execute("DELETE FROM seen_odds WHERE cut = ''")
     db.execute("DELETE FROM forecast_cell WHERE moment = 0")
     db.executemany("INSERT INTO seen VALUES ('', variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                   [(k, m.shown(k), m.pos.get(k), m.owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
+                   [(k, m.shown(k), pos.get(k), owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
                      m.offer.get(k), m.clause.get(k), m.price.get(k), m.route.get(k), m.my_bid.get(k), m.fetch.get(k))
-                    for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine))])
+                    for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine) | set(owner))])
     db.executemany("INSERT INTO seen_odds VALUES ('', variant(), ?, ?, ?)",
                    [(k, r, p) for k, odds in m.odds.items() for r, p in odds])
     db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
@@ -93,14 +95,16 @@ def plan(u: Universe, sales_only: bool = False) -> list[Action]:
 
 
 def _selftest() -> None:
+    import math
     import tempfile
+    from statistics import NormalDist
     from pathlib import Path
 
     from decide import Universe
     from ffcore.forecast import Bootstrap
     from ffcore.market import Market
     from ffcore.season import LeagueState
-    from ffcore.tidy import tables_in
+    from ffcore.tidy import store_sql, tables_in
 
     js = [1, 2]
     squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
@@ -159,6 +163,27 @@ def _selftest() -> None:
             "until clear: bench (0), m4 (-4: his place empty), then a slot each, by name"
         assert labels(plan(universe(10e6, {"star": 8e6}), sales_only=True)) == [], \
             "sales only: no buy, and no sale worth more than nothing"
+
+        # The standings: you (42 a jornada) and a rival of eight at 2 each, short of 5-4-1 by two
+        # defenders and a midfielder: stand-ins at the average of each position's players (19/7, 20/7),
+        # and 10 points banked.
+        riv = {"rk": "POR", **{"rd%d" % i: "DEF" for i in range(3)}, **{"rm%d" % i: "MED" for i in range(3)},
+               "rf": "DEL"}
+        league = Universe(state=LeagueState({"me": squad, "riv": riv}, js, "me"),
+                          forecaster=Bootstrap({j: {**cells, **{k: (2.0, 1.0) for k in riv}} for j in js}),
+                          market=Market(cash=10e6, pos={**squad, **riv}, value={k: 5e6 for k in squad}))
+        store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": "riv", "team_points": "10"}])
+        inputs(league)
+        st = {m: r for m, *r in rows("SELECT manager, mean, lo, hi, finish, p_first, p_above FROM league_standings")}
+        assert abs(st["me"][0] - 2 * 42) < 1e-9 and abs(st["riv"][0] - (10 + 2 * (8 * 2 + 2 * 19 / 7 + 20 / 7))) < 1e-9, \
+            "each one's eleven, a stand-in for each player short, and the points banked"
+        (mean, lo, hi, finish, first, _), (r_mean, r_lo, r_hi, r_finish, r_first, r_above) = st["me"], st["riv"]
+        z = NormalDist().inv_cdf(0.9)
+        assert lo < mean < hi and abs(r_above - NormalDist().cdf(
+            (r_mean - mean) / math.hypot((hi - mean) / z, (r_hi - r_mean) / z))) < 1e-12, \
+            "his chance of ending above you: the difference of two normals"
+        assert abs(finish - (1 + r_above)) < 1e-12 and abs(first - (1 - r_above)) < 1e-3 \
+            and abs(first + r_first - 1) < 1e-3, "your finish and chance of first, against him alone"
     print("decision self-test OK")
 
 

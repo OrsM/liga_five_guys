@@ -14,7 +14,6 @@ from typing import Any, NamedTuple
 
 
 from ffcore.forecast import expected_points
-from ffcore.gain import Standings, standings
 from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
 
@@ -402,7 +401,7 @@ def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datet
     return out
 
 
-def calibration_rows(jornada: int, st: Standings, actual: dict[str, float],
+def calibration_rows(jornada: int, dist: dict[str, tuple[float, float]], actual: dict[str, float],
                      me: str) -> list[dict[str, Any]]:
     """Where what happened falls in the forecast of one jornada (its normal:
     pit, the share below it), for each manager, and for you minus him (the
@@ -412,14 +411,14 @@ def calibration_rows(jornada: int, st: Standings, actual: dict[str, float],
             return 1.0 if x > mean else 0.5 if x == mean else 0.0
         return NormalDist(mean, sd).cdf(x)
     out = []
-    for m, (mean, sd) in st.dist.items():
+    for m, (mean, sd) in dist.items():
         if m not in actual:
             continue
         row: dict[str, Any] = {"jornada": jornada, "manager": m, "actual": actual[m],
                                "mean": mean, "sd": sd, "pit": pit(mean, sd, actual[m]),
                                "diff_actual": None, "diff_mean": None, "diff_sd": None, "diff_pit": None}
-        if m != me and me in st.dist and me in actual:
-            dm, ds = st.dist[me][0] - mean, math.hypot(st.dist[me][1], sd)
+        if m != me and me in dist and me in actual:
+            dm, ds = dist[me][0] - mean, math.hypot(dist[me][1], sd)
             row.update(diff_actual=actual[me] - actual[m], diff_mean=dm, diff_sd=ds,
                        diff_pit=pit(dm, ds, actual[me] - actual[m]))
         out.append(row)
@@ -444,14 +443,15 @@ def sim_calibration() -> list[dict[str, Any]]:
         windows = clean_windows(locks, kicks)
         for j, u in at_locks(set(windows)):
             start, end = windows[j]
-            st = standings(u.forecaster, {m: sq for m, sq in u.state.squads.items()
-                                          if not m.startswith("__")}, [j], {}, u.me)
+            decision.inputs(u)
+            dist = {m: (mean, sd) for m, mean, sd in rows("SELECT manager, mean, sd FROM league_jornada"
+                                                          " WHERE jornada = ?", (j, ))}
             actual = {}
-            for m in st.dist:
+            for m in dist:
                 a0, a1 = points(m, start), points(m, end)
                 if a0 is not None and a1 is not None:
                     actual[m] = a1 - a0
-            out += calibration_rows(j, st, actual, u.me)
+            out += calibration_rows(j, dist, actual, u.me)
     return out
 
 
@@ -690,7 +690,7 @@ def _selftest() -> None:
 
     assert clean_windows({1: day(0), 2: day(5)}, [(1, day(0)), (9, day(0)), (2, day(5))]) == {}, \
         "another jornada's match at the very kickoff of the lock is in the window too"
-    fcst = Standings({"me": (55.0, 10.0), "riv": (45.0, 0.0)}, "me")
+    fcst = {"me": (55.0, 10.0), "riv": (45.0, 0.0)}
     cal = {r["manager"]: r for r in calibration_rows(7, fcst, {"me": 55.0, "riv": 100.0}, "me")}
     assert (cal["me"]["mean"], cal["me"]["pit"], cal["me"]["diff_pit"]) == (55.0, 0.5, None), cal["me"]
     assert cal["riv"]["pit"] == 1.0 and cal["riv"]["actual"] == 100.0, "above a forecast with no spread"
