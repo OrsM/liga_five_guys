@@ -18,7 +18,7 @@ from ffcore.gain import Standings, standings
 from ffcore.jornadas import round_locks
 from ffcore.points import done_jornadas, jornada_points
 
-from assemble import applied, forecast_key, kept_built, player_forecast, price_change, price_momentum, universe
+from assemble import applied, forecast_key, player_forecast, price_change, price_momentum, universe
 import decision
 from decide import Action, Universe
 from sim import with_squad
@@ -84,11 +84,7 @@ def warm(times: list[dt.datetime], also: Callable[[dt.datetime], frozenset[str]]
     for t in times:
         if (t, also(t)) in _AT:
             continue
-        set_now(t)
-        if (hit := kept_built(also(t))) is not None:     # kept: read here, no process to send it back
-            _AT[t, also(t)] = hit.universe
-        else:
-            jobs.append((t, also(t)))
+        jobs.append((t, also(t)))
     if not jobs:
         return
     with multiprocessing.get_context("fork").Pool(WARM_JOBS) as pool:

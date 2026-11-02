@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import sqlite3
 import sys
 from contextlib import closing, contextmanager
@@ -19,7 +18,6 @@ import remind
 from decide import Universe, _fieldable
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import cut, set_variant
-from ffcore import db as lfgdb, kept
 from ffcore.db import connect, named, query, record, rows
 from ffcore.fixture import Ratings, difficulty_ratings
 from ffcore.forecast import Bootstrap
@@ -119,15 +117,6 @@ def fixture_ratings(market: Rows) -> Ratings:
     return difficulty_ratings(market, current("results_history"))
 
 
-def read_by_views() -> dict[str, float]:
-    """The constants the views read (model_constants, by name in
-    schema.sql): what a kept answer depends on. One read in Python alone
-    (score.SHRINK_K) changes no view's answer, and keyed on it
-    every such change rebuilt each universe cold (2026-10-30)."""
-    names = set(re.findall(r"model_constants WHERE name = '(\w+)'", lfgdb.SCHEMA.read_text(encoding="utf-8")))
-    return {n: v for m in constants().values() for n, v in m.items() if n in names}
-
-
 def write_constants() -> None:
     """constants() into lfg.db under the variant in force, for the views."""
     with closing(connect()) as db, db:
@@ -165,26 +154,11 @@ def _keep(select: str, *tables: str) -> None:
                 db.executemany("INSERT INTO %s VALUES (?, ?, ?)" % table, [(r[0], r[1], r[2 + i]) for r in got])
 
 
-def fits_in_place() -> bool:
-    """Do the fit tables hold the cut's rows (read past the kept answers:
-    the file they were kept for may be another copy of the data)."""
-    with closing(connect()) as db:
-        return bool(db.execute(
-            "SELECT (SELECT count(*) FROM momentum_fit WHERE as_of = cut()) > 0"
-            " AND (SELECT count(*) FROM price_trend_fit WHERE as_of = cut()) > 0").fetchone()[0])
-
-
-# What the fits are made from (price_momentum, record_trend): kept while these read as they did.
-FITS = "momentum price_trend_now"
-
-
 def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
-    if not (kept.written(lfgdb.DB, "fits", FITS) and fits_in_place()):
-        _keep("SELECT cut(), h, slope FROM momentum", "momentum_fit")
-        record_trend()
-        kept.mark(lfgdb.DB, "fits", FITS)
+    _keep("SELECT cut(), h, slope FROM momentum", "momentum_fit")
+    record_trend()
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
                   dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
@@ -378,12 +352,11 @@ def _moment(db: sqlite3.Connection) -> tuple[int, bool]:
 def _make(moment: int, also: set[str], every: bool) -> None:
     """The forecast of these players, and of every player the scorer knows
     if every, into the moment."""
-    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
-        market = current("market")
-        sc = scorer(market, current("lineups", LINEUP_SOURCE))
-        keys = also | set(sc.lookup) if every else also
-        ratings = fixture_ratings(market)
-        ex = expectations(sc, ratings, keys, current("matches"), rounds())
+    market = current("market")
+    sc = scorer(market, current("lineups", LINEUP_SOURCE))
+    keys = also | set(sc.lookup) if every else also
+    ratings = fixture_ratings(market)
+    ex = expectations(sc, ratings, keys, current("matches"), rounds())
     cells = [(moment, k, j, pts, p, *((f.ppm, f.fixture, f.picked, f.fit) if (f := ex.factors[j].get(k)) else
                                      (None, None, None, None)))
              for j, layer in ex.per_j.items() for k, (pts, p) in layer.items()]
@@ -415,41 +388,6 @@ def built(also: frozenset[str] = frozenset()) -> Built:
     """The universe, and the parameters it was built with. Its forecast
     covers every player in a squad or on the market, and also these (a
     replay's squads hold players nobody holds now)."""
-    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
-        if (hit := _kept_built(also)) is not None:
-            return hit
-        got = _built(also)
-        kept.put(lfgdb.DB, "built", _built_key(also), got)
-        return got
-
-
-def kept_built(also: frozenset[str] = frozenset()) -> Built | None:
-    """The universe built at the cut as built() keeps it, if it is kept;
-    None, nothing built, if not."""
-    with kept.scope(lfgdb.DB, lfgdb.TABLES_SQL, repr(read_by_views())):
-        return _kept_built(also)
-
-
-def _kept_built(also: frozenset[str]) -> Built | None:
-    return kept.get(lfgdb.DB, "built", _built_key(also))      # type: ignore[no-any-return]
-
-
-def _built_key(also: frozenset[str]) -> tuple[str, str, list[str]]:
-    return _code(), repr(sorted(constants().items())), sorted(also)
-
-
-@cache
-def _code() -> str:
-    """The source a universe is built by, hashed: every module and the
-    schema. A built universe is kept under it with the scope's key (the cut,
-    the data up to it), every constant and also: a backtest's second run
-    loads its universes instead of assembling them again (2026-10-31: 61 of
-    a warm run's 82 seconds)."""
-    src = Path(__file__).resolve().parent
-    return hashlib.sha1(b"".join(f.read_bytes() for f in sorted(src.rglob("*.py")) + sorted(src.rglob("*.sql")))).hexdigest()
-
-
-def _built(also: frozenset[str]) -> Built:
     age = age_hours("api_teams")
     if age is None or age > APP_FRESH_HOURS:
         raise SystemExit("the app's squads are %s old; no board is built from "
