@@ -221,3 +221,13 @@ Kept, and why:
   cold. Board 2.0 s before and after (same data).
 - Next: the board's views read seen (no sim_facts), then the backtest's
   universes (kept pickles) and Universe, then the tests out of the modules.
+- Then (2026-11-02, speed no gate, the user's call): kept.py gone (every
+  universe built from the data; the fits made again at their cut);
+  dec_gain is f of each move's squad less f(S), every squad's eleven by
+  rules.ELEVEN at once (dec_slots and the incremental bars gone, the
+  backtest the same 560 at the same 4.5-5 min); sim_facts a view over seen
+  (sim_runs.cut), the live database's 153 runs moved once
+  (tools/migrate_sim_facts.py; backup data/lfg.db.bak-20261102-sim_facts),
+  the live board identical before and after. Kept, measured: facts.py's
+  price_step and ff_identity_kept (as views, 0.8 s and 0.6 s a read, read
+  many times a universe).
