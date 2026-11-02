@@ -4,8 +4,8 @@
 --
 --   f(S)          the points of squad S's best legal eleven, summed over
 --                 the jornadas left, each player at his forecast cell times
---                 whether he is yours by then (dec_xp); a move's, from the
---                 eleven now by the slots it changes (dec_slots, dec_gain)
+--                 whether he is yours by then (dec_xp); a move's, f of the
+--                 squad it makes less f(S) (dec_gain)
 --   a buy p at b  win(b) x (f(S + p) - f(S)); of bids as likely to win,
 --                 the least
 --   a sale q      f(S - q) - f(S): never more than nothing alone, so made
@@ -164,99 +164,28 @@ SELECT b, '' AS s FROM buys UNION ALL SELECT '', s FROM sells
 UNION ALL SELECT b, s FROM buys, sells
 WHERE top > (SELECT free FROM dec_cash) OR (SELECT count(*) FROM sq) >= (SELECT squad_max FROM dec_money);
 
--- The squad's best legal eleven each jornada: the game's eleven rule
--- (rules.ELEVEN, put in where it is named below as connect() applies this
--- file): each position's lo best, then the best of the rest within each
--- position's hi, to eleven; the best of any formation. A slot nobody can
--- fill scores nothing. Level players: the first by key.
+-- Each next move's points over the jornadas left: the best legal eleven
+-- of the squad it makes, less the squad's as it is, each jornada (the
+-- game's eleven rule, rules.ELEVEN, put in where it is named below as
+-- connect() applies this file: each position's lo best, then the best of
+-- the rest within each position's hi, to eleven; a slot nobody can fill
+-- scores nothing; level players, the first by key).
 DROP VIEW IF EXISTS dec_eleven;
-CREATE VIEW dec_eleven AS
-WITH pick AS (SELECT 1 AS id, x.jornada, q.player, q.pos AS slot, q.player AS ord, x.xp AS e
-              FROM dec_squad q JOIN dec_xp x USING (player)),
-bounds AS (SELECT pos AS slot, lo, hi FROM dec_shape),
-/* rules.ELEVEN */
-SELECT jornada, player, slot AS pos, e AS xp FROM xi;
-
--- Each position, each jornada, in the eleven now: how many play (cnt), the
--- weakest (low, lowp) and next weakest (low2) of them, the best of the
--- position on the bench (bench), and fill, max(cnt, lo) summed over the
--- positions. Eleven players can play together when no position has more
--- than hi and fill is no more than eleven: so a starter can make way for a
--- player of another position only while his own stays above lo and the
--- other's below hi.
 DROP VIEW IF EXISTS dec_slots;
-CREATE VIEW dec_slots AS
-WITH xi AS MATERIALIZED (SELECT * FROM dec_eleven),
-w AS (SELECT jornada, pos, count(*) AS cnt,
-             max(CASE k WHEN 1 THEN xp END) AS low, max(CASE k WHEN 1 THEN player END) AS lowp,
-             max(CASE k WHEN 2 THEN xp END) AS low2
-      FROM (SELECT *, row_number() OVER (PARTITION BY jornada, pos ORDER BY xp, player DESC) AS k FROM xi)
-      GROUP BY jornada, pos),
-bn AS (SELECT x.jornada, q.pos, max(x.xp) AS bench
-       FROM dec_squad q JOIN dec_xp x USING (player)
-       WHERE NOT EXISTS (SELECT 1 FROM xi WHERE xi.jornada = x.jornada AND xi.player = q.player)
-       GROUP BY x.jornada, q.pos)
-SELECT j.jornada, h.pos, h.lo, h.hi, coalesce(w.cnt, 0) AS cnt, w.low, w.lowp, w.low2, bn.bench,
-       sum(max(coalesce(w.cnt, 0), h.lo)) OVER (PARTITION BY j.jornada) AS fill
-FROM (SELECT DISTINCT jornada FROM dec_xp) j CROSS JOIN dec_shape h
-LEFT JOIN w ON w.jornada = j.jornada AND w.pos = h.pos
-LEFT JOIN bn ON bn.jornada = j.jornada AND bn.pos = h.pos;
-
--- Each next move's points over the jornadas left, from the eleven now (no
--- squad's eleven built again: a move changes it by at most one player each
--- way, the formations being a matroid's bases), a jornada at a time:
---   a sale     a starter leaves; his replacement is the best on the bench
---              whose position can legally take his slot, or nobody: it
---              costs his points less his replacement's (nothing if he does
---              not play)
---   a buy      against the eleven that leaves, his bar: the weakest starter
---              whose slot he can legally take (his own position's, or
---              another's while his has room), or an empty slot (0); he adds
---              his points over the bar, or nothing below it
 DROP VIEW IF EXISTS dec_gain;
 CREATE VIEW dec_gain AS
-WITH v AS MATERIALIZED (SELECT * FROM dec_variant),
-st AS MATERIALIZED (SELECT * FROM dec_slots),
-sales AS (SELECT DISTINCT s FROM v),
-starts AS (SELECT d.s, x.jornada, p.pos, x.xp FROM sales d JOIN dec_player p ON p.player = d.s
-           JOIN dec_xp x ON x.player = d.s
-           WHERE EXISTS (SELECT 1 FROM dec_eleven e WHERE e.jornada = x.jornada AND e.player = d.s)),
--- a sale: what each jornada he starts in loses (out) and the position of his replacement (r)
-rm AS MATERIALIZED (
-    SELECT s, jornada, q, out, r FROM (
-        SELECT c.*, row_number() OVER (PARTITION BY s, jornada ORDER BY out DESC, r IS NULL, r) AS k FROM (
-            SELECT a.s, a.jornada, a.pos AS q, -a.xp AS out, NULL AS r FROM starts a
+WITH v AS MATERIALIZED (SELECT row_number() OVER (ORDER BY b, s) AS id, b, s FROM dec_variant
+                        UNION ALL SELECT 0, '', ''),
+sq AS MATERIALIZED (SELECT * FROM dec_squad),
+members AS (SELECT v.id, q.player, q.pos FROM v JOIN sq q ON q.player <> v.s
             UNION ALL
-            SELECT a.s, a.jornada, a.pos, g.bench - a.xp, g.pos
-            FROM starts a JOIN st g ON g.jornada = a.jornada AND g.bench IS NOT NULL
-            JOIN st o ON o.jornada = a.jornada AND o.pos = a.pos
-            WHERE g.pos = a.pos
-               OR (g.cnt + 1 <= g.hi AND g.fill - (o.cnt > o.lo) + (g.cnt >= g.lo) <= (SELECT xi_size FROM dec_money))) c)
-    WHERE k = 1),
--- the slots once he has left: each position's count and weakest starter (low1), fill1
-st1 AS MATERIALIZED (
-    SELECT d.s, t.jornada, t.pos, t.lo, t.hi,
-           t.cnt - (t.pos IS m.q) + (t.pos IS m.r) AS cnt1,
-           nullif(min(coalesce(CASE WHEN t.pos IS m.q AND d.s = t.lowp THEN t.low2 ELSE t.low END, 1e9),
-                      coalesce(CASE WHEN t.pos IS m.r THEN t.bench END, 1e9)), 1e9) AS low1
-    FROM sales d CROSS JOIN st t
-    LEFT JOIN rm m ON m.s = d.s AND m.jornada = t.jornada),
-f1 AS MATERIALIZED (SELECT s, jornada, sum(max(cnt1, lo)) AS fill1 FROM st1 GROUP BY s, jornada),
--- a buy: his bar each jornada in the slots the sale leaves
-bar AS (
-    SELECT v.b, v.s, x.jornada, x.xp, min(
-        CASE WHEN p.cnt1 + 1 <= p.hi AND f.fill1 + (p.cnt1 >= p.lo) <= (SELECT xi_size FROM dec_money) THEN 0.0 ELSE 1e9 END,
-        coalesce((SELECT min(o.low1) FROM st1 o
-                  WHERE o.s = v.s AND o.jornada = x.jornada AND o.cnt1 >= 1
-                    AND (o.pos = p.pos OR (p.cnt1 + 1 <= p.hi
-                                           AND f.fill1 - (o.cnt1 > o.lo) + (p.cnt1 >= p.lo) <= (SELECT xi_size FROM dec_money)))), 1e9)) AS bar
-    FROM v JOIN dec_player bp ON bp.player = v.b JOIN dec_xp x ON x.player = v.b
-    JOIN st1 p ON p.s = v.s AND p.jornada = x.jornada AND p.pos = bp.pos
-    JOIN f1 f ON f.s = v.s AND f.jornada = x.jornada
-    WHERE v.b <> '')
-SELECT v.b, v.s, coalesce((SELECT total(out) FROM rm WHERE rm.s = v.s), 0.0)
-                 + coalesce((SELECT total(max(xp - bar, 0.0)) FROM bar a WHERE a.b = v.b AND a.s = v.s), 0.0) AS gain
-FROM v;
+            SELECT v.id, p.player, p.pos FROM v JOIN dec_player p ON p.player = v.b),
+pick AS (SELECT m.id, x.jornada, m.player, m.pos AS slot, m.player AS ord, x.xp AS e
+         FROM members m JOIN dec_xp x USING (player)),
+bounds AS (SELECT pos AS slot, lo, hi FROM dec_shape),
+/* rules.ELEVEN */,
+f AS (SELECT v.id, coalesce((SELECT total(e) FROM xi WHERE xi.id = v.id), 0.0) AS f FROM v)
+SELECT v.b, v.s, f.f - (SELECT f FROM f WHERE id = 0) AS gain FROM v JOIN f USING (id) WHERE v.id > 0;
 
 -- Every next move, at each bid its odds offer (at asking, sure, with
 -- none), worth its points, a bid's by its chance of winning; with what it

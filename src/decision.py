@@ -127,8 +127,6 @@ def _selftest() -> None:
         inputs(universe(10e6, {"star": 8e6}))
         assert rows("SELECT gain, worth FROM dec_options WHERE b = 'star' AND s = ''") == [(12.0, 12.0)], \
             "star (8) for m4 (2), two jornadas: his points, and nothing for his price"
-        assert rows("SELECT jornada, count(*), total(xp) FROM dec_eleven"
-                    " GROUP BY jornada") == [(1, 11, 42.0), (2, 11, 42.0)]
         assert labels(plan(universe(10e6, {"star": 8e6}))) == ["buy star"]
         assert labels(plan(universe(10e6, {"star": 10e6}))) == ["buy star"], \
             "his price is a limit, not a cost: within cash, the points decide"
