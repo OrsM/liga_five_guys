@@ -149,6 +149,15 @@ CREATE TABLE IF NOT EXISTS seen_odds (
     PRIMARY KEY (cut, variant, player, ratio)
 ) WITHOUT ROWID;
 
+-- What the model looks at, one row: the market as seen at a cut (seen) and
+-- the forecast of a moment (forecast_used). Written by what asks
+-- (decision.inputs).
+CREATE TABLE IF NOT EXISTS look (
+    cut     TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    moment  INTEGER NOT NULL
+);
+
 -- What waiting to sell was worth as the run saw it (waiting as of its cut),
 -- a row a player of yours with an offer standing (kind 'sale'): the board's sales read it.
 CREATE TABLE IF NOT EXISTS sim_waiting (
@@ -587,7 +596,7 @@ WHERE k.t < l.close;
 -- Each moment's forecast (forecast_cell) as a decision made at cut() uses
 -- it: points if he plays, and the chance he plays, none in a jornada he
 -- would join after his club's match (late_arrivals). The universe reads
--- its cells here and decide.sql its dec_xp.
+-- its cells here, and the model the moment it looks at (cell).
 -- Each run's forecast, every cell with factors (ffcore.schedule.Factors):
 -- points = ppm x fixture, plays = picked x fit, expected from the two.
 DROP VIEW IF EXISTS run_forecast;
@@ -601,6 +610,12 @@ DROP VIEW IF EXISTS forecast_used;
 CREATE VIEW forecast_used AS
 SELECT c.moment, c.player, c.jornada, c.pts, CASE WHEN l.player IS NULL THEN c.p ELSE 0.0 END AS p
 FROM forecast_cell c LEFT JOIN late_arrivals l ON l.player = c.player AND l.jornada = c.jornada;
+
+-- Each player's forecast for each jornada left, as the model looks (look's
+-- moment: its cells are the jornadas left at its cut): his expected points.
+DROP VIEW IF EXISTS cell;
+CREATE VIEW cell AS
+SELECT f.jornada, f.player, f.pts * f.p AS e FROM look l JOIN forecast_used f ON f.moment = l.moment;
 
 -- The game's nightly offers still to come before the lock (next_lock): one
 -- as each standing offer expires, then one a day (0 with none standing),

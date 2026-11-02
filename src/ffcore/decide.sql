@@ -3,9 +3,9 @@
 -- money is a limit, never a goal:
 --
 --   f(S)          the points of squad S's best legal eleven, summed over
---                 the jornadas left, each player at his forecast cell times
---                 whether he is yours by then (dec_xp); a move's, f of the
---                 squad it makes less f(S) (dec_gain)
+--                 the jornadas left, each player at his expected points
+--                 (schema.sql cell); a move's, f of the squad it makes less
+--                 f(S) (dec_gain)
 --   a buy p at b  win(b) x (f(S + p) - f(S)); of bids as likely to win,
 --                 the least
 --   a sale q      f(S - q) - f(S): never more than nothing alone, so made
@@ -20,13 +20,11 @@
 -- (a bid won and its sale not made), the least bad sale, and again, until
 -- clear. src/decision.py writes the inputs and adds the moves.
 
--- The inputs, one decision's (decision.py inputs): the market as seen at
--- a cut (schema.sql seen), your squad and cash (yours, or a replay's), the
--- game's debt share and squad cap, the eleven's size; each player's expected
--- points a jornada left as yours; the formations' bounds.
+-- The inputs, one decision's (decision.py inputs), beside what the model
+-- looks at (schema.sql look: the market seen, the forecast): your squad and
+-- cash (yours, or a replay's), the game's debt share and squad cap, the
+-- eleven's size; the formations' bounds.
 CREATE TABLE IF NOT EXISTS dec_state (
-    cut       TEXT NOT NULL,
-    variant   TEXT NOT NULL,
     cash      REAL NOT NULL,
     offers    INTEGER NOT NULL,      -- the offers seen are on this squad's players
     buys      INTEGER NOT NULL,      -- 0: sales only
@@ -60,12 +58,6 @@ CREATE TABLE IF NOT EXISTS dec_money (
     squad_max  INTEGER NOT NULL,
     xi_size    INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS dec_xp (
-    player  TEXT NOT NULL,
-    jornada INTEGER NOT NULL,
-    xp      REAL NOT NULL,
-    PRIMARY KEY (player, jornada)
-) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS dec_shape (
     pos TEXT PRIMARY KEY,
     lo  INTEGER NOT NULL,
@@ -91,23 +83,23 @@ DROP VIEW IF EXISTS dec_player_seen;
 CREATE VIEW dec_player_seen AS
 SELECT m.player, m.pos, 1 AS mine, NULL AS asking,
        coalesce(CASE WHEN st.offers THEN s.fetches END, s.value, 0.0) AS proceeds
-FROM dec_mine m CROSS JOIN dec_state st
-LEFT JOIN seen s ON s.cut = st.cut AND s.variant = st.variant AND s.player = m.player
+FROM dec_mine m CROSS JOIN dec_state st CROSS JOIN look l
+LEFT JOIN seen s ON s.cut = l.cut AND s.variant = l.variant AND s.player = m.player
 UNION ALL
 SELECT s.player, s.pos, 0, s.price, NULL
-FROM seen s JOIN dec_state st ON s.cut = st.cut AND s.variant = st.variant
+FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant CROSS JOIN dec_state st
 WHERE st.buys AND s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player FROM dec_mine);
 
 -- Each buy's bids and their chance of winning, as seen.
 DROP VIEW IF EXISTS dec_odds_seen;
 CREATE VIEW dec_odds_seen AS
-SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN dec_state st ON o.cut = st.cut AND o.variant = st.variant;
+SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN look l ON o.cut = l.cut AND o.variant = l.variant;
 
 -- Your cash, squad value (seen), the game's debt share and squad cap, the
 -- eleven's size.
 DROP VIEW IF EXISTS dec_money_seen;
 CREATE VIEW dec_money_seen AS
-SELECT st.cash, (SELECT total(s.value) FROM dec_mine m JOIN seen s ON s.cut = st.cut AND s.variant = st.variant
+SELECT st.cash, (SELECT total(s.value) FROM dec_mine m JOIN look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant
                  AND s.player = m.player) AS team_value, st.debt, st.squad_max, st.xi_size
 FROM dec_state st;
 
@@ -180,8 +172,8 @@ sq AS MATERIALIZED (SELECT * FROM dec_squad),
 members AS (SELECT v.id, q.player, q.pos FROM v JOIN sq q ON q.player <> v.s
             UNION ALL
             SELECT v.id, p.player, p.pos FROM v JOIN dec_player p ON p.player = v.b),
-pick AS (SELECT m.id, x.jornada, m.player, m.pos AS slot, m.player AS ord, x.xp AS e
-         FROM members m JOIN dec_xp x USING (player)),
+pick AS (SELECT m.id, c.jornada, m.player, m.pos AS slot, m.player AS ord, c.e
+         FROM members m JOIN cell c USING (player)),
 bounds AS (SELECT pos AS slot, lo, hi FROM dec_shape),
 /* rules.ELEVEN */,
 f AS (SELECT v.id, coalesce((SELECT total(e) FROM xi WHERE xi.id = v.id), 0.0) AS f FROM v)

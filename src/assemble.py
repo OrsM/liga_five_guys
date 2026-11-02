@@ -445,7 +445,7 @@ def built(also: frozenset[str] = frozenset()) -> Built:
         state=LeagueState(squads, rem, me, carried), forecaster=boot,
         market=market,
         rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors, cut=c),
+        part_played=played, first_jornada_of=first_jornada_of, factors=fc.factors, cut=c, moment=fc.moment),
         params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 

@@ -32,6 +32,7 @@ class Universe:
     first_jornada_of: dict[str, int] = field(default_factory=dict)
     factors: Mapping[int, Mapping[str, Factors]] = field(default_factory=dict)
     cut: str = ""          # the market as seen then (schema.sql seen); none: made by hand
+    moment: int = 0        # the forecast then (forecast_cell); 0: made by hand
 
     @property
     def me(self) -> str:
