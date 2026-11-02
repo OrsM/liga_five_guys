@@ -10,6 +10,7 @@ from ffcore.action import Action
 from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, SQUAD_MAX, XI_SIZE, position
 
+from assemble import write_constants
 from decide import Universe
 
 __all__ = ["plan", "inputs", "after_auctions"]
@@ -26,8 +27,7 @@ def inputs(u: Universe, buys: bool = True) -> None:
     forecast written first."""
     m = u.market
     if not u.cut:
-        from assemble import write_constants   # the model's constants the views read, as a forecast writes them
-        write_constants()
+        write_constants()   # the model's constants the views read, as a forecast writes them
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)

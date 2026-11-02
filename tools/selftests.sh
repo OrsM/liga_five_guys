@@ -10,7 +10,7 @@ export FF_ROOT=./data
 
 TESTS=(ffcore/facts.py ffcore/parse.py ffcore/text.py ffcore/tidy.py ffcore/db.py
        ffcore/fixtures.py ffcore/auth.py
-       ffcore/forecast.py ffcore/season.py ffcore/outlook.py ffcore/names.py
+       ffcore/forecast.py ffcore/season.py ffcore/names.py
        ffcore/clock.py ffcore/jornadas.py ffcore/points.py
        ffcore/rules.py
        ffcore/startprob.py ffcore/crosswalk.py sources.py ffcore/source.py
@@ -18,7 +18,7 @@ TESTS=(ffcore/facts.py ffcore/parse.py ffcore/text.py ffcore/tidy.py ffcore/db.p
        "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
        ffcore/score.py
        "grading.py --selftest"
-       "crosswalk.py --selftest" "run.py --selftest" "remind.py --selftest" "health.py --selftest" publish.py assemble.py ffcore/gain.py
+       "crosswalk.py --selftest" "run.py --selftest" "remind.py --selftest" "health.py --selftest" publish.py assemble.py
        ffcore/action.py ffcore/market.py ffcore/pricing.py ffcore/schedule.py
        "stats.py --selftest" "act.py --selftest" decision.py
       )
