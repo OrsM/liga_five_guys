@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-02T07:35Z",
+ "generated_at": "2026-11-02T07:36Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -49253553.0,
  "cash_locked": 0.0,
@@ -521,7 +521,7 @@
    "name": null,
    "pos": null,
    "what": "relist",
-   "label": "relist Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras, Julian Alvarez, Bil Nsongo",
+   "label": "relist Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras, Julian Alvarez, Bil Nsongo, Adria Pedrosa, Martin Satriano, Jon Moncayola, Robin Le Normand",
    "step": null,
    "amount": null,
    "done": false,
@@ -626,6 +626,22 @@
      "value": 24491115.0
     },
     {
+     "player_team": "109094607",
+     "player": "1056",
+     "market": "62681664",
+     "bid": "",
+     "pos": "DEF",
+     "value": 3145221.0
+    },
+    {
+     "player_team": "109094609",
+     "player": "255",
+     "market": "62682354",
+     "bid": "",
+     "pos": "DEF",
+     "value": 6318588.0
+    },
+    {
      "player_team": "24338723",
      "player": "3002",
      "market": "54752103",
@@ -642,12 +658,28 @@
      "value": 49429356.0
     },
     {
+     "player_team": "109094610",
+     "player": "637",
+     "market": "62681663",
+     "bid": "",
+     "pos": "MED",
+     "value": 4121682.0
+    },
+    {
      "player_team": "90937863",
      "player": "3074",
      "market": "50121325",
      "bid": "",
      "pos": "MED",
      "value": 18720570.0
+    },
+    {
+     "player_team": "109094608",
+     "player": "3137",
+     "market": "62681662",
+     "bid": "",
+     "pos": "DEL",
+     "value": 17193155.0
     },
     {
      "player_team": "107331404",
@@ -658,61 +690,11 @@
      "value": 12262306.0
     }
    ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Martin Satriano, Adria Pedrosa, Jon Moncayola, Robin Le Normand",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [],
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "109094607",
-     "player": "1056",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 3145221.0
-    },
-    {
-     "player_team": "109094609",
-     "player": "255",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 6318588.0
-    },
-    {
-     "player_team": "109094610",
-     "player": "637",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 4121682.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 17193155.0
-    }
-   ]
   }
  ],
  "cash_after": 55310.0946967602,
  "can_bid": 26269978.0,
- "ping": "sell Dani Martinez; sell Raul Garcia; sell Alvaro F. Carreras; sell Yeray Alvarez; sell Alvaro Garcia; sell Augusto Batalla; sell Thomas Lemar; sell Iñigo Vicente; buy Sergio Canales; relist Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras, Julian Alvarez, Bil Nsongo; list Martin Satriano, Adria Pedrosa, Jon Moncayola, Robin Le Normand",
+ "ping": "sell Dani Martinez; sell Raul Garcia; sell Alvaro F. Carreras; sell Yeray Alvarez; sell Alvaro Garcia; sell Augusto Batalla; sell Thomas Lemar; sell Iñigo Vicente; buy Sergio Canales; relist Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras, Julian Alvarez, Bil Nsongo, Adria Pedrosa, Martin Satriano, Jon Moncayola, Robin Le Normand",
  "buys": [
   {
    "name": "Robert Navarro",
@@ -1549,8 +1531,8 @@
   {
    "name": "Robin Le Normand",
    "pos": "DEF",
-   "what": "list",
-   "label": "list Robin Le Normand",
+   "what": "sell",
+   "label": "sell Robin Le Normand",
    "step": "take offer",
    "offer": 6771268.0,
    "waiting": 6471728.97476942,
@@ -1594,14 +1576,14 @@
    ],
    "more": true,
    "accepts": [
-    null
+    6771268.0
    ],
    "act": [
     {
      "player_team": "109094609",
      "player": "255",
-     "market": null,
-     "bid": null,
+     "market": "62682354",
+     "bid": "",
      "pos": "DEF",
      "value": 6318588.0
     }
@@ -1610,8 +1592,8 @@
   {
    "name": "Adria Pedrosa",
    "pos": "DEF",
-   "what": "list",
-   "label": "list Adria Pedrosa",
+   "what": "sell",
+   "label": "sell Adria Pedrosa",
    "step": "wait",
    "offer": 3023246.0,
    "waiting": 3269422.0700008,
@@ -1659,15 +1641,13 @@
     ]
    ],
    "more": true,
-   "accepts": [
-    null
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "109094607",
      "player": "1056",
-     "market": null,
-     "bid": null,
+     "market": "62681664",
+     "bid": "",
      "pos": "DEF",
      "value": 3145221.0
     }
@@ -1720,8 +1700,8 @@
   {
    "name": "Jon Moncayola",
    "pos": "MED",
-   "what": "list",
-   "label": "list Jon Moncayola",
+   "what": "sell",
+   "label": "sell Jon Moncayola",
    "step": "take offer",
    "offer": 4304031.0,
    "waiting": 4266984.37706391,
@@ -1765,14 +1745,14 @@
    ],
    "more": true,
    "accepts": [
-    null
+    4304031.0
    ],
    "act": [
     {
      "player_team": "109094610",
      "player": "637",
-     "market": null,
-     "bid": null,
+     "market": "62681663",
+     "bid": "",
      "pos": "MED",
      "value": 4121682.0
     }
@@ -1781,8 +1761,8 @@
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "what": "list",
-   "label": "list Martin Satriano",
+   "what": "sell",
+   "label": "sell Martin Satriano",
    "step": "take offer",
    "offer": 18530205.0,
    "waiting": 18123239.118803,
@@ -1826,14 +1806,14 @@
    ],
    "more": true,
    "accepts": [
-    null
+    18530205.0
    ],
    "act": [
     {
      "player_team": "109094608",
      "player": "3137",
-     "market": null,
-     "bid": null,
+     "market": "62681662",
+     "bid": "",
      "pos": "DEL",
      "value": 17193155.0
     }
