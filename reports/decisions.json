@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-02T07:04Z",
+ "generated_at": "2026-11-02T07:35Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -49253553.0,
  "cash_locked": 0.0,
@@ -12,116 +12,6 @@
   2278.01565365161
  ],
  "do": [
-  {
-   "what": "field",
-   "label": "field Iñigo Vicente, Jon Moncayola",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": 4.62595722854155,
-   "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Georges Mikautadze",
-     "names"
-    ]
-   ],
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "24338723",
-     "player": "3002",
-     "market": "54752103",
-     "bid": "",
-     "pos": "DEL",
-     "value": 25151046.0
-    },
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": "54892898",
-     "bid": "",
-     "pos": "POR",
-     "value": 19759822.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 17193155.0
-    },
-    {
-     "player_team": "107909858",
-     "player": "3147",
-     "market": "61763382",
-     "bid": "",
-     "pos": "DEL",
-     "value": 49429356.0
-    },
-    {
-     "player_team": "44068749",
-     "player": "2639",
-     "market": "50121404",
-     "bid": "",
-     "pos": "MED",
-     "value": 10051387.0
-    },
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": "51255271",
-     "bid": "",
-     "pos": "DEF",
-     "value": 51304573.0
-    },
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": "50121325",
-     "bid": "",
-     "pos": "MED",
-     "value": 18720570.0
-    },
-    {
-     "player_team": "37280098",
-     "player": "3123",
-     "market": "51255255",
-     "bid": "",
-     "pos": "DEF",
-     "value": 24491115.0
-    },
-    {
-     "player_team": "107331405",
-     "player": "2757",
-     "market": "61356752",
-     "bid": "",
-     "pos": "DEF",
-     "value": 40852272.0
-    },
-    {
-     "player_team": "109094610",
-     "player": "637",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 4121682.0
-    },
-    {
-     "player_team": "24338726",
-     "player": "2464",
-     "market": "54752027",
-     "bid": "",
-     "pos": "MED",
-     "value": 37536621.0
-    }
-   ]
-  },
   {
    "name": "Dani Martinez",
    "pos": "DEF",
@@ -822,7 +712,7 @@
  ],
  "cash_after": 55310.0946967602,
  "can_bid": 26269978.0,
- "ping": "field Iñigo Vicente, Jon Moncayola; sell Dani Martinez; sell Raul Garcia; sell Alvaro F. Carreras; sell Yeray Alvarez; sell Alvaro Garcia; sell Augusto Batalla; sell Thomas Lemar; sell Iñigo Vicente; buy Sergio Canales; relist Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras, Julian Alvarez, Bil Nsongo; list Martin Satriano, Adria Pedrosa, Jon Moncayola, Robin Le Normand",
+ "ping": "sell Dani Martinez; sell Raul Garcia; sell Alvaro F. Carreras; sell Yeray Alvarez; sell Alvaro Garcia; sell Augusto Batalla; sell Thomas Lemar; sell Iñigo Vicente; buy Sergio Canales; relist Alvaro Garcia, Gerard Martin, Georges Mikautadze, Natan, Pepelu, Mathew Ryan, Yeray Alvarez, Miguel Roman, German Valera, Marcos Alonso, Iñigo Vicente, Fernando Niño, Alvaro F. Carreras, Julian Alvarez, Bil Nsongo; list Martin Satriano, Adria Pedrosa, Jon Moncayola, Robin Le Normand",
  "buys": [
   {
    "name": "Robert Navarro",
