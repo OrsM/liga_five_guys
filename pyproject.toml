@@ -42,46 +42,7 @@ module = ["lxml", "lxml.*"]
 ignore_missing_imports = true
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "SLF001", "PLC0415"]
-
-# PLC0415 (import outside top level) replaces tools/structure.py's lazy-import
-# check. Ruff cannot exempt a single function, and the self-tests import
-# locally, so the files below (those that do, or hold a deliberate lazy
-# import) are exempt; a new module is checked.
-[tool.ruff.lint.per-file-ignores]
-"src/act.py" = ["PLC0415"]
-"src/assemble.py" = ["PLC0415"]
-"src/crosswalk.py" = ["PLC0415"]
-"src/decision.py" = ["PLC0415"]
-"src/ffcore/auth.py" = ["PLC0415"]
-"src/ffcore/clock.py" = ["PLC0415"]
-"src/ffcore/crosswalk.py" = ["PLC0415"]
-"src/ffcore/db.py" = ["PLC0415"]
-"src/ffcore/facts.py" = ["PLC0415"]
-"src/ffcore/fixture.py" = ["PLC0415"]
-"src/ffcore/fixtures.py" = ["PLC0415"]
-"src/ffcore/futbolfantasy.py" = ["PLC0415"]
-"src/ffcore/jornadas.py" = ["PLC0415"]
-"src/ffcore/laliga_api.py" = ["PLC0415"]
-"src/ffcore/league.py" = ["PLC0415"]
-"src/ffcore/points.py" = ["PLC0415"]
-"src/ffcore/rules.py" = ["PLC0415"]
-"src/ffcore/schedule.py" = ["PLC0415"]
-"src/ffcore/score.py" = ["PLC0415"]
-"src/ffcore/startprob.py" = ["PLC0415"]
-"src/ffcore/tidy.py" = ["PLC0415"]
-"src/grading.py" = ["PLC0415"]
-"src/health.py" = ["PLC0415"]
-"src/ingest.py" = ["PLC0415"]
-"src/publish.py" = ["PLC0415"]
-"src/remind.py" = ["PLC0415"]
-"src/run.py" = ["PLC0415"]
-"src/sim.py" = ["PLC0415"]
-"src/sources.py" = ["PLC0415"]
-"tools/board_history.py" = ["PLC0415"]
-"tools/golden.py" = ["PLC0415"]
-"tools/q.py" = ["PLC0415"]
-"tools/sql.py" = ["PLC0415"]
+select = ["E4", "E7", "E9", "F", "SLF001"]
 
 # src/ holds one package (ffcore) plus the top-level stage modules.
 # Declaring it here is what lets `import ffcore` work from anywhere --

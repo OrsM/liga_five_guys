@@ -51,3 +51,4 @@ data/tidy/parse_state.json
 data/lfg.db*
 /lfg.db*
 data/*.schema.lock
+*.egg-info/
