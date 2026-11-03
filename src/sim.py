@@ -15,9 +15,10 @@ from assemble import built
 import decision
 from decide import Action, Universe
 from ffcore.db import connect, cut, record, rows, this_run
+from ffcore.jornadas import rounds
 from ffcore.tidy import REPORTS
 
-__all__ = ["with_squad", "board_doc", "record_run"]
+__all__ = ["board_doc", "record_run"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
 
@@ -70,11 +71,6 @@ def _selftest() -> None:
     assert sorted(bought) == ["cand", "twin"], "each 4 a jornada for a 2.7 in the eleven"
     sold = [k for a in acts for k in a.sell]
 
-    held = with_squad(ub, {"star": "MED"}, 1e6, {"cand": 5e6, "gone": 1e6})
-    assert held.mine == {"star": "MED"} and held.market.cash == 1e6 and held.me == "me" \
-        and held.state.squads["riv"] == riv and held.market.my_bid == {"cand": 5e6}, \
-        "your squad, cash and bids (on players still on the market) swapped, the rest as it was"
-    assert ub.mine == sqb and ub.market.cash == 10e6, "the original is untouched"
 
     Plan = Sequence[tuple[str, str, float, float, float]]          # kind, player, amount, win, worth
     Option = tuple[str, str, float, float, float, float]    # kind, player, amount, win, gain, worth
@@ -133,7 +129,7 @@ def _selftest() -> None:
                           "sale_price": str(m.price.get(k, 1e6)), "bids": str(n)} for k, n in bids])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
                                      for k in fielded])
-            record_run(u, 7)
+            record_run(7, u=u)
             with closing(connect()) as db, db:
                 db.executemany("INSERT OR REPLACE INTO decision_option VALUES (7, ?, ?, ?, ?, ?, ?, 0)", options)
                 if plan is not None:
@@ -352,7 +348,7 @@ def _selftest() -> None:
 
     ub = replace(ub, market=replace(ub.market, my_bid={}, route={}))
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        got = record_run(ub, 7)
+        got = record_run(7, u=ub)
         assert got == acts and rows("SELECT step, kind, player, amount FROM decision_plan WHERE run_id = 7") \
             == [(i, a.kind, a.buy, a.cost) for i, a in enumerate(acts)], "the plan's moves, in order"
         assert rows("SELECT kind, player, in_plan FROM decision_option WHERE run_id = 7 AND in_plan") \
@@ -444,11 +440,12 @@ def _selftest_lineup() -> None:
 
 
 
-def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | None = None) -> list[Action]:
-    """The decision (decision.plan) and everything the run saw, into its
-    tables: the board views read them; the forecast moment it was built on,
-    and your chance of first and finish once the plan is made, every bid
-    won. The plan's moves."""
+def record_run(run: int, params: Sequence[Doc] = (), moment: int | None = None,
+               u: Universe | None = None) -> list[Action]:
+    """The decision at t (decision.plan; or of a league by hand, u) and
+    everything the run saw, into its tables: the board views read them; the
+    forecast moment it was built on, and your chance of first and finish
+    once the plan is made, every bid won. The plan's moves."""
     decision.inputs(u)
     with closing(connect()) as db, db:
         db.execute(STANDINGS, (run, ))
@@ -467,16 +464,6 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | 
     return acts
 
 
-def with_squad(u: Universe, squad: dict[str, str], cash: float,
-               bids: dict[str, float] | None = None) -> Universe:
-    """The league with this squad, cash and bids in (on players still on
-    the market) as yours, and none of your own bids or the offers on your
-    players (they are not these players')."""
-    return replace(u, state=replace(u.state, squads={**u.state.squads, u.me: dict(squad)}),
-                   market=replace(u.market, cash=cash, offer={}, fetch={},
-                                  my_bid={k: b for k, b in (bids or {}).items() if k in u.market.price}))
-
-
 def board_doc() -> Doc:
     """decisions.json as board_json makes it, from the last run's rows."""
     (doc,), = rows("SELECT json FROM board_json")
@@ -486,15 +473,15 @@ def board_doc() -> Doc:
 
 def main() -> None:
     b = built()
-    u = b.universe
-    if len(u.state.squads) < 2 or not u.state.jornadas:
-        print("sim: nothing to decide (%d squads, %d jornadas left)"
-              % (len(u.state.squads), len(u.state.jornadas)))
+    (managers, ), = rows("SELECT count(*) FROM look l JOIN seen_cash c ON c.cut = l.cut AND c.variant = l.variant")
+    left = rounds().rem
+    if managers < 2 or not left:
+        print("sim: nothing to decide (%d managers, %d jornadas left)" % (managers, len(left)))
         return
     run = this_run()
     if run is None:
         raise SystemExit("sim: the board is the views over a run's rows; run it as run.py sim")
-    record_run(u, run, b.params, b.moment)
+    record_run(run, b.params, b.moment)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(
         board_doc(), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

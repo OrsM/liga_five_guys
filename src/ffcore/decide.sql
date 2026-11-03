@@ -21,20 +21,14 @@
 -- clear. src/decision.py writes the inputs and adds the moves.
 
 -- The inputs, one decision's (decision.py inputs), beside what the model
--- looks at (schema.sql look: the market seen, the forecast): your squad and
--- cash (yours, or a replay's), the game's debt share and squad cap, the
--- eleven's size.
+-- looks at (schema.sql look: the market seen, the forecast, your squad and
+-- cash at t, my_squad and my_cash): whether it may buy, the game's debt
+-- share and squad cap, the eleven's size.
 CREATE TABLE IF NOT EXISTS dec_state (
-    cash      REAL NOT NULL,
-    offers    INTEGER NOT NULL,      -- the offers seen are on this squad's players
     buys      INTEGER NOT NULL,      -- 0: sales only
     debt      REAL NOT NULL,
     squad_max INTEGER NOT NULL,
     xi_size   INTEGER NOT NULL
-);
-CREATE TABLE IF NOT EXISTS dec_mine (
-    player TEXT PRIMARY KEY,
-    pos    TEXT NOT NULL
 );
 -- What the views below make of them, made once a decision (decision.py
 -- inputs; the plan reads them at every step).
@@ -70,20 +64,19 @@ CREATE TABLE IF NOT EXISTS dec_plan (
     PRIMARY KEY (step, kind)
 );
 
--- The players the decision can move: yours, at what a sale of each gets
--- (with an offer on him seen, the offer or what waiting is worth; else his
--- value), and the market's you could buy, at his asking price (not yours,
--- nor any manager's).
+-- The players the decision can move: yours (my_squad), at what a sale of
+-- each gets as seen (seen.fetches: with an offer on him, the offer or what
+-- waiting is worth; else his value), and the market's you could buy, at his
+-- asking price (not yours, nor any manager's).
 DROP VIEW IF EXISTS dec_player_seen;
 CREATE VIEW dec_player_seen AS
-SELECT m.player, m.pos, 1 AS mine, NULL AS asking,
-       coalesce(CASE WHEN st.offers THEN s.fetches END, s.value, 0.0) AS proceeds
-FROM dec_mine m CROSS JOIN dec_state st CROSS JOIN look l
+SELECT m.player, m.pos, 1 AS mine, NULL AS asking, coalesce(s.fetches, s.value, 0.0) AS proceeds
+FROM my_squad m CROSS JOIN look l
 LEFT JOIN seen s ON s.cut = l.cut AND s.variant = l.variant AND s.player = m.player
 UNION ALL
 SELECT s.player, s.pos, 0, s.price, NULL
 FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant CROSS JOIN dec_state st
-WHERE st.buys AND s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player FROM dec_mine);
+WHERE st.buys AND s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player FROM my_squad);
 
 -- Each buy's bids and their chance of winning, as seen.
 DROP VIEW IF EXISTS dec_odds_seen;
@@ -94,9 +87,9 @@ SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN look l ON o.cut = l.cut 
 -- eleven's size.
 DROP VIEW IF EXISTS dec_money_seen;
 CREATE VIEW dec_money_seen AS
-SELECT st.cash, (SELECT total(s.value) FROM dec_mine m JOIN look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant
+SELECT c.cash, (SELECT total(s.value) FROM my_squad m JOIN look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant
                  AND s.player = m.player) AS team_value, st.debt, st.squad_max, st.xi_size
-FROM dec_state st;
+FROM dec_state st, my_cash c;
 
 -- The game's formations (rules.FORMATIONS, put in where it is named below
 -- as connect() applies this file): each one's players by position, f its
@@ -272,7 +265,7 @@ WHERE r = 1;
 DROP VIEW IF EXISTS my_xi;
 CREATE VIEW my_xi AS
 WITH pick AS (SELECT 1 AS id, 0 AS jornada, m.player, m.pos AS slot, m.player AS ord, coalesce(n.e, 0.0) AS e
-              FROM dec_mine m LEFT JOIN next_cell n USING (player)),
+              FROM my_squad m LEFT JOIN next_cell n USING (player)),
 bounds AS (SELECT pos AS slot, lo, hi FROM slot_bounds),
 /* rules.ELEVEN */
 SELECT player, e FROM xi;
@@ -282,13 +275,13 @@ SELECT player, e FROM xi;
 -- left, and whether he is in your eleven next (my_xi).
 DROP VIEW IF EXISTS look_players;
 CREATE VIEW look_players AS
-WITH k AS (SELECT player FROM dec_mine
+WITH k AS (SELECT player FROM my_squad
            UNION SELECT s.player FROM look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant
                  WHERE s.price IS NOT NULL
            UNION SELECT player FROM dec_plan WHERE kind = 'buy'),
 season AS (SELECT player, total(e) AS e FROM cell GROUP BY player)
 SELECT k.player, coalesce(n.p, 0.0) AS start, coalesce(n.e, 0.0) AS next, coalesce(s.e, 0.0) AS season,
-       k.player IN (SELECT player FROM dec_mine) AS mine, k.player IN (SELECT player FROM my_xi) AS xi
+       k.player IN (SELECT player FROM my_squad) AS mine, k.player IN (SELECT player FROM my_xi) AS xi
 FROM k LEFT JOIN next_cell n USING (player) LEFT JOIN season s USING (player);
 
 -- Every manager's eleven each jornada left (rules.ELEVEN), each player's
@@ -325,7 +318,7 @@ FROM g LEFT JOIN (SELECT manager, max(CAST(team_points AS REAL)) AS points FROM 
 -- expected final position (1 and the chance each other ends above him,
 -- level counting half), his chance of first (integrated over his total,
 -- 401 points of it: the chance every other ends no higher), the chance he
--- ends above you, and his cash (yours as the decision holds it).
+-- ends above you, and his cash at t (yours my_cash, his as seen).
 DROP VIEW IF EXISTS league_standings;
 CREATE VIEW league_standings AS
 WITH RECURSIVE g(i) AS (SELECT -200 UNION ALL SELECT i + 1 FROM g WHERE i < 200),
@@ -348,8 +341,9 @@ SELECT d.manager, d.manager = l.me AS me, d.now, d.mean, d.mean + d.sd * ninv(0.
        1 + coalesce((SELECT total(p) FROM above WHERE a <> d.manager AND b = d.manager), 0.0) AS finish,
        f.p AS p_first,
        CASE WHEN d.manager <> l.me THEN 1 - (SELECT p FROM above WHERE a = l.me AND b = d.manager) END AS p_above,
-       CASE WHEN d.manager = l.me THEN (SELECT cash FROM dec_state) ELSE coalesce(c.cash, 0.0) END AS cash
-FROM d CROSS JOIN look l LEFT JOIN first f USING (manager) LEFT JOIN cash c USING (manager);
+       CASE WHEN d.manager = l.me THEN (SELECT cash FROM my_cash) ELSE coalesce(c.cash, 0.0) END AS cash
+FROM d CROSS JOIN look l LEFT JOIN first f USING (manager)
+LEFT JOIN seen_cash c ON c.cut = l.cut AND c.variant = l.variant AND c.manager = d.manager;
 
 -- Each manager's points one jornada at a time, as a normal (a jornada's own
 -- variance: each player's form shared by nothing else): what the standings

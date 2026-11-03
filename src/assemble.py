@@ -5,7 +5,6 @@ themselves."""
 from __future__ import annotations
 
 import hashlib
-import json
 import sqlite3
 import sys
 from contextlib import closing, contextmanager
@@ -15,27 +14,22 @@ from collections.abc import Iterable, Iterator, Sequence
 from typing import Any, NamedTuple
 
 import remind
-from decide import Universe
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import set_variant
 from ffcore.db import connect, cut, named, query, record, rows
 from ffcore.fixture import Ratings, difficulty_ratings
-from ffcore.forecast import Bootstrap
 from ffcore.jornadas import rounds
-from ffcore.league import League
-from ffcore.market import Market
-from ffcore.names import Name
+from ffcore.league import write_config
 from ffcore.parse import Rows
 from ffcore.points import scored, season_record
-from ffcore.schedule import Factors, PerJornada, expectations
+from ffcore.schedule import Factors, expectations
 from ffcore.score import fit_promoted_discount, Scorer
-from ffcore.season import LeagueState
 from ffcore.startprob import Availability, Calibration, StartOdds, fit_availability
 from ffcore.tidy import LINEUP_SOURCE, age_hours, current
 from stats import percentile
 
-__all__ = ["applied", "constants", "universe", "built", "player_forecast", "forecast_key", "params", "scorer", "fixture_ratings", "price_momentum",
-           "price_change", "bid_odds", "write_constants", "record_trend", "market_offer_ratios",
+__all__ = ["applied", "constants", "built", "player_forecast", "forecast_key", "params", "scorer", "fixture_ratings", "price_momentum",
+           "price_change", "write_constants", "record_trend", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
@@ -88,7 +82,7 @@ def applied(variant: str) -> Iterator[None]:
 
 
 def scorer(market: Rows, xi_rows: Rows) -> Scorer:
-    """The scorer as of cut(), its fits read from the start and points views
+    """The scorer as of t, its fits read from the start and points views
     (written constants first: the views read them)."""
     write_constants()
     last_season = {k: {"pts": pts, "pj": pj} for k, pts, pj in rows("SELECT ff_id, pts, pj FROM last_season")}
@@ -172,36 +166,19 @@ def price_change(day: str, h: int) -> dict[str, float | None]:
 
 
 def see() -> str:
-    """The market and the league as of cut() into seen and seen_odds, made
-    again (player_facts, sale_odds, bid_odds): what a universe is built
-    from. The cut."""
+    """The market and the league as of t into seen, seen_cash and
+    seen_odds, made again (player_facts, sale_odds, cash, bid_odds): what a
+    decision at t reads. The cut."""
     with closing(connect()) as db, db:
         (c, ), = db.execute("SELECT cut FROM look").fetchall()
-        for t in ("seen", "seen_odds"):
+        for t in ("seen", "seen_cash", "seen_odds"):
             db.execute("DELETE FROM %s WHERE cut = ? AND variant = variant()" % t, (c, ))
         db.execute("INSERT INTO seen SELECT ?, variant(), f.player, f.name, f.pos, f.owner, f.value, f.trend, f.paid,"
                    " f.offer, f.clause, f.price, f.route, f.my_bid, s.fetches"
                    " FROM player_facts f LEFT JOIN sale_odds s USING (player)", (c, ))
+        db.execute("INSERT INTO seen_cash SELECT ?, variant(), manager, cash FROM cash", (c, ))
         db.execute("INSERT INTO seen_odds SELECT ?, variant(), player, ratio, p_win FROM bid_odds", (c, ))
     return c
-
-
-def market_facts(c: str) -> dict[str, dict[str, Any]]:
-    """player_facts as seen at cut c, by player, and what a sale of each gets (fetches)."""
-    cols, got = query("SELECT player, name, pos, owner, value, trend, paid, offer, clause, price, route, my_bid,"
-                      " fetches FROM seen WHERE cut = ?1 AND variant = variant()", (c, ))
-    return {r[0]: dict(zip(cols[1:], r[1:])) for r in got}
-
-
-def bid_odds(c: str) -> dict[str, tuple[tuple[float, float], ...]]:
-    """For each player on the game's market, the bids over asking to choose
-    from and each one's chance of winning (schema.sql's bid_odds, as seen at
-    cut c), lowest first."""
-    out: dict[str, list[tuple[float, float]]] = {}
-    for k, ratio, p in rows("SELECT player, ratio, p_win FROM seen_odds WHERE cut = ? AND variant = variant()"
-                            " ORDER BY player, ratio", (c, )):
-        out.setdefault(k, []).append((ratio, p))
-    return {k: tuple(v) for k, v in out.items()}
 
 
 def market_offer_ratios() -> list[float]:
@@ -240,13 +217,12 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
 
 
 class Built(NamedTuple):
-    universe: Universe
     params: list[dict[str, Any]]
     moment: int
 
 
 class Forecast(NamedTuple):
-    """The forecast as of cut(): its moment (its cells are forecast_cell's,
+    """The forecast as of t: its moment (its cells are forecast_cell's,
     as used forecast_used's), the jornadas it has cells for and the values it fitted (params rows)."""
     moment: int
     jornadas: frozenset[int]
@@ -254,7 +230,7 @@ class Forecast(NamedTuple):
 
 
 def player_forecast(players: Iterable[str] | None = None) -> Forecast:
-    """The forecast as of cut(), the one the board, the backtests and the
+    """The forecast as of t, the one the board, the backtests and the
     replays all read: of these players, or of every player the scorer knows.
     Made once a moment (forecast_key) into forecast_cell, every player the
     scorer knows, and read from there. Each player's cell is his alone (the
@@ -269,10 +245,6 @@ def player_forecast(players: Iterable[str] | None = None) -> Forecast:
     elif asked and (missing := asked - have):
         _make(moment, missing, every=False)
     return _read(moment, asked)
-
-
-def _json(players: set[str] | None) -> str | None:
-    return None if players is None else json.dumps(sorted(players))
 
 
 def forecast_key() -> tuple[str, str, str]:
@@ -349,54 +321,29 @@ def _read(moment: int, players: set[str] | None) -> Forecast:
     return Forecast(moment, jornadas, fits)
 
 
-def universe(also: frozenset[str] = frozenset()) -> Universe:
-    return built(also).universe
-
-
-def built(also: frozenset[str] = frozenset()) -> Built:
-    """The universe, and the parameters it was built with. Its forecast
-    covers every player in a squad or on the market, and also these (a
-    replay's squads hold players nobody holds now)."""
+def built() -> Built:
+    """The league at t made for a decision (look): the market and the
+    league seen then (see), the forecast of every player in a squad, on the
+    market or yours at t or at a path's start (my_squad: a path's may hold
+    players nobody holds now), its moment and you in look; and the parameters it was made with.
+    None made from squads older than APP_FRESH_HOURS."""
     age = age_hours("api_teams")
     if age is None or age > APP_FRESH_HOURS:
         raise SystemExit("the app's squads are %s old; no board is built from "
                          "them" % ("unknown" if age is None else "%.0fh" % age))
-    lg = League.load()
-    me = lg.me
+    me = write_config()
     prices = price_momentum()          # first: it keeps the trend that player_facts and sale_odds read
-    c = see()
-    facts = market_facts(c)
-
-    def column(c: str) -> dict[str, Any]:
-        return {k: f[c] for k, f in facts.items() if f[c] is not None}
-    pos = column("pos")
-    price = column("price")
-    squads = {mgr: {k: pos[k] for k in lg.squad(mgr) if k in pos}
-              for mgr in lg.managers}
-    left = rounds()
-    base = set(price).union(*squads.values())
-    asked = base | also
-    fc = player_forecast(asked)
-    rem = left.rem
-    per_j: PerJornada = {j: {} for j in rem}
-    for k, j, pts, p in rows("SELECT player, jornada, pts, p FROM forecast_used WHERE moment = ?1"
-                             " AND player IN (SELECT value FROM json_each(?2))", (fc.moment, _json(asked))):
-        if j in per_j:
-            per_j[j][k] = (pts, p)
-    market = Market(
-        cash=lg.cash[me], odds=bid_odds(c),
-        name={k: Name(f["name"]) for k, f in facts.items()},
-        pos=pos, price=price, route=column("route"), owner=column("owner"),
-        paid=column("paid"), offer=column("offer"),
-        value=column("value"), my_bid=column("my_bid"),
-        trend=prices.trend, clause=column("clause"),
-        fetch=column("fetches"))
-    boot = Bootstrap(per_j)
-    return Built(Universe(
-        state=LeagueState(squads, rem, me), forecaster=boot,
-        market=market,
-        cut=c, moment=fc.moment),
-        params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
+    see()
+    with closing(connect()) as db, db:
+        db.execute("UPDATE look SET variant = variant(), me = ?", (me, ))
+    fc = player_forecast({k for (k, ) in rows(
+        "SELECT s.player FROM look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant"
+        " WHERE s.price IS NOT NULL OR (s.owner IS NOT NULL AND s.pos IS NOT NULL)"
+        " UNION SELECT player FROM my_squad UNION SELECT s.player FROM look l JOIN seen s"
+        " ON s.cut = l.t0 AND s.variant = l.variant AND s.owner = l.me")})
+    with closing(connect()) as db, db:
+        db.execute("UPDATE look SET moment = ?", (fc.moment, ))
+    return Built(params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 
 def _selftest() -> None:
@@ -637,7 +584,7 @@ def _selftest_sale() -> None:
 
 
 def _selftest_facts() -> None:
-    """schema.sql's player_facts, as market_facts reads it."""
+    """schema.sql's player_facts, as seen at a cut (see)."""
     import tempfile
     from pathlib import Path
 
@@ -684,7 +631,10 @@ def _selftest_facts() -> None:
                                       ("t1", "pending", "5000000", "o2"),
                                       ("t1", "accepted", "9000000", "o3"),
                                       ("t3", "pending", "4000000", "o4")]])
-            got = market_facts(see())
+            c = see()
+            cols, seen = query("SELECT player, name, pos, owner, value, trend, paid, offer, clause, price, route,"
+                               " my_bid, fetches FROM seen WHERE cut = ?", (c, ))
+            got = {r[0]: dict(zip(cols[1:], r[1:])) for r in seen}
         finally:
             set_now(None)
     assert set(got) == {"p1", "p2", "p3", "p4", "p5", "p7"}, \
@@ -847,7 +797,12 @@ def _selftest_market() -> None:
                                + [("2026-09-05T0000Z", "p99", 5.0)])
             try:
                 set_now(datetime(2026, 9, 5, 12, tzinfo=timezone.utc))
-                return bid_odds(see())
+                c = see()
+                out: dict[str, tuple[tuple[float, float], ...]] = {}
+                for k, ratio, p in rows("SELECT player, ratio, p_win FROM seen_odds WHERE cut = ?"
+                                        " ORDER BY player, ratio", (c, )):
+                    out[k] = (*out.get(k, ()), (ratio, p))
+                return out
             finally:
                 set_now(None)
 

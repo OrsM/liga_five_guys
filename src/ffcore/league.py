@@ -4,13 +4,14 @@ import configparser
 import sys
 from contextlib import closing
 from dataclasses import dataclass
+from pathlib import Path
 
 from ffcore import db as lfg
 from ffcore.parse import money
-from ffcore.tidy import current, input_path
+from ffcore.tidy import input_path
 
 from ffcore.names import AppId, PlayerKey
-__all__ = ["Config", "load_config", "League"]
+__all__ = ["Config", "load_config", "write_config"]
 
 
 @dataclass
@@ -31,33 +32,15 @@ def load_config(name: str = "league.ini") -> Config:
         budget=money(cp.get("league", "budget", fallback=str(base.budget))) or 0.0)
 
 
-class League:
-    """The league as lfg.db has it (schema.sql: owners, users, cash,
-    price_paid over the app's tables as of cut(), players by the registry
-    the crosswalk stage writes). Writes the one input no table holds, the config."""
-
-    def __init__(self, cfg: Config) -> None:
-        self.cfg = cfg
-        with closing(lfg.connect()) as db, db:
-            db.execute("DELETE FROM league_config")
-            db.execute("INSERT INTO league_config VALUES (?, ?)", (cfg.me, cfg.budget))
-        self.owner: dict[str, str] = dict(lfg.rows("SELECT player, manager FROM owners"))
-        users = [m for (m,) in lfg.rows("SELECT manager FROM users")]
-        self.cash: dict[str, float] = dict(lfg.rows("SELECT manager, cash FROM cash"))
-        self.paid: dict[str, float] = dict(lfg.rows("SELECT player, paid FROM price_paid"))
-        self.standings = current("api_standings")
-        self.managers = sorted({cfg.me} | set(self.owner.values()) | set(users))
-
-    @classmethod
-    def load(cls) -> "League":
-        return cls(load_config())
-
-    @property
-    def me(self) -> str:
-        return self.cfg.me
-
-    def squad(self, handle: str) -> list[str]:
-        return sorted(k for k, m in self.owner.items() if m == handle)
+def write_config(cfg: Config | None = None, path: Path | None = None) -> str:
+    """The one input of the league's views no table holds (schema.sql:
+    owners, users, cash, price_paid over the app's tables as of t): you and
+    the budget, into league_config. You."""
+    cfg = cfg or load_config()
+    with closing(lfg.connect(path)) as db, db:
+        db.execute("DELETE FROM league_config")
+        db.execute("INSERT INTO league_config VALUES (?, ?)", (cfg.me, cfg.budget))
+    return cfg.me
 
 
 def _selftest() -> None:
@@ -86,9 +69,22 @@ def _selftest() -> None:
     pq = Crosswalk({"p": Player(PlayerKey("p"), app_id=AppId("7")),
                     "q": Player(PlayerKey("q"), app_id=AppId("8"))})
 
+    class League:
+        """The league's views read from lfg.db: owners, cash, price_paid."""
+        def __init__(self) -> None:
+            write_config(Config(me="me", budget=100.0))
+            self.owner = dict(lfg.rows("SELECT player, manager FROM owners"))
+            self.cash = dict(lfg.rows("SELECT manager, cash FROM cash"))
+            self.paid = dict(lfg.rows("SELECT player, paid FROM price_paid"))
+            self.managers = sorted({"me"} | set(self.owner.values())
+                                   | {m for (m,) in lfg.rows("SELECT manager FROM users")})
+
+        def squad(self, handle: str) -> list[str]:
+            return sorted(k for k, m in self.owner.items() if m == handle)
+
     def league(activity: list[dict[str, str]], standings: list[dict[str, str]],
                teams: list[dict[str, str]], xw: Crosswalk = pq) -> League:
-        """A League read from lfg.db holding these rows (teams stamped a or b)."""
+        """The league's views over these rows (teams stamped a or b)."""
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             store_sql("api_activity", [{"at": "", "counterparty": "", "player_id": "", **r,
                                         "observed_at": a} for r in activity])
@@ -97,7 +93,7 @@ def _selftest() -> None:
                 store_sql("api_teams", [r for r in teams if r["observed_at"] == stamp]
                           or [{"observed_at": stamp, "manager": "", "player_id": ""}])
             xw.mirror()
-            return League(Config(me="me", budget=100.0))
+            return League()
 
     with_money = [dict(users[0], team_money="116")] + users[1:]
     assert league(feed, with_money, []).cash == {"me": 116.0, "riv": 91.0, "quiet": 106.0}, \
@@ -142,7 +138,7 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
         raise SystemExit(0)
-    lg = League.load()
-    for m in lg.managers:
-        print("%-18s %2d players  cash %7.2fM" % (m, len(lg.squad(m)),
-                                                 lg.cash[m] / 1e6))
+    write_config()
+    for m, n, cash in lfg.rows("SELECT c.manager, count(o.player), c.cash FROM cash c"
+                               " LEFT JOIN owners o USING (manager) GROUP BY c.manager"):
+        print("%-18s %2d players  cash %7.2fM" % (m, n, cash / 1e6))

@@ -115,6 +115,15 @@ CREATE TABLE IF NOT EXISTS seen (
     fetches REAL,
     PRIMARY KEY (cut, variant, player)
 ) WITHOUT ROWID;
+-- Every manager's cash as seen at a cut (the cash view then): where your
+-- cash at t starts from (my_cash).
+CREATE TABLE IF NOT EXISTS seen_cash (
+    cut     TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    manager TEXT NOT NULL,
+    cash    REAL NOT NULL,
+    PRIMARY KEY (cut, variant, manager)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS seen_odds (
     cut     TEXT NOT NULL,
     variant TEXT NOT NULL,
@@ -128,13 +137,90 @@ CREATE TABLE IF NOT EXISTS seen_odds (
 -- as of (cut: a run sets it to its own time, a replay to each past time it
 -- stands at, ffcore.db.set_now; every as-of view reads it, and nothing
 -- else), the market as seen then (seen at that cut), the forecast of a
--- moment (forecast_used) and who you are (decision.inputs).
+-- moment (forecast_used) and who you are (decision.inputs). Your squad and
+-- cash at t are those at t0 with your moves since (a path's: path, t0;
+-- live, none: t0 is t and the plan's moves are decide.sql's dec_plan).
 CREATE TABLE IF NOT EXISTS look (
     cut     TEXT NOT NULL,
     variant TEXT NOT NULL,
     moment  INTEGER NOT NULL,
-    me      TEXT NOT NULL DEFAULT ''
+    me      TEXT NOT NULL DEFAULT '',
+    path    TEXT NOT NULL DEFAULT '',
+    t0      TEXT NOT NULL DEFAULT ''     -- a stamp; '': t itself
 );
+
+-- A path's moves, each at its t (a stamp): a bid on a player of the game's
+-- market at its amount, one taken back (withdraw), a sale at what it gets.
+-- What you would have done (a replay's phantom, grading.phantom_path) is
+-- an input beside the facts, never a changed world: the league at t reads
+-- look's path's moves in (t0, t] (my_bids, my_squad, my_cash).
+CREATE TABLE IF NOT EXISTS moves (
+    path   TEXT NOT NULL,
+    at     TEXT NOT NULL,
+    kind   TEXT NOT NULL,            -- bid, withdraw, sell
+    player TEXT NOT NULL,
+    amount REAL,
+    PRIMARY KEY (path, at, kind, player)
+) WITHOUT ROWID;
+
+-- The path's moves in (t0, t] (look; none live).
+DROP VIEW IF EXISTS my_moves;
+CREATE VIEW my_moves AS
+SELECT m.at, m.kind, m.player, m.amount FROM look l JOIN moves m ON m.path = l.path
+WHERE l.t0 <> '' AND m.at > l.t0 AND m.at <= l.cut;
+
+-- Each bid of the path's, and the auction it is settled in: his first
+-- close on the game's market after it (auction_results), if by t (close,
+-- a stamp), and whether it won there (it reaches what that auction took:
+-- bar x asking; nothing reaches none). A bid taken back or bid again
+-- before its close is no bid. won NULL: his auction is still to close at
+-- t, the bid stands.
+DROP VIEW IF EXISTS my_bids;
+CREATE VIEW my_bids AS
+WITH m AS MATERIALIZED (SELECT * FROM my_moves),
+r AS MATERIALIZED (SELECT player, strftime('%Y-%m-%dT%H%MZ', close) AS close, asking, bar FROM auction_results
+                   WHERE seller = 'marketPlayerLeague' AND strftime('%Y-%m-%dT%H%MZ', close) <= (SELECT cut FROM look)
+                     AND player IN (SELECT player FROM m WHERE kind = 'bid')),
+b AS (SELECT m.at, m.player, m.amount, (SELECT min(r.close) FROM r WHERE r.player = m.player AND r.close > m.at) AS close
+      FROM m WHERE m.kind = 'bid')
+SELECT b.at, b.player, b.amount, b.close,
+       CASE WHEN b.close IS NOT NULL THEN coalesce(b.amount >= r.bar * r.asking, 0) END AS won
+FROM b LEFT JOIN r ON r.player = b.player AND r.close = b.close
+WHERE NOT EXISTS (SELECT 1 FROM m n WHERE n.player = b.player AND n.kind IN ('bid', 'withdraw')
+                  AND n.at > b.at AND (b.close IS NULL OR n.at < b.close));
+
+-- Your squad at t: whom you held at t0 (seen then), and whom the path has
+-- bought (bids won by t) or sold since, by the last of them; each at his
+-- position as seen at t (else at t0).
+DROP VIEW IF EXISTS my_squad;
+CREATE VIEW my_squad AS
+WITH l AS (SELECT cut, variant, me, CASE WHEN t0 = '' THEN cut ELSE t0 END AS t0 FROM look),
+start AS (SELECT s.player FROM l JOIN seen s ON s.cut = l.t0 AND s.variant = l.variant AND s.owner = l.me),
+ev AS (SELECT player, at AS t, 0 AS held FROM my_moves WHERE kind = 'sell'
+       UNION ALL SELECT player, close, 1 FROM my_bids WHERE won),
+last AS (SELECT player, held FROM (SELECT player, held, row_number() OVER (PARTITION BY player ORDER BY t DESC) AS n
+                                   FROM ev) WHERE n = 1),
+k AS (SELECT player FROM start WHERE player NOT IN (SELECT player FROM last)
+      UNION SELECT player FROM last WHERE held)
+SELECT k.player, coalesce(n.pos, o.pos, 'MED') AS pos
+FROM k CROSS JOIN l
+LEFT JOIN seen n ON n.cut = l.cut AND n.variant = l.variant AND n.player = k.player
+LEFT JOIN seen o ON o.cut = l.t0 AND o.variant = l.variant AND o.player = k.player;
+
+-- Your cash at t: as seen at t0 (seen_cash), less the bids the path won by
+-- t, plus its sales and the league's bonuses to you since (the ledger's:
+-- the money the game pays whatever you do).
+DROP VIEW IF EXISTS my_cash;
+CREATE VIEW my_cash AS
+WITH l AS (SELECT cut, variant, me, t0 FROM look)
+SELECT coalesce((SELECT c.cash FROM seen_cash c WHERE c.cut = CASE WHEN l.t0 = '' THEN l.cut ELSE l.t0 END
+                 AND c.variant = l.variant AND c.manager = l.me), 0.0)
+       - (SELECT total(amount) FROM my_bids WHERE won)
+       + (SELECT total(amount) FROM my_moves WHERE kind = 'sell')
+       + CASE WHEN l.t0 = '' THEN 0.0 ELSE (
+             SELECT total(g.amount) FROM ledger g WHERE g.kind = 'bonus' AND g.who = l.me
+             AND julianday(g.at) > stamp_jd(l.t0) AND julianday(g.at) <= stamp_jd(l.cut)) END AS cash
+FROM l;
 
 -- What waiting to sell was worth as the run saw it (waiting as of its cut),
 -- a row a player of yours with an offer standing (kind 'sale'): the board's sales read it.

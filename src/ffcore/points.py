@@ -1,4 +1,4 @@
-"""The points history, as schema.sql's views have it as of cut(): each
+"""The points history, as schema.sql's views have it as of t: each
 change in a player's season total, by jornada, and his season so far."""
 from __future__ import annotations
 
