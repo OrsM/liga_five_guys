@@ -34,33 +34,60 @@ and each layer reads only the named views of the layer below:
     grade, board  how good a move was; what to show
 
 A concept with two homes, a layer reaching past the one below, or a
-concept held as mutable state is a fault. Draft homes, to be verified:
+concept held as mutable state is a fault. Verified by six read-only
+audits (2026-11-03):
 
-| # | Concept | Layer | Homes today |
-|---|---|---|---|
-| 1 | Now, the moment we look from | league at t | cut() process clock; look.cut; grading's set_now per date |
-| 2 | Who a player is | facts | identity.sql; crosswalk.py matching; text.resolve for clubs |
-| 3 | Who owns whom | league at t | seen.owner / api_teams; League.owner; assemble's squads; Universe.mine -> dec_mine; grading's Day |
-| 4 | Cash | league at t | cash view; League.cash; Market.cash / left; dec_state + dec_money; Day |
-| 5 | The market: listed, price, value | league at t | seen; Market dicts (written, read back, written again); market / api_market / api_players_all / api_teams for a value at one instant |
-| 6 | What a sale fetches | league at t | dec_player_seen; waiting / sale_odds; the backtest credits its own guess |
-| 7 | Did a bid win | league at t | auction_results; grading's closed / auction_bars |
-| 8 | Jornadas and locks | league at t | jornada_calendar; jornadas.rounds(); grading's before_locks / run_times |
-| 9 | A player's forecast each jornada | forecast | forecast_cell / cell; Bootstrap.per_jornada; expected_points |
-| 10 | Price trend | forecast | momentum views; assemble refits and rewrites them each build |
-| 11 | Season points, matches played | facts | points; season_points; scored.games vs season_record.apps |
-| 12 | The best eleven | decision | rules.ELEVEN (one) |
-| 13 | A stand-in | decision | league_squad (one, 2026-11-03) |
-| 14 | A game's points spread | forecast | score_spread (one, 2026-11-03) |
-| 15 | Standings | grade, board | league_standings; api_standings; sim_standings |
-| 16 | A move, the plan | decision | dec_next / dec_plan; Action; decision_plan |
-| 17 | How good a move was | grade, board | grading's simulated path; grade_decisions; grade_forecast; sim_calibration |
-| 18 | A fake league for tests | (tests) | fixtures.py; decision._by_hand; hand-built Universes |
-| 19 | Explaining the board | grade, board | q.py / sql.py / datasette board views |
+| # | Concept | Layer | The one home | Copies and crossings today |
+|---|---|---|---|---|
+| 1 | t, the moment | league at t | one t, an argument | cut() a process global (clock.py _NOW/_SET, db.py functions); look.cut a second t; views of one decision read both (decide.sql seen via look.cut, jornada_calendar and cash via cut()); set_now per date in grading; datetime.now in grading.auction_closes, run_now in age_hours |
+| 2 | Who a player is | facts | identity.sql views | Python Crosswalk/Player rewrites the crosswalk table; ff_identity_kept cache; text.resolve fuzzy clubs; lineup_gap, auction_results, grading re-match by hand |
+| 3 | Who owns whom | league at t | owners view at t | seen.owner (stored at 91 of 233 cuts: history before owners were kept), League.owner/squad, LeagueState.squads, Universe.mine, Market.owner, dec_mine, grading Day / with_squad |
+| 4 | Cash | league at t | cash view at t | League.cash, Market.cash/left, dec_state, dec_money, Day cash; League() writes league_config on every build |
+| 5 | The market | league at t | seen at a cut | seen -> Market dicts -> seen (_by_hand); board_buy_facts, board_json, late_arrivals, listing_ends, grading read api_market directly; sim.report swaps views for tables |
+| 6 | What a sale fetches | league at t | seen.fetches | the backtest blanks offers (with_squad) and credits value; sim_waiting copy |
+| 7 | Did a bid win | league at t | one cut-bound auction outcome | auction_results ignores the cut; grading.closed / auction_bars read future bars; my_bid three ways |
+| 8 | Jornadas and locks | league at t | jornada_calendar | @cache round_locks/rounds_ahead/rounds (reset by the clock); LeagueState.jornadas; before_locks / run_times (21:45 hard-coded) |
+| 9 | A player's forecast | forecast | forecast_cell -> cell | pts*p written five times (expected_points, cell, standin_cell, grade_forecast, replayed); Bootstrap.per_jornada; Factors.cell vs run_forecast |
+| 10 | Price trend | forecast | views at t | kept fits read "last kept at or before t", so a past t depends on which builds ran; refit and rewritten every build; read four routes; momentum_day built by flipping the clock |
+| 11 | Season points, matches played | facts | scored -> season_record | points and season_points; "played" three ways (page games, scored.games, apps), mixed in assemble's pj |
+| 12 | The best eleven | decision | rules.ELEVEN | one (my_xi's pick differs: next jornada only) |
+| 13 | A stand-in | decision | league_squad | one; reads me from the plan's dec_squad |
+| 14 | A game's spread | forecast | score_spread | one; the variance expression twice (cell, standin_cell) |
+| 15 | Standings | grade, board | league_standings | sim_standings (a run's record, fine); league_season reads api_standings raw |
+| 16 | A move, the plan | decision | dec_next -> dec_plan | Action; dec_start; the loop needed (each step depends on the last) but small |
+| 17 | How good a move was | grade, board | the same views at past t | six or seven replay drivers (at_locks/decisions, backtest, replay, phantom_path, variant_ahead, sql.py --at); only sql.py --at is "same views at past t" |
+| 18 | A fake league for tests | (tests) | rows in the fact tables | about 20 hand-built Universe/Market/Bootstrap/LeagueState objects, _by_hand, sim.report's swaps |
+| 19 | Explaining the board | grade, board | board views, datasette | the board reaches down to api_* and league-at-t views; several grade tables read only by datasette |
 
-Rows 1 and 3-8 are one concept, the league at t, built twice: as SQL (seen
-at a cut) and as Python (Universe, the backtest's Day). That is most of the
-copies, the 10 min backtest and its self-graded 560.
+What a run told you (sim_runs, decision_plan, decision_option, sim_standings,
+sim_players) is a fact of its time, not a copy: kept.
+
+Rows 1 and 3-8 are one concept, the league at t, built twice: as SQL at a
+cut and as Python (League, Market, LeagueState, Universe, the backtest's
+Day). "What if I had moved otherwise" is held as a mutated Day instead of
+an input. That is most of the copies, the 10 min backtest and its
+self-graded 560.
+
+## The plan by layer (2026-11-03)
+
+Bottom up; each item one concept to one home, the copies deleted in the
+same step.
+
+1. t: one t. cut() reads the single t a run or a replay sets; look.cut is
+   it; no other clock in a view or in grading.
+2. My moves as an input: the squad and cash at t are the facts at t plus
+   my moves (the plan's, the phantom's) as rows. Replaces dec_mine,
+   dec_state's cash, Day, with_squad, League, Market, LeagueState,
+   Universe's state.
+3. Auction and sale outcomes at t: one cut-bound auction outcome; a sale
+   at seen's fetches at t.
+4. One replay: the backtest is the same views at each past t, the
+   phantom's moves its input; the other replay drivers go or become a
+   view over it.
+5. Forecast: pts*p once (cell); price fits a function of t, not of which
+   builds ran.
+6. Facts: identity in SQL only; one "played"; derived tables out of facts.
+7. Decision and tests: the plan loop with no Action; tests seed fact rows.
 
 ## Bugs found on the way
 
