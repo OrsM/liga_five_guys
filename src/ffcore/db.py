@@ -68,50 +68,16 @@ def _quantile(sorted_values: list[float], p: float) -> float:
     return sorted_values[lo] + (sorted_values[hi] - sorted_values[lo]) * (pos - lo)
 
 
-class _Quantile:
+class _Median:
     def __init__(self) -> None:
         self.values: list[float] = []
-        self.p = 0.5
 
-    def step(self, *args: Any) -> None:
-        x = args[0]
-        self.p = args[1] if len(args) > 1 else 0.5
+    def step(self, x: Any) -> None:
         if x is not None:
             self.values.append(float(x))
 
     def finalize(self) -> float | None:
-        return _quantile(sorted(self.values), self.p) if self.values else None
-
-
-class _Median(_Quantile):
-    pass
-
-
-class _Corr:
-    """Pearson correlation of the pairs where neither is NULL."""
-
-    def __init__(self) -> None:
-        self.n, self.sx, self.sy, self.sxx, self.syy, self.sxy = 0, 0.0, 0.0, 0.0, 0.0, 0.0
-
-    def step(self, *args: Any) -> None:
-        x, y = args
-        if x is None or y is None:
-            return
-        self.n += 1
-        self.sx += x
-        self.sy += y
-        self.sxx += x * x
-        self.syy += y * y
-        self.sxy += x * y
-
-    def finalize(self) -> float | None:
-        if self.n < 2:
-            return None
-        vx = self.sxx - self.sx * self.sx / self.n
-        vy = self.syy - self.sy * self.sy / self.n
-        if vx <= 1e-12 or vy <= 1e-12:
-            return None
-        return (self.sxy - self.sx * self.sy / self.n) / (vx * vy) ** 0.5
+        return _quantile(sorted(self.values), 0.5) if self.values else None
 
 
 def stamp_jd(s: str | None) -> float | None:
@@ -125,8 +91,8 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (now, as a stamp: the model's
     clock unless told otherwise), stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
     platt() and prognosis_bucket() (startprob's), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
-    lo95(), hi95() and claim() (an estimate and its standard error), and
-    the aggregates median(), quantile(x, p) and corr(x, y)."""
+    lo95(), hi95() and claim() (an estimate and its standard error) and
+    the aggregate median()."""
     db.create_function("cut", 0, now)
     db.create_function("stamp_jd", 1, stamp_jd, deterministic=True)
     db.create_function("variant", 0, variant)
@@ -134,8 +100,6 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
     db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
     db.create_aggregate("median", 1, _Median)  # type: ignore[arg-type]  # the stubs only allow int results
-    db.create_aggregate("quantile", 2, _Quantile)  # type: ignore[arg-type]  # the stubs only allow int results
-    db.create_aggregate("corr", 2, _Corr)  # type: ignore[arg-type]  # the stubs only allow int results
     for fn in (lo95, hi95, claim):
         db.create_function(fn.__name__, 2, fn, deterministic=True)
     db.create_function("platt", 3, platt, deterministic=True)
@@ -354,12 +318,6 @@ def _selftest() -> None:
     assert mem.execute("SELECT median(x), median(x) FROM t WHERE x < 10").fetchone() == (2.5, 2.5), "even count: the middle two"
     assert mem.execute("SELECT median(x) FROM t").fetchone() == (3.0,), "odd count, nulls ignored"
     assert mem.execute("SELECT median(x) FROM t WHERE x > 1000").fetchone() == (None,)
-    assert abs(mem.execute("SELECT corr(x, y) FROM t WHERE x < 10").fetchone()[0] - 1.0) < 1e-12
-    assert mem.execute("SELECT corr(x, -y) FROM t WHERE x < 10").fetchone()[0] < -0.999999
-    assert mem.execute("SELECT corr(x, y) FROM t WHERE x = 1").fetchone() == (None,), "one point has no correlation"
-    assert mem.execute("SELECT corr(x, 5) FROM t WHERE x < 10").fetchone() == (None,), "no spread in one"
-    assert mem.execute("SELECT quantile(x, 0.5), quantile(x, 0), quantile(x, 1) FROM t WHERE x < 10").fetchone() \
-        == (2.5, 1.0, 4.0), "linear between ranks"
     assert mem.execute("SELECT lo95(1.0, 0.5), hi95(1.0, 0.5), claim(1.0, 0.5), claim(1.0, 0.6),"
                        " claim(-1.0, 0.5), claim(0.0, 1.0), claim(1.0, NULL), lo95(NULL, 1)").fetchone() \
         == (1.0 - 0.98, 1.0 + 0.98, "positive", "not established", "negative",
