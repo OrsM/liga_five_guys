@@ -119,8 +119,6 @@ CREATE TABLE IF NOT EXISTS dec_start (
     worth    REAL NOT NULL
 );
 
-DROP VIEW IF EXISTS money_rate;
-
 -- The squad once the plan's moves are made, every bid won.
 DROP VIEW IF EXISTS dec_squad;
 CREATE VIEW dec_squad AS
@@ -165,8 +163,6 @@ WHERE top > (SELECT free FROM dec_cash) OR (SELECT count(*) FROM sq) >= (SELECT 
 -- connect() applies this file: each position's lo best, then the best of
 -- the rest within each position's hi, to eleven; a slot nobody can fill
 -- scores nothing; level players, the first by key).
-DROP VIEW IF EXISTS dec_eleven;
-DROP VIEW IF EXISTS dec_slots;
 DROP VIEW IF EXISTS dec_gain;
 CREATE VIEW dec_gain AS
 WITH v AS MATERIALIZED (SELECT row_number() OVER (ORDER BY b, s) AS id, b, s FROM dec_variant

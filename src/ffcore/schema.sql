@@ -48,23 +48,6 @@ CREATE TABLE IF NOT EXISTS decision_plan (
     PRIMARY KEY (run_id, step, kind)
 );
 
--- The program's board (decide.board, before the decision in SQL), and the
--- rivals' boards made with it (2026-10-31).
-DROP TABLE IF EXISTS funnel;
-DROP TABLE IF EXISTS sim_plan;
-DROP TABLE IF EXISTS rival_boards;
-DROP TABLE IF EXISTS rival_moves;
-DROP TABLE IF EXISTS debt_sales;
-
--- The second plan's tables, from before one score measured both (2026-10-28).
-DROP VIEW IF EXISTS board_plans;
-DROP TABLE IF EXISTS sim_plans;
-DROP TABLE IF EXISTS sim_plan_heads;
-
--- Each run's forecast copied a run (2026-11-01): now the run's moment
--- (sim_runs.moment), read through run_forecast.
-DROP TABLE IF EXISTS forecast;
-
 -- Every constant and fitted value a run was built with (assemble.params),
 -- broom's tidy(): drift and "what changed" are queries over this.
 CREATE TABLE IF NOT EXISTS params (
@@ -76,14 +59,6 @@ CREATE TABLE IF NOT EXISTS params (
     n         INTEGER,           -- observations behind it, where known
     PRIMARY KEY (run_id, component, term)
 );
-
--- The board as a table each list was, before the board became views
--- (S6b): gone, its runs in git (reports/decisions.json).
-DROP TABLE IF EXISTS boards;
-DROP TABLE IF EXISTS board_do;
-DROP TABLE IF EXISTS board_squad;
-DROP TABLE IF EXISTS board_standings;
-DROP TABLE IF EXISTS board_exposed;
 
 -- What the simulation and the plan search decided, a run each (sim.main):
 -- what the board views add the market's and the league's facts to.
@@ -259,11 +234,6 @@ CREATE TABLE IF NOT EXISTS forecast_variant (
     code      TEXT NOT NULL,
     constants TEXT NOT NULL
 );
-
--- Kept by variant name, not by code: a changed model kept the old one's
--- forecasts for ever (2026-10-31). Now the view replayed, over forecast_cell.
-DROP TABLE IF EXISTS replay_tried;
-DROP TABLE IF EXISTS replay_forecast;
 
 -- Is each source still arriving, and whole? Per source that stores a whole
 -- snapshot each fetch (not the keyed tables, which keep only changes) (a page that parsed to nothing stores no snapshot at all),
@@ -569,9 +539,6 @@ WHERE last = 1;
 -- One for everything: the board, the nights before it, the reminder. A
 -- jornada under way locks nothing the market's moves reach (bought tonight,
 -- a player plays none of what is left of it: late_arrivals).
-DROP VIEW IF EXISTS behind_jornadas;
-DROP VIEW IF EXISTS next_kickoff;
-DROP VIEW IF EXISTS next_round_lock;
 DROP VIEW IF EXISTS next_lock;
 CREATE VIEW next_lock AS
 SELECT min(lock) AS lock,
@@ -670,8 +637,6 @@ SELECT player, max(expires_at) AS ends, max(julianday(expires_at)) AS t
 FROM current_api_market
 WHERE player IS NOT NULL AND seller = 'marketPlayerTeam' AND expires_at <> ''
 GROUP BY player;
-
-DROP VIEW IF EXISTS resale_nights;
 
 -- What waiting to sell a player of yours with an offer standing is worth,
 -- over the nights before the lock (next_lock, nights_left): each night's
@@ -809,7 +774,6 @@ FROM (SELECT ff_id, observed_at, value, id,
 
 -- The constants a run is built with (assemble.constants), for the views,
 -- per variant: live, or a challenger's (variants) while it is replayed.
-DROP TABLE IF EXISTS constants;
 CREATE TABLE IF NOT EXISTS model_constants (
     variant TEXT NOT NULL DEFAULT 'live',
     name    TEXT NOT NULL,
@@ -968,12 +932,6 @@ CREATE VIEW fitted AS
 SELECT h, slope FROM momentum_fit
 WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut()));
 
--- How far a value forecast was off (the program's money variance, before the
--- decision in SQL: 2026-10-31).
-DROP VIEW IF EXISTS price_error_now;
-DROP VIEW IF EXISTS price_error;
-DROP TABLE IF EXISTS price_error_fit;
-
 -- The share of a trend (its move over the horizon, the longest h fitted)
 -- already made after each update.
 DROP VIEW IF EXISTS price_carry;
@@ -1017,8 +975,6 @@ WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut
 -- where nobody bought or the winner was you (the bids you beat are not
 -- seen); NULL for a manager's listing (no one's deal with him is seen).
 -- Ground truth for the replays, so it reads every sighting whatever cut().
-DROP VIEW IF EXISTS auction_ratios;
-DROP VIEW IF EXISTS premium;
 DROP VIEW IF EXISTS auction_results;
 CREATE VIEW auction_results AS
 WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM api_standings s, league_config c
@@ -1331,9 +1287,6 @@ SELECT m.player, coalesce(max(f.my + f.b * coalesce(m.x - f.mx, 0.0), 0.0),
                           (SELECT median(y) FROM s)) AS prior
 FROM m LEFT JOIN f USING (pos);
 
-DROP VIEW IF EXISTS pick_prior;
-DROP VIEW IF EXISTS pick_later;
-
 -- Starts: each matchday squad (starters) against the club's last
 -- futbolfantasy listing before the jornada locked. Each player in either,
 -- with his listing (start % as a share, status, note) and his minutes:
@@ -1445,8 +1398,6 @@ SELECT CASE WHEN better THEN best.alpha ELSE 0.0 END AS alpha,
        fall.neutral AS neutral_start, fall.absent AS absent_start
 FROM fits, fall LEFT JOIN best;
 
-DROP VIEW IF EXISTS sim_facts_now;
-
 -- The board: the last run's decisions and the facts it saw (sim_*,
 -- decision_option, decision_plan), the app's line-up and the next kickoff
 -- as of cut().
@@ -1470,7 +1421,6 @@ FROM sim_players p JOIN board_run USING (run_id) LEFT JOIN sim_facts f USING (ru
 -- (asking), the bid (the plan's, or the lowest his odds offer) and its
 -- chance of winning (win), your bid if it is in, what you pay (cost), his
 -- value and trend, his points alone, and whether the plan buys him.
-DROP VIEW IF EXISTS board_market;
 DROP VIEW IF EXISTS board_buys;
 CREATE VIEW board_buys AS
 SELECT o.player, coalesce(s.name, o.player) AS name, coalesce(s.pos, '') AS pos,
@@ -1487,8 +1437,6 @@ WHERE o.kind = 'buy';
 -- him, and what turning the offer down is worth (waiting: the best of the
 -- game's offers still to come before the lock, sim_waiting).
 -- relist_after: when his listing ends, if before the last of those offers.
-DROP VIEW IF EXISTS board_holdings;
-DROP VIEW IF EXISTS board_offers;
 DROP VIEW IF EXISTS board_mine;
 CREATE VIEW board_mine AS
 WITH r AS (SELECT ratio FROM recent_offers),
@@ -1567,7 +1515,6 @@ FROM sim_standings s JOIN board_run USING (run_id);
 -- The eleven to field at the lock: the best of your squad now, each with his
 -- place in your team, as the app lines him up. The line-up reminder and the
 -- board's field line both read it.
-DROP VIEW IF EXISTS field_basis;
 DROP VIEW IF EXISTS board_eleven;
 CREATE VIEW board_eleven AS
 SELECT p.player, p.name, p.pos, p.next FROM board_players p WHERE p.xi;
@@ -1623,10 +1570,6 @@ SELECT row_number() OVER (ORDER BY p.step, p.kind) - 1 AS ord, p.step, p.kind, p
        CASE p.kind WHEN 'buy' THEN p.amount ELSE -p.amount END AS net, p.win, p.worth, p.after
 FROM decision_plan p JOIN board_run USING (run_id);
 
-DROP VIEW IF EXISTS board_money;
-
-DROP VIEW IF EXISTS board_resale;
-
 -- Every line of the board, each once: what to do now, each with the step
 -- it takes in the app and the amount that step names, whether it is done,
 -- its points (over the season, or next for the line-up) and the numbers
@@ -1643,7 +1586,6 @@ DROP VIEW IF EXISTS board_resale;
 --   offers only for those listed, listing costs nothing and a listed player
 --   still plays for you; and those whose listing ends before the last
 --   offer before the lock, to relist once it does.
-DROP VIEW IF EXISTS board_moves;
 DROP VIEW IF EXISTS board_rows;
 CREATE VIEW board_rows AS
 WITH gap AS MATERIALIZED (SELECT * FROM lineup_gap),

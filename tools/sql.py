@@ -5,7 +5,7 @@
     python tools/sql.py --variant shrink-8 "SELECT name, value FROM model_constants WHERE variant = variant()"
 
 The same functions as Datasette (cut(), variant(), name_key(), claim(),
-median(), corr(), ...); --at sets cut() to a past stamp, so every view reads
+median(), ...); --at sets cut() to a past stamp, so every view reads
 as it did then. Nothing can be written.
 """
 from __future__ import annotations
