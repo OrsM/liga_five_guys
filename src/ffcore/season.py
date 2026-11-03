@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ffcore.rules import MAX_SLOT, SHAPES, XI_SIZE, Squads
 
@@ -14,7 +14,6 @@ class LeagueState:
     squads: Squads
     jornadas: list[int]
     me: str = ""
-    carried: dict[str, float] = field(default_factory=dict)
 
 
 def _selftest() -> None:

@@ -8,7 +8,6 @@ from typing import NamedTuple
 from ffcore.fixture import Match, Ratings, season_board
 from ffcore.forecast import Cell, PerJornada
 from ffcore.parse import Rows
-from ffcore.rules import MAX_SLOT, Squad, Squads, shortfall
 from ffcore.score import Rates, Scorer
 
 # The chance a player is fit in a jornada: (player, jornada, his first jornada).
@@ -110,42 +109,6 @@ def expectations(sc: Scorer, ratings: Ratings, keys: Iterable[str], matches: Row
     return Expectations(per_j, first_of, rates, rem, played, factors)
 
 
-def phantom_topup(sq: Squad) -> Squad:
-    """The squad with a stand-in for each player it is short of a formation."""
-    short = shortfall(sq)
-    return {**sq, **{"__phantom_%s_%d" % (p, i): p for p, n in short.items() for i in range(n)}}
-
-
-def phantom_fill(squads: Squads, per_jornada: PerJornada, pos: dict[str, str],
-                 pool: set[str] | None = None) -> tuple[Squads, PerJornada]:
-    """Each squad topped up to a formation with stand-ins, each stand-in
-    the average forecast of its position over the pool (every player
-    forecast, if none given)."""
-
-    squads = {m: dict(sq) for m, sq in squads.items()}
-    per_jornada = {j: dict(layer) for j, layer in per_jornada.items()}
-    avg: dict[int, dict[str, Cell]] = {}
-    for j, layer in per_jornada.items():
-        by_pos: dict[str, list[tuple[float, float]]] = {}
-        for k, (pts, p) in layer.items():
-            s = pos.get(k)
-            if s and (pool is None or k in pool):
-                by_pos.setdefault(s, []).append((pts, p))
-        avg[j] = {s: (sum(v[0] for v in vs) / len(vs),
-                     sum(v[1] for v in vs) / len(vs))
-                 for s, vs in by_pos.items() if vs}
-
-    for j in per_jornada:
-        for s, n in MAX_SLOT.items():
-            if s not in avg.get(j, {}):
-                continue
-            for i in range(n):
-                per_jornada[j].setdefault("__phantom_%s_%d" % (s, i), avg[j][s])
-
-    squads = {m: phantom_topup(sq) for m, sq in squads.items()}
-    return squads, per_jornada
-
-
 def _selftest() -> None:
     from ffcore.score import Rates as R
 
@@ -195,40 +158,6 @@ def _selftest() -> None:
     assert set(later[1]) == {"ghost"} and later[2]["del"] == (8.0 * 0.8, 0.9)
     assert later_first["del"] == 2 and later_first["ghost"] == 1
     assert season(rates, club, [], {}, board) == ({}, {}, {})
-
-    ph_sq = {"m": {"d1": "DEF", "d2": "DEF", "x1": "MED", "x2": "MED",
-                   "x3": "MED", "p1": "POR", "f1": "DEL"}}
-    ph_pos = {"d1": "DEF", "d2": "DEF", "other_def": "DEF",
-              "x1": "MED", "x2": "MED", "x3": "MED", "p1": "POR", "f1": "DEL"}
-    ph_per = {1: {"d1": (4.0, 1.0), "d2": (2.0, 0.5),
-                  "other_def": (6.0, 0.5), "x1": (3.0, 1.0)}}
-    new_sq, new_per = phantom_fill(ph_sq, ph_per, ph_pos)
-    phantoms = sorted(k for k in new_sq["m"] if k.startswith("__phantom_"))
-    assert phantoms == ["__phantom_DEF_0", "__phantom_DEF_1",
-                        "__phantom_DEF_2", "__phantom_MED_0"], phantoms
-    assert new_per[1]["__phantom_DEF_0"] == (4.0, (1.0 + 0.5 + 0.5) / 3)
-    assert "__phantom_DEF_0" not in ph_sq["m"] and \
-        "__phantom_DEF_0" not in ph_per[1], "inputs must not be mutated"
-    _sq, pooled = phantom_fill(ph_sq, {1: {**ph_per[1], "extra": (40.0, 1.0)}}, {**ph_pos, "extra": "DEF"},
-                               pool={"d1", "d2", "other_def", "x1"})
-    assert pooled[1]["__phantom_DEF_0"] == new_per[1]["__phantom_DEF_0"], \
-        "a stand-in is the pool's average: players forecast beside it (a replay's) do not move it"
-
-    eleven = {"p1": "POR", **{"d%d" % i: "DEF" for i in range(4)},
-              **{"x%d" % i: "MED" for i in range(4)}, "f1": "DEL", "f2": "DEL"}
-    for squad, added in [
-            (eleven, {}),
-            ({k: v for k, v in eleven.items() if k != "p1"}, {"POR": 1}),
-            ({k: v for k, v in eleven.items() if k not in ("d0", "d1")},
-             {"DEF": 2}),
-            (ph_sq["m"], {"DEF": 3, "MED": 1})]:
-        topped = phantom_topup(squad)
-        stand_ins: dict[str, int] = {}
-        for k, pos in topped.items():
-            if k.startswith("__phantom_"):
-                stand_ins[pos] = stand_ins.get(pos, 0) + 1
-        assert stand_ins == added, (squad, stand_ins)
-        assert all(topped[k] == v for k, v in squad.items())
 
     print("ffcore.schedule self-test OK")
 

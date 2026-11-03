@@ -16,10 +16,6 @@ class Action:
     def net(self) -> float:
         return self.cost - self.proceeds
 
-    @property
-    def players(self) -> tuple[str, ...]:
-        return ((self.buy, ) if self.buy else ()) + self.sell
-
     def label(self, names: dict[str, str] | None = None) -> str:
         names = names or {}
         sold = " + ".join(names.get(k, k) for k in self.sell)
@@ -32,8 +28,6 @@ class Action:
 def _selftest() -> None:
     assert Action("swap", buy="X", sell=("Y",)).label() == "buy X · sell Y"
     assert Action("buy", buy="X").sell == ()
-    assert Action("buy", buy="X", sell=("Y",)).players == ("X", "Y")
-    assert Action("sell", sell=("Y",)).players == ("Y", )
     assert Action("sell", sell=("y",)).label({"y": "Yuri"}) == "sell Yuri"
     assert Action("swap", buy="x", sell=("y",)).label({"x": "Xavi"}) \
         == "buy Xavi · sell y"

@@ -28,7 +28,7 @@ MODEL = {"ffcore.score", "ffcore.startprob", "ffcore.schedule",
          "ffcore.rules"}
 REACH = re.compile(r'\bu\.state\.squads\.get\(u\.me|\.view\("|'
                    r'\bself\.state\.squads\.get\(self\.me|'
-                   r'\._pool_mean\b|\[3\]\) \+ bands|lg\.cfg\.me|lg\.xw\.')
+                   r'\[3\]\) \+ bands|lg\.cfg\.me|lg\.xw\.')
 
 
 def modules() -> dict[str, Path]:

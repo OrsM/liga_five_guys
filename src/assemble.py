@@ -9,13 +9,13 @@ import json
 import sqlite3
 import sys
 from contextlib import closing, contextmanager
-from functools import cache, cached_property
+from functools import cache
 from pathlib import Path
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from typing import Any, NamedTuple
 
 import remind
-from decide import Universe, _fieldable
+from decide import Universe
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import cut, set_variant
 from ffcore.db import connect, named, query, record, rows
@@ -27,7 +27,7 @@ from ffcore.market import Market
 from ffcore.names import Name
 from ffcore.parse import Rows
 from ffcore.points import scored, season_record
-from ffcore.schedule import Factors, PerJornada, PerJornadaFactors, expectations, phantom_fill
+from ffcore.schedule import Factors, PerJornada, expectations
 from ffcore.score import fit_promoted_discount, Scorer
 from ffcore.season import LeagueState
 from ffcore.startprob import Availability, Calibration, StartOdds, fit_availability
@@ -247,11 +247,9 @@ class Built(NamedTuple):
 
 class Forecast(NamedTuple):
     """The forecast as of cut(): its moment (its cells are forecast_cell's,
-    as used forecast_used's), the jornadas it has cells for, the players'
-    factors (StoredFactors) and the values it fitted (params rows)."""
+    as used forecast_used's), the jornadas it has cells for and the values it fitted (params rows)."""
     moment: int
     jornadas: frozenset[int]
-    factors: Mapping[int, Mapping[str, Factors]]
     fits: list[dict[str, Any]]
 
 
@@ -271,35 +269,6 @@ def player_forecast(players: Iterable[str] | None = None) -> Forecast:
     elif asked and (missing := asked - have):
         _make(moment, missing, every=False)
     return _read(moment, asked)
-
-
-class StoredFactors(Mapping[int, Mapping[str, Factors]]):
-    """The factors of a moment's cells (forecast_cell), of these players or
-    every one, by jornada: read when first looked at (the board's record and
-    ask.py do; no backtest does)."""
-
-    def __init__(self, moment: int, players: set[str] | None) -> None:
-        self.moment, self.players = moment, players
-
-    @cached_property
-    def _got(self) -> PerJornadaFactors:
-        out: PerJornadaFactors = {}
-        for k, j, ppm, fx, picked, fit in rows(
-                "SELECT player, jornada, ppm, fixture, picked, fit FROM forecast_cell WHERE moment = ?1"
-                " AND ppm IS NOT NULL AND (?2 IS NULL OR player IN (SELECT value FROM json_each(?2)))"
-                " ORDER BY jornada, player",
-                (self.moment, _json(self.players))):
-            out.setdefault(j, {})[k] = Factors(ppm, fx, picked, fit)
-        return out
-
-    def __getitem__(self, j: int) -> Mapping[str, Factors]:
-        return self._got[j]
-
-    def __iter__(self) -> Iterator[int]:
-        return iter(self._got)
-
-    def __len__(self) -> int:
-        return len(self._got)
 
 
 def _json(players: set[str] | None) -> str | None:
@@ -377,7 +346,7 @@ def _read(moment: int, players: set[str] | None) -> Forecast:
                                              (moment, )))
     fits = [_param(c, t, v) for c, t, v in rows(
         "SELECT component, term, value FROM forecast_fit WHERE moment = ? ORDER BY rowid", (moment, ))]
-    return Forecast(moment, jornadas, StoredFactors(moment, players), fits)
+    return Forecast(moment, jornadas, fits)
 
 
 def universe(also: frozenset[str] = frozenset()) -> Universe:
@@ -422,18 +391,11 @@ def built(also: frozenset[str] = frozenset()) -> Built:
         value=column("value"), my_bid=column("my_bid"),
         trend=prices.trend, clause=column("clause"),
         fetch=column("fetches"))
-    squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
-    assert all(_fieldable(sq) for sq in squads.values()), squads
-
-    boot = Bootstrap(per_j, pool=[s.pts for s in scored() if s.games == 1])
-
-    carried = {r["manager"]: r.get("team_points") or 0.0
-               for r in lg.standings if r.get("manager")}
+    boot = Bootstrap(per_j)
     return Built(Universe(
-        state=LeagueState(squads, rem, me, carried), forecaster=boot,
+        state=LeagueState(squads, rem, me), forecaster=boot,
         market=market,
-        rival_cash={h: v for h, v in lg.cash.items() if h != me},
-        factors=fc.factors, cut=c, moment=fc.moment),
+        cut=c, moment=fc.moment),
         params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 
@@ -508,16 +470,14 @@ def _selftest_forecast() -> None:
                 return rows("SELECT jornada, player, pts, p FROM forecast_cell WHERE moment = ?"
                             " ORDER BY jornada, player", (fc.moment, ))
             assert cells(first) == [(3, "a", 4.0, 0.5), (3, "b", 4.0, 0.5), (4, "a", 5.0, 0.5)], cells(first)
-            assert first.jornadas == {3, 4} and set(first.factors[3]) == {"a", "b"}
+            assert first.jornadas == {3, 4}
             assert rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged",
                         (first.moment, )) == [("b", )], "who was listed doubtful then"
             assert ("fixture.difficulty", "x") in {(r["component"], r["term"]) for r in first.fits}
             assert player_forecast() == first and len(made) == 1, "read back as made, not made again"
             got = player_forecast({"a", "c"})
             assert made[1:] == [{"c"}], "only the one not made"
-            assert (3, "c", 4.0, 0.5) in cells(got) and "c" not in got.factors[3], \
-                "an unrated player's cell without factors"
-            assert set(got.factors[3]) == {"a"}, "the factors of the players asked for, and no others"
+            assert (3, "c", 4.0, 0.5) in cells(got), "an unrated player's cell without factors"
             set_now(dt.datetime(2026, 9, 2, 8, 0, tzinfo=dt.timezone.utc))
             player_forecast()
             with mock.patch.object(score, "SHRINK_K", score.SHRINK_K + 1):
@@ -570,7 +530,7 @@ def _selftest_variants() -> None:
             assert constants()["startprob"]["AVAIL_K"] == 2.0 and constants()["score"]["SHRINK_K"] == 9.0
             assert startprob.fit_availability(tally).level["indefinite"] != live, \
                 "the shrinkage a function defaults to follows the variant"
-            assert forecast.Bootstrap({}).share == 0.5
+            assert forecast.PERSISTENT_SHARE == 0.5
             assert score.Scorer([], startprob.StartOdds([], startprob.Calibration(0, 1, 60, 15), startprob.Availability({}), {}, {}, {})
                                 ).shrink_k == 9.0
             write_constants()

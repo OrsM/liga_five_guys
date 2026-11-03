@@ -12,7 +12,7 @@ from ffcore.db import rows
 from ffcore.parse import snapshot_stamp
 from ffcore.schedule import Rounds
 
-__all__ = ["round_locks", "rounds", "rounds_ahead", "jornada_of_match"]
+__all__ = ["round_locks", "rounds", "rounds_ahead"]
 
 
 @cache
@@ -44,12 +44,7 @@ def rounds() -> Rounds:
                   {j for j, state in left.items() if state == "behind"})
 
 
-@cache
-def jornada_of_match() -> dict[str, int]:
-    return dict(rows("SELECT match_id, jornada FROM match_jornada"))
-
-
-for _cached in (round_locks, rounds, rounds_ahead, jornada_of_match):
+for _cached in (round_locks, rounds, rounds_ahead):
     on_reset(_cached.cache_clear)
 
 
@@ -97,7 +92,6 @@ def _selftest() -> None:
                  "home": "celta", "away": "getafe", "kickoff": "2026-08-26T17:00:00+00:00"}])
             assert round_locks() == {2: utc(17, 19, 30), 4: utc(30, 17)}, round_locks()
             assert list(round_locks()) == [2, 4], "in lock order"
-            assert jornada_of_match() == {"b1": 1, "b2": 1, "m1": 2, "m2": 2, "m4": 4}
             assert rounds_ahead() == {1: utc(14, 19, 30), 2: utc(18, 17), 4: utc(30, 17)}, \
                 "jornada 2 by its match still to play"
             assert rows("SELECT lock FROM next_lock") == [("2026-08-30T1700Z",)]

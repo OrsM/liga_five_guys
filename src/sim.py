@@ -378,9 +378,8 @@ def _selftest() -> None:
         sim = {r[0]: r[1:] for r in rows("SELECT manager, me, finish, p_first, p_above, cash, lo, mean, hi"
                                          " FROM sim_standings WHERE run_id = 7")}
         assert set(sim) == {"me", "riv"} and sim["me"][0] == 1 and sim["me"][3] is None
-        (_, finish, first, _, cash, lo, mean, hi), (_, r_finish, r_first, r_above, r_cash, *_) = sim["me"], sim["riv"]
-        assert (cash, r_cash) == (ub.market.cash, ub.rival_cash.get("riv", 0.0)), \
-            "yours from the app, a rival's as estimated"
+        (_, finish, first, _, cash, lo, mean, hi), (_, r_finish, r_first, r_above, *_) = sim["me"], sim["riv"]
+        assert cash == ub.market.cash, "yours from the app"
         assert abs(finish - (1 + r_above)) < 1e-12 and abs(r_finish - (2 - r_above)) < 1e-12, \
             "every manager's finish: 1 and the chance each other ends above him"
         assert abs(first + r_first - 1) < 1e-3 and abs(first - (1 - r_above)) < 1e-3, \

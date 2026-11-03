@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import statistics
-from collections.abc import Iterable
-
 __all__ = ["Bootstrap", "Cell", "PerJornada", "expected_points", "SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE"]
 
 SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
@@ -28,14 +25,8 @@ def expected_points(cell: Cell | None) -> float:
 
 class Bootstrap:
 
-    def __init__(self, per_jornada: PerJornada, pool: Iterable[float | None] = (),
-                 share: float | None = None) -> None:
+    def __init__(self, per_jornada: PerJornada) -> None:
         self.per_jornada = per_jornada
-        self.share = PERSISTENT_SHARE if share is None else share
-        real = [p for p in pool if p is not None]
-        self.pool = tuple(real) if len(real) >= MIN_POOL else SEED_POOL
-        mean = statistics.mean(self.pool)
-        self.pool_mean = mean if abs(mean) > 1e-9 else 1.0
 
     def expected(self, jornada: int) -> dict[str, float]:
         return {k: expected_points(cell)
@@ -49,10 +40,6 @@ def _selftest() -> None:
     assert expected_points((5.0, 0.5)) == 2.5 and expected_points(None) == 0.0, \
         "a cell (points if he plays, chance he plays) is worth their product"
     assert fc.expected(99) == {}, "a jornada nobody plays is empty, not an error"
-    assert Bootstrap({}, pool=[1, 2, 3]).pool == SEED_POOL
-    big = list(range(MIN_POOL))
-    assert Bootstrap({}, pool=big).pool == tuple(big)
-    assert Bootstrap({1: {"x": (4.0, 1.0)}}, pool=[0] * MIN_POOL).pool_mean == 1.0
     print("ffcore.forecast self-test OK")
 
 
