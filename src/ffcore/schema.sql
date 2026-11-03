@@ -620,7 +620,7 @@ DROP VIEW IF EXISTS score_spread;
 CREATE VIEW score_spread AS
 WITH c AS (SELECT (SELECT value FROM model_constants WHERE name = 'MIN_POOL' AND variant = variant()) AS min_pool,
                   (SELECT value FROM model_constants WHERE name = 'PERSISTENT_SHARE' AND variant = variant()) AS share),
-played AS (SELECT pts AS x FROM scored WHERE games = 1 AND pts IS NOT NULL),
+played AS MATERIALIZED (SELECT pts AS x FROM scored WHERE games = 1 AND pts IS NOT NULL),
 pool AS (SELECT x FROM played WHERE (SELECT count(*) FROM played) >= (SELECT min_pool FROM c)
          UNION ALL
          SELECT x FROM (/* forecast.SEED_POOL */) WHERE (SELECT count(*) FROM played) < (SELECT min_pool FROM c)),
@@ -1587,31 +1587,33 @@ WITH t AS MATERIALIZED (
     FROM api_lineup
     WHERE (source, observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
                                     WHERE observed_at <= (SELECT cut()) GROUP BY source)),
+bp AS MATERIALIZED (SELECT * FROM board_players),
 app AS MATERIALIZED (
     SELECT t.i, coalesce(a.player, n.player, f.player) AS player
     FROM t LEFT JOIN app_player a ON a.app_id = t.player_id
     LEFT JOIN name_player n ON n.name_key = t.short
     LEFT JOIN name_player f ON f.name_key = t.full),
 fielded AS (SELECT i, player FROM app
-            WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN board_players b
+            WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN bp b
                               ON b.player = a.player AND b.mine WHERE b.player IS NULL)),
 legal AS (SELECT (SELECT count(*) FROM fielded) > 0
-                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM board_eleven) AS ok)
+                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM bp WHERE xi) AS ok)
 SELECT 'in' AS side, NULL AS i, e.player, e.name, e.next, l.ok AS legal
-FROM board_eleven e, legal l
-WHERE NOT l.ok OR e.player NOT IN (SELECT player FROM fielded)
+FROM bp e, legal l
+WHERE e.xi AND (NOT l.ok OR e.player NOT IN (SELECT player FROM fielded))
 UNION ALL
 SELECT 'out', f.i, b.player, b.name, b.next, l.ok
-FROM fielded f JOIN board_players b USING (player), legal l
-WHERE l.ok AND f.player NOT IN (SELECT player FROM board_eleven);
+FROM fielded f JOIN bp b USING (player), legal l
+WHERE l.ok AND f.player NOT IN (SELECT player FROM bp WHERE xi);
 
 -- The players of each side of lineup_gap as named in one line: those to
 -- field, the best first, and those to take out, as the app has them.
 DROP VIEW IF EXISTS lineup_names;
 CREATE VIEW lineup_names AS
-SELECT 'in' AS side, group_concat(name, ', ' ORDER BY -next, player) AS names FROM lineup_gap WHERE side = 'in'
+WITH gap AS MATERIALIZED (SELECT * FROM lineup_gap)
+SELECT 'in' AS side, group_concat(name, ', ' ORDER BY -next, player) AS names FROM gap WHERE side = 'in'
 UNION ALL
-SELECT 'out', group_concat(name, ', ' ORDER BY i) FROM lineup_gap WHERE side = 'out';
+SELECT 'out', group_concat(name, ', ' ORDER BY i) FROM gap WHERE side = 'out';
 
 -- The plan's moves, in its order (a swap's buy, then its sale), and what
 -- each spends (a sale's is negative).
@@ -1644,9 +1646,11 @@ DROP VIEW IF EXISTS board_resale;
 DROP VIEW IF EXISTS board_moves;
 DROP VIEW IF EXISTS board_rows;
 CREATE VIEW board_rows AS
-WITH ins AS (SELECT * FROM lineup_gap WHERE side = 'in'),
-outs AS (SELECT * FROM lineup_gap WHERE side = 'out'),
-legal AS (SELECT coalesce(max(legal), 0) AS ok FROM lineup_gap),
+WITH gap AS MATERIALIZED (SELECT * FROM lineup_gap),
+bm AS MATERIALIZED (SELECT * FROM board_mine),
+ins AS (SELECT * FROM gap WHERE side = 'in'),
+outs AS (SELECT * FROM gap WHERE side = 'out'),
+legal AS (SELECT coalesce(max(legal), 0) AS ok FROM gap),
 field AS (
     SELECT -1 AS ord, 'field' AS what,
            'field ' || (SELECT names FROM lineup_names WHERE side = 'in') AS label,
@@ -1657,7 +1661,7 @@ field AS (
            'next' AS per,
            (SELECT json_group_array(json_array('bench', bench, 'names')) FROM (
                 SELECT group_concat(name, ', ' ORDER BY i) AS bench FROM outs
-                WHERE player NOT IN (SELECT player FROM board_mine WHERE sell)) WHERE bench IS NOT NULL) AS facts,
+                WHERE player NOT IN (SELECT player FROM bm WHERE sell)) WHERE bench IS NOT NULL) AS facts,
            (SELECT json_group_array(player ORDER BY -next, player) FROM board_eleven) AS players
     FROM legal
     WHERE EXISTS (SELECT 1 FROM ins) OR EXISTS (SELECT 1 FROM outs)),
@@ -1692,16 +1696,16 @@ unlisted AS (
            NULL, NULL, 0, NULL, 'season',
            (SELECT json_group_array(json_array('rising', rising, 'names')) FROM (
                 SELECT group_concat(name, ', ' ORDER BY -trend, player) AS rising
-                FROM board_mine WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL),
+                FROM bm WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL),
            json_group_array(player)
-    FROM board_mine WHERE NOT listed AND NOT sell HAVING count(*) > 0),
+    FROM bm WHERE NOT listed AND NOT sell HAVING count(*) > 0),
 relist AS (
     SELECT 1999, 'relist',
            'relist ' || group_concat(name, ', ' ORDER BY relist_after, -coalesce(trend, 0.0), player), NULL, NULL,
            NULL, NULL, 0, NULL, 'season',
            json_array(json_array('once the listing ends', min(relist_after), 'time')),
            json_group_array(player)
-    FROM board_mine WHERE relist_after IS NOT NULL HAVING count(*) > 0)
+    FROM bm WHERE relist_after IS NOT NULL HAVING count(*) > 0)
 SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name,
        pos, step, amount, done, gain, per, facts, players
 FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM pulled UNION ALL SELECT * FROM sells
