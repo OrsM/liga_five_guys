@@ -18,27 +18,49 @@ reads, one copy of each fact, and nothing the board does not need.
   sim_players beside sim_facts (value, price, route): the inputs of an SQL
   decision.
 
-## One fact, many copies
+## The dictionary (2026-11-03; replaces "one fact, many copies")
 
-| Fact | Copies |
-|---|---|
-| What money is worth | gone (2026-11-01): the decision is points only, money a limit (cash at the lock, the debt rule); money_rate, lam and player_facts.ahead deleted |
-| The eleven | gain.ELEVEN (gain.py:30-44, via Outlook.xi), the program's own formation LP (decide.py:271-315), board_eleven / field_basis / lineup_gap (schema.sql:1466-1506); shortfall vs _fieldable |
-| Debt room, 20% of team value | once (2026-11-01): decide.sql dec_room; a run keeps it (sim_runs.cash_after, can_bid), board_head reads it; board_money gone |
-| A sale's proceeds with no offer | once (2026-11-01): Market.fetches, stored as sim_facts.fetches, the board's raises |
-| Selling to clear a debt | grading.closed via program (board_resale deleted); when a sale is made: decide.sql dec_when, board and backtest |
-| Resale picks | deleted (2026-11-01): never shown on 60 boards; a buy is listed and sold like any other |
-| The accept rule for a board line | once: board_json accepts, for the plan's lines and the rankings' alike; act.py and the server match a line by label and an accepted amount |
-| The board itself | Python Board + sim docs, then SQL board_json, then server notify text, then Fantasy.jsx formatting (two number formatters in one file) |
-| The line-up message | once (2026-11-01): lineup_names, read by the field line and lineup_alert |
-| Shrink toward a prior | once (2026-11-01): stats.shrink, SQL's shrink() |
-| Matches played | scored.games vs season_record.apps |
-| The forecast at a past moment | forecast_cells (backtest, replay) and _built (board, decisions), built twice a lock with different results |
-| A past moment replayed | phantom_path, phantom_season, decisions, replay, backtest, sim_calibration |
-| Caches | kept answers, kept built universes, built @cache, grading._AT, _first_listed, facts (price_step, momentum_day), fit tables (momentum_fit, price_error_fit, price_trend_fit) + the "fits" marker; momentum is held four ways |
-| Player identity | crosswalk / ff_identity views, attach_slugs' second pass, app_links value matching; lineup_gap by app id else name_player (2026-11-01); a match path's clubs by club_slug |
-| A player's value at one instant | market, api_market, api_players_all, api_teams |
-| Explaining the board | ask.py (reruns the program), q.py / datasette board views |
+After SICP: state is a function of time, not a mutated object. The league
+at t = f(facts, t); "now" is an argument (look.cut), never a clock someone
+sets; a backtest is the same expression at an earlier t; "what if I had
+moved otherwise" is a different input (my own moves added to the facts),
+not a changed world. Each concept is named once, as a view, in one layer,
+and each layer reads only the named views of the layer below:
+
+    facts         crawled rows, timestamped (Python: crawl, parse)
+    league at t   who owns whom, cash, market, jornadas, auctions
+    forecast      each player each jornada (Python: the fit; SQL the rest)
+    decision      the plan
+    grade, board  how good a move was; what to show
+
+A concept with two homes, a layer reaching past the one below, or a
+concept held as mutable state is a fault. Draft homes, to be verified:
+
+| # | Concept | Layer | Homes today |
+|---|---|---|---|
+| 1 | Now, the moment we look from | league at t | cut() process clock; look.cut; grading's set_now per date |
+| 2 | Who a player is | facts | identity.sql; crosswalk.py matching; text.resolve for clubs |
+| 3 | Who owns whom | league at t | seen.owner / api_teams; League.owner; assemble's squads; Universe.mine -> dec_mine; grading's Day |
+| 4 | Cash | league at t | cash view; League.cash; Market.cash / left; dec_state + dec_money; Day |
+| 5 | The market: listed, price, value | league at t | seen; Market dicts (written, read back, written again); market / api_market / api_players_all / api_teams for a value at one instant |
+| 6 | What a sale fetches | league at t | dec_player_seen; waiting / sale_odds; the backtest credits its own guess |
+| 7 | Did a bid win | league at t | auction_results; grading's closed / auction_bars |
+| 8 | Jornadas and locks | league at t | jornada_calendar; jornadas.rounds(); grading's before_locks / run_times |
+| 9 | A player's forecast each jornada | forecast | forecast_cell / cell; Bootstrap.per_jornada; expected_points |
+| 10 | Price trend | forecast | momentum views; assemble refits and rewrites them each build |
+| 11 | Season points, matches played | facts | points; season_points; scored.games vs season_record.apps |
+| 12 | The best eleven | decision | rules.ELEVEN (one) |
+| 13 | A stand-in | decision | league_squad (one, 2026-11-03) |
+| 14 | A game's points spread | forecast | score_spread (one, 2026-11-03) |
+| 15 | Standings | grade, board | league_standings; api_standings; sim_standings |
+| 16 | A move, the plan | decision | dec_next / dec_plan; Action; decision_plan |
+| 17 | How good a move was | grade, board | grading's simulated path; grade_decisions; grade_forecast; sim_calibration |
+| 18 | A fake league for tests | (tests) | fixtures.py; decision._by_hand; hand-built Universes |
+| 19 | Explaining the board | grade, board | q.py / sql.py / datasette board views |
+
+Rows 1 and 3-8 are one concept, the league at t, built twice: as SQL (seen
+at a cut) and as Python (Universe, the backtest's Day). That is most of the
+copies, the 10 min backtest and its self-graded 560.
 
 ## Bugs found on the way
 
