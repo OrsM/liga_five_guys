@@ -37,8 +37,7 @@ def inputs(u: Universe, buys: bool = True) -> None:
         db.execute("INSERT INTO dec_state VALUES (?, ?, ?, ?, ?, ?)",
                    (m.cash, int(bool(m.fetch)), int(buys), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
         db.executemany("INSERT INTO dec_mine VALUES (?, ?)",
-                       [(k, position(m.pos.get(k)) or p) for k, p in sorted(u.mine.items())
-                        if not k.startswith("__phantom_")])
+                       [(k, position(m.pos.get(k)) or p) for k, p in sorted(u.mine.items())])
         for t in ("dec_player", "dec_odds", "dec_money"):
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 

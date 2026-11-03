@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from ffcore.action import Action
 from ffcore.forecast import Bootstrap
 from ffcore.market import Market
-from ffcore.rules import Squad, position, shortfall
+from ffcore.rules import Squad, position
 from ffcore.season import LeagueState
 
 __all__ = ["Action", "Universe"]
@@ -41,7 +41,3 @@ class Universe:
             if a.buy:
                 sq[a.buy] = position(self.market.pos.get(a.buy))
         return sq
-
-
-def _fieldable(squad: Squad) -> bool:
-    return not shortfall(squad)

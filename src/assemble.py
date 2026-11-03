@@ -15,7 +15,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from typing import Any, NamedTuple
 
 import remind
-from decide import Universe, _fieldable
+from decide import Universe
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import cut, set_variant
 from ffcore.db import connect, named, query, record, rows
@@ -27,7 +27,7 @@ from ffcore.market import Market
 from ffcore.names import Name
 from ffcore.parse import Rows
 from ffcore.points import scored, season_record
-from ffcore.schedule import Factors, PerJornada, expectations, phantom_fill
+from ffcore.schedule import Factors, PerJornada, expectations
 from ffcore.score import fit_promoted_discount, Scorer
 from ffcore.season import LeagueState
 from ffcore.startprob import Availability, Calibration, StartOdds, fit_availability
@@ -391,9 +391,6 @@ def built(also: frozenset[str] = frozenset()) -> Built:
         value=column("value"), my_bid=column("my_bid"),
         trend=prices.trend, clause=column("clause"),
         fetch=column("fetches"))
-    squads, per_j = phantom_fill(squads, per_j, pos, base)     # the also forecast beside, not in the stand-ins
-    assert all(_fieldable(sq) for sq in squads.values()), squads
-
     boot = Bootstrap(per_j)
     return Built(Universe(
         state=LeagueState(squads, rem, me), forecaster=boot,

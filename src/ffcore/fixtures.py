@@ -99,12 +99,8 @@ def tiny_market_universe(**overrides: Any) -> Universe:
 
 
 def _selftest() -> None:
-    from decide import _fieldable
-
     u = tiny_universe()
     assert u.state.squads["me"] == DEFAULT_SQUAD, u.state.squads
-    for manager, squad in u.state.squads.items():
-        assert _fieldable(squad), (manager, squad)
     assert u.market.pos == DEFAULT_SQUAD, u.market.pos
 
     boot = tiny_bootstrap()
@@ -130,9 +126,7 @@ def _selftest() -> None:
     assert changed_st.squads == base_st.squads
     assert changed_st.jornadas == base_st.jornadas
 
-    mu = tiny_market_universe()
-    assert _fieldable(mu.state.squads["me"]), mu.state.squads["me"]
-
+    tiny_market_universe()
 
     print("ffcore.fixtures self-test OK")
 

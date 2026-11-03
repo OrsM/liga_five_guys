@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "FORMATIONS", "shortfall",
+__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "FORMATIONS",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -30,17 +30,6 @@ SHAPES = [dict(zip(POSITIONS, (1, d, m, f))) for d, m, f in FREE_FORMATIONS]
 MAX_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(max, zip(*FREE_FORMATIONS))))}
 MIN_SLOT = {"POR": 1, **dict(zip(POSITIONS[1:], map(min, zip(*FREE_FORMATIONS))))}
 
-
-
-def shortfall(squad: Squad) -> dict[str, int]:
-    """The players a squad (player: position) is short of the nearest
-    formation, by position: empty when it can field one. On a tie, the
-    first formation in FREE_FORMATIONS."""
-    have = {p: 0 for p in POSITIONS}
-    for p in squad.values():
-        have[p] = have.get(p, 0) + 1
-    return min(({p: n - have[p] for p, n in shape.items() if n > have[p]} for shape in SHAPES),
-               key=lambda short: sum(short.values()))
 
 
 def slot(raw: str | None) -> str:
@@ -108,15 +97,6 @@ def _selftest() -> None:
                                                                 for p in POSITIONS)) if sum(n) == XI_SIZE]
     assert sorted(map(sorted, map(dict.items, box))) == sorted(map(sorted, map(dict.items, SHAPES))), \
         "the formations are every count of each position between its least and most that makes eleven"
-    four_four_two = {"k": "POR", **{f"d{i}": "DEF" for i in range(4)},
-                     **{f"m{i}": "MED" for i in range(4)}, "f1": "DEL", "f2": "DEL"}
-    assert shortfall(four_four_two) == {}
-    assert shortfall({k: p for k, p in four_four_two.items() if k != "k"}) == {"POR": 1}
-    two_backs = {"k": "POR", "d0": "DEF", "d1": "DEF", **{f"m{i}": "MED" for i in range(5)},
-                 "f0": "DEL", "f1": "DEL", "f2": "DEL"}
-    assert shortfall(two_backs) == {"DEF": 1}, "the nearest formation, not the first"
-    assert shortfall({}) == {"POR": 1, "DEF": 5, "MED": 4, "DEL": 1}, \
-        "an empty squad: the first of the formations short of all eleven"
 
     import sqlite3
 
