@@ -4,13 +4,12 @@ import csv
 import io
 import os
 import sqlite3
-import sys
 from contextlib import closing, contextmanager
 from pathlib import Path
 from types import MappingProxyType
-from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any
 
 from ffcore import db as lfg
 from ffcore.clock import run_now
@@ -18,17 +17,12 @@ from ffcore.db import ROOT
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "REPORTS",
-           "current", "history", "typed", "age_hours", "table_path", "tables_in",
-           "input_path", "read_csv", "write_csv",
-           "csv_string", "mtime_cached", "store_sql", "stored",
+           "current", "history", "typed", "age_hours", "tables_in",
+           "input_path", "csv_string", "store_sql", "stored",
            "clear_sql", "NUMBERS", "LINEUP_SOURCE"]
 
 TIDY = ROOT / "tidy"
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
-
-
-def table_path(name: str) -> Path:
-    return TIDY / f"{name}.csv"
 
 
 @contextmanager
@@ -48,70 +42,12 @@ def input_path(name: str) -> Path:
     return p if p.exists() else Path(name)
 
 
-Stamp = tuple[int, int]
-_READ_CACHE: dict[str, tuple[Stamp, list[dict[str, str]]]] = {}
-T = TypeVar("T")
-
-
-def _forget(path: str | Path) -> None:
-    _READ_CACHE.pop(str(Path(path)), None)
-
-
-def mtime_cached(path: str | Path, cache: dict[Any, tuple[Stamp, T]], key: Hashable,
-                 build: Callable[..., T], *args: Any) -> T | None:
-    """build(*args), kept until the file at path changes; None if it is gone."""
-    path = Path(path)
-    try:
-        st = path.stat()
-    except OSError:
-        return None
-    stamp = (st.st_mtime_ns, st.st_size)
-    hit = cache.get(key)
-    if hit is None or hit[0] != stamp:
-        hit = (stamp, build(*args))
-        cache[key] = hit
-    return hit[1]
-
-
-def _parse_csv(path: str | Path) -> list[dict[str, str]]:
-    with Path(path).open(encoding="utf-8") as fh:
-        r = csv.reader(fh)
-        fieldnames = next(r, [])
-        return [dict(zip(fieldnames, map(sys.intern, row))) for row in r if row]
-
-
-def read_csv(path: str | Path) -> list[Mapping[str, str]]:
-    rows = mtime_cached(path, _READ_CACHE, str(Path(path)), _parse_csv, path)
-    return [MappingProxyType(r) for r in (rows or [])]
-
-
-@contextmanager
-def _csv_dictwriter(path: Path, fieldnames: Sequence[str], mode: str,
-                    **writer_kw: Any) -> Iterator[csv.DictWriter[str]]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open(mode, newline="", encoding="utf-8") as fh:
-        yield csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore",
-                             lineterminator="\n", **writer_kw)
-
-
 def csv_string(rows: Iterable[Mapping[str, Any]], fieldnames: Sequence[str]) -> str:
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=fieldnames, lineterminator="\n")
     w.writeheader()
     w.writerows(rows)
     return buf.getvalue()
-
-
-def write_csv(path: str | Path, rows: Sequence[Mapping[str, Any]],
-              fieldnames: Sequence[str] | None = None) -> None:
-    path = Path(path)
-    _forget(path)
-    if not rows:
-        return
-    fieldnames = fieldnames or list(rows[0])
-    with _csv_dictwriter(path, fieldnames, "w") as w:
-        w.writeheader()
-        w.writerows(rows)
 
 
 def _cols(parse: Callable[[object], Any], *cols: str
@@ -225,29 +161,6 @@ def age_hours(name: str, now: datetime | None = None) -> float | None:
 LINEUP_SOURCE = "futbolfantasy"
 
 
-def _selftest_cache() -> None:
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as tmp:
-        p = Path(tmp) / "t.csv"
-        write_csv(p, [{"a": "1", "b": "x"}, {"a": "2", "b": "y"}])
-        first = read_csv(p)
-        assert [r["a"] for r in first] == ["1", "2"], first
-
-        try:
-            first[0]["a"] = "999"  # type: ignore[index]  # the point: it must refuse
-            raise AssertionError("read_csv rows must be read-only")
-        except TypeError:
-            pass
-        first.append({"a": "3", "b": "z"})
-        assert [r["a"] for r in read_csv(p)] == ["1", "2"], read_csv(p)
-
-        write_csv(p, [{"a": "7", "b": "q"}])
-        assert [r["a"] for r in read_csv(p)] == ["7"], read_csv(p)
-
-        assert read_csv(Path(tmp) / "nope.csv") == []
-
-
 def _selftest_tables() -> None:
     import tempfile
 
@@ -316,7 +229,6 @@ def _selftest_tables() -> None:
 
 
 def _selftest() -> None:
-    _selftest_cache()
     _selftest_tables()
 
     print("ffcore.tidy self-test OK")
