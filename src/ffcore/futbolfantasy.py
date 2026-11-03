@@ -12,7 +12,7 @@ from lxml import html as lh
 from ffcore.clock import MADRID
 from ffcore.rules import XI_SIZE
 from ffcore.names import Name
-from ffcore.text import norm, resolve
+from ffcore.text import norm
 from ffcore.parse import Row, ratio, year_for
 
 from ffcore.source import Source, _once, _rebuild
@@ -46,19 +46,17 @@ CLUB_ALIASES = {
     "atl madrid": "atletico", "espanol": "espanyol", "sociedad": "real-sociedad",
     "vallecano": "rayo-vallecano", "rayo": "rayo-vallecano",
     "dep a coruna": "deportivo", "la coruna": "deportivo",
-    "santander": "racing",
+    "santander": "racing", "celta vigo": "celta", "real betis": "betis",
 }
-
-
-_TEAM_ROWS = [{"name": t} for t in TEAMS]
+_CLUBS = {norm(t): t for t in TEAMS} | CLUB_ALIASES
 
 
 def club_slug(name: str | None) -> str:
-    """The futbolfantasy slug of a club as a page names it, or ""."""
+    """The futbolfantasy slug of a club as a page names it (accents, case and
+    punctuation never count), or ""."""
     if not name or "," in name:
         return ""
-    row, _ = resolve(name, _TEAM_ROWS)
-    return row["name"] if row else CLUB_ALIASES.get(norm(name), "")
+    return _CLUBS.get(norm(name), "")
 
 
 HREF_RE = re.compile(r'href="[^"]*?/jugadores/([^"?#]+)"')
