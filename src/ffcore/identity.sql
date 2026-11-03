@@ -1,8 +1,7 @@
 -- Who each player is: the registry the crosswalk stage rebuilds from the
 -- data each run (schema.sql registry, app_links), and one rule
 -- per identity question: an id or a name names a player only when it names
--- exactly one. ffcore.crosswalk runs these same views on the players it
--- holds, so the rule is here and only here.
+-- exactly one. The rule is here and only here.
 CREATE TABLE IF NOT EXISTS crosswalk (
     player_id TEXT PRIMARY KEY,
     name      TEXT NOT NULL DEFAULT '',

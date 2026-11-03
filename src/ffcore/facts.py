@@ -69,7 +69,7 @@ def ensure(db: sqlite3.Connection, now: Callable[[], str] | None = None) -> None
 
 def identity(db: sqlite3.Connection) -> None:
     """ff_identity up to the registry and the rows it is read for: refilled
-    when either changed (the crosswalk mirror calls it too)."""
+    when either changed (the crosswalk stage calls it too)."""
     if db.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('ff_identity_kept', 'facts_meta')"
                   ).fetchone()[0] < 2:
         return

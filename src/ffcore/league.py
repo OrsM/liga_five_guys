@@ -9,7 +9,6 @@ from ffcore import db as lfg
 from ffcore.parse import money
 from ffcore.tidy import current, input_path
 
-from ffcore.names import AppId, PlayerKey
 __all__ = ["Config", "load_config", "League"]
 
 
@@ -63,7 +62,6 @@ class League:
 def _selftest() -> None:
     import tempfile
     from pathlib import Path
-    from ffcore.crosswalk import Crosswalk, Player
     from ffcore.tidy import store_sql, tables_in
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -83,11 +81,10 @@ def _selftest() -> None:
             {"activity_id": "e", "kind": "joined", "user_id": "3"}]
     users = [{"user_id": "1", "manager": "me"}, {"user_id": "2", "manager": "riv"},
              {"user_id": "3", "manager": "quiet"}]
-    pq = Crosswalk({"p": Player(PlayerKey("p"), app_id=AppId("7")),
-                    "q": Player(PlayerKey("q"), app_id=AppId("8"))})
+    pq = {"p": "7", "q": "8"}
 
     def league(activity: list[dict[str, str]], standings: list[dict[str, str]],
-               teams: list[dict[str, str]], xw: Crosswalk = pq) -> League:
+               teams: list[dict[str, str]], xw: dict[str, str] = pq) -> League:
         """A League read from lfg.db holding these rows (teams stamped a or b)."""
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             store_sql("api_activity", [{"at": "", "counterparty": "", "player_id": "", **r,
@@ -96,7 +93,8 @@ def _selftest() -> None:
             for stamp in (a, b):
                 store_sql("api_teams", [r for r in teams if r["observed_at"] == stamp]
                           or [{"observed_at": stamp, "manager": "", "player_id": ""}])
-            xw.mirror()
+            with closing(lfg.connect()) as db, db:
+                db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)", xw.items())
             return League(Config(me="me", budget=100.0))
 
     with_money = [dict(users[0], team_money="116")] + users[1:]
@@ -121,7 +119,7 @@ def _selftest() -> None:
     assert league(feed, users, away).cash["riv"] == 85.0, \
         "a snapshot without his squad shows no exit"
 
-    xw = Crosswalk({"p": Player(PlayerKey("p"), app_id=AppId("7"))})
+    xw = {"p": "7"}
     lg = league(feed, with_money[:2], [{"observed_at": b, "manager": "riv", "player_id": "7"},
                                        {"observed_at": b, "manager": "riv", "player_id": "404"}],
                 xw)

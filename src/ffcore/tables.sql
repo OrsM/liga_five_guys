@@ -52,7 +52,7 @@ CREATE INDEX IF NOT EXISTS lineups_who ON lineups (player_slug, player_name, tea
 CREATE INDEX IF NOT EXISTS lineups_club ON lineups (team_slug, observed_at);
 DROP VIEW IF EXISTS history_lineups;
 CREATE VIEW history_lineups AS
-SELECT t.observed_at, t.source, t.start_pct, t.player_slug, t.player_name, t.team_slug, t.role, t.status, t.note, f.player
+SELECT t.rowid AS seq, t.observed_at, t.source, t.start_pct, t.player_slug, t.player_name, t.team_slug, t.role, t.status, t.note, f.player
 FROM lineups t LEFT JOIN ff_identity f ON f.player_slug = t.player_slug AND f.player_name = t.player_name AND f.team_slug = t.team_slug
 WHERE t.observed_at <= (SELECT cut()) ORDER BY t.rowid;
 DROP VIEW IF EXISTS current_lineups;
@@ -372,7 +372,7 @@ WHEN EXISTS (SELECT 1 FROM starters o WHERE o.rowid = (SELECT max(rowid) FROM st
 BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS current_starters;
 CREATE VIEW current_starters AS
-SELECT t.observed_at, t.source, t.minute, t.player_slug, t.player_name, t.team_slug, t.match_id, t.role, f.player
+SELECT t.rowid AS seq, t.observed_at, t.source, t.minute, t.player_slug, t.player_name, t.team_slug, t.match_id, t.role, f.player
 FROM starters t LEFT JOIN ff_identity f ON f.player_slug = t.player_slug AND f.player_name = t.player_name AND f.team_slug = t.team_slug
 WHERE t.match_id <> '' AND t.team_slug <> '' AND t.player_slug <> ''
   AND t.rowid = (SELECT max(rowid) FROM starters x WHERE x.match_id = t.match_id AND x.team_slug = t.team_slug AND x.player_slug = t.player_slug AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;

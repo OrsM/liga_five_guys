@@ -1,75 +1,76 @@
-
 from __future__ import annotations
 
+import sqlite3
 import sys
+from contextlib import closing
 
-
-from ffcore.parse import Rows, text
-from ffcore.crosswalk import Crosswalk, Player, clashes
-from ffcore.names import AppId, PlayerKey
+from ffcore import db as lfg
+from ffcore.facts import identity
 from ffcore.db import rows
-from ffcore.tidy import current, history
+
+# Who each player is, as SQL: the registry view (schema.sql) written into
+# crosswalk with no slugs; each ff_identity row (identity.sql) then names
+# its player by name, or name and club, while a slug names nobody; each
+# player's slug is the first one a line-up or starters row of his gave, in
+# the order stored; then ff_identity again, now that slugs name players.
+REGISTRY = """
+INSERT INTO crosswalk (player_id, name, club_id, app_id)
+SELECT player_id, name, club_id, app_id FROM registry
+"""
+SLUGS = """
+UPDATE crosswalk SET ff_slug = f.player_slug
+FROM (SELECT player, player_slug FROM (
+          SELECT player, player_slug, row_number() OVER (PARTITION BY player ORDER BY src, seq) AS n
+          FROM (SELECT 0 AS src, seq, player_slug, player FROM history_lineups
+                UNION ALL SELECT 1, seq, player_slug, player FROM current_starters)
+          WHERE player IS NOT NULL AND player_slug <> '') WHERE n = 1) f
+WHERE crosswalk.player_id = f.player
+"""
 
 
-
-def registry() -> dict[str, Player]:
-    """Every player as the data has it (schema.sql registry): name, club
-    and app id, no slugs yet."""
-    return {pid: Player(PlayerKey(pid), name, club, app_id=AppId(aid))
-            for pid, name, club, aid in rows("SELECT player_id, name, club_id, app_id FROM registry")}
-
-
-def attach_slugs(players: dict[str, Player], rows: Rows) -> None:
-    """Each futbolfantasy slug to the player its rows resolve to (by name,
-    or name and club, while the slug names nobody), if he has none."""
-    for r in rows:
-        slug, who = text(r, "player_slug"), r.get("player")
-        if slug and who in players and not players[who].ff_slug:
-            players[who].ff_slug = slug
+def build(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM crosswalk")
+    db.execute(REGISTRY)
+    identity(db)
+    db.execute(SLUGS)
+    identity(db)
 
 
 def main() -> None:
-    players = registry()
-    xw = Crosswalk(players)
-    xw.mirror()
-    attach_slugs(players, [*history("lineups"), *current("starters")])
-    xw.mirror()
-
-    c = xw.coverage()
+    with closing(lfg.connect()) as db, db:
+        build(db)
+        n, ff, app = db.execute("SELECT count(*), sum(ff_slug <> ''), sum(app_id <> '') FROM crosswalk").fetchone()
     print("registry: %d players — %.0f%% carry a probable-XI slug, %.0f%% an app id"
-          % (c["players"], 100 * c["ff"], 100 * c["app"]))
-    for idx, ids in clashes().items():
+          % (n, 100 * ff / (n or 1), 100 * app / (n or 1)))
+    clashes: dict[str, list[str]] = {}
+    for idx, value in rows("SELECT id, value FROM id_clashes ORDER BY id, value"):
+        clashes.setdefault(idx, []).append(value)
+    for idx, ids in clashes.items():
         print("  warn: %s claimed by two players, refused until resolved: %s"
               % (idx, ", ".join(ids)))
 
 
 def _selftest() -> None:
-    from ffcore.tidy import typed
-    market = typed("market", [{"ff_id": "af", "name": "Álvaro Fernández", "team": "Espanyol",
-               "club": "espanyol"},
-              {"ff_id": "jc", "name": "Jonny Castro", "team": "Alavés", "club": "alaves"}])
-    lineups = typed("lineups", [
-        {"source": "futbolfantasy", "team_slug": "espanyol",
-         "player_name": "Álvaro Fernández", "player_slug": "alvaro-fdez"},
-    ])
-    starters = typed("starters", [{"team_slug": "alaves", "player_name": "Jonny Castro",
-                 "player_slug": "jonny-castro-ff", "role": "starter"}])
     import tempfile
     from pathlib import Path
-    from ffcore.tidy import store_sql, tables_in
-    players = {k: Player(PlayerKey(k), text(r, "name"), r.get("club") or "")
-               for r in market for k in [text(r, "ff_id")]}
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        Crosswalk(players).mirror()
-        store_sql("lineups", [dict(r, observed_at="2026-08-01T0900Z") for r in lineups])
-        store_sql("starters", [dict(r, observed_at="2026-08-01T0900Z", match_id="m")
-                               for r in starters])
-        attach_slugs(players, [*history("lineups"), *current("starters")])
-    assert players["af"].ff_slug == "alvaro-fdez", players
-    assert players["jc"].ff_slug == "jonny-castro-ff", "by name within the club"
-    assert players["af"].club_id == "espanyol"
+    from ffcore.tidy import current, store_sql, tables_in
 
     a, b = "2026-08-01T0900Z", "2026-08-02T0900Z"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        store_sql("market", [{"observed_at": a, "ff_id": i, "name": n, "club": c, "value": "1"}
+                             for i, n, c in [("af", "Álvaro Fernández", "espanyol"),
+                                             ("jc", "Jonny Castro", "alaves")]])
+        store_sql("lineups", [{"observed_at": a, "source": "futbolfantasy", "team_slug": "espanyol",
+                               "player_name": "Álvaro Fernández", "player_slug": slug}
+                              for slug in ("alvaro-fdez", "second")])
+        store_sql("starters", [{"observed_at": a, "team_slug": "alaves", "player_name": "Jonny Castro",
+                                "player_slug": "jonny-castro-ff", "role": "starter", "match_id": "m"}])
+        with closing(lfg.connect()) as db, db:
+            build(db)
+            got = dict(db.execute("SELECT player_id, ff_slug FROM crosswalk"))
+        assert got == {"af": "alvaro-fdez", "jc": "jonny-castro-ff"}, \
+            ("a slug, the first his rows gave, to the player the row names by name (within the club)", got)
+
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         store_sql("market", [{"observed_at": at, "ff_id": i, "name": n, "club": c, "value": v}
                              for at, i, n, c, v in [
@@ -88,13 +89,31 @@ def _selftest() -> None:
                      for at in (a,)])
         store_sql("api_players_all", [{"observed_at": a, "player_id": "3279", "player_name": "Bonafé",
                                        "market_value": "1057681"}])
-        got = registry()
-    assert {k: p.app_id for k, p in got.items()} == {
+        got = {r[0]: r[1:] for r in rows("SELECT player_id, app_id, name, club_id FROM registry")}
+    assert {k: v[0] for k, v in got.items()} == {
         "jc": "2552", "lz": "3178", "ja": "3172", "pf": "", "gone": "", "bo": "3279", "bn": ""}, \
         ("same value, names sharing a stem; at one value, the most stems shared wins; an all-players"
          " row holds until his next, so it meets every market snapshot in between", got)
-    assert (got["jc"].name, got["jc"].club_id) == ("Jonny Castro", "alaves"), \
-        "his latest market row; one who left keeps his"
+    assert got["jc"][1:] == ("Jonny Castro", "alaves"), "his latest market row; one who left keeps his"
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        with closing(lfg.connect()) as db, db:
+            db.executemany("INSERT INTO crosswalk (player_id, name, club_id, ff_slug, app_id) VALUES (?, ?, ?, ?, ?)", [
+                ("af", "Alvaro Fernandez", "espanyol", "alvaro-fernandez", "2101"),
+                ("jc", "Jonny Castro", "alaves", "jonny-castro", ""),
+                ("cr", "Carlos Romero", "", "", "2614"), ("ir", "Isaac Romero", "", "", "2614"),
+                ("11", "Álvaro García", "betis", "", ""), ("12", "Alvaro Garcia", "rayo", "", "")])
+        store_sql("lineups", [dict(observed_at=a, player_slug=slug, player_name=name,
+                                   team_slug=club) for slug, name, club in [
+            ("alvaro-fernandez", "x", "espanyol"), ("", "Álvaro Fernández", ""),
+            ("who-is-this", "", ""), ("", "Álvaro García", ""), ("", "Alvaro Garcia", "rayo")]])
+        assert [r["player"] for r in current("lineups")] == ["af", "af", None, None, "12"], \
+            "slug, else a name one player has, else a name one player of the club has"
+        store_sql("api_teams", [dict(observed_at=a, player_id=i, manager="m")
+                                for i in ("2101", "2614", "9999")])
+        assert [r["player"] for r in current("api_teams")] == ["af", None, None], \
+            "an app id two players claim names nobody"
+        assert rows("SELECT id, value FROM id_clashes") == [("app_id", "2614")]
 
     print("crosswalk self-test OK")
 

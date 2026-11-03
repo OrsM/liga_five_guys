@@ -232,7 +232,7 @@ rather than reaching through them; ruff flags reads of private members.
                     rules (positions, formations, the eleven, the debt),
                     names (Name, PlayerKey, AppId: who a player is),
                     source, futbolfantasy, footballdata, laliga_api, parse,
-                    facts, text, auth, crosswalk, league, score, startprob,
+                    facts, text, auth, league, score, startprob,
                     fixture, schedule, forecast, season, outlook, gain,
                     market, pricing, action, fixtures (test data)
     inputs/         league.ini
