@@ -715,6 +715,15 @@ def _selftest_market() -> None:
             ("p7", 10e6, 12e6, 0, 1.2), ("p8", 10e6, 99.0, 1, None)], \
             "the highest buy at a listing's close is what a bid had to reach (not a buy days later); " \
             "a manager's listing is never reached"
+        from ffcore.db import set_now
+        from ffcore.parse import snapshot_stamp
+        try:
+            set_now(snapshot_stamp("2026-09-02T2000Z"))
+            assert rows("SELECT count(*) FROM auction_results") == [(0, )], "no auction's outcome before its close"
+            set_now(snapshot_stamp("2026-09-02T2024Z"))
+            assert rows("SELECT count(*) FROM auction_results") == [(2, )], "at its close, however late the feed"
+        finally:
+            set_now(None)
 
         store_sql("api_teams", [{"observed_at": a, "player_team_id": "9", "market_value": "10",
                                  "manager": "", "player_id": ""}])

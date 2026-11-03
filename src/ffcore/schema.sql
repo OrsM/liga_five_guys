@@ -170,7 +170,7 @@ SELECT m.at, m.kind, m.player, m.amount FROM look l JOIN moves m ON m.path = l.p
 WHERE l.t0 <> '' AND m.at > l.t0 AND m.at <= l.cut;
 
 -- Each bid of the path's, and the auction it is settled in: his first
--- close on the game's market after it (auction_results), if by t (close,
+-- close on the game's market after it (auction_results: closed by t; close,
 -- a stamp), and whether it won there (it reaches what that auction took:
 -- bar x asking; nothing reaches none). A bid taken back or bid again
 -- before its close is no bid. won NULL: his auction is still to close at
@@ -178,9 +178,8 @@ WHERE l.t0 <> '' AND m.at > l.t0 AND m.at <= l.cut;
 DROP VIEW IF EXISTS my_bids;
 CREATE VIEW my_bids AS
 WITH m AS MATERIALIZED (SELECT * FROM my_moves),
-r AS MATERIALIZED (SELECT player, strftime('%Y-%m-%dT%H%MZ', close) AS close, asking, bar FROM auction_results
-                   WHERE seller = 'marketPlayerLeague' AND strftime('%Y-%m-%dT%H%MZ', close) <= (SELECT cut FROM look)
-                     AND player IN (SELECT player FROM m WHERE kind = 'bid')),
+r AS MATERIALIZED (SELECT player, closed AS close, asking, bar FROM auction_results
+                   WHERE seller = 'marketPlayerLeague' AND player IN (SELECT player FROM m WHERE kind = 'bid')),
 b AS (SELECT m.at, m.player, m.amount, (SELECT min(r.close) FROM r WHERE r.player = m.player AND r.close > m.at) AS close
       FROM m WHERE m.kind = 'bid')
 SELECT b.at, b.player, b.amount, b.close,
@@ -1054,15 +1053,18 @@ CREATE VIEW price_trend AS
 SELECT ff_id, trend FROM price_trend_fit
 WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut FROM look));
 
--- How each listing's auction went: every listing on the market (the game's
--- or a manager's) by player and close, its asking price at its last
--- sighting and his price trend then (the last kept at or before its
--- close), and the buy made within ten minutes of its close if one was:
--- what the winner paid (won; NULL: nobody bought) and whether it was you.
--- bar is what a bid had to reach, over asking: the winner's bid; asking
--- where nobody bought or the winner was you (the bids you beat are not
--- seen); NULL for a manager's listing (no one's deal with him is seen).
--- Ground truth for the replays, so it reads every sighting whatever t.
+-- How each listing's auction went, once it has closed (by t): every
+-- listing on the market (the game's or a manager's) by player and close
+-- (closed, as a stamp), its asking price at its last sighting and his
+-- price trend then (the last kept at or before its close), and the buy
+-- made within ten minutes of its close if one was: what the winner paid
+-- (won; NULL: nobody bought) and whether it was you. bar is what a bid had
+-- to reach, over asking: the winner's bid; asking where nobody bought or
+-- the winner was you (the bids you beat are not seen); NULL for a
+-- manager's listing (no one's deal with him is seen). The one auction
+-- outcome: what bids win now (bid_odds) and a path's bids (my_bids) both
+-- read it, and no bar before its close. An outcome is the close's, however
+-- late the feed tells of it.
 DROP VIEW IF EXISTS auction_results;
 CREATE VIEW auction_results AS
 WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM api_standings s, league_config c
@@ -1087,14 +1089,14 @@ won AS (SELECT * FROM (
             FROM ends e LEFT JOIN buys b ON b.pid = e.pid AND abs(b.t - e.close) * 86400 < 600)
         WHERE top = 1),
 fits AS (SELECT DISTINCT as_of FROM price_trend_fit)
-SELECT w.player, w.at AS close, w.asking, w.seller, w.won, w.me AS by_me,
+SELECT w.player, w.at AS close, strftime('%Y-%m-%dT%H%MZ', w.at) AS closed, w.asking, w.seller, w.won, w.me AS by_me,
        CASE WHEN w.seller <> 'marketPlayerLeague' THEN NULL
             WHEN w.won IS NULL OR w.me THEN 1.0 ELSE w.won / w.asking END AS bar,
        (SELECT t.trend FROM price_trend_fit t
         WHERE t.ff_id = w.player
           AND t.as_of = (SELECT max(as_of) FROM fits WHERE as_of <= strftime('%Y-%m-%dT%H%MZ', w.at)))
        AS trend
-FROM won w;
+FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut FROM look);
 
 -- What a bid wins on the game's market now, for each player listed there:
 -- his BID_NEIGHBOURS past listings closest to him in price trend (before
@@ -1105,8 +1107,7 @@ DROP VIEW IF EXISTS bid_odds;
 CREATE VIEW bid_odds AS
 WITH past AS MATERIALIZED (
     SELECT trend, bar FROM auction_results
-    WHERE bar IS NOT NULL AND trend IS NOT NULL AND NOT coalesce(by_me, 0)
-      AND strftime('%Y-%m-%dT%H%MZ', close) <= (SELECT cut FROM look)),
+    WHERE bar IS NOT NULL AND trend IS NOT NULL AND NOT coalesce(by_me, 0)),
 now AS (SELECT DISTINCT s.player, coalesce(t.trend, 0.0) AS trend
         FROM current_api_market s LEFT JOIN price_trend t ON t.ff_id = s.player
         WHERE s.seller = 'marketPlayerLeague' AND s.player IS NOT NULL AND s.sale_price <> 0),
