@@ -296,3 +296,24 @@ Kept, and why:
   the standings move: a decision.inputs per look). Speed no gate here.
 - Rollback note: the old code refuses a database the new has opened
   (dec_state lost cut); drop the dec_* tables first.
+
+## Step 9: the league at t, items 1-4 of the plan by layer (2026-11-03, branch w-core)
+
+- One t: look's cut (set_now writes it, db.replaying puts it back); the
+  views read nothing else (cut() the function, clock._NOW, on_reset gone).
+  t is the file's, so one process moves it at a time: the warm pool and
+  replay's shards went. Backtest identical (124, 7, 560 vs 451).
+- My moves as an input: moves (path, at, kind, player, amount) and
+  look.path/t0; my_squad, my_cash, my_bids. Day, acted, closed,
+  with_squad, League, dec_mine, dec_state.cash, universe_when/_AT gone.
+  my_cash adds the league's bonuses since t0 (the definition's "real
+  non-move income"); Day added none. That alone moves the backtest to 129
+  moves, 5 lost, 522 vs 451, value 327.9M: with the bonus term out it is
+  124/7/560 again, every jornada's moves the same.
+- One auction outcome: auction_results only closes by t; bid_odds and
+  my_bids read it. A sale gets seen.fetches (in the backtest every sale
+  came after the auctions, none with an offer: all at value, as before).
+- seen made once a cut, variant and code (seen.code). Backtest 865 s cold
+  (forecasts remade), 556 s warm (711 s before). A decision at a past t:
+  the league 1.0 s made before (3.1 s not; the universe was 2.9 s), the
+  plan 7.7 s as before (its ~25 dec_next steps: the next thing to speed).

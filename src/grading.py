@@ -667,7 +667,7 @@ if __name__ == "__main__":
             sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
             got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0,
             got[-1]["standpat_money"] / 1e6 if got else 0.0), flush=True)
-        # Out without freeing the universes one object at a time: ~8 s of a
+        # Out without freeing what it made one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
     print("grading.py --selftest | money (LFG_VARIANT=name) | replay (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")

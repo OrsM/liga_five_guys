@@ -48,7 +48,7 @@ def _by_hand(db: Any, u: Universe) -> None:
     for t in ("seen", "seen_cash", "seen_odds"):
         db.execute("DELETE FROM %s WHERE cut = (SELECT cut FROM look) AND variant = variant()" % t)
     db.execute("DELETE FROM forecast_cell WHERE moment = 0")
-    db.executemany("INSERT INTO seen VALUES ((SELECT cut FROM look), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    db.executemany("INSERT INTO seen VALUES ((SELECT cut FROM look), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
                    [(k, m.shown(k), pos.get(k), owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
                      m.offer.get(k), m.clause.get(k), m.price.get(k), m.route.get(k), m.my_bid.get(k), m.fetch.get(k))
                     for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine) | set(owner))])

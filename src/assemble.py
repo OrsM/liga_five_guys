@@ -167,15 +167,22 @@ def price_change(day: str, h: int) -> dict[str, float | None]:
 
 def see() -> str:
     """The market and the league as of t into seen, seen_cash and
-    seen_odds, made again (player_facts, sale_odds, cash, bid_odds): what a
-    decision at t reads. The cut."""
+    seen_odds (player_facts, sale_odds, cash, bid_odds): what a decision at t
+    reads. Made once a cut, variant and code (seen.code: this forecast code
+    and every constant, so another code or a variant redefined makes them
+    again, never reads a stale one). The cut."""
+    key = hashlib.sha1(repr((_forecast_code(), sorted((m, sorted(c.items())) for m, c in constants().items())))
+                       .encode()).hexdigest()[:12]
     with closing(connect()) as db, db:
         (c, ), = db.execute("SELECT cut FROM look").fetchall()
+        if db.execute("SELECT 1 FROM seen WHERE cut = ? AND variant = variant() AND code = ? LIMIT 1",
+                      (c, key)).fetchone():
+            return c
         for t in ("seen", "seen_cash", "seen_odds"):
             db.execute("DELETE FROM %s WHERE cut = ? AND variant = variant()" % t, (c, ))
         db.execute("INSERT INTO seen SELECT ?, variant(), f.player, f.name, f.pos, f.owner, f.value, f.trend, f.paid,"
-                   " f.offer, f.clause, f.price, f.route, f.my_bid, s.fetches"
-                   " FROM player_facts f LEFT JOIN sale_odds s USING (player)", (c, ))
+                   " f.offer, f.clause, f.price, f.route, f.my_bid, s.fetches, ?"
+                   " FROM player_facts f LEFT JOIN sale_odds s USING (player)", (c, key))
         db.execute("INSERT INTO seen_cash SELECT ?, variant(), manager, cash FROM cash", (c, ))
         db.execute("INSERT INTO seen_odds SELECT ?, variant(), player, ratio, p_win FROM bid_odds", (c, ))
     return c
@@ -635,6 +642,15 @@ def _selftest_facts() -> None:
             cols, seen = query("SELECT player, name, pos, owner, value, trend, paid, offer, clause, price, route,"
                                " my_bid, fetches FROM seen WHERE cut = ?", (c, ))
             got = {r[0]: dict(zip(cols[1:], r[1:])) for r in seen}
+            with closing(connect()) as db, db:
+                db.execute("UPDATE seen SET value = -1 WHERE player = 'p1'")
+            see()
+            assert rows("SELECT value FROM seen WHERE player = 'p1'") == [(-1, )], \
+                "made once a cut and code: read, not made again"
+            from unittest import mock
+            with mock.patch(__name__ + "._forecast_code", lambda: "other"):
+                see()
+            assert rows("SELECT value FROM seen WHERE player = 'p1'") == [(5e6, )], "another code makes it again"
         finally:
             set_now(None)
     assert set(got) == {"p1", "p2", "p3", "p4", "p5", "p7"}, \

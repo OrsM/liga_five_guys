@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS seen (
     route   TEXT,
     my_bid  REAL,
     fetches REAL,
+    code    TEXT NOT NULL DEFAULT '',   -- what made it (assemble.see); '': by hand
     PRIMARY KEY (cut, variant, player)
 ) WITHOUT ROWID;
 -- Every manager's cash as seen at a cut (the cash view then): where your
