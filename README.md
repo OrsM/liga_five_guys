@@ -210,7 +210,6 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     python tools/structure.py [--check]           # coupling numbers; --check gates selftests
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
-    python tools/uml.py docs                      # regenerate docs/*.mmd from the code
     python tools/q.py --time                      # every saved Datasette query, timed
 
 Run them with `PYTHONPATH=src FF_ROOT=<a copy of data>`; rehearse boards on a

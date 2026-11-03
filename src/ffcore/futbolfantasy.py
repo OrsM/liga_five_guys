@@ -6,10 +6,10 @@ import re
 from collections.abc import Callable
 from typing import Any
 from datetime import date, datetime
-from zoneinfo import ZoneInfo
 
 from lxml import html as lh
 
+from ffcore.clock import MADRID
 from ffcore.rules import XI_SIZE
 from ffcore.names import Name
 from ffcore.text import norm, resolve
@@ -59,10 +59,6 @@ def club_slug(name: str | None) -> str:
         return ""
     row, _ = resolve(name, _TEAM_ROWS)
     return row["name"] if row else CLUB_ALIASES.get(norm(name), "")
-
-
-TEAM_SELECT_RE = re.compile(r'<select[^>]*name="equipo"[^>]*>(.*?)</select>', re.S)
-OPTION_RE = re.compile(r'<option[^>]*value="(\d+)"[^>]*>([^<]+)</option>')
 
 
 HREF_RE = re.compile(r'href="[^"]*?/jugadores/([^"?#]+)"')
@@ -262,6 +258,7 @@ def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[
     from ffcore.parse import ratio
 
     doc = lh.fromstring(html)
+    season = season_label(html)
     best: list[Row] = []
 
     for table in doc.xpath("//table"):
@@ -310,7 +307,7 @@ def parse_points(html: str, observed_at: str = "", key: str = "points") -> list[
                 "points": f"{pts:g}",
                 "games": f"{pj:g}",
                 "avg": f"{avg:.3f}" if avg is not None else "",
-                "season": season_label(html),
+                "season": season,
             })
 
         if len(rows) > len(best):
@@ -343,7 +340,6 @@ MATCH_KEY_RE = re.compile(r"^match_(\d+-[a-z0-9-]+)$")
 CAL_JORNADA_RE = re.compile(r"Jornada\s*(\d+)")
 CAL_SCORE_RE = re.compile(r"\b(\d+\s*-\s*\d+)\b")
 CAL_KICKOFF_RE = re.compile(r"(\d\d)/(\d\d) (\d\d):(\d\d)h")
-MADRID = ZoneInfo("Europe/Madrid")
 
 
 def _kickoff(text: str, observed_at: str) -> str:
