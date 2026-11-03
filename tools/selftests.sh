@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# The gate: every module under src/ and tools/ that defines a top-level
+# _selftest() is run (nothing to list or keep in step), then mypy and ruff.
+# Modules that gate their self-test on a flag take --selftest; the rest
+# ignore it. A failure prints that suite's own output once.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -7,58 +11,20 @@ cd "$REPO_ROOT"
 UV="$HOME/.local/bin/uv"
 export PYTHONPATH=src
 export FF_ROOT=./data
+export UV
 
-TESTS=(ffcore/facts.py ffcore/parse.py ffcore/text.py ffcore/tidy.py ffcore/db.py
-       ffcore/fixtures.py ffcore/auth.py
-       ffcore/forecast.py ffcore/season.py ffcore/names.py
-       ffcore/clock.py ffcore/jornadas.py ffcore/points.py
-       ffcore/rules.py
-       ffcore/startprob.py ffcore/crosswalk.py sources.py ffcore/source.py
-       ffcore/futbolfantasy.py ffcore/footballdata.py ffcore/laliga_api.py
-       "ingest.py --selftest" "ffcore/league.py --selftest" ffcore/fixture.py
-       ffcore/score.py
-       "grading.py --selftest"
-       "crosswalk.py --selftest" "run.py --selftest" "remind.py --selftest" "health.py --selftest" publish.py assemble.py
-       ffcore/action.py ffcore/market.py ffcore/pricing.py ffcore/schedule.py
-       "stats.py --selftest" "act.py --selftest" decision.py
-      )
-# One list, in tools/session_selftests.py: the serial re-run below reads it.
-mapfile -t SESSION_TESTS < <("$UV" run --frozen python tools/session_selftests.py --list)
+mapfile -t SUITES < <(grep -rl --include='*.py' '^def _selftest' src tools | sort)
 
-session_ok=0
-"$UV" run --frozen python tools/session_selftests.py >/dev/null 2>&1 &
-session_pid=$!
-
-if printf '%s\n' "${TESTS[@]}" \
-    | xargs -P 4 -I {} sh -c "\"$UV\" run --frozen python src/{} >/dev/null 2>&1 \
-        || { echo \"  FAILED: {}\"; exit 255; }"
-then
-    tests_ok=0
-else
-    tests_ok=1
-fi
-wait "$session_pid" || session_ok=1
-structure_ok=0
-"$UV" run --frozen python tools/structure.py --check >&2 || structure_ok=1
-"$UV" run --frozen mypy src tools >/dev/null 2>&1 \
-    || { echo "  FAILED: mypy src tools" >&2; "$UV" run --frozen mypy src tools | tail -20 >&2; structure_ok=1; }
-"$UV" run --frozen ruff check -q src tools >&2 || { echo "  FAILED: ruff check src tools" >&2; structure_ok=1; }
-
-if [ "$tests_ok" -eq 0 ] && [ "$session_ok" -eq 0 ] && [ "$structure_ok" -eq 0 ]; then
-    echo "selftests: $(( ${#TESTS[@]} + ${#SESSION_TESTS[@]} )) suites pass"
-    exit 0
-fi
-
-echo "selftests: failures detected — re-running serially for detail" >&2
 status=0
-for t in "${TESTS[@]/#/src/}" "${SESSION_TESTS[@]/%/ --selftest}"; do
+printf '%s\n' "${SUITES[@]}" | xargs -P 4 -I {} sh -c '
+    out=$("$UV" run --frozen python {} --selftest 2>&1) \
+        || { echo "  FAILED: {}"; echo "$out" | tail -20; exit 255; }' || status=1
+
+for cmd in "mypy src tools" "ruff check -q src tools"; do
     # shellcheck disable=SC2086
-    if ! "$UV" run --frozen python $t >/dev/null 2>&1; then
-        echo "  FAILED: $t" >&2
-        # shellcheck disable=SC2086
-        "$UV" run --frozen python $t 2>&1 | tail -20 >&2
-        status=1
-    fi
+    out=$("$UV" run --frozen $cmd 2>&1) \
+        || { echo "  FAILED: $cmd"; echo "$out" | tail -20; status=1; }
 done
-[ "$structure_ok" -eq 0 ] || status=1
+
+[ "$status" -eq 0 ] && echo "selftests: ${#SUITES[@]} suites pass"
 exit "$status"

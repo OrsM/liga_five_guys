@@ -207,7 +207,6 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     bash tools/selftests.sh                       # every module's self-test
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
     python tools/golden.py freeze|check           # a refactor must rebuild the same board
-    python tools/structure.py [--check]           # coupling numbers; --check gates selftests
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
     python tools/uml.py docs                      # regenerate docs/*.mmd from the code
