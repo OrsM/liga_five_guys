@@ -14,7 +14,7 @@ from typing import Any
 from assemble import built
 import decision
 from decide import Action, Universe
-from ffcore.db import connect, record, rows, this_run
+from ffcore.db import connect, cut, record, rows, this_run
 from ffcore.tidy import REPORTS
 
 __all__ = ["with_squad", "board_doc", "record_run"]
@@ -462,7 +462,7 @@ def record_run(u: Universe, run: int, params: Sequence[Doc] = (), moment: int | 
         db.execute(KEEP_PLAN, (run,))
         db.execute("INSERT INTO sim_runs (run_id, moment, cut, p_first_after, finish_after, cash_after, can_bid)"
                    " SELECT ?, ?, ?, s.p_first, s.finish, c.free, r.room FROM dec_cash c, dec_room r, league_standings s"
-                   " WHERE s.me", (run, moment, u.cut))
+                   " WHERE s.me", (run, moment, cut()))
         db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
     return acts
 

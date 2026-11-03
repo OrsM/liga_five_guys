@@ -306,7 +306,7 @@ def _selftest_views() -> None:
     import tempfile
     from pathlib import Path
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import record, rows
     from ffcore.rules import MATCH_LEN
     from ffcore.tidy import store_sql, tables_in

@@ -17,8 +17,8 @@ from typing import Any, NamedTuple
 import remind
 from decide import Universe
 from ffcore import fixture, forecast, pricing, rules, score, startprob
-from ffcore.clock import cut, set_variant
-from ffcore.db import connect, named, query, record, rows
+from ffcore.clock import set_variant
+from ffcore.db import connect, cut, named, query, record, rows
 from ffcore.fixture import Ratings, difficulty_ratings
 from ffcore.forecast import Bootstrap
 from ffcore.jornadas import rounds
@@ -137,7 +137,7 @@ class Prices(NamedTuple):
 def record_trend() -> None:
     """Each player's price trend as of the model's cut, kept (price_trend_fit)
     for the views that read it; the momentum it rests on kept first."""
-    _keep("SELECT cut(), ff_id, trend FROM price_trend_now", "price_trend_fit")
+    _keep("SELECT cut, ff_id, trend FROM look, price_trend_now", "price_trend_fit")
 
 
 def _keep(select: str, *tables: str) -> None:
@@ -150,14 +150,14 @@ def _keep(select: str, *tables: str) -> None:
         got = db.execute(select).fetchall()
         with db:
             for i, table in enumerate(tables):
-                db.execute("DELETE FROM %s WHERE as_of = cut()" % table)
+                db.execute("DELETE FROM %s WHERE as_of = (SELECT cut FROM look)" % table)
                 db.executemany("INSERT INTO %s VALUES (?, ?, ?)" % table, [(r[0], r[1], r[2 + i]) for r in got])
 
 
 def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
-    _keep("SELECT cut(), h, slope FROM momentum", "momentum_fit")
+    _keep("SELECT cut, h, slope FROM look, momentum", "momentum_fit")
     record_trend()
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
@@ -176,7 +176,7 @@ def see() -> str:
     again (player_facts, sale_odds, bid_odds): what a universe is built
     from. The cut."""
     with closing(connect()) as db, db:
-        (c, ), = db.execute("SELECT cut()").fetchall()
+        (c, ), = db.execute("SELECT cut FROM look").fetchall()
         for t in ("seen", "seen_odds"):
             db.execute("DELETE FROM %s WHERE cut = ? AND variant = variant()" % t, (c, ))
         db.execute("INSERT INTO seen SELECT ?, variant(), f.player, f.name, f.pos, f.owner, f.value, f.trend, f.paid,"
@@ -441,7 +441,7 @@ def _selftest_forecast() -> None:
     from types import SimpleNamespace
     from unittest import mock
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.schedule import Expectations
     from ffcore.tidy import tables_in
 
@@ -562,7 +562,7 @@ def _selftest_sale() -> None:
     import tempfile
     from pathlib import Path
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import record
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import store_sql, tables_in
@@ -641,7 +641,7 @@ def _selftest_facts() -> None:
     import tempfile
     from pathlib import Path
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import record
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import store_sql, tables_in
@@ -732,7 +732,7 @@ def _selftest_market() -> None:
 
         from datetime import datetime, timezone
 
-        from ffcore.clock import set_now
+        from ffcore.db import set_now
         try:
             set_now(datetime(2026, 8, 12, 12, tzinfo=timezone.utc))
             store_sql("market", [{"observed_at": at, "ff_id": "mid", "value": "100"}

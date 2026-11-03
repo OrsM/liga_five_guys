@@ -185,11 +185,9 @@ def builds(nows: Sequence[str], hash_seed: str, base: Path) -> list[dict[str, An
 def _worker(nows: Sequence[str]) -> None:
     """Build the board at each time, in this process, as run.py sim does."""
     import run
-    from ffcore import clock
     out = Path(os.environ["LFG_REPORTS"])
     for now in nows:
-        os.environ["LFG_NOW"] = now
-        clock.set_now(None)
+        os.environ["LFG_NOW"] = now         # the run sets t to it (run.main)
         (out / "decisions.json").unlink(missing_ok=True)
         run.main(["sim"])
         if (out / "decisions.json").exists():

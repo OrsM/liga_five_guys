@@ -8,11 +8,9 @@ from contextlib import closing, contextmanager
 from pathlib import Path
 from types import MappingProxyType
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from datetime import datetime
 from typing import Any
 
 from ffcore import db as lfg
-from ffcore.clock import run_now
 from ffcore.db import ROOT
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
@@ -140,22 +138,23 @@ def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any
 
 
 def history(name: str, source: str = "") -> list[Mapping[str, Any]]:
-    """Every row of a table up to cut(), in the order stored."""
+    """Every row of a table up to t, in the order stored."""
     return [MappingProxyType(r) for r in _read_sql("history_" + name)
             if not source or r.get("source") == source]
 
 
 def current(name: str, source: str = "") -> list[dict[str, Any]]:
-    """A table as of cut(): a snapshot table's last stamp per source (a
+    """A table as of t: a snapshot table's last stamp per source (a
     daily one's last closed day), a keyed one's last row per key."""
     return [r for r in _read_sql("current_" + name)
             if not source or r.get("source") == source]
 
 
-def age_hours(name: str, now: datetime | None = None) -> float | None:
+def age_hours(name: str) -> float | None:
+    """How old a table's last row is at t, in hours."""
     stamps = [r.get("observed_at", "") for r in current(name)]
-    when = snapshot_stamp(max(stamps)) if stamps else None
-    return None if when is None else ((now or run_now()) - when).total_seconds() / 3600
+    when, t = snapshot_stamp(max(stamps)) if stamps else None, snapshot_stamp(lfg.cut())
+    return None if when is None or t is None else (t - when).total_seconds() / 3600
 
 
 LINEUP_SOURCE = "futbolfantasy"
@@ -164,7 +163,7 @@ LINEUP_SOURCE = "futbolfantasy"
 def _selftest_tables() -> None:
     import tempfile
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import rows
 
     a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"

@@ -1,13 +1,10 @@
 """The jornada calendar as schema.sql's jornada_calendar has it, as of
-cut(): when each round locks, the jornadas left, and which jornada a match
+t: when each round locks, the jornadas left, and which jornada a match
 belongs to."""
 from __future__ import annotations
 
 
 from datetime import datetime
-from functools import cache
-
-from ffcore.clock import on_reset
 from ffcore.db import rows
 from ffcore.parse import snapshot_stamp
 from ffcore.schedule import Rounds
@@ -15,21 +12,18 @@ from ffcore.schedule import Rounds
 __all__ = ["round_locks", "rounds", "rounds_ahead"]
 
 
-@cache
 def round_locks() -> dict[int, datetime]:
     """Each jornada's lock (round_locks), in lock order."""
     return {j: when for j, at in rows("SELECT jornada, lock FROM round_locks ORDER BY lock, jornada")
             if (when := snapshot_stamp(at)) is not None}
 
 
-@cache
 def rounds_ahead() -> dict[int, datetime]:
     """Each jornada with a match still to play: when the next one kicks off (rounds_ahead)."""
     return {j: when for j, at in rows("SELECT jornada, next FROM rounds_ahead ORDER BY next, jornada")
             if (when := snapshot_stamp(at)) is not None}
 
 
-@cache
 def rounds() -> Rounds:
     """The jornadas left (jornada_calendar's not done), by when each next
     plays (rounds_ahead; none known last), the clubs that have played in each
@@ -44,10 +38,6 @@ def rounds() -> Rounds:
                   {j for j, state in left.items() if state == "behind"})
 
 
-for _cached in (round_locks, rounds, rounds_ahead):
-    on_reset(_cached.cache_clear)
-
-
 def _selftest() -> None:
     import tempfile
     from datetime import timezone
@@ -55,7 +45,7 @@ def _selftest() -> None:
 
     from contextlib import closing
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import connect
     from ffcore.tidy import store_sql, tables_in
 
@@ -99,7 +89,7 @@ def _selftest() -> None:
             assert rows("SELECT lock FROM next_lock") == [("2026-08-30T1700Z",)], \
                 "the rest of a jornada under way locks nothing: the next jornada's lock"
             set_now(utc(22, 0))
-            assert 3 in round_locks(), "set_now clears the cache"
+            assert 3 in round_locks(), "read as of t"
             assert rows("SELECT lock FROM next_lock") == [("2026-08-23T1700Z",)], \
                 "jornada 3's lock comes before jornada 2's match put back"
             set_now(utc(24, 0))

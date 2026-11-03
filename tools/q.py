@@ -100,7 +100,7 @@ def _selftest_changes() -> None:
     import tempfile
     from datetime import datetime, timezone
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import record
     from ffcore.tidy import store_sql, tables_in
 
@@ -329,7 +329,7 @@ def _selftest_queries() -> None:
     import tempfile
     from datetime import datetime, timezone
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import record
     from ffcore.tidy import store_sql, tables_in
     from grading import view_table

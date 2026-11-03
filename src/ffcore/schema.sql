@@ -124,9 +124,11 @@ CREATE TABLE IF NOT EXISTS seen_odds (
     PRIMARY KEY (cut, variant, player, ratio)
 ) WITHOUT ROWID;
 
--- What the model looks at, one row: the market as seen at a cut (seen) and
--- the forecast of a moment (forecast_used). Written by what asks
--- (decision.inputs).
+-- What the model looks at, one row: t, the one moment every view is read
+-- as of (cut: a run sets it to its own time, a replay to each past time it
+-- stands at, ffcore.db.set_now; every as-of view reads it, and nothing
+-- else), the market as seen then (seen at that cut), the forecast of a
+-- moment (forecast_used) and who you are (decision.inputs).
 CREATE TABLE IF NOT EXISTS look (
     cut     TEXT NOT NULL,
     variant TEXT NOT NULL,
@@ -244,16 +246,16 @@ CREATE TABLE IF NOT EXISTS forecast_variant (
 DROP VIEW IF EXISTS parser_health;
 CREATE VIEW parser_health AS
 WITH snaps AS (
-  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM lineups WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM api_standings WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
+  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM market WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
+  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM lineups WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
+  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM api_standings WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
+  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM api_lineup WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
+  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM api_teams WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
+  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM api_leagues WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at),
 r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, stamp_jd(at) AS jd FROM snaps),
 usual AS (SELECT src, avg(n) AS usual_rows, (max(jd) - min(jd)) * 24 / (count(*) - 1) AS gap_h
           FROM r WHERE k BETWEEN 2 AND 21 GROUP BY src HAVING count(*) >= 5),
-now AS (SELECT julianday(substr((SELECT cut()), 1, 10) || 'T' || substr((SELECT cut()), 12, 2) || ':' || substr((SELECT cut()), 14, 2) || 'Z') AS jd)
+now AS (SELECT julianday(substr((SELECT cut FROM look), 1, 10) || 'T' || substr((SELECT cut FROM look), 12, 2) || ':' || substr((SELECT cut FROM look), 14, 2) || 'Z') AS jd)
 SELECT l.src, l.at AS last_at, l.n AS rows, round(u.usual_rows, 1) AS usual_rows,
        round((now.jd - l.jd) * 24, 1) AS hours_since, round(u.gap_h, 1) AS usual_gap_h,
        CASE WHEN (now.jd - l.jd) * 24 > max(6.0, 3 * u.gap_h) THEN 'stale'
@@ -370,7 +372,7 @@ FROM grade_forecast g GROUP BY run_id, from_j, jornada;
 DROP VIEW IF EXISTS replay_moments;
 CREATE VIEW replay_moments AS
 WITH snaps AS MATERIALIZED (SELECT DISTINCT observed_at AS at FROM lineups
-                            WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut())),
+                            WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut FROM look)),
 w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS opens FROM round_locks)
 SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens AND s.at < w.lock
 ORDER BY w.lock, s.at;
@@ -443,7 +445,7 @@ FROM t;
 
 
 -- The league's money, as SQL over the app's tables (current_/history_ views
--- read as of cut(), each row with its player). League writes the one
+-- read as of t, each row with its player). League writes the one
 -- input no table holds, the config.
 CREATE TABLE IF NOT EXISTS league_config (
     me     TEXT NOT NULL,
@@ -534,7 +536,7 @@ SELECT player, amount AS paid FROM (
     FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
--- The lock: the next jornada to lock after cut(), at its first kickoff
+-- The lock: the next jornada to lock after t, at its first kickoff
 -- (round_locks), as a stamp and a julian day (t); NULL once none is left.
 -- One for everything: the board, the nights before it, the reminder. A
 -- jornada under way locks nothing the market's moves reach (bought tonight,
@@ -543,7 +545,7 @@ DROP VIEW IF EXISTS next_lock;
 CREATE VIEW next_lock AS
 SELECT min(lock) AS lock,
        stamp_jd(min(lock)) AS t
-FROM round_locks WHERE lock > (SELECT cut());
+FROM round_locks WHERE lock > (SELECT cut FROM look);
 
 -- The players on the game's market who could not play a jornada's match
 -- for whoever buys them: his auction closes after his club's kickoff in it
@@ -561,7 +563,7 @@ JOIN kickoffs k ON m.club IN (k.home, k.away)
 JOIN jornada_calendar c ON c.jornada = k.jornada AND c.state IN ('under way', 'ahead')
 WHERE k.t < l.close;
 
--- Each moment's forecast (forecast_cell) as a decision made at cut() uses
+-- Each moment's forecast (forecast_cell) as a decision made at t uses
 -- it: points if he plays, and the chance he plays, none in a jornada he
 -- would join after his club's match (late_arrivals). The universe reads
 -- its cells here, and the model the moment it looks at (cell).
@@ -628,7 +630,7 @@ SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEG
        ends AS first
 FROM e, l;
 
--- When each manager's listing on the game's market ends, as of cut() (t, a
+-- When each manager's listing on the game's market ends, as of t (t, a
 -- julian day): a listing runs three days, and the game offers for a player
 -- at each close only while he is listed.
 DROP VIEW IF EXISTS listing_ends;
@@ -674,7 +676,7 @@ SELECT f.player, f.offer, w.later AS waiting, max(f.offer, coalesce(w.later, 0.0
 FROM player_facts f LEFT JOIN waiting w ON w.player = f.player AND w.kind = 'sale'
 WHERE f.offer IS NOT NULL;
 
--- Every player the market or a futbolfantasy line-up names, as of cut(),
+-- Every player the market or a futbolfantasy line-up names, as of t,
 -- but coaches (no slot of the eleven, and the league has none: "Coach is not
 -- enabled", 2026-10-29): his name and position, what he is worth (market
 -- value; 0 is none), whether he is on sale (price, never under his value:
@@ -720,12 +722,12 @@ CREATE INDEX IF NOT EXISTS market_observed ON market (observed_at);
 
 -- The market as it closed each day: the rows of each day's last snapshot
 -- (each snapshot holds the whole market). Values move once a day; the
--- change from one day's to the next is a step. As of cut(): today's row is
+-- change from one day's to the next is a step. As of t: today's row is
 -- the last snapshot up to it, as the run at that moment saw it.
 DROP VIEW IF EXISTS market_daily;
 CREATE VIEW market_daily AS
 SELECT *, rowid AS id FROM market
-WHERE observed_at IN (SELECT max(observed_at) FROM market WHERE observed_at <= (SELECT cut())
+WHERE observed_at IN (SELECT max(observed_at) FROM market WHERE observed_at <= (SELECT cut FROM look)
                       GROUP BY substr(observed_at, 1, 10));
 
 -- What facts.ensure has kept, and through which day. A changed schema makes
@@ -811,14 +813,14 @@ CREATE VIEW k AS SELECT
        AND c.variant = w0.variant AND c.variant = w1.variant AND c.variant = w2.variant
        AND c.variant = (SELECT variant())) AS ckey;
 
--- Every valued day of every player as of cut(): the closed days kept in
+-- Every valued day of every player as of t: the closed days kept in
 -- price_step, and the day of the cut (the last snapshot of it up to the cut)
 -- worked out against the day before.
--- The last day with a market snapshot as of cut(): the one day price_step
+-- The last day with a market snapshot as of t: the one day price_step
 -- does not hold for it (the days before are closed).
 DROP VIEW IF EXISTS price_day_now;
 CREATE VIEW price_day_now AS
-SELECT coalesce(substr(max(observed_at), 1, 10), '') AS d FROM market WHERE observed_at <= (SELECT cut());
+SELECT coalesce(substr(max(observed_at), 1, 10), '') AS d FROM market WHERE observed_at <= (SELECT cut FROM look);
 
 DROP VIEW IF EXISTS price_rows;
 CREATE VIEW price_rows AS
@@ -831,7 +833,7 @@ seed AS (SELECT a.ff_id, a.n, a.value, l.i AS i0, l.step AS last_step, l.s1 AS l
 live AS (SELECT m.ff_id, m.observed_at, m.value, s.n AS n0, s.value AS pv, s.i0, s.last_step, s.last_s1
          FROM market m LEFT JOIN seed s ON s.ff_id = m.ff_id
          WHERE m.observed_at = (SELECT max(observed_at) FROM market
-                                WHERE observed_at >= (SELECT d FROM cutday) AND observed_at <= (SELECT cut()))
+                                WHERE observed_at >= (SELECT d FROM cutday) AND observed_at <= (SELECT cut FROM look))
            AND coalesce(m.ff_id, '') <> '' AND m.value IS NOT NULL)
 SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE day < (SELECT d FROM cutday)
 UNION ALL
@@ -853,7 +855,7 @@ FROM (SELECT ff_id, observed_at, day, step, i, value, k.price_w0, k.price_w1, k.
              max(-k.clip, min(k.clip, s2)) AS c2
       FROM price_rows, k WHERE step IS NOT NULL);
 
--- The longest horizon momentum fits, as of cut(): a quarter of the median
+-- The longest horizon momentum fits, as of t: a quarter of the median
 -- player's number of changes (players with none count), at least 1.
 DROP VIEW IF EXISTS price_hmax;
 CREATE VIEW price_hmax AS
@@ -879,13 +881,13 @@ SELECT a.ff_id, a.i, a.day, a.x, hs.h, b.observed_at AS end_at,
 FROM s b JOIN horizons hs ON hs.h <= (SELECT hmax FROM price_hmax) + hpad()
 JOIN s a ON a.ff_id = b.ff_id AND a.i = b.i - hs.h;
 
--- Momentum, as of cut(): how much of a price change carries into the next
+-- Momentum, as of t: how much of a price change carries into the next
 -- h (up to price_hmax), the move over h clipped at CLIP an update.
 DROP VIEW IF EXISTS momentum_pairs;
 CREATE VIEW momentum_pairs AS
 SELECT p.h, p.ff_id, p.i, p.end_day, p.x,
        max(-k.clip * p.h, min(k.clip * p.h, p.change)) AS y
-FROM price_ahead p, k WHERE p.end_at <= (SELECT cut());
+FROM price_ahead p, k WHERE p.end_at <= (SELECT cut FROM look);
 
 -- What each closed day adds to the momentum fit, per horizon: the sums of x*y
 -- and x*x of the pairs that end that day, written once (facts.MOMENTUM_DAY)
@@ -899,7 +901,7 @@ CREATE TABLE IF NOT EXISTS momentum_day (
     PRIMARY KEY (ckey, h, end_day)
 ) WITHOUT ROWID;
 
--- The momentum fit's sums per horizon, as of cut(): the closed days kept in
+-- The momentum fit's sums per horizon, as of t: the closed days kept in
 -- momentum_day, and the pairs ending on the day of the cut.
 DROP VIEW IF EXISTS momentum_sums;
 CREATE VIEW momentum_sums AS
@@ -930,7 +932,7 @@ CREATE TABLE IF NOT EXISTS momentum_fit (
 DROP VIEW IF EXISTS fitted;
 CREATE VIEW fitted AS
 SELECT h, slope FROM momentum_fit
-WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut()));
+WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut FROM look));
 
 -- The share of a trend (its move over the horizon, the longest h fitted)
 -- already made after each update.
@@ -944,13 +946,13 @@ WHERE e.slope <> 0 ORDER BY m.h;
 -- change is the newest day's: as long as you would hold him. Working it out
 -- walks every player's whole price history (~1s), and four things read it a
 -- run, so a run works it out once and keeps it (assemble.record_trend); what
--- reads it gets the last one kept at or before cut(), as momentum_fit does.
+-- reads it gets the last one kept at or before t, as momentum_fit does.
 DROP VIEW IF EXISTS price_trend_now;
 CREATE VIEW price_trend_now AS
 WITH s AS (SELECT coalesce((SELECT slope FROM fitted ORDER BY h DESC LIMIT 1), 0.0) AS slope),
 last AS (SELECT ff_id, day, x FROM (
              SELECT ff_id, day, x, row_number() OVER (PARTITION BY ff_id ORDER BY i DESC) AS r
-             FROM price_series WHERE observed_at <= (SELECT cut()))
+             FROM price_series WHERE observed_at <= (SELECT cut FROM look))
          WHERE r = 1)
 SELECT last.ff_id, s.slope * last.x AS trend
 FROM last, s WHERE last.day = (SELECT max(day) FROM last);
@@ -964,7 +966,7 @@ CREATE TABLE IF NOT EXISTS price_trend_fit (
 DROP VIEW IF EXISTS price_trend;
 CREATE VIEW price_trend AS
 SELECT ff_id, trend FROM price_trend_fit
-WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut()));
+WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut FROM look));
 
 -- How each listing's auction went: every listing on the market (the game's
 -- or a manager's) by player and close, its asking price at its last
@@ -974,7 +976,7 @@ WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut
 -- bar is what a bid had to reach, over asking: the winner's bid; asking
 -- where nobody bought or the winner was you (the bids you beat are not
 -- seen); NULL for a manager's listing (no one's deal with him is seen).
--- Ground truth for the replays, so it reads every sighting whatever cut().
+-- Ground truth for the replays, so it reads every sighting whatever t.
 DROP VIEW IF EXISTS auction_results;
 CREATE VIEW auction_results AS
 WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM api_standings s, league_config c
@@ -1010,7 +1012,7 @@ FROM won w;
 
 -- What a bid wins on the game's market now, for each player listed there:
 -- his BID_NEIGHBOURS past listings closest to him in price trend (before
--- cut(), none you won: what you beat is not seen), and for each bid over
+-- t, none you won: what you beat is not seen), and for each bid over
 -- asking that reached one of their bars (and asking itself) the share it
 -- would have won (p_win; 1 with no past to go on).
 DROP VIEW IF EXISTS bid_odds;
@@ -1018,7 +1020,7 @@ CREATE VIEW bid_odds AS
 WITH past AS MATERIALIZED (
     SELECT trend, bar FROM auction_results
     WHERE bar IS NOT NULL AND trend IS NOT NULL AND NOT coalesce(by_me, 0)
-      AND strftime('%Y-%m-%dT%H%MZ', close) <= (SELECT cut())),
+      AND strftime('%Y-%m-%dT%H%MZ', close) <= (SELECT cut FROM look)),
 now AS (SELECT DISTINCT s.player, coalesce(t.trend, 0.0) AS trend
         FROM current_api_market s LEFT JOIN price_trend t ON t.ff_id = s.player
         WHERE s.seller = 'marketPlayerLeague' AND s.player IS NOT NULL AND s.sale_price <> 0),
@@ -1041,13 +1043,13 @@ WITH v AS (SELECT observed_at, player_team_id, market_value FROM (
                SELECT observed_at, player_team_id, coalesce(market_value, 0.0) AS market_value,
                       row_number() OVER (PARTITION BY observed_at, player_team_id
                                          ORDER BY rowid DESC) AS last
-               FROM api_teams WHERE observed_at <= (SELECT cut()))
+               FROM api_teams WHERE observed_at <= (SELECT cut FROM look))
            WHERE last = 1),
 o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value AS ratio,
              row_number() OVER (PARTITION BY o.offer_id ORDER BY o.rowid) AS first
       FROM api_offers o JOIN v ON v.observed_at = o.observed_at
        AND v.player_team_id IS o.player_team_id
-      WHERE o.observed_at <= (SELECT cut()) AND o.from_market = 'true' AND o.money <> 0
+      WHERE o.observed_at <= (SELECT cut FROM look) AND o.from_market = 'true' AND o.money <> 0
         AND v.market_value <> 0 AND coalesce(o.offer_id, '') <> '')
 SELECT created_at, ratio FROM o WHERE first = 1 ORDER BY created_at, ratio;
 
@@ -1058,7 +1060,7 @@ CREATE VIEW recent_offers AS
 SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
 LIMIT coalesce((SELECT CAST(price_window AS INTEGER) FROM k), -1);
 
--- The jornada calendar, as of cut(). Each fixture's kickoff as last seen
+-- The jornada calendar, as of t. Each fixture's kickoff as last seen
 -- (a played match's page drops it) and its jornada, as a UTC stamp (as
 -- observed_at is), and as a julian day (t).
 DROP VIEW IF EXISTS kickoffs;
@@ -1067,7 +1069,7 @@ SELECT home, away, jornada, kick, t FROM (
     SELECT home, away, jornada, strftime('%Y-%m-%dT%H%MZ', kickoff) AS kick, julianday(kickoff) AS t,
            row_number() OVER (PARTITION BY home, away ORDER BY observed_at DESC, rowid DESC) AS n
     FROM matches
-    WHERE observed_at <= (SELECT cut()) AND jornada IS NOT NULL
+    WHERE observed_at <= (SELECT cut FROM look) AND jornada IS NOT NULL
       AND strftime('%Y-%m-%dT%H%MZ', kickoff) IS NOT NULL)
 WHERE n = 1;
 
@@ -1076,11 +1078,11 @@ WHERE n = 1;
 DROP VIEW IF EXISTS blind_results;
 CREATE VIEW blind_results AS
 SELECT home, away, jornada, min(observed_at) AS seen FROM matches m
-WHERE observed_at <= (SELECT cut()) AND score <> '' AND jornada IS NOT NULL
+WHERE observed_at <= (SELECT cut FROM look) AND score <> '' AND jornada IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM kickoffs k WHERE k.home = m.home AND k.away = m.away)
 GROUP BY home, away;
 
--- The jornada calendar as of cut(), one row a jornada, what everything
+-- The jornada calendar as of t, one row a jornada, what everything
 -- about locks and jornadas left reads: when it locks (its first kickoff;
 -- NULL with a blind result, its first kickoff not known), when its next
 -- match still to play kicks off (NULL with none), and its state, by its
@@ -1100,11 +1102,11 @@ j AS (SELECT jornada, min(kick) AS start,
              CASE WHEN jornada NOT IN (SELECT jornada FROM blind_results) THEN min(kick) END AS lock,
              min(CASE WHEN NOT played THEN kick END) AS next, sum(NOT played) AS left
       FROM games GROUP BY jornada),
-last AS (SELECT max(start) AS start FROM j WHERE start <= (SELECT cut()))
+last AS (SELECT max(start) AS start FROM j WHERE start <= (SELECT cut FROM look))
 SELECT j.jornada, j.lock, j.next,
        CASE WHEN j.left = 0 THEN 'done'
             WHEN j.start < last.start THEN 'behind'
-            WHEN j.start <= (SELECT cut()) THEN 'under way'
+            WHEN j.start <= (SELECT cut FROM look) THEN 'under way'
             ELSE 'ahead' END AS state
 FROM j, last;
 
@@ -1149,12 +1151,12 @@ UNION ALL SELECT away, jornada, at FROM g WHERE away <> '';
 DROP VIEW IF EXISTS scored;
 CREATE VIEW scored AS
 WITH s AS (SELECT max(season) AS season, min(observed_at) AS first FROM points
-           WHERE observed_at <= (SELECT cut())
-             AND season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut()))),
+           WHERE observed_at <= (SELECT cut FROM look)
+             AND season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut FROM look))),
 p AS (SELECT ff_id, observed_at AS at, points, games, points.rowid AS id,
              lag(points, 1, 0.0) OVER w AS points0, lag(games, 1, 0.0) OVER w AS games0
       FROM points, s
-      WHERE observed_at <= (SELECT cut()) AND points.season = s.season AND ff_id <> ''
+      WHERE observed_at <= (SELECT cut FROM look) AND points.season = s.season AND ff_id <> ''
       WINDOW w AS (PARTITION BY ff_id ORDER BY observed_at, points.rowid)),
 c AS (SELECT ff_id, nullif(club, '') AS club FROM current_market WHERE ff_id <> '' GROUP BY ff_id),
 g AS MATERIALIZED (SELECT club, jornada, at FROM club_games
@@ -1203,7 +1205,7 @@ SELECT r.*, shrink(k.neutral_start / 100.0, k.pick_k, apps, squads) AS pick FROM
 -- Each app id's player: the futbolfantasy player whose value it equalled
 -- at the most market snapshots (an all-players row holds until his next),
 -- then the most name stems shared (stems_meet); each app id's unique best,
--- then per player the unique best. Over all rows, not as of cut().
+-- then per player the unique best. Over all rows, not as of t.
 CREATE INDEX IF NOT EXISTS market_by_value ON market (value);
 DROP VIEW IF EXISTS app_links;
 CREATE VIEW app_links AS
@@ -1400,7 +1402,7 @@ FROM fits, fall LEFT JOIN best;
 
 -- The board: the last run's decisions and the facts it saw (sim_*,
 -- decision_option, decision_plan), the app's line-up and the next kickoff
--- as of cut().
+-- as of t.
 -- board_json is decisions.json, the phone's copy; sim.main writes it from
 -- here. Names, not keys: the board is what the phone shows.
 DROP VIEW IF EXISTS board_run;
@@ -1533,7 +1535,7 @@ WITH t AS MATERIALIZED (
     SELECT rowid AS i, player_id, name_key(player_name) AS short, name_key(player_name_full) AS full
     FROM api_lineup
     WHERE (source, observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
-                                    WHERE observed_at <= (SELECT cut()) GROUP BY source)),
+                                    WHERE observed_at <= (SELECT cut FROM look) GROUP BY source)),
 bp AS MATERIALIZED (SELECT * FROM board_players),
 app AS MATERIALIZED (
     SELECT t.i, coalesce(a.player, n.player, f.player) AS player
@@ -1664,7 +1666,7 @@ CREATE VIEW board_head AS
 WITH me AS (SELECT * FROM board_league WHERE me),
 lock AS (SELECT lock AS kick FROM next_lock)
 SELECT (SELECT run_id FROM board_run) AS run_id,
-       substr(cut(), 1, 13) || ':' || substr(cut(), 14) AS generated_at,
+       substr((SELECT cut FROM look), 1, 13) || ':' || substr((SELECT cut FROM look), 14) AS generated_at,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
        me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
@@ -1769,17 +1771,17 @@ SELECT json_object(
                       'p_above', p_above) ORDER BY ord) FROM board_league)) AS json
 FROM board_head h;
 
--- A run to remind you of your line-up is due once the next jornada's lock is
--- within REMIND_HOURS, and only once: not if a run was asked for it
--- (trigger 'reminder', as_of the window's opening or later).
+-- The next jornada's lock as of the last run, and when a run to remind you
+-- of your line-up opens (REMIND_HOURS before it), while none has been
+-- asked for it (trigger 'reminder', as_of the window's opening or later):
+-- once the wall clock passes opens, that run is due (remind.due).
 DROP VIEW IF EXISTS lock_due;
 CREATE VIEW lock_due AS
 WITH w AS (
     SELECT lock, strftime('%Y-%m-%dT%H%MZ', stamp_jd(lock) - (SELECT remind_hours FROM k) / 24.0) AS opens
     FROM next_lock WHERE lock IS NOT NULL)
-SELECT lock FROM w
-WHERE opens <= (SELECT cut())
-  AND NOT EXISTS (SELECT 1 FROM runs WHERE trigger = 'reminder' AND as_of >= w.opens);
+SELECT lock, opens FROM w
+WHERE NOT EXISTS (SELECT 1 FROM runs WHERE trigger = 'reminder' AND as_of >= w.opens);
 
 -- What to tell you about your line-up before the next lock, from the last
 -- run: set it, if the app's is not one I can match, or change it to your
@@ -1791,7 +1793,7 @@ ins AS (SELECT names FROM lineup_names WHERE side = 'in'),
 outs AS (SELECT names FROM lineup_names WHERE side = 'out'),
 left AS (SELECT CAST(round((
              stamp_jd(lock)
-             - stamp_jd(cut())
+             - stamp_jd((SELECT cut FROM look))
          ) * 1440) AS INTEGER) AS minutes FROM next_lock)
 SELECT CASE WHEN (SELECT max(legal) FROM g)
             THEN 'Change your line-up: field ' || ins.names || ' for ' || outs.names

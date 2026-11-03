@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import sqlite3
 import zlib
-from collections.abc import Callable
 
 __all__ = ["ensure"]
 
@@ -54,17 +53,14 @@ PAD = 2
 FACTS = {"price_step": PRICE_STEP}
 
 
-def ensure(db: sqlite3.Connection, now: Callable[[], str] | None = None) -> None:
-    """Bring each kept fact up to the data: nothing when it is current. now
-    is the connection's clock, which is put back after the one fact that
-    needs it pinned (momentum_day)."""
+def ensure(db: sqlite3.Connection) -> None:
+    """Bring each kept fact up to the data: nothing when it is current."""
     if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'facts_meta'").fetchone() is None:
         return                                  # a schema without them (a test's own)
     identity(db)
     latest = db.execute("SELECT substr(max(observed_at), 1, 10) FROM market").fetchone()[0] or ""
     _price_step(db, latest)
-    if now is not None:
-        _momentum_day(db, latest, now)
+    _momentum_day(db, latest)
 
 
 def identity(db: sqlite3.Connection) -> None:
@@ -97,29 +93,33 @@ def identity(db: sqlite3.Connection) -> None:
         raise
 
 
-def _momentum_day(db: sqlite3.Connection, latest: str, now: Callable[[], str]) -> None:
+def _momentum_day(db: sqlite3.Connection, latest: str) -> None:
+    """momentum_day worked out with t put past the last day (look's cut, set
+    and put back inside the one transaction: no other reader sees it moved)."""
+    if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'look'").fetchone() is None:
+        return                                  # a schema without it (a test's own)
     ckey = db.execute("SELECT ckey FROM k").fetchone()[0]
     if ckey is None or not latest:
         return                                  # no constants yet, or nothing to fit
-    db.create_function("cut", 0, lambda: FAR)
+    name, version, through = "momentum_day:" + ckey, "%08x" % zlib.crc32((MOMENTUM_DAY + str(PAD)).encode()), latest
+    if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() == (version, through):
+        return
     db.create_function("hpad", 0, lambda: PAD)      # a cut a day on can reach one horizon further
+    db.execute("BEGIN IMMEDIATE")
     try:
-        name, version, through = "momentum_day:" + ckey, "%08x" % zlib.crc32((MOMENTUM_DAY + str(PAD)).encode()), latest
-        if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() == (version, through):
-            return
-        db.execute("BEGIN IMMEDIATE")
-        try:
-            if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() != (version, through):
-                for statement in MOMENTUM_DAY.split(";\n"):
-                    if statement.strip():
-                        db.execute(statement)
-                db.execute("INSERT OR REPLACE INTO facts_meta VALUES (?, ?, ?)", (name, version, through))
-            db.execute("COMMIT")
-        except BaseException:
-            db.execute("ROLLBACK")
-            raise
+        if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() != (version, through):
+            (t, ), = db.execute("SELECT cut FROM look").fetchall()
+            db.execute("UPDATE look SET cut = ?", (FAR, ))
+            for statement in MOMENTUM_DAY.split(";\n"):
+                if statement.strip():
+                    db.execute(statement)
+            db.execute("UPDATE look SET cut = ?", (t, ))
+            db.execute("INSERT OR REPLACE INTO facts_meta VALUES (?, ?, ?)", (name, version, through))
+        db.execute("COMMIT")
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
     finally:
-        db.create_function("cut", 0, now)
         db.create_function("hpad", 0, lambda: 0)
 
 
@@ -212,7 +212,7 @@ def _selftest() -> None:
         for cut in ("2026-08-17T0900Z", "2026-08-17T2100Z", "2026-08-09T2100Z", "2026-08-03T0000Z"):
             from datetime import datetime, timezone
 
-            from ffcore.clock import set_now
+            from ffcore.db import set_now
             try:
                 set_now(datetime.strptime(cut, "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc))
                 kept_fit = dict(rows("SELECT h, slope FROM momentum"))
@@ -224,7 +224,7 @@ def _selftest() -> None:
         def series_at(cut: str) -> list[tuple[object, ...]]:
             from datetime import datetime, timezone
 
-            from ffcore.clock import set_now
+            from ffcore.db import set_now
             try:
                 set_now(datetime.strptime(cut, "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc))
                 return [tuple(r) for r in rows("SELECT ff_id, i, round(x, 9), value FROM price_series ORDER BY ff_id, i")]

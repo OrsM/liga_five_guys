@@ -15,12 +15,13 @@ from decide import Universe
 
 __all__ = ["plan", "inputs", "after_auctions"]
 
-INPUTS = ("look", "dec_state", "dec_mine", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
+INPUTS = ("dec_state", "dec_mine", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
 
 def inputs(u: Universe, buys: bool = True) -> None:
-    """What the decision looks at (the universe's cut and forecast moment:
-    the market seen and the forecast, schema.sql look), and its squad and
+    """What the decision looks at (the universe's forecast moment and you,
+    beside t, look's cut, which the universe was built at: the market seen
+    and the forecast, schema.sql look), and its squad and
     cash (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen). The
     offers seen count only on the squad seen (a replay's has none,
     sim.with_squad). A universe made by hand (no cut) has its market and
@@ -33,7 +34,9 @@ def inputs(u: Universe, buys: bool = True) -> None:
             db.execute("DELETE FROM %s" % t)
         if not u.cut:
             _by_hand(db, u)
-        db.execute("INSERT INTO look VALUES (?, variant(), ?, ?)", (u.cut, u.moment, u.me))
+        (t, ), = db.execute("SELECT cut FROM look").fetchall()
+        assert not u.cut or u.cut == t, "a universe is read at the t it was built at (%s, t %s)" % (u.cut, t)
+        db.execute("UPDATE look SET variant = variant(), moment = ?, me = ?", (u.moment, u.me))
         db.execute("INSERT INTO dec_state VALUES (?, ?, ?, ?, ?, ?)",
                    (m.cash, int(bool(m.fetch)), int(buys), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
         db.executemany("INSERT INTO dec_mine VALUES (?, ?)",
@@ -44,18 +47,18 @@ def inputs(u: Universe, buys: bool = True) -> None:
 
 def _by_hand(db: Any, u: Universe) -> None:
     """A self-test's market and forecast, as assemble writes them (seen at
-    cut '', forecast_cell at moment 0)."""
+    t, forecast_cell at moment 0)."""
     m = u.market
     owner = {**{k: mgr for mgr, sq in u.state.squads.items() for k in sq}, **m.owner}
     pos = {**{k: p for sq in u.state.squads.values() for k, p in sq.items()}, **m.pos}
-    db.execute("DELETE FROM seen WHERE cut = ''")
-    db.execute("DELETE FROM seen_odds WHERE cut = ''")
+    db.execute("DELETE FROM seen WHERE cut = (SELECT cut FROM look) AND variant = variant()")
+    db.execute("DELETE FROM seen_odds WHERE cut = (SELECT cut FROM look) AND variant = variant()")
     db.execute("DELETE FROM forecast_cell WHERE moment = 0")
-    db.executemany("INSERT INTO seen VALUES ('', variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    db.executemany("INSERT INTO seen VALUES ((SELECT cut FROM look), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                    [(k, m.shown(k), pos.get(k), owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
                      m.offer.get(k), m.clause.get(k), m.price.get(k), m.route.get(k), m.my_bid.get(k), m.fetch.get(k))
                     for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine) | set(owner))])
-    db.executemany("INSERT INTO seen_odds VALUES ('', variant(), ?, ?, ?)",
+    db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut FROM look), variant(), ?, ?, ?)",
                    [(k, r, p) for k, odds in m.odds.items() for r, p in odds])
     db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
                    [(k, j, pts, p) for j in u.state.jornadas

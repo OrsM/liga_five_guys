@@ -46,7 +46,7 @@ def _selftest() -> None:
     import tempfile
     from pathlib import Path
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import record
     from ffcore.parse import snapshot_stamp
     from ffcore.rules import MATCH_LEN

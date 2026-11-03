@@ -11,23 +11,25 @@ import sqlite3
 import time
 import zlib
 from statistics import NormalDist
-from collections.abc import Callable, Mapping, Sequence
-from contextlib import closing
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any
 
-from ffcore.clock import cut, variant
+from datetime import datetime
+
+from ffcore.clock import run_now, variant
 from ffcore.facts import ensure
 from ffcore.names import Name
-from ffcore.parse import snapshot_stamp
+from ffcore.parse import snapshot_stamp, stamp
 from stats import shrink
 from ffcore.forecast import SEED_POOL
 from ffcore.rules import ELEVEN, FORMATIONS, position, slot
 from ffcore.text import stems_meet
 from ffcore.startprob import platt, prognosis_bucket
 
-__all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "functions", "query",
-           "record", "rows", "this_run"]
+__all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "cut",
+           "functions", "query", "record", "replaying", "rows", "set_now", "this_run"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
@@ -87,13 +89,11 @@ def stamp_jd(s: str | None) -> float | None:
     return None if t is None else t.timestamp() / 86400.0 + 2440587.5
 
 
-def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
-    """The functions the views call: cut() (now, as a stamp: the model's
-    clock unless told otherwise), stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
+def functions(db: sqlite3.Connection) -> None:
+    """The functions the views call: stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
     platt() and prognosis_bucket() (startprob's), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
     lo95(), hi95() and claim() (an estimate and its standard error) and
     the aggregate median()."""
-    db.create_function("cut", 0, now)
     db.create_function("stamp_jd", 1, stamp_jd, deterministic=True)
     db.create_function("variant", 0, variant)
     db.create_function("hpad", 0, lambda: 0)
@@ -156,9 +156,9 @@ def _put(sql: str) -> str:
 
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
-    """The file at path (DB by default) in WAL mode, schema applied, and
-    cut() the model's clock as a stamp, which the tables' as-of views read.
-    The schema is applied when the file does not carry its version (it
+    """The file at path (DB by default) in WAL mode, schema applied, and t
+    (look's cut, which the as-of views read) set to the wall clock if the
+    file has none yet (set_now). The schema is applied when the file does not carry its version (it
     recreates every view, 0.17s), one process at a time: a process that finds
     it applied leaves the views other processes are using alone."""
     path = path or DB
@@ -181,8 +181,37 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
                     db.executescript(sql)
                 db.execute("PRAGMA user_version = %d" % version)
         _APPLIED.add(key)
-    ensure(db, cut)
+    if schema == SCHEMA and db.execute("SELECT 1 FROM look").fetchone() is None:
+        with db:
+            db.execute("INSERT INTO look (cut, variant, moment) SELECT ?, 'live', 0"
+                       " WHERE NOT EXISTS (SELECT 1 FROM look)", (stamp(run_now()), ))
+    ensure(db)
     return db
+
+
+def cut() -> str:
+    """t as a stamp: look's cut, the one moment every view is read as of."""
+    with closing(connect()) as db:
+        (c, ), = db.execute("SELECT cut FROM look").fetchall()
+    return str(c)
+
+
+def set_now(when: datetime | None, path: Path | None = None) -> None:
+    """Set t, the one moment every view reads (look's cut): a replay's past
+    time, or None for the run's own (the wall clock, clock.run_now). One row
+    in the file: every process on it reads the same t."""
+    with closing(connect(path)) as db, db:
+        db.execute("UPDATE look SET cut = ?", (stamp(when or run_now()), ))
+
+
+@contextmanager
+def replaying() -> Iterator[None]:
+    """t as it was put back once a replay that moves it (set_now) is done."""
+    was = snapshot_stamp(cut())
+    try:
+        yield
+    finally:
+        set_now(was)
 
 
 def query(sql: str, params: Sequence[object] | Mapping[str, object] = (),

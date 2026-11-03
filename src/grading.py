@@ -3,9 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import math
 import os
-import sqlite3
 import sys
-import time
 from collections.abc import Callable, Iterator
 from contextlib import closing
 from pathlib import Path
@@ -21,8 +19,8 @@ from assemble import applied, forecast_key, player_forecast, price_change, price
 import decision
 from decide import Action, Universe
 from sim import with_squad
-from ffcore.clock import set_now, snapshot_stamp, stamp
-from ffcore.db import connect, record, rows, this_run
+from ffcore.db import connect, record, replaying, rows, set_now, this_run
+from ffcore.parse import snapshot_stamp, stamp
 __all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "superseded", "view_table",
            "record_grades"]
 
@@ -68,32 +66,6 @@ def first_listed() -> dict[str, str]:
                      " GROUP BY player"))
 
 
-def _built_at(job: tuple[dt.datetime, frozenset[str]]) -> tuple[dt.datetime, Universe | None]:
-    t, also = job
-    return t, universe_when(t, also)
-
-
-def warm(times: list[dt.datetime], also: Callable[[dt.datetime], frozenset[str]]) -> None:
-    """The universe at each of these times built ahead, WARM_JOBS at a time
-    in their own processes, each forecasting also(t): a phantom's decisions
-    then wait on nothing but his plans. A universe depends on nothing he
-    did as long as also(t) holds whoever he can hold (on_market_by)."""
-    import multiprocessing
-    jobs = []
-    for t in times:
-        if (t, also(t)) in _AT:
-            continue
-        jobs.append((t, also(t)))
-    if not jobs:
-        return
-    with multiprocessing.get_context("fork").Pool(WARM_JOBS) as pool:
-        for t, u in pool.imap_unordered(_built_at, jobs):
-            _AT[t, also(t)] = u
-
-
-WARM_JOBS = 4
-
-
 def before_locks() -> dict[dt.datetime, int]:
     """A minute before each finished jornada's lock, oldest first, and the
     jornada: where every replay of a lock stands."""
@@ -103,24 +75,22 @@ def before_locks() -> dict[dt.datetime, int]:
 
 def at_locks(only: set[int] | None = None) -> Iterator[tuple[int, Universe]]:
     """Each finished jornada (of only, if given) and the universe a minute
-    before its lock (universe_when), where one could be built; the clock
-    let go after: decisions and sim_calibration stand there."""
-    try:
+    before its lock (universe_when), where one could be built; t put back
+    after: decisions and sim_calibration stand there."""
+    with replaying():
         for t, j in before_locks().items():
             if (only is None or j in only) and (u := universe_when(t)) is not None:
                 yield j, u
-    finally:
-        set_now(None)
 
 
 def auction_closes() -> list[dt.datetime]:
-    """When each past night's auctions on the game's market closed (the
+    """When each night's auctions on the game's market closed by t (the
     listings' expiry), oldest first: a day's buying and selling is decided
     before it."""
-    now = dt.datetime.now(dt.timezone.utc)
-    return [t for (c, ) in rows("SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
-                                " AND coalesce(expires_at, '') <> '' ORDER BY 1")
-            if (t := dt.datetime.fromisoformat(c)) <= now]
+    return [dt.datetime.fromisoformat(c) for (c, ) in rows(
+        "SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
+        " AND coalesce(expires_at, '') <> '' AND julianday(expires_at) <= stamp_jd((SELECT cut FROM look))"
+        " ORDER BY 1")]
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
@@ -129,14 +99,12 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     the next ones too, each one done. Graded in SQL (grade_forecast)."""
     done = done_jornadas()
     out = []
-    try:
+    with replaying():
         for t, i in before_locks().items():
             set_now(t)
             fc = player_forecast()
             out += [{"from_j": i, "jornada": j, "moment": fc.moment}
                     for j in range(i, i + ahead + 1) if j in done and j in fc.jornadas]
-    finally:
-        set_now(None)
     return out
 
 
@@ -148,34 +116,25 @@ WHERE m.jornada IN (SELECT jornada FROM jornadas_done)
 ORDER BY m.as_of"""
 
 
-def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> int:
+def replay(variant: str = REPLAY_VARIANT) -> int:
     """Forecast the next jornada at every line-up snapshot before a played
     jornada's lock (replay_moments) with this code, under the variant's
     constants (assemble.applied), into the forecast's store
     (player_forecast), which the view replayed reads with what then
     happened. Resumes: only the moments TODO owes this code and these
-    constants. shard (i, n) takes every nth moment."""
+    constants. One process at a time: t is the file's (look)."""
     with applied(variant):
         code, consts, _at = forecast_key()
         with closing(connect()) as db, db:
             db.execute("INSERT OR REPLACE INTO forecast_variant VALUES (?, ?, ?)", (variant, code, consts))
-            todo = [(j, a) for j, a in db.execute(TODO, {"code": code, "constants": consts})][shard[0]::shard[1]]
-        try:
+            todo = [(j, a) for j, a in db.execute(TODO, {"code": code, "constants": consts})]
+        with replaying():
             for j, at in todo:
                 moment = snapshot_stamp(at)
                 assert moment is not None
                 set_now(moment)
-                for attempt in range(5):
-                    try:    # another shard connecting re-creates the views under this one
-                        player_forecast()
-                        break
-                    except sqlite3.OperationalError as e:
-                        if "schema has changed" not in str(e) or attempt == 4:
-                            raise
-                        time.sleep(1 + attempt)
+                player_forecast()
                 print("  replay %s j%d %s" % (at, j, variant), flush=True)
-        finally:
-            set_now(None)
     return len(todo)
 
 
@@ -312,8 +271,12 @@ def phantom_path() -> list[dict[str, Any]]:
     scored on what they got (nothing in debt, the game's rule), beside a
     manager who never moves, picked the same way. One row a played jornada:
     both elevens' points, the moves made since the last, the bids lost, his cash and his squad's worth
-    after them."""
-    set_now(None)
+    after them. Up to t, put back after."""
+    with replaying():
+        return _phantom_path()
+
+
+def _phantom_path() -> list[dict[str, Any]]:
     actual = jornada_points()
     played = before_locks()
     first = min(played, default=None)
@@ -338,44 +301,40 @@ def phantom_path() -> list[dict[str, Any]]:
         if t not in ever:
             ever[t] = on_market_by(t, listed) | frozenset(hold)
         return ever[t]
-    try:
-        for t in sorted(set(played) | set(runs) | closes):
-            if squad is None:
-                if t not in played or (start := universe_when(t)) is None:
-                    continue
-                squad, hold, cash = dict(start.mine), dict(start.mine), start.market.cash
-                held_cash = cash
-                warm([r for r in sorted(set(played) | set(runs)) if r > t], held)
-            if t in closes:
-                if last is not None:
-                    day, sold, n = closed(with_squad(last, squad, cash), Day(squad, cash, bids, pending), bars, t)
-                    squad, cash, bids, pending = day
-                    made += [a.label(last.market.names) for a in sold]
-                    lost += n
-                if t not in played and t not in runs:
-                    continue
-            assert hold and frozenset(squad) | frozenset(bids) <= held(t), "the phantom holds a player never listed"
-            u = universe_when(t, held(t) if hold else frozenset(squad))
-            if u is None:
+    for t in sorted(set(played) | set(runs) | closes):
+        if squad is None:
+            if t not in played or (start := universe_when(t)) is None:
                 continue
+            squad, hold, cash = dict(start.mine), dict(start.mine), start.market.cash
+            held_cash = cash
+        if t in closes:
+            if last is not None:
+                day, sold, n = closed(with_squad(last, squad, cash), Day(squad, cash, bids, pending), bars, t)
+                squad, cash, bids, pending = day
+                made += [a.label(last.market.names) for a in sold]
+                lost += n
+            if t not in played and t not in runs:
+                continue
+        assert hold and frozenset(squad) | frozenset(bids) <= held(t), "the phantom holds a player never listed"
+        u = universe_when(t, held(t) if hold else frozenset(squad))
+        if u is None:
+            continue
+        up = with_squad(u, squad, cash, bids)
+        if t in runs:
+            acts = decision.plan(up)
+            (squad, cash, bids, pending), acts = acted(up, bids, acts, decision.after_auctions())
             up = with_squad(u, squad, cash, bids)
-            if t in runs:
-                acts = decision.plan(up)
-                (squad, cash, bids, pending), acts = acted(up, bids, acts, decision.after_auctions())
-                up = with_squad(u, squad, cash, bids)
-                made += [a.label(up.market.names) for a in acts]
-                last = u
-            if t in played:
-                i = played[t]
-                out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in eleven(up))
-                            if cash >= 0 else 0.0,
-                            "standpat": sum(actual.get((k, i), 0.0) for k in eleven(with_squad(u, hold, cash))),
-                            "moves": "; ".join(made), "lost": lost, "cash": cash,
-                            "value": sum(u.market.value.get(k, 0.0) for k in squad),
-                            "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold)})
-                made, lost = [], 0
-    finally:
-        set_now(None)
+            made += [a.label(up.market.names) for a in acts]
+            last = u
+        if t in played:
+            i = played[t]
+            out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in eleven(up))
+                        if cash >= 0 else 0.0,
+                        "standpat": sum(actual.get((k, i), 0.0) for k in eleven(with_squad(u, hold, cash))),
+                        "moves": "; ".join(made), "lost": lost, "cash": cash,
+                        "value": sum(u.market.value.get(k, 0.0) for k in squad),
+                        "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold)})
+            made, lost = [], 0
     return out
 
 
@@ -495,7 +454,7 @@ def record_grades() -> dict[str, int]:
     happened (one set a code: superseded), unless this code has graded them
     on every jornada done (graded). The replay of every snapshot is not
     run here: monitoring, ~550 moments made again at each forecast change
-    (grading.py replay JOBS)."""
+    (grading.py replay)."""
     done = done_jornadas()
     resolved = len(done)
     run = this_run()
@@ -718,22 +677,16 @@ if __name__ == "__main__":
             db.executemany("INSERT INTO variants VALUES (?, ?, ?)", [(name, k, float(v)) for k, v in sets])
         raise SystemExit(0)
     if sys.argv[1:2] == ["replay"]:
-        # replay [JOBS] [SHARD/OF] (LFG_VARIANT=name): JOBS processes side by side, each its share of the moments
-        import subprocess
-        jobs = int(sys.argv[2]) if len(sys.argv) > 2 else 1
-        if len(sys.argv) > 3:
-            i, n = map(int, sys.argv[3].split("/"))
-            print("replayed %d moments" % replay(os.environ.get("LFG_VARIANT", REPLAY_VARIANT), (i, n)))
-        else:
-            procs = [subprocess.Popen([sys.executable, __file__, "replay", str(jobs), "%d/%d" % (i, jobs)])
-                     for i in range(jobs)]
-            raise SystemExit(max(p.wait() for p in procs))
+        # replay (LFG_VARIANT=name)
+        set_now(None)
+        print("replayed %d moments" % replay(os.environ.get("LFG_VARIANT", REPLAY_VARIANT)))
         raise SystemExit(0)
     if sys.argv[1:2] == ["money"]:
         # money: the phantom deciding daily (decision.plan), beside standing still
         # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
+        set_now(None)
         got = phantom_path()
         # The scoreboard: points, for both, what finishing first is won on;
         # and the cash and squad value the phantom ends with, and standing still.
@@ -747,5 +700,5 @@ if __name__ == "__main__":
         # Out without freeing the universes one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
-    print("grading.py --selftest | money (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | money (LFG_VARIANT=name) | replay (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

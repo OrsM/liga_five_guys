@@ -1,15 +1,13 @@
-"""The one clock every stage reads: now (pinnable with LFG_NOW), snapshot
-stamps, kickoff times, and Madrid time for people. Modules that cache what
-depends on now register a reset with on_reset; set_now calls them."""
+"""The wall clock (pinnable with LFG_NOW), for crawl stamps, run timing and
+the t a live run sets (ffcore.db.set_now: look's cut, the one moment every
+view reads); snapshot stamps, kickoff times, and Madrid time for people."""
 from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Callable
+from ffcore.parse import snapshot_stamp
 
-from ffcore.parse import snapshot_stamp, stamp
-
-__all__ = ["MADRID", "run_now", "set_now", "on_reset", "shown", "variant", "set_variant"]
+__all__ = ["MADRID", "run_now", "shown", "variant", "set_variant"]
 
 
 def _madrid() -> tzinfo:
@@ -23,29 +21,13 @@ def _madrid() -> tzinfo:
 MADRID = _madrid()
 
 
-_NOW: list[datetime] = []
-_SET: list[bool] = [False]      # set_now was given a time (a replay)
-
-_RESETS: list[Callable[[], None]] = []
-
-
-def on_reset(fn: Callable[[], None]) -> None:
-    _RESETS.append(fn)
-
-
 def run_now() -> datetime:
-    if not _NOW:
-        pinned = os.environ.get("LFG_NOW", "").strip()
-        when = snapshot_stamp(pinned) if pinned else datetime.now(timezone.utc)
-        if when is None:
-            raise ValueError("LFG_NOW=%r is not a time (2026-10-07T0934Z)" % pinned)
-        _NOW.append(when)
-    return _NOW[0]
-
-
-def cut() -> str:
-    """Now as a stamp: what a table is read as of."""
-    return stamp(run_now())
+    """The wall clock (LFG_NOW when pinned): what a live run sets t to."""
+    pinned = os.environ.get("LFG_NOW", "").strip()
+    when = snapshot_stamp(pinned) if pinned else datetime.now(timezone.utc)
+    if when is None:
+        raise ValueError("LFG_NOW=%r is not a time (2026-10-07T0934Z)" % pinned)
+    return when
 
 
 _VARIANT: list[str] = ["live"]
@@ -59,45 +41,18 @@ def variant() -> str:
 
 def set_variant(name: str) -> None:
     _VARIANT[:] = [name]
-    for reset in _RESETS:
-        reset()
 
 
-def pinned() -> bool:
-    """Is the clock at a time somebody gave (a replay, LFG_NOW), not the live now?"""
-    return _SET[0] or bool(os.environ.get("LFG_NOW", "").strip())
-
-
-def set_now(when: datetime | None) -> None:
-    _NOW[:] = [when] if when is not None else []
-    _SET[0] = when is not None
-    for reset in _RESETS:
-        reset()
-
-
-def shown(t: datetime | None = None, fmt: str = "%Y-%m-%d %H:%M") -> str:
-    when = run_now() if t is None else t
-    return when.astimezone(MADRID).strftime(fmt + " %Z")
+def shown(t: datetime, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    return t.astimezone(MADRID).strftime(fmt + " %Z")
 
 
 def _selftest() -> None:
-    assert run_now() is run_now()
     assert run_now().tzinfo is timezone.utc
-    _NOW.clear()
     os.environ["LFG_NOW"] = "2026-08-20T0900Z"
     assert run_now() == snapshot_stamp("2026-08-20T0900Z")
     del os.environ["LFG_NOW"]
-    _NOW.clear()
     assert run_now().year >= 2026
-
-    cleared = []
-    on_reset(lambda: cleared.append(True))
-    set_now(snapshot_stamp("2026-08-01T1000Z"))
-    assert run_now() == snapshot_stamp("2026-08-01T1000Z") and cleared
-    set_now(None)
-    assert run_now() != snapshot_stamp("2026-08-01T1000Z")
-    _RESETS.pop()
-
 
     summer = datetime(2026, 9, 18, 16, 40, tzinfo=timezone.utc)
     winter = datetime(2026, 12, 18, 16, 40, tzinfo=timezone.utc)
