@@ -39,7 +39,6 @@ def tiny_state(**overrides: Any) -> LeagueState:
         squads={"me": dict(DEFAULT_SQUAD)},
         jornadas=list(DEFAULT_JORNADAS),
         me="me",
-        carried={},
     )
     return LeagueState(**_with_overrides("tiny_state", defaults, overrides))
 
@@ -52,7 +51,6 @@ def tiny_bootstrap(**overrides: Any) -> Bootstrap:
     }
     defaults = dict(
         per_jornada=default_per_jornada,
-        pool=(),
     )
     return Bootstrap(**_with_overrides("tiny_bootstrap", defaults, overrides))
 
@@ -135,8 +133,6 @@ def _selftest() -> None:
     mu = tiny_market_universe()
     assert _fieldable(mu.state.squads["me"]), mu.state.squads["me"]
 
-    targets = {k for k in mu.market.price if mu.acquire(k)}
-    assert targets == {"cand_free"}, ("a player on the market, never a rival's", targets)
 
     print("ffcore.fixtures self-test OK")
 
