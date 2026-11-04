@@ -14,7 +14,9 @@ from typing import Any, NamedTuple
 import remind
 from ffcore import forecast as model, pricing, rules
 from ffcore.clock import set_variant
-from ffcore.db import connect, cut, named, query, record, rows, set_constants, set_look
+from ffcore.db import connect, query, record, rows, set_constants, set_look
+from ffcore.forecast_store import Prices, forecast, price_change, price_momentum
+from ffcore.seen import see as see_at
 from ffcore.league import write_config
 from ffcore.tidy import age_hours
 from stats import percentile
@@ -64,52 +66,15 @@ def applied(variant: str) -> Iterator[None]:
         set_variant("live")
 
 
-class Prices(NamedTuple):
-    """Momentum as schema.sql fits it: a slope per horizon, the share of a
-    trend made after each update, each player's trend in %, and the horizon."""
-    slope: dict[int, float]
-    carry: tuple[float, ...]
-    trend: dict[str, float]
-    horizon: int
-
-
-def price_momentum() -> Prices:
-    """Momentum and the price trend at t (views: momentum, price_carry,
-    price_trend), read."""
-    slope: dict[int, float] = dict(rows("SELECT h, slope FROM momentum ORDER BY h"))
-    return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
-                  dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
-
-
-def price_change(day: str, h: int) -> dict[str, float | None]:
-    """Each player's change in % over the h updates after his last one on or
-    before day, all time (None where there are not h more: not known yet):
-    what a replay looks back on."""
-    return dict(named("price_change", {"day": day, "h": h})[1])
-
-
 def see() -> str:
-    """The market and the league as of t into seen, seen_cash and
-    seen_odds (player_facts, sale_odds, cash, bid_odds): what a decision at t
-    reads. Made once a cut, variant and code (seen.code: the SQL's version
-    and every constant, so another schema or a variant redefined makes them
-    again, never reads a stale one). The cut."""
-    with closing(connect()) as db, db:
+    """The market and the league as of t into seen, seen_cash and seen_odds (the decision's
+    snapshot, seen.see), made once a cut, variant and code: the key is the SQL's version and
+    every constant, so another schema or a variant redefined makes them again, never reads a
+    stale one. The cut."""
+    with closing(connect()) as db:
         version, = db.execute("PRAGMA user_version").fetchone()
-        key = hashlib.sha1(repr((version, sorted((m, sorted(c.items())) for m, c in constants().items())))
-                           .encode()).hexdigest()[:12]
-        c = cut()
-        if db.execute("SELECT 1 FROM seen WHERE cut = ? AND variant = variant() AND code = ? LIMIT 1",
-                      (c, key)).fetchone():
-            return c
-        for t in ("seen", "seen_cash", "seen_odds"):
-            db.execute("DELETE FROM %s WHERE cut = ? AND variant = variant()" % t, (c, ))
-        db.execute("INSERT INTO seen SELECT ?, variant(), f.player, f.name, f.pos, f.owner, f.value, f.trend, f.paid,"
-                   " f.offer, f.clause, f.price, f.route, f.my_bid, s.fetches, ?"
-                   " FROM player_facts f LEFT JOIN sale_odds s USING (player)", (c, key))
-        db.execute("INSERT INTO seen_cash SELECT ?, variant(), manager, cash FROM cash", (c, ))
-        db.execute("INSERT INTO seen_odds SELECT ?, variant(), player, ratio, p_win FROM bid_odds", (c, ))
-    return c
+    return see_at(hashlib.sha1(repr((version, sorted((m, sorted(c.items())) for m, c in constants().items())))
+                               .encode()).hexdigest()[:12])
 
 
 def market_offer_ratios() -> list[float]:
@@ -144,27 +109,6 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
 class Built(NamedTuple):
     params: list[dict[str, Any]]
     moment: int
-
-
-def forecast() -> int:
-    """The forecast at t (forecast_now) made into a new moment, every
-    player's cells and who is flagged (player_status); the moments of this
-    cut and variant no run or grade points to dropped. The moment."""
-    with closing(connect()) as db:
-        cells = db.execute("SELECT player, jornada, pts, p, ppm, fixture, picked, fit FROM forecast_now").fetchall()
-        flagged = dict(db.execute("SELECT player, status IS NOT NULL FROM player_status"))
-        with db:
-            old = ("SELECT moment FROM forecast_moment WHERE as_of = cut() AND variant = variant()"
-                   " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL"
-                   " UNION SELECT moment FROM grade_moment)")
-            for t in ("forecast_cell", "forecast_player", "forecast_moment"):
-                db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old))
-            moment = db.execute("INSERT INTO forecast_moment (as_of, variant) VALUES (cut(), variant())").lastrowid
-            assert moment is not None
-            db.executemany("INSERT INTO forecast_cell VALUES (%d, ?, ?, ?, ?, ?, ?, ?, ?)" % moment, cells)
-            db.executemany("INSERT INTO forecast_player VALUES (%d, ?, ?)" % moment,
-                           [(k, flagged.get(k, 0)) for k in sorted({c[0] for c in cells})])
-    return moment
 
 
 def built() -> Built:
@@ -204,7 +148,6 @@ def _selftest() -> None:
     _selftest_variants()
     _selftest_prior()
     _selftest_points()
-    _selftest_forecast()
     print("assemble self-test OK")
 
 
@@ -336,100 +279,6 @@ def _selftest_points() -> None:
                 "a starter the match unless he came off, a sub from when he came on"
             assert abs(got["1"][3] - (model.PICK_K * model.NEUTRAL_START / 100 + 2) / (model.PICK_K + 2)) < 1e-12, \
                 "his record pulled toward NEUTRAL_START, worth PICK_K matches"
-        finally:
-            set_now(None)
-
-
-def _selftest_forecast() -> None:
-    """schema.sql's forecast on fact rows: club_rating, forecast_rate,
-    forecast_fit and the cell (forecast_now), and forecast() making it a
-    moment."""
-    import datetime as dt
-    import tempfile
-
-    from ffcore.db import set_now
-    from ffcore.tidy import store_sql, tables_in
-    from stats import shrink
-
-    seen, kick = "2026-09-19T1000Z", {2: "2026-09-21T19:00:00+00:00", 3: "2026-09-28T19:00:00+00:00"}
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(dt.datetime(2026, 9, 20, 12, tzinfo=dt.timezone.utc))
-            store_sql("matches", [{"observed_at": seen, "match_id": "m%d%s" % (j, h), "jornada": str(j), "home": h,
-                                   "away": w, "score": s, "kickoff": k} for j, h, w, s, k in [
-                (1, "a", "b", "1-0", ""), (1, "c", "d", "0-0", ""),
-                (2, "a", "b", "", kick[2]), (2, "c", "d", "2-2", ""),
-                (3, "b", "a", "", kick[3]), (3, "d", "c", "", kick[3])]])
-            # a scores 3 a match and concedes 1, b the other way; c and d none
-            store_sql("results_history", [{"observed_at": seen, "season": "2526", "date": "d%d" % i,
-                                           "home_name": "A", "away_name": "B", "home": "a", "away": "b",
-                                           "home_goals": "3", "away_goals": "1"} for i in range(10)])
-            store_sql("market", [{"observed_at": seen, "ff_id": k, "name": k, "club": c, "position": p, "value": "5000000"}
-                                 for k, c, p in [("fwd", "a", "delantero"), ("back", "a", "defensa"),
-                                                 ("hurt", "b", "delantero"), ("susp", "b", "delantero"),
-                                                 ("dbt", "b", "delantero"), ("gone", "b", "delantero"),
-                                                 ("cee", "c", "delantero"), ("coach", "a", "entrenador"),
-                                                 ("nocl", "", "delantero")]])
-            record([{"player_id": k, "ff_slug": k, "app_id": "9" if k == "gone" else ""}
-                    for k in ("fwd", "back", "hurt", "susp", "dbt", "gone", "cee")], "crosswalk")
-            store_sql("lineups", [{"observed_at": seen, "source": "futbolfantasy", "team_slug": c, "player_slug": k,
-                                   "player_name": k, "start_pct": pct, "status": st, "note": note}
-                                  for k, c, pct, st, note in [
-                ("fwd", "a", "80", "ok", ""), ("back", "a", "", "ok", ""),
-                ("hurt", "b", "0", "injured", "Lesión Desde 10/09 Baja hasta finales de septiembre"),
-                ("susp", "b", "0", "suspended", ""), ("dbt", "b", "50", "doubt", "x Duda para la jornada 3")]])
-            store_sql("api_players_all", [{"observed_at": seen, "player_id": "9", "player_status": "out_of_league"}])
-            record([{"season": "2025-26", "ff_id": "fwd", "points": 150.0, "games": 30.0}], "season_points")
-
-            mu = 2.0
-            rating = {c: (a, d) for c, _n, a, d in rows("SELECT club, n, attack, defence FROM club_rating")}
-            k = model.FIXTURE_K
-            assert abs(rating["a"][0] - (30 + k * mu) / ((10 + k) * mu)) < 1e-12 \
-                and abs(rating["b"][1] - (30 + k * mu) / ((10 + k) * mu)) < 1e-12, \
-                "goals for and against a match over the league's, pulled toward it by FIXTURE_K matches"
-            assert set(rating) == {"a", "b"}, "a club with no results has no rating"
-
-            prior = dict(rows("SELECT player, prior FROM ppm_prior"))
-            rate = {p: (ppm, pk) for p, ppm, pk in rows("SELECT player, ppm, picked FROM forecast_rate")}
-            sk, pk = model.SHRINK_K, model.PICK_K
-            assert abs(rate["fwd"][0] - shrink(shrink(prior["fwd"], sk, 150.0, 30.0), sk, 0.0, 0.0)) < 1e-12, \
-                "his value's prior, pulled toward last season's 5 a match"
-            assert rate["hurt"][0] == prior["hurt"], "no record at all: his value's"
-            assert rate["fwd"][1] == 0.8 and rate["back"][1] == model.NEUTRAL_START / 100, \
-                "his listing's start %; listed with none, NEUTRAL_START"
-            assert rate["hurt"][1] == rate["dbt"][1] == model.NEUTRAL_START / 100, \
-                "flagged: his listing speaks of the injury, not of selection"
-            assert rate["cee"][1] == model.ABSENT_START / 100 and pk > 0, "not listed: ABSENT_START"
-
-            cells = {(p, j): r for p, j, *r in rows("SELECT player, jornada, pts, p, ppm, fixture, picked, fit"
-                                                     " FROM forecast_now")}
-            assert set(cells) == {(p, j) for p in ("fwd", "back", "hurt", "susp", "dbt", "gone") for j in (2, 3)} \
-                | {("cee", 3)}, "every jornada left his club plays; a coach, a player with no club: none"
-            for (p, j), (pts, pr, ppm, fix, picked, fit) in cells.items():
-                assert abs(pts - max(0.0, ppm * fix)) < 1e-12 and abs(pr - picked * fit) < 1e-12, \
-                    "points if he plays = ppm x fixture; the chance he plays = picked x fit"
-            assert abs(cells["fwd", 2][3] - rating["b"][1]) < 1e-12, "an attacker: his opponent's defence"
-            assert abs(cells["back", 2][3] - 1 / rating["b"][0]) < 1e-12, "a defender: 1 / its attack"
-            assert cells["cee", 3][3] == 1.0, "an opponent with no rating: 1"
-            fit = {(p, j): r[5] for (p, j), r in cells.items()}
-            assert (fit["fwd", 2], fit["hurt", 2], fit["hurt", 3]) == (1.0, 0.0, 1.0), \
-                "fit unless flagged; out until the 25th: not on the 21st, fit on the 28th"
-            assert (fit["susp", 2], fit["susp", 3]) == (0.0, 1.0), "a suspension is his next match"
-            assert (fit["dbt", 2], fit["dbt", 3]) == (0.0, 0.5), "a doubt for 3: out before it, half at it"
-            assert fit["gone", 2] == fit["gone", 3] == 0.0, "left the league: out for good"
-
-            first = forecast()
-            assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (first, )) == [(len(cells), )]
-            assert rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged ORDER BY player",
-                        (first, )) == [("dbt", ), ("gone", ), ("hurt", ), ("susp", )], "who was flagged then"
-            with closing(connect()) as db, db:
-                db.execute("INSERT INTO sim_runs (run_id, moment) VALUES (1, ?)", (first, ))
-            forecast()
-            third = forecast()
-            assert [m for m, in rows("SELECT moment FROM forecast_moment ORDER BY moment")] \
-                == [first, third], "made again each time; the cut's earlier ones go but a run's, its record"
-            assert rows("SELECT count(*) FROM forecast_cell WHERE moment NOT IN (SELECT moment FROM forecast_moment)") \
-                == [(0, )]
         finally:
             set_now(None)
 
