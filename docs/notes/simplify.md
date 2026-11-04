@@ -22,16 +22,19 @@ reads, one copy of each fact, and nothing the board does not need.
 
 Five modules. Each reads the facts and earlier modules' contracts only, owns its
 own tables and views, and is judged by its own test and measure. The money
-backtest only wires them together as a smoke test (it runs, no debt, a full
-eleven, no bid left open). It ranks nothing: one season path swings about
-±19 points a jornada.
+replay is deleted (2026-11-04): one season path swung about ±19 points a
+jornada and ranked nothing. The decision's measure is `grading.py ceiling`: at
+each past lock, the real points of the best eleven for standing still (floor),
+the plan on the forecast (ours) and the same plan_rows on real points
+(ceiling); share = (ours - floor) / (ceiling - floor). Its seeded end-to-end
+test (grading.py _selftest_ceiling) is the smoke test of the wiring.
 
 | # | Module | Reads | Its contract (what the next reads) | Test | Measure |
 |---|---|---|---|---|---|
 | 1 | Ingest | raw pages, the API | facts: player_club, player_value, player_status, player_points, club_fixture, owners, cash, listings, offers, auction closes; all timestamped | fixed raw → expected rows; one row per key; no nulls in keys | parser health |
 | 2 | Forecast | facts at t (nothing after t) | cell(player, jornada, pts, p) | seeded facts → cells | accuracy against real points (RMSE, r), next jornada and five ahead |
-| 3 | Decision | cell, the league at t (squads, cash, market, bid odds), moves | plan(step, kind, player, amount, win, worth) | seeded league → plan | expected gap: the plan's eleven's e against standing pat's, a lock at a time; checks: cash ≥ 0 at the lock, squad ≤ SQUAD_MAX, a legal eleven |
-| 4 | Settlement | plan, auction closes | moves(path, at, kind, player, amount) | seeded closes → moves; a won bid settles with its own paired sale | none: correctness only |
+| 3 | Decision | cell, the league at t (squads, cash, market, bid odds), moves | plan(step, kind, player, amount, win, worth) | seeded league → plan | `grading.py ceiling` (floor, ours, ceiling on real points, a lock at a time); expected gap: the plan's eleven's e against standing pat's; checks: cash ≥ 0 at the lock, squad ≤ SQUAD_MAX, a legal eleven |
+| 4 | Settlement | plan, auction closes | moves(path, at, kind, player, amount) (the replay's moves path is deleted; live has none yet) | seeded closes → moves; a won bid settles with its own paired sale | none: correctness only |
 | 5 | Board | plan, standings, moves | the page (board_json) | snapshot | none: correctness only |
 
 The same modules run live and in the replay; only t and the moves differ.

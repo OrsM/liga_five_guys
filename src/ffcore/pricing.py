@@ -10,7 +10,7 @@ PRICE_WINDOW = 50
 # ones almost never (5%; 2026-10-20). 30, not 60: with 85 past listings
 # rising 10%+, 60 borrowed slower ones and put a riser's chance at asking at
 # 0.48 (0.33 won). Each past listing's odds from those before it, Brier
-# 0.0264 at 60, 0.0259 at 30; backtest (grading.py money) forecast points
+# 0.0264 at 60, 0.0259 at 30; the money replay (grading.py money, since deleted) forecast points
 # 478 at 60, 489 at 45, 497 at 30, 495 at 20, value and cash 310M, 329M,
 # 377M, 352M (2026-10-31).
 BID_NEIGHBOURS = 30

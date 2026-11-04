@@ -25,15 +25,15 @@ NAMES = {
               "player_jornadas season_record season_points next_lock listing_ends price_paid",
     "forecast": "cell standin_cell score_spread run_forecast forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
-    "decision": "moves bid_odds recent_offers sale_odds waiting nights_left player_facts "
-                "next_cell my_moves my_bids my_squad my_cash my_xi look_players formation slot_bounds "
+    "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts "
+                "next_cell my_squad my_cash my_xi look_players formation slot_bounds "
                 "decision_option decision_plan",
     "settlement": "",
     "board": "lock_due lineup_alert league_standings",
     "grading": "replayed lead_buckets"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
 SKIP = {"k", "model_constants", "variants", "params", "runs", "run_measures", "facts_meta", "parser_health",
-        "persistence_by_run", "phantom_jornadas", "board_history", "board_history_moves"}  # no module: config, bookkeeping
+        "persistence_by_run", "board_history", "board_history_moves"}  # no module: config, bookkeeping
 
 
 def module(name: str) -> str | None:

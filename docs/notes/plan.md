@@ -131,7 +131,7 @@ and holds no plan for the next.
 
 The forecasts. Eight jornadas of backtest cannot separate close settings;
 lambda_end and the variance weight are the only constants left, and the
-backtest (grading.py money, bids held between the timers' runs) judges
+backtest (grading.py ceiling, 2026-11-04; it replaced the money replay) judges
 them, evidence growing a jornada a week.
 
 ## Order
