@@ -18,6 +18,38 @@ reads, one copy of each fact, and nothing the board does not need.
   sim_players beside sim_facts (value, price, route): the inputs of an SQL
   decision.
 
+## Modules and contracts (2026-11-04; the frame every change is judged in)
+
+Five modules. Each reads only the contract of the module before it, owns its
+own tables and views, and is judged by its own test and measure. The money
+backtest only wires them together as a smoke test (it runs, no debt, a full
+eleven, no bid left open). It ranks nothing: one season path swings about
+±19 points a jornada.
+
+| # | Module | Reads | Its contract (what the next reads) | Test | Measure |
+|---|---|---|---|---|---|
+| 1 | Ingest | raw pages, the API | facts: player_club, player_value, player_status, player_points, club_fixture, owners, cash, listings, offers, auction closes; all timestamped | fixed raw → expected rows; one row per key; no nulls in keys | parser health |
+| 2 | Forecast | facts at t (nothing after t) | cell(player, jornada, pts, p) | seeded facts → cells | accuracy against real points (RMSE, r), next jornada and five ahead |
+| 3 | Decision | cell, the league at t (squads, cash, market, bid odds), moves | plan(step, kind, player, amount, win, worth) | seeded league → plan | expected gap: the plan's eleven's e against standing pat's, a lock at a time; checks: cash ≥ 0 at the lock, squad ≤ SQUAD_MAX, a legal eleven |
+| 4 | Settlement | plan, auction closes | moves(path, at, kind, player, amount) | seeded closes → moves; a won bid settles with its own paired sale | none: correctness only |
+| 5 | Board | plan, standings, moves | the page (board_json) | snapshot | none: correctness only |
+
+The same modules run live and in the replay; only t and the moves differ.
+
+**Rules.**
+- A module reads nothing from more than one step back, and nothing of a later one.
+- A test seeds its module's inputs as rows. No Python mirror of a table (Universe, Market, LeagueState, Bootstrap).
+- A change to a module is judged by that module's measure. Old output is a score to beat, not to reproduce.
+- A tool checks the frontiers: it reads each view's dependencies from SQLite and fails on a read past the frontier.
+
+**Frontiers crossed today (to fix, one module at a time):**
+- Decision reads ingest: player_facts reads current_market.
+- Decision's tests build Python objects (Universe, Market, LeagueState, Bootstrap) instead of rows.
+- Settlement decides: on a lost bid, grading.py drops the paired sales and runs decision.plan(sales_only=True) (grading.py:292-297). That sold Agoume, Moncayola, and Maffeo the night he was bought.
+- More, once the frontier check lists them.
+
+**Order.** (1) The frontier check, to get the full list. (2) Settlement: own its rule and fix the lost-bid sell-off. (3) Decision: tests on rows, the expected gap as its measure. (4) Forecast: tests on rows. (5) Ingest: facts as tables at fetch. Each step is done by one agent with a short brief, and is finished when its module's test and measure pass and its old copy is deleted.
+
 ## The dictionary (2026-11-03; replaces "one fact, many copies")
 
 After SICP: state is a function of time, not a mutated object. The league
