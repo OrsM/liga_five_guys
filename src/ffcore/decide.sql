@@ -311,7 +311,7 @@ WITH per AS (SELECT manager, player, total(e) AS a, total(v) AS v FROM league_xi
 g AS (SELECT p.manager, total(p.a) AS mean, (1 + w.share * w.share) * total(p.v) + w.share * w.share * total(p.a * p.a) AS var
       FROM per p CROSS JOIN score_spread w GROUP BY p.manager)
 SELECT g.manager, coalesce(b.points, 0.0) AS now, g.mean + coalesce(b.points, 0.0) AS mean, sqrt(max(g.var, 0.0)) AS sd
-FROM g LEFT JOIN (SELECT manager, max(CAST(team_points AS REAL)) AS points FROM current_api_standings GROUP BY manager) b
+FROM g LEFT JOIN (SELECT manager, max(CAST(team_points AS REAL)) AS points FROM standings GROUP BY manager) b
      USING (manager);
 
 -- Each manager's standing: his season's 10th-90th percentile band, his

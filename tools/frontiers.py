@@ -3,8 +3,6 @@ Builds a scratch DB from the schema, finds what each view reads (names after FRO
 skipped) and prints every read past the frontier: a read of a later module, or of a scraped
 table from outside ingest. Any module may read the facts and t (look) and an earlier module's contract. Exit 1 if there is one.
 Python files' FROM/JOIN reads are listed for information only."""
-from __future__ import annotations
-
 import re
 import shutil
 import sqlite3
@@ -23,10 +21,11 @@ NAMES = {
     "ingest": "market lineups matches points results_history starters crosswalk app_player slug_player id_clashes "
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes "
+              "player_roster listings offers squads standings app_lineup price_history offer_ratios "
               "player_jornadas season_record season_points next_lock listing_ends price_paid",
-    "forecast": "cell standin_cell score_spread run_forecast forecast_used "
+    "forecast": "cell score_spread run_forecast forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
-    "decision": "moves bid_odds offer_ratios recent_offers sale_odds waiting nights_left player_facts "
+    "decision": "moves standin_cell bid_odds recent_offers sale_odds waiting nights_left player_facts "
                 "next_cell my_moves my_bids my_squad my_cash my_xi look_players formation slot_bounds "
                 "decision_option decision_plan",
     "settlement": "",
