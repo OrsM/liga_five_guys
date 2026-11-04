@@ -325,6 +325,28 @@ def record_grades() -> dict[str, int]:
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}     # forecasts: lock moments a jornada
 
 
+def log_measure(measure: str, values: dict[str, float]) -> None:
+    """The headline numbers of a measure appended to measure_log, beside
+    the code's short commit (measure_latest shows each against the one
+    before). A variant's measure is named measure:variant."""
+    import subprocess
+    sha = subprocess.run(["git", "-C", str(Path(__file__).parent), "rev-parse", "--short", "HEAD"],
+                         capture_output=True, text=True).stdout.strip() or "unknown"
+    var = os.environ.get("LFG_VARIANT", "live")
+    at = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    record([{"at": at, "commit_sha": sha, "measure": measure if var == "live" else "%s:%s" % (measure, var),
+             "key": k, "value": v} for k, v in values.items()], "measure_log")
+
+
+def ceiling_headline(got: list[dict[str, Any]]) -> dict[str, float]:
+    """The season's totals of ceiling(): floor, ours, ceiling and the shares
+    (all jornadas from each lock, and next only)."""
+    tot = {pre + k: sum(g[pre + k] for g in got) for pre in ("", "next_") for k in ("floor", "ours", "ceiling")}
+    share = {pre + "share": (tot[pre + "ours"] - tot[pre + "floor"]) / (tot[pre + "ceiling"] - tot[pre + "floor"])
+             for pre in ("", "next_") if tot[pre + "ceiling"] > tot[pre + "floor"]}
+    return {**tot, **share}
+
+
 def accuracy(ahead: int = 5) -> list[tuple[Any, ...]]:
     """The forecast at each lock (backtest) graded as a run of its own
     (trigger 'accuracy'): at the next jornada and at ahead, the rows
@@ -334,8 +356,11 @@ def accuracy(ahead: int = 5) -> list[tuple[Any, ...]]:
                          " VALUES ('', '', 'accuracy', '', 1)").lastrowid
     assert run is not None
     record([{"run_id": run, **r} for r in backtest(ahead)], "grade_moment")
-    return [tuple(r) for r in rows("SELECT ahead, n, rmse, mae, r FROM grade_accuracy"
-                                   " WHERE run_id = ? AND ahead IN (0, ?) ORDER BY ahead", (run, ahead))]
+    got = [tuple(r) for r in rows("SELECT ahead, n, rmse, mae, r FROM grade_accuracy"
+                                  " WHERE run_id = ? AND ahead IN (0, ?) ORDER BY ahead", (run, ahead))]
+    log_measure("accuracy", {"%s@%d" % (k, a): v for a, n, rmse, mae, r in got
+                             for k, v in (("n", n), ("rmse", rmse), ("mae", mae), ("r", r))})
+    return got
 
 
 def view_table(view: str, path: Path | None = None) -> str:
@@ -383,8 +408,24 @@ def _selftest_ceiling() -> None:
     assert (two["floor"], two["ours"], two["ceiling"]) == (88.0, 94.0, 99.0), two
 
 
+def _selftest_measure_log() -> None:
+    """measure_log keeps each run's headline numbers; measure_latest sets the latest beside the one before."""
+    import tempfile
+    from ffcore.tidy import tables_in
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        one = {"floor": 1.0, "ours": 3.0, "ceiling": 5.0}
+        assert ceiling_headline([{**one, **{"next_" + k: v for k, v in one.items()}}])["share"] == 0.5
+        log_measure("ceiling", {"share": 0.25})
+        assert rows("SELECT measure, key, value, previous FROM measure_latest") == [("ceiling", "share", 0.25, None)]
+        (sha,), = rows("SELECT commit_sha FROM measure_log")
+        assert sha != "unknown" and 4 <= len(sha) <= 12, sha
+        log_measure("ceiling", {"share": 0.5})
+        assert rows("SELECT key, value, previous, change FROM measure_latest") == [("share", 0.5, 0.25, 0.25)]
+
+
 def _selftest() -> None:
     _selftest_ceiling()
+    _selftest_measure_log()
     import tempfile
     from ffcore.tidy import store_sql, tables_in
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
@@ -540,7 +581,9 @@ if __name__ == "__main__":
         # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
-        print(ceiling_report(ceiling()), flush=True)
+        got = ceiling()
+        print(ceiling_report(got), flush=True)
+        log_measure("ceiling", ceiling_headline(got))
         # Out without freeing what it made one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)

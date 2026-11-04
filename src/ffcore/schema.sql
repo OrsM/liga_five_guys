@@ -22,6 +22,27 @@ CREATE TABLE IF NOT EXISTS run_measures (
     PRIMARY KEY (run_id, stage, measure)
 );
 
+-- The headline numbers of `grading.py accuracy` and `grading.py ceiling`, kept a run at a time:
+-- measure ('accuracy', 'ceiling', each with ':variant' unless live), key (rmse@5, share...), the
+-- code's short commit. (commit_sha: COMMIT is an SQL keyword.)
+CREATE TABLE IF NOT EXISTS measure_log (
+    at         TEXT NOT NULL,     -- wall clock, UTC
+    commit_sha TEXT NOT NULL,
+    measure    TEXT NOT NULL,
+    key        TEXT NOT NULL,
+    value      REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS measure_log_key ON measure_log (measure, key, at);
+
+-- Each measure's latest value beside the one before it.
+DROP VIEW IF EXISTS measure_latest;
+CREATE VIEW measure_latest AS
+WITH r AS (SELECT *, row_number() OVER (PARTITION BY measure, key ORDER BY at DESC, rowid DESC) AS n FROM measure_log)
+SELECT a.measure, a.key, a.value, a.at, a.commit_sha, p.value AS previous, p.at AS previous_at,
+       p.commit_sha AS previous_commit, a.value - p.value AS change
+FROM r a LEFT JOIN r p ON p.measure = a.measure AND p.key = a.key AND p.n = 2
+WHERE a.n = 1;
+
 -- The decision a run made (decision.plan, ffcore/decide.sql): every single
 -- move valued from the squad as it is (dec_rows), and the plan's moves in
 -- order (dec_plan; a swap is a buy and a sale of one step), in points.

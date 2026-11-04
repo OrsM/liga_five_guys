@@ -31,7 +31,7 @@ NAMES = {
                 "decision_option decision_plan",
     "settlement": "",
     "board": "lock_due lineup_alert league_standings",
-    "grading": "replayed lead_buckets"}
+    "grading": "replayed lead_buckets measure_log measure_latest"}
 # Each module's contract: the views and tables other modules may read; a comment says why where it is not a plain fact.
 EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_points season_record
