@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sqlite3
 import zlib
+from collections.abc import Callable
 
 __all__ = ["ensure"]
 
@@ -53,19 +54,22 @@ PAD = 2
 FACTS = {"price_step": PRICE_STEP}
 
 
-def ensure(db: sqlite3.Connection) -> None:
-    """Bring each kept fact up to the data: nothing when it is current."""
+def ensure(db: sqlite3.Connection, now: Callable[[], str] | None = None) -> None:
+    """Bring each kept fact up to the data: nothing when it is current. now
+    is the connection's clock, which is put back after the one fact that
+    needs it pinned (momentum_day)."""
     if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'facts_meta'").fetchone() is None:
         return                                  # a schema without them (a test's own)
     identity(db)
     latest = db.execute("SELECT substr(max(observed_at), 1, 10) FROM market").fetchone()[0] or ""
     _price_step(db, latest)
-    _momentum_day(db, latest)
+    if now is not None:
+        _momentum_day(db, latest, now)
 
 
 def identity(db: sqlite3.Connection) -> None:
     """ff_identity up to the registry and the rows it is read for: refilled
-    when either changed (the crosswalk mirror calls it too)."""
+    when either changed (the crosswalk stage calls it too)."""
     if db.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('ff_identity_kept', 'facts_meta')"
                   ).fetchone()[0] < 2:
         return
@@ -93,33 +97,29 @@ def identity(db: sqlite3.Connection) -> None:
         raise
 
 
-def _momentum_day(db: sqlite3.Connection, latest: str) -> None:
-    """momentum_day worked out with t put past the last day (look's cut, set
-    and put back inside the one transaction: no other reader sees it moved)."""
-    if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'look'").fetchone() is None:
-        return                                  # a schema without it (a test's own)
+def _momentum_day(db: sqlite3.Connection, latest: str, now: Callable[[], str]) -> None:
     ckey = db.execute("SELECT ckey FROM k").fetchone()[0]
     if ckey is None or not latest:
         return                                  # no constants yet, or nothing to fit
-    name, version, through = "momentum_day:" + ckey, "%08x" % zlib.crc32((MOMENTUM_DAY + str(PAD)).encode()), latest
-    if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() == (version, through):
-        return
+    db.create_function("cut", 0, lambda: FAR)
     db.create_function("hpad", 0, lambda: PAD)      # a cut a day on can reach one horizon further
-    db.execute("BEGIN IMMEDIATE")
     try:
-        if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() != (version, through):
-            (t, ), = db.execute("SELECT cut FROM look").fetchall()
-            db.execute("UPDATE look SET cut = ?", (FAR, ))
-            for statement in MOMENTUM_DAY.split(";\n"):
-                if statement.strip():
-                    db.execute(statement)
-            db.execute("UPDATE look SET cut = ?", (t, ))
-            db.execute("INSERT OR REPLACE INTO facts_meta VALUES (?, ?, ?)", (name, version, through))
-        db.execute("COMMIT")
-    except BaseException:
-        db.execute("ROLLBACK")
-        raise
+        name, version, through = "momentum_day:" + ckey, "%08x" % zlib.crc32((MOMENTUM_DAY + str(PAD)).encode()), latest
+        if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() == (version, through):
+            return
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            if db.execute("SELECT version, through FROM facts_meta WHERE name = ?", (name,)).fetchone() != (version, through):
+                for statement in MOMENTUM_DAY.split(";\n"):
+                    if statement.strip():
+                        db.execute(statement)
+                db.execute("INSERT OR REPLACE INTO facts_meta VALUES (?, ?, ?)", (name, version, through))
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
     finally:
+        db.create_function("cut", 0, now)
         db.create_function("hpad", 0, lambda: 0)
 
 

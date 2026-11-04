@@ -16,7 +16,7 @@ from typing import Any, NamedTuple
 import remind
 from ffcore import fixture, forecast, pricing, rules, score, startprob
 from ffcore.clock import set_variant
-from ffcore.db import connect, cut, named, query, record, rows
+from ffcore.db import connect, cut, named, query, record, rows, set_look
 from ffcore.fixture import Ratings, difficulty_ratings
 from ffcore.jornadas import rounds
 from ffcore.league import write_config
@@ -131,7 +131,7 @@ class Prices(NamedTuple):
 def record_trend() -> None:
     """Each player's price trend as of the model's cut, kept (price_trend_fit)
     for the views that read it; the momentum it rests on kept first."""
-    _keep("SELECT cut, ff_id, trend FROM look, price_trend_now", "price_trend_fit")
+    _keep("SELECT cut(), ff_id, trend FROM price_trend_now", "price_trend_fit")
 
 
 def _keep(select: str, *tables: str) -> None:
@@ -144,14 +144,14 @@ def _keep(select: str, *tables: str) -> None:
         got = db.execute(select).fetchall()
         with db:
             for i, table in enumerate(tables):
-                db.execute("DELETE FROM %s WHERE as_of = (SELECT cut FROM look)" % table)
+                db.execute("DELETE FROM %s WHERE as_of = (SELECT cut())" % table)
                 db.executemany("INSERT INTO %s VALUES (?, ?, ?)" % table, [(r[0], r[1], r[2 + i]) for r in got])
 
 
 def price_momentum() -> Prices:
     """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
     then read."""
-    _keep("SELECT cut, h, slope FROM look, momentum", "momentum_fit")
+    _keep("SELECT cut(), h, slope FROM momentum", "momentum_fit")
     record_trend()
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
@@ -174,7 +174,7 @@ def see() -> str:
     key = hashlib.sha1(repr((_forecast_code(), sorted((m, sorted(c.items())) for m, c in constants().items())))
                        .encode()).hexdigest()[:12]
     with closing(connect()) as db, db:
-        (c, ), = db.execute("SELECT cut FROM look").fetchall()
+        c = cut()
         if db.execute("SELECT 1 FROM seen WHERE cut = ? AND variant = variant() AND code = ? LIMIT 1",
                       (c, key)).fetchone():
             return c
@@ -341,15 +341,13 @@ def built() -> Built:
     me = write_config()
     prices = price_momentum()          # first: it keeps the trend that player_facts and sale_odds read
     see()
-    with closing(connect()) as db, db:
-        db.execute("UPDATE look SET variant = variant(), me = ?", (me, ))
+    set_look(me=me)
     fc = player_forecast({k for (k, ) in rows(
         "SELECT s.player FROM look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant"
         " WHERE s.price IS NOT NULL OR (s.owner IS NOT NULL AND s.pos IS NOT NULL)"
         " UNION SELECT player FROM my_squad UNION SELECT s.player FROM look l JOIN seen s"
         " ON s.cut = l.t0 AND s.variant = l.variant AND s.owner = l.me")})
-    with closing(connect()) as db, db:
-        db.execute("UPDATE look SET moment = ?", (fc.moment, ))
+    set_look(moment=fc.moment)
     return Built(params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
 
 

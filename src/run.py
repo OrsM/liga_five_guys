@@ -67,11 +67,11 @@ def _commit(repo: Path = Path(".")) -> str:
         return "?"
 
 
-def _start(db: sqlite3.Connection, path: Path | None = None) -> int:
+def _start(db: sqlite3.Connection) -> int:
     """The run recorded, and t set to its time (the wall clock, LFG_NOW when
     pinned): every stage reads the league as of it."""
     now = run_now()
-    set_now(now, path)
+    set_now(now)
     with db:
         cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha)"
                          " VALUES (?, ?, ?, ?)",
@@ -102,7 +102,7 @@ def main(argv: list[str], every: Sequence[tuple[str, str, bool]] = STAGES,
     and run_measures (the run ok only if every one was); 1 if a stage that
     makes the report failed."""
     db = connect(path)
-    run = _start(db, path)
+    run = _start(db)
     os.environ[RUN_ENV] = str(run)
     failed: list[tuple[str, bool]] = [("", True)]
     try:

@@ -8,7 +8,7 @@ from contextlib import closing
 from typing import Any
 
 from ffcore.action import Action
-from ffcore.db import connect, rows
+from ffcore.db import connect, rows, set_look
 from ffcore.rules import DEBT_SHARE, SQUAD_MAX, XI_SIZE
 
 from assemble import write_constants
@@ -44,16 +44,16 @@ def _by_hand(db: Any, u: Universe) -> None:
     m = u.market
     owner = {**{k: mgr for mgr, sq in u.state.squads.items() for k in sq}, **m.owner}
     pos = {**{k: p for sq in u.state.squads.values() for k, p in sq.items()}, **m.pos}
-    db.execute("UPDATE look SET variant = variant(), moment = 0, me = ?, path = '', t0 = ''", (u.me, ))
+    set_look(moment=0, me=u.me, path="", t0="")
     for t in ("seen", "seen_cash", "seen_odds"):
-        db.execute("DELETE FROM %s WHERE cut = (SELECT cut FROM look) AND variant = variant()" % t)
+        db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)
     db.execute("DELETE FROM forecast_cell WHERE moment = 0")
-    db.executemany("INSERT INTO seen VALUES ((SELECT cut FROM look), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
+    db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
                    [(k, m.shown(k), pos.get(k), owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
                      m.offer.get(k), m.clause.get(k), m.price.get(k), m.route.get(k), m.my_bid.get(k), m.fetch.get(k))
                     for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine) | set(owner))])
-    db.execute("INSERT INTO seen_cash VALUES ((SELECT cut FROM look), variant(), ?, ?)", (u.me, m.cash))
-    db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut FROM look), variant(), ?, ?, ?)",
+    db.execute("INSERT INTO seen_cash VALUES ((SELECT cut()), variant(), ?, ?)", (u.me, m.cash))
+    db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut()), variant(), ?, ?, ?)",
                    [(k, r, p) for k, odds in m.odds.items() for r, p in odds])
     db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
                    [(k, j, pts, p) for j in u.state.jornadas

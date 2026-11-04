@@ -9,22 +9,18 @@ shell (lfg-lock, lfg-run).
 from __future__ import annotations
 
 import sys
-from datetime import datetime
 
-from ffcore.clock import run_now
 from ffcore.db import rows
-from ffcore.parse import stamp
 
 __all__ = ["REMIND_HOURS", "due", "text"]
 
 REMIND_HOURS = 3.0
 
 
-def due(now: datetime | None = None) -> str | None:
-    """The lock (a stamp) a reminder run is due for now (the wall clock: run
-    timing, not a view's t): it is within REMIND_HOURS and no run has been
-    asked for it yet."""
-    got = rows("SELECT lock FROM lock_due WHERE opens <= ? AND lock > ?", (stamp(now or run_now()), ) * 2)
+def due() -> str | None:
+    """The lock (a stamp) a reminder run is due for: it is within
+    REMIND_HOURS and no run has been asked for it yet."""
+    got = rows("SELECT lock FROM lock_due")
     return got[0][0] if got else None
 
 
@@ -65,15 +61,16 @@ def _selftest() -> None:
         try:
             world(fine, ids)                       # jornada 5 locks 10-16 19:00 UTC, with its first match
             set_now(at(16, 15))
-            assert due(at(16, 15)) is None, "four hours to the lock: not yet"
+            assert due() is None, "four hours to the lock: not yet"
             set_now(at(16, 16, 30))
-            assert due(at(16, 16, 30)) == "2026-10-16T1900Z", "inside the window: a reminder run is due"
+            assert due() == "2026-10-16T1900Z", "inside the window: a reminder run is due"
             assert text() == "", "the line-up set is the best eleven: nothing to say"
             with connect() as db:
                 db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha)"
                            " VALUES ('t', '2026-10-16T1631Z', 'reminder', 'c')")
-            assert due(at(16, 16, 30)) is None, "a run has been asked for this lock: once"
-            assert due(at(16, 19, 30)) is None, "the lock has passed"
+            assert due() is None, "a run has been asked for this lock: once"
+            set_now(at(16, 19, 30))
+            assert due() is None, "the lock has passed"
         finally:
             set_now(None)
 
@@ -99,7 +96,7 @@ def _selftest() -> None:
                 db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha)"
                            " VALUES ('t', '2026-10-09T1700Z', 'reminder', 'c')")
             set_now(at(16, 16, 30))
-            assert due(at(16, 16, 30)) == "2026-10-16T1900Z"
+            assert due() == "2026-10-16T1900Z"
         finally:
             set_now(None)
     print("remind self-test OK")

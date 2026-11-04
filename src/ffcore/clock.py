@@ -1,5 +1,5 @@
 """The wall clock (pinnable with LFG_NOW), for crawl stamps, run timing and
-the t a live run sets (ffcore.db.set_now: look's cut, the one moment every
+the t a live run sets (ffcore.db.set_now: cut(), the one moment every
 view reads); snapshot stamps, kickoff times, and Madrid time for people."""
 from __future__ import annotations
 

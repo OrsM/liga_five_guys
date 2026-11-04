@@ -134,21 +134,16 @@ CREATE TABLE IF NOT EXISTS seen_odds (
     PRIMARY KEY (cut, variant, player, ratio)
 ) WITHOUT ROWID;
 
--- What the model looks at, one row: t, the one moment every view is read
--- as of (cut: a run sets it to its own time, a replay to each past time it
--- stands at, ffcore.db.set_now; every as-of view reads it, and nothing
--- else), the market as seen then (seen at that cut), the forecast of a
--- moment (forecast_used) and who you are (decision.inputs). Your squad and
--- cash at t are those at t0 with your moves since (a path's: path, t0;
--- live, none: t0 is t and the plan's moves are decide.sql's dec_plan).
-CREATE TABLE IF NOT EXISTS look (
-    cut     TEXT NOT NULL,
-    variant TEXT NOT NULL,
-    moment  INTEGER NOT NULL,
-    me      TEXT NOT NULL DEFAULT '',
-    path    TEXT NOT NULL DEFAULT '',
-    t0      TEXT NOT NULL DEFAULT ''     -- a stamp; '': t itself
-);
+-- What the model looks at, one row, the process's own (ffcore.db.LOOK,
+-- never the file's): t, the one moment every view is read as of (cut(): a
+-- run's start, or each past time a replay stands at, set_now), the market
+-- as seen then (seen at that cut), the forecast of a moment (forecast_used)
+-- and who you are (assemble.built). Your squad and cash at t are those at
+-- t0 with your moves since (a path's: path, t0, a stamp; live, none: t0 is
+-- t and the plan's moves are decide.sql's dec_plan).
+DROP VIEW IF EXISTS look;
+CREATE VIEW look AS
+SELECT cut() AS cut, variant() AS variant, moment() AS moment, me() AS me, path() AS path, t0() AS t0;
 
 -- A path's moves, each at its t (a stamp): a bid on a player of the game's
 -- market at its amount, one taken back (withdraw), a sale at what it gets.
@@ -332,16 +327,16 @@ CREATE TABLE IF NOT EXISTS forecast_variant (
 DROP VIEW IF EXISTS parser_health;
 CREATE VIEW parser_health AS
 WITH snaps AS (
-  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM market WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
-  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM lineups WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
-  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM api_standings WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
-  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM api_lineup WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
-  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM api_teams WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at
-  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM api_leagues WHERE observed_at <= (SELECT cut FROM look) GROUP BY observed_at),
+  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM lineups WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM api_standings WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
 r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, stamp_jd(at) AS jd FROM snaps),
 usual AS (SELECT src, avg(n) AS usual_rows, (max(jd) - min(jd)) * 24 / (count(*) - 1) AS gap_h
           FROM r WHERE k BETWEEN 2 AND 21 GROUP BY src HAVING count(*) >= 5),
-now AS (SELECT julianday(substr((SELECT cut FROM look), 1, 10) || 'T' || substr((SELECT cut FROM look), 12, 2) || ':' || substr((SELECT cut FROM look), 14, 2) || 'Z') AS jd)
+now AS (SELECT julianday(substr((SELECT cut()), 1, 10) || 'T' || substr((SELECT cut()), 12, 2) || ':' || substr((SELECT cut()), 14, 2) || 'Z') AS jd)
 SELECT l.src, l.at AS last_at, l.n AS rows, round(u.usual_rows, 1) AS usual_rows,
        round((now.jd - l.jd) * 24, 1) AS hours_since, round(u.gap_h, 1) AS usual_gap_h,
        CASE WHEN (now.jd - l.jd) * 24 > max(6.0, 3 * u.gap_h) THEN 'stale'
@@ -458,7 +453,7 @@ FROM grade_forecast g GROUP BY run_id, from_j, jornada;
 DROP VIEW IF EXISTS replay_moments;
 CREATE VIEW replay_moments AS
 WITH snaps AS MATERIALIZED (SELECT DISTINCT observed_at AS at FROM lineups
-                            WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut FROM look)),
+                            WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut())),
 w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS opens FROM round_locks)
 SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens AND s.at < w.lock
 ORDER BY w.lock, s.at;
@@ -631,7 +626,7 @@ DROP VIEW IF EXISTS next_lock;
 CREATE VIEW next_lock AS
 SELECT min(lock) AS lock,
        stamp_jd(min(lock)) AS t
-FROM round_locks WHERE lock > (SELECT cut FROM look);
+FROM round_locks WHERE lock > (SELECT cut());
 
 -- The players on the game's market who could not play a jornada's match
 -- for whoever buys them: his auction closes after his club's kickoff in it
@@ -813,7 +808,7 @@ CREATE INDEX IF NOT EXISTS market_observed ON market (observed_at);
 DROP VIEW IF EXISTS market_daily;
 CREATE VIEW market_daily AS
 SELECT *, rowid AS id FROM market
-WHERE observed_at IN (SELECT max(observed_at) FROM market WHERE observed_at <= (SELECT cut FROM look)
+WHERE observed_at IN (SELECT max(observed_at) FROM market WHERE observed_at <= (SELECT cut())
                       GROUP BY substr(observed_at, 1, 10));
 
 -- What facts.ensure has kept, and through which day. A changed schema makes
@@ -906,7 +901,7 @@ CREATE VIEW k AS SELECT
 -- does not hold for it (the days before are closed).
 DROP VIEW IF EXISTS price_day_now;
 CREATE VIEW price_day_now AS
-SELECT coalesce(substr(max(observed_at), 1, 10), '') AS d FROM market WHERE observed_at <= (SELECT cut FROM look);
+SELECT coalesce(substr(max(observed_at), 1, 10), '') AS d FROM market WHERE observed_at <= (SELECT cut());
 
 DROP VIEW IF EXISTS price_rows;
 CREATE VIEW price_rows AS
@@ -919,7 +914,7 @@ seed AS (SELECT a.ff_id, a.n, a.value, l.i AS i0, l.step AS last_step, l.s1 AS l
 live AS (SELECT m.ff_id, m.observed_at, m.value, s.n AS n0, s.value AS pv, s.i0, s.last_step, s.last_s1
          FROM market m LEFT JOIN seed s ON s.ff_id = m.ff_id
          WHERE m.observed_at = (SELECT max(observed_at) FROM market
-                                WHERE observed_at >= (SELECT d FROM cutday) AND observed_at <= (SELECT cut FROM look))
+                                WHERE observed_at >= (SELECT d FROM cutday) AND observed_at <= (SELECT cut()))
            AND coalesce(m.ff_id, '') <> '' AND m.value IS NOT NULL)
 SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE day < (SELECT d FROM cutday)
 UNION ALL
@@ -973,7 +968,7 @@ DROP VIEW IF EXISTS momentum_pairs;
 CREATE VIEW momentum_pairs AS
 SELECT p.h, p.ff_id, p.i, p.end_day, p.x,
        max(-k.clip * p.h, min(k.clip * p.h, p.change)) AS y
-FROM price_ahead p, k WHERE p.end_at <= (SELECT cut FROM look);
+FROM price_ahead p, k WHERE p.end_at <= (SELECT cut());
 
 -- What each closed day adds to the momentum fit, per horizon: the sums of x*y
 -- and x*x of the pairs that end that day, written once (facts.MOMENTUM_DAY)
@@ -1018,7 +1013,7 @@ CREATE TABLE IF NOT EXISTS momentum_fit (
 DROP VIEW IF EXISTS fitted;
 CREATE VIEW fitted AS
 SELECT h, slope FROM momentum_fit
-WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut FROM look));
+WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut()));
 
 -- The share of a trend (its move over the horizon, the longest h fitted)
 -- already made after each update.
@@ -1038,7 +1033,7 @@ CREATE VIEW price_trend_now AS
 WITH s AS (SELECT coalesce((SELECT slope FROM fitted ORDER BY h DESC LIMIT 1), 0.0) AS slope),
 last AS (SELECT ff_id, day, x FROM (
              SELECT ff_id, day, x, row_number() OVER (PARTITION BY ff_id ORDER BY i DESC) AS r
-             FROM price_series WHERE observed_at <= (SELECT cut FROM look))
+             FROM price_series WHERE observed_at <= (SELECT cut()))
          WHERE r = 1)
 SELECT last.ff_id, s.slope * last.x AS trend
 FROM last, s WHERE last.day = (SELECT max(day) FROM last);
@@ -1052,7 +1047,7 @@ CREATE TABLE IF NOT EXISTS price_trend_fit (
 DROP VIEW IF EXISTS price_trend;
 CREATE VIEW price_trend AS
 SELECT ff_id, trend FROM price_trend_fit
-WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut FROM look));
+WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut()));
 
 -- How each listing's auction went, once it has closed (by t): every
 -- listing on the market (the game's or a manager's) by player and close
@@ -1097,7 +1092,7 @@ SELECT w.player, w.at AS close, strftime('%Y-%m-%dT%H%MZ', w.at) AS closed, w.as
         WHERE t.ff_id = w.player
           AND t.as_of = (SELECT max(as_of) FROM fits WHERE as_of <= strftime('%Y-%m-%dT%H%MZ', w.at)))
        AS trend
-FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut FROM look);
+FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut());
 
 -- What a bid wins on the game's market now, for each player listed there:
 -- his BID_NEIGHBOURS past listings closest to him in price trend (before
@@ -1131,13 +1126,13 @@ WITH v AS (SELECT observed_at, player_team_id, market_value FROM (
                SELECT observed_at, player_team_id, coalesce(market_value, 0.0) AS market_value,
                       row_number() OVER (PARTITION BY observed_at, player_team_id
                                          ORDER BY rowid DESC) AS last
-               FROM api_teams WHERE observed_at <= (SELECT cut FROM look))
+               FROM api_teams WHERE observed_at <= (SELECT cut()))
            WHERE last = 1),
 o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value AS ratio,
              row_number() OVER (PARTITION BY o.offer_id ORDER BY o.rowid) AS first
       FROM api_offers o JOIN v ON v.observed_at = o.observed_at
        AND v.player_team_id IS o.player_team_id
-      WHERE o.observed_at <= (SELECT cut FROM look) AND o.from_market = 'true' AND o.money <> 0
+      WHERE o.observed_at <= (SELECT cut()) AND o.from_market = 'true' AND o.money <> 0
         AND v.market_value <> 0 AND coalesce(o.offer_id, '') <> '')
 SELECT created_at, ratio FROM o WHERE first = 1 ORDER BY created_at, ratio;
 
@@ -1157,7 +1152,7 @@ SELECT home, away, jornada, kick, t FROM (
     SELECT home, away, jornada, strftime('%Y-%m-%dT%H%MZ', kickoff) AS kick, julianday(kickoff) AS t,
            row_number() OVER (PARTITION BY home, away ORDER BY observed_at DESC, rowid DESC) AS n
     FROM matches
-    WHERE observed_at <= (SELECT cut FROM look) AND jornada IS NOT NULL
+    WHERE observed_at <= (SELECT cut()) AND jornada IS NOT NULL
       AND strftime('%Y-%m-%dT%H%MZ', kickoff) IS NOT NULL)
 WHERE n = 1;
 
@@ -1166,7 +1161,7 @@ WHERE n = 1;
 DROP VIEW IF EXISTS blind_results;
 CREATE VIEW blind_results AS
 SELECT home, away, jornada, min(observed_at) AS seen FROM matches m
-WHERE observed_at <= (SELECT cut FROM look) AND score <> '' AND jornada IS NOT NULL
+WHERE observed_at <= (SELECT cut()) AND score <> '' AND jornada IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM kickoffs k WHERE k.home = m.home AND k.away = m.away)
 GROUP BY home, away;
 
@@ -1190,11 +1185,11 @@ j AS (SELECT jornada, min(kick) AS start,
              CASE WHEN jornada NOT IN (SELECT jornada FROM blind_results) THEN min(kick) END AS lock,
              min(CASE WHEN NOT played THEN kick END) AS next, sum(NOT played) AS left
       FROM games GROUP BY jornada),
-last AS (SELECT max(start) AS start FROM j WHERE start <= (SELECT cut FROM look))
+last AS (SELECT max(start) AS start FROM j WHERE start <= (SELECT cut()))
 SELECT j.jornada, j.lock, j.next,
        CASE WHEN j.left = 0 THEN 'done'
             WHEN j.start < last.start THEN 'behind'
-            WHEN j.start <= (SELECT cut FROM look) THEN 'under way'
+            WHEN j.start <= (SELECT cut()) THEN 'under way'
             ELSE 'ahead' END AS state
 FROM j, last;
 
@@ -1239,12 +1234,12 @@ UNION ALL SELECT away, jornada, at FROM g WHERE away <> '';
 DROP VIEW IF EXISTS scored;
 CREATE VIEW scored AS
 WITH s AS (SELECT max(season) AS season, min(observed_at) AS first FROM points
-           WHERE observed_at <= (SELECT cut FROM look)
-             AND season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut FROM look))),
+           WHERE observed_at <= (SELECT cut())
+             AND season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut()))),
 p AS (SELECT ff_id, observed_at AS at, points, games, points.rowid AS id,
              lag(points, 1, 0.0) OVER w AS points0, lag(games, 1, 0.0) OVER w AS games0
       FROM points, s
-      WHERE observed_at <= (SELECT cut FROM look) AND points.season = s.season AND ff_id <> ''
+      WHERE observed_at <= (SELECT cut()) AND points.season = s.season AND ff_id <> ''
       WINDOW w AS (PARTITION BY ff_id ORDER BY observed_at, points.rowid)),
 c AS (SELECT ff_id, nullif(club, '') AS club FROM current_market WHERE ff_id <> '' GROUP BY ff_id),
 g AS MATERIALIZED (SELECT club, jornada, at FROM club_games
@@ -1623,7 +1618,7 @@ WITH t AS MATERIALIZED (
     SELECT rowid AS i, player_id, name_key(player_name) AS short, name_key(player_name_full) AS full
     FROM api_lineup
     WHERE (source, observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
-                                    WHERE observed_at <= (SELECT cut FROM look) GROUP BY source)),
+                                    WHERE observed_at <= (SELECT cut()) GROUP BY source)),
 bp AS MATERIALIZED (SELECT * FROM board_players),
 app AS MATERIALIZED (
     SELECT t.i, coalesce(a.player, n.player, f.player) AS player
@@ -1754,7 +1749,7 @@ CREATE VIEW board_head AS
 WITH me AS (SELECT * FROM board_league WHERE me),
 lock AS (SELECT lock AS kick FROM next_lock)
 SELECT (SELECT run_id FROM board_run) AS run_id,
-       substr((SELECT cut FROM look), 1, 13) || ':' || substr((SELECT cut FROM look), 14) AS generated_at,
+       substr((SELECT cut()), 1, 13) || ':' || substr((SELECT cut()), 14) AS generated_at,
        (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
        me.cash, (SELECT total(my_bid) FROM sim_facts JOIN board_run USING (run_id)) AS cash_locked,
        round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
@@ -1859,17 +1854,17 @@ SELECT json_object(
                       'p_above', p_above) ORDER BY ord) FROM board_league)) AS json
 FROM board_head h;
 
--- The next jornada's lock as of the last run, and when a run to remind you
--- of your line-up opens (REMIND_HOURS before it), while none has been
--- asked for it (trigger 'reminder', as_of the window's opening or later):
--- once the wall clock passes opens, that run is due (remind.due).
+-- A run to remind you of your line-up is due once the next jornada's lock is
+-- within REMIND_HOURS, and only once: not if a run was asked for it
+-- (trigger 'reminder', as_of the window's opening or later).
 DROP VIEW IF EXISTS lock_due;
 CREATE VIEW lock_due AS
 WITH w AS (
     SELECT lock, strftime('%Y-%m-%dT%H%MZ', stamp_jd(lock) - (SELECT remind_hours FROM k) / 24.0) AS opens
     FROM next_lock WHERE lock IS NOT NULL)
-SELECT lock, opens FROM w
-WHERE NOT EXISTS (SELECT 1 FROM runs WHERE trigger = 'reminder' AND as_of >= w.opens);
+SELECT lock FROM w
+WHERE opens <= (SELECT cut())
+  AND NOT EXISTS (SELECT 1 FROM runs WHERE trigger = 'reminder' AND as_of >= w.opens);
 
 -- What to tell you about your line-up before the next lock, from the last
 -- run: set it, if the app's is not one I can match, or change it to your
@@ -1881,7 +1876,7 @@ ins AS (SELECT names FROM lineup_names WHERE side = 'in'),
 outs AS (SELECT names FROM lineup_names WHERE side = 'out'),
 left AS (SELECT CAST(round((
              stamp_jd(lock)
-             - stamp_jd((SELECT cut FROM look))
+             - stamp_jd((SELECT cut()))
          ) * 1440) AS INTEGER) AS minutes FROM next_lock)
 SELECT CASE WHEN (SELECT max(legal) FROM g)
             THEN 'Change your line-up: field ' || ins.names || ' for ' || outs.names

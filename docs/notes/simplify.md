@@ -299,10 +299,13 @@ Kept, and why:
 
 ## Step 9: the league at t, items 1-4 of the plan by layer (2026-11-03, branch w-core)
 
-- One t: look's cut (set_now writes it, db.replaying puts it back); the
-  views read nothing else (cut() the function, clock._NOW, on_reset gone).
-  t is the file's, so one process moves it at a time: the warm pool and
-  replay's shards went. Backtest identical (124, 7, 560 vs 451).
+- One t: the process's (db.LOOK: t, moment, me, path, t0; set_now and
+  set_look write it, db.replaying puts it back), read by the views as
+  cut() and the view look; no t in the file (a first try kept it in a
+  table row, shared by every process on the live file: the watcher, the
+  reminder, Datasette and the grade stage's replays would read each
+  other's t). clock._NOW, on_reset and the jornadas' caches gone.
+  Backtest identical (124, 7, 560 vs 451).
 - My moves as an input: moves (path, at, kind, player, amount) and
   look.path/t0; my_squad, my_cash, my_bids. Day, acted, closed,
   with_squad, League, dec_mine, dec_state.cash, universe_when/_AT gone.
