@@ -597,6 +597,21 @@ def _selftest() -> None:
     assert ln[0]["snapshot_at"].startswith("2026-08-19T20:26")
     assert parse_api_lineup("not json", "t1") == []
 
+    # The contract: one row per key, and no key empty (an offers page with no
+    # offer is the one row that says so: its offer_id is empty by design).
+    def one_per_key(got: list[dict[str, Any]], *key: str) -> None:
+        keys = [tuple(r.get(k) for k in key) for r in got]
+        assert all(v not in (None, "") for k in keys for v in k), (key, keys)
+        assert len(set(keys)) == len(keys), (key, keys)
+
+    one_per_key(mk, "player_id", "seller")
+    one_per_key(ac, "activity_id")
+    one_per_key(tm, "player_id", "manager")
+    one_per_key(sd, "user_id")
+    one_per_key(pa, "player_id")
+    one_per_key(off, "offer_id")
+    one_per_key(ln, "week", "slot", "player_id")
+
     print("ffcore.laliga_api self-test OK")
 
 
