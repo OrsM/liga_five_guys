@@ -212,6 +212,7 @@ def built() -> Built:
         raise SystemExit("the app's squads are %s old; no board is built from "
                          "them" % ("unknown" if age is None else "%.0fh" % age))
     me = write_config()
+    write_constants()                  # the views read them, the price trend first
     prices = price_momentum()          # first: it keeps the trend that player_facts and sale_odds read
     see()
     moment = forecast()
