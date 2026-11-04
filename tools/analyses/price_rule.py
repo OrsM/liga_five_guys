@@ -20,7 +20,7 @@ LAGS = 6
 
 
 def main() -> None:
-    clip = rows("SELECT clip FROM k")[0][0] if rows("SELECT count(*) FROM model_constants")[0][0] else 20.0
+    clip = rows("SELECT clip FROM k")[0][0]
     by_player: dict[str, list[tuple[int, float | None]]] = collections.defaultdict(list)
     for ff_id, day, step in connect().execute(
             "SELECT ff_id, substr(observed_at, 1, 10), step FROM price_obs ORDER BY ff_id, observed_at"):

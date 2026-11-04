@@ -45,7 +45,7 @@ FROM base b LEFT JOIN changes c ON c.ff_id = b.ff_id AND c.n = b.n
 MOMENTUM_DAY = """
 DELETE FROM momentum_day WHERE ckey = (SELECT ckey FROM k);
 INSERT INTO momentum_day
-SELECT (SELECT ckey FROM k), h, end_day, sum(x * y), sum(x * x)
+SELECT (SELECT ckey FROM k), h, end_day, coalesce(sum(x * y), 0), sum(x * x)
 FROM momentum_pairs GROUP BY h, end_day
 """
 FAR = "9999-12-31T2359Z"
@@ -99,8 +99,8 @@ def identity(db: sqlite3.Connection) -> None:
 
 def _momentum_day(db: sqlite3.Connection, latest: str, now: Callable[[], str]) -> None:
     ckey = db.execute("SELECT ckey FROM k").fetchone()[0]
-    if ckey is None or not latest:
-        return                                  # no constants yet, or nothing to fit
+    if not latest:
+        return                                  # nothing to fit
     db.create_function("cut", 0, lambda: FAR)
     db.create_function("hpad", 0, lambda: PAD)      # a cut a day on can reach one horizon further
     try:
@@ -192,9 +192,7 @@ def _selftest() -> None:
             identity(db)
         assert who() == [("x", None)], "a changed registry refills it in the caller's transaction"
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        from ffcore.db import record, rows
-        record([{"name": n, "value": v} for n, v in (("CLIP", 20.0), ("PRICE_W0", .4), ("PRICE_W1", .4), ("PRICE_W2", .2))],
-               "model_constants")
+        from ffcore.db import rows
         import random
         rng = random.Random(7)
         level = {k: 100.0 for k in ("up", "down", "wobble", "late", "spike")}
@@ -233,17 +231,12 @@ def _selftest() -> None:
         assert series_at("2026-08-17T2100Z") == series_at("2026-08-29T0000Z") != [], \
             "a cut days after the data ends sees the last day, as it stood"
         assert series_at("2026-08-17T0900Z") != series_at("2026-08-17T2100Z"), "and a cut within a day sees that day so far (the morning's snapshot)"
-        record([{"variant": "wide", "name": n, "value": v} for n, v in (("CLIP", 5.0), ("PRICE_W0", 1.0), ("PRICE_W1", 0.0), ("PRICE_W2", 0.0))],
-               "model_constants")
-        from ffcore.clock import set_variant
-        try:
-            set_variant("wide")
+        from ffcore.db import set_constants
+        with set_constants(CLIP=5.0, PRICE_W0=1.0, PRICE_W1=0.0, PRICE_W2=0.0):
             with closing(connect()) as db:
                 assert db.execute("SELECT count(DISTINCT ckey) FROM momentum_day").fetchone()[0] == 2, "each set of constants its own days"
             assert dict(rows("SELECT h, slope FROM momentum")).keys() == dict(rows(
                 "SELECT h, sum(x * y) / sum(x * x) FROM momentum_pairs GROUP BY h HAVING sum(x * x) <> 0")).keys()
-        finally:
-            set_variant("live")
     print("ffcore.facts self-test OK")
 
 

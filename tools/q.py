@@ -335,7 +335,6 @@ def _selftest_queries() -> None:
             record([{"run_id": 1, "ord": i, "lock": 1, "move": m, "reached": r, "kind": "get", "real": v}
                     for i, (m, r, v) in enumerate([("x", "plan", 3.0), ("y", "cleared", -1.0),
                                                    ("z", "rejected", 5.0)])], "grade_decisions")
-            record([{"name": "PERSISTENT_SHARE", "value": 0.08}], "model_constants")
             assert asked("persistence") == [(0.5,)], "misses of +1 and -1 repeat: sqrt(2 / 8)"
             assert asked("constants_vs_measured") == [
                 ("PERSISTENT_SHARE", 0.08, 0.5, 2, "share of a player's miss that repeats the next jornada")], \

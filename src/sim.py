@@ -137,8 +137,6 @@ def _selftest() -> None:
                 db.execute("DROP VIEW nights_left")
                 db.execute("CREATE TABLE nights_left AS SELECT ? AS nights,"
                            " julianday('2026-08-02T20:24:00Z') AS first", (nights,))
-                db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
-                    ("PRICE_WINDOW", 50.0)])
             store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": "me"}])
             store_sql("api_market", [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerTeam",
                                       "expires_at": e} for k, e in listings]

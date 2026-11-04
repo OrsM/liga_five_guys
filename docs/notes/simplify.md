@@ -168,7 +168,7 @@ same step.
    | left the league | the app's players at t | player_status |
    | opponent, kickoff, jornadas left | fixtures at t | club_fixture |
    | goals for and against | results_history at t | club_rating |
-   | SHRINK_K, PICK_K, NEUTRAL_START, ABSENT_START, FIXTURE_K | model_constants | k |
+   | SHRINK_K, PICK_K, NEUTRAL_START, ABSENT_START, FIXTURE_K | module constants, read by const(NAME) | k |
 
    The forecast: forecast_ppm (value prior -> last season -> this season,
    each a shrink), forecast_picked (his listing, or neutral if flagged,

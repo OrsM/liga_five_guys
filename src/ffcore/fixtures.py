@@ -22,11 +22,9 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
     and look on them."""
     from contextlib import closing
 
-    from assemble import write_constants
     from ffcore.db import connect, set_look
     from ffcore.tidy import store_sql
 
-    write_constants()   # the model's constants the views read, as a forecast writes them
     set_look(moment=0, me=me)
     with closing(connect()) as db, db:
         for t in ("seen", "seen_cash", "seen_odds"):

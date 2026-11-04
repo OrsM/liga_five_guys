@@ -2,7 +2,7 @@
 
     python tools/sql.py "SELECT * FROM parser_health"
     python tools/sql.py --at 2026-09-27T0934Z "SELECT count(*) FROM player_facts"
-    python tools/sql.py --variant shrink-8 "SELECT name, value FROM model_constants WHERE variant = variant()"
+    python tools/sql.py --variant shrink-8 "SELECT const('SHRINK_K')"
 
 The same functions as Datasette (variant(), name_key(), claim(),
 median(), ...); --at sets t (cut(), this process's) to a past stamp, so

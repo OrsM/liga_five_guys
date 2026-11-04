@@ -1,5 +1,5 @@
 """The forecast's constants (schema.sql's forecast views read them through
-model_constants, as k)."""
+const(), as k)."""
 from __future__ import annotations
 
 __all__ = ["SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE",

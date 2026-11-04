@@ -37,7 +37,7 @@ def _selftest() -> None:
     from pathlib import Path
 
     from ffcore.db import set_now
-    from ffcore.db import connect, record
+    from ffcore.db import connect
     from ffcore.fixtures import lineup_board
     from ffcore.tidy import store_sql, tables_in
 
@@ -46,7 +46,6 @@ def _selftest() -> None:
 
     def world(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
         lineup_board(app, ids)
-        record([{"name": "REMIND_HOURS", "value": REMIND_HOURS}], "model_constants")
         store_sql("matches", [
             {"observed_at": "2026-10-01T0000Z", "match_id": "m4", "jornada": "4", "home": "a",
              "away": "b", "kickoff": "2026-10-09T21:00:00+02:00"},

@@ -14,13 +14,13 @@ from typing import Any, NamedTuple
 import remind
 from ffcore import forecast as model, pricing, rules
 from ffcore.clock import set_variant
-from ffcore.db import connect, cut, named, query, record, rows, set_look
+from ffcore.db import connect, cut, named, query, record, rows, set_constants, set_look
 from ffcore.league import write_config
 from ffcore.tidy import age_hours
 from stats import percentile
 
 __all__ = ["applied", "constants", "built", "forecast", "params", "price_momentum",
-           "price_change", "write_constants", "record_trend", "market_offer_ratios",
+           "price_change", "record_trend", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
@@ -56,24 +56,12 @@ def applied(variant: str) -> Iterator[None]:
     unknown = [n for n, _v in over if n not in owner]
     if unknown:
         raise ValueError("variant %s sets %s, which no module has as a constant" % (variant, unknown))
-    was = {n: getattr(MODULES[owner[n]], n) for n, _v in over}
     try:
-        for n, v in over:
-            setattr(MODULES[owner[n]], n, v)
-        set_variant(variant)
-        yield
+        with set_constants(**dict(over)):
+            set_variant(variant)
+            yield
     finally:
-        for n, v in was.items():
-            setattr(MODULES[owner[n]], n, v)
         set_variant("live")
-
-
-def write_constants() -> None:
-    """constants() into lfg.db under the variant in force, for the views."""
-    with closing(connect()) as db, db:
-        db.execute("DELETE FROM model_constants WHERE variant = variant()")
-        db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)",
-                       [(n, v) for names in constants().values() for n, v in names.items()])
 
 
 class Prices(NamedTuple):
@@ -184,7 +172,6 @@ def forecast() -> int:
     """The forecast at t (forecast_now) made into a new moment, every
     player's cells and who is flagged (player_status); the moments of this
     cut and variant no run or grade points to dropped. The moment."""
-    write_constants()
     with closing(connect()) as db:
         cells = db.execute("SELECT player, jornada, pts, p, ppm, fixture, picked, fit FROM forecast_now").fetchall()
         flagged = dict(db.execute("SELECT player, status IS NOT NULL FROM player_status"))
@@ -212,7 +199,6 @@ def built() -> Built:
         raise SystemExit("the app's squads are %s old; no board is built from "
                          "them" % ("unknown" if age is None else "%.0fh" % age))
     me = write_config()
-    write_constants()                  # the views read them, the price trend first
     prices = price_momentum()          # first: it keeps the trend that player_facts and sale_odds read
     see()
     moment = forecast()
@@ -298,7 +284,6 @@ def _selftest_points() -> None:
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
             set_now(snapshot_stamp("2026-08-04T0000Z"))
-            write_constants()
             store_sql("market", [
                 {"observed_at": a, "ff_id": "1", "club": "x"},
                 {"observed_at": a, "ff_id": "2", "club": "y"}])
@@ -355,7 +340,6 @@ def _selftest_forecast() -> None:
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
             set_now(dt.datetime(2026, 9, 20, 12, tzinfo=dt.timezone.utc))
-            write_constants()
             store_sql("matches", [{"observed_at": seen, "match_id": "m%d%s" % (j, h), "jornada": str(j), "home": h,
                                    "away": w, "score": s, "kickoff": k} for j, h, w, s, k in [
                 (1, "a", "b", "1-0", ""), (1, "c", "d", "0-0", ""),
@@ -448,16 +432,12 @@ def _selftest_variants() -> None:
             ("slow", "SHRINK_K", 9.0), ("slow", "PERSISTENT_SHARE", 0.5),
             ("slow", "NEUTRAL_START", 33.0), ("typo", "AVIAL_K", 1.0))], "variants")
         live_shrink = model.SHRINK_K
-        write_constants()
         assert rows("SELECT neutral_start, shrink_k FROM k") == [(60.0, live_shrink)]
         with applied("slow"):
             assert constants()["forecast"]["SHRINK_K"] == 9.0 and model.PERSISTENT_SHARE == 0.5
-            write_constants()
-            assert rows("SELECT neutral_start, shrink_k FROM k") == [(33.0, 9.0)], "the views read the variant's row"
-            assert rows("SELECT count(*) FROM model_constants WHERE variant = 'slow'") == [(len(
-                [n for names in constants().values() for n in names]),)]
+            assert rows("SELECT neutral_start, shrink_k FROM k") == [(33.0, 9.0)], "the views read the variant's constants"
         assert model.SHRINK_K == live_shrink and model.PERSISTENT_SHARE == 0.08, "restored on leaving"
-        assert rows("SELECT neutral_start FROM k") == [(60.0,)], "the live rows were never touched"
+        assert rows("SELECT neutral_start FROM k") == [(60.0,)], "the live values were never touched"
         try:
             with applied("typo"):
                 raise AssertionError("a name that is no constant must not apply quietly")
@@ -486,13 +466,11 @@ def _selftest_sale() -> None:
     def at(n: int) -> str:
         return "2026-09-0%dT1000Z" % n
 
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), set_constants(
+            PRICE_WINDOW=3.0, CLIP=20.0, PRICE_W0=1.0, PRICE_W1=0.0, PRICE_W2=0.0):
         try:
             set_now(snapshot_stamp("2026-09-04T1200Z"))
             record([{"me": "me", "budget": 100e6}], "league_config")
-            record([{"name": "PRICE_WINDOW", "value": 3.0}, {"name": "CLIP", "value": 20.0},
-                    {"name": "PRICE_W0", "value": 1.0}, {"name": "PRICE_W1", "value": 0.0},
-                    {"name": "PRICE_W2", "value": 0.0}], "model_constants")
             record([{"player_id": "p1", "app_id": "1"}, {"player_id": "p2", "app_id": "2"}],
                    "crosswalk")
             store_sql("market", [{"observed_at": at(1), "ff_id": k, "name": k, "value": "10000000"}
@@ -712,7 +690,6 @@ def _selftest_market() -> None:
         assert market_offer_ratios() == [1.1], "the game's offers, each once, over value"
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        write_constants()
         for n, v in enumerate((100, 110, 110, 110)):
             store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": "x", "value": str(v)}])
         assert [round(x, 6) for (x,) in rows("SELECT x FROM price_series WHERE ff_id = 'x' ORDER BY i")] \
@@ -723,7 +700,6 @@ def _selftest_market() -> None:
     def prices(series: dict[str, list[float]]) -> Prices:
         """The momentum views over these values, one a day from 2026-08-10."""
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-            write_constants()
             for n in range(max(len(v) for v in series.values())):
                 store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": k,
                                       "value": str(v[n])} for k, v in series.items() if n < len(v)])
@@ -743,7 +719,6 @@ def _selftest_market() -> None:
     assert abs(rise.slope[2] * 15.0 - (1.15 ** 2 - 1) * 100) < 1e-6, \
         "a rise over several updates is not clipped as if it were one"
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        write_constants()
         for n in range(20):
             store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": k,
                                   "value": str(v[n])} for k, v in by.items()])
@@ -758,8 +733,7 @@ def _selftest_market() -> None:
         """bid_odds for a player rising 5% listed now, after these past
         listings at 100 (trend, the winning bid or None, whether it was
         yours), BID_NEIGHBOURS of 3."""
-        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-            write_constants()
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), set_constants(BID_NEIGHBOURS=3):
             at = "2026-09-0%dT1000Z"
             listed = [(str(i), "2026-09-02T22:%02d:00+02:00" % i, str(i)) for i in range(len(past))]
             store_sql("api_standings", [{"observed_at": at % 1, "user_id": "1", "manager": "me"},
@@ -776,7 +750,6 @@ def _selftest_market() -> None:
                      "player_id": "", "at": "", "counterparty": ""}])
             with closing(connect()) as db, db:
                 db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
-                db.execute("UPDATE model_constants SET value = 3 WHERE name = 'BID_NEIGHBOURS'")
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
                                [("p" + i, i) for i, _c, _ in listed] + [("p99", "99")])
                 db.executemany("INSERT INTO price_trend_fit VALUES (?, ?, ?)",

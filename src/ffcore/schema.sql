@@ -584,8 +584,8 @@ FROM forecast_e c LEFT JOIN late_arrivals l ON l.player = c.player AND l.jornada
 -- player's form that persists from one jornada to the next (share).
 DROP VIEW IF EXISTS score_spread;
 CREATE VIEW score_spread AS
-WITH c AS (SELECT (SELECT value FROM model_constants WHERE name = 'MIN_POOL' AND variant = variant()) AS min_pool,
-                  (SELECT value FROM model_constants WHERE name = 'PERSISTENT_SHARE' AND variant = variant()) AS share),
+WITH c AS (SELECT const('MIN_POOL') AS min_pool,
+                  const('PERSISTENT_SHARE') AS share),
 played AS MATERIALIZED (SELECT sum(s.pts) AS x FROM scored s JOIN appearances a ON a.player = s.player AND a.jornada = s.jornada
                         GROUP BY s.player, s.jornada),
 pool AS (SELECT x FROM played WHERE (SELECT count(*) FROM played) >= (SELECT min_pool FROM c)
@@ -767,14 +767,8 @@ FROM (SELECT ff_id, observed_at, value, id,
       FROM market_daily WHERE coalesce(ff_id, '') <> '' AND value IS NOT NULL
       WINDOW p AS (PARTITION BY ff_id ORDER BY observed_at, id));
 
--- The constants a run is built with (assemble.constants), for the views,
--- per variant: live, or a challenger's (variants) while it is replayed.
-CREATE TABLE IF NOT EXISTS model_constants (
-    variant TEXT NOT NULL DEFAULT 'live',
-    name    TEXT NOT NULL,
-    value   REAL NOT NULL,
-    PRIMARY KEY (variant, name)
-);
+-- (model_constants, once a table of the constants per variant, is gone: the views read const(NAME), the module's value.)
+DROP TABLE IF EXISTS model_constants;
 
 -- A challenger: the constants it sets differently from live's.
 CREATE TABLE IF NOT EXISTS variants (
@@ -787,25 +781,21 @@ CREATE TABLE IF NOT EXISTS variants (
 -- The constants the views use, one row: each named once, here.
 DROP VIEW IF EXISTS k;
 CREATE VIEW k AS SELECT
-    (SELECT value FROM model_constants WHERE name = 'CLIP' AND variant = (SELECT variant())) AS clip,
-    (SELECT value FROM model_constants WHERE name = 'PRICE_WINDOW' AND variant = (SELECT variant())) AS price_window,
-    (SELECT value FROM model_constants WHERE name = 'BID_NEIGHBOURS' AND variant = (SELECT variant())) AS bid_neighbours,
-    (SELECT value FROM model_constants WHERE name = 'PRICE_W0' AND variant = (SELECT variant())) AS price_w0,
-    (SELECT value FROM model_constants WHERE name = 'PRICE_W1' AND variant = (SELECT variant())) AS price_w1,
-    (SELECT value FROM model_constants WHERE name = 'PRICE_W2' AND variant = (SELECT variant())) AS price_w2,
-    (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
-    (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
-    (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
-    (SELECT value FROM model_constants WHERE name = 'SHRINK_K' AND variant = (SELECT variant())) AS shrink_k,
-    (SELECT value FROM model_constants WHERE name = 'FIXTURE_K' AND variant = (SELECT variant())) AS fixture_k,
-    (SELECT value FROM model_constants WHERE name = 'PICK_K' AND variant = (SELECT variant())) AS pick_k,
-    (SELECT value FROM model_constants WHERE name = 'REMIND_HOURS' AND variant = (SELECT variant())) AS remind_hours,
+    const('CLIP') AS clip,
+    const('PRICE_WINDOW') AS price_window,
+    const('BID_NEIGHBOURS') AS bid_neighbours,
+    const('PRICE_W0') AS price_w0,
+    const('PRICE_W1') AS price_w1,
+    const('PRICE_W2') AS price_w2,
+    const('MATCH_LEN') AS match_len,
+    const('NEUTRAL_START') AS neutral_start,
+    const('ABSENT_START') AS absent_start,
+    const('SHRINK_K') AS shrink_k,
+    const('FIXTURE_K') AS fixture_k,
+    const('PICK_K') AS pick_k,
+    const('REMIND_HOURS') AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
-    (SELECT printf('%.9g|%.9g|%.9g|%.9g', c.value, w0.value, w1.value, w2.value)
-     FROM model_constants c, model_constants w0, model_constants w1, model_constants w2
-     WHERE c.name = 'CLIP' AND w0.name = 'PRICE_W0' AND w1.name = 'PRICE_W1' AND w2.name = 'PRICE_W2'
-       AND c.variant = w0.variant AND c.variant = w1.variant AND c.variant = w2.variant
-       AND c.variant = (SELECT variant())) AS ckey;
+    printf('%.9g|%.9g|%.9g|%.9g', const('CLIP'), const('PRICE_W0'), const('PRICE_W1'), const('PRICE_W2')) AS ckey;
 
 -- Every valued day of every player as of t: the closed days kept in
 -- price_step, and the day of the cut (the last snapshot of it up to the cut)

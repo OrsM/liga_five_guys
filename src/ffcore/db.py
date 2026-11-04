@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import datetime as dt
 import fcntl
+import importlib
 import json
 import os
 import re
@@ -163,10 +164,40 @@ def replaying() -> Iterator[None]:
         LOOK.update(was)
 
 
+# The model's constants are module attributes (forecast, pricing, rules, remind); the views read them through
+# const(NAME) as they stand when the query runs, so a variant (assemble.applied) or a test is just set_constants.
+CONSTANT_MODULES = ("ffcore.forecast", "ffcore.pricing", "ffcore.rules", "remind", "assemble")
+
+
+def _owner(name: str) -> Any:
+    for module in CONSTANT_MODULES:
+        owner = importlib.import_module(module)
+        if hasattr(owner, name):
+            return owner
+    raise KeyError("no module has the constant %s" % name)
+
+
+def const(name: str) -> float:
+    return float(getattr(_owner(name), name))  # type: ignore[no-any-return]
+
+
+@contextmanager
+def set_constants(**values: float) -> Iterator[None]:
+    """Constants set on the modules that own them, put back on leaving."""
+    was = {n: getattr(_owner(n), n) for n in values}
+    try:
+        for n, v in values.items():
+            setattr(_owner(n), n, v)
+        yield
+    finally:
+        for n, v in was.items():
+            setattr(_owner(n), n, v)
+
+
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (t as a stamp: the process's,
     unless told otherwise), moment() and me() (LOOK's),
-    stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
+    stamp_jd() (a stamp as a Julian day), variant() (the variant in force), const() (a model constant as it stands), name_key() and name_shown() (Name's),
     prognosis() (a flagged player's listing read), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
     lo95(), hi95() and claim() (an estimate and its standard error) and
     the aggregate median()."""
@@ -175,6 +206,7 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
         db.create_function(k, 0, lambda k=k: LOOK[k])
     db.create_function("stamp_jd", 1, stamp_jd, deterministic=True)
     db.create_function("variant", 0, variant)
+    db.create_function("const", 1, const)
     db.create_function("hpad", 0, lambda: 0)
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
     db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
