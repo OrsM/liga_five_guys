@@ -1,4 +1,4 @@
-"""The points history, as schema.sql's views have it as of cut(): each
+"""The points history, as schema.sql's views have it as of t: each
 change in a player's season total, by jornada, and his season so far."""
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _selftest() -> None:
     import tempfile
     from pathlib import Path
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import record
     from ffcore.parse import snapshot_stamp
     from ffcore.rules import MATCH_LEN

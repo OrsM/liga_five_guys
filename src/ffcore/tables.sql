@@ -3,9 +3,9 @@
 -- as stored (tidy.NUMBERS); text is stripped and never NULL.
 --
 -- A snapshot table keeps every fetch's rows: its current_ view is each
--- source's last fetch, as of cut(). A keyed table keeps a row once, and again
+-- source's last fetch, as of t. A keyed table keeps a row once, and again
 -- only when it changes (its trigger): its current_ view is each key's last
--- row. history_ views are every row up to cut(). Rows about a player carry
+-- row. history_ views are every row up to t. Rows about a player carry
 -- him (identity.sql): an app row by its app id, a futbolfantasy row by
 -- ff_identity.
 

@@ -36,7 +36,7 @@ def _selftest() -> None:
     from datetime import datetime, timezone
     from pathlib import Path
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.db import connect, record
     from ffcore.fixtures import lineup_board
     from ffcore.tidy import store_sql, tables_in

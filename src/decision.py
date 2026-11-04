@@ -1,61 +1,59 @@
-"""The decision as ffcore/decide.sql makes it: one universe's facts written
-as its inputs, then its next move added until there is none. Every number
-the plan rests on is a row there to read (dec_money, dec_options)."""
+"""The decision as ffcore/decide.sql makes it: the league at t (schema.sql
+look, my_squad, my_cash) made into its inputs, then its next move added
+until there is none. Every number the plan rests on is a row there to read
+(dec_money, dec_options)."""
 from __future__ import annotations
 
 from contextlib import closing
 from typing import Any
 
 from ffcore.action import Action
-from ffcore.db import connect, rows
-from ffcore.rules import DEBT_SHARE, SQUAD_MAX, XI_SIZE, position
+from ffcore.db import connect, rows, set_look
+from ffcore.rules import DEBT_SHARE, SQUAD_MAX, XI_SIZE
 
 from assemble import write_constants
 from decide import Universe
 
 __all__ = ["plan", "inputs", "after_auctions"]
 
-INPUTS = ("look", "dec_state", "dec_mine", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
+INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
 
-def inputs(u: Universe, buys: bool = True) -> None:
-    """What the decision looks at (the universe's cut and forecast moment:
-    the market seen and the forecast, schema.sql look), and its squad and
-    cash (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen). The
-    offers seen count only on the squad seen (a replay's has none,
-    sim.with_squad). A universe made by hand (no cut) has its market and
-    forecast written first."""
-    m = u.market
-    if not u.cut:
+def inputs(u: Universe | None = None, buys: bool = True) -> None:
+    """What the decision looks at, the league at t (look: the market seen,
+    the forecast, your squad and cash then), made once a decision
+    (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen); buys, or
+    sales only. A league made by hand (u, a self-test's) is written first
+    as assemble writes the league at t (_by_hand)."""
+    if u is not None:
         write_constants()   # the model's constants the views read, as a forecast writes them
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
-        if not u.cut:
+        if u is not None:
             _by_hand(db, u)
-        db.execute("INSERT INTO look VALUES (?, variant(), ?, ?)", (u.cut, u.moment, u.me))
-        db.execute("INSERT INTO dec_state VALUES (?, ?, ?, ?, ?, ?)",
-                   (m.cash, int(bool(m.fetch)), int(buys), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
-        db.executemany("INSERT INTO dec_mine VALUES (?, ?)",
-                       [(k, position(m.pos.get(k)) or p) for k, p in sorted(u.mine.items())])
+        db.execute("INSERT INTO dec_state VALUES (?, ?, ?, ?)", (int(buys), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
         for t in ("dec_player", "dec_odds", "dec_money"):
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 
 
 def _by_hand(db: Any, u: Universe) -> None:
-    """A self-test's market and forecast, as assemble writes them (seen at
-    cut '', forecast_cell at moment 0)."""
+    """A self-test's league at t, as assemble writes it: seen and seen_cash
+    at t (your squad yours there), forecast_cell at moment 0, and look on
+    them, with no path."""
     m = u.market
     owner = {**{k: mgr for mgr, sq in u.state.squads.items() for k in sq}, **m.owner}
     pos = {**{k: p for sq in u.state.squads.values() for k, p in sq.items()}, **m.pos}
-    db.execute("DELETE FROM seen WHERE cut = ''")
-    db.execute("DELETE FROM seen_odds WHERE cut = ''")
+    set_look(moment=0, me=u.me, path="", t0="")
+    for t in ("seen", "seen_cash", "seen_odds"):
+        db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)
     db.execute("DELETE FROM forecast_cell WHERE moment = 0")
-    db.executemany("INSERT INTO seen VALUES ('', variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
                    [(k, m.shown(k), pos.get(k), owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
                      m.offer.get(k), m.clause.get(k), m.price.get(k), m.route.get(k), m.my_bid.get(k), m.fetch.get(k))
                     for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine) | set(owner))])
-    db.executemany("INSERT INTO seen_odds VALUES ('', variant(), ?, ?, ?)",
+    db.execute("INSERT INTO seen_cash VALUES ((SELECT cut()), variant(), ?, ?)", (u.me, m.cash))
+    db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut()), variant(), ?, ?, ?)",
                    [(k, r, p) for k, odds in m.odds.items() for r, p in odds])
     db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
                    [(k, j, pts, p) for j in u.state.jornadas
@@ -67,11 +65,12 @@ def after_auctions() -> frozenset[str]:
     return frozenset(k for (k,) in rows("SELECT player FROM dec_when WHERE after"))
 
 
-def plan(u: Universe, sales_only: bool = False) -> list[Action]:
-    """The plan decide.sql makes for this universe, its moves in order: a
-    buy at its bid, a sale at what it gets (a swap's buy, then its sale). With
-    sales_only, only sales (what clearing a debt takes). Every single move
-    as valued before the first is kept beside it (dec_start, dec_rows)."""
+def plan(u: Universe | None = None, sales_only: bool = False) -> list[Action]:
+    """The plan decide.sql makes at t (or for a league by hand, u), its
+    moves in order: a buy at its bid, a sale at what it gets (a swap's buy,
+    then its sale). With sales_only, only sales (what clearing a debt
+    takes). Every single move as valued before the first is kept beside it
+    (dec_start, dec_rows)."""
     inputs(u, buys=not sales_only)
     out: list[Action] = []
     with closing(connect()) as db, db:

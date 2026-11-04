@@ -4,7 +4,7 @@ before a commit, and a slowdown shows up like a failing test.
     python tools/perf.py          # time each date, compare with tools/perf.json; exit 1 past SLOWER
     python tools/perf.py --save   # the same, and keep these times as the ones to compare with
 
-Each date's universe is built from the data, then its decision
+Each date's league at t is made from the data (grading.at), then its decision
 (decision.plan), on the dry-run copy
 of the data (FF_ROOT, as the backtests use it). The backtest is about 140
 of these, so a second here is two minutes there (2026-10-30: backtests had
@@ -33,15 +33,14 @@ SLOWER = 1.3
 
 
 def measure() -> dict[str, dict[str, float]]:
-    """Each date's seconds: its universe and its board."""
+    """Each date's seconds: its league at t and its board."""
     out = {}
     for t in DATES:
         s = time.perf_counter()
-        u = grading.universe_when(t)
+        assert grading.at(t) is not None, t
         built = time.perf_counter() - s
-        assert u is not None, t
         s = time.perf_counter()
-        decision.plan(u)
+        decision.plan()
         out[t.date().isoformat()] = {"universe": round(built, 2), "board": round(time.perf_counter() - s, 2)}
     return out
 

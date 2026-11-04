@@ -4,9 +4,9 @@
     python tools/sql.py --at 2026-09-27T0934Z "SELECT count(*) FROM player_facts"
     python tools/sql.py --variant shrink-8 "SELECT name, value FROM model_constants WHERE variant = variant()"
 
-The same functions as Datasette (cut(), variant(), name_key(), claim(),
-median(), ...); --at sets cut() to a past stamp, so every view reads
-as it did then. Nothing can be written.
+The same functions as Datasette (variant(), name_key(), claim(),
+median(), ...); --at sets t (cut(), this process's) to a past stamp, so
+every view reads as it did then. Nothing can be written.
 """
 from __future__ import annotations
 
@@ -15,27 +15,26 @@ import sys
 from contextlib import closing
 from typing import Any
 
-from ffcore.clock import set_now, set_variant
-from ffcore.db import connect
+from ffcore.clock import set_variant
+from ffcore.db import connect, replaying, set_now
 from ffcore.parse import snapshot_stamp
 from q import table
 
 
 def ask(sql: str, at: str = "", variant: str = "live") -> tuple[list[str], list[tuple[Any, ...]]]:
     """sql's columns and rows, as of the stamp at (now if empty), under variant."""
-    if at:
-        when = snapshot_stamp(at)
-        if when is None:
-            raise SystemExit("--at %r is not a stamp (2026-09-27T0934Z)" % at)
-        set_now(when)
+    when = snapshot_stamp(at) if at else None
+    if at and when is None:
+        raise SystemExit("--at %r is not a stamp (2026-09-27T0934Z)" % at)
     set_variant(variant)
     try:
-        with closing(connect()) as db:
+        with replaying(), closing(connect()) as db:
+            if when is not None:
+                set_now(when)
             db.execute("PRAGMA query_only = 1")
             cur = db.execute(sql)
             return [d[0] for d in cur.description or ()], [tuple(r) for r in cur.fetchall()]
     finally:
-        set_now(None)
         set_variant("live")
 
 
@@ -73,7 +72,7 @@ def _selftest() -> None:
         assert ask("SELECT count(*) FROM current_market")[1] == [(1,)]
         assert ask("SELECT observed_at FROM current_market", at="2026-09-01T1200Z")[1] == [("2026-09-01T1000Z",)], \
             "--at: the views as they stood then"
-        assert ask("SELECT cut()")[1][0][0] != "2026-09-01T1200Z", "the clock is put back afterwards"
+        assert ask("SELECT cut()")[1][0][0] != "2026-09-01T1200Z", "t is put back afterwards"
         for bad in ("DELETE FROM market", "CREATE TABLE x (a)", "INSERT INTO market (observed_at) VALUES ('t')"):
             try:
                 ask(bad)

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from ffcore.clock import run_now
 from ffcore.parse import stamp
-from ffcore.db import RUN_ENV, connect, this_run
+from ffcore.db import RUN_ENV, connect, set_now, this_run
 
 
 # Every run, in order: (name, function, makes the report). A stage that
@@ -68,10 +68,14 @@ def _commit(repo: Path = Path(".")) -> str:
 
 
 def _start(db: sqlite3.Connection) -> int:
+    """The run recorded, and t set to its time (the wall clock, LFG_NOW when
+    pinned): every stage reads the league as of it."""
+    now = run_now()
+    set_now(now)
     with db:
         cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha)"
                          " VALUES (?, ?, ?, ?)",
-                         (_utc(), stamp(run_now()),
+                         (_utc(), stamp(now),
                           os.environ.get("LFG_TRIGGER", "service"), _commit()))
     assert cur.lastrowid is not None
     return cur.lastrowid

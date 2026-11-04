@@ -10,19 +10,17 @@ from collections.abc import Callable, Iterator
 from contextlib import closing
 from pathlib import Path
 from statistics import NormalDist
-from typing import Any, NamedTuple
+from typing import Any
 
 
-from ffcore.forecast import expected_points
-from ffcore.jornadas import round_locks
+from ffcore.jornadas import round_locks, rounds
 from ffcore.points import done_jornadas, jornada_points
 
-from assemble import applied, forecast_key, player_forecast, price_change, price_momentum, universe
+from assemble import applied, built, forecast_key, player_forecast, price_change, price_momentum
 import decision
-from decide import Action, Universe
-from sim import with_squad
-from ffcore.clock import set_now, snapshot_stamp, stamp
-from ffcore.db import connect, record, rows, this_run
+from decide import Action
+from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
+from ffcore.parse import snapshot_stamp, stamp
 __all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "superseded", "view_table",
            "record_grades"]
 
@@ -30,65 +28,33 @@ REPLAY_VARIANT = "live"
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 
 
-_AT: dict[tuple[dt.datetime, frozenset[str]], Universe | None] = {}
-
-
-def universe_when(t: dt.datetime, also: frozenset[str] = frozenset()) -> Universe | None:
-    """The universe at t (None if no board could be built then), with the
-    clock set to it, forecasting also these players (assemble.built). Built
-    once however many of the replays ask: a universe costs ~10s cold."""
+def at(t: dt.datetime) -> int | None:
+    """t set (set_now) and the league at t made for a decision there
+    (assemble.built): its forecast moment, None if no board could be made
+    then."""
     set_now(t)
-    if (t, also) not in _AT:
-        try:
-            _AT[t, also] = universe(also)
-        except SystemExit as e:
-            print("%s: no board (%s)" % (t.isoformat(), e), file=sys.stderr)
-            _AT[t, also] = None
-    return _AT[t, also]
+    try:
+        return built().moment
+    except SystemExit as e:
+        print("%s: no board (%s)" % (t.isoformat(), e), file=sys.stderr)
+        return None
 
 
-def on_market_by(t: dt.datetime, listed: dict[str, str]) -> frozenset[str]:
-    """Every player listed on the game's market up to t (listed: when each
-    first was, first_listed): whom a replay's phantom can hold then
-    (whatever he bought, he bought from it)."""
-    cut = stamp(t)
-    return frozenset(k for k, first in listed.items() if first <= cut)
+def _made_at(t: dt.datetime) -> dt.datetime:
+    set_look(path="", t0="")
+    at(t)
+    return t
 
 
-def first_listed() -> dict[str, str]:
-    """When each player was first on the market, read once a replay (a read
-    a time was 9 of a backtest's 34 s, 2026-10-31). His first listing
-    (api_market, where buys come from) or his first value (market),
-    whichever is earlier: 9 players were listed before their first value
-    (2026-10-31)."""
-    return dict(rows("SELECT player, min(first) FROM ("
-                     " SELECT ff_id AS player, min(observed_at) AS first FROM market WHERE ff_id <> '' GROUP BY ff_id"
-                     " UNION ALL SELECT a.player, min(t.observed_at) FROM api_market t"
-                     " JOIN app_player a ON a.app_id = t.player_id GROUP BY a.player)"
-                     " GROUP BY player"))
-
-
-def _built_at(job: tuple[dt.datetime, frozenset[str]]) -> tuple[dt.datetime, Universe | None]:
-    t, also = job
-    return t, universe_when(t, also)
-
-
-def warm(times: list[dt.datetime], also: Callable[[dt.datetime], frozenset[str]]) -> None:
-    """The universe at each of these times built ahead, WARM_JOBS at a time
-    in their own processes, each forecasting also(t): a phantom's decisions
-    then wait on nothing but his plans. A universe depends on nothing he
-    did as long as also(t) holds whoever he can hold (on_market_by)."""
+def warm(times: list[dt.datetime]) -> None:
+    """The league at each of these times made ahead (seen, the forecast,
+    the price fits: kept in the file, read back by at), WARM_JOBS at a time
+    in their own processes, each at its own t: a replay then waits on
+    nothing but its plans and the players only its path holds."""
     import multiprocessing
-    jobs = []
-    for t in times:
-        if (t, also(t)) in _AT:
-            continue
-        jobs.append((t, also(t)))
-    if not jobs:
-        return
     with multiprocessing.get_context("fork").Pool(WARM_JOBS) as pool:
-        for t, u in pool.imap_unordered(_built_at, jobs):
-            _AT[t, also(t)] = u
+        for _t in pool.imap_unordered(_made_at, times):
+            pass
 
 
 WARM_JOBS = 4
@@ -101,26 +67,24 @@ def before_locks() -> dict[dt.datetime, int]:
     return {locks[j] - dt.timedelta(minutes=1): j for j in sorted(done_jornadas() & set(locks), key=locks.__getitem__)}
 
 
-def at_locks(only: set[int] | None = None) -> Iterator[tuple[int, Universe]]:
-    """Each finished jornada (of only, if given) and the universe a minute
-    before its lock (universe_when), where one could be built; the clock
-    let go after: decisions and sim_calibration stand there."""
-    try:
+def at_locks(only: set[int] | None = None) -> Iterator[int]:
+    """Each finished jornada (of only, if given) where the league could be
+    made a minute before its lock, with t there (at); t put back after:
+    decisions and sim_calibration stand there."""
+    with replaying():
         for t, j in before_locks().items():
-            if (only is None or j in only) and (u := universe_when(t)) is not None:
-                yield j, u
-    finally:
-        set_now(None)
+            if (only is None or j in only) and at(t) is not None:
+                yield j
 
 
 def auction_closes() -> list[dt.datetime]:
-    """When each past night's auctions on the game's market closed (the
+    """When each night's auctions on the game's market closed by t (the
     listings' expiry), oldest first: a day's buying and selling is decided
     before it."""
-    now = dt.datetime.now(dt.timezone.utc)
-    return [t for (c, ) in rows("SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
-                                " AND coalesce(expires_at, '') <> '' ORDER BY 1")
-            if (t := dt.datetime.fromisoformat(c)) <= now]
+    return [dt.datetime.fromisoformat(c) for (c, ) in rows(
+        "SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
+        " AND coalesce(expires_at, '') <> '' AND julianday(expires_at) <= stamp_jd((SELECT cut()))"
+        " ORDER BY 1")]
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
@@ -129,14 +93,12 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
     the next ones too, each one done. Graded in SQL (grade_forecast)."""
     done = done_jornadas()
     out = []
-    try:
+    with replaying():
         for t, i in before_locks().items():
             set_now(t)
             fc = player_forecast()
             out += [{"from_j": i, "jornada": j, "moment": fc.moment}
                     for j in range(i, i + ahead + 1) if j in done and j in fc.jornadas]
-    finally:
-        set_now(None)
     return out
 
 
@@ -160,7 +122,7 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
         with closing(connect()) as db, db:
             db.execute("INSERT OR REPLACE INTO forecast_variant VALUES (?, ?, ?)", (variant, code, consts))
             todo = [(j, a) for j, a in db.execute(TODO, {"code": code, "constants": consts})][shard[0]::shard[1]]
-        try:
+        with replaying():
             for j, at in todo:
                 moment = snapshot_stamp(at)
                 assert moment is not None
@@ -174,8 +136,6 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
                             raise
                         time.sleep(1 + attempt)
                 print("  replay %s j%d %s" % (at, j, variant), flush=True)
-        finally:
-            set_now(None)
     return len(todo)
 
 
@@ -188,17 +148,22 @@ def decisions() -> list[dict[str, Any]]:
     price horizon, in millions, against what they did."""
     locks, actual = round_locks(), jornada_points()
     done = done_jornadas()
-    made: list[tuple[int, Universe, list[tuple[Any, ...]], int]] = []
-    for i, u in at_locks():
-        decision.plan(u)
-        made.append((i, u, rows("SELECT kind, player, amount, in_plan FROM dec_rows"),
-                     price_momentum().horizon))
+    made = []
+    for i in at_locks():
+        decision.plan()
+        moved = rows("SELECT kind, player, amount, in_plan FROM dec_rows")
+        e = {(k, j): x for k, j, x in rows("SELECT player, jornada, e FROM cell"
+                                           " WHERE player IN (SELECT player FROM dec_rows)")}
+        seen = {k: (name, value or 0.0, trend or 0.0) for k, name, value, trend in rows(
+            "SELECT s.player, name_shown(s.name), s.value, s.trend FROM look l"
+            " JOIN seen s ON s.cut = l.cut AND s.variant = l.variant")}
+        made.append((i, moved, e, seen, set(rounds().rem), price_momentum().horizon))
     out = []
-    for i, u, moved, horizon in made:
-        # what happened is read with the clock let go: as of the lock, no later price is seen
+    for i, moved, e, seen, rem, horizon in made:
+        # what happened is read with t put back: as of the lock, no later price is seen
         rose = price_change(locks[i].strftime("%Y-%m-%d"), horizon)
-        per_j, m = u.forecaster.per_jornada, u.market
-        later = sorted(j for j in done if j >= i and j in per_j)
+        later = sorted(j for j in done if j >= i and j in rem)
+        names = {k: f[0] for k, f in seen.items()}
 
         def worth(a: Action, pct: Callable[[str], float | None]) -> float | None:
             """What the move's players were worth more (bought) or less
@@ -206,8 +171,9 @@ def decisions() -> list[dict[str, Any]]:
             got = {k: pct(k) for k in (*((a.buy, ) if a.buy else ()), *a.sell)}
             if any(v is None for v in got.values()):
                 return None
-            return (m.value.get(a.buy, 0.0) * (got.get(a.buy) or 0.0) - sum(
-                m.value.get(k, 0.0) * (got[k] or 0.0) for k in a.sell)) / 100e6
+            value = {k: f[1] for k, f in seen.items()}
+            return (value.get(a.buy, 0.0) * (got.get(a.buy) or 0.0) - sum(
+                value.get(k, 0.0) * (got[k] or 0.0) for k in a.sell)) / 100e6
 
         def change(a: Action, pts: Callable[[str, int], float]) -> float:
             return sum(pts(a.buy, j) for j in later) - sum(
@@ -215,23 +181,15 @@ def decisions() -> list[dict[str, Any]]:
         for kind, k, amount, in_plan in moved:
             a = Action("buy", buy=k, cost=amount) if kind == "buy" else Action("sell", sell=(k, ), proceeds=amount)
             out.append({
-                "lock": i, "jornadas": len(later), "move": a.label(u.market.names),
+                "lock": i, "jornadas": len(later), "move": a.label(names),
                 "group": "plan" if in_plan else "left out",
                 "kind": "sell" if not a.buy else "get",
                 "chance": None,
-                "pred": change(a, lambda k, j: expected_points(per_j[j].get(k))),
+                "pred": change(a, lambda k, j: e.get((k, j), 0.0)),
                 "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
-                "value_pred": worth(a, lambda k: m.trend.get(k, 0.0)),
+                "value_pred": worth(a, lambda k: seen[k][2] if k in seen else 0.0),
                 "value_real": worth(a, lambda k: rose.get(k))})
     return out
-
-
-def auction_bars() -> dict[tuple[str, dt.datetime], float | None]:
-    """What a bid had to reach at each past close for each player listed
-    then, keyed by player and close (auction_results' bar, in money; None:
-    no bid gets him)."""
-    return {(p, dt.datetime.fromisoformat(c)): None if bar is None else bar * asking
-            for p, c, asking, bar in rows("SELECT player, close, asking, bar FROM auction_results")}
 
 
 # The runs a day the board is acted on, local time as the closes are
@@ -250,132 +208,121 @@ def run_times(closes: list[dt.datetime]) -> dict[dt.datetime, dt.datetime]:
             if (r := c.replace(hour=h, minute=m, second=0, microsecond=0)) < c}
 
 
-class Day(NamedTuple):
-    """The phantom between runs: his squad and cash, his bids in, and the
-    sales the last run left for after the auctions (pending)."""
-    squad: dict[str, str]
-    cash: float
-    bids: dict[str, float]
-    pending: tuple[Action, ...] = ()
+# The paths the phantom's replay reads the league at t as (look.path): his
+# moves, and none (the manager who never moves).
+PHANTOM, STANDPAT = "phantom", "standpat"
 
 
-def acted(up: Universe, bids: dict[str, float], acts: list[Action],
-          later: frozenset[str] = frozenset()) -> tuple[Day, list[Action]]:
-    """A run's plan, made: its buys bid at its amounts (a bid already in
-    set to the plan's, one the plan does not make taken back: the plan
-    weighs every bid, yours in or not), and its sales made at once, but
-    those of players in later (the plan's to make after the auctions,
-    decision.after_auctions), left for after them (closed). The plan's bids
-    are within what the app takes (decide.sql dec_next: your cash and the
-    debt it allows). And the moves made."""
-    sales = [a for a in acts if a.sell]
-    made = [a for a in acts if not a.sell]
-    bids = {a.buy: a.cost for a in made if a.buy}
-    now = [a for a in sales if not set(a.sell) & later]
-    return (Day(up.squad_after(*now), up.market.left(now), bids, tuple(a for a in sales if a not in now)),
-            made + now)
+def follow(path: str, t0: str = "") -> None:
+    """The league at t read as path's (look: its moves since t0); '': live,
+    your own squad and cash at t."""
+    set_look(path=path, t0=t0)
 
 
-def closed(up: Universe, day: Day, bars: dict[tuple[str, dt.datetime], float | None],
-           close: dt.datetime) -> tuple[Day, list[Action], int]:
-    """The auctions closing: a bid on a player whose auction closes then
-    (auction_bars) wins if it reaches what it had to and is paid, the player
-    yours; otherwise it is lost. Bids on the others stand. The sales left for
-    after the auctions are made if none was lost; with one lost, only those
-    the money rule then needs (decision.plan over the sales alone: those
-    clearing a debt at fewest points), the rest the next run decides again. The day after, the sales
-    made and how many bids were lost."""
-    closing = {k: b for k, b in day.bids.items() if (k, close) in bars}
-    won = [k for k, b in closing.items() if (bar := bars[k, close]) is not None and b >= bar]
-    after = with_squad(up, up.squad_after(*(Action("buy", buy=k) for k in won)),
-                       up.market.cash - sum(closing[k] for k in won))
-    sales = list(day.pending) if len(won) == len(closing) else decision.plan(after, sales_only=True)
-    return (Day(after.squad_after(*sales), after.market.left(sales),
-                {k: b for k, b in day.bids.items() if k not in closing}),
-            sales, len(closing) - len(won))
-
-
-def eleven(u: Universe) -> list[str]:
-    """Your eleven next as the model sees it (decide.sql my_xi)."""
-    decision.inputs(u, buys=False)
-    return [k for k, in rows("SELECT player FROM my_xi")]
+def move(path: str, t: dt.datetime, kind: str, player: str, amount: float | None) -> None:
+    with closing(connect()) as db, db:
+        db.execute("INSERT OR REPLACE INTO moves VALUES (?, ?, ?, ?, ?)", (path, stamp(t), kind, player, amount))
 
 
 def phantom_path() -> list[dict[str, Any]]:
     """The league's sixth manager: your squad and cash at the first lock,
-    then the plan (every player he or the manager beside him holds
-    forecast, though nobody may hold him now) this code makes for the squad
-    and cash he has, made at each run the board is acted on (run_times),
-    his bids standing from one run to the next as yours do (acted) and
-    settled at each close against what the real auction took (closed). At each lock his
-    eleven picked from that lock's forecast from the squad he holds and
-    scored on what they got (nothing in debt, the game's rule), beside a
-    manager who never moves, picked the same way. One row a played jornada:
-    both elevens' points, the moves made since the last, the bids lost, his cash and his squad's worth
-    after them."""
-    set_now(None)
+    then his own moves (the path PHANTOM's, rows the league at t reads:
+    schema.sql my_squad, my_cash), as this code's plan makes them at each
+    run the board is acted on (run_times), at t there: its bids placed and
+    those it no longer makes taken back, its sales made at once, but those
+    beside a bid, which are made at the close if every bid closing then won
+    (else only what clearing a debt then takes: the plan, sales only, at the
+    close). A bid is settled at its auction's close by what that auction took
+    (my_bids). At each lock his eleven (my_xi) scored on what they got
+    (nothing in debt, the game's rule), beside a manager who never moves
+    (STANDPAT), picked the same way. One row a played jornada: both elevens'
+    points, the moves made since the last, the bids lost, his cash and his
+    squad's worth after them. Up to t, put back after, and the paths
+    left as made (moves) but not followed."""
+    with replaying():
+        try:
+            return _phantom_path()
+        finally:
+            follow("")
+
+
+def _phantom_path() -> list[dict[str, Any]]:
     actual = jornada_points()
     played = before_locks()
     first = min(played, default=None)
-    runs = run_times([c for c in auction_closes() if first is not None and c > first])
-    runs = {r: c for r, c in runs.items() if first is not None and r > first}
+    if first is None:
+        return []
+    runs = {r: c for r, c in run_times([c for c in auction_closes() if c > first]).items() if r > first}
     closes = set(runs.values())
-    bars = auction_bars()
-    squad: dict[str, str] | None = None
-    hold: dict[str, str] = {}
-    bids: dict[str, float] = {}
-    pending: tuple[Action, ...] = ()
-    cash = held_cash = 0.0
+    with closing(connect()) as db, db:
+        db.execute("DELETE FROM moves WHERE path IN (?, ?)", (PHANTOM, STANDPAT))
+    start = ""
     made: list[str] = []
+    pending: list[Action] = []      # the last run's sales beside its bids
     lost = 0
-    last: Universe | None = None
     out = []
-    ever: dict[dt.datetime, frozenset[str]] = {}
-    listed = first_listed()
 
-    def held(t: dt.datetime) -> frozenset[str]:
-        """Whom the phantom can hold at t: who was listed by then, and the squad he started with."""
-        if t not in ever:
-            ever[t] = on_market_by(t, listed) | frozenset(hold)
-        return ever[t]
-    try:
-        for t in sorted(set(played) | set(runs) | closes):
-            if squad is None:
-                if t not in played or (start := universe_when(t)) is None:
-                    continue
-                squad, hold, cash = dict(start.mine), dict(start.mine), start.market.cash
-                held_cash = cash
-                warm([r for r in sorted(set(played) | set(runs)) if r > t], held)
-            if t in closes:
-                if last is not None:
-                    day, sold, n = closed(with_squad(last, squad, cash), Day(squad, cash, bids, pending), bars, t)
-                    squad, cash, bids, pending = day
-                    made += [a.label(last.market.names) for a in sold]
-                    lost += n
-                if t not in played and t not in runs:
-                    continue
-            assert hold and frozenset(squad) | frozenset(bids) <= held(t), "the phantom holds a player never listed"
-            u = universe_when(t, held(t) if hold else frozenset(squad))
-            if u is None:
+    def names() -> dict[str, str]:
+        """Each player's name as last seen by t."""
+        return dict(rows("SELECT s.player, name_shown(s.name) FROM look l JOIN seen s"
+                         " ON s.cut = (SELECT max(cut) FROM seen WHERE cut <= l.cut) AND s.variant = l.variant"))
+
+    def sell(t: dt.datetime, sales: list[Action]) -> None:
+        for a in sales:
+            move(PHANTOM, t, "sell", a.sell[0], a.proceeds)
+        made.extend(a.label(names()) for a in sales)
+
+    def held() -> tuple[list[str], float, float]:
+        """His eleven next, cash and squad's value, as of t."""
+        (cash, value), = rows("SELECT (SELECT cash FROM my_cash), (SELECT total(s.value) FROM my_squad m"
+                              " JOIN look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant"
+                              " AND s.player = m.player)")
+        return [k for k, in rows("SELECT player FROM my_xi")], cash, value
+
+    for t in sorted(set(played) | set(runs) | closes):
+        ready = False
+        if not start:
+            if t not in played or at(t) is None:
                 continue
-            up = with_squad(u, squad, cash, bids)
-            if t in runs:
-                acts = decision.plan(up)
-                (squad, cash, bids, pending), acts = acted(up, bids, acts, decision.after_auctions())
-                up = with_squad(u, squad, cash, bids)
-                made += [a.label(up.market.names) for a in acts]
-                last = u
-            if t in played:
-                i = played[t]
-                out.append({"jornada": i, "phantom": sum(actual.get((k, i), 0.0) for k in eleven(up))
-                            if cash >= 0 else 0.0,
-                            "standpat": sum(actual.get((k, i), 0.0) for k in eleven(with_squad(u, hold, cash))),
-                            "moves": "; ".join(made), "lost": lost, "cash": cash,
-                            "value": sum(u.market.value.get(k, 0.0) for k in squad),
-                            "standpat_money": held_cash + sum(u.market.value.get(k, 0.0) for k in hold)})
-                made, lost = [], 0
-    finally:
-        set_now(None)
+            start, ready = stamp(t), True
+            warm(sorted(r for r in set(played) | set(runs) if r > t))
+            follow(PHANTOM, start)
+        if t in closes:
+            set_now(t)
+            settled = rows("SELECT won FROM my_bids WHERE close = ?", (stamp(t), ))
+            n = sum(not won for won, in settled)
+            if not n:
+                sell(t, pending)
+            elif at(t) is not None:
+                sell(t, decision.plan(sales_only=True))
+            pending, lost = [], lost + n
+            if t not in played and t not in runs:
+                continue
+        if not ready and at(t) is None:
+            continue
+        if t in runs:
+            acts = decision.plan()
+            after = decision.after_auctions()
+            bids = {a.buy: a.cost for a in acts if a.buy}
+            for (k, ) in rows("SELECT player FROM my_bids WHERE won IS NULL"):
+                if k not in bids:
+                    move(PHANTOM, t, "withdraw", k, None)
+            for k, b in bids.items():
+                move(PHANTOM, t, "bid", k, b)
+            pending = [a for a in acts if a.sell and set(a.sell) & after]
+            made.extend(a.label(names()) for a in acts if a.buy)
+            sell(t, [a for a in acts if a.sell and not set(a.sell) & after])
+        if t in played:
+            xi, cash, value = held()
+            follow(STANDPAT, start)
+            still, still_cash, still_value = held()
+            follow(PHANTOM, start)
+            out.append({"jornada": played[t],
+                        "phantom": sum(actual.get((k, played[t]), 0.0) for k in xi) if cash >= 0 else 0.0,
+                        "standpat": sum(actual.get((k, played[t]), 0.0) for k in still),
+                        "moves": "; ".join(made), "lost": lost, "cash": cash, "value": value,
+                        "standpat_money": still_cash + still_value})
+            made, lost = [], 0
     return out
 
 
@@ -445,9 +392,9 @@ def sim_calibration() -> list[dict[str, Any]]:
             return None if got is None else float(got[0])
         out: list[dict[str, Any]] = []
         windows = clean_windows(locks, kicks)
-        for j, u in at_locks(set(windows)):
+        for j in at_locks(set(windows)):
             start, end = windows[j]
-            decision.inputs(u)
+            decision.inputs()
             dist = {m: (mean, sd) for m, mean, sd in rows("SELECT manager, mean, sd FROM league_jornada"
                                                           " WHERE jornada = ?", (j, ))}
             actual = {}
@@ -455,7 +402,7 @@ def sim_calibration() -> list[dict[str, Any]]:
                 a0, a1 = points(m, start), points(m, end)
                 if a0 is not None and a1 is not None:
                     actual[m] = a1 - a0
-            out += calibration_rows(j, dist, actual, u.me)
+            out += calibration_rows(j, dist, actual, rows("SELECT me FROM look")[0][0])
     return out
 
 
@@ -502,17 +449,13 @@ def record_grades() -> dict[str, int]:
     if run is not None and done and graded(run, max(done)):
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, "moves": 0}
-    _AT.clear()
-    try:
-        fc, moves = backtest(GRADE_AHEAD), decision_rows(decisions())
-        if run is not None:
-            record([{"run_id": run, **r} for r in fc], "grade_moment")
-            record([{"run_id": run, **r} for r in moves], "grade_decisions")
-            record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
-            record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
-            superseded(run)
-    finally:
-        _AT.clear()
+    fc, moves = backtest(GRADE_AHEAD), decision_rows(decisions())
+    if run is not None:
+        record([{"run_id": run, **r} for r in fc], "grade_moment")
+        record([{"run_id": run, **r} for r in moves], "grade_decisions")
+        record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
+        record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
+        superseded(run)
     print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}     # forecasts: lock moments a jornada
 
@@ -530,7 +473,6 @@ def view_table(view: str, path: Path | None = None) -> str:
 def _selftest_todo() -> None:
     """TODO on its inputs as tables: a finished jornada's moments this
     forecast (its code and constants) has not made."""
-    import sqlite3
     db = sqlite3.connect(":memory:")
     db.executescript("""CREATE TABLE replay_moments (jornada, as_of, lock);
         CREATE TABLE jornadas_done (jornada); CREATE TABLE forecast_moment (code, constants, as_of, made);
@@ -544,44 +486,57 @@ def _selftest_todo() -> None:
 
 
 def _selftest_phantom() -> None:
-    """The phantom's day: bids placed at a run stand to the next and are
-    settled at the close."""
-    from dataclasses import replace
-    from ffcore.fixtures import tiny_market_universe
+    """The phantom's league at t (schema.sql my_bids, my_squad, my_cash):
+    his squad and cash at t0 and his moves since, his bids settled at their
+    auction's close by what it took."""
+    import tempfile
+    from ffcore.tidy import store_sql, tables_in
+
     madrid = dt.timezone(dt.timedelta(hours=2))
     close = dt.datetime(2026, 10, 20, 22, 24, tzinfo=madrid)
-    assert run_times([close]) == {close.replace(hour=21, minute=45): close}, "the evening's run, before the close"
-    u = with_squad(tiny_market_universe(), dict(tiny_market_universe().mine), 5.5e6)
-    buy, sale = Action("buy", buy="cand_free", cost=5e6), Action("sell", sell=("bench_m",), proceeds=3e6)
-    day, made = acted(u, {}, [buy, sale], frozenset({"bench_m"}))
-    assert (day.bids, day.cash, "bench_m" in day.squad, day.pending, made) \
-        == ({"cand_free": 5e6}, 5.5e6, True, (sale,), [buy]), \
-        "a buy is a bid in, paid only if it wins; the sale beside it waits for the auction"
-    alone, made = acted(u, {}, [sale])
-    assert (alone.cash, "bench_m" in alone.squad, alone.pending, made) == (8.5e6, False, (), [sale]), \
-        "a sale the plan makes at once"
-    held = with_squad(u, day.squad, day.cash, day.bids)
-    assert held.market.my_bid == {"cand_free": 5e6}, "the next run sees it as your bid in"
-    again, made = acted(held, day.bids, [Action("buy", buy="cand_free", cost=6e6), sale], frozenset({"bench_m"}))
-    assert (again.bids, again.pending) == ({"cand_free": 6e6}, (sale,)), \
-        "a bid already in, raised to the plan's amount: the sale beside it waits for it"
-    assert acted(held, day.bids, [sale])[0].bids == {}, \
-        "a bid in that the plan does not make is taken back: it would win beside the plan's"
-    assert acted(held, day.bids, [Action("withdraw", sell=("cand_free",), proceeds=5e6)])[0].bids == {}, \
-        "withdrawn"
-    gone = replace(held, market=replace(held.market, price={}))
-    assert acted(gone, day.bids, [])[0].bids == {}, "off the market: the bid is gone"
-    won, sold, n = closed(held, day, {("cand_free", close): 4.9e6}, close)
-    assert ("cand_free" in won.squad, "bench_m" in won.squad, won.cash, won.bids, sold, n) \
-        == (True, False, 3.5e6, {}, [sale], 0), "won: paid, yours, and the sale beside it made"
-    lost, sold, n = closed(held, day, {("cand_free", close): 5.2e6}, close)
-    assert ("cand_free" in lost.squad, "bench_m" in lost.squad, lost.cash, sold, n) \
-        == (False, True, 5.5e6, [], 1), "lost: no charge, and the sale it needed not made"
-    owing = with_squad(u, dict(u.mine), -1e6)
-    _o, sold, _n = closed(owing, day._replace(cash=-1e6), {("cand_free", close): 5.2e6}, close)
-    assert [a.sell for a in sold] in ([("bench_m",)], [("bench_k",)]), \
-        "lost, in debt: one sale the money rule needs, of a bench player costing no points"
-    assert closed(held, day, {}, close)[0].bids == {"cand_free": 5e6}, "his auction is not tonight: it stands"
+    run, t0 = close.replace(hour=21, minute=45), stamp(close - dt.timedelta(days=2))
+    assert run_times([close]) == {run: close}, "the evening's run, before the close"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        a = "2026-10-17T1000Z"
+        store_sql("api_standings", [{"observed_at": a, "user_id": "1", "manager": "me"},
+                                    {"observed_at": a, "user_id": "2", "manager": "riv"}])
+        store_sql("api_market", [{"observed_at": a, "seller": "marketPlayerLeague", "player_id": i,
+                                  "expires_at": close.isoformat(), "sale_price": "5000000"} for i in ("7", "8", "9")])
+        store_sql("api_activity", [
+            {"observed_at": a, "activity_id": "x", "kind": "buy", "user_id": "2", "player_id": "7",
+             "at": "2026-10-20T22:24:10+02:00", "amount": "6000000", "counterparty": ""},
+            {"observed_at": a, "activity_id": "z", "kind": "buy", "user_id": "2", "player_id": "8",
+             "at": "2026-10-20T22:24:10+02:00", "amount": "5800000", "counterparty": ""},
+            {"observed_at": a, "activity_id": "y", "kind": "bonus", "user_id": "1", "player_id": "",
+             "at": "2026-10-19T04:40:00+02:00", "amount": "2000000", "counterparty": ""}])
+        with closing(connect()) as db, db:
+            db.execute("INSERT INTO league_config VALUES ('me', 100e6)")
+            db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
+                           [("cand", "7"), ("cheap", "8"), ("gone", "9")])
+            db.executemany("INSERT INTO seen (cut, variant, player, name, pos, owner) VALUES (?, 'live', ?, ?, ?, ?)",
+                           [(t0, k, k, pos, "me") for k, pos in (("k", "POR"), ("bench", "DEF"))])
+            db.execute("INSERT INTO seen_cash VALUES (?, 'live', 'me', 10e6)", (t0, ))
+            set_look(me="me", path="p", t0=t0)
+            db.executemany("INSERT INTO moves VALUES ('p', ?, ?, ?, ?)", [
+                (stamp(run), "bid", "cand", 6.5e6), (stamp(run), "bid", "cheap", 5.5e6), (stamp(run), "sell", "bench", 3e6),
+                (stamp(run - dt.timedelta(days=1)), "bid", "gone", 9e6),
+                (stamp(run), "withdraw", "gone", None)])
+
+        def state() -> tuple[list[tuple[Any, ...]], list[str], float]:
+            return (rows("SELECT player, won FROM my_bids ORDER BY player"),
+                    [k for k, in rows("SELECT player FROM my_squad ORDER BY player")],
+                    rows("SELECT cash FROM my_cash")[0][0])
+        set_now(run)
+        assert state() == ([("cand", None), ("cheap", None)], ["k"], 10e6 + 2e6 + 3e6), \
+            "before the close his bids stand, unpaid; the sale made, and the league's bonus since t0 his"
+        set_now(close)
+        assert state() == ([("cand", 1), ("cheap", 0)], ["cand", "k"], 10e6 + 2e6 + 3e6 - 6.5e6), \
+            ("at the close, what each auction took (6M, 5.8M): his 6.5M wins, paid, and he is his; 5.5M is lost;"
+             " a bid taken back before its close is none")
+        set_look(path="other")
+        assert state() == ([], ["bench", "k"], 12e6), "another path: its own moves (none), the same facts"
+        set_look(path="", t0="")
+        assert state()[0] == [], "live: no path's moves"
 
 
 def _selftest() -> None:
@@ -744,7 +699,7 @@ if __name__ == "__main__":
             sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
             got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0,
             got[-1]["standpat_money"] / 1e6 if got else 0.0), flush=True)
-        # Out without freeing the universes one object at a time: ~8 s of a
+        # Out without freeing what it made one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
     print("grading.py --selftest | money (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")

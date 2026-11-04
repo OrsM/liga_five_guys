@@ -49,7 +49,7 @@ def _selftest() -> None:
     from datetime import datetime, timedelta, timezone
     from pathlib import Path
 
-    from ffcore.clock import set_now
+    from ffcore.db import set_now
     from ffcore.tidy import store_sql, tables_in
 
     now = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)

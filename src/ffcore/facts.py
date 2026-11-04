@@ -212,7 +212,7 @@ def _selftest() -> None:
         for cut in ("2026-08-17T0900Z", "2026-08-17T2100Z", "2026-08-09T2100Z", "2026-08-03T0000Z"):
             from datetime import datetime, timezone
 
-            from ffcore.clock import set_now
+            from ffcore.db import set_now
             try:
                 set_now(datetime.strptime(cut, "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc))
                 kept_fit = dict(rows("SELECT h, slope FROM momentum"))
@@ -224,7 +224,7 @@ def _selftest() -> None:
         def series_at(cut: str) -> list[tuple[object, ...]]:
             from datetime import datetime, timezone
 
-            from ffcore.clock import set_now
+            from ffcore.db import set_now
             try:
                 set_now(datetime.strptime(cut, "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc))
                 return [tuple(r) for r in rows("SELECT ff_id, i, round(x, 9), value FROM price_series ORDER BY ff_id, i")]
