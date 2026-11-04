@@ -36,6 +36,8 @@ eleven, no bid left open). It ranks nothing: one season path swings about
 
 The same modules run live and in the replay; only t and the moves differ.
 
+Every contract is a SQL table or view, and modules 2-5 are SQL views. Python is left only where SQL can't go: fetching and parsing (ingest), the plan's loop (insert the next move while one exists), and driving the app.
+
 **Rules.**
 - A module reads nothing from more than one step back, and nothing of a later one.
 - A test seeds its module's inputs as rows. No Python mirror of a table (Universe, Market, LeagueState, Bootstrap).
