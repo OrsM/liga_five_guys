@@ -318,8 +318,8 @@ def _selftest_points() -> None:
                  "points": "12", "games": "2"},
                 {"observed_at": later, "season": "2026-27", "ff_id": "2",
                  "points": "3", "games": "1"}])
-            assert set(rows("SELECT player, jornada, pts, games, at FROM scored")) == {
-                ("1", 1, 5.0, 1.0, b), ("1", 2, 7.0, 1.0, later), ("2", 1, 3.0, 1.0, later)}
+            assert set(rows("SELECT player, jornada, pts, at FROM scored")) == {
+                ("1", 1, 5.0, b), ("1", 2, 7.0, later), ("2", 1, 3.0, later)}
             record([{"player_id": k, "ff_slug": slug} for k, slug in
                     [("1", "uno"), ("2", "dos"), ("3", "tres")]], "crosswalk")
             store_sql("starters", [
@@ -329,6 +329,8 @@ def _selftest_points() -> None:
                                    ("tres", "3", "sub", ""), ("uno-coach", "1", "coach", "")]] + [
                 {"observed_at": later, "match_id": "m2", "team_slug": "x", "player_slug": "uno",
                  "player_name": "1", "role": "starter", "minute": "45"}])
+            assert set(rows("SELECT player, jornada FROM appearances")) == {("1", 1), ("1", 2), ("2", 1)}, \
+                "started or came on, not an unused sub"
             got = {k: r for k, *r in rows("SELECT player, pts, apps, squads, pick FROM season_record")}
             assert {k: tuple(r[:3]) for k, r in got.items()} == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0)}, \
                 "a starter the match unless he came off, a sub from when he came on"

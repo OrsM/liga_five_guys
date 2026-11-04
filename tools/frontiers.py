@@ -20,7 +20,7 @@ PREFIX = {"api_": "ingest", "current_": "ingest", "history_": "ingest", "ff_iden
 NAMES = {
     "ingest": "market lineups matches points results_history starters crosswalk app_player slug_player id_clashes "
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
-              "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes "
+              "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
               "player_jornadas season_record season_points next_lock listing_ends price_paid",
     "forecast": "cell standin_cell score_spread run_forecast forecast_used "

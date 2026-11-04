@@ -319,6 +319,19 @@ def record_grades() -> dict[str, int]:
     return {"resolved": resolved, "forecasts": len(fc), "moves": len(moves)}     # forecasts: lock moments a jornada
 
 
+def accuracy(ahead: int = 5) -> list[tuple[Any, ...]]:
+    """The forecast at each lock (backtest) graded as a run of its own
+    (trigger 'accuracy'): at the next jornada and at ahead, the rows
+    (ahead, n, rmse, mae, r) of grade_accuracy."""
+    with closing(connect()) as db, db:
+        run = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
+                         " VALUES ('', '', 'accuracy', '', 1)").lastrowid
+    assert run is not None
+    record([{"run_id": run, **r} for r in backtest(ahead)], "grade_moment")
+    return [tuple(r) for r in rows("SELECT ahead, n, rmse, mae, r FROM grade_accuracy"
+                                   " WHERE run_id = ? AND ahead IN (0, ?) ORDER BY ahead", (run, ahead))]
+
+
 def view_table(view: str, path: Path | None = None) -> str:
     """A view (replayed, grade_forecast) made a table of its columns in the
     current tables (tidy.tables_in), for its readers' tests to fill."""
@@ -500,6 +513,14 @@ if __name__ == "__main__":
                      for i in range(jobs)]
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
+    if sys.argv[1:2] == ["accuracy"]:
+        # accuracy: predicted e against actual points, next jornada and five ahead, at every past lock
+        # (records a run of trigger 'accuracy' in the database it reads)
+        held = applied(os.environ.get("LFG_VARIANT", "live"))
+        held.__enter__()
+        for a, n, rmse, mae, r in accuracy():
+            print("ahead %d  n=%d  rmse=%.4f  mae=%.4f  r=%.4f" % (a, n, rmse, mae, r), flush=True)
+        os._exit(0)
     if sys.argv[1:2] == ["ceiling"]:
         # ceiling: at each past lock, standing still, this code's plan and the plan on real points
         # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
@@ -509,5 +530,5 @@ if __name__ == "__main__":
         # Out without freeing what it made one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
-    print("grading.py --selftest | ceiling (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | accuracy | ceiling (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)
