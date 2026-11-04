@@ -32,9 +32,10 @@ NAMES = {
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
     "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts "
                 "next_cell my_squad my_cash my_xi look_players formation slot_bounds "
-                "decision_option decision_plan",
+                "decision_option decision_plan decision_facts decision_players decision_waiting decision_run "
+                "decision_standings",
     "settlement": "settlement_moves",
-    "board": "lock_due lineup_alert league_standings",
+    "board": "lock_due lineup_alert",
     "grading": "replayed lead_buckets measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
@@ -43,7 +44,12 @@ EXPORTS = {
         listings listing_ends offers offer_ratios price_history price_paid auction_results
         squads owners cash standings league_config app_lineup""",  # app_lineup: the lineup facts, player resolved
     "forecast": "cell price_carry price_trend price_trend_daily",  # cell(player, jornada, pts, p); the price trend and carry the decision's odds read
-    "decision": "decision_plan",  # plan(step, kind, player, amount, win, worth)
+    # plan(step, kind, player, amount, win, worth) and its detail, a run each (decision.record): every move alone
+    # (decision_option, with the chance at the asking price and where an offer ranks), the players it looked at
+    # and their facts (decision_players, decision_facts), what waiting is worth, the standings forecast, what
+    # the plan leaves; league_jornada: each manager's points a jornada as a normal, what that forecast is graded on
+    "decision": "decision_plan decision_option decision_players decision_facts decision_waiting decision_standings "
+                "decision_run league_jornada",
     "settlement": "settlement_moves",  # moves(path, at, kind, player, amount)
     "board": "board_json",
     "grading": "",  # a measure: nothing downstream reads it

@@ -41,8 +41,8 @@ Everything else comes from the app's API and public pages.
 2. **crosswalk** (`crosswalk.py`): the registry, lfg.db's `crosswalk` table,
    one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
 3. **sim** (`sim.py`, `decision.py`, `ffcore/decide.sql`): the decision,
-   and what the board reads: the run's moves, the facts it saw (`sim_facts`,
-   `sim_waiting`), its forecast moment (`sim_runs.moment`).
+   and what the board reads: the run's moves, the facts it saw (`decision_facts`,
+   `decision_waiting`), its forecast moment (`sim_runs.moment`).
 4. **publish** (`publish.py`): the board (`board_json`) to the phone, and its ping.
 5. **grade** (`grading.py`: each past lock forecast and decided again with
    this code, one set kept a code version; the forecasts graded are the
@@ -140,7 +140,7 @@ Every forecast is the same product, for every player and jornada
   whether it is done, its points and the numbers that made it, and the
   amounts it is accepted at (`accepts`, which act.py, the server and the
   page read). They come from what the run recorded (`decision_option`,
-  `decision_plan`, `sim_facts`, `sim_waiting`). The board also lists your
+  `decision_plan`, `decision_facts`, `decision_waiting`). The board also lists your
   players a rival can take by clause now (`board_clauses`): all of them,
   since a sale to the game pays at once and any rival can raise a clause
   that way. The page lays rows out and decides nothing.
