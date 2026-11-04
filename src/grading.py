@@ -17,7 +17,6 @@ from ffcore.jornadas import round_locks, rounds
 
 from assemble import applied, built, forecast, price_change, price_momentum
 import decision
-from decide import Action
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.parse import snapshot_stamp, stamp
 __all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "superseded", "view_table",
@@ -166,30 +165,27 @@ def decisions() -> list[dict[str, Any]]:
         later = sorted(j for j in done if j >= i and j in rem)
         names = {k: f[0] for k, f in seen.items()}
 
-        def worth(a: Action, pct: Callable[[str], float | None]) -> float | None:
-            """What the move's players were worth more (bought) or less
+        def worth(kind: str, k: str, pct: Callable[[str], float | None]) -> float | None:
+            """What the move's player was worth more (bought) or less
             (sold) after the horizon, in millions; None until it has passed."""
-            got = {k: pct(k) for k in (*((a.buy, ) if a.buy else ()), *a.sell)}
-            if any(v is None for v in got.values()):
+            got = pct(k)
+            if got is None:
                 return None
-            value = {k: f[1] for k, f in seen.items()}
-            return (value.get(a.buy, 0.0) * (got.get(a.buy) or 0.0) - sum(
-                value.get(k, 0.0) * (got[k] or 0.0) for k in a.sell)) / 100e6
+            value = seen[k][1] if k in seen else 0.0
+            return (1 if kind == "buy" else -1) * value * got / 100e6
 
-        def change(a: Action, pts: Callable[[str, int], float]) -> float:
-            return sum(pts(a.buy, j) for j in later) - sum(
-                pts(k, j) for k in a.sell for j in later)
+        def change(kind: str, k: str, pts: Callable[[str, int], float]) -> float:
+            return (1 if kind == "buy" else -1) * sum(pts(k, j) for j in later)
         for kind, k, amount, in_plan in moved:
-            a = Action("buy", buy=k, cost=amount) if kind == "buy" else Action("sell", sell=(k, ), proceeds=amount)
             out.append({
-                "lock": i, "jornadas": len(later), "move": a.label(names),
+                "lock": i, "jornadas": len(later), "move": label(kind, k, names),
                 "group": "plan" if in_plan else "left out",
-                "kind": "sell" if not a.buy else "get",
+                "kind": "sell" if kind == "sell" else "get",
                 "chance": None,
-                "pred": change(a, lambda k, j: e.get((k, j), 0.0)),
-                "real": change(a, lambda k, j: actual.get((k, j), 0.0)),
-                "value_pred": worth(a, lambda k: seen[k][2] if k in seen else 0.0),
-                "value_real": worth(a, lambda k: rose.get(k))})
+                "pred": change(kind, k, lambda k, j: e.get((k, j), 0.0)),
+                "real": change(kind, k, lambda k, j: actual.get((k, j), 0.0)),
+                "value_pred": worth(kind, k, lambda k: seen[k][2] if k in seen else 0.0),
+                "value_real": worth(kind, k, lambda k: rose.get(k))})
     return out
 
 
@@ -225,15 +221,23 @@ def move(path: str, t: dt.datetime, kind: str, player: str, amount: float | None
         db.execute("INSERT OR REPLACE INTO moves VALUES (?, ?, ?, ?, ?)", (path, stamp(t), kind, player, amount))
 
 
-def pairs(acts: list[Action]) -> list[tuple[str, Action]]:
-    """Each sale of the plan with the buy it funds ('' for a lone sale): the
-    two of one step (dec_plan; a swap is a buy and a sale of one step)."""
-    buy = {step: k for step, k in rows("SELECT step, player FROM dec_plan WHERE kind = 'buy'")}
-    step = {k: s for s, k in rows("SELECT step, player FROM dec_plan WHERE kind = 'sell'")}
-    return [(buy.get(step.get(a.sell[0], -1), ""), a) for a in acts if a.sell]
+def label(kind: str, k: str, names: dict[str, str]) -> str:
+    """A move as the grades and the phantom's log say it."""
+    return "%s %s" % (kind, names.get(k, k))
 
 
-def settlement(pending: list[tuple[str, Action]], won: set[str], closed: set[str]) -> list[Action]:
+Sale = tuple[str, float]   # the player sold, what it gets
+
+
+def pairs(steps: list[tuple[Any, ...]]) -> list[tuple[str, Sale]]:
+    """Each sale of the plan (dec_plan rows: step, kind, player, amount, ...)
+    with the buy it funds ('' for a lone sale): the two of one step (a swap
+    is a buy and a sale of one step)."""
+    buy = {step: k for step, kind, k, *_ in steps if kind == "buy"}
+    return [(buy.get(step, ""), (k, amount)) for step, kind, k, amount, *_ in steps if kind == "sell"]
+
+
+def settlement(pending: list[tuple[str, Sale]], won: set[str], closed: set[str]) -> list[Sale]:
     """The sales to make at a close: a bid won makes the sale funding it, a
     bid lost does not; a bid not closing then waits. No re-planning: cash
     below zero is the decision's to mend at its next run."""
@@ -273,7 +277,7 @@ def _phantom_path() -> list[dict[str, Any]]:
         db.execute("DELETE FROM moves WHERE path IN (?, ?)", (PHANTOM, STANDPAT))
     start = ""
     made: list[str] = []
-    pending: list[tuple[str, Action]] = []   # the last run's (bid, the sale funding it)
+    pending: list[tuple[str, Sale]] = []   # the last run's (bid, the sale funding it)
     lost = 0
     out = []
 
@@ -282,10 +286,10 @@ def _phantom_path() -> list[dict[str, Any]]:
         return dict(rows("SELECT s.player, name_shown(s.name) FROM look l JOIN seen s"
                          " ON s.cut = (SELECT max(cut) FROM seen WHERE cut <= l.cut) AND s.variant = l.variant"))
 
-    def sell(t: dt.datetime, sales: list[Action]) -> None:
-        for a in sales:
-            move(PHANTOM, t, "sell", a.sell[0], a.proceeds)
-        made.extend(a.label(names()) for a in sales)
+    def sell(t: dt.datetime, sales: list[Sale]) -> None:
+        for k, amount in sales:
+            move(PHANTOM, t, "sell", k, amount)
+        made.extend(label("sell", k, names()) for k, _ in sales)
 
     def held() -> tuple[list[str], float, float]:
         """His eleven next, cash and squad's value, as of t."""
@@ -313,16 +317,16 @@ def _phantom_path() -> list[dict[str, Any]]:
         if not ready and at(t) is None:
             continue
         if t in runs:
-            acts = decision.plan()
-            bids = {a.buy: a.cost for a in acts if a.buy}
+            steps = decision.plan()
+            bids = {k: amount for _, kind, k, amount, *_ in steps if kind == "buy"}
             for (k, ) in rows("SELECT player FROM my_bids WHERE won IS NULL"):
                 if k not in bids:
                     move(PHANTOM, t, "withdraw", k, None)
             for k, b in bids.items():
                 move(PHANTOM, t, "bid", k, b)
-            paired = pairs(acts)
+            paired = pairs(steps)
             pending = [(k, a) for k, a in paired if k]
-            made.extend(a.label(names()) for a in acts if a.buy)
+            made.extend(label("buy", k, names()) for k in bids)
             sell(t, [a for k, a in paired if not k])
         if t in played:
             xi, cash, value = held()
@@ -539,19 +543,11 @@ def _selftest_phantom() -> None:
 def _selftest_settlement() -> None:
     """A won bid makes the sale funding it, a lost bid's sale is not made, a
     lone sale is made at once, a bid closing later waits."""
-    import tempfile
-    from ffcore.tidy import tables_in
-    pend = [("won", Action("sell", sell=("a", ), proceeds=1.0)), ("lost", Action("sell", sell=("b", ), proceeds=2.0)),
-            ("later", Action("sell", sell=("d", ), proceeds=4.0))]
-    assert [a.sell for a in settlement(pend, {"won"}, {"won", "lost"})] == [("a", )]
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        with closing(connect()) as db, db:
-            db.executemany("INSERT INTO dec_plan VALUES (?, ?, ?, ?, 1, 0)", [
-                (0, "buy", "won", 5), (0, "sell", "a", 1), (1, "buy", "lost", 6), (1, "sell", "b", 2), (2, "sell", "c", 3)])
-        acts = [Action("buy", buy="won", cost=5), Action("sell", sell=("a", ), proceeds=1.0),
-                Action("buy", buy="lost", cost=6), Action("sell", sell=("b", ), proceeds=2.0),
-                Action("sell", sell=("c", ), proceeds=3.0)]
-        assert [(k, a.sell[0]) for k, a in pairs(acts)] == [("won", "a"), ("lost", "b"), ("", "c")]
+    pend = [("won", ("a", 1.0)), ("lost", ("b", 2.0)), ("later", ("d", 4.0))]
+    assert settlement(pend, {"won"}, {"won", "lost"}) == [("a", 1.0)]
+    steps = [(0, "buy", "won", 5, 1, 0), (0, "sell", "a", 1, 1, 0), (1, "buy", "lost", 6, 1, 0),
+             (1, "sell", "b", 2, 1, 0), (2, "sell", "c", 3, 1, 0)]
+    assert pairs(steps) == [("won", ("a", 1)), ("lost", ("b", 2)), ("", ("c", 3))]
 
 
 def _selftest() -> None:

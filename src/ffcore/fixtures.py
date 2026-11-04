@@ -1,138 +1,43 @@
-
+"""Rows seeded by hand for the self-tests: a league at t as assemble writes it
+(seed_league), the board's line-up inputs (lineup_board)."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping
+from typing import Any
 
-if TYPE_CHECKING:
-    from decide import Universe
-    from ffcore.forecast import Bootstrap
-    from ffcore.season import LeagueState
+__all__ = ["seed_league", "lineup_board"]
 
-
-__all__ = ["tiny_state", "tiny_bootstrap", "tiny_universe",
-          "tiny_market_universe", "lineup_board"]
+PLAYER_COLUMNS = ("name", "pos", "owner", "value", "trend", "paid", "offer", "clause", "price", "route",
+                  "my_bid", "fetches")
 
 
-DEFAULT_SQUAD: dict[str, str] = {
-    "k": "POR",
-    "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF",
-    "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED",
-    "f1": "DEL", "f2": "DEL",
-}
+def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
+                cells: Mapping[int, Mapping[str, tuple[float, float]]],
+                odds: Mapping[str, Any] | None = None) -> None:
+    """Into the current tables (tidy.tables_in), a league at t as assemble
+    writes it: seen (a row a player, PLAYER_COLUMNS; name defaults to his
+    key, your squad is those he owns by `me`), your cash (seen_cash),
+    forecast_cell at moment 0 (cells: jornada -> player -> (points if he
+    plays, chance he plays)), bid odds (player -> ((ratio, p_win), ...)),
+    and look on them, with no path."""
+    from contextlib import closing
 
-DEFAULT_JORNADAS: list[int] = [1, 2]
+    from assemble import write_constants
+    from ffcore.db import connect, set_look
 
-def _with_overrides(name: str, defaults: dict[str, Any], overrides: dict[str, Any]
-                    ) -> dict[str, Any]:
-    for k in overrides:
-        if k not in defaults:
-            raise TypeError(f"{name}: unknown override {k!r}")
-    defaults = dict(defaults)
-    defaults.update(overrides)
-    return defaults
-
-
-def tiny_state(**overrides: Any) -> LeagueState:
-    from ffcore.season import LeagueState
-
-    defaults = dict(
-        squads={"me": dict(DEFAULT_SQUAD)},
-        jornadas=list(DEFAULT_JORNADAS),
-        me="me",
-    )
-    return LeagueState(**_with_overrides("tiny_state", defaults, overrides))
-
-
-def tiny_bootstrap(**overrides: Any) -> Bootstrap:
-    from ffcore.forecast import Bootstrap
-
-    default_per_jornada = {
-        j: {k: (5.0, 0.8) for k in DEFAULT_SQUAD} for j in DEFAULT_JORNADAS
-    }
-    defaults = dict(
-        per_jornada=default_per_jornada,
-    )
-    return Bootstrap(**_with_overrides("tiny_bootstrap", defaults, overrides))
-
-
-def _universe(defaults: dict[str, Any], market: dict[str, Any], overrides: dict[str, Any]
-              ) -> Universe:
-    from dataclasses import fields
-
-    from decide import Universe
-    from ffcore.market import Market
-
-    tables = {f.name for f in fields(Market)}
-    market.update({k: v for k, v in overrides.items() if k in tables})
-    defaults.update({k: v for k, v in overrides.items() if k not in tables})
-    return Universe(market=Market(**market), **defaults)
-
-
-def tiny_universe(**overrides: Any) -> Universe:
-    return _universe(dict(state=tiny_state(), forecaster=tiny_bootstrap()),
-                     {"pos": dict(DEFAULT_SQUAD), "cash": 20e6}, overrides)
-
-
-def tiny_market_universe(**overrides: Any) -> Universe:
-    squad = dict(DEFAULT_SQUAD)
-    squad["bench_m"] = "MED"
-    squad["bench_k"] = "POR"
-
-    per_jornada = {j: {k: (5.0, 0.8) for k in DEFAULT_SQUAD}
-                   for j in DEFAULT_JORNADAS}
-    for j in DEFAULT_JORNADAS:
-        per_jornada[j]["bench_m"] = (1.0, 0.5)
-        per_jornada[j]["bench_k"] = (1.0, 0.5)
-        per_jornada[j]["cand_free"] = (9.0, 0.8)
-        per_jornada[j]["cand_rival"] = (10.0, 0.9)
-
-    market = {"pos": {**squad, "cand_free": "MED", "cand_rival": "MED"},
-              "price": {"cand_free": 5e6, "cand_rival": 100e6},
-              "value": {"bench_m": 3e6, "bench_k": 2e6, "cand_free": 5e6},
-              "owner": {"cand_rival": "riv"},
-              "route": {"cand_rival": "listed"},
-              "cash": 5.5e6}
-
-    return _universe(dict(state=tiny_state(squads={"me": squad}),
-                          forecaster=tiny_bootstrap(per_jornada=per_jornada)),
-                     market, overrides)
-
-
-def _selftest() -> None:
-    u = tiny_universe()
-    assert u.state.squads["me"] == DEFAULT_SQUAD, u.state.squads
-    assert u.market.pos == DEFAULT_SQUAD, u.market.pos
-
-    boot = tiny_bootstrap()
-    for j in DEFAULT_JORNADAS:
-        exp = boot.expected(j)
-        assert set(exp) == set(DEFAULT_SQUAD), (j, exp)
-        assert all(v > 0 for v in exp.values()), exp
-    st = tiny_state()
-    for j in st.jornadas:
-        assert boot.expected(j), j
-
-    for j in u.state.jornadas:
-        assert u.forecaster.expected(j), j
-
-    base_u = tiny_universe()
-    changed_u = tiny_universe(cash=1.0)
-    assert changed_u.market.cash == 1.0
-    assert changed_u.state.squads == base_u.state.squads
-
-    base_st = tiny_state()
-    changed_st = tiny_state(me="riv")
-    assert changed_st.me == "riv"
-    assert changed_st.squads == base_st.squads
-    assert changed_st.jornadas == base_st.jornadas
-
-    tiny_market_universe()
-
-    print("ffcore.fixtures self-test OK")
-
-
-if __name__ == "__main__":
-    _selftest()
+    write_constants()   # the model's constants the views read, as a forecast writes them
+    set_look(moment=0, me=me, path="", t0="")
+    with closing(connect()) as db, db:
+        for t in ("seen", "seen_cash", "seen_odds"):
+            db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)
+        db.execute("DELETE FROM forecast_cell WHERE moment = 0")
+        db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
+                       [(k, p.get("name", k), *(p.get(c) for c in PLAYER_COLUMNS[1:])) for k, p in sorted(players.items())])
+        db.execute("INSERT INTO seen_cash VALUES ((SELECT cut()), variant(), ?, ?)", (me, cash))
+        db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut()), variant(), ?, ?, ?)",
+                       [(k, r, p) for k, o in (odds or {}).items() for r, p in o])
+        db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
+                       [(k, j, pts, p) for j, per in cells.items() for k, (pts, p) in per.items()])
 
 
 def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
@@ -162,3 +67,24 @@ def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:
                            ["ionut radu", "pepelu", "cai coro", "bench boy", *ids])])
     store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": i,
                               "player_name": n, "player_name_full": n} for i, n in app])
+
+
+def _selftest() -> None:
+    import tempfile
+    from pathlib import Path
+
+    from ffcore.db import rows
+    from ffcore.tidy import tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        seed_league("me", 7e6, {"a": {"pos": "POR", "owner": "me", "value": 1e6}, "b": {"pos": "DEF", "price": 2e6}},
+                    {1: {"a": (5.0, 0.8)}}, odds={"b": ((1.0, 0.5),)})
+        assert rows("SELECT player, name, owner, price FROM seen ORDER BY player") == [
+            ("a", "a", "me", None), ("b", "b", None, 2e6)]
+        assert rows("SELECT player FROM my_squad") == [("a",)] and rows("SELECT cash FROM my_cash") == [(7e6,)]
+        assert rows("SELECT player, jornada, pts, p FROM forecast_cell") == [("a", 1, 5.0, 0.8)]
+    print("ffcore.fixtures self-test OK")
+
+
+if __name__ == "__main__":
+    _selftest()

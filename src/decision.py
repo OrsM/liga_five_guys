@@ -7,62 +7,24 @@ from __future__ import annotations
 from contextlib import closing
 from typing import Any
 
-from ffcore.action import Action
-from ffcore.db import connect, rows, set_look
+from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, MAX_SLOT, MIN_SLOT, POSITIONS, SQUAD_MAX, XI_SIZE
 
-from assemble import write_constants
-from decide import Universe
-
-__all__ = ["plan", "plan_rows", "inputs", "after_auctions"]
+__all__ = ["plan", "plan_rows", "inputs"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
 
-def inputs(u: Universe | None = None, buys: bool = True) -> None:
+def inputs() -> None:
     """What the decision looks at, the league at t (look: the market seen,
     the forecast, your squad and cash then), made once a decision
-    (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen); buys, or
-    sales only. A league made by hand (u, a self-test's) is written first
-    as assemble writes the league at t (_by_hand)."""
-    if u is not None:
-        write_constants()   # the model's constants the views read, as a forecast writes them
+    (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen)."""
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
-        if u is not None:
-            _by_hand(db, u)
-        db.execute("INSERT INTO dec_state VALUES (?, ?, ?, ?)", (int(buys), DEBT_SHARE, SQUAD_MAX, XI_SIZE))
+        db.execute("INSERT INTO dec_state VALUES (?, ?, ?)", (DEBT_SHARE, SQUAD_MAX, XI_SIZE))
         for t in ("dec_player", "dec_odds", "dec_money"):
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
-
-
-def _by_hand(db: Any, u: Universe) -> None:
-    """A self-test's league at t, as assemble writes it: seen and seen_cash
-    at t (your squad yours there), forecast_cell at moment 0, and look on
-    them, with no path."""
-    m = u.market
-    owner = {**{k: mgr for mgr, sq in u.state.squads.items() for k in sq}, **m.owner}
-    pos = {**{k: p for sq in u.state.squads.values() for k, p in sq.items()}, **m.pos}
-    set_look(moment=0, me=u.me, path="", t0="")
-    for t in ("seen", "seen_cash", "seen_odds"):
-        db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)
-    db.execute("DELETE FROM forecast_cell WHERE moment = 0")
-    db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
-                   [(k, m.shown(k), pos.get(k), owner.get(k), m.value.get(k), m.trend.get(k), m.paid.get(k),
-                     m.offer.get(k), m.clause.get(k), m.price.get(k), m.route.get(k), m.my_bid.get(k), m.fetch.get(k))
-                    for k in sorted(set(m.name) | set(m.pos) | set(m.price) | set(u.mine) | set(owner))])
-    db.execute("INSERT INTO seen_cash VALUES ((SELECT cut()), variant(), ?, ?)", (u.me, m.cash))
-    db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut()), variant(), ?, ?, ?)",
-                   [(k, r, p) for k, odds in m.odds.items() for r, p in odds])
-    db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
-                   [(k, j, pts, p) for j in u.state.jornadas
-                    for k, (pts, p) in u.forecaster.per_jornada.get(j, {}).items()])
-
-
-def after_auctions() -> frozenset[str]:
-    """The last plan's sales to make after the auctions (decide.sql dec_when)."""
-    return frozenset(k for (k,) in rows("SELECT player FROM dec_when WHERE after"))
 
 
 def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
@@ -161,20 +123,18 @@ def _write(steps: list[tuple[Any, ...]], start: list[tuple[Any, ...]]) -> None:
         db.executemany("INSERT INTO dec_start VALUES (?, ?, ?, ?, ?, ?, ?)", start)
 
 
-def plan(u: Universe | None = None, sales_only: bool = False) -> list[Action]:
-    """The plan at t (or for a league by hand, u), its moves in order: a buy
-    at its bid, a sale at what it gets (a swap's buy, then its sale). With
-    sales_only, only sales (what clearing a debt takes). Written to dec_plan,
-    and every single move as valued before the first beside it (dec_start,
-    dec_rows)."""
-    inputs(u, buys=not sales_only)
+def plan() -> list[tuple[Any, ...]]:
+    """The plan at t, its moves in order as dec_plan rows (step, kind,
+    player, amount, win, worth): a buy at its bid, a sale at what it gets (a
+    swap's buy, then its sale). Written to dec_plan, and every single move as
+    valued before the first beside it (dec_start, dec_rows)."""
+    inputs()
     with closing(connect()) as db:
         inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in ("dec_player", "dec_odds", "dec_money")}
         inp["cell"] = db.execute("SELECT player, jornada, e FROM cell").fetchall()
     steps, start = plan_rows(inp)
     _write(steps, start)
-    return [Action("buy", buy=k, cost=amount) if kind == "buy" else Action("sell", sell=(k, ), proceeds=amount)
-            for _, kind, k, amount, _, _ in steps]
+    return steps
 
 
 def _selftest() -> None:
@@ -183,10 +143,7 @@ def _selftest() -> None:
     from statistics import NormalDist
     from pathlib import Path
 
-    from decide import Universe
-    from ffcore.forecast import Bootstrap
-    from ffcore.market import Market
-    from ffcore.season import LeagueState
+    from ffcore.fixtures import seed_league
     from ffcore.tidy import store_sql, tables_in
 
     js = [1, 2]
@@ -213,6 +170,10 @@ def _selftest() -> None:
 
     def labels(steps: list[tuple[Any, ...]]) -> list[str]:
         return ["%s %s" % (kind, k) for _, kind, k, *_ in steps]
+
+    def after_auctions() -> set[str]:
+        """The last plan's sales to make after the auctions (decide.sql dec_when)."""
+        return {k for (k,) in rows("SELECT player FROM dec_when WHERE after")}
 
     def sold(steps: list[tuple[Any, ...]]) -> set[str]:
         return {k for _, kind, k, *_ in steps if kind == "sell"}
@@ -266,12 +227,12 @@ def _selftest() -> None:
         # and 10 points banked.
         riv = {"rk": "POR", **{"rd%d" % i: "DEF" for i in range(3)}, **{"rm%d" % i: "MED" for i in range(3)},
                "rf": "DEL"}
-        lg = Universe(state=LeagueState({"me": squad, "riv": riv}, js, "me"),
-                      forecaster=Bootstrap({j: {**{k: (e, 1.0) for k, e in cells.items()}, **{k: (2.0, 1.0) for k in riv}}
-                                            for j in js}),
-                      market=Market(cash=10e6, pos={**squad, **riv}, value={k: 5e6 for k in squad}))
+        seed_league("me", 10e6,
+                    {**{k: {"pos": p, "owner": "me", "value": 5e6} for k, p in squad.items()},
+                     **{k: {"pos": p, "owner": "riv"} for k, p in riv.items()}},
+                    {j: {**{k: (e, 1.0) for k, e in cells.items()}, **{k: (2.0, 1.0) for k in riv}} for j in js})
         store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": "riv", "team_points": "10"}])
-        inputs(lg)
+        inputs()
         st = {m: r for m, *r in rows("SELECT manager, mean, lo, hi, finish, p_first, p_above FROM league_standings")}
         assert abs(st["me"][0] - 2 * 42) < 1e-9 and abs(st["riv"][0] - (10 + 2 * (8 * 2 + 2 * 19 / 7 + 20 / 7))) < 1e-9, \
             "each one's eleven, a stand-in for each player short, and the points banked"

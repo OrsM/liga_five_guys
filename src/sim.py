@@ -8,12 +8,10 @@ import json
 import sys
 from collections.abc import Sequence
 from contextlib import closing
-from dataclasses import replace
 from typing import Any
 
 from assemble import built
 import decision
-from decide import Action, Universe
 from ffcore.db import connect, cut, record, rows, this_run
 from ffcore.jornadas import rounds
 from ffcore.tidy import REPORTS
@@ -40,11 +38,10 @@ def _selftest() -> None:
     from statistics import NormalDist
 
     from ffcore.db import connect
-    from ffcore.market import Market
+    from ffcore.fixtures import seed_league
+    from ffcore.names import Name
     from ffcore.rules import DEBT_SHARE
     from ffcore.tidy import store_sql, tables_in
-    from ffcore.forecast import Bootstrap
-    from ffcore.season import LeagueState
 
     many_j = list(range(1, 11))
     sqb = {"k": "POR", **{f"d{i}": "DEF" for i in range(1, 5)},
@@ -56,26 +53,49 @@ def _selftest() -> None:
                 "star": (6.0, 0.9), "dead": (3.0, 0.05), "cand": (5.0, 0.8),
                 "twin": (5.0, 0.8), **{k: (3.0, 0.9) for k in riv}}
             for j in many_j}
-    ub = Universe(state=LeagueState({"me": dict(sqb), "riv": dict(riv)}, many_j,
-                                    "me"),
-                  forecaster=Bootstrap(perb),
-                  market=Market(cash=10e6, pos={**sqb, "cand": "MED", "twin": "MED"},
-                                price={"cand": 5e6, "twin": 5e6},
-                                value={"dead": 1e6, "star": 20e6}))
+    def put(w: dict[str, Any], col: str, vals: dict[str, Any]) -> dict[str, Any]:
+        """The league with this column of seen as vals (players not in it have none)."""
+        p = {k: {**r, col: None} for k, r in w["p"].items()}
+        for k, v in vals.items():
+            p.setdefault(k, {})[col] = v
+        return {**w, "p": p}
 
-    def decided(u: Universe) -> list[Action]:
+    def get(w: dict[str, Any], col: str) -> dict[str, Any]:
+        return {k: r[col] for k, r in w["p"].items() if r.get(col) is not None}
+
+    def mine(w: dict[str, Any]) -> list[str]:
+        return [k for k, r in w["p"].items() if r.get("owner") == "me"]
+
+    def seed(w: dict[str, Any], names: dict[str, str] | None = None) -> None:
+        """The league's rows, in the current tables; his name shown as Name makes it of his key."""
+        seed_league("me", w["cash"], {k: {**r, "name": Name((names or {}).get(k, k)).shown} for k, r in w["p"].items()},
+                    w["cells"])
+
+    def net(steps: Sequence[tuple[Any, ...]]) -> float:
+        return sum(a if kind == "buy" else -a for _, kind, _, a, *_ in steps)
+
+    # A league is its seed_league rows: your cash, a row a player (columns of seen), the cells.
+    World = dict[str, Any]
+    ub: World = {"cash": 10e6, "cells": perb, "p": {
+        **{k: {"pos": p, "owner": "me"} for k, p in sqb.items()},
+        **{k: {"pos": p, "owner": "riv"} for k, p in riv.items()},
+        "cand": {"pos": "MED", "price": 5e6}, "twin": {"pos": "MED", "price": 5e6}}}
+    ub = put(ub, "value", {"dead": 1e6, "star": 20e6})
+
+    def decided(w: World) -> list[tuple[Any, ...]]:
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-            return decision.plan(u)
+            seed(w)
+            return decision.plan()
     acts = decided(ub)
-    bought = [a.buy for a in acts if a.buy]
+    bought = [k for _, kind, k, *_ in acts if kind == "buy"]
     assert sorted(bought) == ["cand", "twin"], "each 4 a jornada for a 2.7 in the eleven"
-    sold = [k for a in acts for k in a.sell]
+    sold = [k for _, kind, k, *_ in acts if kind == "sell"]
 
 
     Plan = Sequence[tuple[str, str, float, float, float]]          # kind, player, amount, win, worth
     Option = tuple[str, str, float, float, float, float]    # kind, player, amount, win, gain, worth
 
-    def report(u: Universe, fielded: Sequence[str] = (),
+    def report(w: World, fielded: Sequence[str] = (),
                ratios: Sequence[float] = (),
                waits: Sequence[tuple[str, float]] = (), nights: int = 0,
                listings: Sequence[tuple[str, str]] = (),
@@ -90,24 +110,21 @@ def _selftest() -> None:
         names the names shown where they are not the player's key; plan, a
         plan of these moves (each its own step) in place of the decision's,
         options, moves valued in place of the decision's."""
-        from ffcore.names import Name
-        u = replace(u, market=replace(u.market, name={
-            **{k: Name(k) for k in set(u.market.pos) | set(u.mine)}, **u.market.name,
-            **{k: Name(v) for k, v in (names or {}).items()}}))
-        m = u.market
+        shown = {k: Name((names or {}).get(k, k)).shown for k in w["p"]}
+        held = {k: r for k, r in w["p"].items() if r.get("owner") in (None, "me")}
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             with closing(connect()) as db, db:
                 db.execute("DROP VIEW player_facts")
                 db.execute("CREATE TABLE player_facts (player, name, pos, value, owner, clause,"
                            " price, route, my_bid, offer, paid, trend)")
                 db.executemany("INSERT INTO player_facts VALUES (%s)" % ", ".join("?" * 12), [
-                    (k, m.shown(k), m.pos.get(k), m.value.get(k), m.owner.get(k), m.clause.get(k),
-                     m.price.get(k), m.route.get(k), m.my_bid.get(k), m.offer.get(k),
-                     m.paid.get(k), m.trend.get(k)) for k in set(m.pos) | set(u.mine)])
+                    (k, shown[k], r.get("pos"), r.get("value"), None, r.get("clause"), r.get("price"),
+                     r.get("route"), r.get("my_bid"), r.get("offer"), r.get("paid"), r.get("trend"))
+                    for k, r in held.items()])
                 db.execute("DROP VIEW sale_odds")
                 db.execute("CREATE TABLE sale_odds (player, offer, waiting, fetches)")
                 db.executemany("INSERT INTO sale_odds VALUES (?, ?, NULL, ?)",
-                               [(k, o, m.fetch[k]) for k, o in m.offer.items()])
+                               [(k, r["offer"], r.get("fetches")) for k, r in held.items() if r.get("offer") is not None])
                 db.execute("DROP VIEW offer_ratios")
                 db.execute("CREATE TABLE offer_ratios (created_at, ratio)")
                 db.executemany("INSERT INTO offer_ratios VALUES ('', ?)", [(r,) for r in ratios])
@@ -122,14 +139,15 @@ def _selftest() -> None:
                            " julianday('2026-08-02T20:24:00Z') AS first", (nights,))
                 db.executemany("INSERT INTO model_constants VALUES (variant(), ?, ?)", [
                     ("PRICE_WINDOW", 50.0)])
-            store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": u.me}])
+            store_sql("api_standings", [{"observed_at": "2026-08-01T0000Z", "manager": "me"}])
             store_sql("api_market", [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerTeam",
                                       "expires_at": e} for k, e in listings]
                       + [{"observed_at": "2026-08-01T0000Z", "player_id": k, "seller": "marketPlayerLeague",
-                          "sale_price": str(m.price.get(k, 1e6)), "bids": str(n)} for k, n in bids])
+                          "sale_price": str(held.get(k, {}).get("price") or 1e6), "bids": str(n)} for k, n in bids])
             store_sql("api_lineup", [{"observed_at": "2026-08-01T0000Z", "player_id": k}
                                      for k in fielded])
-            record_run(7, u=u)
+            seed(w, names)
+            record_run(7)
             with closing(connect()) as db, db:
                 db.executemany("INSERT OR REPLACE INTO decision_option VALUES (7, ?, ?, ?, ?, ?, ?, 0)", options)
                 if plan is not None:
@@ -173,8 +191,8 @@ def _selftest() -> None:
          [(d["label"], d["act"]) for d in doc["do"]][:3])
     assert [d["what"] for d in doc["do"]][:1] == ["field"], doc["do"]
     assert {d["name"].lower() for d in doc["do"] if d["what"] == "buy"} == set(bought)
-    assert doc["cash_after"] == ub.market.left(acts)
-    exposed = report(replace(ub, market=replace(ub.market, clause={"star": 20e6, "dead": 30e6})))["exposed"]
+    assert doc["cash_after"] == ub["cash"] - net(acts)
+    exposed = report(put(ub, "clause", {"star": 20e6, "dead": 30e6}))["exposed"]
     assert [e["name"].lower() for e in exposed] == ["star", "dead"], \
         "exposed: every player with a clause, most valuable first"
     assert report(ub, plan=[])["cash_after"] is None, "no cash line when the plan moves no money"
@@ -182,23 +200,23 @@ def _selftest() -> None:
     assert all(r["estimated"] for r in doc["standings"] if not r["me"]), \
         "rival cash is estimated from the feed"
     shown = sorted((d["name"].lower(), d["amount"]) for d in doc["do"] if d["what"] == "buy")
-    assert shown == sorted((a.buy, a.cost) for a in acts if a.buy), \
+    assert shown == sorted((k, a) for _, kind, k, a, *_ in acts if kind == "buy"), \
         ("the plan's buys, each once at its bid, and no move it does not make: the plan is the one judgement", shown)
     assert all(abs(d["gain"] - facts(d)["points"]) < 1e-9 and "money" not in facts(d)
                for d in doc["do"] if d["what"] == "buy"), "its worth: its points, and no money counted as points"
-    assert all(facts(d)["listed at"] == ub.market.price[d["name"].lower()]
+    assert all(facts(d)["listed at"] == get(ub, "price")[d["name"].lower()]
                for d in doc["do"] if d["what"] == "buy"), \
         "what he is listed at, and the bid it takes"
     assert all((d["asking"], d["win"], d["asking_win"], facts(d)["chance to win"])
-               == (ub.market.price[d["name"].lower()], 1.0, 1.0, 1.0) for d in doc["do"] if d["what"] == "buy"), \
+               == (get(ub, "price")[d["name"].lower()], 1.0, 1.0, 1.0) for d in doc["do"] if d["what"] == "buy"), \
         "each bid at its asking price too, and the chance of each (with no past auctions to go on, sure)"
     assert "lam" not in doc, "no money rate: money is a limit, not points"
     assert doc["buys"] and all(b["gain"] > 0 for b in doc["buys"]) \
         and [b["gain"] for b in doc["buys"]] == sorted((b["gain"] for b in doc["buys"]), reverse=True), \
         "the buys ranked: each that adds points, most first"
-    assert {b["name"].lower() for b in doc["buys"]} <= set(ub.market.price) - set(ub.market.owner), \
+    assert {b["name"].lower() for b in doc["buys"]} <= set(get(ub, "price")) - {k for k, o in get(ub, "owner").items() if o != "me"}, \
         "only players you can buy: the game's market, never a rival's listing"
-    assert {s["name"].lower() for s in doc["sells"]} == set(ub.state.squads[ub.me]) \
+    assert {s["name"].lower() for s in doc["sells"]} == set(mine(ub)) \
         and [s["gain"] for s in doc["sells"]] == sorted((s["gain"] for s in doc["sells"]), reverse=True), \
         "every player of yours ranked, the fewest points lost first"
     plan_lines = {d["label"]: d for d in doc["do"] if d["ranked"]}
@@ -225,45 +243,44 @@ def _selftest() -> None:
         "one list of lines, not a section per source"
     listing = doc["do"][-1]
     assert listing["what"] == "list" and set(listing["label"].removeprefix("list ").lower().split(", ")) \
-        == set(ub.mine) - set(sold), ("list every player of yours not listed and not sold", listing)
+        == set(mine(ub)) - set(sold), ("list every player of yours not listed and not sold", listing)
     assert doc["standings"][[r["me"] for r in doc["standings"]].index(True)]["p_above"] is None
     json.dumps(doc)
     assert doc["ping"] == "; ".join(d["label"] for d in doc["do"]), \
-        "the ping is each move's Action.label, not words of its own"
+        "the ping is each move's label, not words of its own"
 
-    def valued(u: Universe, total: float) -> Universe:
+    def valued(w: World, total: float) -> World:
         """Your players worth total between them: the team value the debt is a share of."""
-        return replace(u, market=replace(u.market, value={**u.market.value,
-                                                          **{k: total / len(u.mine) for k in u.mine}}))
+        return put(w, "value", {**get(w, "value"), **{k: total / len(mine(w)) for k in mine(w)}})
 
     rich = valued(ub, 100e6)
     rich_doc = report(rich)
-    assert rich_doc["can_bid"] == max(0.0, rich.market.cash + DEBT_SHARE * 100e6
+    assert rich_doc["can_bid"] == max(0.0, rich["cash"] + DEBT_SHARE * 100e6
                                       - sum(d["amount"] for d in rich_doc["do"] if d["what"] == "buy")), \
         ("what you can bid: your cash and the debt the game allows (rules.DEBT_SHARE) less the plan's bids;"
          " sales do not count, made after the auctions")
-    stray = replace(rich.market, pos={**rich.market.pos, "ghost": "DEF"}, my_bid={"ghost": 3e6})
-    assert abs(report(replace(rich, market=stray))["can_bid"]
+    stray = put(put(rich, "pos", {**get(rich, "pos"), "ghost": "DEF"}), "my_bid", {"ghost": 3e6})
+    assert abs(report(stray)["can_bid"]
                - (rich_doc["can_bid"] - 3e6)) < 1, \
         "a bid of yours the plan does not make is money you cannot bid again"
-    cost = next(a.cost for a in acts if a.buy == bought[0])
-    in_plan = replace(rich.market, my_bid={bought[0]: cost})
-    assert report(replace(rich, market=in_plan))["can_bid"] == rich_doc["can_bid"], \
+    cost = next(a for _, kind, k, a, *_ in acts if kind == "buy" and k == bought[0])
+    in_plan = put(rich, "my_bid", {bought[0]: cost})
+    assert report(in_plan)["can_bid"] == rich_doc["can_bid"], \
         "the plan's own bid is counted once, in the plan"
     pulled = [(d["what"], d["label"], d["step"], d["amount"], d["done"])
-              for d in report(replace(ub, market=stray))["do"] if d["what"] == "withdraw"]
+              for d in report(stray)["do"] if d["what"] == "withdraw"]
     assert pulled == [("withdraw", "withdraw bid on Ghost", "withdraw bid", 3e6, False)], \
         ("a bid of yours the plan does not make: take it back, or it may win beside the plan's", pulled)
 
     def bid_line(mine: float) -> tuple[Any, ...]:
-        d = next(d for d in report(replace(ub, market=replace(ub.market, my_bid={bought[0]: mine})))["do"]
+        d = next(d for d in report(put(ub, "my_bid", {bought[0]: mine}))["do"]
                  if d["what"] == "buy" and d["name"].lower() == bought[0])
         return d["step"], d["amount"], d["done"], facts(d).get("your bid")
     assert bid_line(cost) == ("bid in", cost, True, None), "your bid is the plan's: done"
     assert bid_line(cost - 1e6) == ("bid up to", cost, False, cost - 1e6), \
         "your bid under the plan's: change it to the plan's"
-    ub = replace(ub, market=replace(ub.market, my_bid={bought[0]: cost}, route={"dead": "listed"}))
-    buys_planned: Plan = [("buy", a.buy, a.cost, 1.0, 1.0) for a in acts if a.buy]
+    ub = put(put(ub, "my_bid", {bought[0]: cost}), "route", {"dead": "listed"})
+    buys_planned: Plan = [("buy", k, a, 1.0, 1.0) for _, kind, k, a, *_ in acts if kind == "buy"]
     sell_dead: Plan = [("sell", "dead", 1e6, 1.0, 0.5)]
     dead_alone: Option = ("sell", "dead", 1e6, 1.0, 0.5, 0.5)
     doc = report(ub, plan=[*buys_planned, *sell_dead], options=[dead_alone])
@@ -275,21 +292,21 @@ def _selftest() -> None:
     assert [(d["name"].lower(), d["done"], d["step"], d["amount"]) for d in doc["do"]
             if d["what"] == "sell"] == [("dead", False, "sell after the auctions", 1e6)], \
         "beside the plan's bids: once they are won"
-    mine, *others = [bought[0], *(n for n in buys if n != bought[0])]
+    yours, *others = [bought[0], *(n for n in buys if n != bought[0])]
 
     def hot(n_mine: int, n_other: int) -> dict[str, Any]:
-        crowd = report(ub, bids=[(mine, n_mine), *((o, n_other) for o in others[:1])])
+        crowd = report(ub, bids=[(yours, n_mine), *((o, n_other) for o in others[:1])])
         return {d["name"].lower(): facts(d).get("bids") for d in crowd["do"] if d["what"] == "buy"}
     assert others, "the case: a buy of the plan you have not bid on"
-    assert hot(1, 3) == {mine: "only yours", others[0]: "3", **{o: None for o in others[1:]}}, hot(1, 3)
-    assert hot(4, 0) == {mine: "4, yours among them", others[0]: "none yet", **{o: None for o in others[1:]}}, \
+    assert hot(1, 3) == {yours: "only yours", others[0]: "3", **{o: None for o in others[1:]}}, hot(1, 3)
+    assert hot(4, 0) == {yours: "4, yours among them", others[0]: "none yet", **{o: None for o in others[1:]}}, \
         "how many bid on each: a crowd, only yours, or none yet"
-    unlisted = report(replace(ub, market=replace(ub.market, route={})), plan=sell_dead, options=[dead_alone])
+    unlisted = report(put(ub, "route", {}), plan=sell_dead, options=[dead_alone])
     assert [(d["step"], d["done"]) for d in unlisted["do"] if d["what"] == "sell"] == [("list", False)]
 
     def offered_doc(offer: float, nights: int = 0) -> Doc:
-        mk = replace(ub.market, offer={"dead": offer}, fetch={"dead": max(offer, 1.0e6)})
-        return report(replace(ub, market=mk), plan=sell_dead, options=[dead_alone],
+        mk = put(put(ub, "offer", {"dead": offer}), "fetches", {"dead": max(offer, 1.0e6)})
+        return report(mk, plan=sell_dead, options=[dead_alone],
                       waits=[("dead", 1.0e6)], nights=nights)
 
     def sale(offer: float, nights: int = 0) -> tuple[Doc, list[str]]:
@@ -315,7 +332,7 @@ def _selftest() -> None:
     assert "sell Dead" not in quiet, quiet
 
     def relists(ends: str, nights: int) -> list[tuple[Any, ...]]:
-        doc = report(replace(ub, market=replace(ub.market, route={"dead": "listed"})),
+        doc = report(put(ub, "route", {"dead": "listed"}),
                      nights=nights, listings=[("dead", ends)])
         return [(d["label"], d["facts"]) for d in doc["do"] if d["what"] == "relist"]
     assert relists("2026-08-03T10:00:00+02:00", 3) == [
@@ -326,8 +343,9 @@ def _selftest() -> None:
 
     # a sale beside the plan's buy
     def hedge(offer: float, waits: float, nights: int, win: float = 0.5, worth: float = -5.0) -> Doc:
-        mk = replace(ub.market, route={"dead": "listed"}, offer={"dead": offer}, fetch={"dead": max(offer, waits)})
-        doc = report(replace(ub, market=mk), waits=[("dead", waits)], nights=nights,
+        mk = put(put(put(ub, "route", {"dead": "listed"}), "offer", {"dead": offer}), "fetches",
+                 {"dead": max(offer, waits)})
+        doc = report(mk, waits=[("dead", waits)], nights=nights,
                      plan=[("buy", "cand", 2e6, win, 3.0), ("sell", "dead", 1e6, 1.0, worth)],
                      options=[("buy", "cand", 2e6, win, 3.0, 3.0), ("sell", "dead", 1e6, 1.0, worth, worth)])
         return next(d for d in doc["do"] if d["what"] == "sell")
@@ -336,8 +354,7 @@ def _selftest() -> None:
         == ("sell after the auctions", 1e6, False, []), \
         "beside the plan's bid: sold to the game at his value once the bid is won, no button before"
 
-    offered = replace(ub, market=replace(ub.market, offer={"dead": 1.1e6, "star": 19e6},
-                                         fetch={"dead": 1.1e6, "star": 19e6}))
+    offered = put(put(ub, "offer", {"dead": 1.1e6, "star": 19e6}), "fetches", {"dead": 1.1e6, "star": 19e6})
     told = report(offered, ratios=[0.9, 0.95, 1.0, 1.05])
     assert not [d for d in told["do"] if d["what"] == "sell"], \
         "an offer the plan does not take is not shown, however good: the plan is the one judgement"
@@ -346,19 +363,21 @@ def _selftest() -> None:
     assert [(d["step"], facts(d)["the game's recent offers"]) for d in took["do"] if d["what"] == "sell"] \
         == [("take offer", 1.0)], "the plan sells him: to do, and how his offer ranks among the game's"
 
-    ub = replace(ub, market=replace(ub.market, my_bid={}, route={}))
+    ub = put(put(ub, "my_bid", {}), "route", {})
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        got = record_run(7, u=ub)
+        seed(ub)
+        got = record_run(7)
         assert got == acts and rows("SELECT step, kind, player, amount FROM decision_plan WHERE run_id = 7") \
-            == [(i, a.kind, a.buy, a.cost) for i, a in enumerate(acts)], "the plan's moves, in order"
+            == [(s, kind, k, a) for s, kind, k, a, *_ in acts], "the plan's moves, in order"
         assert rows("SELECT kind, player, in_plan FROM decision_option WHERE run_id = 7 AND in_plan") \
             == [("buy", k, 1) for k in sorted(bought)], "each move alone, the plan's marked"
         assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'sell'") == [(len(sqb), )]
-        m = ub.market
+        held = {k: r for k, r in ub["p"].items() if r.get("owner") != "riv"}
         assert [r for r in rows("SELECT player, pos, value, price, offer, fetches FROM sim_facts WHERE run_id = 7"
-                                " ORDER BY player") if r[0] in set(m.name) | set(m.pos)] == sorted(
-            (k, m.pos.get(k, ""), m.value.get(k), m.price.get(k), m.offer.get(k), m.fetch.get(k, m.value.get(k, 0.0)) if k in ub.mine else None)
-            for k in set(m.name) | set(m.pos)), "the facts the decision was made on, as its universe holds them"
+                                " ORDER BY player") if r[0] in held] == sorted(
+            (k, r.get("pos") or "", r.get("value"), r.get("price"), r.get("offer"),
+             (r["fetches"] if r.get("fetches") is not None else r.get("value") or 0.0) if r.get("owner") == "me" else None)
+            for k, r in held.items()), "the facts the decision was made on, as its league holds them"
         assert rows("SELECT moment FROM sim_runs WHERE run_id = 7") == [(None,)]
         with closing(connect()) as db, db:
             db.execute("INSERT INTO forecast_moment VALUES (5, 'c', 't', 'live')")
@@ -375,7 +394,7 @@ def _selftest() -> None:
                                          " FROM sim_standings WHERE run_id = 7")}
         assert set(sim) == {"me", "riv"} and sim["me"][0] == 1 and sim["me"][3] is None
         (_, finish, first, _, cash, lo, mean, hi), (_, r_finish, r_first, r_above, *_) = sim["me"], sim["riv"]
-        assert cash == ub.market.cash, "yours from the app"
+        assert cash == ub["cash"], "yours from the app"
         assert abs(finish - (1 + r_above)) < 1e-12 and abs(r_finish - (2 - r_above)) < 1e-12, \
             "every manager's finish: 1 and the chance each other ends above him"
         assert abs(first + r_first - 1) < 1e-3 and abs(first - (1 - r_above)) < 1e-3, \
@@ -390,14 +409,13 @@ def _selftest() -> None:
             and won_finish < finish, \
             "your chance of first and finish once the plan is made, every bid won (the star in): the same standings"
         who = {k: r for k, *r in rows("SELECT player, start, next, season, mine, xi FROM sim_players WHERE run_id = 7")}
-        assert set(who) == set(ub.mine) | set(bought), "your squad and the plan's buys"
+        assert set(who) == set(mine(ub)) | set(bought), "your squad and the plan's buys"
         assert sum(r[4] for r in who.values()) == 11 and not who["dead"][4] and not who["cand"][4], \
             "your eleven next is of the squad you hold now"
         assert max(abs(a - b) for a, b in zip(who["star"][:3], (0.9, 5.4, 54.0))) < 1e-9, \
             "the chance he plays next, his expected points next and over the ten jornadas left"
 
-    debt = replace(ub, market=replace(ub.market, cash=-5e6,
-                                      value={**ub.market.value, "k": 4e6, "d1": 9e6, "m1": 1e6}))
+    debt = {**put(ub, "value", {**get(ub, "value"), "k": 4e6, "d1": 9e6, "m1": 1e6}), "cash": -5e6}
     owed = report(debt)
     assert [d["name"] for d in owed["do"] if d["what"] in ("buy", "sell")] == ["Dead", "D1"] \
         and owed["cash_after"] == 5e6, "in debt: sales only, the least bad first, until clear (5M short: 1M, then 9M)"
@@ -440,16 +458,15 @@ def _selftest_lineup() -> None:
 
 
 
-def record_run(run: int, params: Sequence[Doc] = (), moment: int | None = None,
-               u: Universe | None = None) -> list[Action]:
-    """The decision at t (decision.plan; or of a league by hand, u) and
+def record_run(run: int, params: Sequence[Doc] = (), moment: int | None = None) -> list[tuple[Any, ...]]:
+    """The decision at t (decision.plan) and
     everything the run saw, into its tables: the board views read them; the
     forecast moment it was built on, and your chance of first and finish
     once the plan is made, every bid won. The plan's moves."""
-    decision.inputs(u)
+    decision.inputs()
     with closing(connect()) as db, db:
         db.execute(STANDINGS, (run, ))
-    acts = decision.plan(u)
+    acts = decision.plan()
     record([{"run_id": run, **r} for r in params], "params")
     with closing(connect()) as db, db:
         db.execute("INSERT INTO sim_players (run_id, player, start, next, season, mine, xi)"

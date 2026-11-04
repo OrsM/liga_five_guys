@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS sim_players (
 -- The market and the league as a universe was built on them, a cut's and
 -- a variant's: player_facts with what a sale of each gets (sale_odds), and
 -- each buy's bids and their chance (bid_odds). Written by assemble.see,
--- read by Market, the decision (decide.sql) and a run's facts.
+-- read by the decision (decide.sql) and a run's facts.
 CREATE TABLE IF NOT EXISTS seen (
     cut     TEXT NOT NULL,
     variant TEXT NOT NULL,
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS sim_waiting (
 
 -- The forecast moment the run was built on (forecast_cell keeps it while a
 -- run points to it), and your chance of first and expected finish once the
--- plan is made, every bid won (Universe.standings on its squad).
+-- plan is made, every bid won (decide.sql league_standings on its squad).
 CREATE TABLE IF NOT EXISTS sim_runs (
     run_id        INTEGER PRIMARY KEY REFERENCES runs(run_id),
     moment        INTEGER REFERENCES forecast_moment(moment),
@@ -742,7 +742,7 @@ WHERE f.offer IS NOT NULL;
 -- the game takes no bid under it; route: listed by a manager, else free,
 -- the game's own), your pending bid, his owner and release clause (any can
 -- be paid now), the best offer standing on him if he is yours, what his
--- owner paid, his price trend. What Market is built from (assemble) and
+-- owner paid, his price trend. What the market is built from (assemble) and
 -- the board shows.
 DROP VIEW IF EXISTS player_facts;
 CREATE VIEW player_facts AS

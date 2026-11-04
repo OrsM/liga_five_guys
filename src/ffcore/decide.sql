@@ -22,10 +22,10 @@
 
 -- The inputs, one decision's (decision.py inputs), beside what the model
 -- looks at (schema.sql look: the market seen, the forecast, your squad and
--- cash at t, my_squad and my_cash): whether it may buy, the game's debt
+-- cash at t, my_squad and my_cash): the game's debt
 -- share and squad cap, the eleven's size.
-CREATE TABLE IF NOT EXISTS dec_state (
-    buys      INTEGER NOT NULL,      -- 0: sales only
+DROP TABLE IF EXISTS dec_state;
+CREATE TABLE dec_state (
     debt      REAL NOT NULL,
     squad_max INTEGER NOT NULL,
     xi_size   INTEGER NOT NULL
@@ -75,8 +75,8 @@ FROM my_squad m CROSS JOIN look l
 LEFT JOIN seen s ON s.cut = l.cut AND s.variant = l.variant AND s.player = m.player
 UNION ALL
 SELECT s.player, s.pos, 0, s.price, NULL
-FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant CROSS JOIN dec_state st
-WHERE st.buys AND s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player FROM my_squad);
+FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant
+WHERE s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player FROM my_squad);
 
 -- Each buy's bids and their chance of winning, as seen.
 DROP VIEW IF EXISTS dec_odds_seen;
