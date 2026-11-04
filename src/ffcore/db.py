@@ -228,10 +228,19 @@ PUT = {"/* rules.ELEVEN */": ELEVEN, "/* rules.FORMATIONS */": FORMATIONS,
        "/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x in SEED_POOL)}
 
 
+# "Each source's last snapshot as of t", said once: `WHERE /* latest TABLE */`
+# on a table aliased t. "A key's newest row", said once: `/* newest KEY */` is
+# its row_number() (n = 1 is the newest), where rows are ordered as they came.
+_LATEST = re.compile(r"/\* latest (\w+) \*/")
+_NEWEST = re.compile(r"/\* newest ([^*]+) \*/")
+
+
 def _put(sql: str) -> str:
     for name, text in PUT.items():
         sql = sql.replace(name, text)
-    return sql
+    sql = _NEWEST.sub(lambda m: "row_number() OVER (PARTITION BY %s ORDER BY observed_at DESC, rowid DESC)" % m[1], sql)
+    return _LATEST.sub(lambda m: "(t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM %s "
+                                 "WHERE observed_at <= (SELECT cut()) GROUP BY source)" % m[1], sql)
 
 
 def _forecast_tables(db: sqlite3.Connection) -> None:

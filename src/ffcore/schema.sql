@@ -406,10 +406,10 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
 DROP VIEW IF EXISTS grade_forecast;
 CREATE VIEW grade_forecast AS
 WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
-SELECT g.run_id, g.from_j, g.jornada, c.player, c.pts * c.p AS predicted, coalesce(a.pts, 0.0) AS actual,
+SELECT g.run_id, g.from_j, g.jornada, c.player, c.e AS predicted, coalesce(a.pts, 0.0) AS actual,
        coalesce(f.flagged, 0) AS flagged, CASE WHEN m.code <> 'graded before 2026-10-17' THEN c.p END AS plays
 FROM grade_moment g JOIN forecast_moment m ON m.moment = g.moment
-JOIN forecast_cell c ON c.moment = g.moment AND c.jornada = g.jornada
+JOIN forecast_e c ON c.moment = g.moment AND c.jornada = g.jornada
 LEFT JOIN forecast_player f ON f.moment = g.moment AND f.player = c.player
 LEFT JOIN pts a ON a.player = c.player AND a.jornada = g.jornada;
 
@@ -447,14 +447,14 @@ ORDER BY w.lock, s.at;
 DROP VIEW IF EXISTS replayed;
 CREATE VIEW replayed AS
 WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
-SELECT m.variant, r.as_of, r.jornada, c.player, c.pts * c.p AS predicted,
+SELECT m.variant, r.as_of, r.jornada, c.player, c.e AS predicted,
        coalesce(a.pts, 0.0) AS actual, f.flagged,
        24 * (stamp_jd(r.lock)
            - stamp_jd(r.as_of))
            AS lead_h
 FROM (SELECT variant, as_of, max(moment) AS moment FROM forecast_moment WHERE code = 'sql' GROUP BY variant, as_of) m
 JOIN replay_moments r ON r.as_of = m.as_of
-JOIN forecast_cell c ON c.moment = m.moment AND c.jornada = r.jornada
+JOIN forecast_e c ON c.moment = m.moment AND c.jornada = r.jornada
 JOIN forecast_player f ON f.moment = m.moment AND f.player = c.player
 LEFT JOIN pts a ON a.player = c.player AND a.jornada = r.jornada
 WHERE r.jornada IN (SELECT jornada FROM jornadas_done);
@@ -635,10 +635,15 @@ SELECT r.run_id, c.jornada, c.player, c.ppm, c.fixture, c.picked, c.fit,
        max(0.0, c.ppm * c.fixture) * c.picked * c.fit AS expected
 FROM sim_runs r JOIN forecast_cell c ON c.moment = r.moment WHERE c.ppm IS NOT NULL;
 
+-- A cell's expected points, e = pts x p, said once; every reader takes e from here.
+DROP VIEW IF EXISTS forecast_e;
+CREATE VIEW forecast_e AS SELECT moment, player, jornada, pts, p, pts * p AS e FROM forecast_cell;
+
 DROP VIEW IF EXISTS forecast_used;
 CREATE VIEW forecast_used AS
-SELECT c.moment, c.player, c.jornada, c.pts, CASE WHEN l.player IS NULL THEN c.p ELSE 0.0 END AS p
-FROM forecast_cell c LEFT JOIN late_arrivals l ON l.player = c.player AND l.jornada = c.jornada;
+SELECT c.moment, c.player, c.jornada, c.pts, CASE WHEN l.player IS NULL THEN c.p ELSE 0.0 END AS p,
+       CASE WHEN l.player IS NULL THEN c.e ELSE 0.0 END AS e
+FROM forecast_e c LEFT JOIN late_arrivals l ON l.player = c.player AND l.jornada = c.jornada;
 
 -- How a jornada's points spread about a cell's: m2, the mean square of a
 -- single game's points over its mean squared (the season's games scored
@@ -661,7 +666,7 @@ SELECT m.sq / (CASE WHEN abs(m.mean) > 1e-9 THEN m.mean * m.mean ELSE 1.0 END) A
 -- scaled to his points if he plays).
 DROP VIEW IF EXISTS cell;
 CREATE VIEW cell AS
-SELECT f.jornada, f.player, f.p, f.pts * f.p AS e, f.p * f.pts * f.pts * w.m2 - (f.pts * f.p) * (f.pts * f.p) AS v
+SELECT f.jornada, f.player, f.p, f.e, f.p * f.pts * f.pts * w.m2 - f.e * f.e AS v
 FROM look l JOIN forecast_used f ON f.moment = l.moment CROSS JOIN score_spread w;
 
 -- Each position's stand-in each jornada left: the average of the points if
@@ -674,9 +679,10 @@ a AS (SELECT f.jornada, c.pos, avg(f.pts) AS pts, avg(f.p) AS p
            FROM look l JOIN forecast_used f ON f.moment = l.moment
            JOIN held h ON h.player = f.player JOIN player_club c ON c.player = f.player
            WHERE c.pos <> ''
-           GROUP BY f.jornada, c.pos)
-SELECT a.jornada, a.pos, a.pts * a.p AS e, a.p * a.pts * a.pts * w.m2 - (a.pts * a.p) * (a.pts * a.p) AS v
-FROM a CROSS JOIN score_spread w;
+           GROUP BY f.jornada, c.pos),
+b AS (SELECT *, pts * p AS e FROM a)     -- a stand-in's own cell: the averages' product, not a row's
+SELECT a.jornada, a.pos, a.e, a.p * a.pts * a.pts * w.m2 - a.e * a.e AS v
+FROM b a CROSS JOIN score_spread w;
 
 -- The game's nightly offers still to come before the lock (next_lock): one
 -- as each standing offer expires, then one a day (0 with none standing),
@@ -1124,7 +1130,7 @@ DROP VIEW IF EXISTS kickoffs;
 CREATE VIEW kickoffs AS
 SELECT home, away, jornada, kick, t FROM (
     SELECT home, away, jornada, strftime('%Y-%m-%dT%H%MZ', kickoff) AS kick, julianday(kickoff) AS t,
-           row_number() OVER (PARTITION BY home, away ORDER BY observed_at DESC, rowid DESC) AS n
+           /* newest home, away */ AS n
     FROM matches
     WHERE observed_at <= (SELECT cut()) AND jornada IS NOT NULL
       AND strftime('%Y-%m-%dT%H%MZ', kickoff) IS NOT NULL)
@@ -1300,7 +1306,7 @@ SELECT aid AS app_id, ff_id AS player FROM f WHERE rf = 1 AND tie = 1;
 DROP VIEW IF EXISTS registry;
 CREATE VIEW registry AS
 WITH last AS (SELECT ff_id, trim(name) AS name, club,
-                     row_number() OVER (PARTITION BY ff_id ORDER BY observed_at DESC, rowid DESC) AS n
+                     /* newest ff_id */ AS n
               FROM market WHERE ff_id <> '')
 SELECT l.ff_id AS player_id, l.name, l.club AS club_id, coalesce(a.app_id, '') AS app_id
 FROM last l LEFT JOIN app_links a ON a.player = l.ff_id WHERE l.n = 1;
@@ -1444,9 +1450,8 @@ SELECT user_id, manager, position, team_points, fixture_points, team_value, team
 -- Your line-up in the app at t (each source's last snapshot), i its order there.
 DROP VIEW IF EXISTS app_lineup;
 CREATE VIEW app_lineup AS
-SELECT rowid AS i, source, player_id, player_name, player_name_full FROM api_lineup
-WHERE (source, observed_at) IN (SELECT source, max(observed_at) FROM api_lineup
-                                WHERE observed_at <= (SELECT cut()) GROUP BY source);
+SELECT t.rowid AS i, t.source, t.player_id, t.player_name, t.player_name_full FROM api_lineup t
+WHERE /* latest api_lineup */;
 
 -- Every snapshot of futbolfantasy's market up to t: a player's value at each,
 -- id the order they were kept in.

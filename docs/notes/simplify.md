@@ -95,7 +95,7 @@ audits (2026-11-03):
 
 | # | Concept | Layer | The one home | Copies and crossings today |
 |---|---|---|---|---|
-| 1 | t, the moment | league at t | one t, an argument | cut() a process global (clock.py _NOW/_SET, db.py functions); look.cut a second t; views of one decision read both (decide.sql seen via look.cut, jornada_calendar and cash via cut()); set_now per date in grading; datetime.now in grading.auction_closes, run_now in age_hours |
+| 1 | t, the moment | league at t | one t, an argument | Done (2026-11-04): `look` is a view over cut(); there is one t. |
 | 2 | Who a player is | facts | identity.sql views | Python Crosswalk/Player rewrites the crosswalk table; ff_identity_kept cache; text.resolve fuzzy clubs; lineup_gap, auction_results, grading re-match by hand |
 | 3 | Who owns whom | league at t | owners view at t | seen.owner (stored at 91 of 233 cuts: history before owners were kept), League.owner/squad, LeagueState.squads, Universe.mine, Market.owner, dec_mine, grading Day / with_squad |
 | 4 | Cash | league at t | cash view at t | League.cash, Market.cash/left, dec_state, dec_money, Day cash; League() writes league_config on every build |
