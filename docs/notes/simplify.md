@@ -60,8 +60,8 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 
 
 **Frontiers crossed today (to fix, one module at a time):**
-- Decision reads ingest: player_facts reads current_market.
-- Decision's tests build Python objects (Universe, Market, LeagueState, Bootstrap) instead of rows.
+- Decision reads ingest: done (2026-11-04). player_facts, nights_left, bid_odds, league_season read ingest's fact views (player_roster, listings, offers, squads, standings); offer_ratios is ingest's. tools/frontiers.py lists none.
+- Decision's tests: done (2026-11-04). decision._selftest seeds rows (plan_rows on rows, seed_league); no Universe, Market, LeagueState or Bootstrap remains in src or tools. The expected gap is decision.expected_gap.
 - Settlement decides: on a lost bid, grading.py drops the paired sales and runs decision.plan(sales_only=True) (grading.py:292-297). That sold Agoume, Moncayola, and Maffeo the night he was bought.
 - More, once the frontier check lists them.
 
