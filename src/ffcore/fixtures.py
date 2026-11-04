@@ -24,6 +24,7 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
 
     from assemble import write_constants
     from ffcore.db import connect, set_look
+    from ffcore.tidy import store_sql
 
     write_constants()   # the model's constants the views read, as a forecast writes them
     set_look(moment=0, me=me, path="", t0="")
@@ -38,6 +39,12 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
                        [(k, r, p) for k, o in (odds or {}).items() for r, p in o])
         db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
                        [(k, j, pts, p) for j, per in cells.items() for k, (pts, p) in per.items()])
+        # the ingest facts under them, as the app and the market page give them: a position, a squad
+        db.executemany("INSERT OR REPLACE INTO crosswalk (player_id, app_id) VALUES (?, ?)", [(k, k) for k in players])
+    store_sql("market", [{"observed_at": "2026-08-01T0000Z", "source": "test", "ff_id": k, "name": p.get("name", k),
+                          "position": p.get("pos") or ""} for k, p in players.items()])
+    store_sql("api_teams", [{"observed_at": "2026-08-01T0000Z", "source": "test", "player_id": k, "manager": p["owner"]}
+                            for k, p in players.items() if p.get("owner")])
 
 
 def lineup_board(app: list[tuple[str, str]], ids: dict[str, str]) -> None:

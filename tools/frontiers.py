@@ -23,9 +23,9 @@ NAMES = {
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
               "player_jornadas season_record season_points next_lock listing_ends price_paid",
-    "forecast": "cell score_spread run_forecast forecast_used "
+    "forecast": "cell standin_cell score_spread run_forecast forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
-    "decision": "moves standin_cell bid_odds recent_offers sale_odds waiting nights_left player_facts "
+    "decision": "moves bid_odds recent_offers sale_odds waiting nights_left player_facts "
                 "next_cell my_moves my_bids my_squad my_cash my_xi look_players formation slot_bounds "
                 "decision_option decision_plan",
     "settlement": "",

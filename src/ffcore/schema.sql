@@ -666,14 +666,15 @@ FROM look l JOIN forecast_used f ON f.moment = l.moment CROSS JOIN score_spread 
 
 -- Each position's stand-in each jornada left: the average of the points if
 -- he plays and of the chance he plays of the players of that position in a
--- squad or on the market, as seen; his e and v as a cell's.
+-- squad or on the game's market at t (squads, listings); his e and v as a cell's.
 DROP VIEW IF EXISTS standin_cell;
 CREATE VIEW standin_cell AS
-WITH a AS (SELECT f.jornada, s.pos, avg(f.pts) AS pts, avg(f.p) AS p
+WITH held AS (SELECT player FROM squads UNION SELECT player FROM listings),
+a AS (SELECT f.jornada, c.pos, avg(f.pts) AS pts, avg(f.p) AS p
            FROM look l JOIN forecast_used f ON f.moment = l.moment
-           JOIN seen s ON s.cut = l.cut AND s.variant = l.variant AND s.player = f.player
-           WHERE s.pos IS NOT NULL AND (s.price IS NOT NULL OR s.owner IS NOT NULL)
-           GROUP BY f.jornada, s.pos)
+           JOIN held h ON h.player = f.player JOIN player_club c ON c.player = f.player
+           WHERE c.pos <> ''
+           GROUP BY f.jornada, c.pos)
 SELECT a.jornada, a.pos, a.pts * a.p AS e, a.p * a.pts * a.pts * w.m2 - (a.pts * a.p) * (a.pts * a.p) AS v
 FROM a CROSS JOIN score_spread w;
 

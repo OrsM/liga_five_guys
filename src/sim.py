@@ -128,7 +128,7 @@ def _selftest() -> None:
                 db.execute("DROP VIEW offer_ratios")
                 db.execute("CREATE TABLE offer_ratios (created_at, ratio)")
                 db.executemany("INSERT INTO offer_ratios VALUES ('', ?)", [(r,) for r in ratios])
-                db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
+                db.executemany("INSERT OR REPLACE INTO crosswalk (player_id, app_id) VALUES (?, ?)",
                                [(k, k) for k in dict.fromkeys([*fielded, *(k for k, _e in listings),
                                                                 *(k for k, _n in bids)])])
                 db.execute("DROP VIEW waiting")
