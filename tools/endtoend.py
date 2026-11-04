@@ -67,7 +67,7 @@ def _selftest() -> None:
             acts = record_run(1, b.params, b.moment)
             assert acts and {a[2] for a in acts if a[1] == "buy"} <= set(listed), acts
             assert rows("SELECT count(*) FROM dec_plan")[0][0] == len(acts)
-            assert board_doc() and rows("SELECT count(*) FROM sim_players WHERE run_id = 1 AND mine")[0][0] == len(mine)
+            assert board_doc() and rows("SELECT count(*) FROM decision_players WHERE run_id = 1 AND mine")[0][0] == len(mine)
         finally:
             set_now(None)
     print("endtoend self-test OK")

@@ -274,6 +274,57 @@ def _put(sql: str) -> str:
                                  "WHERE observed_at <= (SELECT cut()) GROUP BY source)" % m[1], sql)
 
 
+def _forecast_tables(db: sqlite3.Connection) -> None:
+    """The forecast's store as it was when a code hash keyed it (2026-11-04)
+    made the SQL forecast's: the moments no run or grade points to dropped,
+    the rest kept by what made them; the fits and variants tables gone."""
+    if "made" not in {r[1] for r in db.execute("PRAGMA table_info(forecast_moment)")}:
+        return
+    for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
+        db.execute('DROP VIEW "%s"' % v)
+    kept = "SELECT moment FROM sim_runs WHERE moment IS NOT NULL UNION SELECT moment FROM grade_moment"
+    for t in ("forecast_cell", "forecast_player", "forecast_moment"):
+        db.execute("DELETE FROM %s WHERE moment NOT IN (%s)" % (t, kept))
+    db.executescript("""
+        DROP TABLE IF EXISTS forecast_fit; DROP TABLE IF EXISTS forecast_variant;
+        CREATE TABLE forecast_moment_new (moment INTEGER PRIMARY KEY, code TEXT NOT NULL DEFAULT 'sql',
+                                          as_of TEXT NOT NULL, variant TEXT NOT NULL DEFAULT 'live');
+        INSERT INTO forecast_moment_new SELECT moment, code, as_of, 'live' FROM forecast_moment;
+        DROP TABLE forecast_moment; ALTER TABLE forecast_moment_new RENAME TO forecast_moment;""")
+
+
+def _tables(db: sqlite3.Connection) -> set[str]:
+    return {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+
+
+def _renamed(db: sqlite3.Connection) -> None:
+    """A run's record as it was kept before 2026-11-04, moved to its modules' names before the schema is
+    applied: the decision's plan-detail tables were sim_players, sim_standings and sim_waiting; sim_runs held
+    the decision's after-plan figures beside the forecast moment (the figures move to decision_run, in
+    _kept, once the schema has made it)."""
+    have = _tables(db)
+    old = [(a, b) for a, b in (("sim_players", "decision_players"), ("sim_standings", "decision_standings"),
+                               ("sim_waiting", "decision_waiting")) if a in have and b not in have]
+    split = "sim_runs" in have and "cut" in {r[1] for r in db.execute("PRAGMA table_info(sim_runs)")}
+    if old or split:
+        for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
+            db.execute('DROP VIEW "%s"' % v)     # the schema makes them again
+    for a, b in old:
+        db.execute("ALTER TABLE %s RENAME TO %s" % (a, b))
+    if split:
+        db.execute("ALTER TABLE sim_runs RENAME TO decision_run_old")
+
+
+def _kept(db: sqlite3.Connection) -> None:
+    """What _renamed set aside, put in the tables the schema made."""
+    if "decision_run_old" in _tables(db):
+        db.execute("INSERT INTO sim_runs (run_id, moment) SELECT run_id, moment FROM decision_run_old")
+        db.execute("INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid)"
+                   " SELECT run_id, cut, p_first_after, finish_after, cash_after, can_bid FROM decision_run_old")
+        db.execute("DROP TABLE decision_run_old")
+        db.commit()
+
+
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
     cut() the process's t, which the as-of views read. The schema is applied when the file does not carry its version (it
@@ -297,10 +348,12 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
                 db.execute("PRAGMA journal_mode=WAL")                       # other processes are using
                 if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'look' AND type = 'table'").fetchone():
                     db.execute("DROP TABLE look")                           # a view of LOOK now
-                migrate(db)
+                _forecast_tables(db)
+                _renamed(db)
                 fit_columns(db, texts)
                 for sql in texts:
                     db.executescript(sql)
+                _kept(db)
                 db.execute("PRAGMA user_version = %d" % version)
         _APPLIED.add(key)
     ensure(db, cut)
@@ -531,6 +584,24 @@ def _selftest() -> None:
         with closing(connect(Path(tmp) / "x.db", once)) as db:
             assert db.execute("SELECT count(*) FROM n").fetchone()[0] == 1, \
                 "the schema is applied once a file and process, not every connect"
+    with tempfile.TemporaryDirectory() as tmp:
+        old = Path(tmp) / "old.db"        # a run's record as kept before 2026-11-04
+        with closing(sqlite3.connect(old)) as raw, raw:
+            raw.execute("CREATE TABLE sim_runs (run_id INTEGER PRIMARY KEY, moment INTEGER, cut TEXT,"
+                        " p_first_after REAL, finish_after REAL, cash_after REAL, can_bid REAL)")
+            raw.execute("INSERT INTO sim_runs VALUES (4, 9, 'c', 0.3, 2.0, 5.0, 6.0)")
+            raw.execute("CREATE TABLE sim_players (run_id INTEGER NOT NULL, player TEXT NOT NULL, start REAL, next REAL,"
+                        " season REAL, mine INTEGER NOT NULL, xi INTEGER NOT NULL, PRIMARY KEY (run_id, player))")
+            raw.execute("INSERT INTO sim_players VALUES (4, 'a', 0.9, 3.0, 30.0, 1, 1)")
+        with closing(connect(old)) as db:
+            def got(q: str) -> list[Any]:
+                return db.execute(q).fetchall()
+            assert got("SELECT run_id, moment FROM sim_runs") == [(4, 9)], "the forecast moment stays in sim_runs"
+            assert got("SELECT run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first"
+                       " FROM decision_run") == [(4, "c", 0.3, 2.0, 5.0, 6.0, None, None)], \
+                "what the decision left of a run moved to decision_run"
+            assert got("SELECT player, next FROM decision_players") == [("a", 3.0)], "renamed, rows kept"
+            assert not {"sim_players", "decision_run_old"} & _tables(db), "the old names are gone"
     print("ffcore.db self-test OK")
 
 

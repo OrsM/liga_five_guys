@@ -1,7 +1,7 @@
-"""The sim stage: the decision (decision.plan, ffcore/decide.sql), what the
-run decided recorded (decision_option, decision_plan, forecast, params,
-sim_*), and decisions.json, the phone's copy of the board, written from
-the board views (schema.sql: board_json)."""
+"""The sim stage: the decision made and kept (decision.record: decision_plan,
+decision_option, decision_*), the run's forecast moment (sim_runs) and params, and
+decisions.json, the phone's copy of the board, written from the board views
+(schema.sql: board_json), which read the decision's contract only."""
 from __future__ import annotations
 
 import json
@@ -20,18 +20,8 @@ __all__ = ["board_doc", "record_run"]
 
 Doc = dict[str, Any]  # a JSON object of decisions.json
 
-# Every manager's season if you do nothing, as the run saw it (decide.sql
-# league_standings, before the plan's moves).
-STANDINGS = ("INSERT INTO sim_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash)"
-             " SELECT ?, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash FROM league_standings")
-
-# The plan as the run keeps it: dec_plan's moves, each sale with when it is
-# made (decide.sql dec_when).
-KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
-             " SELECT ?, step, kind, player, amount, win, worth, after FROM dec_when")
-
-
 def _selftest() -> None:
+    _selftest_board_contract()
     import math
     import tempfile
     from pathlib import Path
@@ -147,13 +137,14 @@ def _selftest() -> None:
             seed(w, names)
             record_run(7)
             with closing(connect()) as db, db:
-                db.executemany("INSERT OR REPLACE INTO decision_option VALUES (7, ?, ?, ?, ?, ?, ?, 0)", options)
+                db.executemany("INSERT OR REPLACE INTO decision_option (run_id, kind, player, amount, win, gain, worth, in_plan)"
+                               " VALUES (7, ?, ?, ?, ?, ?, ?, 0)", options)
                 if plan is not None:
                     db.execute("DELETE FROM decision_plan WHERE run_id = 7")
                     db.execute("DELETE FROM dec_plan")
                     db.executemany("INSERT INTO dec_plan VALUES (?, ?, ?, ?, ?, ?)",
                                    [(i, *p) for i, p in enumerate(plan)])
-                    db.execute(KEEP_PLAN, (7,))
+                    db.execute(decision.KEEP_PLAN, (7,))
                 db.execute("UPDATE decision_option SET in_plan = EXISTS (SELECT 1 FROM decision_plan p"
                            " WHERE p.run_id = 7 AND p.kind = decision_option.kind"
                            " AND p.player = decision_option.player) WHERE run_id = 7")
@@ -371,12 +362,14 @@ def _selftest() -> None:
             == [("buy", k, 1) for k in sorted(bought)], "each move alone, the plan's marked"
         assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'sell'") == [(len(sqb), )]
         held = {k: r for k, r in ub["p"].items() if r.get("owner") != "riv"}
-        assert [r for r in rows("SELECT player, pos, value, price, offer, fetches FROM sim_facts WHERE run_id = 7"
+        assert [r for r in rows("SELECT player, pos, value, price, offer, fetches FROM decision_facts WHERE run_id = 7"
                                 " ORDER BY player") if r[0] in held] == sorted(
             (k, r.get("pos") or "", r.get("value"), r.get("price"), r.get("offer"),
              (r["fetches"] if r.get("fetches") is not None else r.get("value") or 0.0) if r.get("owner") == "me" else None)
             for k, r in held.items()), "the facts the decision was made on, as its league holds them"
         assert rows("SELECT moment FROM sim_runs WHERE run_id = 7") == [(None,)]
+        assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'buy'"
+                    " AND asking_win IS NOT 1.0") == [(0,)], "a buy's chance at his asking price: sure with no past"
         with closing(connect()) as db, db:
             db.execute("INSERT INTO forecast_moment VALUES (5, 'c', 't', 'live')")
             db.executemany("INSERT INTO forecast_cell VALUES (5, ?, 3, ?, ?, ?, ?, ?, ?)",
@@ -389,7 +382,7 @@ def _selftest() -> None:
             "a run's forecast is its moment's cells with factors, their products"
 
         sim = {r[0]: r[1:] for r in rows("SELECT manager, me, finish, p_first, p_above, cash, lo, mean, hi"
-                                         " FROM sim_standings WHERE run_id = 7")}
+                                         " FROM decision_standings WHERE run_id = 7")}
         assert set(sim) == {"me", "riv"} and sim["me"][0] == 1 and sim["me"][3] is None
         (_, finish, first, _, cash, lo, mean, hi), (_, r_finish, r_first, r_above, *_) = sim["me"], sim["riv"]
         assert cash == ub["cash"], "yours from the app"
@@ -398,15 +391,15 @@ def _selftest() -> None:
         assert abs(first + r_first - 1) < 1e-3 and abs(first - (1 - r_above)) < 1e-3, \
             "two managers: first is ending above the other (on 401 points of his total)"
         assert lo < mean < hi
-        (r_lo, r_mean, r_hi), = rows("SELECT lo, mean, hi FROM sim_standings WHERE run_id = 7 AND NOT me")
+        (r_lo, r_mean, r_hi), = rows("SELECT lo, mean, hi FROM decision_standings WHERE run_id = 7 AND NOT me")
         z = NormalDist().inv_cdf(0.9)
         assert abs(r_above - NormalDist().cdf((r_mean - mean) / math.hypot((hi - mean) / z, (r_hi - r_mean) / z))) < 1e-9, \
             "above you: the chance he finishes above you, not that you beat him"
         (won_first, won_finish), = rows("SELECT p_first, finish FROM league_standings WHERE me")
-        assert rows("SELECT p_first_after, finish_after FROM sim_runs WHERE run_id = 7") == [(won_first, won_finish)] \
+        assert rows("SELECT p_first_after, finish_after FROM decision_run WHERE run_id = 7") == [(won_first, won_finish)] \
             and won_finish < finish, \
             "your chance of first and finish once the plan is made, every bid won (the star in): the same standings"
-        who = {k: r for k, *r in rows("SELECT player, start, next, season, mine, xi FROM sim_players WHERE run_id = 7")}
+        who = {k: r for k, *r in rows("SELECT player, start, next, season, mine, xi FROM decision_players WHERE run_id = 7")}
         assert set(who) == set(mine(ub)) | set(bought), "your squad and the plan's buys"
         assert sum(r[4] for r in who.values()) == 11 and not who["dead"][4] and not who["cand"][4], \
             "your eleven next is of the squad you hold now"
@@ -455,27 +448,72 @@ def _selftest_lineup() -> None:
     assert gap([], {}) == whole, "no line-up given: the whole eleven"
 
 
+def _selftest_board_contract() -> None:
+    """The board reads the decision's plan-detail contract and nothing else of the decision: seeded rows
+    (decision_run, decision_plan, decision_option, decision_players, decision_waiting, decision_standings, and the
+    facts the run saw, seen at its cut) in, the board's lines out. No decision view is made, so a board that reached
+    for the decision's internals (bid_odds, recent_offers, nights_left, waiting) would find nothing."""
+    import tempfile
+    from pathlib import Path
+
+    from ffcore.db import connect
+    from ffcore.tidy import tables_in
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        c = cut()
+        with closing(connect()) as db, db:
+            db.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha) VALUES (3, 't', 't', 'test', 'c')")
+            db.execute("INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first)"
+                       " VALUES (3, ?, 0.25, 2.5, 4e6, 6e6, 2, julianday('2026-08-02T20:00:00Z'))", (c,))
+            db.executemany("INSERT INTO seen (cut, variant, player, name, pos, owner, value, trend, offer, price, route,"
+                           " fetches) VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           [(c, "a", "Ana", "MED", "me", 1e6, None, 1.1e6, None, "listed", 1.1e6),
+                            (c, "b", "Beto", "DEF", "me", 2e6, 3.0, None, None, None, 2e6),
+                            (c, "c", "Cai", "DEL", None, 4e6, 1.0, None, 5e6, None, None)])
+            db.executemany("INSERT INTO decision_players (run_id, player, start, next, season, mine, xi)"
+                           " VALUES (3, ?, 0.9, ?, 20.0, ?, ?)",
+                           [("a", 1.0, 1, 0), ("b", 3.0, 1, 1), ("c", 4.0, 0, 0)])
+            db.executemany("INSERT INTO decision_option (run_id, kind, player, amount, win, gain, worth, in_plan,"
+                           " asking_win, beats) VALUES (3, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           [("sell", "a", 1.1e6, 1.0, -1.0, -0.5, 1, None, 0.75),
+                            ("sell", "b", 2e6, 1.0, -3.0, -2.0, 0, None, None),
+                            ("buy", "c", 5.2e6, 0.8, 4.0, 3.0, 1, 0.6, None)])
+            db.executemany("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
+                           " VALUES (3, 0, ?, ?, ?, ?, ?, 0)",
+                           [("buy", "c", 5.2e6, 0.8, 3.0), ("sell", "a", 1.1e6, 1.0, -0.5)])
+            db.execute("INSERT INTO decision_waiting (run_id, player, kind, later) VALUES (3, 'a', 'sale', 1.0e6)")
+            db.executemany("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first,"
+                           " p_above, cash) VALUES (3, ?, ?, 10, ?, 0, 0, ?, ?, ?, ?)",
+                           [("me", 1, 50.0, 2.0, 0.4, None, 4e6), ("riv", 0, 60.0, 1.0, 0.6, 0.7, 1e6)])
+        doc = board_doc()
+        do = {d["what"]: d for d in doc["do"]}
+        buy = do["buy"]
+        assert (buy["name"], buy["step"], buy["amount"], buy["win"], buy["asking"], buy["asking_win"]) \
+            == ("Cai", "bid up to", 5.2e6, 0.8, 5e6, 0.6), \
+            "a buy: the plan's bid and its chance, and the chance of winning at his asking price (decision_option)"
+        sell = do["sell"]
+        assert (sell["name"], sell["step"], sell["amount"]) == ("Ana", "take offer", 1.1e6), sell
+        got = {f[0]: f[1] for f in sell["facts"]}
+        assert got["the game's recent offers"] == 0.75 and got["more offers before the lock"] == 2 \
+            and got["waiting is worth"] == 1.0e6, \
+            "a sale: where his offer ranks among the game's recent offers (decision_option.beats), the nights left " \
+            "(decision_run) and what waiting is worth (decision_waiting)"
+        assert (doc["finish"], doc["finish_after"], doc["p_win"], doc["p_win_after"], doc["cash"],
+                doc["cash_after"], doc["can_bid"]) == (2.0, 2.5, 0.4, 0.25, 4e6, 4e6, 6e6), doc
+        assert [(r["manager"], r["p_above"]) for r in doc["standings"]] == [("riv", 0.7), ("me", None)], \
+            "the standings forecast the run recorded, most points first"
+        assert [r["name"] for r in doc["buys"]] == ["Cai"] and [r["name"] for r in doc["sells"]][0] in ("Ana", "Beto")
+
 
 def record_run(run: int, params: Sequence[Doc] = (), moment: int | None = None) -> list[tuple[Any, ...]]:
     """The decision at t (decision.plan) and
     everything the run saw, into its tables: the board views read them; the
     forecast moment it was built on, and your chance of first and finish
     once the plan is made, every bid won. The plan's moves."""
-    decision.inputs()
-    with closing(connect()) as db, db:
-        db.execute(STANDINGS, (run, ))
-    acts = decision.plan()
+    acts = decision.record(run)
     record([{"run_id": run, **r} for r in params], "params")
     with closing(connect()) as db, db:
-        db.execute("INSERT INTO sim_players (run_id, player, start, next, season, mine, xi)"
-                   " SELECT ?, player, start, next, season, mine, xi FROM look_players", (run, ))
-        db.execute("INSERT INTO decision_option SELECT ?, kind, player, amount, win, gain, worth, in_plan"
-                   " FROM dec_rows", (run,))
-        db.execute(KEEP_PLAN, (run,))
-        db.execute("INSERT INTO sim_runs (run_id, moment, cut, p_first_after, finish_after, cash_after, can_bid)"
-                   " SELECT ?, ?, ?, s.p_first, s.finish, c.free, r.room FROM dec_cash c, dec_room r, league_standings s"
-                   " WHERE s.me", (run, moment, cut()))
-        db.execute("INSERT INTO sim_waiting SELECT ?, player, kind, later FROM waiting", (run,))
+        db.execute("INSERT INTO sim_runs (run_id, moment) VALUES (?, ?)", (run, moment))
     return acts
 
 

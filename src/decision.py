@@ -11,7 +11,7 @@ from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, best_eleven
 from recommender import Rec, Recs, cells_of, points, recommend
 
-__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap"]
+__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
@@ -156,6 +156,51 @@ def plan() -> list[tuple[Any, ...]]:
     steps, start = plan_rows(read_inputs())
     _write(steps, start)
     return steps
+
+
+def options() -> list[tuple[Any, ...]]:
+    """Every single move valued alone from the squad as it is (dec_rows) after plan(): kind, player, amount, in_plan."""
+    return [tuple(r) for r in rows("SELECT kind, player, amount, in_plan FROM dec_rows")]
+
+
+# What the decision keeps of a run, the board's plan-detail contract (schema.sql decision_*): the season if you
+# do nothing (before the plan), then the plan, every move alone, who it looked at, what waiting is worth, and
+# what the plan leaves.
+STANDINGS = ("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash)"
+             " SELECT ?, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash FROM league_standings")
+# The plan as the run keeps it: dec_plan's moves, each sale with when it is made (dec_when).
+KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
+             " SELECT ?, step, kind, player, amount, win, worth, after FROM dec_when")
+KEEP = (
+    "INSERT INTO decision_players (run_id, player, start, next, season, mine, xi)"
+    " SELECT ?, player, start, next, season, mine, xi FROM look_players",
+    "INSERT INTO decision_option (run_id, kind, player, amount, win, gain, worth, in_plan, asking_win, beats)"
+    " SELECT ?, d.kind, d.player, d.amount, d.win, d.gain, d.worth, d.in_plan,"
+    " CASE WHEN d.kind = 'buy' THEN coalesce((SELECT o.p_win FROM bid_odds o WHERE o.player = d.player"
+    "                                         AND o.ratio = 1.0), 1.0) END,"
+    " CASE WHEN d.kind = 'sell' AND f.offer IS NOT NULL AND f.value > 0"
+    "      THEN (SELECT avg(r.ratio < f.offer / f.value) FROM recent_offers r) END"
+    " FROM dec_rows d LEFT JOIN player_facts f ON f.player = d.player",
+    KEEP_PLAN,
+    "INSERT INTO decision_waiting SELECT ?, player, kind, later FROM waiting",
+    "INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first)"
+    " SELECT ?, cut(), s.p_first, s.finish, c.free, r.room, n.nights, n.first"
+    " FROM dec_cash c, dec_room r, league_standings s, nights_left n WHERE s.me",
+)
+
+
+def record(run: int) -> list[tuple[Any, ...]]:
+    """The decision at t (inputs, then plan) kept as run's rows: the standings forecast if you do nothing, the
+    plan, its options, the players it looked at, waiting, and what the plan leaves (your chance of first and
+    finish once every bid is won, cash, what more you can bid, the offer nights left). The plan's steps."""
+    inputs()
+    with closing(connect()) as db, db:
+        db.execute(STANDINGS, (run,))
+    acts = plan()
+    with closing(connect()) as db, db:
+        for sql in KEEP:
+            db.execute(sql, (run,))
+    return acts
 
 
 def _selftest() -> None:
