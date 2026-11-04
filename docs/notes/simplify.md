@@ -20,7 +20,7 @@ reads, one copy of each fact, and nothing the board does not need.
 
 ## Modules and contracts (2026-11-04; the frame every change is judged in)
 
-Five modules. Each reads only the contract of the module before it, owns its
+Five modules. Each reads the facts and earlier modules' contracts only, owns its
 own tables and views, and is judged by its own test and measure. The money
 backtest only wires them together as a smoke test (it runs, no debt, a full
 eleven, no bid left open). It ranks nothing: one season path swings about
@@ -39,7 +39,7 @@ The same modules run live and in the replay; only t and the moves differ.
 Every contract is a SQL table or view. Ingest's output, the forecast, settlement and the board are SQL. The decision's search (best eleven for each candidate squad, then the greedy loop) is one pure Python function: it reads its input rows (cell, squads, cash, market, bid odds) and writes plan rows. It holds no copy of a table, and its test seeds rows. Python is also left for fetching and parsing pages, and for driving the app.
 
 **Rules.**
-- A module reads nothing from more than one step back, and nothing of a later one.
+- A module reads ingest's facts, t and earlier modules' contracts; never a later module, never a scraped table (only ingest reads those).
 - A test seeds its module's inputs as rows. No Python mirror of a table (Universe, Market, LeagueState, Bootstrap).
 - A change to a module is judged by that module's measure. Old output is a score to beat, not to reproduce.
 - A tool checks the frontiers: it reads each view's dependencies from SQLite and fails on a read past the frontier.
