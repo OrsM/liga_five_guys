@@ -51,8 +51,8 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 
 | Module | Exports (its contract) |
 |---|---|
-| ingest | appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
-| forecast | cell |
+| ingest | app_lineup, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
+| forecast | cell, price_carry, price_trend, price_trend_daily |
 | decision | decision_plan |
 | settlement | (none yet) |
 | board | board_json |
@@ -174,6 +174,7 @@ no module: sim.py (6):
 - src/sim.py:473 reads dec_rows (decision, not exported)
 - src/sim.py:476 reads dec_cash (decision, not exported)
 - src/sim.py:478 reads waiting (decision, not exported)
+**Forecast (2026-11-04)**: its crossings are fixed (late_arrivals, standin_cell, market_daily, price_day_now, price_rows read ingest's facts; auction_results no longer reads the forecast). The price trend and momentum are views at t (no kept momentum_fit / price_trend_fit; bid_odds reads price_trend_daily, a past close's trend); a cell's e and v are worked out once (cell_pool; stand-ins are its rows with no player).
 
 **Order.** (1) The frontier check, to get the full list. (2) Settlement: own its rule and fix the lost-bid sell-off. (3) Decision: tests on rows, the expected gap as its measure. (4) Forecast: tests on rows. (5) Ingest: facts as tables at fetch. Each step is done by one agent with a short brief, and is finished when its module's test and measure pass and its old copy is deleted.
 

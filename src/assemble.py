@@ -20,7 +20,7 @@ from ffcore.tidy import age_hours
 from stats import percentile
 
 __all__ = ["applied", "constants", "built", "forecast", "params", "price_momentum",
-           "price_change", "record_trend", "market_offer_ratios",
+           "price_change", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
@@ -73,32 +73,10 @@ class Prices(NamedTuple):
     horizon: int
 
 
-def record_trend() -> None:
-    """Each player's price trend as of the model's cut, kept (price_trend_fit)
-    for the views that read it; the momentum it rests on kept first."""
-    _keep("SELECT cut(), ff_id, trend FROM price_trend_now", "price_trend_fit")
-
-
-def _keep(select: str, *tables: str) -> None:
-    """The cut's rows of fit tables replaced by what select makes: its first
-    column, the cut, and its second, the key, in each table, with the next
-    column for each table in turn. Worked out first, the write after, so a
-    universe built beside others (a backtest builds them side by side) holds
-    lfg.db's one writer's lock for the write alone, not for the fit."""
-    with closing(connect()) as db:
-        got = db.execute(select).fetchall()
-        with db:
-            for i, table in enumerate(tables):
-                db.execute("DELETE FROM %s WHERE as_of = (SELECT cut())" % table)
-                db.executemany("INSERT INTO %s VALUES (?, ?, ?)" % table, [(r[0], r[1], r[2 + i]) for r in got])
-
-
 def price_momentum() -> Prices:
-    """Fitted at the model's cut and kept (momentum_fit, price_trend_fit),
-    then read."""
-    _keep("SELECT cut(), h, slope FROM momentum", "momentum_fit")
-    record_trend()
-    slope: dict[int, float] = dict(rows("SELECT h, slope FROM fitted ORDER BY h"))
+    """Momentum and the price trend at t (views: momentum, price_carry,
+    price_trend), read."""
+    slope: dict[int, float] = dict(rows("SELECT h, slope FROM momentum ORDER BY h"))
     return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
                   dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
 
@@ -199,7 +177,7 @@ def built() -> Built:
         raise SystemExit("the app's squads are %s old; no board is built from "
                          "them" % ("unknown" if age is None else "%.0fh" % age))
     me = write_config()
-    prices = price_momentum()          # first: it keeps the trend that player_facts and sale_odds read
+    prices = price_momentum()
     see()
     moment = forecast()
     set_look(me=me, moment=moment)
@@ -228,6 +206,43 @@ def _selftest() -> None:
     _selftest_points()
     _selftest_forecast()
     print("assemble self-test OK")
+
+
+
+def _selftest_price_at_t(by: dict[str, list[float]]) -> None:
+    """The price trend is a view at t: a past t reads the same whichever
+    builds ran, and the same as a database that ended there; no kept fit."""
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from ffcore.db import set_now
+    from ffcore.tidy import store_sql, tables_in
+
+    def seed(days: int) -> None:
+        for n in range(days):
+            store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": k,
+                                  "value": str(v[n])} for k, v in by.items()])
+
+    def look_at(day: int) -> tuple[list[Any], list[Any], list[Any]]:
+        set_now(datetime(2026, 8, 10 + day, 23, 59, 30, tzinfo=timezone.utc))
+        return (rows("SELECT h, slope FROM momentum ORDER BY h"), rows("SELECT ff_id, trend FROM price_trend ORDER BY 1"),
+                rows("SELECT h, carry FROM price_carry ORDER BY h"))
+
+    try:
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            seed(20)
+            assert rows("SELECT name FROM sqlite_master WHERE name IN ('momentum_fit', 'price_trend_fit', 'fitted')") == [], \
+                "no kept fit: the trend and momentum are views at t"
+            early = look_at(12)
+            late = look_at(19)
+            assert look_at(12) == early and early != late, "a past t does not depend on what was read since"
+            assert early[1] and early[0], early
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            seed(13)
+            assert look_at(12) == early, "the same as a database that ended at t"
+    finally:
+        set_now(None)
 
 
 def _selftest_prior() -> None:
@@ -507,15 +522,9 @@ def _selftest_sale() -> None:
             # a rising player, momentum fitted: the offers to come are on the value he will have
             store_sql("market", [{"observed_at": at(n), "ff_id": k, "name": k, "value": v}
                                  for n, v in ((2, "10500000"), (3, "11025000")) for k in ("p1", "p2", "p3")])
-            record([{"as_of": at(3), "h": 1, "slope": 2.0}, {"as_of": at(3), "h": 2, "slope": 8.0}],
-                   "momentum_fit")
-            assert rows("SELECT count(*) FROM price_trend") == [(0,)], "nothing kept until a run keeps it"
-            record_trend()
-            assert dict(rows("SELECT ff_id, trend FROM price_trend")) == dict(rows(
-                "SELECT ff_id, trend FROM price_trend_now")), "kept as the view works it out"
             facts = dict(rows("SELECT ff_id, trend FROM price_trend"))
             carry = [c for (c,) in rows("SELECT carry FROM price_carry ORDER BY h")]
-            assert facts["p1"] > 0 and carry == [0.25, 1.0], (facts, carry)
+            assert facts["p1"] > 0 and carry == [1.0], (facts, carry)
             value, trend, later = 11025000.0, facts["p1"], 0.0
             for night in (2, 1):
                 then = value * (1 + trend / 100 * carry[min(night, len(carry)) - 1])
@@ -715,6 +724,7 @@ def _selftest_market() -> None:
     assert mo.carry[-1] == 1.0 and 0 < mo.carry[0] < mo.carry[1], mo.carry
     assert mo.trend["up0"] > 0 > mo.trend["down0"] and mo.trend["flat0"] == 0.0, mo.trend
     assert prices({"once": [100.0]}).trend == {}
+    _selftest_price_at_t(by)
     rise = prices({"r%d" % i: [100 * 1.15 ** n for n in range(13)] for i in range(3)})
     assert abs(rise.slope[2] * 15.0 - (1.15 ** 2 - 1) * 100) < 1e-6, \
         "a rise over several updates is not clipped as if it were one"
@@ -738,6 +748,13 @@ def _selftest_market() -> None:
             listed = [(str(i), "2026-09-02T22:%02d:00+02:00" % i, str(i)) for i in range(len(past))]
             store_sql("api_standings", [{"observed_at": at % 1, "user_id": "1", "manager": "me"},
                                         {"observed_at": at % 1, "user_id": "2", "manager": "riv"}])
+            # each listed player changed t% a day for three days before his close (08-30 .. 09-02): trend t
+            # (momentum fits slope 1); the player listed now rises 5% a day to 09-05
+            store_sql("market", [{"observed_at": "2026-%s-%02dT1000Z" % (("08", 30 + n) if n < 2 else ("09", n - 1)),
+                                  "ff_id": "p" + i, "value": str(100 * (1 + t / 100) ** n)}
+                                 for (i, _c, _), (t, _w, _m) in zip(listed, past) for n in range(4)]
+                      + [{"observed_at": "2026-%s-%02dT1000Z" % (("08", 30 + n) if n < 2 else ("09", n - 1)),
+                          "ff_id": "p99", "value": str(100 * 1.05 ** n)} for n in range(7)])
             store_sql("api_market", [{"observed_at": at % 1, "seller": "marketPlayerLeague", "player_id": i,
                                       "expires_at": close, "sale_price": "100"} for i, close, _ in listed])
             store_sql("api_market", [{"observed_at": at % 5, "seller": "marketPlayerLeague", "player_id": "99",
@@ -752,9 +769,6 @@ def _selftest_market() -> None:
                 db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
                                [("p" + i, i) for i, _c, _ in listed] + [("p99", "99")])
-                db.executemany("INSERT INTO price_trend_fit VALUES (?, ?, ?)",
-                               [("2026-09-01T0000Z", "p" + i, t) for (i, _c, _), (t, _w, _m) in zip(listed, past)]
-                               + [("2026-09-05T0000Z", "p99", 5.0)])
             try:
                 set_now(datetime(2026, 9, 5, 12, tzinfo=timezone.utc))
                 c = see()
