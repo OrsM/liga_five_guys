@@ -23,20 +23,19 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
     from contextlib import closing
 
     from ffcore.db import connect, set_look
+    from ffcore.forecast_store import seed_cells
     from ffcore.tidy import store_sql
 
     set_look(moment=0, me=me)
     with closing(connect()) as db, db:
         for t in ("seen", "seen_cash", "seen_odds"):
             db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)
-        db.execute("DELETE FROM forecast_cell WHERE moment = 0")
         db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
                        [(k, p.get("name", k), *(p.get(c) for c in PLAYER_COLUMNS[1:])) for k, p in sorted(players.items())])
         db.execute("INSERT INTO seen_cash VALUES ((SELECT cut()), variant(), ?, ?)", (me, cash))
         db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut()), variant(), ?, ?, ?)",
                        [(k, r, p) for k, o in (odds or {}).items() for r, p in o])
-        db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (0, ?, ?, ?, ?)",
-                       [(k, j, pts, p) for j, per in cells.items() for k, (pts, p) in per.items()])
+        seed_cells(db, 0, [(k, j, pts, p) for j, per in cells.items() for k, (pts, p) in per.items()])
         # the ingest facts under them, as the app and the market page give them: a position, a squad
         db.executemany("INSERT OR REPLACE INTO crosswalk (player_id, app_id) VALUES (?, ?)", [(k, k) for k in players])
     store_sql("market", [{"observed_at": "2026-08-01T0000Z", "source": "test", "ff_id": k, "name": p.get("name", k),

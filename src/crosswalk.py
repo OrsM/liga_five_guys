@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import sqlite3
 import sys
+import zlib
 from contextlib import closing
 
 from ffcore import db as lfg
-from ffcore.facts import identity
 from ffcore.db import rows
 
 # Who each player is, as SQL: the registry view (schema.sql) written into
@@ -26,6 +26,37 @@ FROM (SELECT player, player_slug FROM (
           WHERE player IS NOT NULL AND player_slug <> '') WHERE n = 1) f
 WHERE crosswalk.player_id = f.player
 """
+
+
+def identity(db: sqlite3.Connection) -> None:
+    """ff_identity_kept (identity.sql) up to the registry and the rows it is
+    read for: refilled from ff_identity_now when either changed (build calls
+    it too; so does connect, through facts.ensure)."""
+    if db.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('ff_identity_kept', 'facts_meta')"
+                  ).fetchone()[0] < 2:
+        return
+    reg = db.execute("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk ORDER BY 1").fetchall()
+    through = "%08x:%d:%d" % (
+        zlib.crc32(repr(reg).encode()),
+        db.execute("SELECT coalesce(max(rowid), 0) FROM lineups").fetchone()[0],
+        db.execute("SELECT coalesce(max(rowid), 0) FROM starters").fetchone()[0])
+    version = "%08x" % zlib.crc32(db.execute(
+        "SELECT sql FROM sqlite_master WHERE name = 'ff_identity_now'").fetchone()[0].encode())
+    if db.execute("SELECT version, through FROM facts_meta WHERE name = 'ff_identity'").fetchone() == (version, through):
+        return
+    own = not db.in_transaction                 # else the caller's transaction holds it
+    if own:
+        db.execute("BEGIN IMMEDIATE")
+    try:
+        db.execute("DELETE FROM ff_identity_kept")
+        db.execute("INSERT INTO ff_identity_kept SELECT * FROM ff_identity_now")
+        db.execute("INSERT OR REPLACE INTO facts_meta VALUES ('ff_identity', ?, ?)", (version, through))
+        if own:
+            db.execute("COMMIT")
+    except BaseException:
+        if own:
+            db.execute("ROLLBACK")
+        raise
 
 
 def build(db: sqlite3.Connection) -> None:
@@ -114,6 +145,21 @@ def _selftest() -> None:
         assert [r["player"] for r in current("api_teams")] == ["af", None, None], \
             "an app id two players claim names nobody"
         assert rows("SELECT id, value FROM id_clashes") == [("app_id", "2614")]
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        def who() -> list[tuple[object, ...]]:
+            with closing(lfg.connect()) as db:
+                return db.execute("SELECT player_slug, player FROM ff_identity ORDER BY 1").fetchall()
+        assert who() == []
+        store_sql("lineups", [{"observed_at": "2026-08-10T0800Z", "source": "futbolfantasy",
+                               "player_slug": "x", "player_name": "X", "team_slug": "t"}])
+        with closing(lfg.connect()) as db, db:
+            db.execute("INSERT INTO crosswalk (player_id, name, club_id, ff_slug, app_id) VALUES ('p1', 'X', 't', 'x', '')")
+        assert who() == [("x", "p1")], "a new line-up row and a new registry are named at the next connect"
+        with closing(lfg.connect()) as db, db:
+            db.execute("UPDATE crosswalk SET ff_slug = 'y', name = 'Z'")
+            identity(db)
+        assert who() == [("x", None)], "a changed registry refills it in the caller's transaction"
 
     print("crosswalk self-test OK")
 

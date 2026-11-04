@@ -274,25 +274,6 @@ def _put(sql: str) -> str:
                                  "WHERE observed_at <= (SELECT cut()) GROUP BY source)" % m[1], sql)
 
 
-def _forecast_tables(db: sqlite3.Connection) -> None:
-    """The forecast's store as it was when a code hash keyed it (2026-11-04)
-    made the SQL forecast's: the moments no run or grade points to dropped,
-    the rest kept by what made them; the fits and variants tables gone."""
-    if "made" not in {r[1] for r in db.execute("PRAGMA table_info(forecast_moment)")}:
-        return
-    for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
-        db.execute('DROP VIEW "%s"' % v)
-    kept = "SELECT moment FROM sim_runs WHERE moment IS NOT NULL UNION SELECT moment FROM grade_moment"
-    for t in ("forecast_cell", "forecast_player", "forecast_moment"):
-        db.execute("DELETE FROM %s WHERE moment NOT IN (%s)" % (t, kept))
-    db.executescript("""
-        DROP TABLE IF EXISTS forecast_fit; DROP TABLE IF EXISTS forecast_variant;
-        CREATE TABLE forecast_moment_new (moment INTEGER PRIMARY KEY, code TEXT NOT NULL DEFAULT 'sql',
-                                          as_of TEXT NOT NULL, variant TEXT NOT NULL DEFAULT 'live');
-        INSERT INTO forecast_moment_new SELECT moment, code, as_of, 'live' FROM forecast_moment;
-        DROP TABLE forecast_moment; ALTER TABLE forecast_moment_new RENAME TO forecast_moment;""")
-
-
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
     cut() the process's t, which the as-of views read. The schema is applied when the file does not carry its version (it
@@ -308,6 +289,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
+            from ffcore.forecast_store import migrate   # not at the top: it imports this module
             texts = [_put(sql.read_text(encoding="utf-8"))
                      for sql in (IDENTITY, TABLES_SQL, schema) + ((DECIDE_SQL, ) if schema == SCHEMA else ())]
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
@@ -315,7 +297,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
                 db.execute("PRAGMA journal_mode=WAL")                       # other processes are using
                 if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'look' AND type = 'table'").fetchone():
                     db.execute("DROP TABLE look")                           # a view of LOOK now
-                _forecast_tables(db)
+                migrate(db)
                 fit_columns(db, texts)
                 for sql in texts:
                     db.executescript(sql)
