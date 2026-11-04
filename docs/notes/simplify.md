@@ -47,6 +47,18 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 - A change to a module is judged by that module's measure. Old output is a score to beat, not to reproduce.
 - A tool checks the frontiers: it reads each view's dependencies from SQLite and fails on a read past the frontier.
 
+**Exports** (the contracts, enforced by tools/frontiers.py, which tools/selftests.sh runs: it fails on a read of another module's name not listed here, in views and in src/*.py production code; grading may read anything; `python tools/frontiers.py --table` regenerates this table):
+
+| Module | Exports (its contract) |
+|---|---|
+| ingest | app_lineup, app_player, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, listing_ends, listings, look, name_player, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
+| forecast | cell, price_carry, price_trend, price_trend_fit, score_spread, standin_cell |
+| decision | bid_odds, decision_option, decision_plan, league_season, my_cash, nights_left, recent_offers, seen_cash |
+| settlement | (none yet) |
+| board | board_json |
+| grading | sim_facts, sim_players, sim_runs, sim_standings, sim_waiting |
+
+
 **Frontiers crossed today (to fix, one module at a time):**
 - Decision reads ingest: player_facts reads current_market.
 - Decision's tests build Python objects (Universe, Market, LeagueState, Bootstrap) instead of rows.
