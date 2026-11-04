@@ -50,6 +50,17 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 - Settlement decides: on a lost bid, grading.py drops the paired sales and runs decision.plan(sales_only=True) (grading.py:292-297). That sold Agoume, Moncayola, and Maffeo the night he was bought.
 - More, once the frontier check lists them.
 
+**Frontier check (2026-11-04)** (`tools/frontiers.py`; 47 crossings, by pair, reader to read):
+- decision reads settlement (2): my_bids reads auction_results, bid_odds reads auction_results
+- decision reads ingest (16): my_cash reads ledger, nights_left reads current_api_offers, nights_left reads next_lock, player_facts reads current_api_market, player_facts reads current_api_offers, player_facts reads current_api_teams, player_facts reads current_lineups, player_facts reads current_market, player_facts reads league_config, player_facts reads owners, player_facts reads price_paid, bid_odds reads current_api_market, offer_ratios reads api_offers, offer_ratios reads api_teams, next_cell reads jornada_calendar, league_season reads current_api_standings
+- forecast reads decision (3): cell reads look, standin_cell reads look, standin_cell reads seen
+- settlement reads ingest (4): auction_results reads api_activity, auction_results reads api_market, auction_results reads api_standings, auction_results reads app_player
+- settlement reads forecast (1): auction_results reads price_trend_fit
+- ingest reads forecast (1): scored reads player_club
+- board reads decision (10): board_buys reads decision_option, board_mine reads decision_option, board_mine reads nights_left, board_mine reads recent_offers, board_plan reads decision_plan, board_json reads bid_odds, league_standings reads league_season, league_standings reads look, league_standings reads my_cash, league_standings reads seen_cash
+- board reads ingest (10): board_mine reads listing_ends, board_buy_facts reads current_api_market, lineup_gap reads api_lineup, lineup_gap reads app_player, lineup_gap reads name_player, board_head reads next_lock, board_json reads current_api_market, board_json reads current_api_teams, lock_due reads next_lock, lineup_alert reads next_lock
+- Python files reading tables of three or more modules (informational): src/assemble.py, src/grading.py, src/sim.py, src/ffcore/jornadas.py.
+
 **Order.** (1) The frontier check, to get the full list. (2) Settlement: own its rule and fix the lost-bid sell-off. (3) Decision: tests on rows, the expected gap as its measure. (4) Forecast: tests on rows. (5) Ingest: facts as tables at fetch. Each step is done by one agent with a short brief, and is finished when its module's test and measure pass and its old copy is deleted.
 
 ## The dictionary (2026-11-03; replaces "one fact, many copies")
