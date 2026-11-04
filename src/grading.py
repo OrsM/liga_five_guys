@@ -166,31 +166,37 @@ def decisions() -> list[dict[str, Any]]:
 
 def ceiling() -> list[dict[str, Any]]:
     """The decision's measure at each past lock (before_locks), on the real
-    points of the jornadas from that lock to the next: floor, the squad you
+    points of every jornada played from that lock to the last with real
+    points (and, as next_*, of those up to the next lock only): floor, the squad you
     had at t as it was; ours, the plan (decision.plan_rows) on the forecast;
     ceiling, the same plan_rows with every cell's e the player's real points
-    in that jornada (0 if he did not play), the same constraints and bid odds.
+    in the window's jornadas (0 if he did not play, 0 after the window), the same constraints and bid odds.
     All three scored by decision.worth_on."""
     real = jornada_points()
     locks, done = before_locks(), sorted(done_jornadas())
     out = []
     for j in at_locks():
         later = [i for i in locks.values() if i > j]
-        js = [i for i in done if i >= j and (not later or i < min(later))]
+        js = [i for i in done if i >= j]
+        nxt = [i for i in js if not later or i < min(later)]
         inp = decision.read_inputs()
-        out.append({"jornada": j, **decision.measure(inp, real, js)})
+        out.append({"jornada": j, **decision.measure(inp, real, js),
+                    **{"next_" + k: v for k, v in decision.measure(inp, real, nxt).items()}})
     return sorted(out, key=lambda g: g["jornada"])
 
 
 def ceiling_report(got: list[dict[str, Any]]) -> str:
-    """A line a lock and the season's total: share = (ours - floor) / (ceiling - floor)."""
+    """A line a lock and the season's total: share = (ours - floor) / (ceiling - floor),
+    over every played jornada from the lock, and next = the same over the next jornada's span only."""
     def share(f: float, o: float, c: float) -> str:
         return "%6.2f" % ((o - f) / (c - f)) if c > f else "     -"
-    lines = ["j%-3s %7.1f %7.1f %7.1f %s" % (g["jornada"], g["floor"], g["ours"], g["ceiling"],
-                                             share(g["floor"], g["ours"], g["ceiling"])) for g in got]
-    f, o, c = (sum(g[k] for g in got) for k in ("floor", "ours", "ceiling"))
-    return "\n".join(["%-4s %7s %7s %7s %6s" % ("", "floor", "ours", "ceiling", "share")] + lines
-                     + ["%-4s %7.1f %7.1f %7.1f %s" % ("all", f, o, c, share(f, o, c))])
+    def cols(g: dict[str, float], pre: str) -> tuple[float, float, float]:
+        return g[pre + "floor"], g[pre + "ours"], g[pre + "ceiling"]
+    lines = ["j%-3s %7.1f %7.1f %7.1f %s %s" % (g["jornada"], *cols(g, ""), share(*cols(g, "")),
+                                                share(*cols(g, "next_"))) for g in got]
+    tot = {pre + k: sum(g[pre + k] for g in got) for pre in ("", "next_") for k in ("floor", "ours", "ceiling")}
+    return "\n".join(["%-4s %7s %7s %7s %6s %6s" % ("", "floor", "ours", "ceiling", "share", "next")] + lines
+                     + ["%-4s %7.1f %7.1f %7.1f %s %s" % ("all", *cols(tot, ""), share(*cols(tot, "")), share(*cols(tot, "next_")))])
 
 
 def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datetime]]
@@ -340,20 +346,28 @@ def _selftest_ceiling() -> None:
              "m4": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL", "bench": "DEF"}
     e = {**{k: 4.0 for k in squad}, "m4": 2.0, "bench": 1.0}
     market = {"star": ("MED", 8e6), "keeper": ("POR", 6e6)}
-    real = {**{(k, j): 4.0 for k in squad for j in (1, 2)}, ("star", 1): 10.0, ("keeper", 2): 9.0, ("m4", 1): 2.0}
-    got = []
+    real = {**{(k, j): 4.0 for k in squad for j in (1, 2)}, ("star", 1): 10.0, ("star", 2): 4.0, ("keeper", 2): 9.0, ("m4", 1): 2.0}
+    got: list[dict[str, float]] = []
+    two: dict[str, float] = {}
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         for j, (t, forecast_star) in enumerate((("2026-08-20", 8.0), ("2026-08-27", 3.0)), 1):
             set_now(dt.datetime.fromisoformat(t + "T17:59:00+00:00"))
             seed_league("me", 10e6,
                         {**{k: {"pos": p, "owner": "me", "value": 5e6} for k, p in squad.items()},
                          **{k: {"pos": p, "price": a} for k, (p, a) in market.items()}},
-                        {j: {**{k: (x, 1.0) for k, x in e.items()}, "star": (forecast_star, 1.0), "keeper": (3.0, 1.0)}})
-            got.append({"jornada": j, **decision.measure(decision.read_inputs(), real, [j])})
+                        {i: {**{k: (x, 1.0) for k, x in e.items()}, "star": (forecast_star, 1.0), "keeper": (3.0, 1.0)}
+                         for i in range(j, 3)})
+            inp = decision.read_inputs()
+            got.append({"jornada": j, **decision.measure(inp, real, [j]),
+                        **{"next_" + k: v for k, v in decision.measure(inp, real, [j]).items()}})
+            if j == 1:
+                two = decision.measure(inp, real, [1, 2])
     for g in got:
         assert g["floor"] <= g["ours"] <= g["ceiling"], g
     assert [(g["floor"], g["ours"], g["ceiling"]) for g in got] == [(44.0, 50.0, 50.0), (44.0, 44.0, 49.0)], got
-    assert ceiling_report(got).splitlines()[-1].endswith("0.55"), ceiling_report(got)
+    assert ceiling_report(got).splitlines()[-1].endswith("0.55   0.55"), ceiling_report(got)
+    # a two-jornada window: the ceiling counts both jornadas' real points, none after
+    assert (two["floor"], two["ours"], two["ceiling"]) == (88.0, 94.0, 99.0), two
 
 
 def _selftest() -> None:

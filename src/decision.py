@@ -138,9 +138,10 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
 def measure(inp: dict[str, list[tuple[Any, ...]]], real: dict[tuple[str, int], float], js: list[int]) -> dict[str, float]:
     """floor, ours and ceiling at one lock: worth_on of standing still, of
     plan_rows(inp), and of plan_rows on inp with each cell's e the real
-    points (0 if he did not play)."""
+    points in the jornadas js (0 if he did not play; 0 in any later jornada,
+    not yet known)."""
     floor, ours = worth_on(inp, plan_rows(inp)[0], real, js)
-    best = {**inp, "cell": [(k, j, real.get((k, j), 0.0)) for k, j, _ in inp["cell"]]}
+    best = {**inp, "cell": [(k, j, real.get((k, j), 0.0) if j in js else 0.0) for k, j, _ in inp["cell"]]}
     return {"floor": floor, "ours": ours, "ceiling": worth_on(inp, plan_rows(best)[0], real, js)[1]}
 
 
