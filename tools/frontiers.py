@@ -33,7 +33,7 @@ NAMES = {
     "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts "
                 "next_cell my_squad my_cash my_xi look_players formation slot_bounds "
                 "decision_option decision_plan",
-    "settlement": "",
+    "settlement": "settlement_moves",
     "board": "lock_due lineup_alert league_standings",
     "grading": "replayed lead_buckets measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
@@ -46,7 +46,7 @@ EXPORTS = {
     "forecast": "cell standin_cell score_spread price_carry price_trend price_trend_daily",  # cell is the contract; the rest feed the decision's odds and standings
     "decision": """bid_odds recent_offers nights_left league_season seen_cash my_cash
         decision_option decision_plan""",  # the board reads the plan, its options and the odds; league_standings reads cash and season
-    "settlement": "",
+    "settlement": "settlement_moves",
     "board": "board_json",
     "grading": "",  # a measure: nothing downstream reads it
 }
