@@ -10,7 +10,7 @@ from typing import Any
 from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, best_eleven
 
-__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure"]
+__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
@@ -145,6 +145,16 @@ def measure(inp: dict[str, list[tuple[Any, ...]]], real: dict[tuple[str, int], f
     return {"floor": floor, "ours": ours, "ceiling": worth_on(inp, plan_rows(best)[0], real, js)[1]}
 
 
+def expected_gap(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]] | None = None) -> float:
+    """The plan's expected gain on the forecast: the best eleven's e (cell)
+    over every jornada once the plan's steps are made (each at its win
+    chance), less standing pat's. worth_on with e for the real points; the
+    plan's (steps) is plan_rows(inp)'s unless given."""
+    e = {(k, j): x for k, j, x in inp["cell"]}
+    floor, ours = worth_on(inp, plan_rows(inp)[0] if steps is None else steps, e, sorted({j for _, j in e}))
+    return ours - floor
+
+
 def _write(steps: list[tuple[Any, ...]], start: list[tuple[Any, ...]]) -> None:
     with closing(connect()) as db, db:
         for t in ("dec_plan", "dec_start"):
@@ -220,6 +230,8 @@ def _selftest() -> None:
         assert [(g, w) for b, s, _, _, _, g, w in start if (b, s) == ("star", "")] == [(12.0, 12.0)], \
             "star (8) for m4 (2), two jornadas: his points, and nothing for his price"
         assert labels(steps) == ["buy star"]
+        assert expected_gap(league(10e6, {"star": 8e6})) == 12.0, "the plan's eleven against standing pat's: 8 for 2, twice"
+        assert expected_gap(league(2e6, {"star": 8e6})) == 0.0, "no move: no gap"
         assert labels(plan_rows(league(10e6, {"star": 10e6}))[0]) == ["buy star"], \
             "his price is a limit, not a cost: within cash, the points decide"
         got, _ = plan_rows(league(4e6, {"star": 8e6}))
