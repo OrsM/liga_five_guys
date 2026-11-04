@@ -155,8 +155,7 @@ def forecast() -> int:
         flagged = dict(db.execute("SELECT player, status IS NOT NULL FROM player_status"))
         with db:
             old = ("SELECT moment FROM forecast_moment WHERE as_of = cut() AND variant = variant()"
-                   " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL"
-                   " UNION SELECT moment FROM grade_moment)")
+                   " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL)")
             for t in ("forecast_cell", "forecast_player", "forecast_moment"):
                 db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old))
             moment = db.execute("INSERT INTO forecast_moment (as_of, variant) VALUES (cut(), variant())").lastrowid

@@ -46,7 +46,7 @@ Everything else comes from the app's API and public pages.
 4. **publish** (`publish.py`): the board (`board_json`) to the phone, and its ping.
 5. **grade** (`grading.py`: each past lock forecast and decided again with
    this code, one set kept a code version; the forecasts graded are the
-   lock moments, `grade_moment`, read through `grade_forecast`), **health**
+   lock moments, `grade_cell`, read through `grade_forecast`), **health**
    (`health.py`). A failure from here on is noted and the run goes on;
    before it, the run stops.
 
