@@ -199,8 +199,8 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
 [blindaje](https://www.guiafantasy.com/noticias/1686/como-funciona-el-blindaje-la-nueva-regla-que-revoluciona-laliga-fantasy).
 
 ## Checking it
-
-    python src/grading.py money                   # the backtest: a phantom deciding daily since the first lock,
+    python src/grading.py ceiling                # the decision's measure: at each past lock, standing still, the plan and the plan
+                                                  # on real points (floor, ours, ceiling, share) (LFG_VARIANT=name)
                                                   # points and money against standing still (LFG_VARIANT=name)
     python src/grading.py variant NAME K=V ...    # a challenger's constants, for money and replay
     python src/grading.py replay [JOBS]           # the forecast at every past line-up snapshot (view replayed)

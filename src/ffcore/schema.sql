@@ -134,88 +134,24 @@ CREATE TABLE IF NOT EXISTS seen_odds (
     PRIMARY KEY (cut, variant, player, ratio)
 ) WITHOUT ROWID;
 
--- What the model looks at, one row, the process's own (ffcore.db.LOOK,
--- never the file's): t, the one moment every view is read as of (cut(): a
--- run's start, or each past time a replay stands at, set_now), the market
--- as seen then (seen at that cut), the forecast of a moment (forecast_used)
--- and who you are (assemble.built). Your squad and cash at t are those at
--- t0 with your moves since (a path's: path, t0, a stamp; live, none: t0 is
--- t and the plan's moves are decide.sql's dec_plan).
+-- What the model looks at, as t: the cut, the variant's constants, the
+-- forecast moment and who you are (assemble.built); the league as seen then
+-- (seen at that cut) and the forecast of a moment (forecast_used).
 DROP VIEW IF EXISTS look;
 CREATE VIEW look AS
-SELECT cut() AS cut, variant() AS variant, moment() AS moment, me() AS me, path() AS path, t0() AS t0;
+SELECT cut() AS cut, variant() AS variant, moment() AS moment, me() AS me;
 
--- A path's moves, each at its t (a stamp): a bid on a player of the game's
--- market at its amount, one taken back (withdraw), a sale at what it gets.
--- What you would have done (a replay's phantom, grading.phantom_path) is
--- an input beside the facts, never a changed world: the league at t reads
--- look's path's moves in (t0, t] (my_bids, my_squad, my_cash).
-CREATE TABLE IF NOT EXISTS moves (
-    path   TEXT NOT NULL,
-    at     TEXT NOT NULL,
-    kind   TEXT NOT NULL,            -- bid, withdraw, sell
-    player TEXT NOT NULL,
-    amount REAL,
-    PRIMARY KEY (path, at, kind, player)
-) WITHOUT ROWID;
-
--- The path's moves in (t0, t] (look; none live).
-DROP VIEW IF EXISTS my_moves;
-CREATE VIEW my_moves AS
-SELECT m.at, m.kind, m.player, m.amount FROM look l JOIN moves m ON m.path = l.path
-WHERE l.t0 <> '' AND m.at > l.t0 AND m.at <= l.cut;
-
--- Each bid of the path's, and the auction it is settled in: his first
--- close on the game's market after it (auction_results: closed by t; close,
--- a stamp), and whether it won there (it reaches what that auction took:
--- bar x asking; nothing reaches none). A bid taken back or bid again
--- before its close is no bid. won NULL: his auction is still to close at
--- t, the bid stands.
-DROP VIEW IF EXISTS my_bids;
-CREATE VIEW my_bids AS
-WITH m AS MATERIALIZED (SELECT * FROM my_moves),
-r AS MATERIALIZED (SELECT player, closed AS close, asking, bar FROM auction_results
-                   WHERE seller = 'marketPlayerLeague' AND player IN (SELECT player FROM m WHERE kind = 'bid')),
-b AS (SELECT m.at, m.player, m.amount, (SELECT min(r.close) FROM r WHERE r.player = m.player AND r.close > m.at) AS close
-      FROM m WHERE m.kind = 'bid')
-SELECT b.at, b.player, b.amount, b.close,
-       CASE WHEN b.close IS NOT NULL THEN coalesce(b.amount >= r.bar * r.asking, 0) END AS won
-FROM b LEFT JOIN r ON r.player = b.player AND r.close = b.close
-WHERE NOT EXISTS (SELECT 1 FROM m n WHERE n.player = b.player AND n.kind IN ('bid', 'withdraw')
-                  AND n.at > b.at AND (b.close IS NULL OR n.at < b.close));
-
--- Your squad at t: whom you held at t0 (seen then), and whom the path has
--- bought (bids won by t) or sold since, by the last of them; each at his
--- position as seen at t (else at t0).
+-- Your squad at t: whom you owned as seen then, at his position there.
 DROP VIEW IF EXISTS my_squad;
 CREATE VIEW my_squad AS
-WITH l AS (SELECT cut, variant, me, CASE WHEN t0 = '' THEN cut ELSE t0 END AS t0 FROM look),
-start AS (SELECT s.player FROM l JOIN seen s ON s.cut = l.t0 AND s.variant = l.variant AND s.owner = l.me),
-ev AS (SELECT player, at AS t, 0 AS held FROM my_moves WHERE kind = 'sell'
-       UNION ALL SELECT player, close, 1 FROM my_bids WHERE won),
-last AS (SELECT player, held FROM (SELECT player, held, row_number() OVER (PARTITION BY player ORDER BY t DESC) AS n
-                                   FROM ev) WHERE n = 1),
-k AS (SELECT player FROM start WHERE player NOT IN (SELECT player FROM last)
-      UNION SELECT player FROM last WHERE held)
-SELECT k.player, coalesce(n.pos, o.pos, 'MED') AS pos
-FROM k CROSS JOIN l
-LEFT JOIN seen n ON n.cut = l.cut AND n.variant = l.variant AND n.player = k.player
-LEFT JOIN seen o ON o.cut = l.t0 AND o.variant = l.variant AND o.player = k.player;
+SELECT s.player, coalesce(s.pos, 'MED') AS pos
+FROM look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant AND s.owner = l.me;
 
--- Your cash at t: as seen at t0 (seen_cash), less the bids the path won by
--- t, plus its sales and the league's bonuses to you since (the ledger's:
--- the money the game pays whatever you do).
+-- Your cash at t, as seen then (seen_cash).
 DROP VIEW IF EXISTS my_cash;
 CREATE VIEW my_cash AS
-WITH l AS (SELECT cut, variant, me, t0 FROM look)
-SELECT coalesce((SELECT c.cash FROM seen_cash c WHERE c.cut = CASE WHEN l.t0 = '' THEN l.cut ELSE l.t0 END
-                 AND c.variant = l.variant AND c.manager = l.me), 0.0)
-       - (SELECT total(amount) FROM my_bids WHERE won)
-       + (SELECT total(amount) FROM my_moves WHERE kind = 'sell')
-       + CASE WHEN l.t0 = '' THEN 0.0 ELSE (
-             SELECT total(g.amount) FROM ledger g WHERE g.kind = 'bonus' AND g.who = l.me
-             AND julianday(g.at) > stamp_jd(l.t0) AND julianday(g.at) <= stamp_jd(l.cut)) END AS cash
-FROM l;
+SELECT coalesce((SELECT c.cash FROM look l JOIN seen_cash c ON c.cut = l.cut AND c.variant = l.variant
+                 AND c.manager = l.me), 0.0) AS cash;
 
 -- What waiting to sell was worth as the run saw it (waiting as of its cut),
 -- a row a player of yours with an offer standing (kind 'sale'): the board's sales read it.
@@ -342,20 +278,6 @@ CREATE TABLE IF NOT EXISTS sim_calibration (
     PRIMARY KEY (run_id, jornada, manager)
 );
 
-
--- The phantom manager (grading.phantom_season): the points of his eleven
--- each jornada, beside the same squad never moved, what he did, and his
--- cash and his squad's worth once he had.
-CREATE TABLE IF NOT EXISTS phantom_jornadas (
-    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
-    jornada  INTEGER NOT NULL,
-    phantom  REAL NOT NULL,
-    standpat REAL NOT NULL,
-    moves    TEXT NOT NULL,
-    cash     REAL NOT NULL,
-    value    REAL,
-    PRIMARY KEY (run_id, jornada)
-);
 
 -- The boards published before the board was kept as rows, from git
 -- (tools/board_history.py): head and moves, one board a generated_at.

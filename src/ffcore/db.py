@@ -128,10 +128,9 @@ def prognosis(status: str | None, note: str | None, seen_at: str | None) -> str 
 # What the model looks at, this process's (never the file's: every process
 # on it, a run, a replay, the watcher, Datasette, has its own): t, the one
 # moment every view is read as of (a run's start, or a replay's past time:
-# set_now), the forecast moment, who you are, and the path whose moves the
-# league at t holds since t0 ('': live, none). The views read them as
-# cut(), moment(), me(), path(), t0() and the view look.
-LOOK: dict[str, Any] = {"t": None, "moment": 0, "me": "", "path": "", "t0": ""}
+# set_now), the forecast moment and who you are. The views read them as
+# cut(), moment(), me() and the view look.
+LOOK: dict[str, Any] = {"t": None, "moment": 0, "me": ""}
 
 
 def cut() -> str:
@@ -148,7 +147,7 @@ def set_now(when: datetime | None) -> None:
 
 
 def set_look(**what: Any) -> None:
-    """The forecast moment, you, and the path (and its t0) the views read."""
+    """The forecast moment and you, as the views read them."""
     assert set(what) <= set(LOOK) - {"t"}, what
     LOOK.update(what)
 
@@ -166,13 +165,13 @@ def replaying() -> Iterator[None]:
 
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (t as a stamp: the process's,
-    unless told otherwise), moment(), me(), path() and t0() (LOOK's),
+    unless told otherwise), moment() and me() (LOOK's),
     stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
     prognosis() (a flagged player's listing read), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
     lo95(), hi95() and claim() (an estimate and its standard error) and
     the aggregate median()."""
     db.create_function("cut", 0, now)
-    for k in ("moment", "me", "path", "t0"):
+    for k in ("moment", "me"):
         db.create_function(k, 0, lambda k=k: LOOK[k])
     db.create_function("stamp_jd", 1, stamp_jd, deterministic=True)
     db.create_function("variant", 0, variant)

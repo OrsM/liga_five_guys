@@ -19,7 +19,7 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
     key, your squad is those he owns by `me`), your cash (seen_cash),
     forecast_cell at moment 0 (cells: jornada -> player -> (points if he
     plays, chance he plays)), bid odds (player -> ((ratio, p_win), ...)),
-    and look on them, with no path."""
+    and look on them."""
     from contextlib import closing
 
     from assemble import write_constants
@@ -27,7 +27,7 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
     from ffcore.tidy import store_sql
 
     write_constants()   # the model's constants the views read, as a forecast writes them
-    set_look(moment=0, me=me, path="", t0="")
+    set_look(moment=0, me=me)
     with closing(connect()) as db, db:
         for t in ("seen", "seen_cash", "seen_odds"):
             db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)

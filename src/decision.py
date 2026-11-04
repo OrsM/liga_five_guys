@@ -10,7 +10,7 @@ from typing import Any
 from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, best_eleven
 
-__all__ = ["plan", "plan_rows", "inputs"]
+__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
@@ -107,6 +107,43 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     return steps, start
 
 
+def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], real: dict[tuple[str, int], float],
+             js: list[int]) -> tuple[float, float]:
+    """The measure: the real points (real: (player, jornada) -> points, 0 if
+    he did not play) of the best eleven of the squad over the jornadas js:
+    as it stands (inp's dec_player), and once the plan's steps are made,
+    each step's change counted at its win chance as the plan's worth does."""
+    pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
+    squad = {k for k, _, m, *_ in inp["dec_player"] if m}
+
+    def points(sq: set[str]) -> float:
+        return sum(best_eleven({p: sorted((-real.get((k, j), 0.0), k) for k in sq if pos.get(k) == p) for p in POSITIONS})
+                   for j in js)
+    floor = here = points(squad)
+    total = floor
+    for step in sorted({s[0] for s in steps}):
+        win = 1.0
+        for _, kind, k, _, w, _ in (s for s in steps if s[0] == step):
+            if kind == "buy":
+                squad.add(k)
+                win = 1.0 if w is None else w
+            else:
+                squad.discard(k)
+        now = points(squad)
+        total += win * (now - here)
+        here = now
+    return floor, total
+
+
+def measure(inp: dict[str, list[tuple[Any, ...]]], real: dict[tuple[str, int], float], js: list[int]) -> dict[str, float]:
+    """floor, ours and ceiling at one lock: worth_on of standing still, of
+    plan_rows(inp), and of plan_rows on inp with each cell's e the real
+    points (0 if he did not play)."""
+    floor, ours = worth_on(inp, plan_rows(inp)[0], real, js)
+    best = {**inp, "cell": [(k, j, real.get((k, j), 0.0)) for k, j, _ in inp["cell"]]}
+    return {"floor": floor, "ours": ours, "ceiling": worth_on(inp, plan_rows(best)[0], real, js)[1]}
+
+
 def _write(steps: list[tuple[Any, ...]], start: list[tuple[Any, ...]]) -> None:
     with closing(connect()) as db, db:
         for t in ("dec_plan", "dec_start"):
@@ -115,16 +152,21 @@ def _write(steps: list[tuple[Any, ...]], start: list[tuple[Any, ...]]) -> None:
         db.executemany("INSERT INTO dec_start VALUES (?, ?, ?, ?, ?, ?, ?)", start)
 
 
+def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
+    """inputs() made, and read back as plan_rows takes them."""
+    inputs()
+    with closing(connect()) as db:
+        inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in ("dec_player", "dec_odds", "dec_money")}
+        inp["cell"] = db.execute("SELECT player, jornada, e FROM cell").fetchall()
+    return inp
+
+
 def plan() -> list[tuple[Any, ...]]:
     """The plan at t, its moves in order as dec_plan rows (step, kind,
     player, amount, win, worth): a buy at its bid, a sale at what it gets (a
     swap's buy, then its sale). Written to dec_plan, and every single move as
     valued before the first beside it (dec_start, dec_rows)."""
-    inputs()
-    with closing(connect()) as db:
-        inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in ("dec_player", "dec_odds", "dec_money")}
-        inp["cell"] = db.execute("SELECT player, jornada, e FROM cell").fetchall()
-    steps, start = plan_rows(inp)
+    steps, start = plan_rows(read_inputs())
     _write(steps, start)
     return steps
 

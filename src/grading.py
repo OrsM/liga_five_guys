@@ -17,9 +17,9 @@ from ffcore.jornadas import round_locks, rounds
 
 from assemble import applied, built, forecast, price_change, price_momentum
 import decision
-from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
-from ffcore.parse import snapshot_stamp, stamp
-__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "phantom_season", "replay", "decision_rows", "decisions", "phantom_path", "superseded", "view_table",
+from ffcore.db import connect, record, replaying, rows, set_now, this_run
+from ffcore.parse import snapshot_stamp
+__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "replay", "decision_rows", "decisions", "superseded", "view_table",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -38,26 +38,6 @@ def at(t: dt.datetime) -> int | None:
         return None
 
 
-def _made_at(t: dt.datetime) -> dt.datetime:
-    set_look(path="", t0="")
-    at(t)
-    return t
-
-
-def warm(times: list[dt.datetime]) -> None:
-    """The league at each of these times made ahead (seen, the forecast,
-    the price fits: kept in the file, read back by at), WARM_JOBS at a time
-    in their own processes, each at its own t: a replay then waits on
-    nothing but its plans and the players only its path holds."""
-    import multiprocessing
-    with multiprocessing.get_context("fork").Pool(WARM_JOBS) as pool:
-        for _t in pool.imap_unordered(_made_at, times):
-            pass
-
-
-WARM_JOBS = 4
-
-
 def before_locks() -> dict[dt.datetime, int]:
     """A minute before each finished jornada's lock, oldest first, and the
     jornada: where every replay of a lock stands."""
@@ -73,16 +53,6 @@ def at_locks(only: set[int] | None = None) -> Iterator[int]:
         for t, j in before_locks().items():
             if (only is None or j in only) and at(t) is not None:
                 yield j
-
-
-def auction_closes() -> list[dt.datetime]:
-    """When each night's auctions on the game's market closed by t (the
-    listings' expiry), oldest first: a day's buying and selling is decided
-    before it."""
-    return [dt.datetime.fromisoformat(c) for (c, ) in rows(
-        "SELECT DISTINCT expires_at FROM api_market WHERE seller = 'marketPlayerLeague'"
-        " AND coalesce(expires_at, '') <> '' AND julianday(expires_at) <= stamp_jd((SELECT cut()))"
-        " ORDER BY 1")]
 
 
 def jornada_points() -> dict[tuple[str, int], float]:
@@ -139,6 +109,11 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
     return len(todo)
 
 
+def label(kind: str, k: str, names: dict[str, str]) -> str:
+    """A move as the grades say it."""
+    return "%s %s" % (kind, names.get(k, k))
+
+
 def decisions() -> list[dict[str, Any]]:
     """Make each past lock's decision again with this code (decision.plan)
     and set every move it valued alone (dec_rows) against what its players
@@ -189,163 +164,33 @@ def decisions() -> list[dict[str, Any]]:
     return out
 
 
-# The runs a day the board is acted on, local time as the closes are
-# (lfg.timer at 10:00, lfg-flip.timer at 21:45, Europe/Madrid): bids placed
-# at one stand until the next, which sees them as yours.
-# When the phantom acts on the board: once a day, before the night's close,
-# where the bids it places are settled (2026-10-30: as good as twice a day,
-# 10:00 and 21:45, at every move cost tried, and at half the time; the
-# morning's moves the evening's run made again).
-RUNS = ((21, 45),)
-
-
-def run_times(closes: list[dt.datetime]) -> dict[dt.datetime, dt.datetime]:
-    """Each run before a night's close (RUNS on its day), to that close."""
-    return {r: c for c in closes for h, m in RUNS
-            if (r := c.replace(hour=h, minute=m, second=0, microsecond=0)) < c}
-
-
-# The paths the phantom's replay reads the league at t as (look.path): his
-# moves, and none (the manager who never moves).
-PHANTOM, STANDPAT = "phantom", "standpat"
-
-
-def follow(path: str, t0: str = "") -> None:
-    """The league at t read as path's (look: its moves since t0); '': live,
-    your own squad and cash at t."""
-    set_look(path=path, t0=t0)
-
-
-def move(path: str, t: dt.datetime, kind: str, player: str, amount: float | None) -> None:
-    with closing(connect()) as db, db:
-        db.execute("INSERT OR REPLACE INTO moves VALUES (?, ?, ?, ?, ?)", (path, stamp(t), kind, player, amount))
-
-
-def label(kind: str, k: str, names: dict[str, str]) -> str:
-    """A move as the grades and the phantom's log say it."""
-    return "%s %s" % (kind, names.get(k, k))
-
-
-Sale = tuple[str, float]   # the player sold, what it gets
-
-
-def pairs(steps: list[tuple[Any, ...]]) -> list[tuple[str, Sale]]:
-    """Each sale of the plan (dec_plan rows: step, kind, player, amount, ...)
-    with the buy it funds ('' for a lone sale): the two of one step (a swap
-    is a buy and a sale of one step)."""
-    buy = {step: k for step, kind, k, *_ in steps if kind == "buy"}
-    return [(buy.get(step, ""), (k, amount)) for step, kind, k, amount, *_ in steps if kind == "sell"]
-
-
-def settlement(pending: list[tuple[str, Sale]], won: set[str], closed: set[str]) -> list[Sale]:
-    """The sales to make at a close: a bid won makes the sale funding it, a
-    bid lost does not; a bid not closing then waits. No re-planning: cash
-    below zero is the decision's to mend at its next run."""
-    return [a for k, a in pending if k in won and k in closed]
-
-
-def phantom_path() -> list[dict[str, Any]]:
-    """The league's sixth manager: your squad and cash at the first lock,
-    then his own moves (the path PHANTOM's, rows the league at t reads:
-    schema.sql my_squad, my_cash), as this code's plan makes them at each
-    run the board is acted on (run_times), at t there: its bids placed and
-    those it no longer makes taken back, its sales made at once, but those
-    funding a bid (a step's buy and sale: pairs), which are made at the close
-    if that bid won (settlement; a lost bid's sale is not made). A bid is settled at its auction's close by what that auction took
-    (my_bids). At each lock his eleven (my_xi) scored on what they got
-    (nothing in debt, the game's rule), beside a manager who never moves
-    (STANDPAT), picked the same way. One row a played jornada: both elevens'
-    points, the moves made since the last, the bids lost, his cash and his
-    squad's worth after them. Up to t, put back after, and the paths
-    left as made (moves) but not followed."""
-    with replaying():
-        try:
-            return _phantom_path()
-        finally:
-            follow("")
-
-
-def _phantom_path() -> list[dict[str, Any]]:
-    actual = jornada_points()
-    played = before_locks()
-    first = min(played, default=None)
-    if first is None:
-        return []
-    runs = {r: c for r, c in run_times([c for c in auction_closes() if c > first]).items() if r > first}
-    closes = set(runs.values())
-    with closing(connect()) as db, db:
-        db.execute("DELETE FROM moves WHERE path IN (?, ?)", (PHANTOM, STANDPAT))
-    start = ""
-    made: list[str] = []
-    pending: list[tuple[str, Sale]] = []   # the last run's (bid, the sale funding it)
-    lost = 0
+def ceiling() -> list[dict[str, Any]]:
+    """The decision's measure at each past lock (before_locks), on the real
+    points of the jornadas from that lock to the next: floor, the squad you
+    had at t as it was; ours, the plan (decision.plan_rows) on the forecast;
+    ceiling, the same plan_rows with every cell's e the player's real points
+    in that jornada (0 if he did not play), the same constraints and bid odds.
+    All three scored by decision.worth_on."""
+    real = jornada_points()
+    locks, done = before_locks(), sorted(done_jornadas())
     out = []
-
-    def names() -> dict[str, str]:
-        """Each player's name as last seen by t."""
-        return dict(rows("SELECT s.player, name_shown(s.name) FROM look l JOIN seen s"
-                         " ON s.cut = (SELECT max(cut) FROM seen WHERE cut <= l.cut) AND s.variant = l.variant"))
-
-    def sell(t: dt.datetime, sales: list[Sale]) -> None:
-        for k, amount in sales:
-            move(PHANTOM, t, "sell", k, amount)
-        made.extend(label("sell", k, names()) for k, _ in sales)
-
-    def held() -> tuple[list[str], float, float]:
-        """His eleven next, cash and squad's value, as of t."""
-        (cash, value), = rows("SELECT (SELECT cash FROM my_cash), (SELECT total(v.value) FROM my_squad m"
-                              " JOIN player_value v ON v.player = m.player)")
-        return [k for k, in rows("SELECT player FROM my_xi")], cash, value
-
-    for t in sorted(set(played) | set(runs) | closes):
-        ready = False
-        if not start:
-            if t not in played or at(t) is None:
-                continue
-            start, ready = stamp(t), True
-            warm(sorted(r for r in set(played) | set(runs) if r > t))
-            follow(PHANTOM, start)
-        if t in closes:
-            set_now(t)
-            settled = dict(rows("SELECT player, won FROM my_bids WHERE close = ?", (stamp(t), )))
-            sell(t, settlement(pending, {k for k, won in settled.items() if won}, set(settled)))
-            pending = [(k, a) for k, a in pending if k not in settled]
-            lost += sum(not won for won in settled.values())
-            if t not in played and t not in runs:
-                continue
-        if not ready and at(t) is None:
-            continue
-        if t in runs:
-            steps = decision.plan()
-            bids = {k: amount for _, kind, k, amount, *_ in steps if kind == "buy"}
-            for (k, ) in rows("SELECT player FROM my_bids WHERE won IS NULL"):
-                if k not in bids:
-                    move(PHANTOM, t, "withdraw", k, None)
-            for k, b in bids.items():
-                move(PHANTOM, t, "bid", k, b)
-            paired = pairs(steps)
-            pending = [(k, a) for k, a in paired if k]
-            made.extend(label("buy", k, names()) for k in bids)
-            sell(t, [a for k, a in paired if not k])
-        if t in played:
-            xi, cash, value = held()
-            follow(STANDPAT, start)
-            still, still_cash, still_value = held()
-            follow(PHANTOM, start)
-            out.append({"jornada": played[t],
-                        "phantom": sum(actual.get((k, played[t]), 0.0) for k in xi) if cash >= 0 else 0.0,
-                        "standpat": sum(actual.get((k, played[t]), 0.0) for k in still),
-                        "moves": "; ".join(made), "lost": lost, "cash": cash, "value": value,
-                        "standpat_money": still_cash + still_value})
-            made, lost = [], 0
-    return out
+    for j in at_locks():
+        later = [i for i in locks.values() if i > j]
+        js = [i for i in done if i >= j and (not later or i < min(later))]
+        inp = decision.read_inputs()
+        out.append({"jornada": j, **decision.measure(inp, real, js)})
+    return sorted(out, key=lambda g: g["jornada"])
 
 
-def phantom_season() -> list[dict[str, Any]]:
-    """The phantom (phantom_path) as the grade stage keeps it
-    (phantom_jornadas): the forecasts are the grade's own business."""
-    return [{k: v for k, v in r.items() if k not in ("lost", "standpat_money")}
-            for r in phantom_path()]
+def ceiling_report(got: list[dict[str, Any]]) -> str:
+    """A line a lock and the season's total: share = (ours - floor) / (ceiling - floor)."""
+    def share(f: float, o: float, c: float) -> str:
+        return "%6.2f" % ((o - f) / (c - f)) if c > f else "     -"
+    lines = ["j%-3s %7.1f %7.1f %7.1f %s" % (g["jornada"], g["floor"], g["ours"], g["ceiling"],
+                                             share(g["floor"], g["ours"], g["ceiling"])) for g in got]
+    f, o, c = (sum(g[k] for g in got) for k in ("floor", "ours", "ceiling"))
+    return "\n".join(["%-4s %7s %7s %7s %6s" % ("", "floor", "ours", "ceiling", "share")] + lines
+                     + ["%-4s %7.1f %7.1f %7.1f %s" % ("all", f, o, c, share(f, o, c))])
 
 
 def clean_windows(locks: dict[int, dt.datetime], kicks: list[tuple[int, dt.datetime]]
@@ -428,7 +273,7 @@ def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 # What the grade stage keeps, a set a run.
-GRADED = ("grade_moment", "grade_decisions", "phantom_jornadas", "sim_calibration")
+GRADED = ("grade_moment", "grade_decisions", "sim_calibration")
 
 
 def superseded(run: int, path: Path | None = None) -> None:
@@ -468,7 +313,6 @@ def record_grades() -> dict[str, int]:
     if run is not None:
         record([{"run_id": run, **r} for r in fc], "grade_moment")
         record([{"run_id": run, **r} for r in moves], "grade_decisions")
-        record([{"run_id": run, **r} for r in phantom_season()], "phantom_jornadas")
         record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
         superseded(run)
     print("  grade: %d forecasts, %d moves over %d jornadas" % (len(fc), len(moves), resolved))
@@ -485,73 +329,35 @@ def view_table(view: str, path: Path | None = None) -> str:
     return view
 
 
-def _selftest_phantom() -> None:
-    """The phantom's league at t (schema.sql my_bids, my_squad, my_cash):
-    his squad and cash at t0 and his moves since, his bids settled at their
-    auction's close by what it took."""
+def _selftest_ceiling() -> None:
+    """A tiny league at two locks, seeded as assemble writes it, through
+    decision.read_inputs, plan_rows and the ceiling's measure: floor <= ours
+    <= ceiling, and a report line each."""
     import tempfile
-    from ffcore.tidy import store_sql, tables_in
-
-    madrid = dt.timezone(dt.timedelta(hours=2))
-    close = dt.datetime(2026, 10, 20, 22, 24, tzinfo=madrid)
-    run, t0 = close.replace(hour=21, minute=45), stamp(close - dt.timedelta(days=2))
-    assert run_times([close]) == {run: close}, "the evening's run, before the close"
+    from ffcore.fixtures import seed_league
+    from ffcore.tidy import tables_in
+    squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
+             "m4": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL", "bench": "DEF"}
+    e = {**{k: 4.0 for k in squad}, "m4": 2.0, "bench": 1.0}
+    market = {"star": ("MED", 8e6), "keeper": ("POR", 6e6)}
+    real = {**{(k, j): 4.0 for k in squad for j in (1, 2)}, ("star", 1): 10.0, ("keeper", 2): 9.0, ("m4", 1): 2.0}
+    got = []
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        a = "2026-10-17T1000Z"
-        store_sql("api_standings", [{"observed_at": a, "user_id": "1", "manager": "me"},
-                                    {"observed_at": a, "user_id": "2", "manager": "riv"}])
-        store_sql("api_market", [{"observed_at": a, "seller": "marketPlayerLeague", "player_id": i,
-                                  "expires_at": close.isoformat(), "sale_price": "5000000"} for i in ("7", "8", "9")])
-        store_sql("api_activity", [
-            {"observed_at": a, "activity_id": "x", "kind": "buy", "user_id": "2", "player_id": "7",
-             "at": "2026-10-20T22:24:10+02:00", "amount": "6000000", "counterparty": ""},
-            {"observed_at": a, "activity_id": "z", "kind": "buy", "user_id": "2", "player_id": "8",
-             "at": "2026-10-20T22:24:10+02:00", "amount": "5800000", "counterparty": ""},
-            {"observed_at": a, "activity_id": "y", "kind": "bonus", "user_id": "1", "player_id": "",
-             "at": "2026-10-19T04:40:00+02:00", "amount": "2000000", "counterparty": ""}])
-        with closing(connect()) as db, db:
-            db.execute("INSERT INTO league_config VALUES ('me', 100e6)")
-            db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
-                           [("cand", "7"), ("cheap", "8"), ("gone", "9")])
-            db.executemany("INSERT INTO seen (cut, variant, player, name, pos, owner) VALUES (?, 'live', ?, ?, ?, ?)",
-                           [(t0, k, k, pos, "me") for k, pos in (("k", "POR"), ("bench", "DEF"))])
-            db.execute("INSERT INTO seen_cash VALUES (?, 'live', 'me', 10e6)", (t0, ))
-            set_look(me="me", path="p", t0=t0)
-            db.executemany("INSERT INTO moves VALUES ('p', ?, ?, ?, ?)", [
-                (stamp(run), "bid", "cand", 6.5e6), (stamp(run), "bid", "cheap", 5.5e6), (stamp(run), "sell", "bench", 3e6),
-                (stamp(run - dt.timedelta(days=1)), "bid", "gone", 9e6),
-                (stamp(run), "withdraw", "gone", None)])
-
-        def state() -> tuple[list[tuple[Any, ...]], list[str], float]:
-            return (rows("SELECT player, won FROM my_bids ORDER BY player"),
-                    [k for k, in rows("SELECT player FROM my_squad ORDER BY player")],
-                    rows("SELECT cash FROM my_cash")[0][0])
-        set_now(run)
-        assert state() == ([("cand", None), ("cheap", None)], ["k"], 10e6 + 2e6 + 3e6), \
-            "before the close his bids stand, unpaid; the sale made, and the league's bonus since t0 his"
-        set_now(close)
-        assert state() == ([("cand", 1), ("cheap", 0)], ["cand", "k"], 10e6 + 2e6 + 3e6 - 6.5e6), \
-            ("at the close, what each auction took (6M, 5.8M): his 6.5M wins, paid, and he is his; 5.5M is lost;"
-             " a bid taken back before its close is none")
-        set_look(path="other")
-        assert state() == ([], ["bench", "k"], 12e6), "another path: its own moves (none), the same facts"
-        set_look(path="", t0="")
-        assert state()[0] == [], "live: no path's moves"
-
-
-def _selftest_settlement() -> None:
-    """A won bid makes the sale funding it, a lost bid's sale is not made, a
-    lone sale is made at once, a bid closing later waits."""
-    pend = [("won", ("a", 1.0)), ("lost", ("b", 2.0)), ("later", ("d", 4.0))]
-    assert settlement(pend, {"won"}, {"won", "lost"}) == [("a", 1.0)]
-    steps = [(0, "buy", "won", 5, 1, 0), (0, "sell", "a", 1, 1, 0), (1, "buy", "lost", 6, 1, 0),
-             (1, "sell", "b", 2, 1, 0), (2, "sell", "c", 3, 1, 0)]
-    assert pairs(steps) == [("won", ("a", 1)), ("lost", ("b", 2)), ("", ("c", 3))]
+        for j, (t, forecast_star) in enumerate((("2026-08-20", 8.0), ("2026-08-27", 3.0)), 1):
+            set_now(dt.datetime.fromisoformat(t + "T17:59:00+00:00"))
+            seed_league("me", 10e6,
+                        {**{k: {"pos": p, "owner": "me", "value": 5e6} for k, p in squad.items()},
+                         **{k: {"pos": p, "price": a} for k, (p, a) in market.items()}},
+                        {j: {**{k: (x, 1.0) for k, x in e.items()}, "star": (forecast_star, 1.0), "keeper": (3.0, 1.0)}})
+            got.append({"jornada": j, **decision.measure(decision.read_inputs(), real, [j])})
+    for g in got:
+        assert g["floor"] <= g["ours"] <= g["ceiling"], g
+    assert [(g["floor"], g["ours"], g["ceiling"]) for g in got] == [(44.0, 50.0, 50.0), (44.0, 44.0, 49.0)], got
+    assert ceiling_report(got).splitlines()[-1].endswith("0.55"), ceiling_report(got)
 
 
 def _selftest() -> None:
-    _selftest_settlement()
-    _selftest_phantom()
+    _selftest_ceiling()
     import tempfile
     from ffcore.tidy import store_sql, tables_in
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
@@ -694,26 +500,14 @@ if __name__ == "__main__":
                      for i in range(jobs)]
             raise SystemExit(max(p.wait() for p in procs))
         raise SystemExit(0)
-    if sys.argv[1:2] == ["money"]:
-        # money: the phantom deciding daily (decision.plan), beside standing still
+    if sys.argv[1:2] == ["ceiling"]:
+        # ceiling: at each past lock, standing still, this code's plan and the plan on real points
         # LFG_VARIANT=name: the model as that variant sets it (grading.py variant NAME CONSTANT=VALUE)
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
-        got = phantom_path()
-        # Each jornada: both elevens' points and the moves made since the last.
-        for g in got:
-            print("j%-3s %4.0f %4.0f  %s" % (g["jornada"], g["phantom"], g["standpat"], g["moves"]))
-        # The scoreboard: points, for both, what finishing first is won on;
-        # and the cash and squad value the phantom ends with, and standing still.
-        print("%6s %5s %8s %8s %9s %9s %9s" % ("moves", "lost", "points", "standpat",
-                                              "cash(M)", "value(M)", "standpat(M)"))
-        print("%6d %5d %+8.0f %+8.0f %+9.1f %+9.1f %+9.1f" % (
-            sum(len(g["moves"].split("; ")) for g in got if g["moves"]), sum(g["lost"] for g in got),
-            sum(g["phantom"] for g in got), sum(g["standpat"] for g in got),
-            got[-1]["cash"] / 1e6 if got else 0.0, got[-1]["value"] / 1e6 if got else 0.0,
-            got[-1]["standpat_money"] / 1e6 if got else 0.0), flush=True)
+        print(ceiling_report(ceiling()), flush=True)
         # Out without freeing what it made one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
-    print("grading.py --selftest | money (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    print("grading.py --selftest | ceiling (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

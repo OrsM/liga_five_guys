@@ -88,7 +88,6 @@ def _selftest() -> None:
     _selftest_changes()
     _selftest_paired()
     _selftest_variant_gap()
-    _selftest_phantom()
     _selftest_board_history()
     _selftest_sim_calibration()
     print("q.py self-test OK")
@@ -247,28 +246,6 @@ def _selftest_variant_gap() -> None:
         assert far["all"][1] == 3 and abs(far["all"][2] - 13 / 3) < 1e-3, "the last moment of each jornada: 4, 9 and 0"
         assert named("variant_gap", {"old": "live", "new": "slow", "hours": 60})[1] == [], \
             "no moment that early: nothing to compare"
-
-
-def _selftest_phantom() -> None:
-    """phantom_coach: the phantom's eleven each jornada beside the same squad
-    never moved, with a running total."""
-    import tempfile
-
-    from ffcore.db import record
-    from ffcore.tidy import tables_in
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        record([{"run_id": i, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"} for i in (1, 2)], "runs")
-        record([{"run_id": r, "jornada": j, "phantom": ph, "standpat": sp, "moves": m, "cash": 0.0}
-                for r, j, ph, sp, m in ((1, 3, 50.0, 40.0, "buy A"), (1, 2, 30.0, 35.0, ""),
-                                        (2, 2, 99.0, 0.0, "later run"))], "phantom_jornadas")
-        cols, got = named("phantom_coach", {"run": 1})
-        rows_ = [dict(zip(cols, r)) for r in got]
-        assert [(r["jornada"], r["phantom"], r["standpat"], r["gain"], r["total_gain"]) for r in rows_] == [
-            (2, 30.0, 35.0, -5.0, -5.0), (3, 50.0, 40.0, 10.0, 5.0), ("total", 80.0, 75.0, 5.0, 5.0)], \
-            "jornada order, a running total, the named run's rows only"
-        assert rows_[1]["moves"] == "buy A"
-        assert [r[0] for r in named("phantom_coach", {})[1]] == [2, "total"], "no run named: the latest that has rows"
 
 
 def _selftest_board_history() -> None:
