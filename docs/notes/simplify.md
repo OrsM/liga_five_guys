@@ -52,7 +52,7 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 | Module | Exports (its contract) |
 |---|---|
 | ingest | app_lineup, app_player, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, listing_ends, listings, look, name_player, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
-| forecast | cell, price_carry, price_trend, price_trend_fit, score_spread, standin_cell |
+| forecast | cell, price_carry, price_trend, price_trend_daily, score_spread, standin_cell |
 | decision | bid_odds, decision_option, decision_plan, league_season, my_cash, nights_left, recent_offers, seen_cash |
 | settlement | (none yet) |
 | board | board_json |
@@ -64,6 +64,8 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 - Decision's tests build Python objects (Universe, Market, LeagueState, Bootstrap) instead of rows.
 - Settlement decides: on a lost bid, grading.py drops the paired sales and runs decision.plan(sales_only=True) (grading.py:292-297). That sold Agoume, Moncayola, and Maffeo the night he was bought.
 - More, once the frontier check lists them.
+
+**Forecast (2026-11-04)**: its crossings are fixed (late_arrivals, standin_cell, market_daily, price_day_now, price_rows read ingest's facts; auction_results no longer reads the forecast). The price trend and momentum are views at t (no kept momentum_fit / price_trend_fit; bid_odds reads price_trend_daily, a past close's trend); a cell's e and v are worked out once (cell_pool; stand-ins are its rows with no player).
 
 **Frontier check (2026-11-04)** (tools/frontiers.py). The rule: a module may read the facts, t (look) and any earlier module's contract; it may not read a later module, nor a scraped table (api_*, current_*, market, lineups...) from outside ingest. The fact views (player_club, player_value, player_status, club_fixture, club_rating, auction_results) are ingest. 20 crossings:
 - late_arrivals (forecast) reads current_api_market (ingest raw)
