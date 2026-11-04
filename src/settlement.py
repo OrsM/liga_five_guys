@@ -24,7 +24,8 @@ def _selftest() -> None:
                                   "expires_at": "2026-09-09T22:24:00+02:00", "sale_price": "10000000"}])
         store_sql("api_standings", [{"observed_at": at, "user_id": "1", "manager": "me"},
                                     {"observed_at": at, "user_id": "2", "manager": "riv"}])
-        store_sql("api_activity", [{"observed_at": at, "activity_id": i, "kind": "buy", "user_id": u, "player_id": p,
+        # the feed is seen after the close: only then is an auction's result known
+        store_sql("api_activity", [{"observed_at": "2026-09-02T2100Z", "activity_id": i, "kind": "buy", "user_id": u, "player_id": p,
                                     "at": "2026-09-02T22:24:10+02:00", "amount": a, "counterparty": ""}
                                    for i, u, p, a in [("1", "1", "7", "10500000"), ("2", "2", "8", "12000000"),
                                                       ("3", "1", "9", "11000000")]])

@@ -138,7 +138,8 @@ def _selftest() -> None:
     assert crossing("forecast", "decision_plan")  # a later module
     assert crossing("decision", "market")  # a scraped table
     assert crossing("ingest", "market") is None  # ingest reads its own
-    assert crossing(None, "price_trend")  # not exported
+    assert crossing(None, "standin_cell")  # a forecast internal, not exported
+    assert crossing(None, "price_trend") is None  # exported: the trend the decision's odds read
     assert crossing(None, "cell") is None  # exported
     assert lines("select 1\nfrom a join cell c -- from cell", "cell") == [2]
     assert prod("x\ndef _selftest():\n    from cell\n\ny from cell\n").count("\n") == 5
