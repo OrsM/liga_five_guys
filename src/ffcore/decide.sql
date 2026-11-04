@@ -5,7 +5,7 @@
 --   f(S)          the points of squad S's best legal eleven, summed over
 --                 the jornadas left, each player at his expected points
 --                 (schema.sql cell); a move's, f of the squad it makes less
---                 f(S) (dec_gain)
+--                 f(S) (decision.plan_rows)
 --   a buy p at b  win(b) x (f(S + p) - f(S)); of bids as likely to win,
 --                 the least
 --   a sale q      f(S - q) - f(S): never more than nothing alone, so made
@@ -18,7 +18,7 @@
 -- squad stays within SQUAD_MAX counting every bid won, cash at the lock
 -- stays at zero or more, and bids within cash and the game's debt. In debt
 -- (a bid won and its sale not made), the least bad sale, and again, until
--- clear. src/decision.py writes the inputs and adds the moves.
+-- clear. src/decision.py writes the inputs and plan_rows adds the moves.
 
 -- The inputs, one decision's (decision.py inputs), beside what the model
 -- looks at (schema.sql look: the market seen, the forecast, your squad and
@@ -100,7 +100,7 @@ DROP VIEW IF EXISTS slot_bounds;
 CREATE VIEW slot_bounds AS SELECT pos, min(n) AS lo, max(n) AS hi FROM formation GROUP BY pos;
 
 -- Every single move valued from the squad as it is, before the plan's
--- first (dec_options then: a buy at each bid, a sale): what the board shows
+-- first (the plan_rows options then: a buy at each bid, a sale): what the board shows
 -- beside the plan, and what the plan's moves are graded by.
 CREATE TABLE IF NOT EXISTS dec_start (
     b        TEXT NOT NULL,
@@ -134,72 +134,6 @@ FROM dec_money m;
 DROP VIEW IF EXISTS dec_room;
 CREATE VIEW dec_room AS
 SELECT m.cash + m.debt * m.team_value - c.bids AS room FROM dec_money m, dec_cash c;
-
--- Each next move, by the buy (b) and the sale (s) it holds ('' for none):
--- each buy, each sale of a player held now, and each buy with each such sale
--- where his highest bid is more than the cash left or the squad is full (a
--- sale is what pays for him, or makes room for him).
-DROP VIEW IF EXISTS dec_variant;
-CREATE VIEW dec_variant AS
-WITH sq AS MATERIALIZED (SELECT * FROM dec_squad),
-buys AS (SELECT p.player AS b, p.asking * coalesce((SELECT max(ratio) FROM dec_odds o WHERE o.player = p.player), 1.0)
-                AS top
-         FROM dec_player p WHERE p.asking IS NOT NULL AND p.player NOT IN (SELECT player FROM sq)),
-sells AS (SELECT player AS s FROM sq WHERE player IN (SELECT player FROM dec_player WHERE mine))
-SELECT b, '' AS s FROM buys UNION ALL SELECT '', s FROM sells
-UNION ALL SELECT b, s FROM buys, sells
-WHERE top > (SELECT free FROM dec_cash) OR (SELECT count(*) FROM sq) >= (SELECT squad_max FROM dec_money);
-
--- Each next move's points over the jornadas left: the best legal eleven
--- of the squad it makes, less the squad's as it is, each jornada (the
--- game's eleven rule, rules.ELEVEN, put in where it is named below as
--- connect() applies this file: each position's lo best, then the best of
--- the rest within each position's hi, to eleven; a slot nobody can fill
--- scores nothing; level players, the first by key).
-DROP VIEW IF EXISTS dec_gain;
-CREATE VIEW dec_gain AS
-WITH v AS MATERIALIZED (SELECT row_number() OVER (ORDER BY b, s) AS id, b, s FROM dec_variant
-                        UNION ALL SELECT 0, '', ''),
-sq AS MATERIALIZED (SELECT * FROM dec_squad),
-members AS (SELECT v.id, q.player, q.pos FROM v JOIN sq q ON q.player <> v.s
-            UNION ALL
-            SELECT v.id, p.player, p.pos FROM v JOIN dec_player p ON p.player = v.b),
-pick AS (SELECT m.id, c.jornada, m.player, m.pos AS slot, m.player AS ord, c.e
-         FROM members m JOIN cell c USING (player)),
-bounds AS (SELECT pos AS slot, lo, hi FROM slot_bounds),
-/* rules.ELEVEN */,
-f AS (SELECT v.id, coalesce((SELECT total(e) FROM xi WHERE xi.id = v.id), 0.0) AS f FROM v)
-SELECT v.b, v.s, f.f - (SELECT f FROM f WHERE id = 0) AS gain FROM v JOIN f USING (id) WHERE v.id > 0;
-
--- Every next move, at each bid its odds offer (at asking, sure, with
--- none), worth its points, a bid's by its chance of winning; with what it
--- does to the squad's size and the cash at the lock.
-DROP VIEW IF EXISTS dec_options;
-CREATE VIEW dec_options AS
-WITH g AS MATERIALIZED (SELECT * FROM dec_gain),
-bid AS (SELECT p.player, p.asking * coalesce(o.ratio, 1.0) AS amount, coalesce(o.p_win, 1.0) AS win
-        FROM dec_player p LEFT JOIN dec_odds o USING (player) WHERE p.asking IS NOT NULL),
-sale AS (SELECT player, proceeds FROM dec_player WHERE mine)
-SELECT g.b, g.s, b.amount AS bid, b.win, sa.proceeds, g.gain, coalesce(b.win, 1.0) * g.gain AS worth,
-       (g.b <> '') - (g.s <> '') AS size,
-       coalesce(sa.proceeds, 0) - coalesce(b.amount, 0) AS cash
-FROM g LEFT JOIN bid b ON b.player = g.b LEFT JOIN sale sa ON sa.player = g.s
-WHERE g.b = '' OR b.player IS NOT NULL;
-
--- The plan's next move: the best worth more than nothing that keeps the
--- squad within its cap, cash at the lock at zero or more and bids within
--- cash and the debt; in debt, the least bad sale. None: the plan is made.
-DROP VIEW IF EXISTS dec_next;
-CREATE VIEW dec_next AS
-WITH n AS (SELECT count(*) AS size FROM dec_squad)
-SELECT o.* FROM dec_options o, dec_cash c, dec_money m, dec_room r, n
-WHERE CASE WHEN c.free < 0 THEN o.b = '' AND o.s <> ''
-           ELSE o.worth > 0
-                AND n.size + o.size <= m.squad_max
-                AND c.free + o.cash >= 0
-                AND coalesce(o.bid, 0) <= r.room END
-ORDER BY o.worth DESC, o.b, o.s, o.bid
-LIMIT 1;
 
 -- When each of the plan's sales is made: at once, or, when the plan bids,
 -- after the auctions, once you know they are won (a sale made for a bid
