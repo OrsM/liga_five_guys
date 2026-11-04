@@ -748,6 +748,17 @@ def _selftest() -> None:
     ms = match_source("match_22421-alaves-getafe")
     assert ms is not None and ms.key == "match_22421-alaves-getafe"
 
+    # The contract: one row per key, and no key empty.
+    def one_per_key(got: list[Row], *key: str) -> None:
+        keys = [tuple(r.get(k) for k in key) for r in got]
+        assert all(v not in (None, "") for k in keys for v in k), (key, keys)
+        assert len(set(keys)) == len(keys), (key, keys)
+
+    one_per_key(m, "ff_id")
+    one_per_key(p, "ff_id")
+    one_per_key(xi, "team_slug", "player_slug", "match_id")
+    one_per_key(rows, "player_slug")
+
     print("ffcore.futbolfantasy self-test OK")
 
 

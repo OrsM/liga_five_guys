@@ -658,7 +658,7 @@ def _selftest_market() -> None:
         store_sql("api_standings", [{"observed_at": a, "user_id": "1", "manager": "me"},
                                     {"observed_at": a, "user_id": "2", "manager": "riv"}])
         store_sql("api_activity", [
-            {"observed_at": a, "activity_id": i, "kind": "buy", "user_id": u, "player_id": p,
+            {"observed_at": "2026-09-02T2100Z", "activity_id": i, "kind": "buy", "user_id": u, "player_id": p,
              "at": at, "amount": amt, "counterparty": ""}
             for i, u, p, at, amt in [("1", "1", "7", "2026-09-02T22:24:10+02:00", "10400000"),
                                      ("2", "1", "8", "2026-09-02T22:24:10+02:00", "99"),
@@ -677,7 +677,10 @@ def _selftest_market() -> None:
             set_now(snapshot_stamp("2026-09-02T2000Z"))
             assert rows("SELECT count(*) FROM auction_results") == [(0, )], "no auction's outcome before its close"
             set_now(snapshot_stamp("2026-09-02T2024Z"))
-            assert rows("SELECT count(*) FROM auction_results") == [(2, )], "at its close, however late the feed"
+            assert rows("SELECT count(*) FROM auction_results") == [(0, )], \
+                "closed, but the feed has not yet been seen past it: the buy is not known at t"
+            set_now(snapshot_stamp("2026-09-02T2100Z"))
+            assert rows("SELECT count(*) FROM auction_results") == [(2, )], "the feed seen ten minutes past the close"
         finally:
             set_now(None)
 
@@ -743,10 +746,10 @@ def _selftest_market() -> None:
             store_sql("api_market", [{"observed_at": at % 5, "seller": "marketPlayerLeague", "player_id": "99",
                                       "expires_at": "2026-09-05T22:24:00+02:00", "sale_price": "100"}])
             store_sql("api_activity", [
-                {"observed_at": at % 1, "activity_id": i, "kind": "buy", "user_id": "1" if mine else "2",
+                {"observed_at": at % 3, "activity_id": i, "kind": "buy", "user_id": "1" if mine else "2",
                  "player_id": i, "at": close, "amount": str(won), "counterparty": ""}
                 for (i, close, _), (_t, won, mine) in zip(listed, past) if won is not None]
-                or [{"observed_at": at % 1, "activity_id": "x", "kind": "", "user_id": "",
+                or [{"observed_at": at % 3, "activity_id": "x", "kind": "", "user_id": "",
                      "player_id": "", "at": "", "counterparty": ""}])
             with closing(connect()) as db, db:
                 db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
