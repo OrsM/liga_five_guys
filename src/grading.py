@@ -690,6 +690,9 @@ if __name__ == "__main__":
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
         got = phantom_path()
+        # Each jornada: both elevens' points and the moves made since the last.
+        for g in got:
+            print("j%-3s %4.0f %4.0f  %s" % (g["jornada"], g["phantom"], g["standpat"], g["moves"]))
         # The scoreboard: points, for both, what finishing first is won on;
         # and the cash and squad value the phantom ends with, and standing still.
         print("%6s %5s %8s %8s %9s %9s %9s" % ("moves", "lost", "points", "standpat",
