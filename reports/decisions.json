@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-04T06:00Z",
+ "generated_at": "2026-11-04T09:03Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -89878707.0,
  "cash_locked": 0.0,
@@ -12,116 +12,6 @@
   2334.188948356
  ],
  "do": [
-  {
-   "what": "field",
-   "label": "field Pablo Fornals",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": 3.34314214069842,
-   "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Pepelu",
-     "names"
-    ]
-   ],
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "24338723",
-     "player": "3002",
-     "market": "54752103",
-     "bid": "",
-     "pos": "DEL",
-     "value": 24389478.0
-    },
-    {
-     "player_team": "111434450",
-     "player": "3099",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 43138395.0
-    },
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": "54892898",
-     "bid": "",
-     "pos": "POR",
-     "value": 19255695.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": "62681662",
-     "bid": "",
-     "pos": "DEL",
-     "value": 18111862.0
-    },
-    {
-     "player_team": "107909858",
-     "player": "3147",
-     "market": "61763382",
-     "bid": "",
-     "pos": "DEL",
-     "value": 50349422.0
-    },
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": "51255271",
-     "bid": "",
-     "pos": "DEF",
-     "value": 51468502.0
-    },
-    {
-     "player_team": "44068749",
-     "player": "2639",
-     "market": "50121404",
-     "bid": "",
-     "pos": "MED",
-     "value": 9620929.0
-    },
-    {
-     "player_team": "37280098",
-     "player": "3123",
-     "market": "51255255",
-     "bid": "",
-     "pos": "DEF",
-     "value": 24173930.0
-    },
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": "50121325",
-     "bid": "",
-     "pos": "MED",
-     "value": 19130191.0
-    },
-    {
-     "player_team": "107331405",
-     "player": "2757",
-     "market": "61356752",
-     "bid": "",
-     "pos": "DEF",
-     "value": 39288113.0
-    },
-    {
-     "player_team": "109094607",
-     "player": "1056",
-     "market": "62681664",
-     "bid": "",
-     "pos": "DEF",
-     "value": 3165704.0
-    }
-   ]
-  },
   {
    "name": "Dani Martinez",
    "pos": "DEF",
@@ -1019,43 +909,11 @@
      "value": 18111862.0
     }
    ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Pablo Fornals",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Pablo Fornals",
-     "names"
-    ]
-   ],
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "111434450",
-     "player": "3099",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 43138395.0
-    }
-   ]
   }
  ],
  "cash_after": 7685739.12580454,
  "can_bid": 783525.0,
- "ping": "field Pablo Fornals; sell Dani Martinez; sell Raul Garcia; sell Alvaro F. Carreras; sell Yeray Alvarez; sell Jon Moncayola; sell Augusto Batalla; sell Bil Nsongo; sell Robin Le Normand; sell Iñigo Vicente; sell Alvaro Garcia; sell Adria Pedrosa; sell Thomas Lemar; sell Martin Satriano; buy Justin de Haas; buy Aimar Oroz; buy Jorge Herrando; relist Julian Alvarez, Bil Nsongo, Adria Pedrosa, Martin Satriano, Jon Moncayola, Robin Le Normand, Gerard Martin; list Pablo Fornals",
+ "ping": "sell Dani Martinez; sell Raul Garcia; sell Alvaro F. Carreras; sell Yeray Alvarez; sell Jon Moncayola; sell Augusto Batalla; sell Bil Nsongo; sell Robin Le Normand; sell Iñigo Vicente; sell Alvaro Garcia; sell Adria Pedrosa; sell Thomas Lemar; sell Martin Satriano; buy Justin de Haas; buy Aimar Oroz; buy Jorge Herrando; relist Julian Alvarez, Bil Nsongo, Adria Pedrosa, Martin Satriano, Jon Moncayola, Robin Le Normand, Gerard Martin",
  "buys": [
   {
    "name": "Marcos Llorente",
@@ -2803,8 +2661,8 @@
   {
    "name": "Pablo Fornals",
    "pos": "MED",
-   "what": "list",
-   "label": "list Pablo Fornals",
+   "what": "sell",
+   "label": "sell Pablo Fornals",
    "step": null,
    "offer": null,
    "waiting": null,
@@ -2832,15 +2690,13 @@
     ]
    ],
    "more": true,
-   "accepts": [
-    null
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "111434450",
      "player": "3099",
-     "market": null,
-     "bid": null,
+     "market": "65063644",
+     "bid": "",
      "pos": "MED",
      "value": 43138395.0
     }
