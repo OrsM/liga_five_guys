@@ -269,6 +269,12 @@ def _selftest() -> None:
             "his chance of ending above you: the difference of two normals"
         assert abs(finish - (1 + r_above)) < 1e-12 and abs(first - (1 - r_above)) < 1e-3 \
             and abs(first + r_first - 1) < 1e-3, "your finish and chance of first, against him alone"
+        (s,), = rows("SELECT const('PERSISTENT_SHARE')")
+        for m in ("me", "riv"):
+            (ev, vs, e2), = rows("SELECT total(e), total(v), total(e * e) FROM league_xi WHERE manager = ? AND jornada = 1", (m, ))
+            (sd,), = rows("SELECT sd FROM league_jornada WHERE manager = ? AND jornada = 1", (m, ))
+            assert vs > 0 and abs(sd - math.sqrt((1 + s * s) * vs + s * s * e2)) < 1e-9, \
+                "a jornada's variance: (1 + share^2) x the cells' + share^2 x the squares of their e (the persistent share)"
     print("decision self-test OK")
 
 

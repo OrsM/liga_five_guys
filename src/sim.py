@@ -382,7 +382,7 @@ def _selftest() -> None:
             db.executemany("INSERT INTO forecast_cell VALUES (5, ?, 3, ?, ?, ?, ?, ?, ?)",
                            [("star", 6.6, 0.45, 6.0, 1.1, 0.9, 0.5), ("plain", 4.0, 0.8, None, None, None, None)])
             db.execute("UPDATE sim_runs SET moment = 5 WHERE run_id = 7")
-        got_fc, = rows("SELECT player, ppm, fixture, picked, fit, points, plays, expected FROM run_forecast"
+        got_fc, = rows("SELECT player, ppm, fixture, picked, fit, points, plays, expected FROM sim_forecast"
                        " WHERE run_id = 7")
         assert got_fc[:5] == ("star", 6.0, 1.1, 0.9, 0.5) and abs(got_fc[5] - 6.6) < 1e-9 \
             and abs(got_fc[6] - 0.45) < 1e-9 and abs(got_fc[7] - 6.6 * 0.45) < 1e-9, \
