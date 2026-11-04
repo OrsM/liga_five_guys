@@ -323,6 +323,9 @@ def _kept(db: sqlite3.Connection) -> None:
                    " SELECT run_id, cut, p_first_after, finish_after, cash_after, can_bid FROM decision_run_old")
         db.execute("DROP TABLE decision_run_old")
         db.commit()
+    if "grade_moment" in _tables(db):    # grades pointed into the forecast's store; they keep their own cells now
+        db.execute("DROP TABLE grade_moment")      # (the next grade stage makes them again: it finds none of this code's)
+        db.commit()
 
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
@@ -593,15 +596,19 @@ def _selftest() -> None:
             raw.execute("CREATE TABLE sim_players (run_id INTEGER NOT NULL, player TEXT NOT NULL, start REAL, next REAL,"
                         " season REAL, mine INTEGER NOT NULL, xi INTEGER NOT NULL, PRIMARY KEY (run_id, player))")
             raw.execute("INSERT INTO sim_players VALUES (4, 'a', 0.9, 3.0, 30.0, 1, 1)")
+            raw.execute("CREATE TABLE grade_moment (run_id INTEGER NOT NULL, from_j INTEGER NOT NULL,"
+                        " jornada INTEGER NOT NULL, moment INTEGER NOT NULL, PRIMARY KEY (run_id, from_j, jornada))")
         with closing(connect(old)) as db:
-            def got(q: str) -> list[Any]:
+            def kept(q: str) -> list[Any]:
                 return db.execute(q).fetchall()
-            assert got("SELECT run_id, moment FROM sim_runs") == [(4, 9)], "the forecast moment stays in sim_runs"
-            assert got("SELECT run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first"
+            assert kept("SELECT run_id, moment FROM sim_runs") == [(4, 9)], "the forecast moment stays in sim_runs"
+            assert kept("SELECT run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first"
                        " FROM decision_run") == [(4, "c", 0.3, 2.0, 5.0, 6.0, None, None)], \
                 "what the decision left of a run moved to decision_run"
-            assert got("SELECT player, next FROM decision_players") == [("a", 3.0)], "renamed, rows kept"
+            assert kept("SELECT player, next FROM decision_players") == [("a", 3.0)], "renamed, rows kept"
             assert not {"sim_players", "decision_run_old"} & _tables(db), "the old names are gone"
+            assert kept("SELECT count(*) FROM grade_cell") == [(0,)]
+            assert "grade_moment" not in _tables(db), "a grade is its own cells now, not a pointer into the forecast's store"
     print("ffcore.db self-test OK")
 
 

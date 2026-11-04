@@ -231,17 +231,34 @@ SELECT r.run_id, s.player, name_shown(s.name) AS name, coalesce(s.pos, '') AS po
 FROM decision_run r JOIN seen s ON s.cut = r.cut AND s.variant = 'live'
 LEFT JOIN decision_players p ON p.run_id = r.run_id AND p.player = s.player;
 
--- grading, when run.py grade finds something new: each past lock forecast
--- with the run's code (grading.backtest), the moment of it graded on each
--- jornada done up to GRADE_AHEAD past the lock (forecast_cell keeps it
--- while a grade points to it).
-CREATE TABLE IF NOT EXISTS grade_moment (
-    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
-    from_j  INTEGER NOT NULL,      -- the lock forecast from
-    jornada INTEGER NOT NULL,
-    moment  INTEGER NOT NULL REFERENCES forecast_moment(moment),
-    PRIMARY KEY (run_id, from_j, jornada)
-);
+-- grading, when run.py grade finds something new: each past lock's forecast
+-- (the cell contract, read at the lock by grading.backtest), a row a player and
+-- jornada done up to GRADE_AHEAD past the lock: what was expected of him (e),
+-- his chance of playing (NULL in grades kept before 2026-10-17), and whether he
+-- was listed injured, doubtful or suspended then (player_status).
+CREATE TABLE IF NOT EXISTS grade_cell (
+    run_id    INTEGER NOT NULL REFERENCES runs(run_id),
+    from_j    INTEGER NOT NULL,      -- the lock forecast from
+    jornada   INTEGER NOT NULL,
+    player    TEXT NOT NULL,
+    predicted REAL NOT NULL,
+    plays     REAL,
+    flagged   INTEGER NOT NULL,
+    PRIMARY KEY (run_id, from_j, jornada, player)
+) WITHOUT ROWID;
+
+-- The next jornada's forecast at every replay moment (grading.replay), a row a
+-- variant, moment and player: the cell contract read at that t, kept as the
+-- replay's own record.
+CREATE TABLE IF NOT EXISTS replay_cell (
+    variant   TEXT NOT NULL,
+    as_of     TEXT NOT NULL,         -- the line-up snapshot (lineup_snapshots) it was made at
+    jornada   INTEGER NOT NULL,
+    player    TEXT NOT NULL,
+    predicted REAL NOT NULL,
+    flagged   INTEGER NOT NULL,
+    PRIMARY KEY (variant, as_of, player)
+) WITHOUT ROWID;
 
 -- The forecast (forecast_now) as a decision at t reads it, made into a
 -- moment each time (assemble.forecast): every player's cell a jornada and
@@ -371,12 +388,9 @@ CREATE TABLE IF NOT EXISTS grade_decisions (
 DROP VIEW IF EXISTS grade_forecast;
 CREATE VIEW grade_forecast AS
 WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
-SELECT g.run_id, g.from_j, g.jornada, c.player, c.e AS predicted, coalesce(a.pts, 0.0) AS actual,
-       coalesce(f.flagged, 0) AS flagged, CASE WHEN m.code <> 'graded before 2026-10-17' THEN c.p END AS plays
-FROM grade_moment g JOIN forecast_moment m ON m.moment = g.moment
-JOIN forecast_e c ON c.moment = g.moment AND c.jornada = g.jornada
-LEFT JOIN forecast_player f ON f.moment = g.moment AND f.player = c.player
-LEFT JOIN pts a ON a.player = c.player AND a.jornada = g.jornada;
+SELECT g.run_id, g.from_j, g.jornada, g.player, g.predicted, coalesce(a.pts, 0.0) AS actual,
+       g.flagged, g.plays
+FROM grade_cell g LEFT JOIN pts a ON a.player = g.player AND a.jornada = g.jornada;
 
 DROP VIEW IF EXISTS grade_error;
 CREATE VIEW grade_error AS
@@ -407,15 +421,15 @@ FROM g GROUP BY run_id, ahead;
 -- the jornada that was next then, from the previous lock to its own.
 DROP VIEW IF EXISTS replay_moments;
 CREATE VIEW replay_moments AS
-WITH snaps AS MATERIALIZED (SELECT DISTINCT observed_at AS at FROM lineups
-                            WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut())),
-w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS opens FROM round_locks)
+WITH snaps AS MATERIALIZED (SELECT at FROM lineup_snapshots),
+w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS opens FROM jornada_calendar
+      WHERE lock IS NOT NULL)
 SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens AND s.at < w.lock
 ORDER BY w.lock, s.at;
 
 -- The forecast of the next jornada at every replay moment, for each variant
--- as last forecast (its latest moment there; grading.replay makes them), a
--- row a player, with what he scored (0 if nothing) and how many hours
+-- as last forecast (replay_cell; grading.replay makes them), a row a player,
+-- with what he scored (0 if nothing) and how many hours
 -- before the lock: how far from the lock the error is acceptable. The same
 -- outcomes as grade_forecast, forecast again under the information of each
 -- moment, so it says how early a forecast is good, not which model is
@@ -423,17 +437,14 @@ ORDER BY w.lock, s.at;
 DROP VIEW IF EXISTS replayed;
 CREATE VIEW replayed AS
 WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
-SELECT m.variant, r.as_of, r.jornada, c.player, c.e AS predicted,
-       coalesce(a.pts, 0.0) AS actual, f.flagged,
+SELECT c.variant, c.as_of, c.jornada, c.player, c.predicted,
+       coalesce(a.pts, 0.0) AS actual, c.flagged,
        24 * (stamp_jd(r.lock)
-           - stamp_jd(r.as_of))
+           - stamp_jd(c.as_of))
            AS lead_h
-FROM (SELECT variant, as_of, max(moment) AS moment FROM forecast_moment WHERE code = 'sql' GROUP BY variant, as_of) m
-JOIN replay_moments r ON r.as_of = m.as_of
-JOIN forecast_e c ON c.moment = m.moment AND c.jornada = r.jornada
-JOIN forecast_player f ON f.moment = m.moment AND f.player = c.player
-LEFT JOIN pts a ON a.player = c.player AND a.jornada = r.jornada
-WHERE r.jornada IN (SELECT jornada FROM jornadas_done);
+FROM replay_cell c JOIN replay_moments r ON r.as_of = c.as_of AND r.jornada = c.jornada
+LEFT JOIN pts a ON a.player = c.player AND a.jornada = c.jornada
+WHERE c.jornada IN (SELECT jornada FROM jornada_calendar WHERE state = 'done');
 
 -- How far from the lock a replayed forecast was made, in buckets.
 DROP VIEW IF EXISTS lead_buckets;
@@ -1278,6 +1289,13 @@ WITH last AS (SELECT ff_id, trim(name) AS name, club,
               FROM market WHERE ff_id <> '')
 SELECT l.ff_id AS player_id, l.name, l.club AS club_id, coalesce(a.app_id, '') AS app_id
 FROM last l LEFT JOIN app_links a ON a.player = l.ff_id WHERE l.n = 1;
+
+-- When the line-ups were taken, as of t: each futbolfantasy snapshot (one a time):
+-- the moments a forecast can be replayed at.
+DROP VIEW IF EXISTS lineup_snapshots;
+CREATE VIEW lineup_snapshots AS
+SELECT DISTINCT observed_at AS at FROM lineups
+WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut());
 
 -- The jornadas every match of which has a score (jornada_calendar): what a
 -- forecast is graded on (one under way, or with a match postponed, is not).

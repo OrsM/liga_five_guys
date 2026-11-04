@@ -111,6 +111,26 @@ class Built(NamedTuple):
     moment: int
 
 
+def forecast() -> int:
+    """The forecast at t (forecast_now) made into a new moment, every
+    player's cells and who is flagged (player_status); the moments of this
+    cut and variant no run or grade points to dropped. The moment."""
+    with closing(connect()) as db:
+        cells = db.execute("SELECT player, jornada, pts, p, ppm, fixture, picked, fit FROM forecast_now").fetchall()
+        flagged = dict(db.execute("SELECT player, status IS NOT NULL FROM player_status"))
+        with db:
+            old = ("SELECT moment FROM forecast_moment WHERE as_of = cut() AND variant = variant()"
+                   " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL)")
+            for t in ("forecast_cell", "forecast_player", "forecast_moment"):
+                db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old))
+            moment = db.execute("INSERT INTO forecast_moment (as_of, variant) VALUES (cut(), variant())").lastrowid
+            assert moment is not None
+            db.executemany("INSERT INTO forecast_cell VALUES (%d, ?, ?, ?, ?, ?, ?, ?, ?)" % moment, cells)
+            db.executemany("INSERT INTO forecast_player VALUES (%d, ?, ?)" % moment,
+                           [(k, flagged.get(k, 0)) for k in sorted({c[0] for c in cells})])
+    return moment
+
+
 def built() -> Built:
     """The league at t made for a decision (look): the market and the
     league seen then (see), the forecast at t (forecast), its moment and you

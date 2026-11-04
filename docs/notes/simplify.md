@@ -51,13 +51,20 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 
 | Module | Exports (its contract) |
 |---|---|
-| ingest | app_lineup, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
-| forecast | cell, price_carry, price_trend, price_trend_daily, standin_cell |
-| decision | decision_plan |
+| ingest | app_lineup, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, lineup_snapshots, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
+| forecast | cell, price_carry, price_trend, price_trend_daily |
+| decision | decision_facts, decision_option, decision_plan, decision_players, decision_run, decision_standings, decision_waiting, league_jornada |
 | settlement | (none yet) |
 | board | board_json |
 | grading | (none yet) |
 
+
+**Board and grading read contracts (2026-11-04, wave 2).** The root cause: the board was built on the replay's stand-in tables (sim_*), a later module's, and on decision internals (bid_odds, recent_offers, nights_left, waiting). The design:
+- The board needs, for the last run: the plan, each move alone (what the plan was chosen from), the players the run looked at with the facts it saw, what waiting is worth, the standings forecast, what the plan leaves (finish, chance of first, cash, what more to bid), and the offer nights left. It needs no live view of the decision.
+- The decision exports all of it as its plan-detail contract, a run each, written once by `decision.record(run)` (the only place that reads the decision's internals for it): decision_plan (step, kind, player, amount, win, worth, after), decision_option (every move alone, plus asking_win, the chance of winning at his asking price, and beats, the share of the game's recent offers the offer standing on him beats), decision_players (start, next, season, mine, xi), decision_facts (the facts the run saw: a view over `seen` at the run's cut), decision_waiting, decision_standings (every manager's season if you do nothing) and decision_run (cut, finish_after, p_first_after, cash_after, can_bid, nights, first). sim_players/sim_standings/sim_waiting became decision_*; sim_runs keeps only the run's forecast moment, the rest of it moved to decision_run (db._renamed/_kept move a live file once).
+- The replay produces the same contracts at an earlier t instead of private tables the board reads: grading sets t (set_now) and calls the same `decision.plan`/`decision.options`, reads `cell`, `standings`, `scored`, `jornada_calendar`, `player_roster`, `price_trend`, `league_jornada` (exported), and keeps its own records of what it read: grade_cell (a lock's cell contract, a row a player and jornada: replaces grade_moment, which pointed into the forecast's private store) and replay_cell (the next jornada's cells at each line-up snapshot, lineup_snapshots, an ingest fact view; replaces the forecast moments `replayed` read). `grade_forecast` and `replayed` are views over those and `scored`.
+- Not a contract, so not exported: bid_odds, recent_offers, nights_left, waiting, league_standings, league_season (the decision's internals; league_standings is the decision's, it computes p_first_after, and left the board's names in tools/frontiers.py).
+- Left in other slices: forecast (run_forecast reads sim_runs.moment), decision (4), assemble, db, facts, fixtures (listed below).
 
 **Frontiers crossed today (to fix, one module at a time):**
 - Decision reads ingest: done (2026-11-04). player_facts, nights_left, bid_odds, league_season read ingest's fact views (player_roster, listings, offers, squads, standings); offer_ratios is ingest's. tools/frontiers.py lists none.
@@ -66,6 +73,115 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 - Settlement decides: on a lost bid, grading.py drops the paired sales and runs decision.plan(sales_only=True) (grading.py:292-297). That sold Agoume, Moncayola, and Maffeo the night he was bought.
 - The rest: the frontier check list below.
 
+**Frontier check (2026-11-04, no exemptions; the exports above cut to the note's contracts)** (tools/frontiers.py, `python tools/frontiers.py` prints this list, red until it is empty). The rule: a module may read the facts, t (look) and any earlier module's contract; it may not read a later module, nor a scraped table (api_*, current_*, market, lineups...) from outside ingest; a file of no one module (assemble, sim, db, facts, fixtures) reads exports only. Grouped by the reading module, file:line. 77 crossings before wave 2's board slice; now 28 (forecast 1, decision 4, assemble.py 8, db.py 2, facts.py 12, fixtures.py 1; ingest, settlement, board, grading and sim.py 0). The list below is the state before that slice:
+
+forecast (1):
+- src/ffcore/schema.sql:590 view run_forecast reads sim_runs (grading, a later module)
+
+decision (9):
+- src/ffcore/decide.sql:230 view league_xi reads standin_cell (forecast, not exported)
+- src/ffcore/decide.sql:236 view league_xi reads standin_cell (forecast, not exported)
+- src/ffcore/decide.sql:246 view league_season reads score_spread (forecast, not exported)
+- src/ffcore/decide.sql:289 view league_jornada reads score_spread (forecast, not exported)
+- src/ffcore/schema.sql:1023 view bid_odds reads price_trend_fit (forecast, not exported)
+- src/ffcore/schema.sql:1027 view bid_odds reads price_trend_fit (forecast, not exported)
+- src/ffcore/schema.sql:1033 view bid_odds reads price_trend (forecast, not exported)
+- src/ffcore/schema.sql:675 view waiting reads price_carry (forecast, not exported)
+- src/ffcore/schema.sql:733 view player_facts reads price_trend (forecast, not exported)
+
+board (26):
+- src/ffcore/decide.sql:259 view league_standings reads league_season (decision, not exported)
+- src/ffcore/decide.sql:278 view league_standings reads my_cash (decision, not exported)
+- src/ffcore/decide.sql:280 view league_standings reads seen_cash (decision, not exported)
+- src/ffcore/schema.sql:1493 view board_run reads sim_runs (grading, a later module)
+- src/ffcore/schema.sql:1503 view board_players reads sim_facts (grading, a later module)
+- src/ffcore/schema.sql:1503 view board_players reads sim_players (grading, a later module)
+- src/ffcore/schema.sql:1515 view board_buys reads decision_option (decision, not exported)
+- src/ffcore/schema.sql:1516 view board_buys reads sim_facts (grading, a later module)
+- src/ffcore/schema.sql:1528 view board_mine reads recent_offers (decision, not exported)
+- src/ffcore/schema.sql:1529 view board_mine reads nights_left (decision, not exported)
+- src/ffcore/schema.sql:1539 view board_mine reads decision_option (decision, not exported)
+- src/ffcore/schema.sql:1540 view board_mine reads sim_waiting (grading, a later module)
+- src/ffcore/schema.sql:1599 view board_league reads sim_standings (grading, a later module)
+- src/ffcore/schema.sql:1620 view lineup_gap reads app_lineup (ingest, not exported)
+- src/ffcore/schema.sql:1624 view lineup_gap reads app_player (ingest, not exported)
+- src/ffcore/schema.sql:1625 view lineup_gap reads name_player (ingest, not exported)
+- src/ffcore/schema.sql:1626 view lineup_gap reads name_player (ingest, not exported)
+- src/ffcore/schema.sql:1717 view board_rows reads sim_facts (grading, a later module)
+- src/ffcore/schema.sql:1753 view board_head reads sim_facts (grading, a later module)
+- src/ffcore/schema.sql:1755 view board_head reads sim_runs (grading, a later module)
+- src/ffcore/schema.sql:1756 view board_head reads sim_runs (grading, a later module)
+- src/ffcore/schema.sql:1758 view board_head reads sim_runs (grading, a later module)
+- src/ffcore/schema.sql:1760 view board_head reads sim_runs (grading, a later module)
+- src/ffcore/schema.sql:1761 view board_head reads sim_facts (grading, a later module)
+- src/ffcore/schema.sql:1819 view board_json reads bid_odds (decision, not exported)
+- src/ffcore/schema.sql:1833 view board_json reads sim_facts (grading, a later module)
+
+grading (19):
+- src/ffcore/schema.sql:209 view sim_facts reads seen (decision, not exported)
+- src/ffcore/schema.sql:354 view grade_forecast reads forecast_moment (forecast, not exported)
+- src/ffcore/schema.sql:355 view grade_forecast reads forecast_e (forecast, not exported)
+- src/ffcore/schema.sql:356 view grade_forecast reads forecast_player (forecast, not exported)
+- src/ffcore/schema.sql:388 view replay_moments reads lineups (ingest, a scraped table)
+- src/ffcore/schema.sql:390 view replay_moments reads round_locks (ingest, not exported)
+- src/ffcore/schema.sql:409 view replayed reads forecast_moment (forecast, not exported)
+- src/ffcore/schema.sql:411 view replayed reads forecast_e (forecast, not exported)
+- src/ffcore/schema.sql:412 view replayed reads forecast_player (forecast, not exported)
+- src/ffcore/schema.sql:414 view replayed reads jornadas_done (ingest, not exported)
+- src/grading.py:129 reads dec_rows (decision, not exported)
+- src/grading.py:131 reads dec_rows (decision, not exported)
+- src/grading.py:134 reads seen (decision, not exported)
+- src/grading.py:256 reads api_standings (ingest, a scraped table)
+- src/grading.py:264 reads league_jornada (decision, not exported)
+- src/grading.py:60 reads player_jornadas (ingest, not exported)
+- src/grading.py:66 reads jornadas_done (ingest, not exported)
+- src/grading.py:79 reads forecast_cell (forecast, not exported)
+- src/grading.py:93 reads jornadas_done (ingest, not exported)
+
+no module: assemble.py (13):
+- src/assemble.py:101 reads fitted (forecast, not exported)
+- src/assemble.py:102 reads price_carry (forecast, not exported)
+- src/assemble.py:103 reads price_trend (forecast, not exported)
+- src/assemble.py:124 reads seen (decision, not exported)
+- src/assemble.py:131 reads player_facts (decision, not exported)
+- src/assemble.py:131 reads sale_odds (decision, not exported)
+- src/assemble.py:133 reads bid_odds (decision, not exported)
+- src/assemble.py:176 reads forecast_now (forecast, not exported)
+- src/assemble.py:179 reads forecast_moment (forecast, not exported)
+- src/assemble.py:180 reads sim_runs (grading, not exported)
+- src/assemble.py:181 reads grade_moment (grading, not exported)
+- src/assemble.py:79 reads price_trend_now (forecast, not exported)
+- src/assemble.py:99 reads momentum (forecast, not exported)
+
+no module: db.py (3):
+- src/ffcore/db.py:285 reads grade_moment (grading, not exported)
+- src/ffcore/db.py:285 reads sim_runs (grading, not exported)
+- src/ffcore/db.py:292 reads forecast_moment (forecast, not exported)
+
+no module: facts.py (12):
+- src/ffcore/facts.py:24 reads price_step (forecast, not exported)
+- src/ffcore/facts.py:29 reads market (ingest, a scraped table)
+- src/ffcore/facts.py:30 reads market (ingest, a scraped table)
+- src/ffcore/facts.py:31 reads market (ingest, a scraped table)
+- src/ffcore/facts.py:46 reads momentum_day (forecast, not exported)
+- src/ffcore/facts.py:49 reads momentum_pairs (forecast, not exported)
+- src/ffcore/facts.py:64 reads market (ingest, a scraped table)
+- src/ffcore/facts.py:76 reads crosswalk (ingest, not exported)
+- src/ffcore/facts.py:79 reads lineups (ingest, a scraped table)
+- src/ffcore/facts.py:80 reads starters (ingest, a scraped table)
+- src/ffcore/facts.py:89 reads ff_identity_kept (ingest, not exported)
+- src/ffcore/facts.py:90 reads ff_identity_now (ingest, not exported)
+
+no module: fixtures.py (1):
+- src/ffcore/fixtures.py:32 reads forecast_cell (forecast, not exported)
+
+no module: sim.py (6):
+- src/sim.py:26 reads league_standings (board, not exported)
+- src/sim.py:31 reads dec_when (decision, not exported)
+- src/sim.py:471 reads look_players (decision, not exported)
+- src/sim.py:473 reads dec_rows (decision, not exported)
+- src/sim.py:476 reads dec_cash (decision, not exported)
+- src/sim.py:478 reads waiting (decision, not exported)
 **Forecast (2026-11-04)**: its crossings are fixed (late_arrivals, standin_cell, market_daily, price_day_now, price_rows read ingest's facts; auction_results no longer reads the forecast). The price trend and momentum are views at t (no kept momentum_fit / price_trend_fit; bid_odds reads price_trend_daily, a past close's trend); a cell's e and v are worked out once (cell_pool; stand-ins are its rows with no player).
 
 **Frontier check (2026-11-04)** (tools/frontiers.py). The rule: a module may read the facts, t (look) and any earlier module's contract; it may not read a later module, nor a scraped table (api_*, current_*, market, lineups...) from outside ingest. The fact views (player_club, player_value, player_status, club_fixture, club_rating, auction_results) are ingest. 20 crossings:

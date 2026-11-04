@@ -18,15 +18,15 @@ from grading import GRADE_AHEAD, backtest
 
 
 def graded(variant: str) -> int:
-    """The backtest under variant, recorded as a run of grade_moment rows."""
+    """The backtest under variant, recorded as a run of grade_cell rows."""
     with closing(connect()) as db, db:
         run = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
                          " VALUES ('', '', ?, '', 1)", ("variant:" + variant,)).lastrowid
     assert run is not None
     with applied(variant):
         fc = backtest(GRADE_AHEAD)
-    record([{"run_id": run, **r} for r in fc], "grade_moment")
-    print("%s: run %d, %d forecasts" % (variant, run, len(fc)), flush=True)
+    record([{"run_id": run, **r} for r in fc], "grade_cell")
+    print("%s: run %d, %d forecast cells" % (variant, run, len(fc)), flush=True)
     return run
 
 

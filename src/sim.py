@@ -361,6 +361,9 @@ def _selftest() -> None:
         assert rows("SELECT kind, player, in_plan FROM decision_option WHERE run_id = 7 AND in_plan") \
             == [("buy", k, 1) for k in sorted(bought)], "each move alone, the plan's marked"
         assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'sell'") == [(len(sqb), )]
+        assert sorted(decision.options()) == sorted(rows(
+            "SELECT kind, player, amount, in_plan FROM decision_option WHERE run_id = 7")), \
+            "the options as the decision hands them to a replay are the ones it keeps"
         held = {k: r for k, r in ub["p"].items() if r.get("owner") != "riv"}
         assert [r for r in rows("SELECT player, pos, value, price, offer, fetches FROM decision_facts WHERE run_id = 7"
                                 " ORDER BY player") if r[0] in held] == sorted(
