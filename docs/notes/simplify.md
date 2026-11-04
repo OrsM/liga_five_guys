@@ -106,6 +106,10 @@ same step.
    opponent's goals against for attackers, 1 / its goals for for
    defenders, each shrunk toward the league's), and forecast_now, the cell:
    pts = max(0, ppm x fixture), p = picked x fit.
+   Measured (2026-11-04, test copy, 10 locks j2-11, player-jornadas both
+   forecast): next jornada rmse 2.806 vs the Python's 2.800, r 0.591 both;
+   five ahead rmse 2.929 vs 2.903, r 0.529 vs 0.541. Backtest money: 192
+   moves, 4 lost, +476 vs +497 standing (the Python: 145, 5, +578).
 6. Facts: identity in SQL only; one "played"; derived tables out of facts.
 7. Decision and tests: the plan loop with no Action; tests seed fact rows.
 
