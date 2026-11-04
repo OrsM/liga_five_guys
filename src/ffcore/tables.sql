@@ -30,8 +30,7 @@ DROP VIEW IF EXISTS current_market;
 CREATE VIEW current_market AS
 SELECT t.observed_at, t.source, t.value, t.delta_1d, t.delta_pct_1d, t.ff_id, t.name, t.position, t.team_id, t.team, t.club
 FROM market t
-WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM market
-    WHERE observed_at <= (SELECT cut()) GROUP BY source)
+WHERE /* latest market */
 ORDER BY t.rowid;
 
 -- lineups: probable line-ups and injury notes (futbolfantasy, analitica), a snapshot each fetch.
@@ -59,8 +58,7 @@ DROP VIEW IF EXISTS current_lineups;
 CREATE VIEW current_lineups AS
 SELECT t.observed_at, t.source, t.start_pct, t.player_slug, t.player_name, t.team_slug, t.role, t.status, t.note, f.player
 FROM lineups t LEFT JOIN ff_identity f ON f.player_slug = t.player_slug AND f.player_name = t.player_name AND f.team_slug = t.team_slug
-WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM lineups
-    WHERE observed_at <= (SELECT cut()) GROUP BY source)
+WHERE /* latest lineups */
 ORDER BY t.rowid;
 
 -- matches: fixtures and results, a row a match.
@@ -152,8 +150,7 @@ DROP VIEW IF EXISTS current_api_teams;
 CREATE VIEW current_api_teams AS
 SELECT t.observed_at, t.source, t.market_value, t.buyout, t.points, t.player_id, t.team_id, t.manager, t.player_name, t.player_name_full, t.position_id, t.buyout_until, t.player_status, t.player_team_id, a.player
 FROM api_teams t LEFT JOIN app_player a ON a.app_id = t.player_id
-WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_teams
-    WHERE observed_at <= (SELECT cut()) GROUP BY source)
+WHERE /* latest api_teams */
 ORDER BY t.rowid;
 
 -- api_standings: the app's standings: points, value, cash, a snapshot each fetch.
@@ -177,8 +174,7 @@ DROP VIEW IF EXISTS current_api_standings;
 CREATE VIEW current_api_standings AS
 SELECT t.observed_at, t.source, t.position, t.previous_position, t.team_points, t.fixture_points, t.team_value, t.team_money, t.team_id, t.user_id, t.manager, t.banned, t.starting_week
 FROM api_standings t
-WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_standings
-    WHERE observed_at <= (SELECT cut()) GROUP BY source)
+WHERE /* latest api_standings */
 ORDER BY t.rowid;
 
 -- api_market: the app's market listings and your bids, a snapshot each fetch.
@@ -207,8 +203,7 @@ DROP VIEW IF EXISTS current_api_market;
 CREATE VIEW current_api_market AS
 SELECT t.observed_at, t.source, t.market_value, t.sale_price, t.bid_money, t.bids, t.player_id, t.market_id, t.player_name, t.player_name_full, t.position_id, t.seller, t.status, t.player_status, t.shielded, t.expires_at, t.bid_id, t.bid_status, a.player
 FROM api_market t LEFT JOIN app_player a ON a.app_id = t.player_id
-WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_market
-    WHERE observed_at <= (SELECT cut()) GROUP BY source)
+WHERE /* latest api_market */
 ORDER BY t.rowid;
 
 -- api_offers: the game's nightly offers for your listed players, a snapshot each fetch.
@@ -228,8 +223,7 @@ DROP VIEW IF EXISTS current_api_offers;
 CREATE VIEW current_api_offers AS
 SELECT t.observed_at, t.source, t.money, t.player_team_id, t.offer_id, t.status, t.created_at, t.expires_at, t.from_market
 FROM api_offers t
-WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM api_offers
-    WHERE observed_at <= (SELECT cut()) GROUP BY source)
+WHERE /* latest api_offers */
 ORDER BY t.rowid;
 
 -- api_lineup: your line-up as the app has it, a snapshot each fetch.
