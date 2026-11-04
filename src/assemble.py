@@ -5,30 +5,21 @@ themselves."""
 from __future__ import annotations
 
 import hashlib
-import sqlite3
 import sys
 from contextlib import closing, contextmanager
-from functools import cache
 from pathlib import Path
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from typing import Any, NamedTuple
 
 import remind
-from ffcore import fixture, forecast, pricing, rules, score, startprob
+from ffcore import forecast as model, pricing, rules
 from ffcore.clock import set_variant
 from ffcore.db import connect, cut, named, query, record, rows, set_look
-from ffcore.fixture import Ratings, difficulty_ratings
-from ffcore.jornadas import rounds
 from ffcore.league import write_config
-from ffcore.parse import Rows
-from ffcore.points import scored, season_record
-from ffcore.schedule import Factors, expectations
-from ffcore.score import fit_promoted_discount, Scorer
-from ffcore.startprob import Availability, Calibration, StartOdds, fit_availability
-from ffcore.tidy import LINEUP_SOURCE, age_hours, current
+from ffcore.tidy import age_hours
 from stats import percentile
 
-__all__ = ["applied", "constants", "built", "player_forecast", "forecast_key", "params", "scorer", "fixture_ratings", "price_momentum",
+__all__ = ["applied", "constants", "built", "forecast", "params", "price_momentum",
            "price_change", "write_constants", "record_trend", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
@@ -38,17 +29,13 @@ APP_FRESH_HOURS = 14.4
 # and what a variant may set (variants).
 NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS", ),
-    "fixture": ("FIX_BAND", "MIN_AD_MATCHES"),
-    "forecast": ("MIN_POOL", "PERSISTENT_SHARE"),
+    "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "SHRINK_K"),
     "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "remind": ("REMIND_HOURS",),
     "rules": ("DEBT_SHARE", "MATCH_LEN"),
-    "score": ("PROMOTED_DISCOUNT_K", "SHRINK_K"),
-    "startprob": ("ABSENT_START", "AVAIL_K", "FALLBACK_K", "NEUTRAL_START", "PICK_K"),
 }
-MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "fixture": fixture,
-                           "forecast": forecast, "pricing": pricing, "remind": remind,
-                           "rules": rules, "score": score, "startprob": startprob}
+MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "forecast": model, "pricing": pricing,
+                           "remind": remind, "rules": rules}
 
 
 def constants() -> dict[str, dict[str, float]]:
@@ -79,36 +66,6 @@ def applied(variant: str) -> Iterator[None]:
         for n, v in was.items():
             setattr(MODULES[owner[n]], n, v)
         set_variant("live")
-
-
-def scorer(market: Rows, xi_rows: Rows) -> Scorer:
-    """The scorer as of t, its fits read from the start and points views
-    (written constants first: the views read them)."""
-    write_constants()
-    last_season = {k: {"pts": pts, "pj": pj} for k, pts, pj in rows("SELECT ff_id, pts, pj FROM last_season")}
-    priors: dict[str, float] = dict(rows("SELECT player, prior FROM ppm_prior"))
-    season = season_record()
-    cal, = rows("SELECT alpha, beta, neutral_start, absent_start FROM start_calibration")
-    return Scorer(
-        market, StartOdds(xi_rows, Calibration(*cal),
-                          fit_availability(rows("SELECT * FROM availability_tally")),
-                          {k: (r.apps, r.squads) for k, r in season.items()},
-                          dict(rows("SELECT player, pct FROM last_fit")), app_status(),
-                          {k: r.pick for k, r in season.items() if r.pick is not None}),
-        last_season,
-        current={k: {"pts": r.pts, "pj": r.apps} for k, r in season.items()},
-        promoted_discount=fit_promoted_discount(market, last_season, scored(), priors),
-        priors=priors)
-
-
-def app_status() -> dict[str, str]:
-    """The LaLiga app's status for each player it lists."""
-    return {k: r["player_status"] for r in current("api_players_all")
-            if (k := r.get("player")) and r.get("player_status")}
-
-
-def fixture_ratings(market: Rows) -> Ratings:
-    return difficulty_ratings(market, current("results_history"))
 
 
 def write_constants() -> None:
@@ -168,12 +125,13 @@ def price_change(day: str, h: int) -> dict[str, float | None]:
 def see() -> str:
     """The market and the league as of t into seen, seen_cash and
     seen_odds (player_facts, sale_odds, cash, bid_odds): what a decision at t
-    reads. Made once a cut, variant and code (seen.code: this forecast code
-    and every constant, so another code or a variant redefined makes them
+    reads. Made once a cut, variant and code (seen.code: the SQL's version
+    and every constant, so another schema or a variant redefined makes them
     again, never reads a stale one). The cut."""
-    key = hashlib.sha1(repr((_forecast_code(), sorted((m, sorted(c.items())) for m, c in constants().items())))
-                       .encode()).hexdigest()[:12]
     with closing(connect()) as db, db:
+        version, = db.execute("PRAGMA user_version").fetchone()
+        key = hashlib.sha1(repr((version, sorted((m, sorted(c.items())) for m, c in constants().items())))
+                           .encode()).hexdigest()[:12]
         c = cut()
         if db.execute("SELECT 1 FROM seen WHERE cut = ? AND variant = variant() AND code = ? LIMIT 1",
                       (c, key)).fetchone():
@@ -196,8 +154,7 @@ def market_offer_ratios() -> list[float]:
 def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
            carry: Sequence[float]) -> list[dict[str, Any]]:
     """Every constant and fitted value a run is built with, one row each:
-    (component, term, value, kind, n); the forecast's fits as its moment
-    keeps them (forecast_fits)."""
+    (component, term, value, kind, n); the forecast's fits (forecast_fits)."""
     return ([_param(m, name, v, "constant") for m, names in constants().items()
              for name, v in names.items()]
             + list(fits)
@@ -206,16 +163,11 @@ def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
             + [_param("pricing.carry", str(h), v) for h, v in enumerate(carry, 1)])
 
 
-def forecast_fits(cal: Calibration, avail: Availability, promoted: float,
-                  ratings: Ratings) -> list[dict[str, Any]]:
-    """The values the forecast fits, one params row each."""
-    return ([_param("startprob.calibration", t, getattr(cal, t))
-             for t in ("alpha", "beta", "neutral_start", "absent_start")]
-            + [_param("startprob.availability", b, v) for b, v in sorted(avail.level.items())]
-            + [_param("score.promoted_discount", "", promoted)]
-            + [_param("fixture.difficulty", c, v) for c, v in sorted(ratings.diff.items())]
-            + [_param("fixture.%s" % t, c, ad[i]) for c, ad in sorted(ratings.ad.items())
-               for i, t in enumerate(("scored", "conceded"))])
+def forecast_fits() -> list[dict[str, Any]]:
+    """What the forecast fits at t, one params row each: each club's
+    attack and defence (club_rating)."""
+    return [_param("forecast.%s" % t, c, v) for c, a, d in rows("SELECT club, attack, defence FROM club_rating ORDER BY club")
+            for t, v in (("attack", a), ("defence", d))]
 
 
 def _param(component: str, term: str, value: float, kind: str = "fitted",
@@ -228,112 +180,33 @@ class Built(NamedTuple):
     moment: int
 
 
-class Forecast(NamedTuple):
-    """The forecast as of t: its moment (its cells are forecast_cell's,
-    as used forecast_used's), the jornadas it has cells for and the values it fitted (params rows)."""
-    moment: int
-    jornadas: frozenset[int]
-    fits: list[dict[str, Any]]
-
-
-def player_forecast(players: Iterable[str] | None = None) -> Forecast:
-    """The forecast as of t, the one the board, the backtests and the
-    replays all read: of these players, or of every player the scorer knows.
-    Made once a moment (forecast_key) into forecast_cell, every player the
-    scorer knows, and read from there. Each player's cell is his alone (the
-    players asked for change none), so a moment made without someone asked
-    for adds just him."""
-    asked = None if players is None else set(players)
-    with closing(connect()) as db, db:
-        moment, made = _moment(db)
-        have = {k for (k, ) in db.execute("SELECT player FROM forecast_player WHERE moment = ?", (moment, ))}
-    if not made:
-        _make(moment, asked or set(), every=True)
-    elif asked and (missing := asked - have):
-        _make(moment, missing, every=False)
-    return _read(moment, asked)
-
-
-def forecast_key() -> tuple[str, str, str]:
-    """A moment of the forecast: the code it is made by, its constants (both
-    fingerprints) and the cut."""
-    return _forecast_code(), hashlib.sha1(repr(sorted(
-        (m, sorted(c.items())) for m, c in constants().items() if m in FORECAST_MODULES)).encode()
-    ).hexdigest()[:12], cut()
-
-
-# What the forecast is made by: every source under src but these, which only
-# decide, grade or show (an edit to them keeps every forecast made), and the
-# constants of these modules. A file wrongly left in costs a forecast made
-# again; one wrongly left out would keep a stale one: only these are.
-NOT_FORECAST = ("act.py", "decide.py", "decision.py", "ffcore/decide.sql", "grading.py", "health.py", "publish.py", "remind.py", "run.py",
-                "sim.py", "ffcore/action.py", "ffcore/forecast.py", "ffcore/market.py",
-                "ffcore/pricing.py", "ffcore/season.py")
-FORECAST_MODULES = ("fixture", "rules", "score", "startprob")
-
-
-@cache
-def _forecast_code() -> str:
-    src = Path(__file__).resolve().parent
-    files = [f for f in sorted(src.rglob("*.py")) + sorted(src.rglob("*.sql"))
-             if f.relative_to(src).as_posix() not in NOT_FORECAST]
-    return hashlib.sha1(b"".join(f.read_bytes() for f in files)).hexdigest()[:12]
-
-
-def _moment(db: sqlite3.Connection) -> tuple[int, bool]:
-    """The moment as of now (forecast_key), and whether it is made."""
-    code, consts, at = forecast_key()
-    if db.execute("INSERT OR IGNORE INTO forecast_moment (code, constants, as_of) VALUES (?, ?, ?)",
-                  (code, consts, at)).rowcount:
-        # Another code's moments are never made again: gone once this code
-        # makes one, but for those a run was built on or a grade graded (their record).
-        old = ("SELECT moment FROM forecast_moment WHERE code <> ?"
-               " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL"
-               " UNION SELECT moment FROM grade_moment)")
-        for t in ("forecast_cell", "forecast_player", "forecast_fit", "forecast_moment"):
-            db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old), (code, ))
-    (moment, made), = db.execute("SELECT moment, made FROM forecast_moment"
-                                 " WHERE (code, constants, as_of) = (?, ?, ?)", (code, consts, at)).fetchall()
-    return int(moment), bool(made)
-
-
-def _make(moment: int, also: set[str], every: bool) -> None:
-    """The forecast of these players, and of every player the scorer knows
-    if every, into the moment."""
-    market = current("market")
-    sc = scorer(market, current("lineups", LINEUP_SOURCE))
-    keys = also | set(sc.lookup) if every else also
-    ratings = fixture_ratings(market)
-    ex = expectations(sc, ratings, keys, current("matches"), rounds())
-    cells = [(moment, k, j, pts, p, *((f.ppm, f.fixture, f.picked, f.fit) if (f := ex.factors[j].get(k)) else
-                                     (None, None, None, None)))
-             for j, layer in ex.per_j.items() for k, (pts, p) in layer.items()]
-    with closing(connect()) as db, db:
-        db.executemany("INSERT OR REPLACE INTO forecast_player VALUES (?, ?, ?)",
-                       [(moment, k, int(k in sc.lookup and bool(sc.starts.status_of(k)))) for k in keys])
-        db.executemany("INSERT OR REPLACE INTO forecast_cell VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", cells)
-        if every:
-            db.execute("UPDATE forecast_moment SET made = 1 WHERE moment = ?", (moment, ))
-            db.executemany("INSERT OR REPLACE INTO forecast_fit VALUES (?, ?, ?, ?)", [
-                (moment, r["component"], r["term"], r["value"])
-                for r in forecast_fits(sc.starts.cal, sc.starts.avail, sc.promoted_discount, ratings)])
-
-
-def _read(moment: int, players: set[str] | None) -> Forecast:
-    """The moment's forecast of these players, or of every one."""
-    jornadas = frozenset(j for (j, ) in rows("SELECT DISTINCT jornada FROM forecast_cell WHERE moment = ?",
-                                             (moment, )))
-    fits = [_param(c, t, v) for c, t, v in rows(
-        "SELECT component, term, value FROM forecast_fit WHERE moment = ? ORDER BY rowid", (moment, ))]
-    return Forecast(moment, jornadas, fits)
+def forecast() -> int:
+    """The forecast at t (forecast_now) made into a new moment, every
+    player's cells and who is flagged (player_status); the moments of this
+    cut and variant no run or grade points to dropped. The moment."""
+    write_constants()
+    with closing(connect()) as db:
+        cells = db.execute("SELECT player, jornada, pts, p, ppm, fixture, picked, fit FROM forecast_now").fetchall()
+        flagged = dict(db.execute("SELECT player, status IS NOT NULL FROM player_status"))
+        with db:
+            old = ("SELECT moment FROM forecast_moment WHERE as_of = cut() AND variant = variant()"
+                   " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL"
+                   " UNION SELECT moment FROM grade_moment)")
+            for t in ("forecast_cell", "forecast_player", "forecast_moment"):
+                db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old))
+            moment = db.execute("INSERT INTO forecast_moment (as_of, variant) VALUES (cut(), variant())").lastrowid
+            assert moment is not None
+            db.executemany("INSERT INTO forecast_cell VALUES (%d, ?, ?, ?, ?, ?, ?, ?, ?)" % moment, cells)
+            db.executemany("INSERT INTO forecast_player VALUES (%d, ?, ?)" % moment,
+                           [(k, flagged.get(k, 0)) for k in sorted({c[0] for c in cells})])
+    return moment
 
 
 def built() -> Built:
     """The league at t made for a decision (look): the market and the
-    league seen then (see), the forecast of every player in a squad, on the
-    market or yours at t or at a path's start (my_squad: a path's may hold
-    players nobody holds now), its moment and you in look; and the parameters it was made with.
-    None made from squads older than APP_FRESH_HOURS."""
+    league seen then (see), the forecast at t (forecast), its moment and you
+    in look; and the parameters it was made with. None made from squads
+    older than APP_FRESH_HOURS."""
     age = age_hours("api_teams")
     if age is None or age > APP_FRESH_HOURS:
         raise SystemExit("the app's squads are %s old; no board is built from "
@@ -341,123 +214,222 @@ def built() -> Built:
     me = write_config()
     prices = price_momentum()          # first: it keeps the trend that player_facts and sale_odds read
     see()
-    set_look(me=me)
-    fc = player_forecast({k for (k, ) in rows(
-        "SELECT s.player FROM look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant"
-        " WHERE s.price IS NOT NULL OR (s.owner IS NOT NULL AND s.pos IS NOT NULL)"
-        " UNION SELECT player FROM my_squad UNION SELECT s.player FROM look l JOIN seen s"
-        " ON s.cut = l.t0 AND s.variant = l.variant AND s.owner = l.me")})
-    set_look(moment=fc.moment)
-    return Built(params(fc.fits, market_offer_ratios(), prices.carry), fc.moment)
+    moment = forecast()
+    set_look(me=me, moment=moment)
+    return Built(params(forecast_fits(), market_offer_ratios(), prices.carry), moment)
 
 
 def _selftest() -> None:
-    from ffcore.startprob import Availability, Calibration
-
-    rows = params(forecast_fits(Calibration(0.1, 0.9, 55.0, 12.0), Availability({"indefinite": 0.2}), 0.7,
-                                Ratings({"a": 1.1}, {"a": (1.2, 0.8)})),
+    rows = params([_param("forecast.attack", "a", 1.2), _param("forecast.defence", "a", 0.8)],
                   (0.9, 1.0, 1.1), (0.5, 1.0))
     got = {(r["component"], r["term"]): r for r in rows}
     assert len(got) == len(rows), "one row a parameter"
     assert {r["kind"] for r in rows} == {"fitted", "constant"}
-    for key, value in [(("startprob.calibration", "alpha"), 0.1),
-                       (("startprob.calibration", "absent_start"), 12.0),
-                       (("startprob.availability", "indefinite"), 0.2),
-                       (("startprob.availability", "doubt_for:at"), 0.5),
-                       (("score.promoted_discount", ""), 0.7),
-                       (("pricing.offer_ratios", "median"), 1.0),
+    for key, value in [(("pricing.offer_ratios", "median"), 1.0),
                        (("pricing.carry", "2"), 1.0),
-                       (("fixture.difficulty", "a"), 1.1),
-                       (("fixture.scored", "a"), 1.2),
-                       (("fixture.conceded", "a"), 0.8),
+                       (("forecast.attack", "a"), 1.2),
+                       (("forecast.defence", "a"), 0.8),
                        (("rules", "DEBT_SHARE"), rules.DEBT_SHARE)]:
         assert got[key]["value"] == value, (key, got.get(key))
     assert got[("pricing.offer_ratios", "median")]["n"] == 3
     assert got[("rules", "DEBT_SHARE")]["kind"] == "constant"
-    assert got[("startprob.availability", "doubt_for:at")]["kind"] == "fitted", \
-        "a bucket with no data keeps its prior, and is still what the run used"
     _selftest_market()
     _selftest_facts()
     _selftest_sale()
     _selftest_variants()
+    _selftest_prior()
+    _selftest_points()
     _selftest_forecast()
     print("assemble self-test OK")
 
 
-def _selftest_forecast() -> None:
-    """player_forecast: made once a moment and read back as made; a player
-    asked for beyond those made added alone; another cut, code or constant
-    another moment."""
-    import datetime as dt
+def _selftest_prior() -> None:
+    """schema.sql's last_season and ppm_prior on season_points, player_club
+    and player_value as tables: in his position, the least-squares line of
+    last season's points per match (10+ matches) on log value, at his value;
+    a position with fewer than three, its mean; no position, everyone's
+    median."""
+    import math
+    import sqlite3
+    from ffcore.db import SCHEMA, functions
+
+    db = sqlite3.connect(":memory:")
+    functions(db)
+    db.execute("CREATE TABLE season_points (season, ff_id, points, games)")
+    db.execute("CREATE TABLE player_club (player, pos)")
+    db.execute("CREATE TABLE player_value (player, value)")
+    db.executemany("INSERT INTO season_points VALUES (?, ?, ?, ?)", [
+        ("2024-25", "a", 999.0, 30.0),                        # an older season: not read
+        ("2025-26", "a", 60.0, 30.0), ("2025-26", "b", 90.0, 30.0),
+        ("2025-26", "c", 150.0, 30.0), ("2025-26", "d", 210.0, 30.0),
+        ("2025-26", "e", 300.0, 9.0), ("2025-26", "f", 40.0, 10.0)])
+    market = [("a", "DEF", 1e6), ("b", "DEF", 2e6), ("c", "DEF", 50e6), ("d", "DEF", 60e6),
+              ("e", "DEF", 70e6), ("f", "POR", 3e6), ("x", "", 5e6), ("z", "DEF", None)]
+    db.executemany("INSERT INTO player_club VALUES (?, ?)", [(k, p) for k, p, _v in market])
+    db.executemany("INSERT INTO player_value VALUES (?, ?)", [(k, v) for k, _p, v in market if v])
+    sql = SCHEMA.read_text()
+    for view in ("last_season", "ppm_prior"):
+        i = sql.index("CREATE VIEW %s AS" % view)
+        db.execute(sql[i:sql.index(";\n", i)])
+    got = dict(db.execute("SELECT player, prior FROM ppm_prior"))
+    xs, ys = [math.log(v) for v in (1e6, 2e6, 50e6, 60e6)], [2.0, 3.0, 5.0, 7.0]
+    mx, my = sum(xs) / 4, sum(ys) / 4
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+    line = {k: my + slope * (math.log(v) - mx) for k, v in (("a", 1e6), ("d", 60e6), ("e", 70e6))}
+    assert all(abs(got[k] - line[k]) < 1e-9 for k in line), \
+        ("DEF: the line on log value through a-d (e's 9 matches are too few), at each one's value", got, line)
+    assert got["f"] == 4.0, "POR: one player, his mean"
+    assert got["x"] == 4.0, "no position: the median of everyone's (2, 3, 4, 5, 7)"
+    assert got["z"] == my, "no value: his position's mean"
+
+
+def _selftest_points() -> None:
+    """schema.sql's scored and season_record: each change in a player's
+    season total by the jornada of his club's last match by then, and his
+    season so far (points, appearances, squads, pick)."""
     import tempfile
-    from types import SimpleNamespace
-    from unittest import mock
 
     from ffcore.db import set_now
-    from ffcore.schedule import Expectations
-    from ffcore.tidy import tables_in
+    from ffcore.parse import snapshot_stamp
+    from ffcore.tidy import store_sql, tables_in
 
-    made: list[set[str]] = []
-
-    def expect(sc: Any, ratings: Any, keys: Iterable[str], m: Any, left: Any) -> Expectations:
-        keys = set(keys)
-        made.append(keys)
-        per_j = {j: {k: (1.0 + j, 0.5) for k in sorted(keys) if (k, j) != ("b", 4)} for j in (3, 4)}
-        factors = {j: {k: Factors(1.0 + j, 1.0, 0.5, 1.0) for k in layer if k != "c"} for j, layer in per_j.items()}
-        return Expectations(per_j, {}, {}, [3, 4], {}, factors)
-
-    sc = SimpleNamespace(lookup={"a": {}, "b": {}}, promoted_discount=0.7,
-                         starts=SimpleNamespace(status_of=lambda k: "doubt" if k == "b" else "",
-                                                cal=Calibration(0.1, 0.9, 55.0, 12.0),
-                                                avail=Availability({"indefinite": 0.2})))
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), \
-            mock.patch(__name__ + ".expectations", expect), mock.patch(__name__ + ".scorer", lambda *a: sc), \
-            mock.patch(__name__ + ".current", lambda *a: []), mock.patch(__name__ + ".rounds", lambda: None), \
-            mock.patch(__name__ + ".fixture_ratings", lambda m: Ratings({"x": 1.1}, {"x": (1.2, 0.8)})):
+    a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
-            set_now(dt.datetime(2026, 9, 1, 8, 0, tzinfo=dt.timezone.utc))
-            first = player_forecast()
-            assert made == [{"a", "b"}], "every player the scorer knows"
-            def cells(fc: Forecast) -> list[tuple[Any, ...]]:
-                return rows("SELECT jornada, player, pts, p FROM forecast_cell WHERE moment = ?"
-                            " ORDER BY jornada, player", (fc.moment, ))
-            assert cells(first) == [(3, "a", 4.0, 0.5), (3, "b", 4.0, 0.5), (4, "a", 5.0, 0.5)], cells(first)
-            assert first.jornadas == {3, 4}
-            assert rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged",
-                        (first.moment, )) == [("b", )], "who was listed doubtful then"
-            assert ("fixture.difficulty", "x") in {(r["component"], r["term"]) for r in first.fits}
-            assert player_forecast() == first and len(made) == 1, "read back as made, not made again"
-            got = player_forecast({"a", "c"})
-            assert made[1:] == [{"c"}], "only the one not made"
-            assert (3, "c", 4.0, 0.5) in cells(got), "an unrated player's cell without factors"
-            set_now(dt.datetime(2026, 9, 2, 8, 0, tzinfo=dt.timezone.utc))
-            player_forecast()
-            with mock.patch.object(score, "SHRINK_K", score.SHRINK_K + 1):
-                player_forecast()
-            with mock.patch.object(pricing, "PRICE_WINDOW", pricing.PRICE_WINDOW + 1):
-                player_forecast()
-            assert len(made) == 4, "another cut and another forecast constant: made again; a decision's: not"
-            ran = rows("SELECT min(moment) FROM forecast_moment")[0][0]
-            with closing(connect()) as db, db:
-                db.execute("INSERT INTO sim_runs (run_id, moment) VALUES (1, ?)", (ran, ))
-            with mock.patch(__name__ + "._forecast_code", lambda: "newcode"):
-                player_forecast()
-            assert rows("SELECT moment FROM forecast_moment WHERE code <> 'newcode'") == [(ran, )], \
-                "a run's moment kept, its record"
-            with closing(connect()) as db, db:
-                db.execute("DELETE FROM sim_runs")
-            with mock.patch(__name__ + "._forecast_code", lambda: "newer"):
-                player_forecast()
-            assert rows("SELECT DISTINCT code FROM forecast_moment") == [("newer", )] \
-                and rows("SELECT count(*) FROM forecast_cell WHERE moment NOT IN"
-                         " (SELECT moment FROM forecast_moment)") == [(0, )], \
-                "another code's moments gone once this one makes one"
+            set_now(snapshot_stamp("2026-08-04T0000Z"))
+            write_constants()
+            store_sql("market", [
+                {"observed_at": a, "ff_id": "1", "club": "x"},
+                {"observed_at": a, "ff_id": "2", "club": "y"}])
+            store_sql("matches", [
+                {"observed_at": a, "match_id": "m1", "jornada": "1", "home": "x",
+                 "away": "y", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"},
+                {"observed_at": later, "match_id": "m2", "jornada": "2",
+                 "home": "x", "away": "z", "score": "1-0", "kickoff": ""}])
+            store_sql("points", [
+                {"observed_at": a, "season": "2025-26", "ff_id": "1",
+                 "points": "90", "games": "30"},
+                *({"observed_at": a, "season": "2026-27", "ff_id": k,
+                   "points": "0", "games": "0"} for k in "12"),
+                {"observed_at": b, "season": "2026-27", "ff_id": "1",
+                 "points": "5", "games": "1"},
+                {"observed_at": later, "season": "2026-27", "ff_id": "1",
+                 "points": "12", "games": "2"},
+                {"observed_at": later, "season": "2026-27", "ff_id": "2",
+                 "points": "3", "games": "1"}])
+            assert set(rows("SELECT player, jornada, pts, games, at FROM scored")) == {
+                ("1", 1, 5.0, 1.0, b), ("1", 2, 7.0, 1.0, later), ("2", 1, 3.0, 1.0, later)}
+            record([{"player_id": k, "ff_slug": slug} for k, slug in
+                    [("1", "uno"), ("2", "dos"), ("3", "tres")]], "crosswalk")
+            store_sql("starters", [
+                {"observed_at": a, "match_id": "m1", "team_slug": "x", "player_slug": p,
+                 "player_name": n, "role": r, "minute": m}
+                for p, n, r, m in [("uno", "1", "starter", ""), ("dos", "2", "sub", "70"),
+                                   ("tres", "3", "sub", ""), ("uno-coach", "1", "coach", "")]] + [
+                {"observed_at": later, "match_id": "m2", "team_slug": "x", "player_slug": "uno",
+                 "player_name": "1", "role": "starter", "minute": "45"}])
+            got = {k: r for k, *r in rows("SELECT player, pts, apps, squads, pick FROM season_record")}
+            assert {k: tuple(r[:3]) for k, r in got.items()} == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0)}, \
+                "a starter the match unless he came off, a sub from when he came on"
+            assert abs(got["1"][3] - (model.PICK_K * model.NEUTRAL_START / 100 + 2) / (model.PICK_K + 2)) < 1e-12, \
+                "his record pulled toward NEUTRAL_START, worth PICK_K matches"
         finally:
             set_now(None)
-    src = Path(__file__).resolve().parent
-    assert all((src / f).is_file() for f in NOT_FORECAST), \
-        "each file left out of the forecast's code is one there is (a renamed one would be left in)"
-    assert set(FORECAST_MODULES) <= set(NAMES)
+
+
+def _selftest_forecast() -> None:
+    """schema.sql's forecast on fact rows: club_rating, forecast_rate,
+    forecast_fit and the cell (forecast_now), and forecast() making it a
+    moment."""
+    import datetime as dt
+    import tempfile
+
+    from ffcore.db import set_now
+    from ffcore.tidy import store_sql, tables_in
+    from stats import shrink
+
+    seen, kick = "2026-09-19T1000Z", {2: "2026-09-21T19:00:00+00:00", 3: "2026-09-28T19:00:00+00:00"}
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(dt.datetime(2026, 9, 20, 12, tzinfo=dt.timezone.utc))
+            write_constants()
+            store_sql("matches", [{"observed_at": seen, "match_id": "m%d%s" % (j, h), "jornada": str(j), "home": h,
+                                   "away": w, "score": s, "kickoff": k} for j, h, w, s, k in [
+                (1, "a", "b", "1-0", ""), (1, "c", "d", "0-0", ""),
+                (2, "a", "b", "", kick[2]), (2, "c", "d", "2-2", ""),
+                (3, "b", "a", "", kick[3]), (3, "d", "c", "", kick[3])]])
+            # a scores 3 a match and concedes 1, b the other way; c and d none
+            store_sql("results_history", [{"observed_at": seen, "season": "2526", "date": "d%d" % i,
+                                           "home_name": "A", "away_name": "B", "home": "a", "away": "b",
+                                           "home_goals": "3", "away_goals": "1"} for i in range(10)])
+            store_sql("market", [{"observed_at": seen, "ff_id": k, "name": k, "club": c, "position": p, "value": "5000000"}
+                                 for k, c, p in [("fwd", "a", "delantero"), ("back", "a", "defensa"),
+                                                 ("hurt", "b", "delantero"), ("susp", "b", "delantero"),
+                                                 ("dbt", "b", "delantero"), ("gone", "b", "delantero"),
+                                                 ("cee", "c", "delantero"), ("coach", "a", "entrenador"),
+                                                 ("nocl", "", "delantero")]])
+            record([{"player_id": k, "ff_slug": k, "app_id": "9" if k == "gone" else ""}
+                    for k in ("fwd", "back", "hurt", "susp", "dbt", "gone", "cee")], "crosswalk")
+            store_sql("lineups", [{"observed_at": seen, "source": "futbolfantasy", "team_slug": c, "player_slug": k,
+                                   "player_name": k, "start_pct": pct, "status": st, "note": note}
+                                  for k, c, pct, st, note in [
+                ("fwd", "a", "80", "ok", ""), ("back", "a", "", "ok", ""),
+                ("hurt", "b", "0", "injured", "Lesión Desde 10/09 Baja hasta finales de septiembre"),
+                ("susp", "b", "0", "suspended", ""), ("dbt", "b", "50", "doubt", "x Duda para la jornada 3")]])
+            store_sql("api_players_all", [{"observed_at": seen, "player_id": "9", "player_status": "out_of_league"}])
+            record([{"season": "2025-26", "ff_id": "fwd", "points": 150.0, "games": 30.0}], "season_points")
+
+            mu = 2.0
+            rating = {c: (a, d) for c, _n, a, d in rows("SELECT club, n, attack, defence FROM club_rating")}
+            k = model.FIXTURE_K
+            assert abs(rating["a"][0] - (30 + k * mu) / ((10 + k) * mu)) < 1e-12 \
+                and abs(rating["b"][1] - (30 + k * mu) / ((10 + k) * mu)) < 1e-12, \
+                "goals for and against a match over the league's, pulled toward it by FIXTURE_K matches"
+            assert set(rating) == {"a", "b"}, "a club with no results has no rating"
+
+            prior = dict(rows("SELECT player, prior FROM ppm_prior"))
+            rate = {p: (ppm, pk) for p, ppm, pk in rows("SELECT player, ppm, picked FROM forecast_rate")}
+            sk, pk = model.SHRINK_K, model.PICK_K
+            assert abs(rate["fwd"][0] - shrink(shrink(prior["fwd"], sk, 150.0, 30.0), sk, 0.0, 0.0)) < 1e-12, \
+                "his value's prior, pulled toward last season's 5 a match"
+            assert rate["hurt"][0] == prior["hurt"], "no record at all: his value's"
+            assert rate["fwd"][1] == 0.8 and rate["back"][1] == model.NEUTRAL_START / 100, \
+                "his listing's start %; listed with none, NEUTRAL_START"
+            assert rate["hurt"][1] == rate["dbt"][1] == model.NEUTRAL_START / 100, \
+                "flagged: his listing speaks of the injury, not of selection"
+            assert rate["cee"][1] == model.ABSENT_START / 100 and pk > 0, "not listed: ABSENT_START"
+
+            cells = {(p, j): r for p, j, *r in rows("SELECT player, jornada, pts, p, ppm, fixture, picked, fit"
+                                                     " FROM forecast_now")}
+            assert set(cells) == {(p, j) for p in ("fwd", "back", "hurt", "susp", "dbt", "gone") for j in (2, 3)} \
+                | {("cee", 3)}, "every jornada left his club plays; a coach, a player with no club: none"
+            for (p, j), (pts, pr, ppm, fix, picked, fit) in cells.items():
+                assert abs(pts - max(0.0, ppm * fix)) < 1e-12 and abs(pr - picked * fit) < 1e-12, \
+                    "points if he plays = ppm x fixture; the chance he plays = picked x fit"
+            assert abs(cells["fwd", 2][3] - rating["b"][1]) < 1e-12, "an attacker: his opponent's defence"
+            assert abs(cells["back", 2][3] - 1 / rating["b"][0]) < 1e-12, "a defender: 1 / its attack"
+            assert cells["cee", 3][3] == 1.0, "an opponent with no rating: 1"
+            fit = {(p, j): r[5] for (p, j), r in cells.items()}
+            assert (fit["fwd", 2], fit["hurt", 2], fit["hurt", 3]) == (1.0, 0.0, 1.0), \
+                "fit unless flagged; out until the 25th: not on the 21st, fit on the 28th"
+            assert (fit["susp", 2], fit["susp", 3]) == (0.0, 1.0), "a suspension is his next match"
+            assert (fit["dbt", 2], fit["dbt", 3]) == (0.0, 0.5), "a doubt for 3: out before it, half at it"
+            assert fit["gone", 2] == fit["gone", 3] == 0.0, "left the league: out for good"
+
+            first = forecast()
+            assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (first, )) == [(len(cells), )]
+            assert rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged ORDER BY player",
+                        (first, )) == [("dbt", ), ("gone", ), ("hurt", ), ("susp", )], "who was flagged then"
+            with closing(connect()) as db, db:
+                db.execute("INSERT INTO sim_runs (run_id, moment) VALUES (1, ?)", (first, ))
+            forecast()
+            third = forecast()
+            assert [m for m, in rows("SELECT moment FROM forecast_moment ORDER BY moment")] \
+                == [first, third], "made again each time; the cut's earlier ones go but a run's, its record"
+            assert rows("SELECT count(*) FROM forecast_cell WHERE moment NOT IN (SELECT moment FROM forecast_moment)") \
+                == [(0, )]
+        finally:
+            set_now(None)
 
 
 def _selftest_variants() -> None:
@@ -466,46 +438,35 @@ def _selftest_variants() -> None:
     import tempfile
     from pathlib import Path
 
-    from ffcore import forecast, score, startprob
     from ffcore.tidy import tables_in
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         record([{"variant": v, "name": n, "value": x} for v, n, x in (
-            ("slow", "AVAIL_K", 2.0), ("slow", "SHRINK_K", 9.0), ("slow", "PERSISTENT_SHARE", 0.5),
+            ("slow", "SHRINK_K", 9.0), ("slow", "PERSISTENT_SHARE", 0.5),
             ("slow", "NEUTRAL_START", 33.0), ("typo", "AVIAL_K", 1.0))], "variants")
-        tally = [("indefinite", 3.0, 4.0)]
-        live_shrink = score.SHRINK_K
-        live = startprob.fit_availability(tally).level["indefinite"]
+        live_shrink = model.SHRINK_K
         write_constants()
-        assert rows("SELECT neutral_start FROM k") == [(60.0,)]
+        assert rows("SELECT neutral_start, shrink_k FROM k") == [(60.0, live_shrink)]
         with applied("slow"):
-            assert constants()["startprob"]["AVAIL_K"] == 2.0 and constants()["score"]["SHRINK_K"] == 9.0
-            assert startprob.fit_availability(tally).level["indefinite"] != live, \
-                "the shrinkage a function defaults to follows the variant"
-            assert forecast.PERSISTENT_SHARE == 0.5
-            assert score.Scorer([], startprob.StartOdds([], startprob.Calibration(0, 1, 60, 15), startprob.Availability({}), {}, {}, {})
-                                ).shrink_k == 9.0
+            assert constants()["forecast"]["SHRINK_K"] == 9.0 and model.PERSISTENT_SHARE == 0.5
             write_constants()
-            assert rows("SELECT neutral_start FROM k") == [(33.0,)], "the views read the variant's row"
+            assert rows("SELECT neutral_start, shrink_k FROM k") == [(33.0, 9.0)], "the views read the variant's row"
             assert rows("SELECT count(*) FROM model_constants WHERE variant = 'slow'") == [(len(
                 [n for names in constants().values() for n in names]),)]
-        assert startprob.AVAIL_K == 4.0 and score.SHRINK_K == live_shrink and forecast.PERSISTENT_SHARE == 0.08, \
-            "restored on leaving"
+        assert model.SHRINK_K == live_shrink and model.PERSISTENT_SHARE == 0.08, "restored on leaving"
         assert rows("SELECT neutral_start FROM k") == [(60.0,)], "the live rows were never touched"
-        assert startprob.fit_availability(tally).level["indefinite"] == live
         try:
             with applied("typo"):
                 raise AssertionError("a name that is no constant must not apply quietly")
         except ValueError as e:
             assert "AVIAL_K" in str(e)
-        assert startprob.AVAIL_K == 4.0
         try:
             with applied("slwo"):
                 raise AssertionError("a misspelt variant must not run as live")
         except ValueError as e:
             assert "no variant slwo" in str(e)
         with applied("live"):
-            assert startprob.AVAIL_K == 4.0, "live has no rows and is the model as it stands"
+            assert model.SHRINK_K == live_shrink, "live has no rows and is the model as it stands"
 
 
 def _selftest_sale() -> None:
@@ -646,9 +607,9 @@ def _selftest_facts() -> None:
             assert rows("SELECT value FROM seen WHERE player = 'p1'") == [(-1, )], \
                 "made once a cut and code: read, not made again"
             from unittest import mock
-            with mock.patch(__name__ + "._forecast_code", lambda: "other"):
+            with mock.patch(__name__ + ".constants", lambda: {"x": {"Y": 1.0}}):
                 see()
-            assert rows("SELECT value FROM seen WHERE player = 'p1'") == [(5e6, )], "another code makes it again"
+            assert rows("SELECT value FROM seen WHERE player = 'p1'") == [(5e6, )], "other constants make it again"
         finally:
             set_now(None)
     assert set(got) == {"p1", "p2", "p3", "p4", "p5", "p7"}, \

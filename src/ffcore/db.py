@@ -3,6 +3,7 @@ Datasette and ask.py. Disposable: every table but runs is rebuilt from
 data/raw, git or a replay (docs/plan-datasette.md)."""
 from __future__ import annotations
 
+import datetime as dt
 import fcntl
 import json
 import os
@@ -21,12 +22,11 @@ from datetime import datetime
 from ffcore.clock import run_now, variant
 from ffcore.facts import ensure
 from ffcore.names import Name
-from ffcore.parse import snapshot_stamp, stamp
+from ffcore.parse import snapshot_stamp, stamp, year_for
 from stats import shrink
 from ffcore.forecast import SEED_POOL
 from ffcore.rules import ELEVEN, FORMATIONS, position, slot
 from ffcore.text import stems_meet
-from ffcore.startprob import platt, prognosis_bucket
 
 __all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "cut",
            "functions", "query", "record", "replaying", "rows", "set_look", "set_now", "this_run", "LOOK"]
@@ -89,6 +89,42 @@ def stamp_jd(s: str | None) -> float | None:
     return None if t is None else t.timestamp() / 86400.0 + 2440587.5
 
 
+MONTHS = {m: i + 1 for i, m in enumerate(
+    "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre".split())}
+PART = {"principios": 5, "princpios": 5, "mediados": 15, "finales": 25}
+_UNTIL = re.compile(r"Baja (?:hasta|hsata) (?:(%s) de )?(%s)(?:-\w+)?(?: (\d{4}))?"
+                    % ("|".join(PART), "|".join(MONTHS)))
+_SAYS = [(re.compile(r"Duda para la jornada (\d+)"), "doubt"),
+         (re.compile(r"Baja confirmada para la jornada (\d+)"), "out"),
+         (re.compile(r"Disponible para la jornada (\d+)"), "back")]
+# A flagged player whose note names no jornada: his status, of his next match.
+_STATUS = {"doubt": "doubt", "suspended": "out", "unavailable": "out", "injured": "out"}
+
+
+def prognosis(status: str | None, note: str | None, seen_at: str | None) -> str | None:
+    """What a flagged player's listing (player_status) says, as JSON for
+    forecast_fit: {"kind": doubt, out (up to and in j) or back (from j),
+    "j": a jornada, or null for his next match}, {"kind": "until", "until":
+    a date}, or {"kind": "never"} (left the league, or out indefinitely);
+    None if he is fit or it says nothing. futbolfantasy's note is read
+    first ('Duda para la jornada 8', 'Baja hasta mediados de octubre': a
+    month already past is next year's), else the status."""
+    if status in (None, "", "ok"):
+        return None
+    note = note or ""
+    if status == "gone" or "Baja indefinida" in note:
+        return json.dumps({"kind": "never"})
+    for pat, kind in _SAYS:
+        if m := pat.search(note):
+            return json.dumps({"kind": kind, "j": int(m.group(1))})
+    seen = snapshot_stamp(seen_at) if seen_at else None
+    if seen and (m := _UNTIL.search(note)):
+        month = MONTHS[m.group(2)]
+        year = int(m.group(3)) if m.group(3) else year_for(month, seen.date(), seen.month - 1)
+        return json.dumps({"kind": "until", "until": dt.date(year, month, PART.get(m.group(1), 15)).isoformat()})
+    return json.dumps({"kind": _STATUS[status], "j": None}) if status in _STATUS else None
+
+
 # What the model looks at, this process's (never the file's: every process
 # on it, a run, a replay, the watcher, Datasette, has its own): t, the one
 # moment every view is read as of (a run's start, or a replay's past time:
@@ -132,7 +168,7 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (t as a stamp: the process's,
     unless told otherwise), moment(), me(), path() and t0() (LOOK's),
     stamp_jd() (a stamp as a Julian day), variant() (the constants in force), name_key() and name_shown() (Name's),
-    platt() and prognosis_bucket() (startprob's), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
+    prognosis() (a flagged player's listing read), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
     lo95(), hi95() and claim() (an estimate and its standard error) and
     the aggregate median()."""
     db.create_function("cut", 0, now)
@@ -146,7 +182,6 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     db.create_aggregate("median", 1, _Median)  # type: ignore[arg-type]  # the stubs only allow int results
     for fn in (lo95, hi95, claim):
         db.create_function(fn.__name__, 2, fn, deterministic=True)
-    db.create_function("platt", 3, platt, deterministic=True)
     db.create_function("shrink", 4, lambda prior, k, total, n: None if None in (prior, k, total, n) or k + n == 0
                        else shrink(prior, k, total, n), deterministic=True)
     db.create_function("ncdf", 1, NormalDist().cdf, deterministic=True)
@@ -154,7 +189,7 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     db.create_function("position", 1, position, deterministic=True)
     db.create_function("slot", 1, slot, deterministic=True)
     db.create_function("stems_meet", 3, stems_meet, deterministic=True)
-    db.create_function("prognosis_bucket", 6, prognosis_bucket, deterministic=True)
+    db.create_function("prognosis", 3, prognosis, deterministic=True)
 
 
 def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
@@ -199,6 +234,25 @@ def _put(sql: str) -> str:
     return sql
 
 
+def _forecast_tables(db: sqlite3.Connection) -> None:
+    """The forecast's store as it was when a code hash keyed it (2026-11-04)
+    made the SQL forecast's: the moments no run or grade points to dropped,
+    the rest kept by what made them; the fits and variants tables gone."""
+    if "made" not in {r[1] for r in db.execute("PRAGMA table_info(forecast_moment)")}:
+        return
+    for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
+        db.execute('DROP VIEW "%s"' % v)
+    kept = "SELECT moment FROM sim_runs WHERE moment IS NOT NULL UNION SELECT moment FROM grade_moment"
+    for t in ("forecast_cell", "forecast_player", "forecast_moment"):
+        db.execute("DELETE FROM %s WHERE moment NOT IN (%s)" % (t, kept))
+    db.executescript("""
+        DROP TABLE IF EXISTS forecast_fit; DROP TABLE IF EXISTS forecast_variant;
+        CREATE TABLE forecast_moment_new (moment INTEGER PRIMARY KEY, code TEXT NOT NULL DEFAULT 'sql',
+                                          as_of TEXT NOT NULL, variant TEXT NOT NULL DEFAULT 'live');
+        INSERT INTO forecast_moment_new SELECT moment, code, as_of, 'live' FROM forecast_moment;
+        DROP TABLE forecast_moment; ALTER TABLE forecast_moment_new RENAME TO forecast_moment;""")
+
+
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
     cut() the process's t, which the as-of views read. The schema is applied when the file does not carry its version (it
@@ -221,6 +275,7 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
                 db.execute("PRAGMA journal_mode=WAL")                       # other processes are using
                 if db.execute("SELECT 1 FROM sqlite_master WHERE name = 'look' AND type = 'table'").fetchone():
                     db.execute("DROP TABLE look")                           # a view of LOOK now
+                _forecast_tables(db)
                 fit_columns(db, texts)
                 for sql in texts:
                     db.executescript(sql)
@@ -355,6 +410,24 @@ def _selftest() -> None:
         with closing(connect(path, schema)) as db:
             assert db.execute("SELECT * FROM kept").fetchall() == [(1, "")], \
                 "a column the schema no longer gives is dropped, the rows kept"
+
+    def says(status: str, note: str = "", seen: str = "2026-09-28T1000Z") -> Any:
+        got = prognosis(status, note, seen)
+        return got and json.loads(got)
+    assert says("doubt", "Lesión Desde 13/09 (15 días) Duda para la jornada 8") == {"kind": "doubt", "j": 8}
+    assert says("injured", "x Baja confirmada para la jornada 9") == {"kind": "out", "j": 9}
+    assert says("injured", "x Disponible para la jornada 10") == {"kind": "back", "j": 10}
+    assert says("injured", "x Baja hasta mediados de octubre") == {"kind": "until", "until": "2026-10-15"}
+    assert says("injured", "x Baja hasta enero") == {"kind": "until", "until": "2027-01-15"}, \
+        "a month already past is next year's"
+    assert says("injured", "x Baja hasta finales de enero 2028") == {"kind": "until", "until": "2028-01-25"}
+    assert says("injured", "x Baja hsata principios de noviembre") == {"kind": "until", "until": "2026-11-05"}, \
+        "the site's own typo"
+    assert says("injured", "x Baja indefinida") == says("gone") == {"kind": "never"}, "out for good"
+    assert says("suspended", "Sancionado") == {"kind": "out", "j": None}, "a status alone: his next match"
+    assert says("doubt") == {"kind": "doubt", "j": None}
+    assert says("ok", "Duda para la jornada 9") is None and says("", "") is None, "fit: nothing"
+    assert says("other") is None, "a status that says nothing of playing"
 
     mem = sqlite3.connect(":memory:")
     functions(mem)

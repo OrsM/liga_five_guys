@@ -7,9 +7,20 @@ from __future__ import annotations
 from datetime import datetime
 from ffcore.db import rows
 from ffcore.parse import snapshot_stamp
-from ffcore.schedule import Rounds
+from typing import NamedTuple
 
-__all__ = ["round_locks", "rounds", "rounds_ahead"]
+__all__ = ["Rounds", "round_locks", "rounds", "rounds_ahead"]
+
+
+class Rounds(NamedTuple):
+    """The jornadas left as rounds reads them (jornada_calendar): those not
+    done, by when each next plays (none known last); when each next plays;
+    the clubs that have played in each; and those behind (a match put back:
+    no line-up is picked for them)."""
+    rem: list[int]
+    next: dict[int, datetime]
+    played: dict[int, set[str]]
+    behind: set[int]
 
 
 def round_locks() -> dict[int, datetime]:
@@ -108,7 +119,7 @@ def _selftest() -> None:
                 ("his auction closes after rayo kick off in jornadas 3 (under way) and 4: he plays neither; "
                  "elche's man joins the night before; a manager's player plays for him till sold")
             with closing(connect()) as db, db:
-                db.execute("INSERT INTO forecast_moment (moment, code, constants, as_of, made) VALUES (1, '', '', '', 1)")
+                db.execute("INSERT INTO forecast_moment (moment, as_of) VALUES (1, '')")
                 db.executemany("INSERT INTO forecast_cell (moment, player, jornada, pts, p) VALUES (1, ?, ?, 5.0, 0.8)",
                                [(k, j) for k in ("late", "early") for j in (3, 4, 5)])
             assert rows("SELECT player, jornada, pts, p FROM forecast_used WHERE moment = 1 ORDER BY player, jornada") \

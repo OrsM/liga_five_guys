@@ -116,7 +116,7 @@ def _selftest_changes() -> None:
                                  (3, "2026-10-14T11:00:00Z"))], "runs")
             record([{"player_id": k, "name": k.upper()} for k in "abcdef"], "crosswalk")
 
-            record([{"moment": i, "code": "c", "constants": "k", "as_of": str(i), "made": 1} for i in (1, 3)],
+            record([{"moment": i, "code": "c", "as_of": str(i)} for i in (1, 3)],
                    "forecast_moment")
             record([{"run_id": i, "moment": i} for i in (1, 3)], "sim_runs")
 

@@ -361,7 +361,7 @@ def _selftest() -> None:
             for k in set(m.name) | set(m.pos)), "the facts the decision was made on, as its universe holds them"
         assert rows("SELECT moment FROM sim_runs WHERE run_id = 7") == [(None,)]
         with closing(connect()) as db, db:
-            db.execute("INSERT INTO forecast_moment VALUES (5, 'c', 'k', 't', 1)")
+            db.execute("INSERT INTO forecast_moment VALUES (5, 'c', 't', 'live')")
             db.executemany("INSERT INTO forecast_cell VALUES (5, ?, 3, ?, ?, ?, ?, ?, ?)",
                            [("star", 6.6, 0.45, 6.0, 1.1, 0.9, 0.5), ("plain", 4.0, 0.8, None, None, None, None)])
             db.execute("UPDATE sim_runs SET moment = 5 WHERE run_id = 7")

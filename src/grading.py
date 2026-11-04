@@ -14,9 +14,8 @@ from typing import Any
 
 
 from ffcore.jornadas import round_locks, rounds
-from ffcore.points import done_jornadas, jornada_points
 
-from assemble import applied, built, forecast_key, player_forecast, price_change, price_momentum
+from assemble import applied, built, forecast, price_change, price_momentum
 import decision
 from decide import Action
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
@@ -87,41 +86,43 @@ def auction_closes() -> list[dt.datetime]:
         " ORDER BY 1")]
 
 
+def jornada_points() -> dict[tuple[str, int], float]:
+    """Each player's points in each jornada he scored in (player_jornadas)."""
+    return {(k, j): pts for k, j, pts in rows("SELECT player, jornada, pts FROM player_jornadas")}
+
+
+def done_jornadas() -> set[int]:
+    """The jornadas every match of which has a score (jornadas_done): the
+    ones a forecast can be graded on."""
+    return {j for (j,) in rows("SELECT jornada FROM jornadas_done")}
+
+
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
-    """The forecast at each past lock, made with this code if not made yet
-    (player_forecast): its moment, for the jornada it locks and, with ahead,
-    the next ones too, each one done. Graded in SQL (grade_forecast)."""
+    """The forecast at each past lock (assemble.forecast): its moment, for
+    the jornada it locks and, with ahead, the next ones too, each one done.
+    Graded in SQL (grade_forecast)."""
     done = done_jornadas()
     out = []
     with replaying():
         for t, i in before_locks().items():
             set_now(t)
-            fc = player_forecast()
-            out += [{"from_j": i, "jornada": j, "moment": fc.moment}
-                    for j in range(i, i + ahead + 1) if j in done and j in fc.jornadas]
+            moment = forecast()
+            have = {j for (j, ) in rows("SELECT DISTINCT jornada FROM forecast_cell WHERE moment = ?", (moment, ))}
+            out += [{"from_j": i, "jornada": j, "moment": moment}
+                    for j in range(i, i + ahead + 1) if j in done and j in have]
     return out
-
-
-# The moments replay still owes the forecast as made now (:code, its
-# :constants): those of a finished jornada it has not made.
-TODO = """SELECT m.jornada, m.as_of FROM replay_moments m
-WHERE m.jornada IN (SELECT jornada FROM jornadas_done)
-  AND m.as_of NOT IN (SELECT as_of FROM forecast_moment WHERE code = :code AND constants = :constants AND made)
-ORDER BY m.as_of"""
 
 
 def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> int:
     """Forecast the next jornada at every line-up snapshot before a played
-    jornada's lock (replay_moments) with this code, under the variant's
-    constants (assemble.applied), into the forecast's store
-    (player_forecast), which the view replayed reads with what then
-    happened. Resumes: only the moments TODO owes this code and these
-    constants. shard (i, n) takes every nth moment."""
+    jornada's lock (replay_moments) under the variant's constants
+    (assemble.applied), into the forecast's store (assemble.forecast),
+    which the view replayed reads with what then happened. shard (i, n)
+    takes every nth moment."""
     with applied(variant):
-        code, consts, _at = forecast_key()
-        with closing(connect()) as db, db:
-            db.execute("INSERT OR REPLACE INTO forecast_variant VALUES (?, ?, ?)", (variant, code, consts))
-            todo = [(j, a) for j, a in db.execute(TODO, {"code": code, "constants": consts})][shard[0]::shard[1]]
+        todo = [tuple(r) for r in rows("SELECT jornada, as_of FROM replay_moments"
+                                       " WHERE jornada IN (SELECT jornada FROM jornadas_done) ORDER BY as_of")
+                ][shard[0]::shard[1]]
         with replaying():
             for j, at in todo:
                 moment = snapshot_stamp(at)
@@ -129,7 +130,7 @@ def replay(variant: str = REPLAY_VARIANT, shard: tuple[int, int] = (0, 1)) -> in
                 set_now(moment)
                 for attempt in range(5):
                     try:    # another shard connecting re-creates the views under this one
-                        player_forecast()
+                        forecast()
                         break
                     except sqlite3.OperationalError as e:
                         if "schema has changed" not in str(e) or attempt == 4:
@@ -470,21 +471,6 @@ def view_table(view: str, path: Path | None = None) -> str:
     return view
 
 
-def _selftest_todo() -> None:
-    """TODO on its inputs as tables: a finished jornada's moments this
-    forecast (its code and constants) has not made."""
-    db = sqlite3.connect(":memory:")
-    db.executescript("""CREATE TABLE replay_moments (jornada, as_of, lock);
-        CREATE TABLE jornadas_done (jornada); CREATE TABLE forecast_moment (code, constants, as_of, made);
-        INSERT INTO replay_moments VALUES (2, 'a', ''), (2, 'b', ''), (2, 'c', ''), (3, 'd', ''), (9, 'e', '');
-        INSERT INTO jornadas_done VALUES (2), (3);
-        INSERT INTO forecast_moment VALUES ('c1', 'k1', 'a', 1), ('c1', 'k1', 'b', 0), ('c0', 'k1', 'c', 1),
-                                           ('c1', 'k2', 'd', 1);""")
-    assert [tuple(r) for r in db.execute(TODO, {"code": "c1", "constants": "k1"})] == [
-        (2, "b"), (2, "c"), (3, "d")], \
-        "made (a): done; begun but not made (b), another code's (c) or other constants' (d): owed; 9 unfinished"
-
-
 def _selftest_phantom() -> None:
     """The phantom's league at t (schema.sql my_bids, my_squad, my_cash):
     his squad and cash at t0 and his moves since, his bids settled at their
@@ -544,7 +530,7 @@ def _selftest() -> None:
     import tempfile
     from ffcore.tidy import store_sql, tables_in
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        record([{"moment": 3, "code": "c", "constants": "k", "as_of": "t", "made": 1}], "forecast_moment")
+        record([{"moment": 3, "code": "c", "as_of": "t"}], "forecast_moment")
         record([{"moment": 3, "player": k, "jornada": j, "pts": pts, "p": 0.5}
                 for k, pts in (("a", 6.0), ("b", 2.0)) for j in (8, 9)], "forecast_cell")
         record([{"moment": 3, "player": "a", "flagged": 0}, {"moment": 3, "player": "b", "flagged": 1}],
@@ -603,7 +589,6 @@ def _selftest() -> None:
         finally:
             set_now(None)
 
-    _selftest_todo()
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         # squared errors: 1h out 1, 4; 2h out 9, 0; 30h out 16
         record([{"variant": "v", "as_of": "t%d" % (i // 2), "jornada": 2, "player": k, "predicted": pr,

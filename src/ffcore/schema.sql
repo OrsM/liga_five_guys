@@ -264,20 +264,16 @@ CREATE TABLE IF NOT EXISTS grade_moment (
     PRIMARY KEY (run_id, from_j, jornada)
 );
 
--- The forecast (assemble.forecast), made once a moment and kept: every
--- player's cell a jornada as of the moment (pts if he plays, p the chance he
--- plays; for a rated player the factors they are the products of), and who
--- was listed injured, doubtful or suspended then. A moment is the code the
--- forecast is made by and its constants, each a fingerprint
--- (assemble.forecast_key), and the cut: changing either is another moment,
--- never a stale one. The board, the backtests and the replays all read it.
+-- The forecast (forecast_now) as a decision at t reads it, made into a
+-- moment each time (assemble.forecast): every player's cell a jornada and
+-- its factors, and who was flagged then. code says what made a moment kept
+-- from before ('sql' for every one made now); a moment no run or grade
+-- points to is dropped once its cut and variant are made again.
 CREATE TABLE IF NOT EXISTS forecast_moment (
-    moment    INTEGER PRIMARY KEY,
-    code      TEXT NOT NULL,
-    constants TEXT NOT NULL,
-    as_of     TEXT NOT NULL,
-    made      INTEGER NOT NULL DEFAULT 0,   -- every player's cells in
-    UNIQUE (code, constants, as_of)
+    moment  INTEGER PRIMARY KEY,
+    code    TEXT NOT NULL DEFAULT 'sql',
+    as_of   TEXT NOT NULL,
+    variant TEXT NOT NULL DEFAULT 'live'
 );
 
 CREATE TABLE IF NOT EXISTS forecast_player (
@@ -299,24 +295,7 @@ CREATE TABLE IF NOT EXISTS forecast_cell (
     fit     REAL,
     PRIMARY KEY (moment, player, jornada)
 ) WITHOUT ROWID;
-
--- The values the moment's forecast fitted (assemble.forecast_fits), as the
--- run's params records them.
-CREATE TABLE IF NOT EXISTS forecast_fit (
-    moment    INTEGER NOT NULL REFERENCES forecast_moment(moment),
-    component TEXT NOT NULL,
-    term      TEXT NOT NULL,
-    value     REAL NOT NULL,
-    UNIQUE (moment, component, term)
-);
-
--- The code and constants each variant of the model was last forecast with
--- (grading.replay): its replayed forecasts are the moments of those.
-CREATE TABLE IF NOT EXISTS forecast_variant (
-    variant   TEXT PRIMARY KEY,
-    code      TEXT NOT NULL,
-    constants TEXT NOT NULL
-);
+DROP TABLE IF EXISTS forecast_variant;
 
 -- Is each source still arriving, and whole? Per source that stores a whole
 -- snapshot each fetch (not the keyed tables, which keep only changes) (a page that parsed to nothing stores no snapshot at all),
@@ -459,7 +438,7 @@ SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens A
 ORDER BY w.lock, s.at;
 
 -- The forecast of the next jornada at every replay moment, for each variant
--- as last forecast (forecast_variant; grading.replay makes the moments), a
+-- as last forecast (its latest moment there; grading.replay makes them), a
 -- row a player, with what he scored (0 if nothing) and how many hours
 -- before the lock: how far from the lock the error is acceptable. The same
 -- outcomes as grade_forecast, forecast again under the information of each
@@ -468,13 +447,12 @@ ORDER BY w.lock, s.at;
 DROP VIEW IF EXISTS replayed;
 CREATE VIEW replayed AS
 WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
-SELECT v.variant, r.as_of, r.jornada, c.player, c.pts * c.p AS predicted,
+SELECT m.variant, r.as_of, r.jornada, c.player, c.pts * c.p AS predicted,
        coalesce(a.pts, 0.0) AS actual, f.flagged,
        24 * (stamp_jd(r.lock)
            - stamp_jd(r.as_of))
            AS lead_h
-FROM forecast_variant v
-JOIN forecast_moment m ON m.code = v.code AND m.constants = v.constants AND m.made
+FROM (SELECT variant, as_of, max(moment) AS moment FROM forecast_moment WHERE code = 'sql' GROUP BY variant, as_of) m
 JOIN replay_moments r ON r.as_of = m.as_of
 JOIN forecast_cell c ON c.moment = m.moment AND c.jornada = r.jornada
 JOIN forecast_player f ON f.moment = m.moment AND f.player = c.player
@@ -639,7 +617,7 @@ WITH listed AS (SELECT player, max(julianday(expires_at)) AS close FROM current_
                   AND coalesce(expires_at, '') <> ''
                 GROUP BY player)
 SELECT DISTINCT l.player, k.jornada
-FROM listed l JOIN current_market m ON m.ff_id = l.player AND m.club <> ''
+FROM listed l JOIN player_club m ON m.player = l.player AND m.club IS NOT NULL
 JOIN kickoffs k ON m.club IN (k.home, k.away)
 JOIN jornada_calendar c ON c.jornada = k.jornada AND c.state IN ('under way', 'ahead')
 WHERE k.t < l.close;
@@ -884,7 +862,8 @@ CREATE VIEW k AS SELECT
     (SELECT value FROM model_constants WHERE name = 'MATCH_LEN' AND variant = (SELECT variant())) AS match_len,
     (SELECT value FROM model_constants WHERE name = 'NEUTRAL_START' AND variant = (SELECT variant())) AS neutral_start,
     (SELECT value FROM model_constants WHERE name = 'ABSENT_START' AND variant = (SELECT variant())) AS absent_start,
-    (SELECT value FROM model_constants WHERE name = 'FALLBACK_K' AND variant = (SELECT variant())) AS fallback_k,
+    (SELECT value FROM model_constants WHERE name = 'SHRINK_K' AND variant = (SELECT variant())) AS shrink_k,
+    (SELECT value FROM model_constants WHERE name = 'FIXTURE_K' AND variant = (SELECT variant())) AS fixture_k,
     (SELECT value FROM model_constants WHERE name = 'PICK_K' AND variant = (SELECT variant())) AS pick_k,
     (SELECT value FROM model_constants WHERE name = 'REMIND_HOURS' AND variant = (SELECT variant())) AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
@@ -1241,7 +1220,7 @@ p AS (SELECT ff_id, observed_at AS at, points, games, points.rowid AS id,
       FROM points, s
       WHERE observed_at <= (SELECT cut()) AND points.season = s.season AND ff_id <> ''
       WINDOW w AS (PARTITION BY ff_id ORDER BY observed_at, points.rowid)),
-c AS (SELECT ff_id, nullif(club, '') AS club FROM current_market WHERE ff_id <> '' GROUP BY ff_id),
+c AS (SELECT player AS ff_id, club FROM player_club),
 g AS MATERIALIZED (SELECT club, jornada, at FROM club_games
                    UNION ALL SELECT '*', jornada, at FROM club_games),
 credited AS (
@@ -1352,16 +1331,14 @@ CREATE VIEW last_season AS
 SELECT ff_id, points AS pts, games AS pj FROM season_points
 WHERE season = (SELECT max(season) FROM season_points);
 
--- What a player's points per match is pulled toward (score.Scorer): what
+-- What a player's points per match is pulled toward (forecast_ppm): what
 -- his price says, the least-squares line of last season's points per match
 -- (10+ matches) on log value in his position, at his value (never below
 -- 0); a position with fewer than three, or a player with no value, his
 -- position's mean; no position, everyone's median.
 DROP VIEW IF EXISTS ppm_prior;
 CREATE VIEW ppm_prior AS
-WITH m AS (SELECT ff_id AS player, slot(position) AS pos,
-                  CASE WHEN value > 0 THEN ln(value) END AS x
-           FROM current_market WHERE ff_id <> ''),
+WITH m AS (SELECT c.player, c.pos, ln(v.value) AS x FROM player_club c LEFT JOIN player_value v USING (player)),
 s AS (SELECT m.pos, m.x, l.pts / l.pj AS y FROM m JOIN last_season l ON l.ff_id = m.player
       WHERE m.pos <> '' AND m.x IS NOT NULL AND l.pj >= 10),
 f AS (SELECT pos, avg(y) AS my, avg(x) AS mx,
@@ -1372,116 +1349,132 @@ SELECT m.player, coalesce(max(f.my + f.b * coalesce(m.x - f.mx, 0.0), 0.0),
                           (SELECT median(y) FROM s)) AS prior
 FROM m LEFT JOIN f USING (pos);
 
--- Starts: each matchday squad (starters) against the club's last
--- futbolfantasy listing before the jornada locked. Each player in either,
--- with his listing (start % as a share, status, note) and his minutes:
--- what selection and availability are fitted on.
-DROP VIEW IF EXISTS start_outcomes;
-CREATE VIEW start_outcomes AS
-WITH games AS MATERIALIZED (
-    SELECT DISTINCT s.match_id, s.team_slug, s.jornada, r.lock,
-           (SELECT max(observed_at) FROM lineups l
-            WHERE l.team_slug = s.team_slug AND l.observed_at <= r.lock) AS listed_at
-    FROM squad_minutes s JOIN round_locks r USING (jornada)),
-listed AS MATERIALIZED (
-    SELECT g.match_id, l.team_slug, l.player_slug, l.start_pct, l.status, l.note, f.player
-    FROM games g CROSS JOIN lineups l ON l.team_slug = g.team_slug AND l.observed_at = g.listed_at
-    LEFT JOIN ff_identity f ON f.player_slug = l.player_slug AND f.player_name = l.player_name
-         AND f.team_slug = l.team_slug),
-squad AS MATERIALIZED (SELECT * FROM squad_minutes WHERE match_id IN (SELECT match_id FROM games))
-SELECT g.lock AS at, g.jornada, g.match_id || ':' || g.team_slug AS grp, k.player_slug,
-       coalesce(li.player, sq.player) AS player, li.player_slug IS NOT NULL AS listed,
-       li.start_pct / 100.0 AS ff,
-       CASE WHEN li.player_slug IS NULL THEN '' ELSE coalesce(nullif(li.status, ''), 'ok') END AS status,
-       coalesce(li.note, '') AS note, coalesce(sq.mins, 0.0) AS mins
-FROM (SELECT match_id, team_slug, player_slug FROM listed
-      UNION SELECT match_id, team_slug, player_slug FROM squad) k
-JOIN games g USING (match_id, team_slug)
-LEFT JOIN listed li USING (match_id, team_slug, player_slug)
-LEFT JOIN squad sq USING (match_id, team_slug, player_slug);
+-- The forecast's facts at t, one home each, keyed by player (or club) and
+-- jornada.
 
--- How often each player played when listed fit (3 such listings or more):
--- what the chance he is fit under a prognosis is measured against.
-DROP VIEW IF EXISTS fit_rate;
-CREATE VIEW fit_rate AS
-SELECT player, avg(mins > 0) AS rate FROM start_outcomes
-WHERE player <> '' AND listed AND status = 'ok'
-GROUP BY player HAVING count(*) >= 3;
-
--- Each player's last start % while listed fit: his selection before a flag.
-DROP VIEW IF EXISTS last_fit;
-CREATE VIEW last_fit AS
-SELECT player, pct FROM (
-    SELECT player, 100 * ff AS pct, row_number() OVER (PARTITION BY player ORDER BY at DESC, grp DESC) AS n
-    FROM start_outcomes WHERE player <> '' AND listed AND status = 'ok' AND ff IS NOT NULL)
-WHERE n = 1;
-
--- Each prognosis, as listed at one lock, against whether the player played
--- in that jornada and each later one, by where the later one falls against
--- it (prognosis_bucket: startprob.bucket): played, and the plays his fit
--- rate expects. Availability shrinks played / expected toward the bucket's
--- literal reading.
-DROP VIEW IF EXISTS availability_tally;
-CREATE VIEW availability_tally AS
-WITH o AS MATERIALIZED (
-    SELECT player, jornada, at, status, note, mins > 0 AS played FROM (
-        SELECT *, row_number() OVER (PARTITION BY player, jornada ORDER BY at DESC, grp DESC) AS n
-        FROM start_outcomes WHERE player <> '')
-    WHERE n = 1),
-pairs AS (
-    SELECT prognosis_bucket(i.status, i.note, i.at, j.jornada, j.at, i.jornada) AS bucket,
-           j.played, f.rate
-    FROM o i JOIN fit_rate f USING (player) JOIN o j ON j.player = i.player AND j.jornada >= i.jornada
-    WHERE i.status NOT IN ('', 'ok'))
-SELECT bucket, sum(played) AS played, sum(rate) AS expected FROM pairs
-WHERE bucket IS NOT NULL GROUP BY bucket;
-
--- What a start % means for selection: a Platt curve (alpha + beta x its
--- log-odds), the grid point with least squared error on fit players'
--- outcomes, kept only if it beats the raw % held out a squad at a time
--- (fitted without that squad, scored on it); else the raw %. A player
--- listed with no % counts as neutral_start, one not listed as absent_start:
--- each the share of such players who played, shrunk toward the constant.
+-- Players and clubs: each player on futbolfantasy's market at t, his name,
+-- club and position (slot: '' for a coach, who fills no slot).
 DROP VIEW IF EXISTS start_calibration;
-CREATE VIEW start_calibration AS
-WITH RECURSIVE n(v) AS (SELECT 0 UNION ALL SELECT v + 1 FROM n WHERE v < 14),
-o AS MATERIALIZED (SELECT grp, listed, ff, mins > 0 AS y FROM start_outcomes
-                   WHERE status IN ('', 'ok')),
-fall AS MATERIALIZED (
-    SELECT 100 * shrink(k.neutral_start / 100.0, k.fallback_k, vague_played, vague) AS neutral,
-           100 * shrink(k.absent_start / 100.0, k.fallback_k, absent_played, absent) AS absent
-    FROM k, (SELECT count(*) FILTER (WHERE listed AND ff IS NULL) AS vague,
-                    coalesce(sum(y) FILTER (WHERE listed AND ff IS NULL), 0) AS vague_played,
-                    count(*) FILTER (WHERE NOT listed) AS absent,
-                    coalesce(sum(y) FILTER (WHERE NOT listed), 0) AS absent_played FROM o)),
-obs AS MATERIALIZED (
-    SELECT grp, coalesce(ff, CASE WHEN listed THEN neutral ELSE absent END / 100) AS x,
-           count(*) AS n, sum(y) AS ys
-    FROM o, fall GROUP BY grp, x),
-grid AS (SELECT a.v AS i, b.v AS j, round(-3.0 + 0.5 * a.v, 1) AS alpha,
-                round(0.2 + 0.4 * b.v, 1) AS beta
-         FROM n a, n b WHERE a.v <= 12),
-pred AS MATERIALIZED (
-    SELECT i, j, alpha, beta, x, CASE WHEN alpha = 0 AND beta = 1 THEN x ELSE platt(x, alpha, beta) END AS p
-    FROM grid, (SELECT DISTINCT x FROM obs)),
-sse AS MATERIALIZED (
-    SELECT i, j, grp, sum(n * p * p - 2 * p * ys + ys) AS e
-    FROM obs JOIN pred USING (x) GROUP BY i, j, grp),
-total AS MATERIALIZED (SELECT i, j, sum(e) AS e FROM sse GROUP BY i, j),
-held AS (
-    SELECT grp, e FROM (
-        SELECT s.grp, s.e, row_number() OVER (PARTITION BY s.grp ORDER BY t.e - s.e, s.i, s.j) AS n
-        FROM sse s JOIN total t USING (i, j))
-    WHERE n = 1),
-best AS (SELECT alpha, beta FROM total JOIN grid USING (i, j) ORDER BY e, i, j LIMIT 1),
-fits AS (
-    SELECT (SELECT sum(n) FROM obs) >= 3 AND (SELECT count(DISTINCT grp) FROM obs) >= 2
-           AND (SELECT sum(e) FROM held) < (SELECT e FROM total JOIN grid USING (i, j)
-                                            WHERE alpha = 0 AND beta = 1) AS better)
-SELECT CASE WHEN better THEN best.alpha ELSE 0.0 END AS alpha,
-       CASE WHEN better THEN best.beta ELSE 1.0 END AS beta,
-       fall.neutral AS neutral_start, fall.absent AS absent_start
-FROM fits, fall LEFT JOIN best;
+DROP VIEW IF EXISTS availability_tally;
+DROP VIEW IF EXISTS last_fit;
+DROP VIEW IF EXISTS fit_rate;
+DROP VIEW IF EXISTS start_outcomes;
+DROP VIEW IF EXISTS player_club;
+CREATE VIEW player_club AS
+SELECT ff_id AS player, name, nullif(club, '') AS club, slot(position) AS pos
+FROM current_market WHERE ff_id <> '' GROUP BY ff_id;
+
+-- Players and values: his value on the market at t (none at 0).
+DROP VIEW IF EXISTS player_value;
+CREATE VIEW player_value AS
+SELECT ff_id AS player, value FROM current_market WHERE ff_id <> '' AND value > 0 GROUP BY ff_id;
+
+-- Players and expected status at t: futbolfantasy's last listing of him
+-- (start %, when, status and note if flagged: not ok), or the app's word
+-- that he has left the league (status 'gone'). One row a player listed or gone.
+DROP VIEW IF EXISTS player_status;
+CREATE VIEW player_status AS
+WITH l AS (SELECT player, start_pct, observed_at, status, note,
+                  row_number() OVER (PARTITION BY player ORDER BY status NOT IN ('', 'ok') DESC, start_pct DESC) AS n
+           FROM current_lineups WHERE source = 'futbolfantasy' AND player IS NOT NULL),
+gone AS (SELECT DISTINCT player FROM current_api_players_all WHERE player IS NOT NULL AND player_status = 'out_of_league')
+SELECT coalesce(l.player, g.player) AS player, l.player IS NOT NULL AS listed, l.start_pct AS pct, l.observed_at AS at,
+       CASE WHEN g.player IS NOT NULL THEN 'gone' WHEN l.status NOT IN ('', 'ok') THEN l.status END AS status,
+       CASE WHEN g.player IS NULL THEN l.note ELSE '' END AS note
+FROM (SELECT * FROM l WHERE n = 1) l FULL JOIN gone g ON g.player = l.player;
+
+-- Clubs' fixtures: each club's match still to play in each jornada not
+-- done, its opponent and kickoff (a stamp; NULL if none is known).
+DROP VIEW IF EXISTS club_fixture;
+CREATE VIEW club_fixture AS
+WITH m AS (SELECT m.jornada, m.home, m.away, k.kick FROM current_matches m
+           JOIN jornada_calendar c ON c.jornada = m.jornada AND c.state <> 'done'
+           LEFT JOIN kickoffs k ON k.home = m.home AND k.away = m.away
+           WHERE m.score = '')
+SELECT jornada, home AS club, away AS opp, kick FROM m WHERE home <> ''
+UNION SELECT jornada, away, home, kick FROM m WHERE away <> '';
+
+-- Clubs' goals at t (results_history, every season): for (attack) and
+-- against (defence) a match, over the league's, each pulled toward 1 by
+-- FIXTURE_K matches at the league's rate.
+DROP VIEW IF EXISTS club_rating;
+CREATE VIEW club_rating AS
+WITH g AS (SELECT home AS club, home_goals AS gf, away_goals AS ga FROM current_results_history
+           WHERE home <> '' AND home_goals IS NOT NULL AND away_goals IS NOT NULL
+           UNION ALL SELECT away, away_goals, home_goals FROM current_results_history
+           WHERE away <> '' AND home_goals IS NOT NULL AND away_goals IS NOT NULL),
+mu AS (SELECT avg(gf) AS mu FROM g)
+SELECT club, count(*) AS n, (sum(gf) + k.fixture_k * mu) / ((count(*) + k.fixture_k) * mu) AS attack,
+       (sum(ga) + k.fixture_k * mu) / ((count(*) + k.fixture_k) * mu) AS defence
+FROM g, mu, k WHERE mu > 0 GROUP BY club;
+
+-- The forecast, as SQL over those.
+
+-- Each player's rates: ppm, his points per match, what his value says
+-- (ppm_prior) pulled toward last season's points per match, then toward
+-- this season's, each by SHRINK_K matches; and picked, the chance he is
+-- picked if fit, his listing's start % (NEUTRAL_START if listed with none
+-- or flagged, whose listing speaks of the injury; ABSENT_START if not
+-- listed) pulled toward his appearances over his matchday squads by PICK_K.
+DROP VIEW IF EXISTS forecast_ppm;
+DROP VIEW IF EXISTS forecast_picked;
+DROP VIEW IF EXISTS forecast_rate;
+CREATE VIEW forecast_rate AS
+WITH c AS MATERIALIZED (SELECT player FROM player_club),
+r AS MATERIALIZED (SELECT * FROM season_record),
+p AS MATERIALIZED (SELECT * FROM ppm_prior),
+s AS MATERIALIZED (SELECT * FROM player_status)
+SELECT c.player,
+       shrink(shrink(coalesce(p.prior, 0.0), k.shrink_k, coalesce(l.pts, 0.0), coalesce(l.pj, 0.0)),
+              k.shrink_k, coalesce(r.pts, 0.0), coalesce(r.apps, 0.0)) AS ppm,
+       shrink(CASE WHEN s.status IS NOT NULL OR (s.listed AND s.pct IS NULL) THEN k.neutral_start
+                   WHEN s.listed THEN s.pct ELSE k.absent_start END / 100.0,
+              k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) AS picked
+FROM c CROSS JOIN k LEFT JOIN p USING (player) LEFT JOIN last_season l ON l.ff_id = c.player
+LEFT JOIN r USING (player) LEFT JOIN s USING (player);
+
+-- The chance he is fit each jornada his club has left: 1 unless flagged;
+-- if flagged, his prognosis (prognosis()) read literally against the
+-- jornada (a jornada not named: his club's next) or his match's date: out
+-- 0, a doubt 0.5, back 1.
+DROP VIEW IF EXISTS forecast_fit;
+CREATE VIEW forecast_fit AS
+WITH g AS MATERIALIZED (SELECT player, prognosis(status, note, at) AS g FROM player_status WHERE status IS NOT NULL),
+f AS MATERIALIZED (SELECT * FROM club_fixture),
+nx AS MATERIALIZED (SELECT club, jornada AS nx FROM (SELECT club, jornada, row_number() OVER
+           (PARTITION BY club ORDER BY kick IS NULL, kick, jornada) AS n FROM f) WHERE n = 1),
+c AS MATERIALIZED (SELECT player, club FROM player_club WHERE club IS NOT NULL),
+x AS (SELECT c.player, f.jornada, f.kick, json_extract(g.g, '$.kind') AS kind, json_extract(g.g, '$.until') AS until,
+             coalesce(json_extract(g.g, '$.j'), nx.nx) AS j
+      FROM c JOIN f ON f.club = c.club JOIN nx ON nx.club = c.club
+      LEFT JOIN g ON g.player = c.player)
+SELECT player, jornada, CASE kind
+    WHEN 'never' THEN 0.0
+    WHEN 'until' THEN CASE WHEN kick IS NULL OR substr(kick, 1, 10) >= until THEN 1.0 ELSE 0.0 END
+    WHEN 'doubt' THEN CASE WHEN jornada < j THEN 0.0 WHEN jornada = j THEN 0.5 ELSE 1.0 END
+    WHEN 'out' THEN CASE WHEN jornada <= j THEN 0.0 ELSE 1.0 END
+    WHEN 'back' THEN CASE WHEN jornada < j THEN 0.0 ELSE 1.0 END
+    ELSE 1.0 END AS fit
+FROM x;
+
+-- Each player's cell each jornada his club has left (a coach, or a player
+-- with no club, has none): the fixture (an attacker's opponent's defence, a
+-- goalkeeper's or defender's 1 / its attack; 1 with no rating), points if
+-- he plays max(0, ppm x fixture), the chance he plays picked x fit.
+DROP VIEW IF EXISTS forecast_now;
+CREATE VIEW forecast_now AS
+WITH c AS MATERIALIZED (SELECT player, club, pos FROM player_club WHERE pos <> '' AND club IS NOT NULL),
+f AS MATERIALIZED (SELECT * FROM club_fixture),
+o AS MATERIALIZED (SELECT * FROM club_rating),
+rt AS MATERIALIZED (SELECT * FROM forecast_rate),
+ft AS MATERIALIZED (SELECT * FROM forecast_fit),
+x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, ft.fit,
+             coalesce(CASE WHEN c.pos IN ('POR', 'DEF') THEN 1.0 / o.attack ELSE o.defence END, 1.0) AS fixture
+      FROM c JOIN f ON f.club = c.club JOIN rt USING (player)
+      JOIN ft ON ft.player = c.player AND ft.jornada = f.jornada
+      LEFT JOIN o ON o.club = f.opp)
+SELECT player, jornada, max(0.0, ppm * fixture) AS pts, picked * fit AS p, ppm, fixture, picked, fit FROM x;
+
 
 -- The board: the last run's decisions and the facts it saw (sim_*,
 -- decision_option, decision_plan), the app's line-up and the next kickoff

@@ -84,8 +84,28 @@ same step.
 4. One replay: the backtest is the same views at each past t, the
    phantom's moves its input; the other replay drivers go or become a
    view over it.
-5. Forecast: pts*p once (cell); price fits a function of t, not of which
-   builds ran.
+5. Forecast: SQL over a few facts at t (schema.sql), made into
+   forecast_cell once a decision (no code hash). What it reads, and its home:
+
+   | Attribute | Fact it comes from | Its one home |
+   |---|---|---|
+   | club, position, name | futbolfantasy market at t | player_club |
+   | value | futbolfantasy market at t | player_value |
+   | points, appearances, squads this season | points totals, starters | player_jornadas -> season_record |
+   | last season's points, matches | season_points | last_season |
+   | start %, listed, status, note | futbolfantasy line-ups at t | player_status |
+   | left the league | the app's players at t | player_status |
+   | opponent, kickoff, jornadas left | fixtures at t | club_fixture |
+   | goals for and against | results_history at t | club_rating |
+   | SHRINK_K, PICK_K, NEUTRAL_START, ABSENT_START, FIXTURE_K | model_constants | k |
+
+   The forecast: forecast_ppm (value prior -> last season -> this season,
+   each a shrink), forecast_picked (his listing, or neutral if flagged,
+   pulled toward his record), forecast_fit (his prognosis read literally,
+   prognosis() the one Python helper: the note's regex), the fixture (the
+   opponent's goals against for attackers, 1 / its goals for for
+   defenders, each shrunk toward the league's), and forecast_now, the cell:
+   pts = max(0, ppm x fixture), p = picked x fit.
 6. Facts: identity in SQL only; one "played"; derived tables out of facts.
 7. Decision and tests: the plan loop with no Action; tests seed fact rows.
 
