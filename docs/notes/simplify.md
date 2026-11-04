@@ -36,7 +36,7 @@ eleven, no bid left open). It ranks nothing: one season path swings about
 
 The same modules run live and in the replay; only t and the moves differ.
 
-Every contract is a SQL table or view, and modules 2-5 are SQL views. Python is left only where SQL can't go: fetching and parsing (ingest), the plan's loop (insert the next move while one exists), and driving the app.
+Every contract is a SQL table or view. Ingest's output, the forecast, settlement and the board are SQL. The decision's search (best eleven for each candidate squad, then the greedy loop) is one pure Python function: it reads its input rows (cell, squads, cash, market, bid odds) and writes plan rows. It holds no copy of a table, and its test seeds rows. Python is also left for fetching and parsing pages, and for driving the app.
 
 **Rules.**
 - A module reads nothing from more than one step back, and nothing of a later one.
