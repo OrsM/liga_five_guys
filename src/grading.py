@@ -225,15 +225,29 @@ def move(path: str, t: dt.datetime, kind: str, player: str, amount: float | None
         db.execute("INSERT OR REPLACE INTO moves VALUES (?, ?, ?, ?, ?)", (path, stamp(t), kind, player, amount))
 
 
+def pairs(acts: list[Action]) -> list[tuple[str, Action]]:
+    """Each sale of the plan with the buy it funds ('' for a lone sale): the
+    two of one step (dec_plan; a swap is a buy and a sale of one step)."""
+    buy = {step: k for step, k in rows("SELECT step, player FROM dec_plan WHERE kind = 'buy'")}
+    step = {k: s for s, k in rows("SELECT step, player FROM dec_plan WHERE kind = 'sell'")}
+    return [(buy.get(step.get(a.sell[0], -1), ""), a) for a in acts if a.sell]
+
+
+def settlement(pending: list[tuple[str, Action]], won: set[str], closed: set[str]) -> list[Action]:
+    """The sales to make at a close: a bid won makes the sale funding it, a
+    bid lost does not; a bid not closing then waits. No re-planning: cash
+    below zero is the decision's to mend at its next run."""
+    return [a for k, a in pending if k in won and k in closed]
+
+
 def phantom_path() -> list[dict[str, Any]]:
     """The league's sixth manager: your squad and cash at the first lock,
     then his own moves (the path PHANTOM's, rows the league at t reads:
     schema.sql my_squad, my_cash), as this code's plan makes them at each
     run the board is acted on (run_times), at t there: its bids placed and
     those it no longer makes taken back, its sales made at once, but those
-    beside a bid, which are made at the close if every bid closing then won
-    (else only what clearing a debt then takes: the plan, sales only, at the
-    close). A bid is settled at its auction's close by what that auction took
+    funding a bid (a step's buy and sale: pairs), which are made at the close
+    if that bid won (settlement; a lost bid's sale is not made). A bid is settled at its auction's close by what that auction took
     (my_bids). At each lock his eleven (my_xi) scored on what they got
     (nothing in debt, the game's rule), beside a manager who never moves
     (STANDPAT), picked the same way. One row a played jornada: both elevens'
@@ -259,7 +273,7 @@ def _phantom_path() -> list[dict[str, Any]]:
         db.execute("DELETE FROM moves WHERE path IN (?, ?)", (PHANTOM, STANDPAT))
     start = ""
     made: list[str] = []
-    pending: list[Action] = []      # the last run's sales beside its bids
+    pending: list[tuple[str, Action]] = []   # the last run's (bid, the sale funding it)
     lost = 0
     out = []
 
@@ -290,29 +304,26 @@ def _phantom_path() -> list[dict[str, Any]]:
             follow(PHANTOM, start)
         if t in closes:
             set_now(t)
-            settled = rows("SELECT won FROM my_bids WHERE close = ?", (stamp(t), ))
-            n = sum(not won for won, in settled)
-            if not n:
-                sell(t, pending)
-            elif at(t) is not None:
-                sell(t, decision.plan(sales_only=True))
-            pending, lost = [], lost + n
+            settled = dict(rows("SELECT player, won FROM my_bids WHERE close = ?", (stamp(t), )))
+            sell(t, settlement(pending, {k for k, won in settled.items() if won}, set(settled)))
+            pending = [(k, a) for k, a in pending if k not in settled]
+            lost += sum(not won for won in settled.values())
             if t not in played and t not in runs:
                 continue
         if not ready and at(t) is None:
             continue
         if t in runs:
             acts = decision.plan()
-            after = decision.after_auctions()
             bids = {a.buy: a.cost for a in acts if a.buy}
             for (k, ) in rows("SELECT player FROM my_bids WHERE won IS NULL"):
                 if k not in bids:
                     move(PHANTOM, t, "withdraw", k, None)
             for k, b in bids.items():
                 move(PHANTOM, t, "bid", k, b)
-            pending = [a for a in acts if a.sell and set(a.sell) & after]
+            paired = pairs(acts)
+            pending = [(k, a) for k, a in paired if k]
             made.extend(a.label(names()) for a in acts if a.buy)
-            sell(t, [a for a in acts if a.sell and not set(a.sell) & after])
+            sell(t, [a for k, a in paired if not k])
         if t in played:
             xi, cash, value = held()
             follow(STANDPAT, start)
@@ -525,7 +536,26 @@ def _selftest_phantom() -> None:
         assert state()[0] == [], "live: no path's moves"
 
 
+def _selftest_settlement() -> None:
+    """A won bid makes the sale funding it, a lost bid's sale is not made, a
+    lone sale is made at once, a bid closing later waits."""
+    import tempfile
+    from ffcore.tidy import tables_in
+    pend = [("won", Action("sell", sell=("a", ), proceeds=1.0)), ("lost", Action("sell", sell=("b", ), proceeds=2.0)),
+            ("later", Action("sell", sell=("d", ), proceeds=4.0))]
+    assert [a.sell for a in settlement(pend, {"won"}, {"won", "lost"})] == [("a", )]
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        with closing(connect()) as db, db:
+            db.executemany("INSERT INTO dec_plan VALUES (?, ?, ?, ?, 1, 0)", [
+                (0, "buy", "won", 5), (0, "sell", "a", 1), (1, "buy", "lost", 6), (1, "sell", "b", 2), (2, "sell", "c", 3)])
+        acts = [Action("buy", buy="won", cost=5), Action("sell", sell=("a", ), proceeds=1.0),
+                Action("buy", buy="lost", cost=6), Action("sell", sell=("b", ), proceeds=2.0),
+                Action("sell", sell=("c", ), proceeds=3.0)]
+        assert [(k, a.sell[0]) for k, a in pairs(acts)] == [("won", "a"), ("lost", "b"), ("", "c")]
+
+
 def _selftest() -> None:
+    _selftest_settlement()
     _selftest_phantom()
     import tempfile
     from ffcore.tidy import store_sql, tables_in
