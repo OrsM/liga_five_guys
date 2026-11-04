@@ -101,7 +101,7 @@ Every forecast is the same product, for every player and jornada
   winner paid, or asking if nobody bought): rising players draw rivals'
   bids, falling ones almost never. A buy bids the level whose chance times
   the points the move adds is greatest, the least of those as likely
-  (decide.sql's `dec_options`).
+  (decision.plan_rows's options (dec_start)).
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more
@@ -183,7 +183,7 @@ which move wins.
   refuses a closed one anyway.
 - **A negative balance at the matchday's start scores 0 points; debt is
   capped at 20% of team value.** Enforced by the plan (decide.sql's
-  `dec_next`: cash at the lock at least zero, bids within the debt) and by
+  decision.plan_rows: cash at the lock at least zero, bids within the debt) and by
   the app (bids). Not modelled for rivals: the standings ignore every
   manager's cash, so a rival below zero at the lock still scores.
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
