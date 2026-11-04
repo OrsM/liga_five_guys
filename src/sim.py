@@ -490,7 +490,7 @@ def board_doc() -> Doc:
 
 def main() -> None:
     b = built()
-    (managers, ), = rows("SELECT count(*) FROM look l JOIN seen_cash c ON c.cut = l.cut AND c.variant = l.variant")
+    (managers, ), = rows("SELECT count(*) FROM cash")
     left = rounds().rem
     if managers < 2 or not left:
         print("sim: nothing to decide (%d managers, %d jornadas left)" % (managers, len(left)))

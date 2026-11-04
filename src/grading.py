@@ -293,9 +293,8 @@ def _phantom_path() -> list[dict[str, Any]]:
 
     def held() -> tuple[list[str], float, float]:
         """His eleven next, cash and squad's value, as of t."""
-        (cash, value), = rows("SELECT (SELECT cash FROM my_cash), (SELECT total(s.value) FROM my_squad m"
-                              " JOIN look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant"
-                              " AND s.player = m.player)")
+        (cash, value), = rows("SELECT (SELECT cash FROM my_cash), (SELECT total(v.value) FROM my_squad m"
+                              " JOIN player_value v ON v.player = m.player)")
         return [k for k, in rows("SELECT player FROM my_xi")], cash, value
 
     for t in sorted(set(played) | set(runs) | closes):
