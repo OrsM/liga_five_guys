@@ -349,6 +349,17 @@ SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
        avg(CASE WHEN flagged = 1 THEN predicted - actual END) AS flagged_bias
 FROM grade_forecast g GROUP BY run_id, from_j, jornada;
 
+-- A grade's accuracy at each distance (ahead: jornadas past the lock), over
+-- every player forecast: n, RMSE, MAE and the correlation r of predicted
+-- against actual points. grading.py accuracy prints it.
+DROP VIEW IF EXISTS grade_accuracy;
+CREATE VIEW grade_accuracy AS
+WITH g AS (SELECT run_id, jornada - from_j AS ahead, predicted AS x, actual AS y FROM grade_forecast)
+SELECT run_id, ahead, count(*) AS n, sqrt(avg((x - y) * (x - y))) AS rmse, avg(abs(x - y)) AS mae,
+       (avg(x * y) - avg(x) * avg(y))
+       / sqrt((avg(x * x) - avg(x) * avg(x)) * (avg(y * y) - avg(y) * avg(y))) AS r
+FROM g GROUP BY run_id, ahead;
+
 -- The moments to replay at: each line-up snapshot (one a time) belongs to
 -- the jornada that was next then, from the previous lock to its own.
 DROP VIEW IF EXISTS replay_moments;
@@ -575,7 +586,8 @@ DROP VIEW IF EXISTS score_spread;
 CREATE VIEW score_spread AS
 WITH c AS (SELECT (SELECT value FROM model_constants WHERE name = 'MIN_POOL' AND variant = variant()) AS min_pool,
                   (SELECT value FROM model_constants WHERE name = 'PERSISTENT_SHARE' AND variant = variant()) AS share),
-played AS MATERIALIZED (SELECT pts AS x FROM scored WHERE games = 1 AND pts IS NOT NULL),
+played AS MATERIALIZED (SELECT sum(s.pts) AS x FROM scored s JOIN appearances a ON a.player = s.player AND a.jornada = s.jornada
+                        GROUP BY s.player, s.jornada),
 pool AS (SELECT x FROM played WHERE (SELECT count(*) FROM played) >= (SELECT min_pool FROM c)
          UNION ALL
          SELECT x FROM (/* forecast.SEED_POOL */) WHERE (SELECT count(*) FROM played) < (SELECT min_pool FROM c)),
@@ -1152,11 +1164,11 @@ credited AS (
             ORDER BY g.at DESC, g.jornada DESC LIMIT 1) AS jornada
     FROM p, s LEFT JOIN c ON c.ff_id = p.ff_id
     WHERE p.at > s.first AND NOT (p.points IS p.points0 AND p.games IS p.games0))
-SELECT player, jornada, pts, games, at, id FROM credited WHERE jornada IS NOT NULL;
+SELECT player, jornada, pts, at, id FROM credited WHERE jornada IS NOT NULL;
 
--- Who was in each matchday squad (starters' starters and subs) and his
--- minutes: a starter the whole match unless he came off, a sub none
--- unless he came on.
+-- Who was in each matchday squad (starters and subs) and his minutes: a
+-- starter the whole match unless he came off, a sub none unless he came
+-- on (appearances keeps those with some).
 DROP VIEW IF EXISTS squad_minutes;
 CREATE VIEW squad_minutes AS
 SELECT s.match_id, s.team_slug, s.player_slug, s.player, mj.jornada,
@@ -1165,14 +1177,15 @@ SELECT s.match_id, s.team_slug, s.player_slug, s.player, mj.jornada,
 FROM current_starters s JOIN match_jornada mj USING (match_id), k
 WHERE s.role IN ('starter', 'sub') AND s.player_slug <> '';
 
--- Each scoring player's jornadas: his points (scored) and minutes.
+-- Each scoring player's jornadas (scored or in the matchday squad) and his
+-- points.
 DROP VIEW IF EXISTS player_jornadas;
 CREATE VIEW player_jornadas AS
 WITH s AS MATERIALIZED (SELECT player, jornada, pts FROM scored)
-SELECT player, jornada, sum(pts) AS pts, sum(mins) AS mins FROM (
-    SELECT player, jornada, pts, 0.0 AS mins FROM s
+SELECT player, jornada, sum(pts) AS pts FROM (
+    SELECT player, jornada, pts FROM s
     UNION ALL
-    SELECT player, jornada, 0.0, mins FROM squad_minutes
+    SELECT player, jornada, 0.0 FROM squad_minutes
     WHERE player IN (SELECT player FROM s))
 GROUP BY player, jornada;
 
@@ -1183,8 +1196,9 @@ GROUP BY player, jornada;
 -- so the forecast derives the season once a moment.
 DROP VIEW IF EXISTS season_record;
 CREATE VIEW season_record AS
-WITH r AS (SELECT player, sum(pts) AS pts, sum(mins > 0) * 1.0 AS apps, count(*) * 1.0 AS squads
-           FROM player_jornadas GROUP BY player)
+WITH r AS (SELECT p.player, sum(p.pts) AS pts, count(a.jornada) * 1.0 AS apps, count(*) * 1.0 AS squads
+           FROM player_jornadas p LEFT JOIN appearances a ON a.player = p.player AND a.jornada = p.jornada
+           GROUP BY p.player)
 SELECT r.*, shrink(k.neutral_start / 100.0, k.pick_k, apps, squads) AS pick FROM r, k;
 
 -- Each app id's player: the futbolfantasy player whose value it equalled
@@ -1239,9 +1253,11 @@ DROP VIEW IF EXISTS jornadas_done;
 CREATE VIEW jornadas_done AS
 SELECT jornada FROM jornada_calendar WHERE state = 'done' ORDER BY jornada;
 
--- Last season's points per player (ingest.baseline writes it; an empty
--- table is restored from the archived page, raw/season=<season>.tar.xz),
--- and the latest season's.
+-- Last season's points per player and pj, the games the page gives: the
+-- one count of matches played that is not appearances, for no line-ups of
+-- last season are kept. ingest.baseline writes it; an empty table is
+-- restored from the archived page, raw/season=<season>.tar.xz. The latest
+-- season's is last_season.
 CREATE TABLE IF NOT EXISTS season_points (
     season TEXT NOT NULL,
     ff_id  TEXT NOT NULL,
@@ -1291,6 +1307,13 @@ FROM current_market WHERE ff_id <> '' GROUP BY ff_id;
 DROP VIEW IF EXISTS player_value;
 CREATE VIEW player_value AS
 SELECT ff_id AS player, value FROM current_market WHERE ff_id <> '' AND value > 0 GROUP BY ff_id;
+
+-- Players and appearances: each jornada a player started or came on in
+-- (the line-ups; one home for "matches played"). The jornadas of a player
+-- scored in or squadded in without one are not.
+DROP VIEW IF EXISTS appearances;
+CREATE VIEW appearances AS
+SELECT DISTINCT player, jornada FROM squad_minutes WHERE player IS NOT NULL AND mins > 0;
 
 -- Players and expected status at t: futbolfantasy's last listing of him
 -- (start %, when, status and note if flagged: not ok), or the app's word
