@@ -1,6 +1,7 @@
 """Frontier check (docs/notes/simplify.md, "Modules and contracts"): read-only.
 Builds a scratch DB from the schema, finds what each view reads (names after FROM/JOIN, CTEs
-skipped) and prints every read past the frontier. Exit 1 if there is one.
+skipped) and prints every read past the frontier: a read of a later module, or of a scraped
+table from outside ingest. Any module may read the facts and t (look) and an earlier module's contract. Exit 1 if there is one.
 Python files' FROM/JOIN reads are listed for information only."""
 import re, shutil, sqlite3, subprocess, sys, tempfile
 from pathlib import Path
@@ -14,14 +15,14 @@ PREFIX = {"api_": "ingest", "current_": "ingest", "history_": "ingest", "ff_iden
 NAMES = {
     "ingest": "market lineups matches points results_history starters crosswalk app_player slug_player id_clashes "
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
-              "clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes "
+              "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes "
               "player_jornadas season_record season_points next_lock listing_ends price_paid",
-    "forecast": "cell standin_cell score_spread run_forecast forecast_used player_club player_value player_status "
-                "club_fixture club_rating late_arrivals ppm_prior last_season fitted horizons market_daily",
-    "decision": "look moves bid_odds offer_ratios recent_offers sale_odds waiting nights_left player_facts "
+    "forecast": "cell standin_cell score_spread run_forecast forecast_used "
+                "late_arrivals ppm_prior last_season fitted horizons market_daily",
+    "decision": "moves bid_odds offer_ratios recent_offers sale_odds waiting nights_left player_facts "
                 "next_cell my_moves my_bids my_squad my_cash my_xi look_players formation slot_bounds "
                 "decision_option decision_plan",
-    "settlement": "auction_results",
+    "settlement": "",
     "board": "lock_due lineup_alert league_standings",
     "grading": "replayed lead_buckets"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
@@ -33,6 +34,14 @@ def module(name):
     if name in MODULE:
         return MODULE[name]
     return next((m for p, m in PREFIX.items() if name.startswith(p)), None)
+
+
+RAW = {"market", "lineups", "matches", "points", "results_history", "starters"}
+
+
+def raw(name):
+    """A scraped table: only ingest's views read it; the rest read ingest's facts."""
+    return name in RAW or name.startswith(("api_", "current_", "history_"))
 
 
 def reads(sql, own):
@@ -62,8 +71,8 @@ def main():
             continue
         for t in sorted(reads(sql, n) & names):
             a, b = module(n), module(t)
-            if b and b != "grading" and ORDER.index(b) not in (ORDER.index(a), ORDER.index(a) - 1):
-                found.append((n, a, t, b))
+            if b and b != "grading" and (ORDER.index(b) > ORDER.index(a) or (a != "ingest" and raw(t))):
+                found.append((n, a, t, b + (" raw" if raw(t) else "")))
     for n, a, t, b in found:
         print(f"{n} ({a}) reads {t} ({b})")
     print("unassigned:", " ".join(unassigned) or "none")
