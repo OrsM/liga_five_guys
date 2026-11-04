@@ -585,13 +585,12 @@ WHERE k.t < l.close;
 DROP VIEW IF EXISTS run_forecast;
 CREATE VIEW run_forecast AS
 SELECT r.run_id, c.jornada, c.player, c.ppm, c.fixture, c.picked, c.fit,
-       max(0.0, c.ppm * c.fixture) AS points, c.picked * c.fit AS plays,
-       max(0.0, c.ppm * c.fixture) * c.picked * c.fit AS expected
-FROM sim_runs r JOIN forecast_cell c ON c.moment = r.moment WHERE c.ppm IS NOT NULL;
+       c.pts AS points, c.p AS plays, c.e AS expected
+FROM sim_runs r JOIN forecast_e c ON c.moment = r.moment WHERE c.ppm IS NOT NULL;
 
 -- A cell's expected points, e = pts x p, said once; every reader takes e from here.
 DROP VIEW IF EXISTS forecast_e;
-CREATE VIEW forecast_e AS SELECT moment, player, jornada, pts, p, pts * p AS e FROM forecast_cell;
+CREATE VIEW forecast_e AS SELECT moment, player, jornada, pts, p, ppm, fixture, picked, fit, pts * p AS e FROM forecast_cell;
 
 DROP VIEW IF EXISTS forecast_used;
 CREATE VIEW forecast_used AS
@@ -615,29 +614,35 @@ pool AS (SELECT x FROM played WHERE (SELECT count(*) FROM played) >= (SELECT min
 m AS (SELECT avg(x * x) AS sq, avg(x) AS mean FROM pool)
 SELECT m.sq / (CASE WHEN abs(m.mean) > 1e-9 THEN m.mean * m.mean ELSE 1.0 END) AS m2, c.share FROM m, c;
 
--- Each player's forecast for each jornada left, as the model looks (look's
--- moment: its cells are the jornadas left at its cut): the chance he plays
--- (p), his expected points (e) and their variance (v: p pts^2 m2 - e^2, the game drawn from the pool
--- scaled to his points if he plays).
-DROP VIEW IF EXISTS cell;
-CREATE VIEW cell AS
-SELECT f.jornada, f.player, f.p, f.e, f.p * f.pts * f.pts * w.m2 - f.e * f.e AS v
-FROM look l JOIN forecast_used f ON f.moment = l.moment CROSS JOIN score_spread w;
-
--- Each position's stand-in each jornada left: the average of the points if
--- he plays and of the chance he plays of the players of that position in a
--- squad or on the game's market at t (squads, listings); his e and v as a cell's.
-DROP VIEW IF EXISTS standin_cell;
-CREATE VIEW standin_cell AS
+-- Each cell as the model looks (look's moment: its cells are the jornadas
+-- left at its cut): a player's, and each position's stand-in, the average of
+-- the points if he plays and of the chance he plays of the players of that
+-- position in a squad or on the game's market at t (squads, listings), the
+-- product of the averages being his own e. p is the chance he plays, e his
+-- expected points and v their variance (p pts^2 m2 - e^2: the game drawn
+-- from the pool scaled to his points if he plays). The one place e and v are
+-- worked out for a cell as decided on (forecast_e: for a stored moment).
+DROP VIEW IF EXISTS cell_pool;
+CREATE VIEW cell_pool AS
 WITH held AS (SELECT player FROM squads UNION SELECT player FROM listings),
 a AS (SELECT f.jornada, c.pos, avg(f.pts) AS pts, avg(f.p) AS p
            FROM look l JOIN forecast_used f ON f.moment = l.moment
            JOIN held h ON h.player = f.player JOIN player_club c ON c.player = f.player
            WHERE c.pos <> ''
            GROUP BY f.jornada, c.pos),
-b AS (SELECT *, pts * p AS e FROM a)     -- a stand-in's own cell: the averages' product, not a row's
-SELECT a.jornada, a.pos, a.e, a.p * a.pts * a.pts * w.m2 - a.e * a.e AS v
-FROM b a CROSS JOIN score_spread w;
+u AS (SELECT f.jornada, f.player, NULL AS pos, f.pts, f.p, f.e FROM look l JOIN forecast_used f ON f.moment = l.moment
+      UNION ALL
+      SELECT jornada, NULL, pos, pts, p, pts * p FROM a)
+SELECT u.jornada, u.player, u.pos, u.p, u.e, u.p * u.pts * u.pts * w.m2 - u.e * u.e AS v
+FROM u CROSS JOIN score_spread w;
+
+-- Each player's forecast for each jornada left.
+DROP VIEW IF EXISTS cell;
+CREATE VIEW cell AS SELECT jornada, player, p, e, v FROM cell_pool WHERE player IS NOT NULL;
+
+-- Each position's stand-in each jornada left, his e and v as a cell's.
+DROP VIEW IF EXISTS standin_cell;
+CREATE VIEW standin_cell AS SELECT jornada, pos, e, v FROM cell_pool WHERE player IS NULL;
 
 -- The game's nightly offers still to come before the lock (next_lock): one
 -- as each standing offer expires, then one a day (0 with none standing),
@@ -827,8 +832,8 @@ DROP VIEW IF EXISTS price_day_now;
 CREATE VIEW price_day_now AS
 SELECT coalesce(substr(max(observed_at), 1, 10), '') AS d FROM price_history;
 
-DROP VIEW IF EXISTS price_rows;
-CREATE VIEW price_rows AS
+DROP VIEW IF EXISTS price_live;
+CREATE VIEW price_live AS
 WITH cutday AS (SELECT d FROM price_day_now),
 latest AS (SELECT ff_id, max(n) AS n, max(CASE WHEN step IS NOT NULL THEN n END) AS ln
            FROM price_step WHERE day < (SELECT d FROM cutday) GROUP BY ff_id),
@@ -840,13 +845,17 @@ live AS (SELECT m.ff_id, m.observed_at, m.value, s.n AS n0, s.value AS pv, s.i0,
          WHERE m.observed_at = (SELECT max(observed_at) FROM price_history
                                 WHERE observed_at >= (SELECT d FROM cutday))
            AND coalesce(m.ff_id, '') <> '' AND m.value IS NOT NULL)
-SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE day < (SELECT d FROM cutday)
-UNION ALL
-SELECT ff_id, coalesce(n0 + 1, 0), substr(observed_at, 1, 10), observed_at, value,
-       CASE WHEN pv > 0 THEN 100 * (value / pv - 1) END,
-       CASE WHEN pv > 0 THEN coalesce(i0, -1) + 1 END,
-       CASE WHEN pv > 0 THEN last_step END, CASE WHEN pv > 0 THEN last_s1 END
+SELECT ff_id, coalesce(n0 + 1, 0) AS n, substr(observed_at, 1, 10) AS day, observed_at, value,
+       CASE WHEN pv > 0 THEN 100 * (value / pv - 1) END AS step,
+       CASE WHEN pv > 0 THEN coalesce(i0, -1) + 1 END AS i,
+       CASE WHEN pv > 0 THEN last_step END AS s1, CASE WHEN pv > 0 THEN last_s1 END AS s2
 FROM live;
+
+DROP VIEW IF EXISTS price_rows;
+CREATE VIEW price_rows AS
+SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE day < (SELECT d FROM price_day_now)
+UNION ALL
+SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_live;
 
 -- Each player's changes, all time, numbered (i), each clipped at CLIP; x is
 -- the signal momentum fits on: his last three clipped changes weighted
@@ -864,7 +873,9 @@ FROM (SELECT ff_id, observed_at, day, step, i, value, k.price_w0, k.price_w1, k.
 -- player's number of changes (players with none count), at least 1.
 DROP VIEW IF EXISTS price_hmax;
 CREATE VIEW price_hmax AS
-WITH lens AS (SELECT count(step) AS n FROM price_rows GROUP BY ff_id),
+WITH lens AS (SELECT ff_id, sum(n) AS n FROM (
+                  SELECT ff_id, count(step) AS n FROM price_step WHERE day < (SELECT d FROM price_day_now) GROUP BY ff_id
+                  UNION ALL SELECT ff_id, step IS NOT NULL FROM price_live) GROUP BY ff_id),
 ranked AS (SELECT n, row_number() OVER (ORDER BY n) AS r, count(*) OVER () AS m FROM lens)
 SELECT coalesce((SELECT max(1, CAST(avg(n) AS INTEGER) / 4) FROM ranked
                  WHERE r IN ((m + 1) / 2, (m + 2) / 2)), 1) AS hmax;
@@ -880,11 +891,10 @@ WITH RECURSIVE n(h) AS (SELECT 1 UNION ALL SELECT h + 1 FROM n WHERE h < 200) SE
 
 DROP VIEW IF EXISTS price_ahead;
 CREATE VIEW price_ahead AS
-WITH s AS MATERIALIZED (SELECT * FROM price_series)
 SELECT a.ff_id, a.i, a.day, a.x, hs.h, b.observed_at AS end_at,
-       substr(b.observed_at, 1, 10) AS end_day, 100 * (b.value / a.value - 1) AS change
-FROM s b JOIN horizons hs ON hs.h <= (SELECT hmax FROM price_hmax) + hpad()
-JOIN s a ON a.ff_id = b.ff_id AND a.i = b.i - hs.h;
+       b.day AS end_day, 100 * (b.value / a.value - 1) AS change
+FROM price_series b JOIN horizons hs ON hs.h <= (SELECT hmax FROM price_hmax) + hpad()
+JOIN price_series a ON a.ff_id = b.ff_id AND a.i = b.i - hs.h;
 
 -- Momentum, as of t: how much of a price change carries into the next
 -- h (up to price_hmax), the move over h clipped at CLIP an update.
@@ -892,7 +902,7 @@ DROP VIEW IF EXISTS momentum_pairs;
 CREATE VIEW momentum_pairs AS
 SELECT p.h, p.ff_id, p.i, p.end_day, p.x,
        max(-k.clip * p.h, min(k.clip * p.h, p.change)) AS y
-FROM price_ahead p, k WHERE p.end_at <= (SELECT cut());
+FROM price_ahead p, k;
 
 -- What each closed day adds to the momentum fit, per horizon: the sums of x*y
 -- and x*x of the pairs that end that day, written once (facts.MOMENTUM_DAY)
@@ -925,53 +935,47 @@ CREATE VIEW momentum AS
 SELECT h, sxy / sxx AS slope
 FROM momentum_sums WHERE sxx <> 0;
 
--- Momentum as fitted at a cut, kept: fitting costs seconds, and carry and
--- trend read it (assemble.price_momentum fits at the model's cut; Datasette
--- reads the last fit at or before its own).
-CREATE TABLE IF NOT EXISTS momentum_fit (
-    as_of TEXT NOT NULL,
-    h     INTEGER NOT NULL,
-    slope REAL NOT NULL,
-    PRIMARY KEY (as_of, h)
-);
+DROP TABLE IF EXISTS momentum_fit;
+DROP TABLE IF EXISTS price_trend_fit;
 DROP VIEW IF EXISTS fitted;
-CREATE VIEW fitted AS
-SELECT h, slope FROM momentum_fit
-WHERE as_of = (SELECT max(as_of) FROM momentum_fit WHERE as_of <= (SELECT cut()));
+DROP VIEW IF EXISTS price_trend_now;
 
 -- The share of a trend (its move over the horizon, the longest h fitted)
 -- already made after each update.
 DROP VIEW IF EXISTS price_carry;
 CREATE VIEW price_carry AS
+WITH m AS MATERIALIZED (SELECT h, slope FROM momentum)
 SELECT m.h, m.slope / e.slope AS carry
-FROM fitted m, (SELECT slope FROM fitted ORDER BY h DESC LIMIT 1) e
+FROM m, (SELECT slope FROM m ORDER BY h DESC LIMIT 1) e
 WHERE e.slope <> 0 ORDER BY m.h;
 
--- Each player's value change in % over the horizon, for those whose last
--- change is the newest day's: as long as you would hold him. Working it out
--- walks every player's whole price history (~1s), and four things read it a
--- run, so a run works it out once and keeps it (assemble.record_trend); what
--- reads it gets the last one kept at or before t, as momentum_fit does.
-DROP VIEW IF EXISTS price_trend_now;
-CREATE VIEW price_trend_now AS
-WITH s AS (SELECT coalesce((SELECT slope FROM fitted ORDER BY h DESC LIMIT 1), 0.0) AS slope),
-last AS (SELECT ff_id, day, x FROM (
-             SELECT ff_id, day, x, row_number() OVER (PARTITION BY ff_id ORDER BY i DESC) AS r
-             FROM price_series WHERE observed_at <= (SELECT cut()))
-         WHERE r = 1)
-SELECT last.ff_id, s.slope * last.x AS trend
-FROM last, s WHERE last.day = (SELECT max(day) FROM last);
+-- The slope at the longest horizon, each day up to t: a closed day's is the
+-- fit on the pairs that ended by it (the sums momentum_day keeps), the day
+-- of the cut's is momentum's. A day's fit is a function of the facts to that
+-- day, not of which builds ran.
+DROP VIEW IF EXISTS price_slope;
+CREATE VIEW price_slope AS
+WITH top AS MATERIALIZED (SELECT h, slope FROM momentum ORDER BY h DESC LIMIT 1)
+SELECT end_day AS day, sum(sxy) OVER w / sum(sxx) OVER w AS slope
+FROM momentum_day WHERE ckey = (SELECT ckey FROM k) AND h = (SELECT h FROM top)
+  AND end_day < (SELECT d FROM price_day_now)
+WINDOW w AS (ORDER BY end_day)
+UNION ALL
+SELECT (SELECT d FROM price_day_now), slope FROM top;
 
-CREATE TABLE IF NOT EXISTS price_trend_fit (
-    as_of TEXT NOT NULL,
-    ff_id TEXT NOT NULL,
-    trend REAL NOT NULL,
-    PRIMARY KEY (as_of, ff_id)
-) WITHOUT ROWID;
+-- Each player's value change in % over the horizon (the slope times the
+-- signal x of his changes) on each day he changed: as long as you would hold
+-- him. As of t, a function of the facts to t.
+DROP VIEW IF EXISTS price_trend_daily;
+CREATE VIEW price_trend_daily AS
+SELECT s.ff_id, s.day, coalesce(l.slope, 0.0) * s.x AS trend
+FROM price_series s LEFT JOIN price_slope l ON l.day = s.day;
+
+-- Each player's trend as of t: those whose last change is the newest day's
+-- (every player in the day's snapshot has one).
 DROP VIEW IF EXISTS price_trend;
 CREATE VIEW price_trend AS
-SELECT ff_id, trend FROM price_trend_fit
-WHERE as_of = (SELECT max(as_of) FROM price_trend_fit WHERE as_of <= (SELECT cut()));
+SELECT ff_id, trend FROM price_trend_daily WHERE day = (SELECT d FROM price_day_now);
 
 -- How each listing's auction went, once it has closed (by t): every
 -- listing on the market (the game's or a manager's) by player and close
@@ -1014,21 +1018,20 @@ FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut());
 
 -- What a bid wins on the game's market now, for each player listed there:
 -- his BID_NEIGHBOURS past listings closest to him in price trend (the
--- forecast's fit kept at or before each one's close; before
+-- trend each had on the last day with a change up to its close; before
 -- t, none you won: what you beat is not seen), and for each bid over
 -- asking that reached one of their bars (and asking itself) the share it
 -- would have won (p_win; 1 with no past to go on).
 DROP VIEW IF EXISTS bid_odds;
 CREATE VIEW bid_odds AS
-WITH fits AS (SELECT DISTINCT as_of FROM price_trend_fit),
+WITH hist AS MATERIALIZED (SELECT ff_id, day, trend FROM price_trend_daily),
+days AS MATERIALIZED (SELECT DISTINCT day FROM hist),
+closed AS MATERIALIZED (
+    SELECT player, bar, by_me, (SELECT max(day) FROM days WHERE day <= substr(closed, 1, 10)) AS day
+    FROM auction_results),
 past AS MATERIALIZED (
-    SELECT trend, bar FROM (
-        SELECT a.bar, a.by_me,
-               (SELECT t.trend FROM price_trend_fit t
-                WHERE t.ff_id = a.player
-                  AND t.as_of = (SELECT max(as_of) FROM fits WHERE as_of <= a.closed)) AS trend
-        FROM auction_results a)
-    WHERE bar IS NOT NULL AND trend IS NOT NULL AND NOT coalesce(by_me, 0)),
+    SELECT h.trend, c.bar FROM closed c JOIN hist h ON h.ff_id = c.player AND h.day = c.day
+    WHERE c.bar IS NOT NULL AND NOT coalesce(c.by_me, 0)),
 now AS (SELECT DISTINCT s.player, coalesce(t.trend, 0.0) AS trend
         FROM listings s LEFT JOIN price_trend t ON t.ff_id = s.player
         WHERE s.seller = 'marketPlayerLeague' AND s.player IS NOT NULL AND s.sale_price <> 0),

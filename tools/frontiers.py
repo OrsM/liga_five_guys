@@ -28,7 +28,7 @@ NAMES = {
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
               "player_jornadas season_record season_points next_lock listing_ends price_paid",
-    "forecast": "cell standin_cell score_spread run_forecast forecast_used "
+    "forecast": "cell cell_pool standin_cell score_spread run_forecast forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
     "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts "
                 "next_cell my_squad my_cash my_xi look_players formation slot_bounds "
@@ -41,10 +41,12 @@ EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_points season_record
         club_fixture club_rating jornada_calendar kickoffs next_lock look
         listings listing_ends offers offer_ratios price_history price_paid auction_results
-        squads owners cash standings league_config""",
-    "forecast": "cell",  # cell(player, jornada, pts, p)
-    "decision": "decision_plan",  # plan(step, kind, player, amount, win, worth)
-    "settlement": "",  # moves: none yet
+        squads owners cash standings league_config
+        app_lineup app_player name_player""",  # last three: the lineup facts the board's lineup_gap compares
+    "forecast": "cell standin_cell score_spread price_carry price_trend price_trend_daily",  # cell is the contract; the rest feed the decision's odds and standings
+    "decision": """bid_odds recent_offers nights_left league_season seen_cash my_cash
+        decision_option decision_plan""",  # the board reads the plan, its options and the odds; league_standings reads cash and season
+    "settlement": "",
     "board": "board_json",
     "grading": "",  # a measure: nothing downstream reads it
 }
