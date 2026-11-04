@@ -986,8 +986,10 @@ SELECT ff_id, trend FROM price_trend_daily WHERE day = (SELECT d FROM price_day_
 -- the winner was you (the bids you beat are not seen); NULL for a
 -- manager's listing (no one's deal with him is seen). The one auction
 -- outcome: what bids win now (bid_odds) and a path's bids (my_bids) both
--- read it, and no bar before its close. An outcome is the close's, however
--- late the feed tells of it.
+-- read it, and no bar before its close. Cut-bound: only what was observed
+-- by t counts, and an outcome appears once the activity feed has been seen
+-- ten minutes past the close (the window its buy is looked for in), so a
+-- past t never sees a result the feed told of later.
 DROP VIEW IF EXISTS auction_results;
 CREATE VIEW auction_results AS
 WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM api_standings s, league_config c
@@ -998,13 +1000,13 @@ ends AS (SELECT pid, player, close, at, asking, seller FROM (
                     row_number() OVER (PARTITION BY m.player_id, julianday(m.expires_at)
                                        ORDER BY m.observed_at DESC, m.rowid) AS pick
              FROM api_market m JOIN app_player a ON a.app_id = m.player_id
-             WHERE m.seller IN ('marketPlayerLeague', 'marketPlayerTeam')
+             WHERE m.observed_at <= (SELECT cut()) AND m.seller IN ('marketPlayerLeague', 'marketPlayerTeam')
                AND coalesce(m.expires_at, '') <> '' AND coalesce(m.sale_price, 0) > 0)
          WHERE pick = 1),
 buys AS (SELECT player_id AS pid, julianday(at) AS t, amount, user_id IN (SELECT uid FROM mine) AS me
          FROM (SELECT player_id, at, amount, user_id,
                       row_number() OVER (PARTITION BY activity_id ORDER BY rowid DESC) AS last
-               FROM api_activity WHERE kind = 'buy' AND activity_id <> '')
+               FROM api_activity WHERE kind = 'buy' AND activity_id <> '' AND observed_at <= (SELECT cut()))
          WHERE last = 1),
 won AS (SELECT * FROM (
             SELECT e.*, b.amount AS won, b.me,
@@ -1014,7 +1016,9 @@ won AS (SELECT * FROM (
 SELECT w.player, w.at AS close, strftime('%Y-%m-%dT%H%MZ', w.at) AS closed, w.asking, w.seller, w.won, w.me AS by_me,
        CASE WHEN w.seller <> 'marketPlayerLeague' THEN NULL
             WHEN w.won IS NULL OR w.me THEN 1.0 ELSE w.won / w.asking END AS bar
-FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut());
+FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut())
+  AND stamp_jd((SELECT max(observed_at) FROM api_activity WHERE observed_at <= (SELECT cut())))
+      >= w.close + 600.0 / 86400;
 
 -- What a bid wins on the game's market now, for each player listed there:
 -- his BID_NEIGHBOURS past listings closest to him in price trend (the
@@ -1406,10 +1410,17 @@ DROP VIEW IF EXISTS standings;
 CREATE VIEW standings AS
 SELECT user_id, manager, position, team_points, fixture_points, team_value, team_money FROM current_api_standings;
 
--- Your line-up in the app at t (each source's last snapshot), i its order there.
+-- Your line-up in the app at t (each source's last snapshot), i its order there,
+-- and player: who each is (identity.sql), by app id else by the name one player
+-- has (short, else full); NULL when nothing names exactly one.
 DROP VIEW IF EXISTS app_lineup;
 CREATE VIEW app_lineup AS
-SELECT t.rowid AS i, t.source, t.player_id, t.player_name, t.player_name_full FROM api_lineup t
+SELECT t.rowid AS i, t.source, t.player_id, t.player_name, t.player_name_full,
+       coalesce(a.player, n.player, f.player) AS player
+FROM api_lineup t
+LEFT JOIN app_player a ON a.app_id = t.player_id
+LEFT JOIN name_player n ON n.name_key = name_key(t.player_name)
+LEFT JOIN name_player f ON f.name_key = name_key(t.player_name_full)
 WHERE /* latest api_lineup */;
 
 -- Every snapshot of futbolfantasy's market up to t: a player's value at each,
@@ -1611,22 +1622,14 @@ SELECT p.player, p.name, p.pos, p.next FROM board_players p WHERE p.xi;
 -- Your line-up in the app against the best eleven of your squad now
 -- (sim_players.xi): a line-up is of players you hold, so a buy is in it only
 -- once he is yours, at the run after his auction closes. The app's line-up
--- is its players, each by its app id else by the name one player has
--- (identity.sql), and counts only if every one is yours and there are as many as the eleven;
+-- is its players (app_lineup.player), and counts only if every one is yours and there are as many as the eleven;
 -- otherwise it is unknown (legal 0) and the whole eleven is to set. 'in'
 -- are the eleven's players not in it, 'out' (i, its order in the app) those
 -- in it that are not in the eleven.
 DROP VIEW IF EXISTS lineup_gap;
 CREATE VIEW lineup_gap AS
-WITH t AS MATERIALIZED (
-    SELECT i, player_id, name_key(player_name) AS short, name_key(player_name_full) AS full
-    FROM app_lineup),
-bp AS MATERIALIZED (SELECT * FROM board_players),
-app AS MATERIALIZED (
-    SELECT t.i, coalesce(a.player, n.player, f.player) AS player
-    FROM t LEFT JOIN app_player a ON a.app_id = t.player_id
-    LEFT JOIN name_player n ON n.name_key = t.short
-    LEFT JOIN name_player f ON f.name_key = t.full),
+WITH bp AS MATERIALIZED (SELECT * FROM board_players),
+app AS MATERIALIZED (SELECT i, player FROM app_lineup),
 fielded AS (SELECT i, player FROM app
             WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN bp b
                               ON b.player = a.player AND b.mine WHERE b.player IS NULL)),
