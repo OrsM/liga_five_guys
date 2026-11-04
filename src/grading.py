@@ -171,7 +171,8 @@ def ceiling() -> list[dict[str, Any]]:
     had at t as it was; ours, the plan (decision.plan_rows) on the forecast;
     ceiling, the same plan_rows with every cell's e the player's real points
     in the window's jornadas (0 if he did not play, 0 after the window), the same constraints and bid odds.
-    All three scored by decision.worth_on."""
+    All three scored by decision.worth_on. gap: decision.expected_gap at the lock (the plan's e over
+    standing pat's, on the forecast)."""
     real = jornada_points()
     locks, done = before_locks(), sorted(done_jornadas())
     out = []
@@ -180,7 +181,7 @@ def ceiling() -> list[dict[str, Any]]:
         js = [i for i in done if i >= j]
         nxt = [i for i in js if not later or i < min(later)]
         inp = decision.read_inputs()
-        out.append({"jornada": j, **decision.measure(inp, real, js),
+        out.append({"jornada": j, "gap": decision.expected_gap(inp), **decision.measure(inp, real, js),
                     **{"next_" + k: v for k, v in decision.measure(inp, real, nxt).items()}})
     return sorted(out, key=lambda g: g["jornada"])
 
@@ -340,11 +341,11 @@ def log_measure(measure: str, values: dict[str, float]) -> None:
 
 def ceiling_headline(got: list[dict[str, Any]]) -> dict[str, float]:
     """The season's totals of ceiling(): floor, ours, ceiling and the shares
-    (all jornadas from each lock, and next only)."""
+    (all jornadas from each lock, and next only), and the decision's expected gap (the locks' summed)."""
     tot = {pre + k: sum(g[pre + k] for g in got) for pre in ("", "next_") for k in ("floor", "ours", "ceiling")}
     share = {pre + "share": (tot[pre + "ours"] - tot[pre + "floor"]) / (tot[pre + "ceiling"] - tot[pre + "floor"])
              for pre in ("", "next_") if tot[pre + "ceiling"] > tot[pre + "floor"]}
-    return {**tot, **share}
+    return {**tot, **share, "expected_gap": sum(g["gap"] for g in got)}
 
 
 def accuracy(ahead: int = 5) -> list[tuple[Any, ...]]:
@@ -396,7 +397,7 @@ def _selftest_ceiling() -> None:
                         {i: {**{k: (x, 1.0) for k, x in e.items()}, "star": (forecast_star, 1.0), "keeper": (3.0, 1.0)}
                          for i in range(j, 3)})
             inp = decision.read_inputs()
-            got.append({"jornada": j, **decision.measure(inp, real, [j]),
+            got.append({"jornada": j, "gap": decision.expected_gap(inp), **decision.measure(inp, real, [j]),
                         **{"next_" + k: v for k, v in decision.measure(inp, real, [j]).items()}})
             if j == 1:
                 two = decision.measure(inp, real, [1, 2])
@@ -404,6 +405,9 @@ def _selftest_ceiling() -> None:
         assert g["floor"] <= g["ours"] <= g["ceiling"], g
     assert [(g["floor"], g["ours"], g["ceiling"]) for g in got] == [(44.0, 50.0, 50.0), (44.0, 44.0, 49.0)], got
     assert ceiling_report(got).splitlines()[-1].endswith("0.55   0.55"), ceiling_report(got)
+    assert [g["gap"] for g in got] == [12.0, 1.0], \
+        "the plan's expected gain on the forecast: star (8) for m4 (2) in two jornadas; star (3) for m4 (2) in one"
+    assert ceiling_headline(got)["expected_gap"] == 13.0, "the season's total of the locks' expected gaps"
     # a two-jornada window: the ceiling counts both jornadas' real points, none after
     assert (two["floor"], two["ours"], two["ceiling"]) == (88.0, 94.0, 99.0), two
 
@@ -413,8 +417,12 @@ def _selftest_measure_log() -> None:
     import tempfile
     from ffcore.tidy import tables_in
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        one = {"floor": 1.0, "ours": 3.0, "ceiling": 5.0}
+        one = {"floor": 1.0, "ours": 3.0, "ceiling": 5.0, "gap": 2.0}
         assert ceiling_headline([{**one, **{"next_" + k: v for k, v in one.items()}}])["share"] == 0.5
+        log_measure("ceiling", ceiling_headline([{**one, **{"next_" + k: v for k, v in one.items()}}]))
+        assert rows("SELECT value FROM measure_latest WHERE measure = 'ceiling' AND key = 'expected_gap'") == [(2.0, )]
+        with closing(connect()) as db, db:
+            db.execute("DELETE FROM measure_log")
         log_measure("ceiling", {"share": 0.25})
         assert rows("SELECT measure, key, value, previous FROM measure_latest") == [("ceiling", "share", 0.25, None)]
         (sha,), = rows("SELECT commit_sha FROM measure_log")

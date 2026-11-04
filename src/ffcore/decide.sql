@@ -243,7 +243,7 @@ DROP VIEW IF EXISTS league_season;
 CREATE VIEW league_season AS
 WITH per AS (SELECT manager, player, total(e) AS a, total(v) AS v FROM league_xi GROUP BY manager, player),
 g AS (SELECT p.manager, total(p.a) AS mean, (1 + w.share * w.share) * total(p.v) + w.share * w.share * total(p.a * p.a) AS var
-      FROM per p CROSS JOIN score_spread w GROUP BY p.manager)
+      FROM per p CROSS JOIN (SELECT const('PERSISTENT_SHARE') AS share) w GROUP BY p.manager)
 SELECT g.manager, coalesce(b.points, 0.0) AS now, g.mean + coalesce(b.points, 0.0) AS mean, sqrt(max(g.var, 0.0)) AS sd
 FROM g LEFT JOIN (SELECT manager, max(CAST(team_points AS REAL)) AS points FROM standings GROUP BY manager) b
      USING (manager);
@@ -286,4 +286,4 @@ DROP VIEW IF EXISTS league_jornada;
 CREATE VIEW league_jornada AS
 SELECT x.manager, x.jornada, total(x.e) AS mean,
        sqrt(max((1 + w.share * w.share) * total(x.v) + w.share * w.share * total(x.e * x.e), 0.0)) AS sd
-FROM league_xi x CROSS JOIN score_spread w GROUP BY x.manager, x.jornada;
+FROM league_xi x CROSS JOIN (SELECT const('PERSISTENT_SHARE') AS share) w GROUP BY x.manager, x.jornada;

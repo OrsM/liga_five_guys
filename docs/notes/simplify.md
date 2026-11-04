@@ -52,7 +52,7 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 | Module | Exports (its contract) |
 |---|---|
 | ingest | app_lineup, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
-| forecast | cell, price_carry, price_trend, price_trend_daily |
+| forecast | cell, price_carry, price_trend, price_trend_daily, standin_cell |
 | decision | decision_plan |
 | settlement | (none yet) |
 | board | board_json |
@@ -62,6 +62,7 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 **Frontiers crossed today (to fix, one module at a time):**
 - Decision reads ingest: done (2026-11-04). player_facts, nights_left, bid_odds, league_season read ingest's fact views (player_roster, listings, offers, squads, standings); offer_ratios is ingest's. tools/frontiers.py lists none.
 - Decision's tests: done (2026-11-04). decision._selftest seeds rows (plan_rows on rows, seed_league); no Universe, Market, LeagueState or Bootstrap remains in src or tools. The expected gap is decision.expected_gap.
+- Forecast and decision crossings: done (2026-11-04). run_forecast was a run's forecast (grading's): now sim_forecast. league_xi/season/jornada read the persistent share through const() (not score_spread) and a position's stand-in cell, part of the cell contract (standin_cell exported). The expected gap is in `grading.py ceiling`'s headline (measure_log key expected_gap).
 - Settlement decides: on a lost bid, grading.py drops the paired sales and runs decision.plan(sales_only=True) (grading.py:292-297). That sold Agoume, Moncayola, and Maffeo the night he was bought.
 - The rest: the frontier check list below.
 

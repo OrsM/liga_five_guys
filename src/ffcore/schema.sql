@@ -197,6 +197,14 @@ CREATE TABLE IF NOT EXISTS sim_runs (
     can_bid       REAL
 );
 
+-- Each run's forecast, every cell with factors (ffcore.schedule.Factors):
+-- points = ppm x fixture, plays = picked x fit, expected from the two.
+DROP VIEW IF EXISTS sim_forecast;
+CREATE VIEW sim_forecast AS
+SELECT r.run_id, c.jornada, c.player, c.ppm, c.fixture, c.picked, c.fit,
+       c.pts AS points, c.p AS plays, c.e AS expected
+FROM sim_runs r JOIN forecast_e c ON c.moment = r.moment WHERE c.ppm IS NOT NULL;
+
 -- The market's and the league's facts as each run saw them (seen at its
 -- cut), every player: the board shows these, and a past run's board is
 -- these and its decisions. fetches is what a sale of one of yours gets
@@ -580,14 +588,6 @@ WHERE k.t < l.close;
 -- it: points if he plays, and the chance he plays, none in a jornada he
 -- would join after his club's match (late_arrivals). The universe reads
 -- its cells here, and the model the moment it looks at (cell).
--- Each run's forecast, every cell with factors (ffcore.schedule.Factors):
--- points = ppm x fixture, plays = picked x fit, expected from the two.
-DROP VIEW IF EXISTS run_forecast;
-CREATE VIEW run_forecast AS
-SELECT r.run_id, c.jornada, c.player, c.ppm, c.fixture, c.picked, c.fit,
-       c.pts AS points, c.p AS plays, c.e AS expected
-FROM sim_runs r JOIN forecast_e c ON c.moment = r.moment WHERE c.ppm IS NOT NULL;
-
 -- A cell's expected points, e = pts x p, said once; every reader takes e from here.
 DROP VIEW IF EXISTS forecast_e;
 CREATE VIEW forecast_e AS SELECT moment, player, jornada, pts, p, ppm, fixture, picked, fit, pts * p AS e FROM forecast_cell;
