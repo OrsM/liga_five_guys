@@ -3,7 +3,10 @@ Builds a scratch DB from the schema, finds what each view reads (names after FRO
 skipped) and prints every read past the frontier: a read of a later module, or of a scraped
 table from outside ingest. Any module may read the facts and t (look) and an earlier module's contract. Exit 1 if there is one.
 Each module's EXPORTS is its contract: reading another module's name that is not exported fails, in views and in the
-production code of src/*.py (selftests excluded). grading may read anything. `--table` prints the exports as markdown."""
+production code of src/*.py (selftests excluded). No exemptions: grading is the last module and reads contracts only.
+A Python file that implements several modules (assemble, sim, db, facts, fixtures) is no module's: whatever it reads
+of a module that is not exported is a crossing. Every crossing is printed, grouped by the reading module, with
+file:line. `--table` prints the exports as markdown."""
 import re
 import shutil
 import sqlite3
@@ -14,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ORDER = ["ingest", "forecast", "decision", "settlement", "board"]
+ORDER_ALL = ORDER + ["grading"]  # grading, the measure, is last: it reads contracts like the rest
 PREFIX = {"api_": "ingest", "current_": "ingest", "history_": "ingest", "ff_identity": "ingest",
           "name_": "ingest", "forecast_": "forecast", "price_": "forecast", "momentum": "forecast",
           "dec_": "decision", "seen": "decision", "my_": "decision", "league_": "decision",
@@ -32,26 +36,23 @@ NAMES = {
     "settlement": "",
     "board": "lock_due lineup_alert league_standings",
     "grading": "replayed lead_buckets measure_log measure_latest"}
-# Each module's contract: the views and tables other modules may read; a comment says why where it is not a plain fact.
+# Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_points season_record
         club_fixture club_rating jornada_calendar kickoffs next_lock look
         listings listing_ends offers offer_ratios price_history price_paid auction_results
-        squads owners cash standings league_config
-        app_lineup app_player name_player""",  # last three: the lineup facts the board's lineup_gap compares
-    "forecast": "cell standin_cell score_spread price_carry price_trend price_trend_fit",  # cell is the contract; the rest feed the decision's odds and standings
-    "decision": """bid_odds recent_offers nights_left league_season seen_cash my_cash
-        decision_option decision_plan""",  # the board reads the plan, its options and the odds; league_standings reads cash and season
-    "settlement": "",
+        squads owners cash standings league_config""",
+    "forecast": "cell",  # cell(player, jornada, pts, p)
+    "decision": "decision_plan",  # plan(step, kind, player, amount, win, worth)
+    "settlement": "",  # moves: none yet
     "board": "board_json",
-    "grading": "sim_facts sim_players sim_runs sim_standings sim_waiting",  # the replay's stand-ins the board reads
+    "grading": "",  # a measure: nothing downstream reads it
 }
 EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
-# Python files that implement more than their own module: they may read those modules' internals.
-OWNS = {"assemble": {"forecast", "decision", "grading"}, "sim": {"decision", "board", "grading"},
-        "db": {"forecast", "grading"}, "facts": {"ingest", "forecast"}, "remind": {"board"},
-        "decision": {"decision"}, "fixtures": set(ORDER) | {"grading"}, "grading": set(ORDER) | {"grading"}}
-OWNS |= {f: {"ingest"} for f in ("ingest", "crosswalk", "league", "jornadas", "tidy")}
+# Python files that are wholly one module's: their reads are judged as that module's. A file not here (assemble,
+# sim, db, facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
+OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest",
+        "forecast": "forecast", "decision": "decision", "remind": "board", "grading": "grading"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
 SKIP = {"k", "model_constants", "variants", "params", "runs", "run_measures", "facts_meta", "parser_health",
         "persistence_by_run", "board_history", "board_history_moves"}  # no module: config, bookkeeping
@@ -86,23 +87,60 @@ def scratch() -> list[tuple[str, str, str]]:
         return db.execute("select type, name, sql from sqlite_master where type in ('table','view')").fetchall()
     finally:
         shutil.rmtree(tmp)
+
+
 def prod(text: str) -> str:
-    """A Python file's production code: its top-level _selftest functions removed."""
-    return re.sub(r"(?ms)^def _selftest\w*\(.*?(?=^\S)", "", text + "\nX")
+    """A Python file's production code: its top-level _selftest functions blanked (line numbers kept)."""
+    return re.sub(r"(?ms)^def _selftest\w*\(.*?(?=^\S)", lambda m: re.sub(r"[^\n]", "", m.group()), text + "\nX")[:-2]
+
+
+def lines(text: str, t: str) -> list[int]:
+    """The 1-based lines of text that read t (after FROM or JOIN), comments and quoted text ignored."""
+    return [i for i, line in enumerate(text.split("\n"), 1)
+            if re.search(r"\b(?:from|join)\s+%s\b" % t, re.sub(r"--.*|#.*|'[^']*'", " ", line), re.I)]
+
+
+def view_spans() -> dict[str, tuple[Path, int, str]]:
+    """Where each view is written: its .sql file, first line and text (up to the next CREATE VIEW)."""
+    spans = {}
+    for f in sorted((ROOT / "src/ffcore").glob("*.sql")):
+        text = f.read_text()
+        starts = [(m.start(), m.group(1))
+                  for m in re.finditer(r"(?im)^CREATE\s+VIEW\s+(?:IF NOT EXISTS\s+)?(\w+)", text)]
+        for k, (at, name) in enumerate(starts):
+            end = starts[k + 1][0] if k + 1 < len(starts) else len(text)
+            spans[name] = (f, text.count("\n", 0, at) + 1, text[at:end])
+    return spans
+
+
+def crossing(a: str | None, t: str) -> str | None:
+    """Why a reader in module a (None: a file of no single module) may not read t, or None if it may."""
+    b = module(t)
+    if b is None or b == a:
+        return None
+    if a is not None and ORDER_ALL.index(b) > ORDER_ALL.index(a):
+        return f"{b}, a later module"
+    if a != "ingest" and raw(t):
+        return f"{b}, a scraped table"
+    return None if t in EXPORT[b] else f"{b}, not exported"
 
 
 def table() -> str:
     rows = ["| Module | Exports (its contract) |", "|---|---|"]
-    rows += [f"| {m} | {', '.join(sorted(EXPORT[m])) or '(none yet)'} |" for m in ORDER + ["grading"]]
+    rows += [f"| {m} | {', '.join(sorted(EXPORT[m])) or '(none yet)'} |" for m in ORDER_ALL]
     return "\n".join(rows)
 
 
 def _selftest() -> None:
-    """The tree passes; and dropping an export makes the check fail (the rule is enforced, not just printed)."""
-    assert main() == 0
-    EXPORT["forecast"].discard("cell")
-    assert main() == 1
-    EXPORT["forecast"].add("cell")
+    """The rule is enforced: a later module, a scraped table and an unexported name are crossings; an export is not."""
+    assert crossing("forecast", "decision_plan")  # a later module
+    assert crossing("decision", "market")  # a scraped table
+    assert crossing("ingest", "market") is None  # ingest reads its own
+    assert crossing(None, "price_trend")  # not exported
+    assert crossing(None, "cell") is None  # exported
+    assert lines("select 1\nfrom a join cell c -- from cell", "cell") == [2]
+    assert prod("x\ndef _selftest():\n    from cell\n\ny from cell\n").count("\n") == 5
+    assert main() == 0, "the tree has crossings (listed above)"  # the gate: red until they are fixed
     print("frontiers selftest ok")
 
 
@@ -113,28 +151,33 @@ def main() -> int:
     objs = scratch()
     names = {n for _, n, _ in objs}
     unassigned = sorted(n for n in names if module(n) is None and n not in SKIP)
-    found = []
+    found: dict[str, set[str]] = {}  # the reading module (or a file of no module) -> its crossings
+    spans = view_spans()
     for kind, n, sql in objs:
         a = module(n)
-        if kind != "view" or a in (None, "grading"):
+        if kind != "view" or a is None:
             continue
+        f, first, text = spans.get(n, (None, 0, ""))
         for t in sorted(reads(sql, n) & names):
-            b = module(t)
-            if not b or b == a:
-                continue
-            if b != "grading" and (ORDER.index(b) > ORDER.index(a) or (a != "ingest" and raw(t))):
-                found.append(f"{n} ({a}) reads {t} ({b}{' raw' if raw(t) else ''})")
-            elif t not in EXPORT[b]:
-                found.append(f"{n} ({a}) reads {t} ({b}), not exported")
+            why = crossing(a, t)
+            for ln in [first + i - 1 for i in lines(text, t)] or [first] if why else []:
+                where = f"{f.relative_to(ROOT)}:{ln}" if f else "(view source not found)"
+                found.setdefault(a, set()).add(f"{where}  view {n} reads {t} ({why})")
     for f in sorted((ROOT / "src").glob("*.py")) + sorted((ROOT / "src/ffcore").glob("*.py")):
-        if f.stem == "grading":
-            continue
-        for t in sorted({t for t in re.findall(r"\b(?:from|join)\s+(\w+)", prod(f.read_text()), re.I) if t in names}):
-            b = module(t)
-            if b and b not in OWNS.get(f.stem, set()) and t not in EXPORT[b]:
-                found.append(f"{f.relative_to(ROOT)} reads {t} ({b}), not exported")
+        a = OWNS.get(f.stem)
+        text = prod(f.read_text())
+        for t in sorted(names):
+            why = crossing(a, t)
+            for ln in lines(text, t) if why else []:
+                found.setdefault(a or "no module: " + f.name, set()).add(
+                    f"{f.relative_to(ROOT)}:{ln}  reads {t} ({why})")
     stale = sorted(f"{m}.{t}" for m, e in EXPORT.items() for t in e if t not in names)
-    print("\n".join(found))
+    total = 0
+    for who in sorted(found, key=lambda w: (ORDER_ALL.index(w) if w in ORDER_ALL else 9, w)):
+        total += len(found[who])
+        print(f"== {who}: {len(found[who])} crossings")
+        print("\n".join("  " + r for r in sorted(found[who])))
+    print(f"crossings: {total}")
     print("unassigned:", " ".join(unassigned) or "none")
     print("exported but not in the schema:", " ".join(stale) or "none")
     return 1 if found or stale else 0
