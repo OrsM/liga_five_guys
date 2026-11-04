@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "FORMATIONS",
+__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "best_eleven", "FORMATIONS",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -67,6 +67,18 @@ xi AS MATERIALIZED (
     UNION ALL
     SELECT id, jornada, player, slot, e FROM rest WHERE m <= %d - (SELECT sum(lo) FROM bounds))""" % XI_SIZE
 
+def best_eleven(by_pos: dict[str, list[tuple[float, str]]]) -> float:
+    """ELEVEN's points in Python, for the decision's search: by_pos is each
+    position's players as (-e, ord), best first; each position's MIN_SLOT
+    best, then the best of the rest within MAX_SLOT to XI_SIZE (level: the
+    lower ord plays, as the tuple sort has it)."""
+    total, rest = 0.0, []
+    for p in POSITIONS:
+        total += sum(-e for e, _ in by_pos[p][:MIN_SLOT[p]])
+        rest += by_pos[p][MIN_SLOT[p]:MAX_SLOT[p]]
+    return total + sum(-e for e, _ in sorted(rest)[:XI_SIZE - sum(MIN_SLOT.values())])
+
+
 # The formations as SQL rows (f, pos, n), f their order above: what the
 # views read where they name rules.FORMATIONS (db.connect puts it in).
 FORMATIONS = " UNION ALL ".join("SELECT %d AS f, '%s' AS pos, %d AS n" % (i, p, n)
@@ -121,6 +133,16 @@ def _selftest() -> None:
            "DEL0": "DEL", "DEL1": "DEL", "DEL2": "DEL", "DEF4": "DEF", "MED3": "MED"}
     level = eleven(tie, {**{k: 3.0 for k in tie}, "DEF4": 2.0, "MED3": 2.0})
     assert "DEF4" in level and "MED3" not in level, "level players for the last place: the lower ord plays"
+    import random
+    rng = random.Random(7)
+    for n in range(60):   # SQL and Python pick the same eleven: seeded squads, short and long, with ties
+        sq = {f"p{i:02d}": rng.choice(POSITIONS) for i in range(rng.choice([0, 1, 5, 11, 16, 24]))}
+        if n % 3 == 0:
+            sq = {k: ("DEF" if p == "MED" else p) for k, p in sq.items()}   # short of a position
+        val = {k: float(rng.randint(0, 3)) for k in sq}   # few levels: many ties
+        by_pos = {p: sorted((-val[k], k) for k in sq if sq[k] == p) for p in POSITIONS}
+        got = eleven(sq, val)
+        assert abs(best_eleven(by_pos) - sum(val[k] for k in got)) < 1e-9, (sq, val)
     print("ffcore.rules self-test OK")
 
 

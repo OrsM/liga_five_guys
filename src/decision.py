@@ -8,7 +8,7 @@ from contextlib import closing
 from typing import Any
 
 from ffcore.db import connect, rows
-from ffcore.rules import DEBT_SHARE, MAX_SLOT, MIN_SLOT, POSITIONS, SQUAD_MAX, XI_SIZE
+from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, best_eleven
 
 __all__ = ["plan", "plan_rows", "inputs"]
 
@@ -38,7 +38,7 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     cash and the debt; in debt (cash at the lock below zero), the least bad
     sale; again, until there is none. A swap pairs a buy with a sale only
     where his top bid is more than the cash left or the squad is full."""
-    (cash, team_value, debt, squad_max, xi_n), = inp["dec_money"]
+    (cash, team_value, debt, squad_max, _), = inp["dec_money"]
     pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
     mine = {k: proceeds for k, _, m, _, proceeds in inp["dec_player"] if m}
     ratios: dict[str, list[tuple[float, float]]] = {}
@@ -51,20 +51,12 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
         if k in pos:
             cells.setdefault(j, {})[k] = e
 
-    def xi(d: dict[str, list[tuple[float, str]]]) -> float:
-        """One jornada's eleven from each position's players, best first."""
-        total, rest = 0.0, []
-        for p in POSITIONS:
-            total += sum(-e for e, _ in d[p][:MIN_SLOT[p]])
-            rest += d[p][MIN_SLOT[p]:MAX_SLOT[p]]
-        return total + sum(-e for e, _ in sorted(rest)[:xi_n - sum(MIN_SLOT.values())])
-
     squad, steps, start = set(mine), [], []
     free, placed = cash, 0.0
     for step in range(squad_max * 2):
         base = {j: {p: sorted((-e[k], k) for k in squad if k in e and pos[k] == p) for p in POSITIONS}
                 for j, e in cells.items()}
-        here = {j: xi(d) for j, d in base.items()}
+        here = {j: best_eleven(d) for j, d in base.items()}
 
         def gain(b: str, s: str) -> float:
             """The squad less s and plus b, over this squad's, over the jornadas."""
@@ -76,7 +68,7 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
                         d[pos[s]] = [x for x in d[pos[s]] if x[1] != s]
                     if b in e:
                         d[pos[b]] = sorted(d[pos[b]] + [(-e[b], b)])
-                    g += xi(d) - here[j]
+                    g += best_eleven(d) - here[j]
             return g
 
         def options(b: str, s: str, g: float) -> list[tuple[Any, ...]]:
