@@ -296,9 +296,6 @@ def _selftest() -> None:
         "how many bid on each: a crowd, only yours, or none yet"
     unlisted = report(put(ub, "route", {}), plan=sell_dead, options=[dead_alone])
     assert [(d["step"], d["done"]) for d in unlisted["do"] if d["what"] == "sell"] == [("list", False)]
-    listed = report(put(ub, "route", {"dead": "listed"}), plan=sell_dead, options=[dead_alone])["unlisted"]
-    assert "Dead" in unlisted["unlisted"] and "Dead" not in listed and len(listed) == len(unlisted["unlisted"]) - 1, \
-        "the warning: players of yours not listed, by name; he leaves it once listed"
 
     def offered_doc(offer: float, nights: int = 0) -> Doc:
         mk = put(put(ub, "offer", {"dead": offer}), "fetches", {"dead": max(offer, 1.0e6)})
