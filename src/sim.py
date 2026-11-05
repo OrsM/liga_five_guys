@@ -175,7 +175,7 @@ def _selftest() -> None:
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()) - (
-            {"cash_then", "skip", "due"} if d["what"] in ("buy", "sell") else set()), d
+            {"detail"} if d["what"] in ("buy", "sell") else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert all(len(d["act"]) == 1 for d in doc["do"] if d["what"] in ("buy", "sell")) \
         and len(field["act"]) == 11 \
@@ -424,9 +424,9 @@ def _selftest() -> None:
     owed = report(debt)
     assert [d["name"] for d in owed["do"] if d["what"] in ("buy", "sell")] == ["Dead", "D1"] \
         and owed["cash_after"] == 5e6, "in debt: sales only, the least bad first, until clear (5M short: 1M, then 9M)"
-    assert [d["cash_then"] for d in owed["do"] if d["what"] in ("buy", "sell")] == [-4e6, 5e6], \
+    assert [d["detail"]["cash_then"] for d in owed["do"] if d["what"] in ("buy", "sell")] == [-4e6, 5e6], \
         "each step of the plan says the cash it leaves, running from today's: -5M, then +1M, then +9M"
-    assert all("cash_then" not in d for d in owed["do"] if d["what"] not in ("buy", "sell")), \
+    assert all("detail" not in d for d in owed["do"] if d["what"] not in ("buy", "sell")), \
         "a line that moves no money says none"
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
@@ -529,17 +529,17 @@ def _selftest_board_contract() -> None:
             == ("Cai", "bid up to", 5.2e6, 0.8, 5e6, 0.6), \
             "a buy: the plan's bid and its chance, and the chance of winning at his asking price (decision_option)"
         sell = do["sell"]
-        assert (buy["due"], sell["due"]) == ({"due": "2026-11-04T22:24Z", "why": "auction closes"},
-                                             {"due": "2026-11-06T20:00Z", "why": "before the lock"}), \
+        assert [(d["detail"]["due"], d["detail"]["why"]) for d in (buy, sell)] == [
+            ("2026-11-04T22:24Z", "auction closes"), ("2026-11-06T20:00Z", "before the lock")], \
             "each step carries when it is due and what sets it (decision_plan)"
         assert (sell["name"], sell["step"], sell["amount"]) == ("Ana", "take offer", 1.1e6), sell
-        assert buy["skip"] == [{"blocker": "none", "label": "safe to skip", "amount": None}] \
-            and sell["skip"] == [
+        assert buy["detail"]["skip"] == [{"blocker": "none", "label": "safe to skip", "amount": None}] \
+            and sell["detail"]["skip"] == [
                 {"blocker": "debt", "label": "if you skip this: in debt at the lock", "amount": -1e6},
                 {"blocker": "eleven", "label": "if you skip this: no eleven can be fielded", "amount": None}], \
             "what skipping a step leaves (decision_skip), worded once by the board, by blocker"
-        assert all("skip" not in d for d in doc["do"] if d["what"] not in ("buy", "sell")) \
-            and all("skip" not in d for d in doc["buys"] + doc["sells"]), "only the plan's buys and sales carry skip"
+        assert all("detail" not in d for d in doc["do"] if d["what"] not in ("buy", "sell")) \
+            and all("detail" not in d for d in doc["buys"] + doc["sells"]), "only the plan's buys and sales carry detail"
         got = {f[0]: f[1] for f in sell["facts"]}
         assert got["the game's recent offers"] == 0.75 and got["more offers before the lock"] == 2 \
             and got["waiting is worth"] == 1.0e6, \
