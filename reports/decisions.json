@@ -1,7 +1,7 @@
 {
- "generated_at": "2026-11-05T19:55Z",
+ "generated_at": "2026-11-05T20:17Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
- "cash": -84411994.0,
+ "cash": -84311994.0,
  "cash_locked": 0.0,
  "finish": 2.28,
  "p_win": 0.094,
@@ -50,7 +50,7 @@
     ]
    ],
    "detail": {
-    "cash_then": -89555946.0498207,
+    "cash_then": -89455946.0498207,
     "due": "2026-11-05T21:24Z",
     "why": "auction closes",
     "skip": [
@@ -134,7 +134,7 @@
     ]
    ],
    "detail": {
-    "cash_then": -91263322.0498207,
+    "cash_then": -91163322.0498207,
     "due": "2026-11-05T21:24Z",
     "why": "auction closes",
     "skip": [
@@ -247,14 +247,14 @@
     ]
    ],
    "detail": {
-    "cash_then": -86053783.0498207,
+    "cash_then": -85953783.0498207,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -1663393.07034049
+      "amount": -1563393.07034049
      }
     ]
    },
@@ -355,7 +355,7 @@
     ]
    ],
    "detail": {
-    "cash_then": -85438560.0498207,
+    "cash_then": -85338560.0498207,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
@@ -463,7 +463,7 @@
     ]
    ],
    "detail": {
-    "cash_then": -81995351.0498207,
+    "cash_then": -81895351.0498207,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
@@ -531,7 +531,7 @@
     ]
    ],
    "detail": {
-    "cash_then": -81099319.0498207,
+    "cash_then": -80999319.0498207,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
@@ -644,14 +644,14 @@
     ]
    ],
    "detail": {
-    "cash_then": -75177944.9210244,
+    "cash_then": -75077944.9210244,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -2375228.19913677
+      "amount": -2275228.19913677
      }
     ]
    },
@@ -677,8 +677,8 @@
     {
      "player_team": "109094609",
      "player": "255",
-     "market": null,
-     "bid": null,
+     "market": "62682354",
+     "bid": "",
      "pos": "DEF",
      "value": 5963708.0
     }
@@ -757,14 +757,14 @@
     ]
    ],
    "detail": {
-    "cash_then": -71157260.9787341,
+    "cash_then": -71057260.9787341,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -474538.012630768
+      "amount": -374538.012630768
      }
     ]
    },
@@ -790,8 +790,8 @@
     {
      "player_team": "109094610",
      "player": "637",
-     "market": null,
-     "bid": null,
+     "market": "62681663",
+     "bid": "",
      "pos": "MED",
      "value": 4010275.0
     }
@@ -870,14 +870,14 @@
     ]
    ],
    "detail": {
-    "cash_then": -59840320.0703405,
+    "cash_then": -59740320.0703405,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -7770794.97873411
+      "amount": -7670794.97873411
      }
     ]
    },
@@ -978,14 +978,14 @@
     ]
    ],
    "detail": {
-    "cash_then": 3546145.92965951,
+    "cash_then": 3646145.92965951,
     "due": "2026-11-05T21:24Z",
     "why": "after the auctions",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -59840320.0703405
+      "amount": -59740320.0703405
      }
     ]
    },
@@ -1011,8 +1011,8 @@
     {
      "player_team": "110441736",
      "player": "3088",
-     "market": null,
-     "bid": null,
+     "market": "64125159",
+     "bid": "",
      "pos": "DEL",
      "value": 59640111.0
     }
@@ -1063,67 +1063,12 @@
      "value": 38565398.0
     }
    ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Martin Satriano, Adria Pedrosa",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Martin Satriano, Adria Pedrosa",
-     "names"
-    ]
-   ],
-   "trace": [
-    3525014.0,
-    3532147.0,
-    3494314.0,
-    3431907.0,
-    3370831.0,
-    3313813.0,
-    3263345.0,
-    3227542.0,
-    3196857.0,
-    3143832.0,
-    3145221.0,
-    3159212.0,
-    3165704.0,
-    3181423.0
-   ],
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "109094607",
-     "player": "1056",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 3181423.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 18574655.0
-    }
-   ]
   }
  ],
- "cash_after": 3546145.92965951,
- "can_bid": 7611488.75017935,
- "ping": "buy Moi Gomez; buy Roger Hinojo; sell Alvaro F. Carreras; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin; list Martin Satriano, Adria Pedrosa",
+ "cash_after": 3646145.92965951,
+ "can_bid": 7711488.75017935,
+ "ping": "buy Moi Gomez; buy Roger Hinojo; sell Alvaro F. Carreras; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin",
+ "unlisted": [],
  "buys": [
   {
    "name": "Moi Gomez",
@@ -1956,8 +1901,8 @@
     {
      "player_team": "109094609",
      "player": "255",
-     "market": null,
-     "bid": null,
+     "market": "62682354",
+     "bid": "",
      "pos": "DEF",
      "value": 5963708.0
     }
@@ -2061,8 +2006,8 @@
     {
      "player_team": "109094610",
      "player": "637",
-     "market": null,
-     "bid": null,
+     "market": "62681663",
+     "bid": "",
      "pos": "MED",
      "value": 4010275.0
     }
@@ -2131,8 +2076,8 @@
   {
    "name": "Adria Pedrosa",
    "pos": "DEF",
-   "what": "list",
-   "label": "list Adria Pedrosa",
+   "what": "sell",
+   "label": "sell Adria Pedrosa",
    "step": "take offer",
    "offer": 3235793.0,
    "waiting": 3222790.35212026,
@@ -2217,14 +2162,14 @@
    ],
    "more": true,
    "accepts": [
-    null
+    3235793.0
    ],
    "act": [
     {
      "player_team": "109094607",
      "player": "1056",
-     "market": null,
-     "bid": null,
+     "market": "62681664",
+     "bid": "",
      "pos": "DEF",
      "value": 3181423.0
     }
@@ -2844,8 +2789,8 @@
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "what": "list",
-   "label": "list Martin Satriano",
+   "what": "sell",
+   "label": "sell Martin Satriano",
    "step": "wait",
    "offer": 18622426.0,
    "waiting": 19179766.9515736,
@@ -2934,15 +2879,13 @@
     18574655.0
    ],
    "more": true,
-   "accepts": [
-    null
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "109094608",
      "player": "3137",
-     "market": null,
-     "bid": null,
+     "market": "62681662",
+     "bid": "",
      "pos": "DEL",
      "value": 18574655.0
     }
@@ -3041,8 +2984,8 @@
     {
      "player_team": "110441736",
      "player": "3088",
-     "market": null,
-     "bid": null,
+     "market": "64125159",
+     "bid": "",
      "pos": "DEL",
      "value": 59640111.0
     }
@@ -3872,7 +3815,7 @@
    "future": "nothing",
    "blocker": "debt",
    "label": "if you do nothing: in debt at the lock",
-   "amount": -84411994.0
+   "amount": -84311994.0
   }
  ],
  "exposed": [
@@ -4004,7 +3947,7 @@
    "now": 568.0,
    "lo": 2207.79245654617,
    "hi": 2505.73197674406,
-   "cash": -23703714.0,
+   "cash": -23603714.0,
    "estimated": true,
    "p_above": 0.896564575574844
   },
@@ -4014,7 +3957,7 @@
    "now": 573.0,
    "lo": 2025.75497054265,
    "hi": 2293.34568110026,
-   "cash": -84411994.0,
+   "cash": -84311994.0,
    "estimated": false,
    "p_above": null
   },
@@ -4024,7 +3967,7 @@
    "now": 464.0,
    "lo": 1964.48774266924,
    "hi": 2239.25497547372,
-   "cash": -34653192.0,
+   "cash": -34553192.0,
    "estimated": true,
    "p_above": 0.349949892209232
   },
@@ -4034,7 +3977,7 @@
    "now": 416.0,
    "lo": 1763.95564130354,
    "hi": 2012.14807838618,
-   "cash": -9043575.0,
+   "cash": -8943575.0,
    "estimated": true,
    "p_above": 0.0282819948566044
   },
@@ -4044,7 +3987,7 @@
    "now": 443.0,
    "lo": 1590.15794288127,
    "hi": 1812.21716466499,
-   "cash": 63993671.0,
+   "cash": 64093671.0,
    "estimated": true,
    "p_above": 0.000364296186717739
   }
