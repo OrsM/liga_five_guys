@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS decision_blocker (
 -- step (a buy goes with its paired sale, the same step). One row a blocker the skip leaves, as decision_blocker's;
 -- blocker 'none' (amount NULL) when skipping leaves nothing. kind: the skipped step's.
 -- What flipping one move leaves, from the plan as it stands (decision.flips): a move in the plan is taken out, one
--- not in it is added. cash at the lock, the season's points against standing pat, and what stops you (a JSON array of blocker names).
+-- not in it is added; kind 'plan' (no player) is the plan itself, to read them against. cash at the lock, the season's points against standing pat, and what stops you (a JSON array of blocker names).
 CREATE TABLE IF NOT EXISTS decision_flip (
     run_id   INTEGER NOT NULL REFERENCES runs(run_id),
     player   TEXT NOT NULL,
@@ -1970,6 +1970,7 @@ SELECT json_object(
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'do'),
     'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
+    'plan_flip', json((SELECT flip FROM board_flip WHERE kind = 'plan')),
     'buys', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'buys'),
     'sells', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'sells'),
     'blockers', (SELECT json_group_array(json_object('future', future, 'blocker', blocker, 'label', label,

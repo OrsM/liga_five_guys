@@ -520,7 +520,8 @@ def _selftest_board_contract() -> None:
                             ("sell", "a", 1.1e6, 1.0, -0.5, 1, "2026-11-06T20:00Z", "before the lock")])
             db.execute("INSERT INTO decision_waiting (run_id, player, kind, later) VALUES (3, 'a', 'sale', 1.0e6)")
             db.executemany("INSERT INTO decision_flip (run_id, player, kind, cash, points, blockers) VALUES (3, ?, ?, ?, ?, ?)",
-                           [("c", "buy", -1e6, 2.5, '["debt", "eleven"]'), ("a", "sell", 6e6, -1.0, "[]")])
+                           [("c", "buy", -1e6, 2.5, '["debt", "eleven"]'), ("a", "sell", 6e6, -1.0, "[]"),
+                            ("", "plan", 3e6, 4.0, "[]")])
             db.executemany("INSERT INTO market (observed_at, source, value, ff_id, name) VALUES (?, '', ?, 'c', 'Cai')",
                            [("2026-08-01T0900Z", 4.0e6), ("2026-08-01T1800Z", 4.1e6), ("2026-08-02T0900Z", 4.2e6)])
             db.executemany("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first,"
@@ -538,6 +539,7 @@ def _selftest_board_contract() -> None:
         assert buy["flip"] == {"cash": -1e6, "points": 2.5, "blockers": ["in debt at the lock", "no eleven can be fielded"]} \
             and sell["flip"] == {"cash": 6e6, "points": -1.0, "blockers": []}, \
             "what flipping each move leaves: its cash, points and what stops you, worded once (decision_flip)"
+        assert board_doc()["plan_flip"] == {"cash": 3e6, "points": 4.0, "blockers": []}, "the plan's own, to read a flip against"
         assert [(d["detail"]["due"], d["detail"]["why"]) for d in (buy, sell)] == [
             ("2026-11-04T22:24Z", "auction closes"), ("2026-11-06T20:00Z", "before the lock")], \
             "each step carries when it is due and what sets it (decision_plan)"

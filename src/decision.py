@@ -391,7 +391,8 @@ def record(run: int) -> list[tuple[Any, ...]]:
         db.executemany("INSERT INTO decision_flip (run_id, player, kind, cash, points, blockers) VALUES (?, ?, ?, ?, ?, ?)",
                        [(run, f.player, f.kind, f.evaluation.cash, f.evaluation.points,
                          json.dumps([b for b, _ in f.evaluation.blockers]))
-                        for f in flips(inp, acts, db.execute("SELECT kind, player, amount, win, in_plan FROM dec_rows").fetchall())])
+                        for f in [Flip("", "plan", evaluate(inp, acts)),
+                                  *flips(inp, acts, db.execute("SELECT kind, player, amount, win, in_plan FROM dec_rows").fetchall())]])
         db.executemany("INSERT INTO decision_skip (run_id, player, kind, blocker, amount) VALUES (?, ?, ?, ?, ?)",
                        [(run, *r) for r in skip_rows(inp, acts)])
     return acts
