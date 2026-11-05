@@ -207,7 +207,9 @@ CREATE TABLE IF NOT EXISTS decision_run (
     cash_after    REAL,
     can_bid       REAL,
     nights        INTEGER,
-    first         REAL
+    first         REAL,
+    offer_mean    REAL,                -- the recent offers (recent_offers) as shares of value: mean and
+    offer_sd      REAL                 -- standard deviation, what an offer is read against
 );
 
 -- Each run's forecast, every cell with factors (ffcore.schedule.Factors):
@@ -1602,14 +1604,14 @@ WHERE o.kind = 'buy';
 -- relist_after: when his listing ends, if before the last of those offers.
 DROP VIEW IF EXISTS board_mine;
 CREATE VIEW board_mine AS
-WITH n AS (SELECT run_id, nights, first FROM decision_run)
+WITH n AS (SELECT run_id, nights, first, offer_mean, offer_sd FROM decision_run)
 SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.takes,
        b.route IS 'listed' AS listed,
        CASE WHEN b.offer IS NOT NULL AND b.value > 0 THEN f.beats END AS beats,
        f.gain, f.worth, coalesce(f.in_plan, 0) AS sell,
        w.later AS waiting,
        CASE WHEN b.route IS 'listed' AND l.t < n.first + n.nights - 1 THEN l.ends END AS relist_after,
-       n.nights
+       n.nights, n.offer_mean, n.offer_sd
 FROM board_players b JOIN n USING (run_id)
 LEFT JOIN decision_option f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.player = b.player
 LEFT JOIN decision_waiting w ON w.run_id = b.run_id AND w.player = b.player AND w.kind = 'sale'
@@ -1652,6 +1654,15 @@ SELECT s.*,
                     WHERE s.offer IS NOT NULL AND s.nights > 0
                 UNION ALL SELECT 2.4, 'more offers before the lock', s.nights, 'count'
                     WHERE s.offer IS NOT NULL
+                UNION ALL SELECT 1.1, 'paid', s.paid, 'money' WHERE s.offer IS NOT NULL
+                UNION ALL SELECT 1.2, 'made on the sale', s.offer - s.paid, 'money'
+                    WHERE s.offer IS NOT NULL AND s.paid IS NOT NULL
+                UNION ALL SELECT 2.1, 'offer vs the usual (sd)', (s.offer / s.value - s.offer_mean) / s.offer_sd, 'sd'
+                    WHERE s.offer IS NOT NULL AND s.value > 0 AND s.offer_sd > 0
+                UNION ALL SELECT 2.3, 'a better offer comes', 1 - power(s.beats, s.nights), 'chance'
+                    WHERE s.offer IS NOT NULL AND s.beats IS NOT NULL AND s.nights > 0
+                UNION ALL SELECT 2.25, 'waiting less the offer', s.waiting - s.offer, 'money'
+                    WHERE s.offer IS NOT NULL AND s.nights > 0 AND s.waiting IS NOT NULL
                 UNION ALL SELECT 3, 'points', s.gain, 'points'
                 UNION ALL SELECT 4, '', s.trend, 'trend')
             WHERE v IS NOT NULL) AS facts

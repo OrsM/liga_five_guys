@@ -28,9 +28,9 @@ NAMES = {
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
               "player_jornadas season_record season_points next_lock listing_ends price_paid lineup_snapshots",
-    "forecast": "cell cell_pool standin_cell score_spread run_forecast forecast_used "
+    "forecast": "cell cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
-    "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts "
+    "decision": "bid_odds recent_offers offer_spread sale_odds waiting nights_left player_facts "
                 "next_cell my_squad my_cash my_xi look_players formation slot_bounds "
                 "decision_option decision_plan decision_facts decision_players decision_waiting decision_run "
                 "decision_standings",
@@ -58,7 +58,7 @@ EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
 # Python files that are wholly one module's: their reads are judged as that module's. A file not here (assemble,
 # sim, db, facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
 OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest",
-        "forecast": "forecast", "forecast_store": "forecast", "seen": "decision", "decision": "decision", "remind": "board", "grading": "grading"}
+        "forecast": "forecast", "forecast_store": "forecast", "seen": "decision", "decision": "decision", "recommender": "decision", "remind": "board", "grading": "grading"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
 SKIP = {"k", "model_constants", "variants", "params", "runs", "run_measures", "facts_meta", "parser_health",
         "persistence_by_run", "board_history", "board_history_moves"}  # no module: config, bookkeeping

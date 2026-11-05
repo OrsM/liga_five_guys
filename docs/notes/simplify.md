@@ -52,9 +52,9 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 | Module | Exports (its contract) |
 |---|---|
 | ingest | app_lineup, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, lineup_snapshots, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
-| forecast | cell, price_carry, price_trend, price_trend_daily |
+| forecast | cell, price_carry, price_trend, price_trend_daily, standin_cell |
 | decision | decision_facts, decision_option, decision_plan, decision_players, decision_run, decision_standings, decision_waiting, league_jornada |
-| settlement | (none yet) |
+| settlement | settlement_moves |
 | board | board_json |
 | grading | (none yet) |
 
@@ -183,28 +183,6 @@ no module: sim.py (6):
 - src/sim.py:476 reads dec_cash (decision, not exported)
 - src/sim.py:478 reads waiting (decision, not exported)
 **Forecast (2026-11-04)**: its crossings are fixed (late_arrivals, standin_cell, market_daily, price_day_now, price_rows read ingest's facts; auction_results no longer reads the forecast). The price trend and momentum are views at t (no kept momentum_fit / price_trend_fit; bid_odds reads price_trend_daily, a past close's trend); a cell's e and v are worked out once (cell_pool; stand-ins are its rows with no player).
-
-**Frontier check (2026-11-04)** (tools/frontiers.py). The rule: a module may read the facts, t (look) and any earlier module's contract; it may not read a later module, nor a scraped table (api_*, current_*, market, lineups...) from outside ingest. The fact views (player_club, player_value, player_status, club_fixture, club_rating, auction_results) are ingest. 20 crossings:
-- late_arrivals (forecast) reads current_api_market (ingest raw)
-- standin_cell (forecast) reads seen (decision)
-- nights_left (decision) reads current_api_offers (ingest raw)
-- player_facts (decision) reads current_api_market (ingest raw)
-- player_facts (decision) reads current_api_offers (ingest raw)
-- player_facts (decision) reads current_api_teams (ingest raw)
-- player_facts (decision) reads current_lineups (ingest raw)
-- player_facts (decision) reads current_market (ingest raw)
-- market_daily (forecast) reads market (ingest raw)
-- price_day_now (forecast) reads market (ingest raw)
-- price_rows (forecast) reads market (ingest raw)
-- auction_results (ingest) reads price_trend_fit (forecast)
-- bid_odds (decision) reads current_api_market (ingest raw)
-- offer_ratios (decision) reads api_offers (ingest raw)
-- offer_ratios (decision) reads api_teams (ingest raw)
-- board_buy_facts (board) reads current_api_market (ingest raw)
-- lineup_gap (board) reads api_lineup (ingest raw)
-- board_json (board) reads current_api_market (ingest raw)
-- board_json (board) reads current_api_teams (ingest raw)
-- league_season (decision) reads current_api_standings (ingest raw)
 
 **Order.** (1) The frontier check, to get the full list. (2) Settlement: own its rule and fix the lost-bid sell-off. (3) Decision: tests on rows, the expected gap as its measure. (4) Forecast: tests on rows. (5) Ingest: facts as tables at fetch. Each step is done by one agent with a short brief, and is finished when its module's test and measure pass and its old copy is deleted.
 

@@ -287,3 +287,9 @@ CREATE VIEW league_jornada AS
 SELECT x.manager, x.jornada, total(x.e) AS mean,
        sqrt(max((1 + w.share * w.share) * total(x.v) + w.share * w.share * total(x.e * x.e), 0.0)) AS sd
 FROM league_xi x CROSS JOIN (SELECT const('PERSISTENT_SHARE') AS share) w GROUP BY x.manager, x.jornada;
+
+-- What an offer is read against: the mean and standard deviation of the recent offers (recent_offers)
+-- as shares of value. decision_run keeps them, the board shows an offer in standard deviations from the mean.
+DROP VIEW IF EXISTS offer_spread;
+CREATE VIEW offer_spread AS
+SELECT avg(ratio) AS mean, sqrt(max(avg(ratio * ratio) - avg(ratio) * avg(ratio), 0.0)) AS sd FROM recent_offers;

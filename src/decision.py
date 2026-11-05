@@ -184,9 +184,10 @@ KEEP = (
     " FROM dec_rows d LEFT JOIN player_facts f ON f.player = d.player",
     KEEP_PLAN,
     "INSERT INTO decision_waiting SELECT ?, player, kind, later FROM waiting",
-    "INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first)"
-    " SELECT ?, cut(), s.p_first, s.finish, c.free, r.room, n.nights, n.first"
-    " FROM dec_cash c, dec_room r, league_standings s, nights_left n WHERE s.me",
+    "INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first,"
+    " offer_mean, offer_sd)"
+    " SELECT ?, cut(), s.p_first, s.finish, c.free, r.room, n.nights, n.first, o.mean, o.sd"
+    " FROM dec_cash c, dec_room r, league_standings s, nights_left n, offer_spread o WHERE s.me",
 )
 
 
@@ -246,6 +247,16 @@ def _selftest() -> None:
         return {k for _, kind, k, *_ in steps if kind == "sell"}
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        assert rows("SELECT mean, sd FROM offer_spread") == [(None, None)], "no offer seen: nothing to read one against"
+        for n, money in enumerate(("8000000", "9000000", "10000000"), 1):      # 0.8, 0.9, 1.0 of value
+            store_sql("api_teams", [{"observed_at": "2026-09-0%dT1000Z" % n, "player_id": "1", "manager": "me",
+                                     "market_value": "10000000", "player_team_id": "t1"}])
+            store_sql("api_offers", [{"observed_at": "2026-09-0%dT1000Z" % n, "player_team_id": "t1", "offer_id": "o%d" % n,
+                                      "from_market": "true", "money": money, "status": "accepted",
+                                      "created_at": "2026-09-0%dT09:00:00+02:00" % n}])
+        (mean, sd), = rows("SELECT mean, sd FROM offer_spread")
+        assert abs(mean - 0.9) < 1e-9 and abs(sd - math.sqrt(0.02 / 3)) < 1e-9, \
+            "the offers seen as shares of value: their mean and (population) standard deviation"
         # The eleven: k, d1-d3, m1-m3, f1 (each position's least), then the best three of the rest:
         # f2, f3 and m4 (2 points); bench (1) plays for nobody. 42 points a jornada.
         steps, start = plan_rows(league(10e6, {"star": 8e6}))

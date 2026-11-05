@@ -466,13 +466,14 @@ def _selftest_board_contract() -> None:
         c = cut()
         with closing(connect()) as db, db:
             db.execute("INSERT INTO runs (run_id, started, as_of, trigger, commit_sha) VALUES (3, 't', 't', 'test', 'c')")
-            db.execute("INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first)"
-                       " VALUES (3, ?, 0.25, 2.5, 4e6, 6e6, 2, julianday('2026-08-02T20:00:00Z'))", (c,))
+            db.execute("INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first,"
+                       " offer_mean, offer_sd) VALUES (3, ?, 0.25, 2.5, 4e6, 6e6, 2, julianday('2026-08-02T20:00:00Z'), 1.0, 0.05)",
+                       (c,))
             db.executemany("INSERT INTO seen (cut, variant, player, name, pos, owner, value, trend, offer, price, route,"
-                           " fetches) VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                           [(c, "a", "Ana", "MED", "me", 1e6, None, 1.1e6, None, "listed", 1.1e6),
-                            (c, "b", "Beto", "DEF", "me", 2e6, 3.0, None, None, None, 2e6),
-                            (c, "c", "Cai", "DEL", None, 4e6, 1.0, None, 5e6, None, None)])
+                           " fetches, paid) VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           [(c, "a", "Ana", "MED", "me", 1e6, None, 1.1e6, None, "listed", 1.1e6, 0.8e6),
+                            (c, "b", "Beto", "DEF", "me", 2e6, 3.0, None, None, None, 2e6, None),
+                            (c, "c", "Cai", "DEL", None, 4e6, 1.0, None, 5e6, None, None, None)])
             db.executemany("INSERT INTO decision_players (run_id, player, start, next, season, mine, xi)"
                            " VALUES (3, ?, 0.9, ?, 20.0, ?, ?)",
                            [("a", 1.0, 1, 0), ("b", 3.0, 1, 1), ("c", 4.0, 0, 0)])
@@ -501,6 +502,14 @@ def _selftest_board_contract() -> None:
             and got["waiting is worth"] == 1.0e6, \
             "a sale: where his offer ranks among the game's recent offers (decision_option.beats), the nights left " \
             "(decision_run) and what waiting is worth (decision_waiting)"
+        facts_of = {f[0]: (f[1], f[2]) for f in sell["facts"]}
+        assert facts_of["paid"] == (0.8e6, "money") and facts_of["made on the sale"] == (0.3e6, "money"), \
+            "what you make: the offer less what you paid"
+        assert abs(facts_of["offer vs the usual (sd)"][0] - 2.0) < 1e-9 and facts_of["offer vs the usual (sd)"][1] == "sd", \
+            "the offer's share of value (1.1) against the recent offers' mean (1.0) in their standard deviations (0.05)"
+        assert facts_of["a better offer comes"] == (1 - 0.75 ** 2, "chance"), \
+            "he beats 75% of offers and two nights are left, one offer a night, independent: 1 - 0.75^2"
+        assert facts_of["waiting less the offer"] == (-0.1e6, "money"), "waiting worth 1.0M against the offer 1.1M"
         assert (doc["finish"], doc["finish_after"], doc["p_win"], doc["p_win_after"], doc["cash"],
                 doc["cash_after"], doc["can_bid"]) == (2.0, 2.5, 0.4, 0.25, 4e6, 4e6, 6e6), doc
         assert [(r["manager"], r["p_above"]) for r in doc["standings"]] == [("riv", 0.7), ("me", None)], \
