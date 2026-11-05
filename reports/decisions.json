@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-05T05:37Z",
+ "generated_at": "2026-11-05T06:35Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84411994.0,
  "cash_locked": 0.0,
@@ -85,14 +85,39 @@
      "money"
     ],
     [
+     "paid",
+     5634247.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -424708.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      1.0,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     1.46366639490068,
+     "sd"
+    ],
+    [
      "waiting is worth",
      4688289.57525455,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -521249.424745447,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.0,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -195,14 +220,39 @@
      "money"
     ],
     [
+     "paid",
+     589995.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     25228.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.46,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.15178708298475,
+     "sd"
+    ],
+    [
      "waiting is worth",
      610735.100487386,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -4487.89951261389,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.54,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -250,14 +300,39 @@
      "money"
     ],
     [
+     "paid",
+     6931556.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -3488347.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.92,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     1.18010580350641,
+     "sd"
+    ],
+    [
      "waiting is worth",
      3142892.44050828,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -300316.559491722,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.08,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -350,14 +425,39 @@
      "money"
     ],
     [
+     "paid",
+     6865304.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -1064355.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.38,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.589082719433332,
+     "sd"
+    ],
+    [
      "waiting is worth",
      5921374.12879629,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     120425.128796285,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.62,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -410,14 +510,39 @@
      "money"
     ],
     [
+     "paid",
+     4279563.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -448548.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.3,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.865953210106685,
+     "sd"
+    ],
+    [
      "waiting is worth",
      4020683.94229028,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     189668.942290282,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.7,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -470,14 +595,39 @@
      "money"
     ],
     [
+     "paid",
+     13097547.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -2207383.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.26,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.916892386422325,
+     "sd"
+    ],
+    [
      "waiting is worth",
      11316940.9083936,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     426776.908393612,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.74,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -525,14 +675,39 @@
      "money"
     ],
     [
+     "paid",
+     53582476.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     9803990.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.74,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.844010079852163,
+     "sd"
+    ],
+    [
      "waiting is worth",
      61574892.1779466,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -1811573.82205339,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.26,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -952,14 +1127,39 @@
      "money"
     ],
     [
+     "paid",
+     5634247.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -424708.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      1.0,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     1.46366639490068,
+     "sd"
+    ],
+    [
      "waiting is worth",
      4688289.57525455,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -521249.424745447,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.0,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1011,14 +1211,39 @@
      "money"
     ],
     [
+     "paid",
+     6931556.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -3488347.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.92,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     1.18010580350641,
+     "sd"
+    ],
+    [
      "waiting is worth",
      3142892.44050828,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -300316.559491722,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.08,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1114,14 +1339,39 @@
      "money"
     ],
     [
+     "paid",
+     589995.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     25228.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.46,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.15178708298475,
+     "sd"
+    ],
+    [
      "waiting is worth",
      610735.100487386,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -4487.89951261389,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.54,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1178,14 +1428,39 @@
      "money"
     ],
     [
+     "paid",
+     6865304.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -1064355.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.38,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.589082719433332,
+     "sd"
+    ],
+    [
      "waiting is worth",
      5921374.12879629,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     120425.128796285,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.62,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1242,14 +1517,39 @@
      "money"
     ],
     [
+     "paid",
+     4279563.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -448548.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.3,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.865953210106685,
+     "sd"
+    ],
+    [
      "waiting is worth",
      4020683.94229028,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     189668.942290282,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.7,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1345,14 +1645,39 @@
      "money"
     ],
     [
+     "paid",
+     5505499.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -861089.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.6,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.531153152765908,
+     "sd"
+    ],
+    [
      "waiting is worth",
      4392636.41866917,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -251773.581330833,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.4,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1406,14 +1731,39 @@
      "money"
     ],
     [
+     "paid",
+     3313813.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -78020.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.46,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.116769840820788,
+     "sd"
+    ],
+    [
      "waiting is worth",
      3222790.35212026,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -13002.6478797393,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.54,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1472,14 +1822,39 @@
      "money"
     ],
     [
+     "paid",
+     6674686.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     626275.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.22,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -1.12515234685873,
+     "sd"
+    ],
+    [
      "waiting is worth",
      7783490.86344201,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     482529.863442007,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.78,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1536,14 +1911,39 @@
      "money"
     ],
     [
+     "paid",
+     13097547.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -2207383.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.26,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.916892386422325,
+     "sd"
+    ],
+    [
      "waiting is worth",
      11316940.9083936,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     426776.908393612,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.74,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1605,9 +2005,24 @@
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -1.20552845475744,
+     "sd"
+    ],
+    [
      "waiting is worth",
      24026277.8630753,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     1525585.86307528,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.84,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1659,14 +2074,39 @@
      "money"
     ],
     [
+     "paid",
+     42016585.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     3772130.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.74,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.82427522166427,
+     "sd"
+    ],
+    [
      "waiting is worth",
      44443945.6294835,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -1344769.37051647,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.26,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1720,14 +2160,39 @@
      "money"
     ],
     [
+     "paid",
+     5307217.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     4156627.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.44,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.0490307715390832,
+     "sd"
+    ],
+    [
      "waiting is worth",
      9309906.43819381,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -153937.561806194,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.56,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1786,14 +2251,39 @@
      "money"
     ],
     [
+     "paid",
+     17220303.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     1402123.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.42,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.114127864997898,
+     "sd"
+    ],
+    [
      "waiting is worth",
      19179766.9515736,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     557340.951573581,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.58,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1845,14 +2335,39 @@
      "money"
     ],
     [
+     "paid",
+     53582476.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     9803990.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.74,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.844010079852163,
+     "sd"
+    ],
+    [
      "waiting is worth",
      61574892.1779466,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -1811573.82205339,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.26,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1909,14 +2424,39 @@
      "money"
     ],
     [
+     "paid",
+     42723121.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     5282082.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.3,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.833334973157262,
+     "sd"
+    ],
+    [
      "waiting is worth",
      50764723.6903175,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     2759520.69031746,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.7,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -1968,14 +2508,39 @@
      "money"
     ],
     [
+     "paid",
+     28589508.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -2254361.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.98,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     1.40838674166721,
+     "sd"
+    ],
+    [
      "waiting is worth",
      24043498.8828343,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -2291648.11716566,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.02,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -2029,14 +2594,39 @@
      "money"
     ],
     [
+     "paid",
+     13966262.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     6729890.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.76,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.991866962018775,
+     "sd"
+    ],
+    [
      "waiting is worth",
      19661067.2399194,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -1035084.76008056,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.24,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -2095,9 +2685,24 @@
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     0.572088229168008,
+     "sd"
+    ],
+    [
      "waiting is worth",
      42986462.9455027,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -277870.054497302,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.38,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -2156,14 +2761,39 @@
      "money"
     ],
     [
+     "paid",
+     43516633.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -5523758.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.4,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.391137501832069,
+     "sd"
+    ],
+    [
      "waiting is worth",
      38295002.3159547,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     302127.315954745,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.6,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -2215,14 +2845,39 @@
      "money"
     ],
     [
+     "paid",
+     37492727.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     19042986.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.98,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     1.38431237375579,
+     "sd"
+    ],
+    [
      "waiting is worth",
      52112110.4004159,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     -4423602.5995841,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.02,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -2281,14 +2936,39 @@
      "money"
     ],
     [
+     "paid",
+     45725154.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -4668291.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.16,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -1.28222511493904,
+     "sd"
+    ],
+    [
      "waiting is worth",
      45564090.908502,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     4507227.90850195,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.84,
+     "chance"
     ],
     [
      "more offers before the lock",
@@ -2345,14 +3025,39 @@
      "money"
     ],
     [
+     "paid",
+     21511188.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -3074809.0,
+     "money"
+    ],
+    [
      "the game's recent offers",
      0.38,
      "beats"
     ],
     [
+     "offer vs the usual (sd)",
+     -0.675550852381634,
+     "sd"
+    ],
+    [
      "waiting is worth",
      19052855.5338908,
      "money"
+    ],
+    [
+     "waiting less the offer",
+     616476.533890821,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.62,
+     "chance"
     ],
     [
      "more offers before the lock",
