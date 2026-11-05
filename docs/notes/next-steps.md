@@ -26,6 +26,9 @@ Dani Martínez (zero points; the game only offers for listed players) is also yo
 
 ## Open, in order
 
+0. The stress test's findings are in `model.md`, ranked: first, a stated policy for a sale whose offer lapses at the
+   close (sell before the bids settle, or to a later offer), then lost bids as a branch, then the cap on pending bids.
+
 1. **Fold the per-row board fields** (`cash_then`, `skip`, `due`) into one `plan` object: each new field costs a
    column, a JSON key and a remove clause in `board_json`.
 2. **Delete `settlement_moves`** (nothing reads it; `listing_close` and `schedule` cover its timing). A module in the
