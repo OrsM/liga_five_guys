@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-05T09:04Z",
+ "generated_at": "2026-11-05T09:58Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84411994.0,
  "cash_locked": 0.0,
@@ -50,6 +50,13 @@
     ]
    ],
    "cash_then": -89555946.0498207,
+   "skip": [
+    {
+     "blocker": "none",
+     "label": "safe to skip",
+     "amount": null
+    }
+   ],
    "ranked": true,
    "asking": 4138235.0,
    "win": 1.0,
@@ -137,6 +144,13 @@
     ]
    ],
    "cash_then": -84346407.0498207,
+   "skip": [
+    {
+     "blocker": "debt",
+     "label": "if you skip this: in debt at the lock",
+     "amount": -1663393.07034049
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -188,6 +202,13 @@
     ]
    ],
    "cash_then": -86053783.0498207,
+   "skip": [
+    {
+     "blocker": "none",
+     "label": "safe to skip",
+     "amount": null
+    }
+   ],
    "ranked": true,
    "asking": 1707376.0,
    "win": 1.0,
@@ -274,6 +295,13 @@
     ]
    ],
    "cash_then": -85438560.0498207,
+   "skip": [
+    {
+     "blocker": "none",
+     "label": "safe to skip",
+     "amount": null
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -355,6 +383,13 @@
     ]
    ],
    "cash_then": -81995351.0498207,
+   "skip": [
+    {
+     "blocker": "none",
+     "label": "safe to skip",
+     "amount": null
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -396,6 +431,13 @@
     ]
    ],
    "cash_then": -81099319.0498207,
+   "skip": [
+    {
+     "blocker": "none",
+     "label": "safe to skip",
+     "amount": null
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -482,6 +524,13 @@
     ]
    ],
    "cash_then": -75177944.9210244,
+   "skip": [
+    {
+     "blocker": "debt",
+     "label": "if you skip this: in debt at the lock",
+     "amount": -2375228.19913677
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -568,6 +617,13 @@
     ]
    ],
    "cash_then": -71157260.9787341,
+   "skip": [
+    {
+     "blocker": "debt",
+     "label": "if you skip this: in debt at the lock",
+     "amount": -474538.012630768
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -654,6 +710,13 @@
     ]
    ],
    "cash_then": -59840320.0703405,
+   "skip": [
+    {
+     "blocker": "debt",
+     "label": "if you skip this: in debt at the lock",
+     "amount": -7770794.97873411
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -734,7 +797,14 @@
      "trend"
     ]
    ],
-   "cash_then": 3546145.92965952,
+   "cash_then": 3546145.92965951,
+   "skip": [
+    {
+     "blocker": "debt",
+     "label": "if you skip this: in debt at the lock",
+     "amount": -59840320.0703405
+    }
+   ],
    "ranked": true,
    "accepts": [],
    "act": [
@@ -819,7 +889,7 @@
    ]
   }
  ],
- "cash_after": 3546145.92965952,
+ "cash_after": 3546145.92965951,
  "can_bid": 7611488.75017935,
  "ping": "buy Moi Gomez; sell Alvaro F. Carreras; buy Roger Hinojo; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin; list Martin Satriano, Adria Pedrosa",
  "buys": [
