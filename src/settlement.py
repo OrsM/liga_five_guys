@@ -52,10 +52,10 @@ def _selftest() -> None:
         finally:
             set_now(None)
     p, c = "run 1", "2026-09-02T2024Z"
-    assert got == [(p, run, "sell", "lone", 2e6),
-                   (p, c, "buy", "also won", 11e6), (p, c, "buy", "won", 10.5e6), (p, c, "sell", "a", 4e6)], \
+    assert got == [(p, c, "buy", "also won", 11e6), (p, c, "buy", "won", 10.5e6), (p, c, "sell", "a", 4e6),
+                   (p, c, "sell", "lone", 2e6)], \
         "won bids make their buys and their own paired sale; a lost bid (maffeo's) makes no sale, nor a bid " \
-        "not yet closed (d's); a lone sale is made at once: %s" % got
+        "not yet closed (d's); a sale of no bid's, beside bids, once one is won: %s" % got
     print("settlement self-test OK")
 
 

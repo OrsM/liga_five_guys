@@ -85,15 +85,14 @@ def keep(db: sqlite3.Connection, now: Callable[[], str]) -> None:
 
 def migrate(db: sqlite3.Connection) -> None:
     """The forecast's store as it was when a code hash keyed it (2026-11-04)
-    made the SQL forecast's: the moments no run or grade points to dropped,
-    the rest kept by what made them; the fits and variants tables gone."""
+    made the SQL forecast's: its moments and cells kept, the fits and
+    variants tables gone."""
     if "made" not in {r[1] for r in db.execute("PRAGMA table_info(forecast_moment)")}:
         return
     for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
         db.execute('DROP VIEW "%s"' % v)
-    kept = "SELECT moment FROM sim_runs WHERE moment IS NOT NULL UNION SELECT moment FROM grade_moment"
-    for t in ("forecast_cell", "forecast_player", "forecast_moment"):
-        db.execute("DELETE FROM %s WHERE moment NOT IN (%s)" % (t, kept))
+    for t in ("forecast_cell", "forecast_player"):
+        db.execute("DELETE FROM %s WHERE moment NOT IN (SELECT moment FROM forecast_moment)" % t)
     db.executescript("""
         DROP TABLE IF EXISTS forecast_fit; DROP TABLE IF EXISTS forecast_variant;
         CREATE TABLE forecast_moment_new (moment INTEGER PRIMARY KEY, code TEXT NOT NULL DEFAULT 'sql',
@@ -110,9 +109,7 @@ def forecast() -> int:
         cells = db.execute("SELECT player, jornada, pts, p, ppm, fixture, picked, fit FROM forecast_now").fetchall()
         flagged = dict(db.execute("SELECT player, status IS NOT NULL FROM player_status"))
         with db:
-            old = ("SELECT moment FROM forecast_moment WHERE as_of = cut() AND variant = variant()"
-                   " AND moment NOT IN (SELECT moment FROM sim_runs WHERE moment IS NOT NULL"
-                   " UNION SELECT moment FROM grade_moment)")
+            old = "SELECT moment FROM forecast_moment WHERE as_of = cut() AND variant = variant() AND NOT pinned"
             for t in ("forecast_cell", "forecast_player", "forecast_moment"):
                 db.execute("DELETE FROM %s WHERE moment IN (%s)" % (t, old))
             moment = db.execute("INSERT INTO forecast_moment (as_of, variant) VALUES (cut(), variant())").lastrowid
@@ -330,7 +327,7 @@ def _selftest_forecast() -> None:
             assert rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged ORDER BY player",
                         (first, )) == [("dbt", ), ("gone", ), ("hurt", ), ("susp", )], "who was flagged then"
             with closing(connect()) as db, db:
-                db.execute("INSERT INTO sim_runs (run_id, moment) VALUES (1, ?)", (first, ))
+                db.execute("UPDATE forecast_moment SET pinned = 1 WHERE moment = ?", (first, ))
             forecast()
             third = forecast()
             assert [m for m, in rows("SELECT moment FROM forecast_moment ORDER BY moment")] \

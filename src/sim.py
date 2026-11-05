@@ -374,7 +374,7 @@ def _selftest() -> None:
         assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'buy'"
                     " AND asking_win IS NOT 1.0") == [(0,)], "a buy's chance at his asking price: sure with no past"
         with closing(connect()) as db, db:
-            db.execute("INSERT INTO forecast_moment VALUES (5, 'c', 't', 'live')")
+            db.execute("INSERT INTO forecast_moment (moment, code, as_of, variant) VALUES (5, 'c', 't', 'live')")
             db.executemany("INSERT INTO forecast_cell VALUES (5, ?, 3, ?, ?, ?, ?, ?, ?)",
                            [("star", 6.6, 0.45, 6.0, 1.1, 0.9, 0.5), ("plain", 4.0, 0.8, None, None, None, None)])
             db.execute("UPDATE sim_runs SET moment = 5 WHERE run_id = 7")
@@ -517,6 +517,7 @@ def record_run(run: int, params: Sequence[Doc] = (), moment: int | None = None) 
     record([{"run_id": run, **r} for r in params], "params")
     with closing(connect()) as db, db:
         db.execute("INSERT INTO sim_runs (run_id, moment) VALUES (?, ?)", (run, moment))
+        db.execute("UPDATE forecast_moment SET pinned = 1 WHERE moment = ?", (moment,))   # a run keeps its forecast
     return acts
 
 

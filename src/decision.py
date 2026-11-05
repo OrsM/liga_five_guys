@@ -45,7 +45,8 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]], recs: Recs | None = None
 
     def fund(picks: list[Rec]) -> tuple[list[tuple[Any, ...]], set[str], float]:
         """The steps that make these buys and bring the cash at the lock to zero or more: (steps, squad, cash)."""
-        squad, steps, free = set(mine), [], cash
+        squad, free = set(mine), cash
+        steps: list[tuple[Any, ...]] = []
         for pick in picks:
             steps.append((len(steps), "buy", pick.player, pick.bid, pick.win, pick.worth))
             squad.add(pick.player)

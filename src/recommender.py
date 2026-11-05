@@ -68,7 +68,8 @@ def recommend(inp: Rows) -> Recs:
     where = {k: {j for j, e in cells.items() if k in e} for k in pos}
     limit = cash + debt * team_value
 
-    squad, picks, placed = set(mine), [], 0.0
+    squad, placed = set(mine), 0.0
+    picks: list[Rec] = []
     alone: list[tuple[Any, ...]] = []
 
     def value(b: str, drop: str) -> Rec | None:
@@ -128,12 +129,12 @@ def _selftest() -> None:
     e = {**{k: 4.0 for k in squad}, "m4": 2.0, "star": 8.0, "good": 5.0, "keeper": 3.0, "pricey": 9.0}
     kinds = {"star": "MED", "good": "MED", "keeper": "POR", "pricey": "MED"}
 
-    def rows(cash: float, ask: dict[str, float], odds: list[tuple[str, float, float]] = (),
+    def rows(cash: float, ask: dict[str, float], odds: list[tuple[str, float, float]] | None = None,
              extra: int = 0) -> Rows:
         sq = {**squad, **{"x%02d" % i: "DEF" for i in range(extra)}}
         return {"dec_player": [(k, p, 1, None, 5e6) for k, p in sq.items()]
                               + [(k, kinds[k], 0, a, None) for k, a in ask.items()],
-                "dec_odds": list(odds), "dec_money": [(cash, 5e6 * len(sq), DEBT_SHARE, SQUAD_MAX, XI_SIZE)],
+                "dec_odds": list(odds or []), "dec_money": [(cash, 5e6 * len(sq), DEBT_SHARE, SQUAD_MAX, XI_SIZE)],
                 "cell": [(k, 1, v) for k, v in e.items() if k in sq or k in ask]}
 
     def names(r: Recs) -> list[str]:
