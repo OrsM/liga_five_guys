@@ -134,7 +134,7 @@ def expected_gap(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, .
 
 
 def in_order(steps: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
-    """The plan's steps in its order: step, a buy before a sale (the board's ORDER BY step, kind)."""
+    """The plan's steps in its order: step, a buy before a sale (decision_plan.ord)."""
     return sorted(steps, key=lambda s: (s[0], s[1]))
 
 
@@ -300,8 +300,8 @@ def record(run: int) -> list[tuple[Any, ...]]:
         for sql in KEEP:
             db.execute(sql, (run,))
         db.execute(KEEP_RUN, (run, planned.cash, room))
-        db.executemany("UPDATE decision_plan SET cash_then = ? WHERE run_id = ? AND step = ? AND kind = ?",
-                       [(c, run, step, kind) for c, (step, kind, *_) in zip(planned.cash_then, in_order(acts))])
+        db.executemany("UPDATE decision_plan SET cash_then = ?, ord = ? WHERE run_id = ? AND step = ? AND kind = ?",
+                       [(c, i, run, step, kind) for i, (c, (step, kind, *_)) in enumerate(zip(planned.cash_then, in_order(acts)))])
         db.executemany("INSERT INTO decision_sale (run_id, player, offer, paid, made, z, p_better, waiting_less)"
                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                        [(run, k, offer, paid, *assess_sale(offer, value, paid, beats, nights, waiting, mean, sd))
@@ -524,7 +524,7 @@ def _selftest_blockers() -> None:
         free = cash - sum(a if kind == "buy" else -a for _, kind, _, a, *_ in steps)
         res = after(rows_in, steps)
         assert res.cash == free, ("after().cash is fund()'s free", cash, steps)
-        ordered = sorted(steps, key=lambda s: (s[0], s[1]))
+        ordered = in_order(steps)
         assert res.cash_then[-1:] == ([free] if steps else []) and len(res.cash_then) == len(steps), ordered
 
 

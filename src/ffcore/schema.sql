@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS decision_plan (
     worth  REAL NOT NULL,            -- the step's, in points
     after  INTEGER NOT NULL DEFAULT 0, -- a sale made after the auctions (decide.sql dec_when)
     cash_then REAL,                    -- the cash this step leaves, running from today's (decision.after)
+    ord    INTEGER,                    -- the step's place in the plan's order, from 0 (decision.in_order); everything reads this
     PRIMARY KEY (run_id, step, kind)
 );
 
@@ -1765,8 +1766,7 @@ SELECT 'out', group_concat(name, ', ' ORDER BY i) FROM gap WHERE side = 'out';
 -- each spends (a sale's is negative).
 DROP VIEW IF EXISTS board_plan;
 CREATE VIEW board_plan AS
-SELECT row_number() OVER (ORDER BY p.step, p.kind) - 1 AS ord, p.step, p.kind, p.player, p.amount,
-       CASE p.kind WHEN 'buy' THEN p.amount ELSE -p.amount END AS net, p.win, p.worth, p.after, p.cash_then
+SELECT p.ord, p.step, p.kind, p.player, p.amount, p.win, p.worth, p.after, p.cash_then
 FROM decision_plan p JOIN board_run USING (run_id);
 
 -- Every line of the board, each once: what to do now, each with the step
@@ -1976,14 +1976,20 @@ FROM board_head h;
 -- A run to remind you of your line-up is due once the next jornada's lock is
 -- within REMIND_HOURS, and only once: not if a run was asked for it
 -- (trigger 'reminder', as_of the window's opening or later).
+-- Each blocker's words, once; the views below add what the blocker is about.
+DROP VIEW IF EXISTS board_blocker_word;
+CREATE VIEW board_blocker_word AS
+SELECT 'debt' AS blocker, 'in debt at the lock' AS phrase
+UNION ALL SELECT 'eleven', 'no eleven can be fielded'
+UNION ALL SELECT 'squad', 'more players than the squad holds';
+
 -- The last run's blockers, each worded once for the page.
 DROP VIEW IF EXISTS board_blockers;
 CREATE VIEW board_blockers AS
 SELECT row_number() OVER (ORDER BY b.future = 'plan', b.blocker) AS ord, b.future, b.blocker, b.amount,
        CASE b.future WHEN 'nothing' THEN 'if you do nothing: ' ELSE 'if you do the plan: ' END
-       || CASE b.blocker WHEN 'debt' THEN 'in debt at the lock' WHEN 'eleven' THEN 'no eleven can be fielded'
-                         ELSE 'more players than the squad holds' END AS label
-FROM decision_blocker b JOIN board_run USING (run_id);
+       || w.phrase AS label
+FROM decision_blocker b JOIN board_run USING (run_id) JOIN board_blocker_word w USING (blocker);
 
 -- What skipping one step of the plan leaves (decision_skip), worded once for the page; a do row's `skip`
 -- in board_json (buy and sell rows only; none when the run recorded nothing for the step).
@@ -1991,10 +1997,8 @@ DROP VIEW IF EXISTS board_skip;
 CREATE VIEW board_skip AS
 SELECT s.player, s.kind, s.blocker, s.amount,
        CASE s.blocker WHEN 'none' THEN 'safe to skip'
-                      ELSE 'if you skip this: ' || CASE s.blocker WHEN 'debt' THEN 'in debt at the lock'
-                                                                  WHEN 'eleven' THEN 'no eleven can be fielded'
-                                                                  ELSE 'more players than the squad holds' END END AS label
-FROM decision_skip s JOIN board_run USING (run_id);
+                      ELSE 'if you skip this: ' || w.phrase END AS label
+FROM decision_skip s JOIN board_run USING (run_id) LEFT JOIN board_blocker_word w USING (blocker);
 
 DROP VIEW IF EXISTS lock_due;
 CREATE VIEW lock_due AS
