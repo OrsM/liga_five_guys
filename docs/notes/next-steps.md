@@ -94,3 +94,17 @@ only when a blocker appears. Not the list of verbs.
 
 Order of work: U5 (one `FACT` entry and its test) → U1 and U2 (the board already has the data) → U3 and U4
 (Decision work, test first) → the rest. The page decides nothing; any new number comes from a board column.
+
+## Status (2026-11-05, later)
+
+Done and live: the pull fix (`--rebase=merges`, `tools/pullcheck.py`); `decision.after` (one evaluator of cash and
+squad after moves; cash_then, cash_after, can_bid, blockers and skip all come from it; `dec_bid` is an input);
+the board words and carries blockers, running cash and skip (`decision_blocker`, `decision_skip`, `board_skip`);
+the page shows them (deployed). The settlement view has no live reader (only the replay was meant to); not deleted.
+
+Open: the ordered "do this" list by deadline (bids close 22:24 CET, cash is due Fri 20:00Z); a hold/keep input so a
+re-plan without a move is one tap (skip says only what is left, not the best alternative); a skip is judged alone
+(skipping several is not their sum); relist vs wait odds; unlisted players' proceeds; recommender thresholds from
+data; pin legacy forecast moments; delete settlement_moves if the replay does not need it; stale worktrees
+(`position-baseline` holds two unmerged October commits; 16 agent worktrees of ~370 MB each, three with uncommitted
+WIP from abandoned approaches).
