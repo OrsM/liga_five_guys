@@ -198,6 +198,18 @@ CREATE TABLE IF NOT EXISTS decision_blocker (
     PRIMARY KEY (run_id, future, blocker)
 );
 
+-- What skipping one step of the plan leaves (decision.after): do the rest of the plan as written, without this
+-- step (a buy goes with its paired sale, the same step). One row a blocker the skip leaves, as decision_blocker's;
+-- blocker 'none' (amount NULL) when skipping leaves nothing. kind: the skipped step's.
+CREATE TABLE IF NOT EXISTS decision_skip (
+    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
+    player  TEXT NOT NULL,
+    kind    TEXT NOT NULL,
+    blocker TEXT NOT NULL,
+    amount  REAL,
+    PRIMARY KEY (run_id, player, kind, blocker)
+);
+
 -- Each offer standing on one of your players, assessed (decision.assess_sale): what you make on it over
 -- what you paid, how far it is from the recent offers' mean in standard deviations, the chance a better
 -- one comes before the lock, what waiting is worth less the offer.
