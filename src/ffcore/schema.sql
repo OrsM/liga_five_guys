@@ -1879,14 +1879,18 @@ CREATE VIEW board_json AS
 WITH br AS MATERIALIZED (SELECT * FROM board_rows),
 rows AS (
     SELECT 'do' AS list, ord, what, label, name, pos, step, amount, done, gain, per, facts, players,
-           NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan, what IN ('buy', 'sell') AS fold
+           NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan, what IN ('buy', 'sell') AS fold,
+           CASE WHEN what IN ('buy', 'sell') THEN (SELECT cash FROM board_league WHERE me)
+                                                  - (SELECT total(net) FROM board_plan p
+                                                     WHERE p.ord <= (SELECT q.ord FROM board_plan q
+                                                                     WHERE q.player = json_extract(br.players, '$[0]'))) END AS cash_then
     FROM br
     UNION ALL
     SELECT 'buys', row_number() OVER (ORDER BY -b.gain, b.player), 'buy', coalesce(p.label, 'buy ' || b.name), b.name, b.pos,
            coalesce(p.step, CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END),
            coalesce(p.amount, b.cost), coalesce(p.done, b.my_bid = b.cost, 0),
            b.gain, 'season', b.facts, json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
-           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan
+           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan, NULL
     FROM board_buy_facts b
     LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
     WHERE b.gain > 0
@@ -1897,10 +1901,12 @@ rows AS (
            s.name, s.pos, coalesce(p.step, CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait' END),
            CASE WHEN p.label IS NOT NULL THEN p.amount WHEN s.takes THEN s.offer ELSE s.waiting END, coalesce(p.done, 0),
            s.gain, 'season', s.facts, json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
-           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell
+           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell, NULL
     FROM board_sell_facts s
     LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
-lines AS MATERIALIZED (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
+lines AS MATERIALIZED (SELECT list, ord, json(CASE WHEN json_extract(o, '$.cash_then') IS NULL
+                                   THEN json_remove(o, '$.cash_then') ELSE o END) AS o
+          FROM (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
                                       WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
           FROM (SELECT list, ord, json(CASE WHEN what = 'field'
                                              THEN json_remove(o, '$.name', '$.pos', '$.asking', '$.win', '$.asking_win')
@@ -1911,7 +1917,7 @@ lines AS MATERIALIZED (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remo
                          CASE r.list WHEN 'buys' THEN 'price' ELSE 'offer' END, r.money, 'waiting', r.waiting, 'trend', r.trend,
                          'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
-                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')),
+                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'cash_then', r.cash_then,
                          CASE r.list WHEN 'do' THEN 'ranked' ELSE 'more' END,
                          json(CASE WHEN r.fold THEN 'true' ELSE 'false' END),
                          'asking', b.asking, 'win', round(b.win, 3),
@@ -1932,7 +1938,7 @@ lines AS MATERIALIZED (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remo
                                  LEFT JOIN squads t ON t.player = e.value
                                  LEFT JOIN listings m ON m.player = e.value)) AS o
                      FROM rows r LEFT JOIN board_buys b ON r.what = 'buy'
-                                                AND b.player = json_extract(r.players, '$[0]'))))
+                                                AND b.player = json_extract(r.players, '$[0]')))))
 SELECT json_object(
     'generated_at', h.generated_at, 'lock_at', h.lock_at,
     'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,

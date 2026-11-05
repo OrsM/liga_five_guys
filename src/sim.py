@@ -171,7 +171,8 @@ def _selftest() -> None:
             "set as the best eleven now: nothing to field, before the auctions or after (Dituro, 2026-10-30)"
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts"} - (
-            {"asking", "win", "asking_win"} if d["what"] == "buy" else set()), d
+            {"asking", "win", "asking_win"} if d["what"] == "buy" else set()) - (
+            {"cash_then"} if d["what"] in ("buy", "sell") else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert all(len(d["act"]) == 1 for d in doc["do"] if d["what"] in ("buy", "sell")) \
         and len(field["act"]) == 11 \
@@ -418,6 +419,10 @@ def _selftest() -> None:
     owed = report(debt)
     assert [d["name"] for d in owed["do"] if d["what"] in ("buy", "sell")] == ["Dead", "D1"] \
         and owed["cash_after"] == 5e6, "in debt: sales only, the least bad first, until clear (5M short: 1M, then 9M)"
+    assert [d["cash_then"] for d in owed["do"] if d["what"] in ("buy", "sell")] == [-4e6, 5e6], \
+        "each step of the plan says the cash it leaves, running from today's: -5M, then +1M, then +9M"
+    assert all("cash_then" not in d for d in owed["do"] if d["what"] not in ("buy", "sell")), \
+        "a line that moves no money says none"
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         seed(debt)
