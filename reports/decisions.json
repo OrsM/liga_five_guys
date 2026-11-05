@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-05T16:57Z",
+ "generated_at": "2026-11-05T18:51Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84411994.0,
  "cash_locked": 0.0,
@@ -30,7 +30,7 @@
     ],
     [
      "bids",
-     "1",
+     "2",
      "count"
     ],
     [
@@ -49,17 +49,17 @@
      "trend"
     ]
    ],
-   "cash_then": -89555946.0498207,
-   "skip": [
-    {
-     "blocker": "none",
-     "label": "safe to skip",
-     "amount": null
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -89555946.0498207,
     "due": "2026-11-05T21:24Z",
-    "why": "auction closes"
+    "why": "auction closes",
+    "skip": [
+     {
+      "blocker": "none",
+      "label": "safe to skip",
+      "amount": null
+     }
+    ]
    },
    "ranked": true,
    "asking": 4138235.0,
@@ -117,17 +117,17 @@
      "trend"
     ]
    ],
-   "cash_then": -91263322.0498207,
-   "skip": [
-    {
-     "blocker": "none",
-     "label": "safe to skip",
-     "amount": null
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -91263322.0498207,
     "due": "2026-11-05T21:24Z",
-    "why": "auction closes"
+    "why": "auction closes",
+    "skip": [
+     {
+      "blocker": "none",
+      "label": "safe to skip",
+      "amount": null
+     }
+    ]
    },
    "ranked": true,
    "asking": 1707376.0,
@@ -214,17 +214,17 @@
      "trend"
     ]
    ],
-   "cash_then": -86053783.0498207,
-   "skip": [
-    {
-     "blocker": "debt",
-     "label": "if you skip this: in debt at the lock",
-     "amount": -1663393.07034049
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -86053783.0498207,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -1663393.07034049
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -306,17 +306,17 @@
      "trend"
     ]
    ],
-   "cash_then": -85438560.0498207,
-   "skip": [
-    {
-     "blocker": "none",
-     "label": "safe to skip",
-     "amount": null
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -85438560.0498207,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "none",
+      "label": "safe to skip",
+      "amount": null
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -398,17 +398,17 @@
      "trend"
     ]
    ],
-   "cash_then": -81995351.0498207,
-   "skip": [
-    {
-     "blocker": "none",
-     "label": "safe to skip",
-     "amount": null
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -81995351.0498207,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "none",
+      "label": "safe to skip",
+      "amount": null
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -450,17 +450,17 @@
      "trend"
     ]
    ],
-   "cash_then": -81099319.0498207,
-   "skip": [
-    {
-     "blocker": "none",
-     "label": "safe to skip",
-     "amount": null
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -81099319.0498207,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "none",
+      "label": "safe to skip",
+      "amount": null
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -547,17 +547,17 @@
      "trend"
     ]
    ],
-   "cash_then": -75177944.9210244,
-   "skip": [
-    {
-     "blocker": "debt",
-     "label": "if you skip this: in debt at the lock",
-     "amount": -2375228.19913677
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -75177944.9210244,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -2375228.19913677
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -644,17 +644,17 @@
      "trend"
     ]
    ],
-   "cash_then": -71157260.9787341,
-   "skip": [
-    {
-     "blocker": "debt",
-     "label": "if you skip this: in debt at the lock",
-     "amount": -474538.012630768
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -71157260.9787341,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -474538.012630768
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -741,17 +741,17 @@
      "trend"
     ]
    ],
-   "cash_then": -59840320.0703405,
-   "skip": [
-    {
-     "blocker": "debt",
-     "label": "if you skip this: in debt at the lock",
-     "amount": -7770794.97873411
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": -59840320.0703405,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -7770794.97873411
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -833,17 +833,17 @@
      "trend"
     ]
    ],
-   "cash_then": 3546145.92965951,
-   "skip": [
-    {
-     "blocker": "debt",
-     "label": "if you skip this: in debt at the lock",
-     "amount": -59840320.0703405
-    }
-   ],
-   "due": {
+   "detail": {
+    "cash_then": 3546145.92965951,
     "due": "2026-11-05T21:24Z",
-    "why": "after the auctions"
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -59840320.0703405
+     }
+    ]
    },
    "ranked": true,
    "accepts": [],
@@ -954,7 +954,7 @@
     ],
     [
      "bids",
-     "1",
+     "2",
      "count"
     ],
     [
