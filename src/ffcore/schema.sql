@@ -636,21 +636,25 @@ SELECT min(lock) AS lock,
        stamp_jd(min(lock)) AS t
 FROM round_locks WHERE lock > (SELECT cut());
 
+-- When each player on the game's market has his auction close (the last close listed): the fact the forecast's
+-- late arrivals and the decision's schedule both read.
+DROP VIEW IF EXISTS listing_close;
+CREATE VIEW listing_close AS
+SELECT player, max(julianday(expires_at)) AS t FROM listings
+WHERE seller = 'marketPlayerLeague' AND player IS NOT NULL AND sale_price <> 0 AND coalesce(expires_at, '') <> ''
+GROUP BY player;
+
 -- The players on the game's market who could not play a jornada's match
 -- for whoever buys them: his auction closes after his club's kickoff in it
 -- (of a jornada under way or to come). Nobody holds them, so for everyone
 -- they play none of it.
 DROP VIEW IF EXISTS late_arrivals;
 CREATE VIEW late_arrivals AS
-WITH listed AS (SELECT player, max(julianday(expires_at)) AS close FROM listings
-                WHERE seller = 'marketPlayerLeague' AND player IS NOT NULL AND sale_price <> 0
-                  AND coalesce(expires_at, '') <> ''
-                GROUP BY player)
 SELECT DISTINCT l.player, k.jornada
-FROM listed l JOIN player_club m ON m.player = l.player AND m.club IS NOT NULL
+FROM listing_close l JOIN player_club m ON m.player = l.player AND m.club IS NOT NULL
 JOIN kickoffs k ON m.club IN (k.home, k.away)
 JOIN jornada_calendar c ON c.jornada = k.jornada AND c.state IN ('under way', 'ahead')
-WHERE k.t < l.close;
+WHERE k.t < l.t;
 
 -- Each moment's forecast (forecast_cell) as a decision made at t uses
 -- it: points if he plays, and the chance he plays, none in a jornada he

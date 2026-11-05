@@ -101,9 +101,7 @@ SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN look l ON o.cut = l.cut 
 -- cash is due by (ingest's next_lock), as the game's clock; the plan's steps are due by them (decision.schedule).
 DROP VIEW IF EXISTS dec_close_seen;
 CREATE VIEW dec_close_seen AS
-SELECT player, strftime('%Y-%m-%dT%H:%MZ', max(julianday(expires_at))) AS close FROM listings
-WHERE seller = 'marketPlayerLeague' AND player IS NOT NULL AND sale_price <> 0 GROUP BY player
-HAVING max(julianday(expires_at)) IS NOT NULL;
+SELECT player, strftime('%Y-%m-%dT%H:%MZ', t) AS close FROM listing_close;
 DROP VIEW IF EXISTS dec_lock_seen;
 CREATE VIEW dec_lock_seen AS
 SELECT strftime('%Y-%m-%dT%H:%MZ', t) AS lock FROM next_lock WHERE t IS NOT NULL;
