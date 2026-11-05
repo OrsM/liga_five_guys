@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-05T20:46Z",
+ "generated_at": "2026-11-05T20:53Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84311994.0,
  "cash_locked": 0.0,
@@ -77,6 +77,11 @@
     3971689.0,
     4138235.0
    ],
+   "flip": {
+    "cash": 3580558.97948017,
+    "points": -26.9435009035906,
+    "blockers": []
+   },
    "ranked": true,
    "asking": 4138235.0,
    "win": 1.0,
@@ -161,6 +166,11 @@
     1707376.0,
     1664610.0
    ],
+   "flip": {
+    "cash": 4738298.92965951,
+    "points": -19.0029841115497,
+    "blockers": []
+   },
    "ranked": true,
    "asking": 1707376.0,
    "win": 1.0,
@@ -274,6 +284,13 @@
     4824091.0,
     4728303.0
    ],
+   "flip": {
+    "cash": -1563393.07034049,
+    "points": -18.8574153579436,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -382,6 +399,11 @@
     602136.0,
     603579.0
    ],
+   "flip": {
+    "cash": 3030922.92965951,
+    "points": -18.8574153579436,
+    "blockers": []
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -490,6 +512,11 @@
     3250237.0,
     3176543.0
    ],
+   "flip": {
+    "cash": 202936.929659508,
+    "points": -18.8574153579436,
+    "blockers": []
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -558,6 +585,11 @@
     906774.0,
     896032.0
    ],
+   "flip": {
+    "cash": 2750113.92965951,
+    "points": -18.8574153579436,
+    "blockers": []
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -671,6 +703,13 @@
     6084130.0,
     5963708.0
    ],
+   "flip": {
+    "cash": -2275228.19913677,
+    "points": -18.0360890002007,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -784,6 +823,13 @@
     4026214.0,
     4010275.0
    ],
+   "flip": {
+    "cash": -374538.012630768,
+    "points": -17.8887119638116,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -897,6 +943,13 @@
     11723467.0,
     11438083.0
    ],
+   "flip": {
+    "cash": -7670794.97873411,
+    "points": -15.7802444240879,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -1005,6 +1058,13 @@
     58298851.0,
     59640111.0
    ],
+   "flip": {
+    "cash": -59740320.0703405,
+    "points": 0.412945372202785,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -1051,6 +1111,7 @@
     39288113.0,
     38565398.0
    ],
+   "flip": null,
    "ranked": false,
    "accepts": [],
    "act": [
@@ -1068,6 +1129,11 @@
  "cash_after": 3646145.92965951,
  "can_bid": 7711488.75017935,
  "ping": "buy Moi Gomez; buy Roger Hinojo; sell Alvaro F. Carreras; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin",
+ "plan_flip": {
+  "cash": 3646145.92965951,
+  "points": -18.8574153579436,
+  "blockers": []
+ },
  "buys": [
   {
    "name": "Moi Gomez",
@@ -1125,6 +1191,11 @@
     3971689.0,
     4138235.0
    ],
+   "flip": {
+    "cash": 3580558.97948017,
+    "points": -26.9435009035906,
+    "blockers": []
+   },
    "more": false,
    "asking": 4138235.0,
    "win": 1.0,
@@ -1200,6 +1271,13 @@
     14043612.0,
     13882949.0
    ],
+   "flip": {
+    "cash": -10397466.0703405,
+    "points": -16.7131735594423,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": false,
    "asking": 14043612.0,
    "win": 1.0,
@@ -1274,6 +1352,13 @@
     19230386.0,
     18718844.0
    ],
+   "flip": {
+    "cash": -15584240.0703405,
+    "points": -15.3367505443596,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": false,
    "asking": 19230386.0,
    "win": 1.0,
@@ -1348,6 +1433,13 @@
     7767980.0,
     7624648.0
    ],
+   "flip": {
+    "cash": -4121834.0703405,
+    "points": -18.473586900034,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": true,
    "asking": 7767980.0,
    "win": 1.0,
@@ -1422,6 +1514,11 @@
     1707376.0,
     1664610.0
    ],
+   "flip": {
+    "cash": 4738298.92965951,
+    "points": -19.0029841115497,
+    "blockers": []
+   },
    "more": false,
    "asking": 1707376.0,
    "win": 1.0,
@@ -1529,6 +1626,13 @@
     4824091.0,
     4728303.0
    ],
+   "flip": {
+    "cash": -1563393.07034049,
+    "points": -18.8574153579436,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -1629,6 +1733,11 @@
     3250237.0,
     3176543.0
    ],
+   "flip": {
+    "cash": 202936.929659508,
+    "points": -18.8574153579436,
+    "blockers": []
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -1689,6 +1798,11 @@
     906774.0,
     896032.0
    ],
+   "flip": {
+    "cash": 2750113.92965951,
+    "points": -18.8574153579436,
+    "blockers": []
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -1789,6 +1903,11 @@
     602136.0,
     603579.0
    ],
+   "flip": {
+    "cash": 3030922.92965951,
+    "points": -18.8574153579436,
+    "blockers": []
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -1894,6 +2013,13 @@
     6084130.0,
     5963708.0
    ],
+   "flip": {
+    "cash": -2275228.19913677,
+    "points": -18.0360890002007,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -1999,6 +2125,13 @@
     4026214.0,
     4010275.0
    ],
+   "flip": {
+    "cash": -374538.012630768,
+    "points": -17.8887119638116,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -2059,6 +2192,11 @@
     5207110.0,
     5148159.0
    ],
+   "flip": {
+    "cash": 8794304.92965951,
+    "points": -22.0850569900356,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
@@ -2159,6 +2297,11 @@
     3165704.0,
     3181423.0
    ],
+   "flip": {
+    "cash": 6881938.92965951,
+    "points": -23.198257214668,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     3235793.0
@@ -2261,6 +2404,11 @@
     4572043.0,
     4452316.0
    ],
+   "flip": {
+    "cash": 8290555.92965951,
+    "points": -22.4207912299396,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     4644410.0
@@ -2368,6 +2516,11 @@
     7965863.0,
     7775232.0
    ],
+   "flip": {
+    "cash": 11429636.7931015,
+    "points": -23.7056261135772,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
@@ -2473,6 +2626,13 @@
     11723467.0,
     11438083.0
    ],
+   "flip": {
+    "cash": -7670794.97873411,
+    "points": -15.7802444240879,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -2568,6 +2728,11 @@
     24389478.0,
     24092003.0
    ],
+   "flip": {
+    "cash": 27672423.7927348,
+    "points": -32.574324416838,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
@@ -2668,6 +2833,11 @@
     42282083.0,
     43132805.0
    ],
+   "flip": {
+    "cash": 49434860.9296595,
+    "points": -42.8393112116144,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     45788715.0
@@ -2770,6 +2940,11 @@
     9620929.0,
     9401186.0
    ],
+   "flip": {
+    "cash": 13109989.9296595,
+    "points": -34.6362928565441,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     9463844.0
@@ -2877,6 +3052,11 @@
     18111862.0,
     18574655.0
    ],
+   "flip": {
+    "cash": 22825912.8812331,
+    "points": -43.3610152526862,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
@@ -2977,6 +3157,13 @@
     58298851.0,
     59640111.0
    ],
+   "flip": {
+    "cash": -59740320.0703405,
+    "points": 0.412945372202785,
+    "blockers": [
+     "in debt at the lock"
+    ]
+   },
    "more": false,
    "accepts": [],
    "act": [
@@ -3082,6 +3269,11 @@
     50349422.0,
     50143799.0
    ],
+   "flip": {
+    "cash": 54410869.619977,
+    "points": -45.9602045663582,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
@@ -3182,6 +3374,11 @@
     24173930.0,
     23978057.0
    ],
+   "flip": {
+    "cash": 29981292.9296595,
+    "points": -45.4919959693466,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     26335147.0
@@ -3284,6 +3481,11 @@
     19130191.0,
     19304082.0
    ],
+   "flip": {
+    "cash": 24342297.9296595,
+    "points": -44.1615340703827,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     20696152.0
@@ -3376,6 +3578,11 @@
     40192367.0,
     41372826.0
    ],
+   "flip": {
+    "cash": 46910478.9296595,
+    "points": -44.2854656755485,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     43264333.0
@@ -3483,6 +3690,11 @@
     39288113.0,
     38565398.0
    ],
+   "flip": {
+    "cash": 41941148.2456143,
+    "points": -55.3652511793427,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
@@ -3583,6 +3795,11 @@
     51468502.0,
     51546607.0
    ],
+   "flip": {
+    "cash": 60181858.9296595,
+    "points": -56.6831973900578,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
     56535713.0
@@ -3690,6 +3907,11 @@
     43138395.0,
     44188684.0
    ],
+   "flip": {
+    "cash": 49210236.8381615,
+    "points": -62.0082891469922,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
@@ -3795,6 +4017,11 @@
     19255695.0,
     19060188.0
    ],
+   "flip": {
+    "cash": 22699001.4635503,
+    "points": -117.473999644525,
+    "blockers": []
+   },
    "more": true,
    "accepts": [],
    "act": [
