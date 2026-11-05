@@ -136,8 +136,8 @@ def expected_gap(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, .
 def blockers(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], bids: dict[str, float]
              ) -> list[tuple[str, str, float | None]]:
     """What stops you, run at the plan's end on two futures: 'nothing' (you do nothing: every bid you have
-    placed wins, nothing is sold) and 'plan' (you do all it says: its buys won at its amounts, its sales made,
-    your other placed bids won). Rows (future, blocker, amount): 'debt' (cash below zero at the lock: the
+    placed wins, nothing is sold) and 'plan' (you do all it says: its buys won at its amounts, its sales made, and
+    every other placed bid withdrawn, as the board tells you). Rows (future, blocker, amount): 'debt' (cash below zero at the lock: the
     matchday scores 0), 'eleven' (no formation can be fielded from the squad), 'squad' (players over the cap)."""
     (cash, _, _, squad_max, _), = inp["dec_money"]
     pos = {k: p for k, p, *_ in inp["dec_player"]}
@@ -145,8 +145,7 @@ def blockers(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
     buys = {k: a for _, kind, k, a, *_ in steps if kind == "buy"}
     sells = {k: a for _, kind, k, a, *_ in steps if kind == "sell"}
     futures = {"nothing": (mine | set(bids), cash - sum(bids.values())),
-               "plan": ((mine | set(bids) | set(buys)) - set(sells),
-                        cash - sum(a for k, a in {**bids, **buys}.items()) + sum(sells.values()))}
+               "plan": ((mine | set(buys)) - set(sells), cash - sum(buys.values()) + sum(sells.values()))}
     out: list[tuple[str, str, float | None]] = []
     for future, (squad, end) in futures.items():
         count = {p: sum(pos.get(k) == p for k in squad) for p in POSITIONS}
@@ -429,16 +428,20 @@ def _selftest_blockers() -> None:
     debt = [("nothing", "debt", -3e6)]
     assert blockers(inp(-3e6), [], {}) == debt + [("plan", "debt", -3e6)], "in debt, and a plan that does not clear it: both futures"
     assert blockers(inp(-3e6), [sell("bench")], {}) == debt, "the plan's sale clears it: only doing nothing is in debt"
-    assert blockers(inp(4e6), [], {"star": 10e6}) == [("nothing", "debt", -6e6), ("plan", "debt", -6e6)], \
-        "a bid placed and won, nothing sold: debt, in both futures"
-    assert blockers(inp(4e6), [sell("bench")], {"star": 10e6}) == [("nothing", "debt", -6e6), ("plan", "debt", -1e6)], \
-        "the plan's sale lowers the debt but the placed bid still leaves it short: the plan's own check says so"
+    assert blockers(inp(4e6), [], {"star": 10e6}) == [("nothing", "debt", -6e6)], \
+        "a bid placed and won, nothing sold: debt if you do nothing; the plan has no such bid (the board says withdraw it)"
+    assert blockers(inp(4e6), [(0, "buy", "star", 10e6, 1.0, 1.0)], {"star": 10e6}) \
+        == [("nothing", "debt", -6e6), ("plan", "debt", -6e6)], "a bid the plan keeps, unfunded: debt in both"
     assert blockers(inp(4e6), [(0, "buy", "star", 10e6, 1.0, 1.0), sell("bench")], {"star": 10e6}) \
-        == [("nothing", "debt", -6e6), ("plan", "debt", -1e6)], "a bid the plan raises counts once, at the plan's amount"
+        == [("nothing", "debt", -6e6), ("plan", "debt", -1e6)], "a bid the plan raises counts once, at the plan's amount, less its sale"
     assert blockers(inp(5e6), [sell("k")], {}) == [("plan", "eleven", None)], \
         "the plan sells the only keeper: no eleven can be fielded"
-    assert blockers(inp(5e6, squad_max=12), [], {"star": 1e6}) == [("nothing", "squad", 1.0), ("plan", "squad", 1.0)], \
-        "a won bid on a full squad: one over"
+    assert blockers(inp(5e6, squad_max=12), [], {"star": 1e6}) == [("nothing", "squad", 1.0)], \
+        "a won bid on a full squad: one over if you do nothing; the plan withdraws it"
+    assert blockers(inp(5e6, squad_max=12), [(0, "buy", "star", 1e6, 1.0, 1.0)], {}) == [("plan", "squad", 1.0)], \
+        "a buy of the plan's on a full squad, with no sale to make room: one over"
+    assert blockers(inp(5e6, squad_max=12), [(0, "buy", "star", 1e6, 1.0, 1.0), sell("bench", 0)], {}) == quiet, \
+        "its paired sale makes the room"
 
 
 if __name__ == "__main__":
