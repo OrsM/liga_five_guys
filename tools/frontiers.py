@@ -42,7 +42,7 @@ EXPORTS = {
         club_fixture club_rating jornada_calendar kickoffs next_lock look
         listings listing_ends listing_close offers offer_ratios price_history price_paid auction_results
         squads owners cash standings league_config app_lineup lineup_snapshots""",  # app_lineup: the lineup facts, player resolved
-    "forecast": "cell standin_cell forecast_e price_carry price_trend price_trend_daily",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read
+    "forecast": "cell standin_cell market_daily forecast_e price_carry price_trend price_trend_daily",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read
     # plan(step, kind, player, amount, win, worth) and its detail, a run each (decision.record): every move alone
     # (decision_option, with the chance at the asking price and where an offer ranks), the players it looked at
     # and their facts (decision_players, decision_facts), what waiting is worth, the standings forecast, what

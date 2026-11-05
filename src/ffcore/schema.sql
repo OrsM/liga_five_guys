@@ -1872,6 +1872,15 @@ SELECT p.player, p.kind, json_object('cash_then', p.cash_then, 'due', p.due, 'wh
                     FROM board_skip k WHERE k.player = p.player AND k.kind = p.kind)) AS detail
 FROM board_plan p;
 
+-- Each player's value over the last fortnight's closed days, oldest first, a JSON array: what the page draws as
+-- his line, with the offer or price as a dot on it (a fact, read as it is: nothing is decided here).
+DROP VIEW IF EXISTS board_trace;
+CREATE VIEW board_trace AS
+SELECT ff_id AS player, json_group_array(value ORDER BY observed_at) AS trace
+FROM market_daily
+WHERE substr(observed_at, 1, 10) > date((SELECT max(substr(observed_at, 1, 10)) FROM market_daily), '-14 day')
+GROUP BY ff_id;
+
 DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
 WITH br AS MATERIALIZED (SELECT * FROM board_rows),
@@ -1912,6 +1921,7 @@ lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extr
                          'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
                          'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'detail', json(r.detail),
+                         'trace', json((SELECT t.trace FROM board_trace t WHERE t.player = json_extract(r.players, '$[0]'))),
                          CASE r.list WHEN 'do' THEN 'ranked' ELSE 'more' END,
                          json(CASE WHEN r.fold THEN 'true' ELSE 'false' END),
                          'asking', b.asking, 'win', round(b.win, 3),
