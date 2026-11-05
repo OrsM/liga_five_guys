@@ -45,13 +45,13 @@ offers; field the best eleven; watch rivals; know whether it worked. The page's 
 
 | # | Gap | State |
 |---|-----|-------|
-| U1 | deadline strip: next deadline with a countdown, blockers | blockers red lines and each step's due are in; countdown strip open |
+| U1 | deadline strip: next deadline with a countdown, blockers | done: blockers, each step's due, the countdown strip |
 | U2 | "Do this" in the order to do it, cash after each step | done (order, `cash_then`, due) |
-| U3 | a move's effect on the chance of first | open: `win_after` per option, in Decision |
+| U3 | a move's effect | cash and points per move are in (`decision_flip`, `evaluate`); the chance of first per move is open |
 | U4 | no way to say "not this one" | open: item 3 above |
 | U5 | facts formatted (`sd`, counts) | done: one `show` for every unit |
-| U6 | the eleven as a pitch | open |
-| U7 | open bids as a section, lost bids told | open |
+| U6 | the eleven as a pitch | open (the warning to field the best eleven is in) |
+| U7 | open bids marked on their buy line; lost bids told | open: lost bids |
 | U8 | the cash path against the debt limit | partly: per-step cash |
 | U9 | confirm sheet with cash after and chance | open |
 | U10 | rivals ranked by the chance above you; exposure ranked | open |
