@@ -79,8 +79,10 @@ if [ -n "$(git status --porcelain data reports inputs)" ]; then
         commit -q -m "report: $(date -u +%Y-%m-%dT%H%MZ)"
     log "  committed"
     if [ "${LFG_PUSH:-}" = "1" ]; then
-        # -X theirs is the commit being replayed: this run's report wins.
-        if ! git pull --rebase --autostash -X theirs -q 2>/dev/null; then
+        # --rebase=merges: the pull replays every unpushed commit, and a plain rebase flattens a merge
+        # among them (2026-11-05 it re-resolved four files). -X theirs is the commit being replayed:
+        # this run's report wins. tools/pullcheck.py tests this line.
+        if ! git pull --rebase=merges --autostash -X theirs -q 2>/dev/null; then
             git rebase --abort 2>/dev/null || true
             log "  pull --rebase failed — a real conflict, needs a human"
         fi
