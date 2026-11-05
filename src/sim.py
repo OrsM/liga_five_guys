@@ -172,7 +172,7 @@ def _selftest() -> None:
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()) - (
-            {"cash_then"} if d["what"] in ("buy", "sell") else set()), d
+            {"cash_then", "skip"} if d["what"] in ("buy", "sell") else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert all(len(d["act"]) == 1 for d in doc["do"] if d["what"] in ("buy", "sell")) \
         and len(field["act"]) == 11 \
@@ -490,6 +490,8 @@ def _selftest_board_contract() -> None:
                        " VALUES (3, 'a', 1.1e6, 0.8e6, 0.3e6, 2.0, 0.4375, -0.1e6)")
             db.executemany("INSERT INTO decision_blocker (run_id, future, blocker, amount) VALUES (3, ?, ?, ?)",
                            [("nothing", "debt", -6e6), ("plan", "debt", -1e6), ("plan", "eleven", None)])
+            db.executemany("INSERT INTO decision_skip (run_id, player, kind, blocker, amount) VALUES (3, ?, ?, ?, ?)",
+                           [("c", "buy", "none", None), ("a", "sell", "debt", -1e6), ("a", "sell", "eleven", None)])
             db.executemany("INSERT INTO seen (cut, variant, player, name, pos, owner, value, trend, offer, price, route,"
                            " fetches, paid) VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                            [(c, "a", "Ana", "MED", "me", 1e6, None, 1.1e6, None, "listed", 1.1e6, 0.8e6),
@@ -518,6 +520,13 @@ def _selftest_board_contract() -> None:
             "a buy: the plan's bid and its chance, and the chance of winning at his asking price (decision_option)"
         sell = do["sell"]
         assert (sell["name"], sell["step"], sell["amount"]) == ("Ana", "take offer", 1.1e6), sell
+        assert buy["skip"] == [{"blocker": "none", "label": "safe to skip", "amount": None}] \
+            and sell["skip"] == [
+                {"blocker": "debt", "label": "if you skip this: in debt at the lock", "amount": -1e6},
+                {"blocker": "eleven", "label": "if you skip this: no eleven can be fielded", "amount": None}], \
+            "what skipping a step leaves (decision_skip), worded once by the board, by blocker"
+        assert all("skip" not in d for d in doc["do"] if d["what"] not in ("buy", "sell")) \
+            and all("skip" not in d for d in doc["buys"] + doc["sells"]), "only the plan's buys and sales carry skip"
         got = {f[0]: f[1] for f in sell["facts"]}
         assert got["the game's recent offers"] == 0.75 and got["more offers before the lock"] == 2 \
             and got["waiting is worth"] == 1.0e6, \
