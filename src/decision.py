@@ -8,7 +8,7 @@ from contextlib import closing
 from typing import Any, NamedTuple
 
 from ffcore.db import connect, rows
-from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
+from ffcore.rules import DEBT_SHARE, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
 from recommender import Rec, Recs, cells_of, recommend
 from recommender import points as eleven_points
 
@@ -131,6 +131,32 @@ def expected_gap(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, .
     e = {(k, j): x for k, j, x in inp["cell"]}
     floor, ours = worth_on(inp, plan_rows(inp)[0] if steps is None else steps, e, sorted({j for _, j in e}))
     return ours - floor
+
+
+def blockers(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], bids: dict[str, float]
+             ) -> list[tuple[str, str, float | None]]:
+    """What stops you, run at the plan's end on two futures: 'nothing' (you do nothing: every bid you have
+    placed wins, nothing is sold) and 'plan' (you do all it says: its buys won at its amounts, its sales made,
+    your other placed bids won). Rows (future, blocker, amount): 'debt' (cash below zero at the lock: the
+    matchday scores 0), 'eleven' (no formation can be fielded from the squad), 'squad' (players over the cap)."""
+    (cash, _, _, squad_max, _), = inp["dec_money"]
+    pos = {k: p for k, p, *_ in inp["dec_player"]}
+    mine = {k for k, _, m, *_ in inp["dec_player"] if m}
+    buys = {k: a for _, kind, k, a, *_ in steps if kind == "buy"}
+    sells = {k: a for _, kind, k, a, *_ in steps if kind == "sell"}
+    futures = {"nothing": (mine | set(bids), cash - sum(bids.values())),
+               "plan": ((mine | set(bids) | set(buys)) - set(sells),
+                        cash - sum(a for k, a in {**bids, **buys}.items()) + sum(sells.values()))}
+    out: list[tuple[str, str, float | None]] = []
+    for future, (squad, end) in futures.items():
+        count = {p: sum(pos.get(k) == p for k in squad) for p in POSITIONS}
+        if end < 0:
+            out.append((future, "debt", end))
+        if not any(all(count[p] >= n for p, n in shape.items()) for shape in SHAPES):
+            out.append((future, "eleven", None))
+        if len(squad) > squad_max:
+            out.append((future, "squad", float(len(squad) - squad_max)))
+    return out
 
 
 def _write(steps: list[tuple[Any, ...]], start: list[tuple[Any, ...]]) -> None:
@@ -370,7 +396,37 @@ def _selftest() -> None:
             (sd,), = rows("SELECT sd FROM league_jornada WHERE manager = ? AND jornada = 1", (m, ))
             assert vs > 0 and abs(sd - math.sqrt((1 + s * s) * vs + s * s * e2)) < 1e-9, \
                 "a jornada's variance: (1 + share^2) x the cells' + share^2 x the squares of their e (the persistent share)"
+    _selftest_blockers()
     print("decision self-test OK")
+
+
+def _selftest_blockers() -> None:
+    """The check at the plan's end: two futures, nothing done and the plan done, each with what stops you."""
+    squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
+             "m4": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL", "bench": "DEF"}
+
+    def inp(cash: float, squad_max: int = 24) -> dict[str, list[tuple[Any, ...]]]:
+        return {"dec_player": [(k, p, 1, None, 5e6) for k, p in squad.items()] + [("star", "MED", 0, 8e6, None)],
+                "dec_odds": [], "cell": [], "dec_money": [(cash, 60e6, 0.2, squad_max, 11)]}
+
+    def sell(k: str, step: int = 0) -> tuple[Any, ...]:
+        return (step, "sell", k, 5e6, 1.0, 0.0)
+
+    quiet: list[tuple[str, str, float | None]] = []
+    assert blockers(inp(5e6), [], {}) == quiet, "cash, no bids, no plan: nothing stops you"
+    debt = [("nothing", "debt", -3e6)]
+    assert blockers(inp(-3e6), [], {}) == debt + [("plan", "debt", -3e6)], "in debt, and a plan that does not clear it: both futures"
+    assert blockers(inp(-3e6), [sell("bench")], {}) == debt, "the plan's sale clears it: only doing nothing is in debt"
+    assert blockers(inp(4e6), [], {"star": 10e6}) == [("nothing", "debt", -6e6), ("plan", "debt", -6e6)], \
+        "a bid placed and won, nothing sold: debt, in both futures"
+    assert blockers(inp(4e6), [sell("bench")], {"star": 10e6}) == [("nothing", "debt", -6e6), ("plan", "debt", -1e6)], \
+        "the plan's sale lowers the debt but the placed bid still leaves it short: the plan's own check says so"
+    assert blockers(inp(4e6), [(0, "buy", "star", 10e6, 1.0, 1.0), sell("bench")], {"star": 10e6}) \
+        == [("nothing", "debt", -6e6), ("plan", "debt", -1e6)], "a bid the plan raises counts once, at the plan's amount"
+    assert blockers(inp(5e6), [sell("k")], {}) == [("plan", "eleven", None)], \
+        "the plan sells the only keeper: no eleven can be fielded"
+    assert blockers(inp(5e6, squad_max=12), [], {"star": 1e6}) == [("nothing", "squad", 1.0), ("plan", "squad", 1.0)], \
+        "a won bid on a full squad: one over"
 
 
 if __name__ == "__main__":
