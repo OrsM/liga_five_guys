@@ -10,7 +10,7 @@ from typing import Any
 from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, best_eleven
 
-__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap"]
+__all__ = ["plan", "plan_rows", "recommend", "inputs", "read_inputs", "worth_on", "measure", "expected_gap"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
@@ -27,7 +27,19 @@ def inputs() -> None:
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 
 
-def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
+def recommend(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, list[tuple[float, float]]]:
+    """The recommender's contract: for each player on offer, the bids worth
+    considering, (bid, chance it wins). Here an asking price made into bids at
+    the season's observed ratios; the plan reads nothing else about the market."""
+    ratios: dict[str, list[tuple[float, float]]] = {}
+    for k, r, w in sorted(inp["dec_odds"]):
+        ratios.setdefault(k, []).append((r, w))
+    return {k: [(a * r, w) for r, w in ratios.get(k, [(1.0, 1.0)])]
+            for k, _, _, a, _ in inp["dec_player"] if a is not None}
+
+
+def plan_rows(inp: dict[str, list[tuple[Any, ...]]], recs: dict[str, list[tuple[float, float]]] | None = None
+              ) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
     """The plan as decide.sql's header states it, one pure function of the
     rows inputs() writes (dec_player, dec_odds, dec_money) and the cells
     (cell: player, jornada, e): (dec_plan rows, dec_start rows).
@@ -37,15 +49,12 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     squad within its cap, cash at the lock at zero or more and the bid within
     cash and the debt; in debt (cash at the lock below zero), the least bad
     sale; again, until there is none. A swap pairs a buy with a sale only
-    where his top bid is more than the cash left or the squad is full."""
+    where his top bid is more than the cash left or the squad is full.
+    recs (default recommend(inp)): who is worth a bid, and at what prices."""
     (cash, team_value, debt, squad_max, _), = inp["dec_money"]
     pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
     mine = {k: proceeds for k, _, m, _, proceeds in inp["dec_player"] if m}
-    ratios: dict[str, list[tuple[float, float]]] = {}
-    for k, r, w in sorted(inp["dec_odds"]):
-        ratios.setdefault(k, []).append((r, w))
-    bids = {k: [(a * r, w) for r, w in ratios.get(k, [(1.0, 1.0)])]
-            for k, _, _, a, _ in inp["dec_player"] if a is not None}
+    bids = recommend(inp) if recs is None else recs
     cells: dict[int, dict[str, float]] = {}
     for k, j, e in inp["cell"]:
         if k in pos:
@@ -232,6 +241,9 @@ def _selftest() -> None:
         assert labels(steps) == ["buy star"]
         assert expected_gap(league(10e6, {"star": 8e6})) == 12.0, "the plan's eleven against standing pat's: 8 for 2, twice"
         assert expected_gap(league(2e6, {"star": 8e6})) == 0.0, "no move: no gap"
+        assert labels(plan_rows(league(10e6, {"star": 99e6}), recs={"star": [(7e6, 0.5)]})[0]) == ["buy star"] \
+            and plan_rows(league(10e6, {"star": 99e6}), recs={"star": [(7e6, 0.5)]})[0][0][3:5] == (7e6, 0.5), \
+            "the plan buys what a recommender offers, at its bid and chance: not from the market's asking"
         assert labels(plan_rows(league(10e6, {"star": 10e6}))[0]) == ["buy star"], \
             "his price is a limit, not a cost: within cash, the points decide"
         got, _ = plan_rows(league(4e6, {"star": 8e6}))
