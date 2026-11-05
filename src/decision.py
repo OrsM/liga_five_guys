@@ -9,11 +9,11 @@ from contextlib import closing
 from typing import Any, NamedTuple
 
 from ffcore.db import connect, rows
-from ffcore.rules import DEBT_SHARE, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
+from ffcore.rules import DEBT_SHARE, bid_limit, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
 from recommender import Rec, Recs, cells_of, recommend
 from recommender import points as eleven_points
 
-__all__ = ["schedule", "stamp_plan", "plan", "plan_rows", "after", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
+__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_plan", "dec_start")
 
@@ -100,9 +100,9 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
         return eleven_points(pos, played, sq)
     floor = here = points(squad)
     total = floor
-    for step in sorted({s[0] for s in steps}):
+    for group in in_groups(inp, steps):
         win = 1.0
-        for _, kind, k, _, w, _ in (s for s in steps if s[0] == step):
+        for _, kind, k, _, w, _ in group:
             if kind == "buy":
                 squad.add(k)
                 win = 1.0 if w is None else w
@@ -162,6 +162,13 @@ def in_order(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
     (a swap's pair: the buy and the sale that funds it share a step)."""
     due = schedule(inp, steps)
     return sorted(steps, key=lambda s: (due[s[0], s[1]].due or "~", s[1], s[0]))
+
+
+def in_groups(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> list[list[tuple[Any, ...]]]:
+    """The plan's steps grouped by step (a buy and the sale that funds it), the groups in the plan's order: each
+    where its first move comes in in_order."""
+    ordered = in_order(inp, steps)
+    return [[s for s in ordered if s[0] == step] for step in dict.fromkeys(s[0] for s in ordered)]
 
 
 class After(NamedTuple):
@@ -330,7 +337,7 @@ def record(run: int) -> list[tuple[Any, ...]]:
     # What more you can bid: the game takes bids up to your cash and the debt it allows (DEBT_SHARE of your team's
     # value); sales do not count, made after the auctions or not at all; a placed bid the plan does not make
     # stands (the board says withdraw it) and holds its money.
-    room = max(0.0, cash + debt * team_value - bids - unplanned)
+    room = max(0.0, bid_limit(cash, team_value, debt) - bids - unplanned)
     with closing(connect()) as db, db:
         for sql in KEEP:
             db.execute(sql, (run,))
@@ -560,6 +567,15 @@ def _selftest_blockers() -> None:
     assert schedule({"dec_lock": [(lock,)]}, [(0, "sell", "x", 1e6, 1.0, 0.0)])[0, "sell"] == Due(lock, "before the lock")
     assert schedule({}, swap)[0, "buy"] == Due(None, "before the lock"), "nothing known: no time, not a guess"
     assert [k for _, _, k, *_ in in_order({}, swap)] == ["a", "b", "x"], "no times: the buys by step, then the sale made after them"
+
+    # The groups: every step once, a pair together, the groups in in_order's order, for any closes.
+    for ca, cb in (("2026-11-04T22:24Z", "2026-11-05T22:24Z"), ("2026-11-05T22:24Z", "2026-11-04T22:24Z")):
+        sched2: dict[str, list[tuple[Any, ...]]] = {"dec_close": [("a", ca), ("b", cb)], "dec_lock": [(lock,)]}
+        groups = in_groups(sched2, swap)
+        assert sorted(s for g in groups for s in g) == sorted(swap) and all(len({s[0] for s in g}) == 1 for g in groups)
+        firsts = [in_order(sched2, swap).index(g[0]) for g in groups]
+        assert firsts == sorted(firsts), "the groups follow the plan's order"
+        assert [g[0][0] for g in groups] == ([0, 1] if ca < cb else [1, 0]), "the earlier close first, whatever the step numbers"
 
     # Property: after(plan).cash is the cash plan_rows' fund() ended on, in several leagues.
     cells = {k: 4.0 for k in squad} | {"m4": 2.0, "bench": 1.0, "star": 8.0, "keeper": 3.0}

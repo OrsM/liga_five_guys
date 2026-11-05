@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
-from ffcore.rules import POSITIONS, best_eleven
+from ffcore.rules import POSITIONS, best_eleven, bid_limit
 
 Rows = dict[str, list[tuple[Any, ...]]]
 
@@ -66,7 +66,7 @@ def recommend(inp: Rows) -> Recs:
     bids = {k: [(a * r, w) for r, w in ratios.get(k, [(1.0, 1.0)])]
             for k, _, _, a, _ in inp["dec_player"] if a is not None and k in pos}
     where = {k: {j for j, e in cells.items() if k in e} for k in pos}
-    limit = cash + debt * team_value
+    limit = bid_limit(cash, team_value, debt)
 
     squad, placed = set(mine), 0.0
     picks: list[Rec] = []

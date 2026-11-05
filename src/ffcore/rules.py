@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "best_eleven", "FORMATIONS",
+__all__ = ["XI_SIZE", "DEBT_SHARE", "bid_limit", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "MAX_SLOT", "MIN_SLOT", "FREE_FORMATIONS", "SHAPES", "ELEVEN", "best_eleven", "FORMATIONS",
            "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
@@ -85,6 +85,11 @@ FORMATIONS = " UNION ALL ".join("SELECT %d AS f, '%s' AS pos, %d AS n" % (i, p, 
                                 for i, shape in enumerate(SHAPES) for p, n in shape.items())
 
 DEBT_SHARE = 0.2  # bids may take you this share of your squad's value into debt (cash at the lock must be 0 or more)
+
+
+def bid_limit(cash: float, team_value: float, debt: float = DEBT_SHARE) -> float:
+    """What bids can total: your cash and the debt the game allows (debt, a share of your team's value)."""
+    return cash + debt * team_value
 # Players a squad may hold, its bids in counted: the app refuses a bid past
 # it ("Bid or offer for more players is not allowed", 23 and a bid, 2026-10-30).
 SQUAD_MAX = 24
@@ -98,6 +103,9 @@ MANAGER_TRADES = False  # offers to or from another manager: only the game's mar
 
 
 def _selftest() -> None:
+    for cash in (-30e6, 0.0, 12e6):      # bids reach past your cash by the debt share of the team, never less, and grow with it
+        assert bid_limit(cash, 0.0) == cash and bid_limit(cash, 100e6) == cash + DEBT_SHARE * 100e6
+        assert bid_limit(cash, 50e6) < bid_limit(cash, 60e6) and bid_limit(cash, 50e6, 0.0) == cash
     assert slot("Centrocampista") == slot("mediocampista") == slot("MED") == "MED"
     assert slot(None) == slot("") == slot("utillero") == "", "unknown is empty, never guessed"
     assert POSITIONS == ("POR", "DEF", "MED", "DEL")
