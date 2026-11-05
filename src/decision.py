@@ -202,8 +202,8 @@ def options() -> list[tuple[Any, ...]]:
 STANDINGS = ("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash)"
              " SELECT ?, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash FROM league_standings")
 # The plan as the run keeps it: dec_plan's moves, each sale with when it is made (dec_when).
-KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
-             " SELECT ?, step, kind, player, amount, win, worth, after FROM dec_when")
+KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after, cash_then)"
+             " SELECT ?, step, kind, player, amount, win, worth, after, cash_then FROM dec_when")
 KEEP = (
     "INSERT INTO decision_players (run_id, player, start, next, season, mine, xi)"
     " SELECT ?, player, start, next, season, mine, xi FROM look_players",
@@ -351,6 +351,11 @@ def _selftest() -> None:
             "4M short of a lock at zero: paid for by a sale of 5M of one he leaves out of the eleven"
         _write(*plan_rows(league(4e6, {"star": 8e6})))
         assert after_auctions() == sold(got), "a sale beside a bid: made once the bid is won"
+        with closing(connect()) as db, db:
+            db.execute("DELETE FROM dec_money")
+            db.execute("INSERT INTO dec_money VALUES (4e6, 60e6, 0.2, 24, 11)")
+        assert rows("SELECT kind, cash_then FROM dec_when ORDER BY step, kind") == [("buy", -4e6), ("sell", 1e6)], \
+            "each step of the plan leaves this cash, running from today's: 4M, less the 8M bid, plus the 5M sale"
         _write(*plan_rows(league(2e6, {"star": 20e6})))
         assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(20e6, 1.0, 0)], \
             "one the plan leaves out, at the lowest bid offered"

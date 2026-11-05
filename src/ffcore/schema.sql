@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS decision_plan (
     win    REAL NOT NULL,
     worth  REAL NOT NULL,            -- the step's, in points
     after  INTEGER NOT NULL DEFAULT 0, -- a sale made after the auctions (decide.sql dec_when)
+    cash_then REAL,                    -- the cash this step leaves, running from today's (decide.sql dec_when)
     PRIMARY KEY (run_id, step, kind)
 );
 
@@ -1751,7 +1752,7 @@ SELECT 'out', group_concat(name, ', ' ORDER BY i) FROM gap WHERE side = 'out';
 DROP VIEW IF EXISTS board_plan;
 CREATE VIEW board_plan AS
 SELECT row_number() OVER (ORDER BY p.step, p.kind) - 1 AS ord, p.step, p.kind, p.player, p.amount,
-       CASE p.kind WHEN 'buy' THEN p.amount ELSE -p.amount END AS net, p.win, p.worth, p.after
+       CASE p.kind WHEN 'buy' THEN p.amount ELSE -p.amount END AS net, p.win, p.worth, p.after, p.cash_then
 FROM decision_plan p JOIN board_run USING (run_id);
 
 -- Every line of the board, each once: what to do now, each with the step
@@ -1880,10 +1881,8 @@ WITH br AS MATERIALIZED (SELECT * FROM board_rows),
 rows AS (
     SELECT 'do' AS list, ord, what, label, name, pos, step, amount, done, gain, per, facts, players,
            NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan, what IN ('buy', 'sell') AS fold,
-           CASE WHEN what IN ('buy', 'sell') THEN (SELECT cash FROM board_league WHERE me)
-                                                  - (SELECT total(net) FROM board_plan p
-                                                     WHERE p.ord <= (SELECT q.ord FROM board_plan q
-                                                                     WHERE q.player = json_extract(br.players, '$[0]'))) END AS cash_then
+           CASE WHEN what IN ('buy', 'sell') THEN (SELECT q.cash_then FROM board_plan q
+                                                    WHERE q.player = json_extract(br.players, '$[0]')) END AS cash_then
     FROM br
     UNION ALL
     SELECT 'buys', row_number() OVER (ORDER BY -b.gain, b.player), 'buy', coalesce(p.label, 'buy ' || b.name), b.name, b.pos,

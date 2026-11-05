@@ -143,7 +143,10 @@ SELECT m.cash + m.debt * m.team_value - c.bids AS room FROM dec_money m, dec_cas
 -- game still buys him at his value).
 DROP VIEW IF EXISTS dec_when;
 CREATE VIEW dec_when AS
-SELECT d.*, d.kind = 'sell' AND EXISTS (SELECT 1 FROM dec_plan b WHERE b.kind = 'buy') AS after
+SELECT d.*, d.kind = 'sell' AND EXISTS (SELECT 1 FROM dec_plan b WHERE b.kind = 'buy') AS after,
+       -- the cash each step leaves, running from today's (the plan's order: its step, a buy before a sale)
+       (SELECT cash FROM dec_money) + sum(CASE d.kind WHEN 'buy' THEN -d.amount ELSE d.amount END)
+           OVER (ORDER BY d.step, d.kind ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cash_then
 FROM dec_plan d;
 
 -- The board's moves: each of your players sold, each buy at the plan's bid
