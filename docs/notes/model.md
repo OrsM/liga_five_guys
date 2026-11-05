@@ -52,18 +52,32 @@ The aim is to finish first. The planner maximises the best eleven's **expected p
 buy at its win chance (`decide.sql`); the chance of first is reported on those points. (The earlier "the objective is
 the chance of first" was loose.)
 
+## Offers, measured (2026-11-05, my listed players, 2026-08-25 to 11-05; NULL-money rows read as "listed, no offer")
+
+- A listed player had an offer on **49%** of nights (534 of 1081 player-nights); **42%** of two-night windows had none on
+  either night; some players sat listed 38-43 nights with offers on few. Not independent: per player, not per night.
+- When there is one, offer / value is mean 0.997, sd 0.057 (min 0.87, max 1.12); mostly noise around 1.0, not player-specific.
+- Next night's best offer against this night's: +0.006 of value, sd 0.073 (higher 46%, lower 40%): waiting for a
+  better offer is not worth, on average, anything; a longer run's best beats its first in 77% of runs by construction (a
+  maximum over time), not as a rule.
+- So a later offer is **not certain**: the plan's `waiting` (an offer each night) is optimistic; per night about half.
+
 ## What the stress test found (open, ranked)
 
-1. **A sale to an offer cannot follow the auctions** the same night: the offer expires at the close, when the bids
-   settle. The plan's "sell after the auctions" is therefore either a sale to a later offer (an unknown amount: the
-   plan counts value) or a sale before the bids settle (a player gone for nobody if the bid is lost). The
-   schedule has no offer expiry (`api_offers.expires_at` carries it). Needs a stated policy in Decision, not a patch.
-2. **Unlisted players have no sale at all** until listed (then an offer at the next close).
-3. **A lost bid is not modelled**: `after()` is "every bid won"; partial wins are a real branch (the settlement note
-   already records a lost bid that left its paired sales made).
-4. **The cap and the debt limit count pending bids**; `after()` checks the cap on won players, at the end.
-5. **Squad after moves is written four times** (`fund`, `after`, the recommender, `dec_squad`) and running cash twice
+1. **A sale to an offer cannot follow the auctions** the same night (the offer expires at the close, when the bids
+   settle), and **a later offer comes on about half the nights**, per player. A funding sale is therefore either a
+   sale on a standing offer (sure, but before the bids settle) or on one that may not come. Decision's `proceeds` is
+   `max(offer, waiting)`: both cases merged, the best case assumed. The failure of the lock (cash below zero: the
+   whole matchday) is the cost nobody prices. Ruled out by the attack: a per-sale win/lose lottery with branch
+   enumeration (2^k outcomes on the hot path; most paired buys win at ~0.97; it prices the wrong risk).
+   Direction: each sale carries the chance it is realised by the lock (1 on a standing offer; one minus no offer on
+   each night left for a listed player; 0 unlisted), from the measured offer rate; the plan's cash check flags a
+   plan that is safe only through sales that may not come. A constraint, not a second objective.
+2. **Unlisted players have no sale at all** until listed (then an offer at the next close, half the nights).
+3. **The cap and the debt limit count pending bids**; `after()` checks the cap on won players, at the end.
+4. **Squad after moves is written four times** (`fund`, `after`, the recommender, `dec_squad`) and running cash twice
    (`fund`, `after`; tied by a property test). Fixed so far: the debt limit (`rules.bid_limit`), the measure's
    step order (`in_groups`).
-6. `settlement_moves` times a sale differently from `schedule` and nothing reads it.
-7. No epsilon on `free < 0` (a −1e-7 cash triggers a sale).
+5. `settlement_moves` times a sale differently from `schedule` and nothing reads it.
+6. `nights_left` is one aggregate for all sales; per-player offer expiry (`offers.expires_at`) must replace it.
+7. No epsilon on `free < 0`.
