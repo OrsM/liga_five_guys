@@ -173,11 +173,12 @@ def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
     return read_made()
 
 
-def read_made() -> dict[str, list[tuple[Any, ...]]]:
-    """The rows inputs() wrote, as plan_rows takes them."""
+def read_made(only: tuple[str, ...] = ("dec_player", "dec_odds", "dec_money", "cell")) -> dict[str, list[tuple[Any, ...]]]:
+    """The rows inputs() wrote, as plan_rows takes them (only: just those tables; the cells cost a forecast)."""
     with closing(connect()) as db:
-        inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in ("dec_player", "dec_odds", "dec_money")}
-        inp["cell"] = db.execute("SELECT player, jornada, e FROM cell").fetchall()
+        inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in only if t != "cell"}
+        if "cell" in only:
+            inp["cell"] = db.execute("SELECT player, jornada, e FROM cell").fetchall()
     return inp
 
 
@@ -265,7 +266,7 @@ def record(run: int) -> list[tuple[Any, ...]]:
                         for k, offer, value, paid, beats, nights, waiting, mean, sd in db.execute(SALES, (run,))])
     with closing(connect()) as db:
         bids = dict(db.execute("SELECT player, my_bid FROM decision_facts WHERE run_id = ? AND my_bid > 0", (run,)))
-    found = blockers(read_made(), acts, bids)
+    found = blockers(read_made(("dec_player", "dec_money")), acts, bids)
     with closing(connect()) as db, db:
         db.executemany("INSERT INTO decision_blocker (run_id, future, blocker, amount) VALUES (?, ?, ?, ?)",
                        [(run, *b) for b in found])
