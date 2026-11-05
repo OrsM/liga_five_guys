@@ -1950,6 +1950,7 @@ SELECT json_object(
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'do'),
     'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
+    'unlisted', (SELECT json_group_array(name ORDER BY name) FROM board_mine WHERE NOT listed),
     'buys', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'buys'),
     'sells', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'sells'),
     'blockers', (SELECT json_group_array(json_object('future', future, 'blocker', blocker, 'label', label,
