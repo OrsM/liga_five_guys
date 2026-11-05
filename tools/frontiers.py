@@ -31,11 +31,11 @@ NAMES = {
     "forecast": "cell cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
     "decision": "bid_odds recent_offers offer_spread sale_odds waiting nights_left player_facts "
-                "next_cell my_squad my_cash my_xi look_players formation slot_bounds decision_sale "
+                "next_cell my_squad my_cash my_xi look_players formation slot_bounds decision_sale decision_blocker "
                 "decision_option decision_plan decision_facts decision_players decision_waiting decision_run "
                 "decision_standings",
     "settlement": "settlement_moves",
-    "board": "lock_due lineup_alert",
+    "board": "lock_due lineup_alert board_blockers",
     "grading": "replayed lead_buckets measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
@@ -48,7 +48,7 @@ EXPORTS = {
     # (decision_option, with the chance at the asking price and where an offer ranks), the players it looked at
     # and their facts (decision_players, decision_facts), what waiting is worth, the standings forecast, what
     # the plan leaves; league_jornada: each manager's points a jornada as a normal, what that forecast is graded on
-    "decision": "decision_plan decision_sale decision_option decision_players decision_facts decision_waiting decision_standings "
+    "decision": "decision_plan decision_sale decision_blocker decision_option decision_players decision_facts decision_waiting decision_standings "
                 "decision_run league_jornada",
     "settlement": "settlement_moves",  # moves(path, at, kind, player, amount)
     "board": "board_json",

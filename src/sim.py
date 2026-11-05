@@ -419,6 +419,14 @@ def _selftest() -> None:
     assert [d["name"] for d in owed["do"] if d["what"] in ("buy", "sell")] == ["Dead", "D1"] \
         and owed["cash_after"] == 5e6, "in debt: sales only, the least bad first, until clear (5M short: 1M, then 9M)"
 
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        seed(debt)
+        record_run(7)
+        assert rows("SELECT future, blocker, amount FROM decision_blocker WHERE run_id = 7 ORDER BY future") \
+            == [("nothing", "debt", -5e6), ("plan", "eleven", None)], \
+            "the run keeps the plan's check: doing nothing stays 5M in debt; the plan sells its way out but its two " \
+            "sales (a defender among them) leave this squad two defenders, short of any formation"
+
     _selftest_lineup()
     print("sim self-test OK")
 
@@ -475,6 +483,8 @@ def _selftest_board_contract() -> None:
                        " VALUES (3, ?, 0.25, 2.5, 4e6, 6e6, 2, julianday('2026-08-02T20:00:00Z'))", (c,))
             db.execute("INSERT INTO decision_sale (run_id, player, offer, paid, made, z, p_better, waiting_less)"
                        " VALUES (3, 'a', 1.1e6, 0.8e6, 0.3e6, 2.0, 0.4375, -0.1e6)")
+            db.executemany("INSERT INTO decision_blocker (run_id, future, blocker, amount) VALUES (3, ?, ?, ?)",
+                           [("nothing", "debt", -6e6), ("plan", "debt", -1e6), ("plan", "eleven", None)])
             db.executemany("INSERT INTO seen (cut, variant, player, name, pos, owner, value, trend, offer, price, route,"
                            " fetches, paid) VALUES (?, 'live', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                            [(c, "a", "Ana", "MED", "me", 1e6, None, 1.1e6, None, "listed", 1.1e6, 0.8e6),
@@ -516,6 +526,11 @@ def _selftest_board_contract() -> None:
         assert facts_of["waiting less the offer"] == (-0.1e6, "money"), "waiting worth 1.0M against the offer 1.1M"
         assert (doc["finish"], doc["finish_after"], doc["p_win"], doc["p_win_after"], doc["cash"],
                 doc["cash_after"], doc["can_bid"]) == (2.0, 2.5, 0.4, 0.25, 4e6, 4e6, 6e6), doc
+        assert doc["blockers"] == [
+            {"future": "nothing", "blocker": "debt", "label": "if you do nothing: in debt at the lock", "amount": -6e6},
+            {"future": "plan", "blocker": "debt", "label": "if you do the plan: in debt at the lock", "amount": -1e6},
+            {"future": "plan", "blocker": "eleven", "label": "if you do the plan: no eleven can be fielded", "amount": None}], \
+            "what the decision's check recorded for both futures, worded once by the board"
         assert [(r["manager"], r["p_above"]) for r in doc["standings"]] == [("riv", 0.7), ("me", None)], \
             "the standings forecast the run recorded, most points first"
         assert [r["name"] for r in doc["buys"]] == ["Cai"] and [r["name"] for r in doc["sells"]][0] in ("Ana", "Beto")

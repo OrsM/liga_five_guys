@@ -170,6 +170,11 @@ def _write(steps: list[tuple[Any, ...]], start: list[tuple[Any, ...]]) -> None:
 def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
     """inputs() made, and read back as plan_rows takes them."""
     inputs()
+    return read_made()
+
+
+def read_made() -> dict[str, list[tuple[Any, ...]]]:
+    """The rows inputs() wrote, as plan_rows takes them."""
     with closing(connect()) as db:
         inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in ("dec_player", "dec_odds", "dec_money")}
         inp["cell"] = db.execute("SELECT player, jornada, e FROM cell").fetchall()
@@ -258,6 +263,12 @@ def record(run: int) -> list[tuple[Any, ...]]:
                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                        [(run, k, offer, paid, *assess_sale(offer, value, paid, beats, nights, waiting, mean, sd))
                         for k, offer, value, paid, beats, nights, waiting, mean, sd in db.execute(SALES, (run,))])
+    with closing(connect()) as db:
+        bids = dict(db.execute("SELECT player, my_bid FROM decision_facts WHERE run_id = ? AND my_bid > 0", (run,)))
+    found = blockers(read_made(), acts, bids)
+    with closing(connect()) as db, db:
+        db.executemany("INSERT INTO decision_blocker (run_id, future, blocker, amount) VALUES (?, ?, ?, ?)",
+                       [(run, *b) for b in found])
     return acts
 
 

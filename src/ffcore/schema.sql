@@ -187,6 +187,16 @@ CREATE TABLE IF NOT EXISTS decision_waiting (
     PRIMARY KEY (run_id, player, kind)
 );
 
+-- What stops you at the plan's end (decision.blockers), on two futures: 'nothing' (you do nothing) and
+-- 'plan' (you do all it says). blocker: debt (amount: cash at the lock), eleven, squad (amount: players over).
+CREATE TABLE IF NOT EXISTS decision_blocker (
+    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
+    future  TEXT NOT NULL,
+    blocker TEXT NOT NULL,
+    amount  REAL,
+    PRIMARY KEY (run_id, future, blocker)
+);
+
 -- Each offer standing on one of your players, assessed (decision.assess_sale): what you make on it over
 -- what you paid, how far it is from the recent offers' mean in standard deviations, the chance a better
 -- one comes before the lock, what waiting is worth less the offer.
@@ -1932,6 +1942,8 @@ SELECT json_object(
     'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
     'buys', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'buys'),
     'sells', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'sells'),
+    'blockers', (SELECT json_group_array(json_object('future', future, 'blocker', blocker, 'label', label,
+                                                      'amount', amount) ORDER BY ord) FROM board_blockers),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
     'standings', (SELECT json_group_array(json_object(
@@ -1944,6 +1956,15 @@ FROM board_head h;
 -- A run to remind you of your line-up is due once the next jornada's lock is
 -- within REMIND_HOURS, and only once: not if a run was asked for it
 -- (trigger 'reminder', as_of the window's opening or later).
+-- The last run's blockers, each worded once for the page.
+DROP VIEW IF EXISTS board_blockers;
+CREATE VIEW board_blockers AS
+SELECT row_number() OVER (ORDER BY b.future = 'plan', b.blocker) AS ord, b.future, b.blocker, b.amount,
+       CASE b.future WHEN 'nothing' THEN 'if you do nothing: ' ELSE 'if you do the plan: ' END
+       || CASE b.blocker WHEN 'debt' THEN 'in debt at the lock' WHEN 'eleven' THEN 'no eleven can be fielded'
+                         ELSE 'more players than the squad holds' END AS label
+FROM decision_blocker b JOIN board_run USING (run_id);
+
 DROP VIEW IF EXISTS lock_due;
 CREATE VIEW lock_due AS
 WITH w AS (
