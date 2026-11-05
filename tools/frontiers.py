@@ -47,7 +47,7 @@ EXPORTS = {
     # (decision_option, with the chance at the asking price and where an offer ranks), the players it looked at
     # and their facts (decision_players, decision_facts), what waiting is worth, the standings forecast, what
     # the plan leaves; league_jornada: each manager's points a jornada as a normal, what that forecast is graded on
-    "decision": "decision_plan decision_sale decision_blocker decision_skip decision_option decision_players decision_facts decision_waiting decision_standings "
+    "decision": "decision_plan decision_sale decision_blocker decision_skip decision_flip decision_option decision_players decision_facts decision_waiting decision_standings "
                 "decision_run league_jornada",
     "board": "board_json",
     "grading": "",  # a measure: nothing downstream reads it

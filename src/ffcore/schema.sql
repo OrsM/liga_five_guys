@@ -203,6 +203,17 @@ CREATE TABLE IF NOT EXISTS decision_blocker (
 -- What skipping one step of the plan leaves (decision.after): do the rest of the plan as written, without this
 -- step (a buy goes with its paired sale, the same step). One row a blocker the skip leaves, as decision_blocker's;
 -- blocker 'none' (amount NULL) when skipping leaves nothing. kind: the skipped step's.
+-- What flipping one move leaves, from the plan as it stands (decision.flips): a move in the plan is taken out, one
+-- not in it is added. cash at the lock, the season's points against standing pat, and what stops you (a JSON array of blocker names).
+CREATE TABLE IF NOT EXISTS decision_flip (
+    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
+    player   TEXT NOT NULL,
+    kind     TEXT NOT NULL,
+    cash     REAL NOT NULL,
+    points   REAL NOT NULL,
+    blockers TEXT NOT NULL,
+    PRIMARY KEY (run_id, kind, player)
+);
 CREATE TABLE IF NOT EXISTS decision_skip (
     run_id  INTEGER NOT NULL REFERENCES runs(run_id),
     player  TEXT NOT NULL,
@@ -1881,6 +1892,14 @@ FROM market_daily
 WHERE substr(observed_at, 1, 10) > date((SELECT max(substr(observed_at, 1, 10)) FROM market_daily), '-14 day')
 GROUP BY ff_id;
 
+-- What flipping one move leaves (decision_flip), blockers worded once (board_blocker_word): a buy or sell row's `flip`.
+DROP VIEW IF EXISTS board_flip;
+CREATE VIEW board_flip AS
+SELECT f.player, f.kind, json_object('cash', f.cash, 'points', f.points,
+           'blockers', (SELECT json_group_array(w.phrase ORDER BY w.phrase)
+                        FROM json_each(f.blockers) e JOIN board_blocker_word w ON w.blocker = e.value)) AS flip
+FROM decision_flip f JOIN board_run USING (run_id);
+
 DROP VIEW IF EXISTS board_json;
 CREATE VIEW board_json AS
 WITH br AS MATERIALIZED (SELECT * FROM board_rows),
@@ -1922,6 +1941,7 @@ lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extr
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
                          'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'detail', json(r.detail),
                          'trace', json((SELECT t.trace FROM board_trace t WHERE t.player = json_extract(r.players, '$[0]'))),
+                         'flip', json((SELECT f.flip FROM board_flip f WHERE f.player = json_extract(r.players, '$[0]') AND f.kind = r.what)),
                          CASE r.list WHEN 'do' THEN 'ranked' ELSE 'more' END,
                          json(CASE WHEN r.fold THEN 'true' ELSE 'false' END),
                          'asking', b.asking, 'win', round(b.win, 3),

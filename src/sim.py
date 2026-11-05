@@ -173,7 +173,7 @@ def _selftest() -> None:
         assert not [d for d in report(ub, now, nights=nights)["do"] if d["what"] == "field"], \
             "set as the best eleven now: nothing to field, before the auctions or after (Dituro, 2026-10-30)"
     for d in doc["do"]:
-        assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts", "trace"} - (
+        assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts", "trace", "flip"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()) - (
             {"detail"} if d["what"] in ("buy", "sell") else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
@@ -519,6 +519,8 @@ def _selftest_board_contract() -> None:
                            [("buy", "c", 5.2e6, 0.8, 3.0, 0, "2026-11-04T22:24Z", "auction closes"),
                             ("sell", "a", 1.1e6, 1.0, -0.5, 1, "2026-11-06T20:00Z", "before the lock")])
             db.execute("INSERT INTO decision_waiting (run_id, player, kind, later) VALUES (3, 'a', 'sale', 1.0e6)")
+            db.executemany("INSERT INTO decision_flip (run_id, player, kind, cash, points, blockers) VALUES (3, ?, ?, ?, ?, ?)",
+                           [("c", "buy", -1e6, 2.5, '["debt", "eleven"]'), ("a", "sell", 6e6, -1.0, "[]")])
             db.executemany("INSERT INTO market (observed_at, source, value, ff_id, name) VALUES (?, '', ?, 'c', 'Cai')",
                            [("2026-08-01T0900Z", 4.0e6), ("2026-08-01T1800Z", 4.1e6), ("2026-08-02T0900Z", 4.2e6)])
             db.executemany("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first,"
@@ -533,6 +535,9 @@ def _selftest_board_contract() -> None:
         sell = do["sell"]
         assert buy["trace"] == [4.1e6, 4.2e6] and sell["trace"] is None, \
             "a player's closed days of value, oldest first, drawn as his line; none seen: none (market_daily)"
+        assert buy["flip"] == {"cash": -1e6, "points": 2.5, "blockers": ["in debt at the lock", "no eleven can be fielded"]} \
+            and sell["flip"] == {"cash": 6e6, "points": -1.0, "blockers": []}, \
+            "what flipping each move leaves: its cash, points and what stops you, worded once (decision_flip)"
         assert [(d["detail"]["due"], d["detail"]["why"]) for d in (buy, sell)] == [
             ("2026-11-04T22:24Z", "auction closes"), ("2026-11-06T20:00Z", "before the lock")], \
             "each step carries when it is due and what sets it (decision_plan)"

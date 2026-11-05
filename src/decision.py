@@ -4,6 +4,7 @@ until there is none. Every number the plan rests on is a row there to read
 (dec_money, dec_start)."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import closing
 from typing import Any, NamedTuple
@@ -13,7 +14,7 @@ from ffcore.rules import DEBT_SHARE, bid_limit, POSITIONS, SHAPES, SQUAD_MAX, XI
 from recommender import Rec, Recs, cells_of, recommend
 from recommender import points as eleven_points
 
-__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
+__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_plan", "dec_start")
 
@@ -207,15 +208,52 @@ def after(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], w
     return After(then, here, squad, out)
 
 
+def without(steps: list[tuple[Any, ...]], kind: str, player: str) -> list[tuple[Any, ...]]:
+    """The plan less one move: a buy goes with the sale that shares its step (it made room or paid for him); a sale
+    goes alone."""
+    step = next(s[0] for s in steps if (s[1], s[2]) == (kind, player))
+    return [s for s in steps if (s[0] != step if kind == "buy" else (s[1], s[2]) != (kind, player))]
+
+
 def skip_rows(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> list[tuple[str, str, str, float | None]]:
     """What skipping each step of the plan leaves: the rest of it as written, no placed bid (the board withdraws
     those), as rows (player, kind, blocker, amount), one a blocker, or blocker 'none' (amount None) for none.
     A buy goes with the sale that shares its step; a sale alone is skipped alone."""
     out: list[tuple[str, str, str, float | None]] = []
     for step, kind, k, *_ in steps:
-        rest = [s for s in steps if (s[0] != step if kind == "buy" else (s[1], s[2]) != (kind, k))]
-        left = after(inp, rest).blockers or [("none", None)]
+        left = after(inp, without(steps, kind, k)).blockers or [("none", None)]
         out += [(k, kind, blocker, amount) for blocker, amount in left]
+    return out
+
+
+class Evaluation(NamedTuple):
+    cash_then: list[float]                      # the cash each move leaves, in the plan's order
+    cash: float                                 # at the lock
+    blockers: list[tuple[str, float | None]]    # what stops you there
+    points: float                               # the season's, against standing pat (expected_gap)
+
+
+def evaluate(inp: dict[str, list[tuple[Any, ...]]], moves: list[tuple[Any, ...]]) -> Evaluation:
+    """What a chosen set of moves (dec_plan rows: step, kind, player, amount, win, worth) leaves: the cash and what
+    stops you (after) and its points (expected_gap), for any mix, the plan's or not. The one place a mix is judged."""
+    made = after(inp, moves)
+    return Evaluation(made.cash_then, made.cash, made.blockers, expected_gap(inp, moves))
+
+
+class Flip(NamedTuple):
+    player: str
+    kind: str
+    evaluation: Evaluation
+
+
+def flips(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]],
+          options: list[tuple[Any, ...]]) -> list[Flip]:
+    """What flipping each single move leaves, from the plan as it stands (evaluate): a move in the plan is taken out
+    (without), one not in it is added at its amount and chance. options: (kind, player, amount, win, in_plan)."""
+    out = []
+    for kind, k, amount, win, in_plan in options:
+        mix = without(steps, kind, k) if in_plan else [*steps, (max((s[0] for s in steps), default=-1) + 1, kind, k, amount, win, 0.0)]
+        out.append(Flip(k, kind, evaluate(inp, mix)))
     return out
 
 
@@ -328,7 +366,7 @@ def record(run: int) -> list[tuple[Any, ...]]:
     with closing(connect()) as db, db:
         db.execute(STANDINGS, (run,))
     acts = plan()
-    inp = read_made(("dec_player", "dec_money", "dec_bid", "dec_close", "dec_lock"))
+    inp = read_made(("dec_player", "dec_money", "dec_bid", "dec_close", "dec_lock", "cell"))
     (cash, team_value, debt, _, _), = inp["dec_money"]
     placed = dict(inp["dec_bid"])
     planned = after(inp, acts)
@@ -350,6 +388,10 @@ def record(run: int) -> list[tuple[Any, ...]]:
         db.executemany("INSERT INTO decision_blocker (run_id, future, blocker, amount) VALUES (?, ?, ?, ?)",
                        [(run, future, *b) for future, found in (("nothing", after(inp, [], placed).blockers), ("plan", planned.blockers))
                         for b in found])
+        db.executemany("INSERT INTO decision_flip (run_id, player, kind, cash, points, blockers) VALUES (?, ?, ?, ?, ?, ?)",
+                       [(run, f.player, f.kind, f.evaluation.cash, f.evaluation.points,
+                         json.dumps([b for b, _ in f.evaluation.blockers]))
+                        for f in flips(inp, acts, db.execute("SELECT kind, player, amount, win, in_plan FROM dec_rows").fetchall())])
         db.executemany("INSERT INTO decision_skip (run_id, player, kind, blocker, amount) VALUES (?, ?, ?, ?, ?)",
                        [(run, *r) for r in skip_rows(inp, acts)])
     return acts
@@ -463,6 +505,27 @@ def _selftest() -> None:
         sales_only = league(10e6, {"star": 8e6})
         sales_only["dec_player"] = [r for r in sales_only["dec_player"] if r[2]]
         assert plan_rows(sales_only)[0] == [], "sales only: no buy, and no sale worth more than nothing"
+
+        # Any mix is judged by evaluate: the plan's own mix gives the plan's cash and points; none leaves today's.
+        mixed = league(4e6, {"star": 8e6})
+        full_plan, _ = plan_rows(mixed)
+        got_all, got_none = evaluate(mixed, full_plan), evaluate(mixed, [])
+        assert (got_all.cash, got_all.cash_then, got_all.points) == (after(mixed, full_plan).cash, [-4e6, 1e6],
+                                                                       expected_gap(mixed, full_plan)), \
+            "the plan's mix: the cash and points the plan itself leaves"
+        assert (got_none.cash, got_none.cash_then, got_none.points, got_none.blockers) == (4e6, [], 0.0, []), "no move: today's"
+        flipped = {(f.kind, f.player): f.evaluation for f in flips(mixed, full_plan, [
+            ("buy", "star", 8e6, 1.0, 1), ("sell", "k", 5e6, 1.0, 0), ("sell", "bench", 5e6, 1.0, int("bench" in sold(full_plan)))])}
+        assert (flipped["buy", "star"].cash, flipped["buy", "star"].points) == (9e6, -2.0), \
+            "flip a buy of the plan: without him, the sale of m4 (own step) still stands: 4M + 5M, m4's place empty"
+        assert flipped["sell", "k"].cash == got_all.cash + 5e6 and flipped["sell", "k"].points == got_all.points - 8.0 \
+            and flipped["sell", "k"].blockers == [("eleven", None)], \
+            "flip a sale not in the plan: the only keeper (4 a jornada, two): his 5M comes in, 8 points go, and no eleven can be fielded"
+        assert flipped["sell", "bench"].blockers == [] and flipped["sell", "bench"].cash == got_all.cash + 5e6, "a sale that plays for nobody"
+        buy_only = [m for m in full_plan if m[1] == "buy"]
+        assert evaluate(mixed, buy_only).cash == -4e6 and ("debt", -4e6) in evaluate(mixed, buy_only).blockers, \
+            "the bid without its funding sale: in debt at the lock, said"
+        assert evaluate(mixed, buy_only).points == got_all.points, "his points are the same with or without the sale that funds him"
 
         # The standings: you (42 a jornada) and a rival of eight at 2 each, short of 5-4-1 by two
         # defenders and a midfielder: stand-ins at the average of each position's players (19/7, 20/7),

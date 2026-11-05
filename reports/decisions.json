@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-05T20:17Z",
+ "generated_at": "2026-11-05T20:46Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84311994.0,
  "cash_locked": 0.0,
@@ -1068,7 +1068,6 @@
  "cash_after": 3646145.92965951,
  "can_bid": 7711488.75017935,
  "ping": "buy Moi Gomez; buy Roger Hinojo; sell Alvaro F. Carreras; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin",
- "unlisted": [],
  "buys": [
   {
    "name": "Moi Gomez",
