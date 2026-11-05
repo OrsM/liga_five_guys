@@ -145,6 +145,9 @@ def _selftest() -> None:
                     db.executemany("INSERT INTO dec_plan VALUES (?, ?, ?, ?, ?, ?)",
                                    [(i, *p) for i, p in enumerate(plan)])
                     db.execute(decision.KEEP_PLAN, (7,))
+                    inp = decision.read_made(("dec_player", "dec_money", "dec_bid", "dec_close", "dec_lock"))
+                    steps = db.execute("SELECT * FROM dec_plan").fetchall()
+                    decision.stamp_plan(db, 7, inp, steps, decision.after(inp, steps).cash_then)
                 db.execute("UPDATE decision_option SET in_plan = EXISTS (SELECT 1 FROM decision_plan p"
                            " WHERE p.run_id = 7 AND p.kind = decision_option.kind"
                            " AND p.player = decision_option.player) WHERE run_id = 7")
@@ -172,7 +175,7 @@ def _selftest() -> None:
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()) - (
-            {"cash_then", "skip"} if d["what"] in ("buy", "sell") else set()), d
+            {"cash_then", "skip", "due"} if d["what"] in ("buy", "sell") else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert all(len(d["act"]) == 1 for d in doc["do"] if d["what"] in ("buy", "sell")) \
         and len(field["act"]) == 11 \
@@ -364,6 +367,8 @@ def _selftest() -> None:
         got = record_run(7)
         assert got == acts and rows("SELECT step, kind, player, amount FROM decision_plan WHERE run_id = 7") \
             == [(s, kind, k, a) for s, kind, k, a, *_ in acts], "the plan's moves, in order"
+        assert rows("SELECT ord, why IS NOT NULL FROM decision_plan WHERE run_id = 7 ORDER BY ord") \
+            == [(i, 1) for i in range(len(acts))], "each step has its place in the order and what sets when it is due"
         assert rows("SELECT kind, player, in_plan FROM decision_option WHERE run_id = 7 AND in_plan") \
             == [("buy", k, 1) for k in sorted(bought)], "each move alone, the plan's marked"
         assert rows("SELECT count(*) FROM decision_option WHERE run_id = 7 AND kind = 'sell'") == [(len(sqb), )]
@@ -509,9 +514,10 @@ def _selftest_board_contract() -> None:
                            [("sell", "a", 1.1e6, 1.0, -1.0, -0.5, 1, None, 0.75),
                             ("sell", "b", 2e6, 1.0, -3.0, -2.0, 0, None, None),
                             ("buy", "c", 5.2e6, 0.8, 4.0, 3.0, 1, 0.6, None)])
-            db.executemany("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
-                           " VALUES (3, 0, ?, ?, ?, ?, ?, 0)",
-                           [("buy", "c", 5.2e6, 0.8, 3.0), ("sell", "a", 1.1e6, 1.0, -0.5)])
+            db.executemany("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, ord, due, why)"
+                           " VALUES (3, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           [("buy", "c", 5.2e6, 0.8, 3.0, 0, "2026-11-04T22:24Z", "auction closes"),
+                            ("sell", "a", 1.1e6, 1.0, -0.5, 1, "2026-11-06T20:00Z", "before the lock")])
             db.execute("INSERT INTO decision_waiting (run_id, player, kind, later) VALUES (3, 'a', 'sale', 1.0e6)")
             db.executemany("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first,"
                            " p_above, cash) VALUES (3, ?, ?, 10, ?, 0, 0, ?, ?, ?, ?)",
@@ -523,6 +529,9 @@ def _selftest_board_contract() -> None:
             == ("Cai", "bid up to", 5.2e6, 0.8, 5e6, 0.6), \
             "a buy: the plan's bid and its chance, and the chance of winning at his asking price (decision_option)"
         sell = do["sell"]
+        assert (buy["due"], sell["due"]) == ({"due": "2026-11-04T22:24Z", "why": "auction closes"},
+                                             {"due": "2026-11-06T20:00Z", "why": "before the lock"}), \
+            "each step carries when it is due and what sets it (decision_plan)"
         assert (sell["name"], sell["step"], sell["amount"]) == ("Ana", "take offer", 1.1e6), sell
         assert buy["skip"] == [{"blocker": "none", "label": "safe to skip", "amount": None}] \
             and sell["skip"] == [

@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS decision_plan (
     amount REAL NOT NULL,
     win    REAL NOT NULL,
     worth  REAL NOT NULL,            -- the step's, in points
-    after  INTEGER NOT NULL DEFAULT 0, -- a sale made after the auctions (decide.sql dec_when)
+    due    TEXT,                       -- when the step is due (decision.schedule), the game's clock
+    why    TEXT,                       -- what sets it: auction closes, after the auctions, before the lock
     cash_then REAL,                    -- the cash this step leaves, running from today's (decision.after)
     ord    INTEGER,                    -- the step's place in the plan's order, from 0 (decision.in_order); everything reads this
     PRIMARY KEY (run_id, step, kind)
@@ -1766,7 +1767,7 @@ SELECT 'out', group_concat(name, ', ' ORDER BY i) FROM gap WHERE side = 'out';
 -- each spends (a sale's is negative).
 DROP VIEW IF EXISTS board_plan;
 CREATE VIEW board_plan AS
-SELECT p.ord, p.step, p.kind, p.player, p.amount, p.win, p.worth, p.after, p.cash_then
+SELECT p.ord, p.step, p.kind, p.player, p.amount, p.win, p.worth, p.due, p.why, p.cash_then
 FROM decision_plan p JOIN board_run USING (run_id);
 
 -- Every line of the board, each once: what to do now, each with the step
@@ -1778,7 +1779,7 @@ FROM decision_plan p JOIN board_run USING (run_id);
 --   bid up to the plan's bid, yours shown if it is another, or yours is
 --   in at it); each bid of yours the plan does not make, to withdraw (it
 --   would win beside the plan's: the plan weighs every bid, yours or not);
---   (a sale: after the auctions when the plan bids (dec_when: once you
+--   (a sale: after the auctions when the plan bids (decision.schedule: once you
 --   know they are won, to the game at his value), else take tonight's
 --   offer, or wait for what waiting is worth, or it is listed, or list
 --   it); your players not listed, rising first: the game
@@ -1817,11 +1818,11 @@ buys AS (
 sells AS (
     SELECT p.ord, 'sell',
            'sell ' || s.name, s.name, s.pos,
-           CASE WHEN p.after THEN 'sell after the auctions'
+           CASE WHEN p.why = 'after the auctions' THEN 'sell after the auctions'
                 WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait'
                 WHEN s.listed THEN 'listed' ELSE 'list' END,
-           CASE WHEN p.after THEN s.value WHEN s.offer IS NOT NULL THEN s.raises END,
-           s.listed AND NOT s.takes AND NOT p.after, s.worth, 'season',
+           CASE WHEN p.why = 'after the auctions' THEN s.value WHEN s.offer IS NOT NULL THEN s.raises END,
+           s.listed AND NOT s.takes AND p.why IS NOT 'after the auctions', s.worth, 'season',
            s.facts,
            json_array(s.player)
     FROM board_sell_facts s JOIN board_plan p ON p.kind = 'sell' AND p.player = s.player
@@ -1897,14 +1898,16 @@ rows AS (
                                                     WHERE q.player = json_extract(br.players, '$[0]')) END AS cash_then,
            CASE WHEN what IN ('buy', 'sell') THEN (SELECT json_group_array(json_object(
                     'blocker', k.blocker, 'label', k.label, 'amount', k.amount) ORDER BY k.blocker)
-                FROM board_skip k WHERE k.player = json_extract(br.players, '$[0]') AND k.kind = br.what) END AS skip
+                FROM board_skip k WHERE k.player = json_extract(br.players, '$[0]') AND k.kind = br.what) END AS skip,
+           CASE WHEN what IN ('buy', 'sell') THEN (SELECT json_object('due', q.due, 'why', q.why) FROM board_plan q
+                                                    WHERE q.player = json_extract(br.players, '$[0]')) END AS due
     FROM br
     UNION ALL
     SELECT 'buys', row_number() OVER (ORDER BY -b.gain, b.player), 'buy', coalesce(p.label, 'buy ' || b.name), b.name, b.pos,
            coalesce(p.step, CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END),
            coalesce(p.amount, b.cost), coalesce(p.done, b.my_bid = b.cost, 0),
            b.gain, 'season', b.facts, json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
-           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan, NULL, NULL
+           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan, NULL, NULL, NULL
     FROM board_buy_facts b
     LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
     WHERE b.gain > 0
@@ -1915,11 +1918,12 @@ rows AS (
            s.name, s.pos, coalesce(p.step, CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait' END),
            CASE WHEN p.label IS NOT NULL THEN p.amount WHEN s.takes THEN s.offer ELSE s.waiting END, coalesce(p.done, 0),
            s.gain, 'season', s.facts, json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
-           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell, NULL, NULL
+           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell, NULL, NULL, NULL
     FROM board_sell_facts s
     LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
 lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extract(o, '$.cash_then') IS NULL THEN '$.cash_then' ELSE '$.none' END,
-                                   CASE WHEN json_extract(o, '$.skip') IS NULL THEN '$.skip' ELSE '$.none' END)) AS o
+                                   CASE WHEN json_extract(o, '$.skip') IS NULL THEN '$.skip' ELSE '$.none' END,
+                                   CASE WHEN json_extract(o, '$.due') IS NULL THEN '$.due' ELSE '$.none' END)) AS o
           FROM (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
                                       WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
           FROM (SELECT list, ord, json(CASE WHEN what = 'field'
@@ -1931,7 +1935,7 @@ lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extr
                          CASE r.list WHEN 'buys' THEN 'price' ELSE 'offer' END, r.money, 'waiting', r.waiting, 'trend', r.trend,
                          'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
-                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'cash_then', r.cash_then, 'skip', json(r.skip),
+                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'cash_then', r.cash_then, 'skip', json(r.skip), 'due', json(r.due),
                          CASE r.list WHEN 'do' THEN 'ranked' ELSE 'more' END,
                          json(CASE WHEN r.fold THEN 'true' ELSE 'false' END),
                          'asking', b.asking, 'win', round(b.win, 3),

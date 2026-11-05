@@ -4,6 +4,7 @@ until there is none. Every number the plan rests on is a row there to read
 (dec_money, dec_start)."""
 from __future__ import annotations
 
+import sqlite3
 from contextlib import closing
 from typing import Any, NamedTuple
 
@@ -12,9 +13,9 @@ from ffcore.rules import DEBT_SHARE, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
 from recommender import Rec, Recs, cells_of, recommend
 from recommender import points as eleven_points
 
-__all__ = ["plan", "plan_rows", "after", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
+__all__ = ["schedule", "stamp_plan", "plan", "plan_rows", "after", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
 
-INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_plan", "dec_start")
+INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_plan", "dec_start")
 
 
 def inputs() -> None:
@@ -25,7 +26,7 @@ def inputs() -> None:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
         db.execute("INSERT INTO dec_state VALUES (?, ?, ?)", (DEBT_SHARE, SQUAD_MAX, XI_SIZE))
-        for t in ("dec_player", "dec_odds", "dec_money", "dec_bid"):
+        for t in ("dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock"):
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 
 
@@ -133,9 +134,34 @@ def expected_gap(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, .
     return ours - floor
 
 
-def in_order(steps: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
-    """The plan's steps in its order: step, a buy before a sale (decision_plan.ord)."""
-    return sorted(steps, key=lambda s: (s[0], s[1]))
+class Due(NamedTuple):
+    due: str | None     # when it must be done, as the game's clock (YYYY-MM-DDTHH:MMZ); None: not known
+    why: str            # what sets it: 'auction closes', 'after the auctions', 'before the lock'
+
+
+AFTER_AUCTIONS = "after the auctions"
+
+
+def schedule(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> dict[tuple[int, str], Due]:
+    """When each step of the plan is due, by (step, kind). A buy: when his auction closes. A sale, when the plan
+    bids: after the last of its auctions, once you know they are won (a sale made for a bid then lost is a player
+    gone for nobody; the game still buys him at his value after the auctions). A sale with no bid: before the
+    lock, the last moment the cash counts. inp: dec_close (player, close) and dec_lock (lock), each as it is
+    known."""
+    closes = dict(inp.get("dec_close", []))
+    lock = next((at for (at,) in inp.get("dec_lock", [])), None)
+    buys = {k: Due(closes.get(k) or lock, "auction closes" if closes.get(k) else "before the lock")
+            for _, kind, k, *_ in steps if kind == "buy"}
+    last = max((d.due for d in buys.values() if d.due), default=lock)
+    return {(step, kind): buys[k] if kind == "buy" else Due(last, AFTER_AUCTIONS) if buys else Due(lock, "before the lock")
+            for step, kind, k, *_ in steps}
+
+
+def in_order(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
+    """The plan's steps in their order (decision_plan.ord): soonest due first, a buy before a sale, then by step
+    (a swap's pair: the buy and the sale that funds it share a step)."""
+    due = schedule(inp, steps)
+    return sorted(steps, key=lambda s: (due[s[0], s[1]].due or "~", s[1], s[0]))
 
 
 class After(NamedTuple):
@@ -155,7 +181,7 @@ def after(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], w
     pos = {k: p for k, p, *_ in inp["dec_player"]}
     squad = {k for k, _, m, *_ in inp["dec_player"] if m}
     here, then = cash, []
-    for _, kind, k, amount, *_ in in_order(steps):
+    for _, kind, k, amount, *_ in in_order(inp, steps):
         here += -amount if kind == "buy" else amount
         squad = squad | {k} if kind == "buy" else squad - {k}
         then.append(here)
@@ -229,10 +255,9 @@ def options() -> list[tuple[Any, ...]]:
 # what the plan leaves.
 STANDINGS = ("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash)"
              " SELECT ?, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash FROM league_standings")
-# The plan as the run keeps it: dec_plan's moves, each sale with when it is made (dec_when).
-# (its running cash, cash_then, is after()'s, written by record).
-KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
-             " SELECT ?, step, kind, player, amount, win, worth, after FROM dec_when")
+# The plan as the run keeps it: dec_plan's moves (the order, ord, cash_then, due and why are written by record).
+KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth)"
+             " SELECT ?, step, kind, player, amount, win, worth FROM dec_plan")
 KEEP = (
     "INSERT INTO decision_players (run_id, player, start, next, season, mine, xi)"
     " SELECT ?, player, start, next, season, mine, xi FROM look_players",
@@ -251,6 +276,16 @@ KEEP_RUN = ("INSERT INTO decision_run (run_id, cut, p_first_after, finish_after,
             " offer_mean, offer_sd)"
             " SELECT ?, cut(), s.p_first, s.finish, ?, ?, n.nights, n.first, o.mean, o.sd"
             " FROM league_standings s, nights_left n, offer_spread o WHERE s.me")
+
+
+def stamp_plan(db: sqlite3.Connection, run: int, inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]],
+               cash_then: list[float]) -> None:
+    """What the run keeps beside each step of its plan (KEEP_PLAN wrote the moves): its place in the plan's order, the
+    cash it leaves (cash_then, after()'s, in that order), when it is due and what sets it (schedule)."""
+    due = schedule(inp, steps)
+    db.executemany("UPDATE decision_plan SET cash_then = ?, ord = ?, due = ?, why = ? WHERE run_id = ? AND step = ? AND kind = ?",
+                   [(c, i, *due[step, kind], run, step, kind)
+                    for i, (c, (step, kind, *_)) in enumerate(zip(cash_then, in_order(inp, steps)))])
 
 
 class SaleAssessment(NamedTuple):
@@ -286,7 +321,7 @@ def record(run: int) -> list[tuple[Any, ...]]:
     with closing(connect()) as db, db:
         db.execute(STANDINGS, (run,))
     acts = plan()
-    inp = read_made(("dec_player", "dec_money", "dec_bid"))
+    inp = read_made(("dec_player", "dec_money", "dec_bid", "dec_close", "dec_lock"))
     (cash, team_value, debt, _, _), = inp["dec_money"]
     placed = dict(inp["dec_bid"])
     planned = after(inp, acts)
@@ -300,8 +335,7 @@ def record(run: int) -> list[tuple[Any, ...]]:
         for sql in KEEP:
             db.execute(sql, (run,))
         db.execute(KEEP_RUN, (run, planned.cash, room))
-        db.executemany("UPDATE decision_plan SET cash_then = ?, ord = ? WHERE run_id = ? AND step = ? AND kind = ?",
-                       [(c, i, run, step, kind) for i, (c, (step, kind, *_)) in enumerate(zip(planned.cash_then, in_order(acts)))])
+        stamp_plan(db, run, inp, acts, planned.cash_then)
         db.executemany("INSERT INTO decision_sale (run_id, player, offer, paid, made, z, p_better, waiting_less)"
                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                        [(run, k, offer, paid, *assess_sale(offer, value, paid, beats, nights, waiting, mean, sd))
@@ -348,9 +382,10 @@ def _selftest() -> None:
     def labels(steps: list[tuple[Any, ...]]) -> list[str]:
         return ["%s %s" % (kind, k) for _, kind, k, *_ in steps]
 
-    def after_auctions() -> set[str]:
-        """The last plan's sales to make after the auctions (decide.sql dec_when)."""
-        return {k for (k,) in rows("SELECT player FROM dec_when WHERE after")}
+    def after_auctions(steps: list[tuple[Any, ...]]) -> set[str]:
+        """The plan's sales to make after the auctions (schedule)."""
+        due = schedule({}, steps)
+        return {k for step, kind, k, *_ in steps if due[step, kind].why == AFTER_AUCTIONS}
 
     def sold(steps: list[tuple[Any, ...]]) -> set[str]:
         return {k for _, kind, k, *_ in steps if kind == "sell"}
@@ -391,8 +426,7 @@ def _selftest() -> None:
         got, _ = plan_rows(league(4e6, {"star": 8e6}))
         assert kinds(got) == ["buy", "sell"] and sold(got) <= {"bench", "m4"}, \
             "4M short of a lock at zero: paid for by a sale of 5M of one he leaves out of the eleven"
-        _write(*plan_rows(league(4e6, {"star": 8e6})))
-        assert after_auctions() == sold(got), "a sale beside a bid: made once the bid is won"
+        assert after_auctions(got) == sold(got), "a sale beside a bid: made once the bid is won"
         assert after(league(4e6, {"star": 8e6}), got).cash_then == [-4e6, 1e6], \
             "each step of the plan leaves this cash, running from today's: 4M, less the 8M bid, plus the 5M sale"
         _write(*plan_rows(league(2e6, {"star": 20e6})))
@@ -416,8 +450,7 @@ def _selftest() -> None:
         assert plan_rows(league(30e6, {}, extra=SQUAD_MAX - len(squad)))[0] == [], \
             "a player who scores nothing is not sold for his money: money is no goal"
         assert labels(plan_rows(league(-3e6, {}))[0]) == ["sell bench"], "in debt: the least bad sale"
-        _write(*plan_rows(league(-3e6, {})))
-        assert after_auctions() == set(), "no bid: the sale at once"
+        assert after_auctions(plan_rows(league(-3e6, {}))[0]) == set(), "no bid: the sale before the lock"
         assert labels(plan_rows(league(-12e6, {}))[0]) == ["sell bench", "sell m4", "sell d1"], \
             "until clear: bench (0), m4 (-4: his place empty), then a slot each, by name"
         sales_only = league(10e6, {"star": 8e6})
@@ -488,7 +521,8 @@ def _selftest_blockers() -> None:
     assert got.cash_then == [-6e6, -1e6] and got.blockers == [("debt", -1e6)], \
         "running cash: 4M, less the 10M bid, plus the 5M sale"
     got = after(inp(4e6), [sell("bench", 0), buy(10e6, 1), sell("m4", 1)], {"x": 1e6})
-    assert got.cash_then == [9e6, -1e6, 4e6], "in the plan's order (step, a buy before its sale), won bids not among them"
+    assert got.cash_then == [-6e6, -1e6, 4e6], \
+        "in the plan's order (with a bid, every sale after the auctions: the buy first, then by step), won bids not among them"
     assert after(inp(5e6), [sell("k")]).blockers == [("eleven", None)], "the plan sells the only keeper: no eleven"
     assert after(inp(5e6, squad_max=12), [], {"star": 1e6}).blockers == [("squad", 1.0)], \
         "a won bid on a full squad: one over"
@@ -512,6 +546,21 @@ def _selftest_blockers() -> None:
     assert skips(inp(-2e6), own) == {("star", "buy"): [("none", None)], ("m4", "sell"): [("debt", -10e6)]}, \
         "a funding sale stands alone: skip it and the buy is unpaid; skip the buy and the sale alone clears the debt"
 
+    # The schedule: a buy is due when his auction closes, a sale beside a bid after the last auction, one with no bid
+    # by the lock; the plan's order follows it, whatever the step numbers. Property over every permutation of closes.
+    lock = "2026-11-06T20:00Z"
+    swap = [(0, "buy", "a", 5e6, 1.0, 1.0), (0, "sell", "x", 5e6, 1.0, 0.0), (1, "buy", "b", 4e6, 1.0, 1.0)]
+    for ca, cb in (("2026-11-04T22:24Z", "2026-11-05T22:24Z"), ("2026-11-05T22:24Z", "2026-11-04T22:24Z")):
+        sched: dict[str, list[tuple[Any, ...]]] = {"dec_close": [("a", ca), ("b", cb)], "dec_lock": [(lock,)]}
+        due = schedule(sched, swap)
+        assert due[0, "buy"] == Due(ca, "auction closes") and due[1, "buy"] == Due(cb, "auction closes")
+        assert due[0, "sell"] == Due(max(ca, cb), AFTER_AUCTIONS), "a sale: after the last auction, once the bids are won"
+        order = [(k, kind) for _, kind, k, *_ in in_order(sched, swap)]
+        assert order[:2] == sorted([("a", "buy"), ("b", "buy")], key=lambda x: {"a": ca, "b": cb}[x[0]]) and order[2] == ("x", "sell"), order
+    assert schedule({"dec_lock": [(lock,)]}, [(0, "sell", "x", 1e6, 1.0, 0.0)])[0, "sell"] == Due(lock, "before the lock")
+    assert schedule({}, swap)[0, "buy"] == Due(None, "before the lock"), "nothing known: no time, not a guess"
+    assert [k for _, _, k, *_ in in_order({}, swap)] == ["a", "b", "x"], "no times: the buys by step, then the sale made after them"
+
     # Property: after(plan).cash is the cash plan_rows' fund() ended on, in several leagues.
     cells = {k: 4.0 for k in squad} | {"m4": 2.0, "bench": 1.0, "star": 8.0, "keeper": 3.0}
     for cash, extra, price in ((10e6, 0, 8e6), (4e6, 0, 8e6), (-3e6, 0, 8e6), (-12e6, 0, 20e6), (30e6, 12, 8e6), (2e6, 0, 20e6)):
@@ -524,7 +573,7 @@ def _selftest_blockers() -> None:
         free = cash - sum(a if kind == "buy" else -a for _, kind, _, a, *_ in steps)
         res = after(rows_in, steps)
         assert res.cash == free, ("after().cash is fund()'s free", cash, steps)
-        ordered = in_order(steps)
+        ordered = in_order(rows_in, steps)
         assert res.cash_then[-1:] == ([free] if steps else []) and len(res.cash_then) == len(steps), ordered
 
 

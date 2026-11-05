@@ -52,6 +52,13 @@ CREATE TABLE IF NOT EXISTS dec_bid (
     player TEXT PRIMARY KEY,
     amount REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS dec_close (
+    player TEXT PRIMARY KEY,
+    close  TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS dec_lock (
+    lock TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS dec_money (
     cash       REAL NOT NULL,
     team_value REAL NOT NULL,
@@ -89,6 +96,17 @@ WHERE s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player
 DROP VIEW IF EXISTS dec_odds_seen;
 CREATE VIEW dec_odds_seen AS
 SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN look l ON o.cut = l.cut AND o.variant = l.variant;
+
+-- When each market player's auction closes (the game's listings, the last close seen), and the lock the
+-- cash is due by (ingest's next_lock), as the game's clock; the plan's steps are due by them (decision.schedule).
+DROP VIEW IF EXISTS dec_close_seen;
+CREATE VIEW dec_close_seen AS
+SELECT player, strftime('%Y-%m-%dT%H:%MZ', max(julianday(expires_at))) AS close FROM listings
+WHERE seller = 'marketPlayerLeague' AND player IS NOT NULL AND sale_price <> 0 GROUP BY player
+HAVING max(julianday(expires_at)) IS NOT NULL;
+DROP VIEW IF EXISTS dec_lock_seen;
+CREATE VIEW dec_lock_seen AS
+SELECT strftime('%Y-%m-%dT%H:%MZ', t) AS lock FROM next_lock WHERE t IS NOT NULL;
 
 -- The bids you have placed, as seen.
 DROP VIEW IF EXISTS dec_bid_seen;
@@ -131,15 +149,6 @@ SELECT player, pos FROM dec_player
 WHERE mine AND player NOT IN (SELECT player FROM dec_plan WHERE kind = 'sell')
 UNION ALL
 SELECT p.player, p.pos FROM dec_plan d JOIN dec_player p USING (player) WHERE d.kind = 'buy';
-
--- When each of the plan's sales is made: at once, or, when the plan bids,
--- after the auctions, once you know they are won (a sale made for a bid
--- that is then lost is a player gone for nobody; after the auctions the
--- game still buys him at his value).
-DROP VIEW IF EXISTS dec_when;
-CREATE VIEW dec_when AS
-SELECT d.*, d.kind = 'sell' AND EXISTS (SELECT 1 FROM dec_plan b WHERE b.kind = 'buy') AS after
-FROM dec_plan d;
 
 -- The board's moves: each of your players sold, each buy at the plan's bid
 -- (or, not in the plan, the lowest bid his odds offer), valued alone from
