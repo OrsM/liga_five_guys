@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-05T08:11Z",
+ "generated_at": "2026-11-05T09:04Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84411994.0,
  "cash_locked": 0.0,
@@ -49,6 +49,7 @@
      "trend"
     ]
    ],
+   "cash_then": -89555946.0498207,
    "ranked": true,
    "asking": 4138235.0,
    "win": 1.0,
@@ -135,6 +136,7 @@
      "trend"
     ]
    ],
+   "cash_then": -84346407.0498207,
    "ranked": true,
    "accepts": [],
    "act": [
@@ -185,6 +187,7 @@
      "trend"
     ]
    ],
+   "cash_then": -86053783.0498207,
    "ranked": true,
    "asking": 1707376.0,
    "win": 1.0,
@@ -270,6 +273,7 @@
      "trend"
     ]
    ],
+   "cash_then": -85438560.0498207,
    "ranked": true,
    "accepts": [],
    "act": [
@@ -350,6 +354,7 @@
      "trend"
     ]
    ],
+   "cash_then": -81995351.0498207,
    "ranked": true,
    "accepts": [],
    "act": [
@@ -390,6 +395,7 @@
      "trend"
     ]
    ],
+   "cash_then": -81099319.0498207,
    "ranked": true,
    "accepts": [],
    "act": [
@@ -475,6 +481,7 @@
      "trend"
     ]
    ],
+   "cash_then": -75177944.9210244,
    "ranked": true,
    "accepts": [],
    "act": [
@@ -560,6 +567,7 @@
      "trend"
     ]
    ],
+   "cash_then": -71157260.9787341,
    "ranked": true,
    "accepts": [],
    "act": [
@@ -645,6 +653,7 @@
      "trend"
     ]
    ],
+   "cash_then": -59840320.0703405,
    "ranked": true,
    "accepts": [],
    "act": [
@@ -725,6 +734,7 @@
      "trend"
     ]
    ],
+   "cash_then": 3546145.92965952,
    "ranked": true,
    "accepts": [],
    "act": [
