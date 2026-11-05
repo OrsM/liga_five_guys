@@ -1,15 +1,15 @@
 {
- "generated_at": "2026-11-05T09:58Z",
+ "generated_at": "2026-11-05T16:57Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84411994.0,
  "cash_locked": 0.0,
  "finish": 2.28,
- "p_win": 0.092,
- "finish_after": 2.36,
- "p_win_after": 0.072,
+ "p_win": 0.094,
+ "finish_after": 2.35,
+ "p_win_after": 0.073,
  "band": [
-  2024.70555173732,
-  2291.79397839742
+  2025.75497054265,
+  2293.34568110026
  ],
  "do": [
   {
@@ -57,6 +57,10 @@
      "amount": null
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "auction closes"
+   },
    "ranked": true,
    "asking": 4138235.0,
    "win": 1.0,
@@ -73,6 +77,73 @@
      "bid": "",
      "pos": "MED",
      "value": 4138235.0
+    }
+   ]
+  },
+  {
+   "name": "Roger Hinojo",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Roger Hinojo",
+   "step": "bid up to",
+   "amount": 1707376.0,
+   "done": false,
+   "gain": 0.145568753606312,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     1707376.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points",
+     0.145568753606312,
+     "points"
+    ],
+    [
+     "",
+     -33.0367086053245,
+     "trend"
+    ]
+   ],
+   "cash_then": -91263322.0498207,
+   "skip": [
+    {
+     "blocker": "none",
+     "label": "safe to skip",
+     "amount": null
+    }
+   ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "auction closes"
+   },
+   "ranked": true,
+   "asking": 1707376.0,
+   "win": 1.0,
+   "asking_win": 1.0,
+   "accepts": [
+    1707376.0
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "3162",
+     "market": "577813597",
+     "bid": "",
+     "pos": "DEF",
+     "value": 1664610.0
     }
    ]
   },
@@ -143,7 +214,7 @@
      "trend"
     ]
    ],
-   "cash_then": -84346407.0498207,
+   "cash_then": -86053783.0498207,
    "skip": [
     {
      "blocker": "debt",
@@ -151,6 +222,10 @@
      "amount": -1663393.07034049
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -161,69 +236,6 @@
      "bid": "",
      "pos": "DEF",
      "value": 4728303.0
-    }
-   ]
-  },
-  {
-   "name": "Roger Hinojo",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Roger Hinojo",
-   "step": "bid up to",
-   "amount": 1707376.0,
-   "done": false,
-   "gain": 0.324921595977685,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     1707376.0,
-     "money"
-    ],
-    [
-     "bids",
-     "none yet",
-     "count"
-    ],
-    [
-     "chance to win",
-     1.0,
-     "chance"
-    ],
-    [
-     "points",
-     0.324921595977685,
-     "points"
-    ],
-    [
-     "",
-     -33.0367086053245,
-     "trend"
-    ]
-   ],
-   "cash_then": -86053783.0498207,
-   "skip": [
-    {
-     "blocker": "none",
-     "label": "safe to skip",
-     "amount": null
-    }
-   ],
-   "ranked": true,
-   "asking": 1707376.0,
-   "win": 1.0,
-   "asking_win": 1.0,
-   "accepts": [
-    1707376.0
-   ],
-   "act": [
-    {
-     "player_team": null,
-     "player": "3162",
-     "market": "577813597",
-     "bid": "",
-     "pos": "DEF",
-     "value": 1664610.0
     }
    ]
   },
@@ -302,6 +314,10 @@
      "amount": null
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -390,6 +406,10 @@
      "amount": null
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -438,6 +458,10 @@
      "amount": null
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -459,7 +483,7 @@
    "step": "sell after the auctions",
    "amount": 5963708.0,
    "done": false,
-   "gain": -0.978224580595452,
+   "gain": -0.821326357742919,
    "per": "season",
    "facts": [
     [
@@ -514,7 +538,7 @@
     ],
     [
      "points",
-     -0.978224580595452,
+     -0.821326357742919,
      "points"
     ],
     [
@@ -531,6 +555,10 @@
      "amount": -2375228.19913677
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -624,6 +652,10 @@
      "amount": -474538.012630768
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -717,6 +749,10 @@
      "amount": -7770794.97873411
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -805,6 +841,10 @@
      "amount": -59840320.0703405
     }
    ],
+   "due": {
+    "due": "2026-11-05T21:24Z",
+    "why": "after the auctions"
+   },
    "ranked": true,
    "accepts": [],
    "act": [
@@ -891,7 +931,7 @@
  ],
  "cash_after": 3546145.92965951,
  "can_bid": 7611488.75017935,
- "ping": "buy Moi Gomez; sell Alvaro F. Carreras; buy Roger Hinojo; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin; list Martin Satriano, Adria Pedrosa",
+ "ping": "buy Moi Gomez; buy Roger Hinojo; sell Alvaro F. Carreras; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin; list Martin Satriano, Adria Pedrosa",
  "buys": [
   {
    "name": "Moi Gomez",
@@ -1069,64 +1109,6 @@
    ]
   },
   {
-   "name": "Roger Hinojo",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Roger Hinojo",
-   "step": "bid up to",
-   "price": 1707376.0,
-   "trend": -33.0367086053245,
-   "plan": true,
-   "amount": 1707376.0,
-   "done": false,
-   "gain": 0.324921595977685,
-   "per": "season",
-   "facts": [
-    [
-     "listed at",
-     1707376.0,
-     "money"
-    ],
-    [
-     "bids",
-     "none yet",
-     "count"
-    ],
-    [
-     "chance to win",
-     1.0,
-     "chance"
-    ],
-    [
-     "points",
-     0.324921595977685,
-     "points"
-    ],
-    [
-     "",
-     -33.0367086053245,
-     "trend"
-    ]
-   ],
-   "more": false,
-   "asking": 1707376.0,
-   "win": 1.0,
-   "asking_win": 1.0,
-   "accepts": [
-    1707376.0
-   ],
-   "act": [
-    {
-     "player_team": null,
-     "player": "3162",
-     "market": "577813597",
-     "bid": "",
-     "pos": "DEF",
-     "value": 1664610.0
-    }
-   ]
-  },
-  {
    "name": "Toni Martinez",
    "pos": "DEL",
    "what": "buy",
@@ -1181,6 +1163,64 @@
      "bid": "",
      "pos": "DEL",
      "value": 7624648.0
+    }
+   ]
+  },
+  {
+   "name": "Roger Hinojo",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Roger Hinojo",
+   "step": "bid up to",
+   "price": 1707376.0,
+   "trend": -33.0367086053245,
+   "plan": true,
+   "amount": 1707376.0,
+   "done": false,
+   "gain": 0.145568753606312,
+   "per": "season",
+   "facts": [
+    [
+     "listed at",
+     1707376.0,
+     "money"
+    ],
+    [
+     "bids",
+     "none yet",
+     "count"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points",
+     0.145568753606312,
+     "points"
+    ],
+    [
+     "",
+     -33.0367086053245,
+     "trend"
+    ]
+   ],
+   "more": false,
+   "asking": 1707376.0,
+   "win": 1.0,
+   "asking_win": 1.0,
+   "accepts": [
+    1707376.0
+   ],
+   "act": [
+    {
+     "player_team": null,
+     "player": "3162",
+     "market": "577813597",
+     "bid": "",
+     "pos": "DEF",
+     "value": 1664610.0
     }
    ]
   }
@@ -1494,7 +1534,7 @@
    "plan": true,
    "amount": 5963708.0,
    "done": false,
-   "gain": -0.978224580595452,
+   "gain": -0.821326357742919,
    "per": "season",
    "facts": [
     [
@@ -1549,7 +1589,7 @@
     ],
     [
      "points",
-     -0.978224580595452,
+     -0.821326357742919,
      "points"
     ],
     [
@@ -1672,7 +1712,7 @@
    "plan": false,
    "amount": null,
    "done": false,
-   "gain": -1.52624432573862,
+   "gain": -2.82680507982104,
    "per": "season",
    "facts": [
     [
@@ -1682,7 +1722,7 @@
     ],
     [
      "points",
-     -1.52624432573862,
+     -2.82680507982104,
      "points"
     ],
     [
@@ -1701,6 +1741,92 @@
      "bid": "",
      "pos": "DEF",
      "value": 5148159.0
+    }
+   ]
+  },
+  {
+   "name": "Adria Pedrosa",
+   "pos": "DEF",
+   "what": "list",
+   "label": "list Adria Pedrosa",
+   "step": "take offer",
+   "offer": 3235793.0,
+   "waiting": 3222790.35212026,
+   "trend": 4.81322531983025,
+   "plan": false,
+   "amount": 3235793.0,
+   "done": false,
+   "gain": -3.3762223361116,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     3181423.0,
+     "money"
+    ],
+    [
+     "paid",
+     3313813.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -78020.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.46,
+     "beats"
+    ],
+    [
+     "offer vs the usual (sd)",
+     0.116769840820788,
+     "sd"
+    ],
+    [
+     "waiting is worth",
+     3222790.35212026,
+     "money"
+    ],
+    [
+     "waiting less the offer",
+     -13002.6478797393,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     0.54,
+     "chance"
+    ],
+    [
+     "more offers before the lock",
+     1,
+     "count"
+    ],
+    [
+     "points",
+     -3.3762223361116,
+     "points"
+    ],
+    [
+     "",
+     4.81322531983025,
+     "trend"
+    ]
+   ],
+   "more": true,
+   "accepts": [
+    null
+   ],
+   "act": [
+    {
+     "player_team": "109094607",
+     "player": "1056",
+     "market": null,
+     "bid": null,
+     "pos": "DEF",
+     "value": 3181423.0
     }
    ]
   },
@@ -1787,92 +1913,6 @@
      "bid": "",
      "pos": "POR",
      "value": 4452316.0
-    }
-   ]
-  },
-  {
-   "name": "Adria Pedrosa",
-   "pos": "DEF",
-   "what": "list",
-   "label": "list Adria Pedrosa",
-   "step": "take offer",
-   "offer": 3235793.0,
-   "waiting": 3222790.35212026,
-   "trend": 4.81322531983025,
-   "plan": false,
-   "amount": 3235793.0,
-   "done": false,
-   "gain": -3.88064076059163,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     3181423.0,
-     "money"
-    ],
-    [
-     "paid",
-     3313813.0,
-     "money"
-    ],
-    [
-     "made on the sale",
-     -78020.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.46,
-     "beats"
-    ],
-    [
-     "offer vs the usual (sd)",
-     0.116769840820788,
-     "sd"
-    ],
-    [
-     "waiting is worth",
-     3222790.35212026,
-     "money"
-    ],
-    [
-     "waiting less the offer",
-     -13002.6478797393,
-     "money"
-    ],
-    [
-     "a better offer comes",
-     0.54,
-     "chance"
-    ],
-    [
-     "more offers before the lock",
-     1,
-     "count"
-    ],
-    [
-     "points",
-     -3.88064076059163,
-     "points"
-    ],
-    [
-     "",
-     4.81322531983025,
-     "trend"
-    ]
-   ],
-   "more": true,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "109094607",
-     "player": "1056",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 3181423.0
     }
    ]
   },
@@ -2231,7 +2271,7 @@
    "plan": false,
    "amount": 9463844.0,
    "done": false,
-   "gain": -15.4817036465129,
+   "gain": -14.9717735871945,
    "per": "season",
    "facts": [
     [
@@ -2281,7 +2321,7 @@
     ],
     [
      "points",
-     -15.4817036465129,
+     -14.9717735871945,
      "points"
     ],
     [
@@ -2581,7 +2621,7 @@
    "plan": false,
    "amount": 26335147.0,
    "done": false,
-   "gain": -24.4638739171555,
+   "gain": -23.3687148938652,
    "per": "season",
    "facts": [
     [
@@ -2631,7 +2671,7 @@
     ],
     [
      "points",
-     -24.4638739171555,
+     -23.3687148938652,
      "points"
     ],
     [
@@ -2667,7 +2707,7 @@
    "plan": false,
    "amount": 20696152.0,
    "done": false,
-   "gain": -24.8678732550172,
+   "gain": -24.3579431956989,
    "per": "season",
    "facts": [
     [
@@ -2717,7 +2757,7 @@
     ],
     [
      "points",
-     -24.8678732550172,
+     -24.3579431956989,
      "points"
     ],
     [
@@ -2753,7 +2793,7 @@
    "plan": false,
    "amount": 43264333.0,
    "done": false,
-   "gain": -25.2935746973105,
+   "gain": -24.7836446379922,
    "per": "season",
    "facts": [
     [
@@ -2793,7 +2833,7 @@
     ],
     [
      "points",
-     -25.2935746973105,
+     -24.7836446379922,
      "points"
     ],
     [
@@ -2829,7 +2869,7 @@
    "plan": false,
    "amount": 38295002.3159547,
    "done": false,
-   "gain": -34.8926652869618,
+   "gain": -33.4509412052598,
    "per": "season",
    "facts": [
     [
@@ -2884,7 +2924,7 @@
     ],
     [
      "points",
-     -34.8926652869618,
+     -33.4509412052598,
      "points"
     ],
     [
@@ -2918,7 +2958,7 @@
    "plan": false,
    "amount": 56535713.0,
    "done": false,
-   "gain": -35.2860522550868,
+   "gain": -34.1590797623055,
    "per": "season",
    "facts": [
     [
@@ -2968,7 +3008,7 @@
     ],
     [
      "points",
-     -35.2860522550868,
+     -34.1590797623055,
      "points"
     ],
     [
@@ -3004,7 +3044,7 @@
    "plan": false,
    "amount": 45564090.908502,
    "done": false,
-   "gain": -42.3651940748666,
+   "gain": -41.8552640155483,
    "per": "season",
    "facts": [
     [
@@ -3059,7 +3099,7 @@
     ],
     [
      "points",
-     -42.3651940748666,
+     -41.8552640155483,
      "points"
     ],
     [
@@ -3266,14 +3306,14 @@
    "clause": 3313813.0
   },
   {
-   "name": "Augusto Batalla",
-   "pos": "POR",
-   "clause": 5505499.0
-  },
-  {
    "name": "Justin de Haas",
    "pos": "DEF",
    "clause": 5207110.0
+  },
+  {
+   "name": "Augusto Batalla",
+   "pos": "POR",
+   "clause": 5505499.0
   },
   {
    "name": "Robin Le Normand",
@@ -3310,14 +3350,14 @@
    "hi": 2505.73197674406,
    "cash": -23703714.0,
    "estimated": true,
-   "p_above": 0.898243387975906
+   "p_above": 0.896564575574844
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 573.0,
-   "lo": 2024.70555173732,
-   "hi": 2291.79397839742,
+   "lo": 2025.75497054265,
+   "hi": 2293.34568110026,
    "cash": -84411994.0,
    "estimated": false,
    "p_above": null
@@ -3326,21 +3366,21 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 464.0,
-   "lo": 1964.26345407004,
-   "hi": 2239.21316098836,
+   "lo": 1964.48774266924,
+   "hi": 2239.25497547372,
    "cash": -34653192.0,
    "estimated": true,
-   "p_above": 0.352763693862179
+   "p_above": 0.349949892209232
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 416.0,
-   "lo": 1764.8734450898,
-   "hi": 2013.02578066824,
+   "lo": 1763.95564130354,
+   "hi": 2012.14807838618,
    "cash": -9043575.0,
    "estimated": true,
-   "p_above": 0.029160462849449
+   "p_above": 0.0282819948566044
   },
   {
    "manager": "Magic Mike 333",
@@ -3350,7 +3390,7 @@
    "hi": 1812.21716466499,
    "cash": 63993671.0,
    "estimated": true,
-   "p_above": 0.000372109167947388
+   "p_above": 0.000364296186717739
   }
  ]
 }
