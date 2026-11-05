@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-05T06:35Z",
+ "generated_at": "2026-11-05T08:11Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": -84411994.0,
  "cash_locked": 0.0,
@@ -481,8 +481,8 @@
     {
      "player_team": "109094609",
      "player": "255",
-     "market": "62682354",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEF",
      "value": 5963708.0
     }
@@ -566,8 +566,8 @@
     {
      "player_team": "109094610",
      "player": "637",
-     "market": "62681663",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "MED",
      "value": 4010275.0
     }
@@ -731,8 +731,8 @@
     {
      "player_team": "110441736",
      "player": "3088",
-     "market": "64125159",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 59640111.0
     }
@@ -742,7 +742,7 @@
    "name": null,
    "pos": null,
    "what": "relist",
-   "label": "relist Julian Alvarez, Adria Pedrosa, Martin Satriano, Jon Moncayola, Robin Le Normand, Gerard Martin",
+   "label": "relist Gerard Martin",
    "step": null,
    "amount": null,
    "done": false,
@@ -751,7 +751,7 @@
    "facts": [
     [
      "once the listing ends",
-     "2026-11-05T08:03:52+01:00",
+     "2026-11-05T22:06:13+01:00",
      "time"
     ]
    ],
@@ -759,50 +759,50 @@
    "accepts": [],
    "act": [
     {
-     "player_team": "110441736",
-     "player": "3088",
-     "market": "64125159",
-     "bid": "",
-     "pos": "DEL",
-     "value": 59640111.0
-    },
-    {
      "player_team": "107331405",
      "player": "2757",
      "market": "61356752",
      "bid": "",
      "pos": "DEF",
      "value": 38565398.0
-    },
+    }
+   ]
+  },
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Martin Satriano, Adria Pedrosa",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": [
+    [
+     "rising",
+     "Martin Satriano, Adria Pedrosa",
+     "names"
+    ]
+   ],
+   "ranked": false,
+   "accepts": [
+    null
+   ],
+   "act": [
     {
      "player_team": "109094607",
      "player": "1056",
-     "market": "62681664",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEF",
      "value": 3181423.0
     },
     {
-     "player_team": "109094609",
-     "player": "255",
-     "market": "62682354",
-     "bid": "",
-     "pos": "DEF",
-     "value": 5963708.0
-    },
-    {
-     "player_team": "109094610",
-     "player": "637",
-     "market": "62681663",
-     "bid": "",
-     "pos": "MED",
-     "value": 4010275.0
-    },
-    {
      "player_team": "109094608",
      "player": "3137",
-     "market": "62681662",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 18574655.0
     }
@@ -811,7 +811,7 @@
  ],
  "cash_after": 3546145.92965952,
  "can_bid": 7611488.75017935,
- "ping": "buy Moi Gomez; sell Alvaro F. Carreras; buy Roger Hinojo; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Julian Alvarez, Adria Pedrosa, Martin Satriano, Jon Moncayola, Robin Le Normand, Gerard Martin",
+ "ping": "buy Moi Gomez; sell Alvaro F. Carreras; buy Roger Hinojo; sell Dani Martinez; sell Yeray Alvarez; sell Raul Garcia; sell Robin Le Normand; sell Jon Moncayola; sell Alvaro Garcia; sell Julian Alvarez; relist Gerard Martin; list Martin Satriano, Adria Pedrosa",
  "buys": [
   {
    "name": "Moi Gomez",
@@ -1484,8 +1484,8 @@
     {
      "player_team": "109094609",
      "player": "255",
-     "market": "62682354",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEF",
      "value": 5963708.0
     }
@@ -1573,8 +1573,8 @@
     {
      "player_team": "109094610",
      "player": "637",
-     "market": "62681663",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "MED",
      "value": 4010275.0
     }
@@ -1713,8 +1713,8 @@
   {
    "name": "Adria Pedrosa",
    "pos": "DEF",
-   "what": "sell",
-   "label": "sell Adria Pedrosa",
+   "what": "list",
+   "label": "list Adria Pedrosa",
    "step": "take offer",
    "offer": 3235793.0,
    "waiting": 3222790.35212026,
@@ -1783,14 +1783,14 @@
    ],
    "more": true,
    "accepts": [
-    3235793.0
+    null
    ],
    "act": [
     {
      "player_team": "109094607",
      "player": "1056",
-     "market": "62681664",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEF",
      "value": 3181423.0
     }
@@ -2228,8 +2228,8 @@
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "what": "sell",
-   "label": "sell Martin Satriano",
+   "what": "list",
+   "label": "list Martin Satriano",
    "step": "wait",
    "offer": 18622426.0,
    "waiting": 19179766.9515736,
@@ -2302,13 +2302,15 @@
     ]
    ],
    "more": true,
-   "accepts": [],
+   "accepts": [
+    null
+   ],
    "act": [
     {
      "player_team": "109094608",
      "player": "3137",
-     "market": "62681662",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 18574655.0
     }
@@ -2391,8 +2393,8 @@
     {
      "player_team": "110441736",
      "player": "3088",
-     "market": "64125159",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 59640111.0
     }
@@ -3087,6 +3089,14 @@
      "value": 19060188.0
     }
    ]
+  }
+ ],
+ "blockers": [
+  {
+   "future": "nothing",
+   "blocker": "debt",
+   "label": "if you do nothing: in debt at the lock",
+   "amount": -84411994.0
   }
  ],
  "exposed": [
