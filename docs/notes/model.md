@@ -52,28 +52,28 @@ The aim is to finish first. The planner maximises the best eleven's **expected p
 buy at its win chance (`decide.sql`); the chance of first is reported on those points. (The earlier "the objective is
 the chance of first" was loose.)
 
-## Offers, measured (2026-11-05, my listed players, 2026-08-25 to 11-05; NULL-money rows read as "listed, no offer")
+## Offers, measured (2026-11-05, my listed players, 2026-08-25 to 11-05)
 
-- A listed player had an offer on **49%** of nights (534 of 1081 player-nights); **42%** of two-night windows had none on
-  either night; some players sat listed 38-43 nights with offers on few. Not independent: per player, not per night.
-- When there is one, offer / value is mean 0.997, sd 0.057 (min 0.87, max 1.12); mostly noise around 1.0, not player-specific.
+- **Every listing leads to an offer**, one at each close while he is listed (the game's rule). A listing made after
+  a close gets its first offer at the next. (A first reading of the data said a listed player had an offer on only
+  49% of nights; that counted 3,425 empty polls, rows with no money and no offer id, taken before the night's offer
+  existed, as nights without one. Wrong; retracted.)
+- When there is an offer, offer / value is mean 0.997, sd 0.057 (min 0.87, max 1.12), mostly noise around 1.0 and not
+  player-specific (offers with money only, so unaffected).
 - Next night's best offer against this night's: +0.006 of value, sd 0.073 (higher 46%, lower 40%): waiting for a
-  better offer is not worth, on average, anything; a longer run's best beats its first in 77% of runs by construction (a
-  maximum over time), not as a rule.
-- So a later offer is **not certain**: the plan's `waiting` (an offer each night) is optimistic; per night about half.
+  better offer is worth nothing on average; its risk is the amount, not whether one comes.
 
 ## What the stress test found (open, ranked)
 
-1. **A sale to an offer cannot follow the auctions** the same night (the offer expires at the close, when the bids
-   settle), and **a later offer comes on about half the nights**, per player. A funding sale is therefore either a
-   sale on a standing offer (sure, but before the bids settle) or on one that may not come. Decision's `proceeds` is
-   `max(offer, waiting)`: both cases merged, the best case assumed. The failure of the lock (cash below zero: the
-   whole matchday) is the cost nobody prices. Ruled out by the attack: a per-sale win/lose lottery with branch
-   enumeration (2^k outcomes on the hot path; most paired buys win at ~0.97; it prices the wrong risk).
-   Direction: each sale carries the chance it is realised by the lock (1 on a standing offer; one minus no offer on
-   each night left for a listed player; 0 unlisted), from the measured offer rate; the plan's cash check flags a
-   plan that is safe only through sales that may not come. A constraint, not a second objective.
-2. **Unlisted players have no sale at all** until listed (then an offer at the next close, half the nights).
+1. **A sale to an offer cannot follow the auctions** the same night: the offer expires at the close, when the bids
+   settle. A funding sale is either on tonight's standing offer (a known amount, before the bids settle: a player gone
+   for nobody if the bid is lost) or on the next close's offer (certain to come, the amount about value, sd 0.057, the
+   cash check at the lock then rests on that ratio). Decision's `proceeds` is `max(offer, waiting)`, which merges the
+   two. Ruled out by the attack: a per-sale win/lose lottery with branch enumeration (2^k outcomes on the hot path; most
+   paired buys win at ~0.97). Open: whether the plan should price the lock's risk from the offer ratio's spread (the
+   amount needed against the distribution), a constraint on the cash check and not a second objective.
+2. **Unlisted players have no sale at all** until listed (then an offer at the next close: list before the last close
+   before the lock, or there is none).
 3. **The cap and the debt limit count pending bids**; `after()` checks the cap on won players, at the end.
 4. **Squad after moves is written four times** (`fund`, `after`, the recommender, `dec_squad`) and running cash twice
    (`fund`, `after`; tied by a property test). Fixed so far: the debt limit (`rules.bid_limit`), the measure's
