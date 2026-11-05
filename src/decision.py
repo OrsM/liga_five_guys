@@ -9,8 +9,9 @@ from typing import Any
 
 from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, best_eleven
+from recommender import Rec, Recs, cells_of, points, recommend
 
-__all__ = ["plan", "plan_rows", "recommend", "inputs", "read_inputs", "worth_on", "measure", "expected_gap"]
+__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
 
@@ -27,92 +28,58 @@ def inputs() -> None:
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 
 
-def recommend(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, list[tuple[float, float]]]:
-    """The recommender's contract: for each player on offer, the bids worth
-    considering, (bid, chance it wins). Here an asking price made into bids at
-    the season's observed ratios; the plan reads nothing else about the market."""
-    ratios: dict[str, list[tuple[float, float]]] = {}
-    for k, r, w in sorted(inp["dec_odds"]):
-        ratios.setdefault(k, []).append((r, w))
-    return {k: [(a * r, w) for r, w in ratios.get(k, [(1.0, 1.0)])]
-            for k, _, _, a, _ in inp["dec_player"] if a is not None}
-
-
-def plan_rows(inp: dict[str, list[tuple[Any, ...]]], recs: dict[str, list[tuple[float, float]]] | None = None
+def plan_rows(inp: dict[str, list[tuple[Any, ...]]], recs: Recs | None = None
               ) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
     """The plan as decide.sql's header states it, one pure function of the
     rows inputs() writes (dec_player, dec_odds, dec_money) and the cells
     (cell: player, jornada, e): (dec_plan rows, dec_start rows).
-    gain of a move = the best legal eleven (rules.ELEVEN) of the squad it
-    makes, less the squad's as it is, summed over the jornadas; worth =
-    win x gain. Greedy: the best move worth more than nothing that keeps the
-    squad within its cap, cash at the lock at zero or more and the bid within
-    cash and the debt; in debt (cash at the lock below zero), the least bad
-    sale; again, until there is none. A swap pairs a buy with a sale only
-    where his top bid is more than the cash left or the squad is full.
-    recs (default recommend(inp)): who is worth a bid, and at what prices."""
-    (cash, team_value, debt, squad_max, _), = inp["dec_money"]
-    pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
+    The buys are the recommender's (recs, default recommend(inp)), each with
+    the sale that makes room when the squad is full. The plan funds them: where
+    the cash at the lock (cash, less the bids, plus those sales) is below zero,
+    a sale that loses nothing, else the one that clears it alone and loses the fewest points, else the one that
+    loses the fewest points per euro raised, until it is zero or more. A sale never has a worth of its own: money is no goal."""
+    (cash, *_), = inp["dec_money"]
+    pos, cells = cells_of(inp)
     mine = {k: proceeds for k, _, m, _, proceeds in inp["dec_player"] if m}
-    bids = recommend(inp) if recs is None else recs
-    cells: dict[int, dict[str, float]] = {}
-    for k, j, e in inp["cell"]:
-        if k in pos:
-            cells.setdefault(j, {})[k] = e
+    recs = recommend(inp) if recs is None else recs
 
-    squad, steps, start = set(mine), [], []
-    free, placed = cash, 0.0
-    for step in range(squad_max * 2):
-        base = {j: {p: sorted((-e[k], k) for k in squad if k in e and pos[k] == p) for p in POSITIONS}
-                for j, e in cells.items()}
-        here = {j: best_eleven(d) for j, d in base.items()}
-
-        def gain(b: str, s: str) -> float:
-            """The squad less s and plus b, over this squad's, over the jornadas."""
-            g = 0.0
-            for j, e in cells.items():
-                if b in e or s in e:
-                    d = dict(base[j])
-                    if s in e:
-                        d[pos[s]] = [x for x in d[pos[s]] if x[1] != s]
-                    if b in e:
-                        d[pos[b]] = sorted(d[pos[b]] + [(-e[b], b)])
-                    g += best_eleven(d) - here[j]
-            return g
-
-        def options(b: str, s: str, g: float) -> list[tuple[Any, ...]]:
-            return [(b, s, bid, win, mine.get(s), g, (1.0 if win is None else win) * g)
-                    for bid, win in bids.get(b, [(None, None)])]
-
-        def fits(b: str, s: str, bid: float | None, proceeds: float | None) -> bool:
-            return (len(squad) + (b != "") - (s != "") <= squad_max and free + (proceeds or 0) - (bid or 0) >= 0
-                    and (bid or 0) <= cash + debt * team_value - placed)
-
-        sales = [s for s in sorted(squad) if s in mine]
-        solo = [options("", s, gain("", s)) for s in sales]
-        buys = [] if free < 0 and step else [b for b in sorted(bids) if b not in squad]
-        solo += [options(b, "", gain(b, "")) for b in buys]
-        if not step:
-            start = [o for opts in solo for o in opts]
-        swaps = [] if free < 0 else [
-            o for opts in solo for b, *_ in opts[:1] if b and opts[0][5] > 0
-            and (max(a for a, _ in bids[b]) > free or len(squad) >= squad_max)
-            for s in sales if any(fits(b, s, a, mine[s]) for a, _ in bids[b]) for o in options(b, s, gain(b, s))]
-        got = [o for opts in solo for o in opts] + swaps
-        got = [o for o in got if (o[0] == "" and o[1] != "") if free < 0] if free < 0 else [
-            o for o in got if o[6] > 0 and fits(o[0], o[1], o[2], o[4])]
-        if not got:
-            break
-        b, s, bid, win, proceeds, _, worth = min(got, key=lambda o: (-o[6], o[0], o[1], o[2] or 0))
-        if b:
-            steps.append((step, "buy", b, bid, win, worth))
-            squad.add(b)
-            free -= bid
-            placed += bid
-        if s:
-            steps.append((step, "sell", s, proceeds, 1.0, worth))
+    def fund(picks: list[Rec]) -> tuple[list[tuple[Any, ...]], set[str], float]:
+        """The steps that make these buys and bring the cash at the lock to zero or more: (steps, squad, cash)."""
+        squad, steps, free = set(mine), [], cash
+        for pick in picks:
+            steps.append((len(steps), "buy", pick.player, pick.bid, pick.win, pick.worth))
+            squad.add(pick.player)
+            free -= pick.bid
+            if pick.drop:
+                steps.append((len(steps) - 1, "sell", pick.drop, mine[pick.drop], 1.0, pick.worth))
+                squad.discard(pick.drop)
+                free += mine[pick.drop]
+        n, here = len(steps), points(pos, cells, squad)
+        while free < 0:
+            lose = {s: here - points(pos, cells, squad - {s}) for s in squad & set(mine) if mine[s] > 0}
+            if not lose:
+                break
+            free_of_cost = [s for s in lose if lose[s] <= 0]  # loses nothing: first, the dearest
+            covers = [s for s in lose if mine[s] >= -free]  # one sale clears it: the least points lost
+            s = max(free_of_cost, key=lambda k: (mine[k], k)) if free_of_cost else min(covers, key=lambda k: (lose[k], k)) if covers else min(lose, key=lambda k: (lose[k] / mine[k], k))
+            worth = points(pos, cells, squad - {s}) - here
+            steps.append((n, "sell", s, mine[s], 1.0, worth))
+            n += 1
             squad.discard(s)
-            free += proceeds
+            free += mine[s]
+            here += worth
+        return steps, squad, free
+
+    # The most buys the sales can pay for without ending with fewer points than making none.
+    floor = points(pos, cells, fund([])[1])
+    for k in range(len(recs.picks), -1, -1):
+        steps, squad, free = fund(recs.picks[:k])
+        if k == 0 or free >= 0 and points(pos, cells, squad) >= floor:
+            break
+    start = [(b, s, bid, win, proceeds, g, w) for b, s, bid, win, proceeds, g, w in recs.alone]
+    start += [("", s, None, None, mine[s], points(pos, cells, set(mine) - {s}) - points(pos, cells, set(mine)),
+               points(pos, cells, set(mine) - {s}) - points(pos, cells, set(mine)))
+              for s in sorted(mine)]
     return steps, start
 
 
@@ -240,9 +207,10 @@ def _selftest() -> None:
             "star (8) for m4 (2), two jornadas: his points, and nothing for his price"
         assert labels(steps) == ["buy star"]
         assert expected_gap(league(10e6, {"star": 8e6})) == 12.0, "the plan's eleven against standing pat's: 8 for 2, twice"
-        assert expected_gap(league(2e6, {"star": 8e6})) == 0.0, "no move: no gap"
-        assert labels(plan_rows(league(10e6, {"star": 99e6}), recs={"star": [(7e6, 0.5)]})[0]) == ["buy star"] \
-            and plan_rows(league(10e6, {"star": 99e6}), recs={"star": [(7e6, 0.5)]})[0][0][3:5] == (7e6, 0.5), \
+        assert expected_gap(league(2e6, {"star": 8e6})) == 12.0, "6M short: two sales out of the eleven (bench, m4) pay for him"
+        assert expected_gap(league(2e6, {"star": 20e6})) == 0.0, "his bid over cash and the debt allowed (14M): no move"
+        assert labels(plan_rows(league(10e6, {"star": 99e6}), recs=Recs([Rec("star", 7e6, 0.5, 12.0, 6.0, "")], []))[0]) == ["buy star"] \
+            and plan_rows(league(10e6, {"star": 99e6}), recs=Recs([Rec("star", 7e6, 0.5, 12.0, 6.0, "")], []))[0][0][3:5] == (7e6, 0.5), \
             "the plan buys what a recommender offers, at its bid and chance: not from the market's asking"
         assert labels(plan_rows(league(10e6, {"star": 10e6}))[0]) == ["buy star"], \
             "his price is a limit, not a cost: within cash, the points decide"
@@ -251,9 +219,8 @@ def _selftest() -> None:
             "4M short of a lock at zero: paid for by a sale of 5M of one he leaves out of the eleven"
         _write(*plan_rows(league(4e6, {"star": 8e6})))
         assert after_auctions() == sold(got), "a sale beside a bid: made once the bid is won"
-        assert plan_rows(league(2e6, {"star": 8e6}))[0] == [], "no one sale pays for him"
-        _write(*plan_rows(league(2e6, {"star": 8e6})))
-        assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(8e6, 1.0, 0)], \
+        _write(*plan_rows(league(2e6, {"star": 20e6})))
+        assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(20e6, 1.0, 0)], \
             "one the plan leaves out, at the lowest bid offered"
         got, _ = plan_rows(league(10e6, {"star": 8e6}, odds={"star": ((1.0, 0.25), (1.25, 1.0), (1.3, 1.0))}))
         assert [(k, a) for _, _, k, a, *_ in got] == [("star", 10e6)], \
@@ -264,8 +231,8 @@ def _selftest() -> None:
         assert rows("SELECT kind, player, amount, win, gain, in_plan FROM dec_rows"
                     " WHERE player IN ('star', 'bench', 'k') ORDER BY player") == [
             ("sell", "bench", 5e6, 1.0, 0.0, 1), ("sell", "k", 5e6, 1.0, -8.0, 0),
-            ("buy", "star", 8e6, 0.25, 12.0, 1)], \
-            "each move alone from the squad as it is, a buy at the plan's bid (at 4M and a sale, his asking)"
+            ("buy", "star", 10e6, 1.0, 12.0, 1)], \
+            "each move alone from the squad as it is, a buy at the plan's bid (the sure one, two sales pay for it)"
         full, _ = plan_rows(league(30e6, {"star": 8e6}, extra=SQUAD_MAX - len(squad)))
         assert kinds(full) == ["buy", "sell"] and (sold(full) == {"bench"} or sold(full) <= {
             "x%02d" % i for i in range(SQUAD_MAX)}), \

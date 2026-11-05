@@ -417,3 +417,12 @@ Kept, and why:
   (forecasts remade), 556 s warm (711 s before). A decision at a past t:
   the league 1.0 s made before (3.1 s not; the universe was 2.9 s), the
   plan 7.7 s as before (its ~25 dec_next steps: the next thing to speed).
+
+## Recommender (inside Decision)
+
+`src/recommender.py` owns every purchase rule. In: `read_inputs()` rows (dec_player, dec_odds, dec_money, cell).
+Out: `Recs(picks, alone)`; `Rec(player, bid, win, gain, worth, drop)`, in the order to bid. A loop over the
+purchases: worth = win x gain, ordered by worth per euro, thresholds worth > 0, bid within cash + debt share, room
+in the squad (else a drop). `decision.plan_rows(inp, recs=None)` only funds them: cash at the lock >= 0 by sales
+(a sale that loses nothing, else one that clears it alone for the fewest points, else fewest points per euro), and
+gives up the buys if the sales cost more points than they gain. It decides no purchase.
