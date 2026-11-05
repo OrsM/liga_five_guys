@@ -12,27 +12,27 @@ from ffcore.rules import DEBT_SHARE, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
 from recommender import Rec, Recs, cells_of, recommend
 from recommender import points as eleven_points
 
-__all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
+__all__ = ["plan", "plan_rows", "after", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
 
-INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_plan", "dec_start")
+INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_plan", "dec_start")
 
 
 def inputs() -> None:
     """What the decision looks at, the league at t (look: the market seen,
     the forecast, your squad and cash then), made once a decision
-    (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen)."""
+    (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen, dec_bid_seen)."""
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
         db.execute("INSERT INTO dec_state VALUES (?, ?, ?)", (DEBT_SHARE, SQUAD_MAX, XI_SIZE))
-        for t in ("dec_player", "dec_odds", "dec_money"):
+        for t in ("dec_player", "dec_odds", "dec_money", "dec_bid"):
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 
 
 def plan_rows(inp: dict[str, list[tuple[Any, ...]]], recs: Recs | None = None
               ) -> tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]:
     """The plan as decide.sql's header states it, one pure function of the
-    rows inputs() writes (dec_player, dec_odds, dec_money) and the cells
+    rows inputs() writes (dec_player, dec_odds, dec_money; dec_bid is for after) and the cells
     (cell: player, jornada, e): (dec_plan rows, dec_start rows).
     The buys are the recommender's (recs, default recommend(inp)), each with
     the sale that makes room when the squad is full. The plan funds them: where
@@ -133,28 +133,56 @@ def expected_gap(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, .
     return ours - floor
 
 
-def blockers(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], bids: dict[str, float]
-             ) -> list[tuple[str, str, float | None]]:
-    """What stops you, run at the plan's end on two futures: 'nothing' (you do nothing: every bid you have
-    placed wins, nothing is sold) and 'plan' (you do all it says: its buys won at its amounts, its sales made, and
-    every other placed bid withdrawn, as the board tells you). Rows (future, blocker, amount): 'debt' (cash below zero at the lock: the
-    matchday scores 0), 'eleven' (no formation can be fielded from the squad), 'squad' (players over the cap)."""
+def in_order(steps: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
+    """The plan's steps in its order: step, a buy before a sale (the board's ORDER BY step, kind)."""
+    return sorted(steps, key=lambda s: (s[0], s[1]))
+
+
+class After(NamedTuple):
+    cash_then: list[float]                      # the cash each step leaves, in the plan's order
+    cash: float                                 # at the lock
+    squad: set[str]
+    blockers: list[tuple[str, float | None]]    # (blocker, amount), what stops you
+
+
+def after(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], won: dict[str, float] | None = None) -> After:
+    """The cash and squad once steps (dec_plan rows) are made, every buy won, and what stops you there. won: bids
+    placed (player -> amount) taken as won beside the steps' buys, one the steps buy too counted once. cash_then:
+    the cash each step leaves running from today's, in the plan's order (step, a buy before a sale). Blockers
+    (blocker, amount): 'debt' (cash below zero at the lock: the matchday scores 0; amount the cash), 'eleven' (no
+    formation can be fielded from the squad), 'squad' (players over the cap, amount how many)."""
     (cash, _, _, squad_max, _), = inp["dec_money"]
     pos = {k: p for k, p, *_ in inp["dec_player"]}
-    mine = {k for k, _, m, *_ in inp["dec_player"] if m}
-    buys = {k: a for _, kind, k, a, *_ in steps if kind == "buy"}
-    sells = {k: a for _, kind, k, a, *_ in steps if kind == "sell"}
-    futures = {"nothing": (mine | set(bids), cash - sum(bids.values())),
-               "plan": ((mine | set(buys)) - set(sells), cash - sum(buys.values()) + sum(sells.values()))}
-    out: list[tuple[str, str, float | None]] = []
-    for future, (squad, end) in futures.items():
-        count = {p: sum(pos.get(k) == p for k in squad) for p in POSITIONS}
-        if end < 0:
-            out.append((future, "debt", end))
-        if not any(all(count[p] >= n for p, n in shape.items()) for shape in SHAPES):
-            out.append((future, "eleven", None))
-        if len(squad) > squad_max:
-            out.append((future, "squad", float(len(squad) - squad_max)))
+    squad = {k for k, _, m, *_ in inp["dec_player"] if m}
+    here, then = cash, []
+    for _, kind, k, amount, *_ in in_order(steps):
+        here += -amount if kind == "buy" else amount
+        squad = squad | {k} if kind == "buy" else squad - {k}
+        then.append(here)
+    for k, amount in (won or {}).items():
+        if k not in squad:
+            here -= amount
+            squad = squad | {k}
+    out: list[tuple[str, float | None]] = []
+    count = {p: sum(pos.get(k) == p for k in squad) for p in POSITIONS}
+    if here < 0:
+        out.append(("debt", here))
+    if not any(all(count[p] >= n for p, n in shape.items()) for shape in SHAPES):
+        out.append(("eleven", None))
+    if len(squad) > squad_max:
+        out.append(("squad", float(len(squad) - squad_max)))
+    return After(then, here, squad, out)
+
+
+def skip_rows(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> list[tuple[str, str, str, float | None]]:
+    """What skipping each step of the plan leaves: the rest of it as written, no placed bid (the board withdraws
+    those), as rows (player, kind, blocker, amount), one a blocker, or blocker 'none' (amount None) for none.
+    A buy goes with the sale that shares its step; a sale alone is skipped alone."""
+    out: list[tuple[str, str, str, float | None]] = []
+    for step, kind, k, *_ in steps:
+        rest = [s for s in steps if (s[0] != step if kind == "buy" else (s[1], s[2]) != (kind, k))]
+        left = after(inp, rest).blockers or [("none", None)]
+        out += [(k, kind, blocker, amount) for blocker, amount in left]
     return out
 
 
@@ -172,7 +200,7 @@ def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
     return read_made()
 
 
-def read_made(only: tuple[str, ...] = ("dec_player", "dec_odds", "dec_money", "cell")) -> dict[str, list[tuple[Any, ...]]]:
+def read_made(only: tuple[str, ...] = ("dec_player", "dec_odds", "dec_money", "dec_bid", "cell")) -> dict[str, list[tuple[Any, ...]]]:
     """The rows inputs() wrote, as plan_rows takes them (only: just those tables; the cells cost a forecast)."""
     with closing(connect()) as db:
         inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in only if t != "cell"}
@@ -202,8 +230,9 @@ def options() -> list[tuple[Any, ...]]:
 STANDINGS = ("INSERT INTO decision_standings (run_id, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash)"
              " SELECT ?, manager, me, now, mean, lo, hi, finish, p_first, p_above, cash FROM league_standings")
 # The plan as the run keeps it: dec_plan's moves, each sale with when it is made (dec_when).
-KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after, cash_then)"
-             " SELECT ?, step, kind, player, amount, win, worth, after, cash_then FROM dec_when")
+# (its running cash, cash_then, is after()'s, written by record).
+KEEP_PLAN = ("INSERT INTO decision_plan (run_id, step, kind, player, amount, win, worth, after)"
+             " SELECT ?, step, kind, player, amount, win, worth, after FROM dec_when")
 KEEP = (
     "INSERT INTO decision_players (run_id, player, start, next, season, mine, xi)"
     " SELECT ?, player, start, next, season, mine, xi FROM look_players",
@@ -216,11 +245,12 @@ KEEP = (
     " FROM dec_rows d LEFT JOIN player_facts f ON f.player = d.player",
     KEEP_PLAN,
     "INSERT INTO decision_waiting SELECT ?, player, kind, later FROM waiting",
-    "INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first,"
-    " offer_mean, offer_sd)"
-    " SELECT ?, cut(), s.p_first, s.finish, c.free, r.room, n.nights, n.first, o.mean, o.sd"
-    " FROM dec_cash c, dec_room r, league_standings s, nights_left n, offer_spread o WHERE s.me",
 )
+# The run's row, once after() has the cash and the bids are known (cash_after, can_bid).
+KEEP_RUN = ("INSERT INTO decision_run (run_id, cut, p_first_after, finish_after, cash_after, can_bid, nights, first,"
+            " offer_mean, offer_sd)"
+            " SELECT ?, cut(), s.p_first, s.finish, ?, ?, n.nights, n.first, o.mean, o.sd"
+            " FROM league_standings s, nights_left n, offer_spread o WHERE s.me")
 
 
 class SaleAssessment(NamedTuple):
@@ -256,19 +286,31 @@ def record(run: int) -> list[tuple[Any, ...]]:
     with closing(connect()) as db, db:
         db.execute(STANDINGS, (run,))
     acts = plan()
+    inp = read_made(("dec_player", "dec_money", "dec_bid"))
+    (cash, team_value, debt, _, _), = inp["dec_money"]
+    placed = dict(inp["dec_bid"])
+    planned = after(inp, acts)
+    bids = sum(a for _, kind, _, a, *_ in acts if kind == "buy")
+    unplanned = sum(a for k, a in placed.items() if not any(kind == "buy" and p == k for _, kind, p, *_ in acts))
+    # What more you can bid: the game takes bids up to your cash and the debt it allows (DEBT_SHARE of your team's
+    # value); sales do not count, made after the auctions or not at all; a placed bid the plan does not make
+    # stands (the board says withdraw it) and holds its money.
+    room = max(0.0, cash + debt * team_value - bids - unplanned)
     with closing(connect()) as db, db:
         for sql in KEEP:
             db.execute(sql, (run,))
+        db.execute(KEEP_RUN, (run, planned.cash, room))
+        db.executemany("UPDATE decision_plan SET cash_then = ? WHERE run_id = ? AND step = ? AND kind = ?",
+                       [(c, run, step, kind) for c, (step, kind, *_) in zip(planned.cash_then, in_order(acts))])
         db.executemany("INSERT INTO decision_sale (run_id, player, offer, paid, made, z, p_better, waiting_less)"
                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                        [(run, k, offer, paid, *assess_sale(offer, value, paid, beats, nights, waiting, mean, sd))
                         for k, offer, value, paid, beats, nights, waiting, mean, sd in db.execute(SALES, (run,))])
-    with closing(connect()) as db:
-        bids = dict(db.execute("SELECT player, my_bid FROM decision_facts WHERE run_id = ? AND my_bid > 0", (run,)))
-    found = blockers(read_made(("dec_player", "dec_money")), acts, bids)
-    with closing(connect()) as db, db:
         db.executemany("INSERT INTO decision_blocker (run_id, future, blocker, amount) VALUES (?, ?, ?, ?)",
-                       [(run, *b) for b in found])
+                       [(run, future, *b) for future, found in (("nothing", after(inp, [], placed).blockers), ("plan", planned.blockers))
+                        for b in found])
+        db.executemany("INSERT INTO decision_skip (run_id, player, kind, blocker, amount) VALUES (?, ?, ?, ?, ?)",
+                       [(run, *r) for r in skip_rows(inp, acts)])
     return acts
 
 
@@ -351,10 +393,7 @@ def _selftest() -> None:
             "4M short of a lock at zero: paid for by a sale of 5M of one he leaves out of the eleven"
         _write(*plan_rows(league(4e6, {"star": 8e6})))
         assert after_auctions() == sold(got), "a sale beside a bid: made once the bid is won"
-        with closing(connect()) as db, db:
-            db.execute("DELETE FROM dec_money")
-            db.execute("INSERT INTO dec_money VALUES (4e6, 60e6, 0.2, 24, 11)")
-        assert rows("SELECT kind, cash_then FROM dec_when ORDER BY step, kind") == [("buy", -4e6), ("sell", 1e6)], \
+        assert after(league(4e6, {"star": 8e6}), got).cash_then == [-4e6, 1e6], \
             "each step of the plan leaves this cash, running from today's: 4M, less the 8M bid, plus the 5M sale"
         _write(*plan_rows(league(2e6, {"star": 20e6})))
         assert rows("SELECT amount, win, in_plan FROM dec_rows WHERE player = 'star'") == [(20e6, 1.0, 0)], \
@@ -417,36 +456,76 @@ def _selftest() -> None:
 
 
 def _selftest_blockers() -> None:
-    """The check at the plan's end: two futures, nothing done and the plan done, each with what stops you."""
+    """after(): the cash each step leaves, the cash and squad at the lock, and what stops you; the same on the
+    futures record() asks (nothing, the plan, the plan less one step)."""
     squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
              "m4": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL", "bench": "DEF"}
 
     def inp(cash: float, squad_max: int = 24) -> dict[str, list[tuple[Any, ...]]]:
         return {"dec_player": [(k, p, 1, None, 5e6) for k, p in squad.items()] + [("star", "MED", 0, 8e6, None)],
-                "dec_odds": [], "cell": [], "dec_money": [(cash, 60e6, 0.2, squad_max, 11)]}
+                "dec_odds": [], "cell": [], "dec_bid": [], "dec_money": [(cash, 60e6, 0.2, squad_max, 11)]}
 
     def sell(k: str, step: int = 0) -> tuple[Any, ...]:
         return (step, "sell", k, 5e6, 1.0, 0.0)
 
-    quiet: list[tuple[str, str, float | None]] = []
-    assert blockers(inp(5e6), [], {}) == quiet, "cash, no bids, no plan: nothing stops you"
-    debt = [("nothing", "debt", -3e6)]
-    assert blockers(inp(-3e6), [], {}) == debt + [("plan", "debt", -3e6)], "in debt, and a plan that does not clear it: both futures"
-    assert blockers(inp(-3e6), [sell("bench")], {}) == debt, "the plan's sale clears it: only doing nothing is in debt"
-    assert blockers(inp(4e6), [], {"star": 10e6}) == [("nothing", "debt", -6e6)], \
-        "a bid placed and won, nothing sold: debt if you do nothing; the plan has no such bid (the board says withdraw it)"
-    assert blockers(inp(4e6), [(0, "buy", "star", 10e6, 1.0, 1.0)], {"star": 10e6}) \
-        == [("nothing", "debt", -6e6), ("plan", "debt", -6e6)], "a bid the plan keeps, unfunded: debt in both"
-    assert blockers(inp(4e6), [(0, "buy", "star", 10e6, 1.0, 1.0), sell("bench")], {"star": 10e6}) \
-        == [("nothing", "debt", -6e6), ("plan", "debt", -1e6)], "a bid the plan raises counts once, at the plan's amount, less its sale"
-    assert blockers(inp(5e6), [sell("k")], {}) == [("plan", "eleven", None)], \
-        "the plan sells the only keeper: no eleven can be fielded"
-    assert blockers(inp(5e6, squad_max=12), [], {"star": 1e6}) == [("nothing", "squad", 1.0)], \
-        "a won bid on a full squad: one over if you do nothing; the plan withdraws it"
-    assert blockers(inp(5e6, squad_max=12), [(0, "buy", "star", 1e6, 1.0, 1.0)], {}) == [("plan", "squad", 1.0)], \
-        "a buy of the plan's on a full squad, with no sale to make room: one over"
-    assert blockers(inp(5e6, squad_max=12), [(0, "buy", "star", 1e6, 1.0, 1.0), sell("bench", 0)], {}) == quiet, \
-        "its paired sale makes the room"
+    def buy(amount: float = 10e6, step: int = 0) -> tuple[Any, ...]:
+        return (step, "buy", "star", amount, 1.0, 1.0)
+
+    quiet: list[tuple[str, float]] = []
+    assert after(inp(5e6), []).blockers == quiet, "cash, no bids, no plan: nothing stops you"
+    got = after(inp(5e6), [])
+    assert (got.cash_then, got.cash, got.squad) == ([], 5e6, set(squad)), "no step: today's cash and squad"
+    debt = [("debt", -3e6)]
+    assert after(inp(-3e6), []).blockers == debt, "in debt, and a plan that does not clear it"
+    got = after(inp(-3e6), [sell("bench")])
+    assert got.blockers == quiet and got.cash == 2e6 and got.squad == set(squad) - {"bench"}, "the plan's sale clears it"
+    got = after(inp(4e6), [], {"star": 10e6})
+    assert got.blockers == [("debt", -6e6)] and got.squad == set(squad) | {"star"} and got.cash_then == [], \
+        "a bid placed and won, nothing sold: debt; it is no step, so no running cash"
+    got = after(inp(4e6), [buy(10e6)], {"star": 10e6})
+    assert got.blockers == [("debt", -6e6)] and got.cash == -6e6, "a bid the plan keeps, placed too: counted once"
+    got = after(inp(4e6), [buy(10e6), sell("bench")])
+    assert got.cash_then == [-6e6, -1e6] and got.blockers == [("debt", -1e6)], \
+        "running cash: 4M, less the 10M bid, plus the 5M sale"
+    got = after(inp(4e6), [sell("bench", 0), buy(10e6, 1), sell("m4", 1)], {"x": 1e6})
+    assert got.cash_then == [9e6, -1e6, 4e6], "in the plan's order (step, a buy before its sale), won bids not among them"
+    assert after(inp(5e6), [sell("k")]).blockers == [("eleven", None)], "the plan sells the only keeper: no eleven"
+    assert after(inp(5e6, squad_max=12), [], {"star": 1e6}).blockers == [("squad", 1.0)], \
+        "a won bid on a full squad: one over"
+    assert after(inp(5e6, squad_max=12), [buy(1e6)]).blockers == [("squad", 1.0)], \
+        "a buy on a full squad, with no sale to make room: one over"
+    assert after(inp(5e6, squad_max=12), [buy(1e6), sell("bench", 0)]).blockers == quiet, "its paired sale makes the room"
+
+    # What skipping a step leaves.
+    def skips(i: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> dict[tuple[str, str], list[tuple[str, float | None]]]:
+        out: dict[tuple[str, str], list[tuple[str, float | None]]] = {}
+        for k, kind, blocker, amount in skip_rows(i, steps):
+            out.setdefault((k, kind), []).append((blocker, amount))
+        return out
+    swap = [buy(8e6), sell("bench")]
+    assert skips(inp(4e6), swap) == {("star", "buy"): [("none", None)], ("bench", "sell"): [("debt", -4e6)]}, \
+        "4M cash, 8M bid, 5M sale: skip the buy and its sale goes too (nothing left); skip the sale and 4M is owed"
+    assert skips(inp(-3e6), [sell("bench")]) == {("bench", "sell"): [("debt", -3e6)]}, "a sale that clears a debt"
+    assert skips(inp(20e6), [sell("bench")]) == {("bench", "sell"): [("none", None)]}, \
+        "a sale of one who scores nothing, cash ample: skipping it leaves nothing"
+    own = [buy(8e6, 0), sell("m4", 1)]
+    assert skips(inp(-2e6), own) == {("star", "buy"): [("none", None)], ("m4", "sell"): [("debt", -10e6)]}, \
+        "a funding sale stands alone: skip it and the buy is unpaid; skip the buy and the sale alone clears the debt"
+
+    # Property: after(plan).cash is the cash plan_rows' fund() ended on, in several leagues.
+    cells = {k: 4.0 for k in squad} | {"m4": 2.0, "bench": 1.0, "star": 8.0, "keeper": 3.0}
+    for cash, extra, price in ((10e6, 0, 8e6), (4e6, 0, 8e6), (-3e6, 0, 8e6), (-12e6, 0, 20e6), (30e6, 12, 8e6), (2e6, 0, 20e6)):
+        sq = {**squad, **{"x%02d" % i: "DEF" for i in range(extra)}}
+        pos = {**sq, "star": "MED", "keeper": "POR"}
+        rows_in: dict[str, list[tuple[Any, ...]]] = {"dec_player": [(k, pos[k], 1, None, 5e6) for k in sq] + [("star", "MED", 0, price, None), ("keeper", "POR", 0, 6e6, None)],
+                   "dec_odds": [], "dec_bid": [], "dec_money": [(cash, 5e6 * len(sq), DEBT_SHARE, SQUAD_MAX, XI_SIZE)],
+                   "cell": [(k, j, cells.get(k, 0.0)) for j in (1, 2) for k in pos if k in cells or k.startswith("x")]}
+        steps, _ = plan_rows(rows_in)
+        free = cash - sum(a if kind == "buy" else -a for _, kind, _, a, *_ in steps)
+        res = after(rows_in, steps)
+        assert res.cash == free, ("after().cash is fund()'s free", cash, steps)
+        ordered = sorted(steps, key=lambda s: (s[0], s[1]))
+        assert res.cash_then[-1:] == ([free] if steps else []) and len(res.cash_then) == len(steps), ordered
 
 
 if __name__ == "__main__":

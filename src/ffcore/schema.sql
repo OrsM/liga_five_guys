@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS decision_plan (
     win    REAL NOT NULL,
     worth  REAL NOT NULL,            -- the step's, in points
     after  INTEGER NOT NULL DEFAULT 0, -- a sale made after the auctions (decide.sql dec_when)
-    cash_then REAL,                    -- the cash this step leaves, running from today's (decide.sql dec_when)
+    cash_then REAL,                    -- the cash this step leaves, running from today's (decision.after)
     PRIMARY KEY (run_id, step, kind)
 );
 
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS decision_waiting (
     PRIMARY KEY (run_id, player, kind)
 );
 
--- What stops you at the plan's end (decision.blockers), on two futures: 'nothing' (you do nothing) and
+-- What stops you at the plan's end (decision.after), on two futures: 'nothing' (you do nothing) and
 -- 'plan' (you do all it says). blocker: debt (amount: cash at the lock), eleven, squad (amount: players over).
 CREATE TABLE IF NOT EXISTS decision_blocker (
     run_id  INTEGER NOT NULL REFERENCES runs(run_id),
@@ -1870,9 +1870,7 @@ SELECT (SELECT run_id FROM board_run) AS run_id,
        me.lo AS band_lo, me.hi AS band_hi,
        CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT cash_after FROM decision_run JOIN board_run USING (run_id)) END
            AS cash_after,
-       (SELECT max(0.0, can_bid) FROM decision_run JOIN board_run USING (run_id))
-       - (SELECT total(f.my_bid) FROM decision_facts f JOIN board_run USING (run_id)
-          WHERE f.my_bid > 0 AND f.player NOT IN (SELECT player FROM board_plan WHERE kind = 'buy')) AS can_bid,
+       (SELECT max(0.0, can_bid) FROM decision_run JOIN board_run USING (run_id)) AS can_bid,
        (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
         WHERE NOT done) AS ping
 FROM me;

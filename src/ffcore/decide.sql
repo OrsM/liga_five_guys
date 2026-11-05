@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS dec_odds (
     p_win  REAL NOT NULL,
     PRIMARY KEY (player, ratio)
 ) WITHOUT ROWID;
+-- The bids you have placed (seen), what the plan's checks (decision.after) take as won.
+CREATE TABLE IF NOT EXISTS dec_bid (
+    player TEXT PRIMARY KEY,
+    amount REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS dec_money (
     cash       REAL NOT NULL,
     team_value REAL NOT NULL,
@@ -85,6 +90,11 @@ DROP VIEW IF EXISTS dec_odds_seen;
 CREATE VIEW dec_odds_seen AS
 SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN look l ON o.cut = l.cut AND o.variant = l.variant;
 
+-- The bids you have placed, as seen.
+DROP VIEW IF EXISTS dec_bid_seen;
+CREATE VIEW dec_bid_seen AS
+SELECT s.player, s.my_bid AS amount FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant WHERE s.my_bid > 0;
+
 -- Your cash, squad value (seen), the game's debt share and squad cap, the
 -- eleven's size.
 DROP VIEW IF EXISTS dec_money_seen;
@@ -122,31 +132,13 @@ WHERE mine AND player NOT IN (SELECT player FROM dec_plan WHERE kind = 'sell')
 UNION ALL
 SELECT p.player, p.pos FROM dec_plan d JOIN dec_player p USING (player) WHERE d.kind = 'buy';
 
--- Cash at the lock once the plan's moves are made, every bid won; the bids
--- it places.
-DROP VIEW IF EXISTS dec_cash;
-CREATE VIEW dec_cash AS
-SELECT m.cash - coalesce((SELECT total(CASE kind WHEN 'buy' THEN amount ELSE -amount END) FROM dec_plan), 0) AS free,
-       coalesce((SELECT total(amount) FROM dec_plan WHERE kind = 'buy'), 0) AS bids
-FROM dec_money m;
-
--- What more you can bid once the plan's bids are in: the game takes bids up
--- to your cash and the debt it allows (DEBT_SHARE of your team's value);
--- sales do not count, made after the auctions or not at all.
-DROP VIEW IF EXISTS dec_room;
-CREATE VIEW dec_room AS
-SELECT m.cash + m.debt * m.team_value - c.bids AS room FROM dec_money m, dec_cash c;
-
 -- When each of the plan's sales is made: at once, or, when the plan bids,
 -- after the auctions, once you know they are won (a sale made for a bid
 -- that is then lost is a player gone for nobody; after the auctions the
 -- game still buys him at his value).
 DROP VIEW IF EXISTS dec_when;
 CREATE VIEW dec_when AS
-SELECT d.*, d.kind = 'sell' AND EXISTS (SELECT 1 FROM dec_plan b WHERE b.kind = 'buy') AS after,
-       -- the cash each step leaves, running from today's (the plan's order: its step, a buy before a sale)
-       (SELECT cash FROM dec_money) + sum(CASE d.kind WHEN 'buy' THEN -d.amount ELSE d.amount END)
-           OVER (ORDER BY d.step, d.kind ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cash_then
+SELECT d.*, d.kind = 'sell' AND EXISTS (SELECT 1 FROM dec_plan b WHERE b.kind = 'buy') AS after
 FROM dec_plan d;
 
 -- The board's moves: each of your players sold, each buy at the plan's bid

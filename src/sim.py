@@ -431,6 +431,10 @@ def _selftest() -> None:
             == [("nothing", "debt", -5e6), ("plan", "eleven", None)], \
             "the run keeps the plan's check: doing nothing stays 5M in debt; the plan sells its way out but its two " \
             "sales (a defender among them) leave this squad two defenders, short of any formation"
+        assert rows("SELECT player, kind, blocker, amount FROM decision_skip WHERE run_id = 7 ORDER BY player") \
+            == [("d1", "sell", "debt", -4e6), ("dead", "sell", "eleven", None)], \
+            "what skipping each step of the plan leaves, kept for every step: without D1's 9M sale 4M is still owed; " \
+            "without Dead's, the squad keeps its defender but the plan's other sale leaves two"
 
     _selftest_lineup()
     print("sim self-test OK")
