@@ -1577,36 +1577,6 @@ x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, ft.fit,
 SELECT player, jornada, max(0.0, ppm * fixture) AS pts, picked * fit AS p, ppm, fixture, picked, fit FROM x;
 
 
--- Settlement (simplify.md, module 4): what a run's plan becomes once the
--- auctions close, as moves(path, at, kind, player, amount), one path a run
--- ('run N'). A buy is made at its auction's close, at what the auction took,
--- if that was you (a close after the run, the first of the player's); a bid
--- lost or not yet closed makes none. A sale of a step with a buy (a swap's:
--- the one funding it) is made at that close, if the buy is won; a bid lost
--- makes no sale and starts no new decision (cash below zero is the next
--- run's to mend). A sale of no bid's, in a plan with bids (it pays for them), is made at the last close won
--- once any bid is won; in a plan with no bid, at the run's own time. at is a stamp.
-DROP VIEW IF EXISTS settlement_moves;
-CREATE VIEW settlement_moves AS
-WITH plan AS (SELECT 'run ' || p.run_id AS path, p.run_id, p.step, p.kind, p.player, p.amount, r.as_of
-              FROM decision_plan p JOIN runs r USING (run_id)),
-closes AS (SELECT path, step, closed, won FROM (
-               SELECT p.path, p.step, c.closed, c.won, c.by_me,
-                      row_number() OVER (PARTITION BY p.path, p.step ORDER BY c.closed) AS n
-               FROM plan p JOIN auction_results c ON c.player = p.player AND c.closed > p.as_of
-               WHERE p.kind = 'buy')
-           WHERE n = 1 AND by_me)
-SELECT c.path, c.closed AS at, 'buy' AS kind, p.player, c.won AS amount
-FROM closes c JOIN plan p ON p.path = c.path AND p.step = c.step AND p.kind = 'buy'
-UNION ALL
-SELECT p.path, coalesce(c.closed, (SELECT max(closed) FROM closes x WHERE x.path = p.path), p.as_of), 'sell', p.player, p.amount
-FROM plan p LEFT JOIN closes c ON c.path = p.path AND c.step = p.step
-WHERE p.kind = 'sell'
-  AND (c.path IS NOT NULL                                                      -- a drop whose buy won
-       OR (NOT EXISTS (SELECT 1 FROM plan b WHERE b.path = p.path AND b.kind = 'buy')   -- no bid: made at once
-           OR (NOT EXISTS (SELECT 1 FROM plan b WHERE b.path = p.path AND b.step = p.step AND b.kind = 'buy')
-               AND EXISTS (SELECT 1 FROM closes x WHERE x.path = p.path))));         -- a funding sale: once any bid is won
-
 -- The board: the last run's decisions and the facts it saw (the decision's
 -- plan-detail contract: decision_*), the app's line-up and the next kickoff
 -- as of t.

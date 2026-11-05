@@ -34,7 +34,7 @@ test (grading.py _selftest_ceiling) is the smoke test of the wiring.
 | 1 | Ingest | raw pages, the API | facts: player_club, player_value, player_status, player_points, club_fixture, owners, cash, listings, offers, auction closes; all timestamped | fixed raw → expected rows; one row per key; no nulls in keys | parser health |
 | 2 | Forecast | facts at t (nothing after t) | cell(player, jornada, pts, p) | seeded facts → cells | accuracy against real points (RMSE, r), next jornada and five ahead |
 | 3 | Decision | cell, the league at t (squads, cash, market, bid odds), moves | plan(step, kind, player, amount, win, worth), kept per run with each step's order (ord), cash after it, when it is due and why (schedule), the blockers on two futures (nothing done, plan done) and what skipping each step leaves | seeded league → plan | `grading.py ceiling` (floor, ours, ceiling on real points, a lock at a time); expected gap: the plan's eleven's e against standing pat's; checks: cash ≥ 0 at the lock, squad ≤ SQUAD_MAX, a legal eleven |
-| 4 | Settlement | plan, auction closes | moves(path, at, kind, player, amount) (the replay's moves path is deleted; live has none yet) | seeded closes → moves; a won bid settles with its own paired sale | none: correctness only |
+| 4 | Settlement | (removed 2026-11-05: nothing read it; when a step is due is the Decision's `schedule`, and what happened is ingest's `auction_results`) | | | |
 | 5 | Board | plan, standings, moves | the page (board_json) | snapshot | none: correctness only |
 
 The same modules run live and in the replay; only t and the moves differ.
@@ -54,7 +54,6 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 | ingest | app_lineup, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, lineup_snapshots, listing_close, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
 | forecast | cell, forecast_e, price_carry, price_trend, price_trend_daily, standin_cell |
 | decision | decision_blocker, decision_facts, decision_option, decision_plan, decision_players, decision_run, decision_sale, decision_skip, decision_standings, decision_waiting, league_jornada |
-| settlement | settlement_moves |
 | board | board_json |
 | grading | (none yet) |
 

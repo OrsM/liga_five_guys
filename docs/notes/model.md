@@ -78,6 +78,6 @@ the chance of first" was loose.)
 4. **Squad after moves is written four times** (`fund`, `after`, the recommender, `dec_squad`) and running cash twice
    (`fund`, `after`; tied by a property test). Fixed so far: the debt limit (`rules.bid_limit`), the measure's
    step order (`in_groups`).
-5. `settlement_moves` times a sale differently from `schedule` and nothing reads it.
+5. (done) `settlement_moves` deleted: it timed a sale differently from `schedule` and nothing read it.
 6. `nights_left` is one aggregate for all sales; per-player offer expiry (`offers.expires_at`) must replace it.
 7. No epsilon on `free < 0`.

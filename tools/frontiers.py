@@ -16,7 +16,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-ORDER = ["ingest", "forecast", "decision", "settlement", "board"]
+ORDER = ["ingest", "forecast", "decision", "board"]
 ORDER_ALL = ORDER + ["grading"]  # grading, the measure, is last: it reads contracts like the rest
 PREFIX = {"api_": "ingest", "current_": "ingest", "history_": "ingest", "ff_identity": "ingest",
           "name_": "ingest", "forecast_": "forecast", "price_": "forecast", "momentum": "forecast",
@@ -34,7 +34,6 @@ NAMES = {
                 "next_cell my_squad my_cash my_xi look_players formation slot_bounds decision_sale decision_blocker decision_skip "
                 "decision_option decision_plan decision_facts decision_players decision_waiting decision_run "
                 "decision_standings",
-    "settlement": "settlement_moves",
     "board": "lock_due lineup_alert board_blockers",
     "grading": "replayed lead_buckets measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
@@ -50,7 +49,6 @@ EXPORTS = {
     # the plan leaves; league_jornada: each manager's points a jornada as a normal, what that forecast is graded on
     "decision": "decision_plan decision_sale decision_blocker decision_skip decision_option decision_players decision_facts decision_waiting decision_standings "
                 "decision_run league_jornada",
-    "settlement": "settlement_moves",  # moves(path, at, kind, player, amount)
     "board": "board_json",
     "grading": "",  # a measure: nothing downstream reads it
 }

@@ -29,10 +29,7 @@ Dani Martínez (zero points; the game only offers for listed players) is also yo
 0. The stress test's findings are in `model.md`, ranked: first, a stated policy for a sale whose offer lapses at the
    close (sell before the bids settle, or to a later offer), then lost bids as a branch, then the cap on pending bids.
 
-1. **Fold the per-row board fields** (`cash_then`, `skip`, `due`) into one `plan` object: each new field costs a
-   column, a JSON key and a remove clause in `board_json`.
-2. **Delete `settlement_moves`** (nothing reads it; `listing_close` and `schedule` cover its timing). A module in the
-   design, so the user decides.
+1. Done: the per-row board fields are one `detail` object (`board_step`); `settlement_moves` is deleted (nothing read it).
 3. **Hold / not this**: a `decision_hold` input so one tap re-plans without a move (Álvarez against holding), with the
    chance of first before and after. Skip says only what is left, and judges each step alone, not summed.
 4. **Offer expiry**: a sale on an offer is due before the offer expires, not only before the lock; needs an expiry fact.
