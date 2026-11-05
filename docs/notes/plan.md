@@ -1,3 +1,6 @@
+> **Superseded (2026-11-05).** The integer program here was deleted; the plan is the recommender's buys funded by
+> sales (docs/notes/simplify.md, "Recommender"). Kept for the reasoning on bids as lotteries and the price of money.
+
 # The plan as one problem: slots, the price of money, bids (2026-10-28)
 
 Design, not yet code. Miguel: "I need to fill the legal 11 and maximize my

@@ -1,11 +1,11 @@
--- The decision (docs/notes/plan.md; the simplify map, step 3). The aim is
+-- The decision (docs/notes/simplify.md). The aim is
 -- to finish first, so every move is worth its points and nothing else;
 -- money is a limit, never a goal:
 --
 --   f(S)          the points of squad S's best legal eleven, summed over
 --                 the jornadas left, each player at his expected points
 --                 (schema.sql cell); a move's, f of the squad it makes less
---                 f(S) (decision.plan_rows)
+--                 f(S) (recommender.points)
 --   a buy p at b  win(b) x (f(S + p) - f(S)); of bids as likely to win,
 --                 the least
 --   a sale q      f(S - q) - f(S): never more than nothing alone, so made
@@ -13,12 +13,14 @@
 --   a swap        a buy with the sale that pays for it, its points on the
 --                 squad they make together
 --
--- The plan: the best move worth more than nothing, added, and again (each
--- move valued on the squad and cash the plan has made so far), while the
--- squad stays within SQUAD_MAX counting every bid won, cash at the lock
--- stays at zero or more, and bids within cash and the game's debt. In debt
--- (a bid won and its sale not made), the least bad sale, and again, until
--- clear. src/decision.py writes the inputs and plan_rows adds the moves.
+-- The plan: the recommender (src/recommender.py) picks the buys, a loop
+-- over the purchases by worth per euro of bid, each valued again once the
+-- one before is in; the plan funds them (src/decision.py plan_rows): where
+-- cash at the lock would be below zero, sales until it is zero or more (one
+-- that loses nothing; else the one that clears it alone for the fewest
+-- points; else the fewest points per euro), and no buy that the sales cost
+-- more points than it gains. In debt with no buy: the same sales.
+-- decision.record keeps each offer on one of yours assessed (decision_sale).
 
 -- The inputs, one decision's (decision.py inputs), beside what the model
 -- looks at (schema.sql look: the market seen, the forecast, your squad and

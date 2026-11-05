@@ -5,11 +5,12 @@ until there is none. Every number the plan rests on is a row there to read
 from __future__ import annotations
 
 from contextlib import closing
-from typing import Any
+from typing import Any, NamedTuple
 
 from ffcore.db import connect, rows
-from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, best_eleven
-from recommender import Rec, Recs, cells_of, points, recommend
+from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
+from recommender import Rec, Recs, cells_of, recommend
+from recommender import points as eleven_points
 
 __all__ = ["plan", "plan_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
 
@@ -55,15 +56,15 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]], recs: Recs | None = None
                 steps.append((len(steps) - 1, "sell", pick.drop, mine[pick.drop], 1.0, pick.worth))
                 squad.discard(pick.drop)
                 free += mine[pick.drop]
-        n, here = len(steps), points(pos, cells, squad)
+        n, here = len(steps), eleven_points(pos, cells, squad)
         while free < 0:
-            lose = {s: here - points(pos, cells, squad - {s}) for s in squad & set(mine) if mine[s] > 0}
+            lose = {s: here - eleven_points(pos, cells, squad - {s}) for s in squad & set(mine) if mine[s] > 0}
             if not lose:
                 break
             free_of_cost = [s for s in lose if lose[s] <= 0]  # loses nothing: first, the dearest
             covers = [s for s in lose if mine[s] >= -free]  # one sale clears it: the least points lost
             s = max(free_of_cost, key=lambda k: (mine[k], k)) if free_of_cost else min(covers, key=lambda k: (lose[k], k)) if covers else min(lose, key=lambda k: (lose[k] / mine[k], k))
-            worth = points(pos, cells, squad - {s}) - here
+            worth = eleven_points(pos, cells, squad - {s}) - here
             steps.append((n, "sell", s, mine[s], 1.0, worth))
             n += 1
             squad.discard(s)
@@ -72,15 +73,14 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]], recs: Recs | None = None
         return steps, squad, free
 
     # The most buys the sales can pay for without ending with fewer points than making none.
-    floor = points(pos, cells, fund([])[1])
+    floor = eleven_points(pos, cells, fund([])[1])
     for k in range(len(recs.picks), -1, -1):
         steps, squad, free = fund(recs.picks[:k])
-        if k == 0 or free >= 0 and points(pos, cells, squad) >= floor:
+        if k == 0 or free >= 0 and eleven_points(pos, cells, squad) >= floor:
             break
     start = [(b, s, bid, win, proceeds, g, w) for b, s, bid, win, proceeds, g, w in recs.alone]
-    start += [("", s, None, None, mine[s], points(pos, cells, set(mine) - {s}) - points(pos, cells, set(mine)),
-               points(pos, cells, set(mine) - {s}) - points(pos, cells, set(mine)))
-              for s in sorted(mine)]
+    now = eleven_points(pos, cells, set(mine))
+    start += [("", s, None, None, mine[s], g, g) for s in sorted(mine) for g in [eleven_points(pos, cells, set(mine) - {s}) - now]]
     return steps, start
 
 
@@ -93,9 +93,10 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
     pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
     squad = {k for k, _, m, *_ in inp["dec_player"] if m}
 
+    played = {j: {k: real.get((k, j), 0.0) for k in pos} for j in js}     # 0 if he did not play
+
     def points(sq: set[str]) -> float:
-        return sum(best_eleven({p: sorted((-real.get((k, j), 0.0), k) for k in sq if pos.get(k) == p) for p in POSITIONS})
-                   for j in js)
+        return eleven_points(pos, played, sq)
     floor = here = points(squad)
     total = floor
     for step in sorted({s[0] for s in steps}):
@@ -191,6 +192,31 @@ KEEP = (
 )
 
 
+class SaleAssessment(NamedTuple):
+    made: float | None            # the offer less what you paid for him
+    z: float | None               # the offer as a share of value, in standard deviations from the recent offers' mean
+    p_better: float | None        # the chance a better offer comes before the lock: one a night, independent
+    waiting_less: float | None    # what waiting is worth less the offer (negative: take it)
+
+
+def assess_sale(offer: float, value: float | None, paid: float | None, beats: float | None, nights: int | None,
+                waiting: float | None, mean: float | None, sd: float | None) -> SaleAssessment:
+    """What an offer on one of yours is worth, read against what you paid and the recent offers (offer_spread).
+    Information the board shows: the plan's choice of take or wait is made in the plan, by the same waiting."""
+    return SaleAssessment(
+        None if paid is None else offer - paid,
+        (offer / value - mean) / sd if value and mean is not None and sd else None,
+        1 - beats ** nights if beats is not None and nights else None,
+        waiting - offer if waiting is not None and nights else None)
+
+
+# Your players with an offer standing, and what the assessment reads of each.
+SALES = ("SELECT o.player, f.offer, f.value, f.paid, o.beats, r.nights, w.later, r.offer_mean, r.offer_sd"
+         " FROM decision_option o JOIN player_facts f ON f.player = o.player JOIN decision_run r ON r.run_id = o.run_id"
+         " LEFT JOIN decision_waiting w ON w.run_id = o.run_id AND w.player = o.player AND w.kind = 'sale'"
+         " WHERE o.run_id = ? AND o.kind = 'sell' AND f.offer IS NOT NULL")
+
+
 def record(run: int) -> list[tuple[Any, ...]]:
     """The decision at t (inputs, then plan) kept as run's rows: the standings forecast if you do nothing, the
     plan, its options, the players it looked at, waiting, and what the plan leaves (your chance of first and
@@ -202,6 +228,10 @@ def record(run: int) -> list[tuple[Any, ...]]:
     with closing(connect()) as db, db:
         for sql in KEEP:
             db.execute(sql, (run,))
+        db.executemany("INSERT INTO decision_sale (run_id, player, offer, paid, made, z, p_better, waiting_less)"
+                       " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                       [(run, k, offer, paid, *assess_sale(offer, value, paid, beats, nights, waiting, mean, sd))
+                        for k, offer, value, paid, beats, nights, waiting, mean, sd in db.execute(SALES, (run,))])
     return acts
 
 
@@ -245,6 +275,14 @@ def _selftest() -> None:
 
     def sold(steps: list[tuple[Any, ...]]) -> set[str]:
         return {k for _, kind, k, *_ in steps if kind == "sell"}
+
+    # A sale assessed: offer 1.1M on value 1.0M, paid 0.8M; the recent offers' mean 1.0, sd 0.05; he beats 75% of
+    # them, two nights left, waiting worth 1.0M.
+    a = assess_sale(1.1e6, 1e6, 0.8e6, 0.75, 2, 1.0e6, 1.0, 0.05)
+    assert (a.made, a.waiting_less) == (0.3e6, -0.1e6) and a.z is not None and abs(a.z - 2.0) < 1e-9 and a.p_better == 1 - 0.75 ** 2, a
+    nothing = assess_sale(1.1e6, 1e6, None, None, 0, None, None, None)
+    assert nothing == SaleAssessment(None, None, None, None), \
+        "no purchase price, no offers to rank against, no night left, nothing to wait for: nothing to say"
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         assert rows("SELECT mean, sd FROM offer_spread") == [(None, None)], "no offer seen: nothing to read one against"

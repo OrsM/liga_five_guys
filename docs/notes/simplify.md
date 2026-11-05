@@ -52,8 +52,8 @@ Every contract is a SQL table or view. Ingest's output, the forecast, settlement
 | Module | Exports (its contract) |
 |---|---|
 | ingest | app_lineup, appearances, auction_results, cash, club_fixture, club_rating, jornada_calendar, kickoffs, league_config, lineup_snapshots, listing_ends, listings, look, next_lock, offer_ratios, offers, owners, player_club, player_roster, player_status, player_value, price_history, price_paid, scored, season_points, season_record, squads, standings |
-| forecast | cell, price_carry, price_trend, price_trend_daily, standin_cell |
-| decision | decision_facts, decision_option, decision_plan, decision_players, decision_run, decision_standings, decision_waiting, league_jornada |
+| forecast | cell, forecast_e, price_carry, price_trend, price_trend_daily, standin_cell |
+| decision | decision_facts, decision_option, decision_plan, decision_players, decision_run, decision_sale, decision_standings, decision_waiting, league_jornada |
 | settlement | settlement_moves |
 | board | board_json |
 | grading | (none yet) |
