@@ -1605,7 +1605,9 @@ WHERE p.kind = 'sell'
 -- plan-detail contract: decision_*), the app's line-up and the next kickoff
 -- as of t.
 -- board_json is decisions.json, the phone's copy; sim.main writes it from
--- here. Names, not keys: the board is what the phone shows.
+-- here. A do row of a buy or a sale also carries `skip`: what skipping that step leaves, doing the rest of the
+-- plan (decision_skip, worded by board_skip): a list of {blocker, label, amount} by blocker, 'none' = safe to
+-- skip; absent when the run recorded nothing for the step. The buys and sells rankings do not carry it. Names, not keys: the board is what the phone shows.
 DROP VIEW IF EXISTS board_run;
 CREATE VIEW board_run AS SELECT max(run_id) AS run_id FROM decision_run;
 
@@ -1892,14 +1894,17 @@ rows AS (
     SELECT 'do' AS list, ord, what, label, name, pos, step, amount, done, gain, per, facts, players,
            NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan, what IN ('buy', 'sell') AS fold,
            CASE WHEN what IN ('buy', 'sell') THEN (SELECT q.cash_then FROM board_plan q
-                                                    WHERE q.player = json_extract(br.players, '$[0]')) END AS cash_then
+                                                    WHERE q.player = json_extract(br.players, '$[0]')) END AS cash_then,
+           CASE WHEN what IN ('buy', 'sell') THEN (SELECT json_group_array(json_object(
+                    'blocker', k.blocker, 'label', k.label, 'amount', k.amount) ORDER BY k.blocker)
+                FROM board_skip k WHERE k.player = json_extract(br.players, '$[0]') AND k.kind = br.what) END AS skip
     FROM br
     UNION ALL
     SELECT 'buys', row_number() OVER (ORDER BY -b.gain, b.player), 'buy', coalesce(p.label, 'buy ' || b.name), b.name, b.pos,
            coalesce(p.step, CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END),
            coalesce(p.amount, b.cost), coalesce(p.done, b.my_bid = b.cost, 0),
            b.gain, 'season', b.facts, json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
-           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan, NULL
+           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan, NULL, NULL
     FROM board_buy_facts b
     LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
     WHERE b.gain > 0
@@ -1910,11 +1915,11 @@ rows AS (
            s.name, s.pos, coalesce(p.step, CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait' END),
            CASE WHEN p.label IS NOT NULL THEN p.amount WHEN s.takes THEN s.offer ELSE s.waiting END, coalesce(p.done, 0),
            s.gain, 'season', s.facts, json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
-           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell, NULL
+           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell, NULL, NULL
     FROM board_sell_facts s
     LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
-lines AS MATERIALIZED (SELECT list, ord, json(CASE WHEN json_extract(o, '$.cash_then') IS NULL
-                                   THEN json_remove(o, '$.cash_then') ELSE o END) AS o
+lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extract(o, '$.cash_then') IS NULL THEN '$.cash_then' ELSE '$.none' END,
+                                   CASE WHEN json_extract(o, '$.skip') IS NULL THEN '$.skip' ELSE '$.none' END)) AS o
           FROM (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
                                       WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
           FROM (SELECT list, ord, json(CASE WHEN what = 'field'
@@ -1926,7 +1931,7 @@ lines AS MATERIALIZED (SELECT list, ord, json(CASE WHEN json_extract(o, '$.cash_
                          CASE r.list WHEN 'buys' THEN 'price' ELSE 'offer' END, r.money, 'waiting', r.waiting, 'trend', r.trend,
                          'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
-                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'cash_then', r.cash_then,
+                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'cash_then', r.cash_then, 'skip', json(r.skip),
                          CASE r.list WHEN 'do' THEN 'ranked' ELSE 'more' END,
                          json(CASE WHEN r.fold THEN 'true' ELSE 'false' END),
                          'asking', b.asking, 'win', round(b.win, 3),
@@ -1979,6 +1984,17 @@ SELECT row_number() OVER (ORDER BY b.future = 'plan', b.blocker) AS ord, b.futur
        || CASE b.blocker WHEN 'debt' THEN 'in debt at the lock' WHEN 'eleven' THEN 'no eleven can be fielded'
                          ELSE 'more players than the squad holds' END AS label
 FROM decision_blocker b JOIN board_run USING (run_id);
+
+-- What skipping one step of the plan leaves (decision_skip), worded once for the page; a do row's `skip`
+-- in board_json (buy and sell rows only; none when the run recorded nothing for the step).
+DROP VIEW IF EXISTS board_skip;
+CREATE VIEW board_skip AS
+SELECT s.player, s.kind, s.blocker, s.amount,
+       CASE s.blocker WHEN 'none' THEN 'safe to skip'
+                      ELSE 'if you skip this: ' || CASE s.blocker WHEN 'debt' THEN 'in debt at the lock'
+                                                                  WHEN 'eleven' THEN 'no eleven can be fielded'
+                                                                  ELSE 'more players than the squad holds' END END AS label
+FROM decision_skip s JOIN board_run USING (run_id);
 
 DROP VIEW IF EXISTS lock_due;
 CREATE VIEW lock_due AS
