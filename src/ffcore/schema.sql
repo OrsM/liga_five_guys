@@ -260,6 +260,13 @@ CREATE TABLE IF NOT EXISTS decision_sale (
 
 -- The forecast moment a run was built on (forecast_cell keeps it while a
 -- run points to it).
+-- Players you hold back from the plan (a tap on the page: not this one): the decision neither buys nor sells them
+-- until you let go. Yours, not derived: no run rebuilds it.
+CREATE TABLE IF NOT EXISTS hold (
+    player TEXT PRIMARY KEY,
+    since  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS sim_runs (
     run_id        INTEGER PRIMARY KEY REFERENCES runs(run_id),
     moment        INTEGER REFERENCES forecast_moment(moment)
@@ -1964,7 +1971,8 @@ lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extr
           FROM (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
                                       WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
           FROM (SELECT list, ord, json(CASE WHEN what = 'field'
-                                             THEN json_remove(o, '$.name', '$.pos', '$.asking', '$.win', '$.asking_win')
+                                             THEN json_remove(o, '$.name', '$.pos', '$.key', '$.held', '$.asking', '$.win', '$.asking_win')
+                                             WHEN what NOT IN ('buy', 'sell') THEN json_remove(o, '$.key', '$.held', '$.asking', '$.win', '$.asking_win')
                                              WHEN what <> 'buy' THEN json_remove(o, '$.asking', '$.win', '$.asking_win')
                                              ELSE o END) AS o
                FROM (SELECT r.list, r.ord, r.what, json_object(
@@ -1972,6 +1980,8 @@ lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extr
                          CASE r.list WHEN 'buys' THEN 'price' ELSE 'offer' END, r.money, 'waiting', r.waiting, 'trend', r.trend,
                          'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
                          'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
+                         'key', json_extract(r.players, '$[0]'),
+                         'held', json(CASE WHEN json_extract(r.players, '$[0]') IN (SELECT player FROM hold) THEN 'true' ELSE 'false' END),
                          'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'detail', json(r.detail),
                          'trace', json((SELECT t.trace FROM board_trace t WHERE t.player = json_extract(r.players, '$[0]'))),
                          'flip', json((SELECT f.flip FROM board_flip f WHERE f.player = json_extract(r.players, '$[0]') AND f.kind = r.what)),
@@ -2003,6 +2013,8 @@ SELECT json_object(
     'band', json_array(h.band_lo, h.band_hi),
     'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'do'),
     'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
+    'held', (SELECT json_group_array(json_object('key', p.player, 'name', p.name))
+             FROM board_players p WHERE p.player IN (SELECT player FROM hold)),
     'plan_flip', json((SELECT flip FROM board_flip WHERE kind = 'plan')),
     'buys', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'buys'),
     'sells', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'sells'),

@@ -49,9 +49,13 @@ else
     ST_PID=$!
 fi
 
-log "fetch"
-"$UV" run --frozen python src/ingest.py fetch || { log "FAILED: fetch"; exit 1; }
-mark fetch
+# LFG_STAGES (lfg-watch, a hold tapped on the page): just those stages of src/run.py, on the data as it is.
+STAGES="${LFG_STAGES:-}"
+if [ -z "$STAGES" ]; then
+    log "fetch"
+    "$UV" run --frozen python src/ingest.py fetch || { log "FAILED: fetch"; exit 1; }
+    mark fetch
+fi
 
 # Both touch data/: a failure beside the fetch is re-run alone before it counts.
 if [ -n "$ST_PID" ]; then
@@ -69,7 +73,8 @@ if [ -n "$ST_PID" ]; then
 fi
 
 log "run"
-"$UV" run --frozen python src/run.py || { log "FAILED: run"; exit 1; }
+# shellcheck disable=SC2086  # STAGES is a list of words
+"$UV" run --frozen python src/run.py $STAGES || { log "FAILED: run"; exit 1; }
 mark run
 
 log "commit"

@@ -163,6 +163,8 @@ def _selftest() -> None:
     assert len(alike) == len(bought) == 2, \
         ("a buy's asking and odds are his, not those of whoever shares his name", alike)
     field = doc["do"][0]
+    assert doc["held"] == [] and all(d["held"] is False for k in ("do", "buys", "sells") for d in doc[k] if d["what"] in ("buy", "sell")), \
+        "nobody held back: each line says so, and the board lists none"
     now = ["star", *sorted(set(sqb) - {"star", "dead"})]       # 5.4 a jornada, then the 2.7s; dead 0.15 out
     on = field["label"].removeprefix("field ").split(", ")
     assert field["what"] == "field" and {n.lower() for n in on} == set(now) and on[0].lower() == now[0], \
@@ -175,7 +177,7 @@ def _selftest() -> None:
     for d in doc["do"]:
         assert set(d) >= ROW and not set(d) - ROW - {"name", "pos", "act", "accepts", "trace", "flip"} - (
             {"asking", "win", "asking_win"} if d["what"] == "buy" else set()) - (
-            {"detail"} if d["what"] in ("buy", "sell") else set()), d
+            {"detail", "key", "held"} if d["what"] in ("buy", "sell") else set()), d
     assert all("gain" in d for d in doc["do"]), "every move says its points"
     assert all(len(d["act"]) == 1 for d in doc["do"] if d["what"] in ("buy", "sell")) \
         and len(field["act"]) == 11 \
