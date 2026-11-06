@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-06T14:02Z",
+ "generated_at": "2026-11-06T15:21Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 6593337.0,
  "cash_locked": 11883998.0,
@@ -18,7 +18,7 @@
    "what": "buy",
    "label": "buy Guido Rodriguez",
    "step": "bid up to",
-   "amount": 12778563.8599786,
+   "amount": 12778574.6127268,
    "done": false,
    "key": "7676",
    "held": false,
@@ -27,7 +27,7 @@
    "facts": [
     [
      "listed at",
-     11883998.0,
+     11884008.0,
      "money"
     ],
     [
@@ -57,7 +57,7 @@
     ]
    ],
    "detail": {
-    "cash_then": -6185226.85997855,
+    "cash_then": -6185237.61272679,
     "due": "2026-11-06T21:24Z",
     "why": "auction closes",
     "skip": [
@@ -90,12 +90,12 @@
     "blockers": []
    },
    "ranked": true,
-   "asking": 11883998.0,
+   "asking": 11884008.0,
    "win": 1.0,
    "asking_win": 0.933,
    "accepts": [
-    11883998.0,
-    12778563.8599786
+    11884008.0,
+    12778574.6127268
    ],
    "act": [
     {
@@ -138,14 +138,14 @@
     ]
    ],
    "detail": {
-    "cash_then": -5526327.85997855,
+    "cash_then": -5526338.61272679,
     "due": "2026-11-06T21:24Z",
     "why": "after the auctions",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -500755.859978551
+      "amount": -500766.612726795
      }
     ]
    },
@@ -166,7 +166,7 @@
     658899.0
    ],
    "flip": {
-    "cash": -500755.859978551,
+    "cash": -500766.612726795,
     "points": 18.3492041955597,
     "blockers": [
      "in debt at the lock"
@@ -240,14 +240,14 @@
     ]
    ],
    "detail": {
-    "cash_then": 158143.140021449,
+    "cash_then": 158132.387273205,
     "due": "2026-11-06T21:24Z",
     "why": "offer expires",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -5526327.85997855
+      "amount": -5526338.61272679
      }
     ]
    },
@@ -268,7 +268,7 @@
     5876589.0
    ],
    "flip": {
-    "cash": -5526327.85997855,
+    "cash": -5526338.61272679,
     "points": 19.7754864940905,
     "blockers": [
      "in debt at the lock"
@@ -290,12 +290,12 @@
    ]
   }
  ],
- "cash_after": 158143.140021449,
- "can_bid": 75543766.9400215,
+ "cash_after": 158132.387273205,
+ "can_bid": 75543756.1872732,
  "ping": "buy Guido Rodriguez; sell Arnau Ortiz; sell Robin Le Normand",
  "held": [],
  "plan_flip": {
-  "cash": 158143.140021449,
+  "cash": 158132.387273205,
   "points": 18.3492041955597,
   "blockers": []
  },
@@ -306,10 +306,10 @@
    "what": "buy",
    "label": "buy Guido Rodriguez",
    "step": "bid up to",
-   "price": 11883998.0,
+   "price": 11884008.0,
    "trend": 8.48024303503561,
    "plan": true,
-   "amount": 12778563.8599786,
+   "amount": 12778574.6127268,
    "done": false,
    "key": "7676",
    "held": false,
@@ -318,7 +318,7 @@
    "facts": [
     [
      "listed at",
-     11883998.0,
+     11884008.0,
      "money"
     ],
     [
@@ -348,7 +348,7 @@
     ]
    ],
    "detail": {
-    "cash_then": -6185226.85997855,
+    "cash_then": -6185237.61272679,
     "due": "2026-11-06T21:24Z",
     "why": "auction closes",
     "skip": [
@@ -381,12 +381,12 @@
     "blockers": []
    },
    "more": false,
-   "asking": 11883998.0,
+   "asking": 11884008.0,
    "win": 1.0,
    "asking_win": 0.933,
    "accepts": [
-    11883998.0,
-    12778563.8599786
+    11884008.0,
+    12778574.6127268
    ],
    "act": [
     {
@@ -458,7 +458,7 @@
     7756841.0
    ],
    "flip": {
-    "cash": -7778521.85997855,
+    "cash": -7778532.61272679,
     "points": 18.6255503390278,
     "blockers": [
      "in debt at the lock"
@@ -518,14 +518,14 @@
     ]
    ],
    "detail": {
-    "cash_then": -5526327.85997855,
+    "cash_then": -5526338.61272679,
     "due": "2026-11-06T21:24Z",
     "why": "after the auctions",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -500755.859978551
+      "amount": -500766.612726795
      }
     ]
    },
@@ -546,7 +546,7 @@
     658899.0
    ],
    "flip": {
-    "cash": -500755.859978551,
+    "cash": -500766.612726795,
     "points": 18.3492041955597,
     "blockers": [
      "in debt at the lock"
@@ -640,7 +640,7 @@
     605539.0
    ],
    "flip": {
-    "cash": 740937.140021449,
+    "cash": 740926.387273205,
     "points": 18.3492041955597,
     "blockers": []
    },
@@ -709,7 +709,7 @@
     1624128.0
    ],
    "flip": {
-    "cash": 1782271.14002145,
+    "cash": 1782260.38727321,
     "points": 18.0018915950793,
     "blockers": []
    },
@@ -785,14 +785,14 @@
     ]
    ],
    "detail": {
-    "cash_then": 158143.140021449,
+    "cash_then": 158132.387273205,
     "due": "2026-11-06T21:24Z",
     "why": "offer expires",
     "skip": [
      {
       "blocker": "debt",
       "label": "if you skip this: in debt at the lock",
-      "amount": -5526327.85997855
+      "amount": -5526338.61272679
      }
     ]
    },
@@ -813,7 +813,7 @@
     5876589.0
    ],
    "flip": {
-    "cash": -5526327.85997855,
+    "cash": -5526338.61272679,
     "points": 19.7754864940905,
     "blockers": [
      "in debt at the lock"
@@ -909,7 +909,7 @@
     4342735.0
    ],
    "flip": {
-    "cash": 4526871.14002145,
+    "cash": 4526860.38727321,
     "points": 14.7877301071344,
     "blockers": []
    },
@@ -1003,7 +1003,7 @@
     3196425.0
    ],
    "flip": {
-    "cash": 3348454.14002145,
+    "cash": 3348443.38727321,
     "points": 10.8415219926012,
     "blockers": []
    },
@@ -1097,7 +1097,7 @@
     7588453.0
    ],
    "flip": {
-    "cash": 7867390.14002145,
+    "cash": 7867379.38727321,
     "points": 15.0328659310874,
     "blockers": []
    },
@@ -1181,7 +1181,7 @@
     23887482.0
    ],
    "flip": {
-    "cash": 25310801.1400215,
+    "cash": 25310790.3872732,
     "points": 7.43886971407187,
     "blockers": []
    },
@@ -1275,7 +1275,7 @@
     9195919.0
    ],
    "flip": {
-    "cash": 10131773.1400214,
+    "cash": 10131762.3872732,
     "points": 5.79636016622953,
     "blockers": []
    },
@@ -1369,7 +1369,7 @@
     43844382.0
    ],
    "flip": {
-    "cash": 43001775.1400215,
+    "cash": 43001764.3872732,
     "points": -4.91968036867661,
     "blockers": []
    },
@@ -1463,7 +1463,7 @@
     19019554.0
    ],
    "flip": {
-    "cash": 20412195.1400215,
+    "cash": 20412184.3872732,
     "points": -5.00029751042052,
     "blockers": []
    },
@@ -1557,7 +1557,7 @@
     23826561.0
    ],
    "flip": {
-    "cash": 23607059.1400215,
+    "cash": 23607048.3872732,
     "points": -12.4573593548109,
     "blockers": []
    },
@@ -1651,7 +1651,7 @@
     49592028.0
    ],
    "flip": {
-    "cash": 50205157.1400215,
+    "cash": 50205146.3872732,
     "points": -6.97720424366798,
     "blockers": []
    },
@@ -1745,7 +1745,7 @@
     19494604.0
    ],
    "flip": {
-    "cash": 21033785.1400215,
+    "cash": 21033774.3872732,
     "points": -4.05170608067328,
     "blockers": []
    },
@@ -1829,7 +1829,7 @@
     42283223.0
    ],
    "flip": {
-    "cash": 38550576.1400215,
+    "cash": 38550565.3872732,
     "points": -5.14329799260986,
     "blockers": []
    },
@@ -1923,7 +1923,7 @@
     51491812.0
    ],
    "flip": {
-    "cash": 48860565.1400215,
+    "cash": 48860554.3872732,
     "points": -24.4851610348728,
     "blockers": []
    },
@@ -2017,7 +2017,7 @@
     38071025.0
    ],
    "flip": {
-    "cash": 35903569.1400215,
+    "cash": 35903558.3872732,
     "points": -25.5668961852243,
     "blockers": []
    },
@@ -2111,7 +2111,7 @@
     45181907.0
    ],
    "flip": {
-    "cash": 43215522.1400215,
+    "cash": 43215511.3872732,
     "points": -21.6292860832095,
     "blockers": []
    },
@@ -2205,7 +2205,7 @@
     18863704.0
    ],
    "flip": {
-    "cash": 18287872.1400215,
+    "cash": 18287861.3872732,
     "points": -73.8312542243111,
     "blockers": []
    },
@@ -2247,17 +2247,17 @@
   {
    "name": "Fernando Niño",
    "pos": "DEL",
-   "clause": 49592028.0
+   "clause": 49592310.0
   },
   {
    "name": "Georges Mikautadze",
    "pos": "DEL",
-   "clause": 43844382.0
+   "clause": 43844646.0
   },
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "clause": 19019554.0
+   "clause": 19019784.0
   },
   {
    "name": "Iñigo Vicente",
@@ -2267,17 +2267,17 @@
   {
    "name": "German Valera",
    "pos": "MED",
-   "clause": 19494604.0
+   "clause": 19494791.0
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "clause": 42283223.0
+   "clause": 42283721.0
   },
   {
    "name": "Natan",
    "pos": "DEF",
-   "clause": 51491812.0
+   "clause": 51492202.0
   },
   {
    "name": "Gerard Martin",
@@ -2287,7 +2287,7 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "clause": 9195919.0
+   "clause": 9195952.0
   },
   {
    "name": "Marcos Alonso",
@@ -2297,7 +2297,7 @@
   {
    "name": "Thomas Lemar",
    "pos": "MED",
-   "clause": 7588453.0
+   "clause": 7588477.0
   },
   {
    "name": "Adria Pedrosa",
