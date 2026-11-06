@@ -1,12 +1,12 @@
 {
- "generated_at": "2026-11-06T09:02Z",
+ "generated_at": "2026-11-06T12:23Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 224626.0,
  "cash_locked": 0.0,
- "finish": 2.24,
- "p_win": 0.101,
- "finish_after": 2.17,
- "p_win_after": 0.12,
+ "finish": 2.25,
+ "p_win": 0.1,
+ "finish_after": 2.18,
+ "p_win_after": 0.119,
  "band": [
   2001.57325546223,
   2265.72491275564
@@ -20,7 +20,7 @@
    "step": "bid up to",
    "amount": 12778563.8599786,
    "done": false,
-   "gain": 19.1813505895886,
+   "gain": 19.1813505895889,
    "per": "season",
    "facts": [
     [
@@ -40,7 +40,7 @@
     ],
     [
      "points",
-     19.1813505895886,
+     19.1813505895889,
      "points"
     ],
     [
@@ -158,7 +158,7 @@
    ],
    "flip": {
     "cash": -500755.859978551,
-    "points": 15.1918536963485,
+    "points": 15.1918536963487,
     "blockers": [
      "in debt at the lock"
     ]
@@ -258,7 +258,7 @@
    ],
    "flip": {
     "cash": -795510.859978551,
-    "points": 15.1918536963485,
+    "points": 15.1918536963487,
     "blockers": [
      "in debt at the lock"
     ]
@@ -358,7 +358,7 @@
    ],
    "flip": {
     "cash": -5526327.85997855,
-    "points": 16.6181359948791,
+    "points": 16.6181359948796,
     "blockers": [
      "in debt at the lock"
     ]
@@ -384,7 +384,7 @@
    "step": "sell after the auctions",
    "amount": 5095615.0,
    "done": false,
-   "gain": -3.15735049921136,
+   "gain": -3.15735049921091,
    "per": "season",
    "facts": [
     [
@@ -419,7 +419,7 @@
     ],
     [
      "points",
-     -3.15735049921136,
+     -3.15735049921091,
      "points"
     ],
     [
@@ -458,7 +458,7 @@
    ],
    "flip": {
     "cash": -5256913.85997855,
-    "points": 18.3627137294293,
+    "points": 18.3627137294295,
     "blockers": [
      "in debt at the lock"
     ]
@@ -579,7 +579,7 @@
  "ping": "buy Guido Rodriguez; sell Arnau Ortiz; sell Raul Garcia; sell Robin Le Normand; sell Justin de Haas; list Pepelu, Georges Mikautadze, German Valera, Natan, Marcos Alonso, Mathew Ryan, Miguel Roman",
  "plan_flip": {
   "cash": 158143.140021449,
-  "points": 15.1918536963485,
+  "points": 15.1918536963487,
   "blockers": []
  },
  "buys": [
@@ -594,7 +594,7 @@
    "plan": true,
    "amount": 12778563.8599786,
    "done": false,
-   "gain": 19.1813505895886,
+   "gain": 19.1813505895889,
    "per": "season",
    "facts": [
     [
@@ -614,7 +614,7 @@
     ],
     [
      "points",
-     19.1813505895886,
+     19.1813505895889,
      "points"
     ],
     [
@@ -674,7 +674,7 @@
    "plan": false,
    "amount": 7936665.0,
    "done": false,
-   "gain": 0.276346143468345,
+   "gain": 0.276346143468118,
    "per": "season",
    "facts": [
     [
@@ -694,7 +694,7 @@
     ],
     [
      "points",
-     0.276346143468345,
+     0.276346143468118,
      "points"
     ],
     [
@@ -820,7 +820,7 @@
    ],
    "flip": {
     "cash": -795510.859978551,
-    "points": 15.1918536963485,
+    "points": 15.1918536963487,
     "blockers": [
      "in debt at the lock"
     ]
@@ -887,7 +887,7 @@
    ],
    "flip": {
     "cash": -500755.859978551,
-    "points": 15.1918536963485,
+    "points": 15.1918536963487,
     "blockers": [
      "in debt at the lock"
     ]
@@ -979,7 +979,7 @@
    ],
    "flip": {
     "cash": 740937.140021449,
-    "points": 15.1918536963485,
+    "points": 15.1918536963487,
     "blockers": []
    },
    "more": false,
@@ -1136,7 +1136,7 @@
    ],
    "flip": {
     "cash": -5526327.85997855,
-    "points": 16.6181359948791,
+    "points": 16.6181359948796,
     "blockers": [
      "in debt at the lock"
     ]
@@ -1166,7 +1166,7 @@
    "plan": true,
    "amount": 5095615.0,
    "done": false,
-   "gain": -3.15735049921136,
+   "gain": -3.15735049921091,
    "per": "season",
    "facts": [
     [
@@ -1201,7 +1201,7 @@
     ],
     [
      "points",
-     -3.15735049921136,
+     -3.15735049921091,
      "points"
     ],
     [
@@ -1228,7 +1228,7 @@
    ],
    "flip": {
     "cash": -5256913.85997855,
-    "points": 18.3627137294293,
+    "points": 18.3627137294295,
     "blockers": [
      "in debt at the lock"
     ]
@@ -1320,7 +1320,7 @@
    ],
    "flip": {
     "cash": 4526871.14002145,
-    "points": 11.630379607923,
+    "points": 11.6303796079235,
     "blockers": []
    },
    "more": true,
@@ -1350,7 +1350,7 @@
    "plan": false,
    "amount": 3190311.0,
    "done": false,
-   "gain": -4.34007461999909,
+   "gain": -4.34007461999931,
    "per": "season",
    "facts": [
     [
@@ -1385,7 +1385,7 @@
     ],
     [
      "points",
-     -4.34007461999909,
+     -4.34007461999931,
      "points"
     ],
     [
@@ -1412,7 +1412,7 @@
    ],
    "flip": {
     "cash": 3348454.14002145,
-    "points": 7.55191618033746,
+    "points": 7.68417149339029,
     "blockers": []
    },
    "more": true,
@@ -1504,7 +1504,7 @@
    ],
    "flip": {
     "cash": 7867390.14002145,
-    "points": 11.875515431876,
+    "points": 11.8755154318765,
     "blockers": []
    },
    "more": true,
@@ -1586,7 +1586,7 @@
    ],
    "flip": {
     "cash": 25310801.1400215,
-    "points": 2.85824107992471,
+    "points": 4.28151921486096,
     "blockers": []
    },
    "more": true,
@@ -1704,7 +1704,7 @@
    "plan": false,
    "amount": 23448916.0,
    "done": false,
-   "gain": -23.6197233428848,
+   "gain": -23.6197233428845,
    "per": "season",
    "facts": [
     [
@@ -1739,7 +1739,7 @@
     ],
     [
      "points",
-     -23.6197233428848,
+     -23.6197233428845,
      "points"
     ],
     [
@@ -1792,7 +1792,7 @@
    "plan": false,
    "amount": 42843632.0,
    "done": false,
-   "gain": -24.5911930553932,
+   "gain": -24.5911930553925,
    "per": "season",
    "facts": [
     [
@@ -1827,7 +1827,7 @@
     ],
     [
      "points",
-     -24.5911930553932,
+     -24.5911930553925,
      "points"
     ],
     [
@@ -1880,7 +1880,7 @@
    "plan": false,
    "amount": 20254052.0,
    "done": false,
-   "gain": -24.9292975786293,
+   "gain": -24.9292975786291,
    "per": "season",
    "facts": [
     [
@@ -1915,7 +1915,7 @@
     ],
     [
      "points",
-     -24.9292975786293,
+     -24.9292975786291,
      "points"
     ],
     [
@@ -1942,7 +1942,7 @@
    ],
    "flip": {
     "cash": 20412195.1400215,
-    "points": -8.93173665236691,
+    "points": -8.15764800963143,
     "blockers": []
    },
    "more": true,
@@ -1972,7 +1972,7 @@
    "plan": false,
    "amount": 50047014.0,
    "done": false,
-   "gain": -27.6567961307742,
+   "gain": -27.6567961307744,
    "per": "season",
    "facts": [
     [
@@ -2007,7 +2007,7 @@
     ],
     [
      "points",
-     -27.6567961307742,
+     -27.6567961307744,
      "points"
     ],
     [
@@ -2034,7 +2034,7 @@
    ],
    "flip": {
     "cash": 50205157.1400215,
-    "points": -10.4678612312239,
+    "points": -10.1345547428789,
     "blockers": []
    },
    "more": true,
@@ -2064,7 +2064,7 @@
    "plan": false,
    "amount": 20875642.0,
    "done": false,
-   "gain": -29.7022107415914,
+   "gain": -29.702210741591,
    "per": "season",
    "facts": [
     [
@@ -2099,7 +2099,7 @@
     ],
     [
      "points",
-     -29.7022107415914,
+     -29.702210741591,
      "points"
     ],
     [
@@ -2292,7 +2292,7 @@
    ],
    "flip": {
     "cash": 35903569.1400215,
-    "points": -29.0199962707791,
+    "points": -28.7242466844352,
     "blockers": []
    },
    "more": true,
@@ -2472,7 +2472,7 @@
    ],
    "flip": {
     "cash": 43215522.1400215,
-    "points": -27.53866324351,
+    "points": -24.7866365824204,
     "blockers": []
    },
    "more": true,
@@ -2502,7 +2502,7 @@
    "plan": false,
    "amount": 18129729.0,
    "done": false,
-   "gain": -98.6236583484042,
+   "gain": -98.6236583484038,
    "per": "season",
    "facts": [
     [
@@ -2537,7 +2537,7 @@
     ],
     [
      "points",
-     -98.6236583484042,
+     -98.6236583484038,
      "points"
     ],
     [
@@ -2871,11 +2871,11 @@
    "manager": "SusoGattuso",
    "me": false,
    "now": 416.0,
-   "lo": 1770.92077041563,
-   "hi": 2020.09557553672,
+   "lo": 1789.27902818498,
+   "hi": 2038.82666231009,
    "cash": 9808831.0,
    "estimated": true,
-   "p_above": 0.0463931275668592
+   "p_above": 0.0607036525720195
   },
   {
    "manager": "Magic Mike 333",
