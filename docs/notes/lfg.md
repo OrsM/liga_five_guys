@@ -163,11 +163,10 @@ Kept because it explains why the code is shaped this way; the code that implemen
 Rule for each: the page decides nothing; any new number is a column from Decision.
 
 **Now: what wins the league**
-1. Chance of first per move (U3): each move's chance of first with and without it, computed in Decision (`flips`),
-   read by the page beside "plan without it". This is the mix and match.
-2. The plan block as one compact table (one row per move: action and price, points, "plan without it" column with red
-   blocker, bid chips, a small × for hold; facts behind a tap; head as one dense line). Built on 1. Check with `shot`.
-3. Confirm sheet (U9): before a bid or an accepted offer, cash after and chance of first.
+1. The plan block as one compact table (one row per move: action and price, points, "plan without it" column with red
+   blocker, bid chips, a small x for hold; facts behind a tap; head as one dense line). Points only: chance of first
+   per move was considered and dropped 2026-11-06 (too complex, forecasts too noisy). Check with `shot`.
+2. 2. Confirm sheet (U9): before a bid or an accepted offer, cash after and points.
 
 **Then: make the plan more right**
 4. Offer-lapse policy (6.1), lost bids as a branch, a cap on pending bids.
