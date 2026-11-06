@@ -32,7 +32,7 @@ Dani Martínez (zero points; the game only offers for listed players) is also yo
 1. Done: the per-row board fields are one `detail` object (`board_step`); `settlement_moves` is deleted (nothing read it).
 3. **Hold / not this**: a `decision_hold` input so one tap re-plans without a move (Álvarez against holding), with the
    chance of first before and after. Skip says only what is left, and judges each step alone, not summed.
-4. **Offer expiry**: a sale on an offer is due before the offer expires, not only before the lock; needs an expiry fact.
+4. Done: **offer expiry**: a sale to a standing offer is due when it lapses (`dec_offer`, `decision.lapses`).
 5. Relist against wait (the chance a listed player gets an offer on a night); unlisted players' proceeds in the plan.
 6. Recommender cut-offs from data; pin legacy forecast moments; re-read the early non-TDD tests.
 7. Sibling worktrees (`act`, `squad-cap`, `fast-plan`, `fast-int`, `move-cost` dirty; `position-baseline` has two

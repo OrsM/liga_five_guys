@@ -344,6 +344,8 @@ Two files, one decision, each with its own job (2026-11-06).
   jornadas. A buy closing after tonight's lock is no debt tonight and scores from the next jornada; a sale made
   after tonight's lock still scores tonight. `decision.sale_due` is the one rule for when a sale is due: after the
   last auction of its bids, unless the bids closing by the next lock leave the cash short there, then by the lock.
+  A sale to a standing offer is due by the time the offer lapses (`dec_offer`, `decision.lapses`): offers expire at
+  the close, with the auctions, so such a sale cannot follow them; only a sale to a later offer waits.
   No second place knows about locks: the board and the page read the due and the blockers.
   Still the forecast's own rule, `late_arrivals` (a player who joins after his club's kickoff plays none of it), is
   looser than the frozen eleven; it matters only for jornadas already locked, and the plan no longer needs it.

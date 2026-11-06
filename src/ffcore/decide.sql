@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS dec_close (
     player TEXT PRIMARY KEY,
     close  TEXT NOT NULL
 );
+-- Your players whose sale is to a standing offer (it beats waiting), and when that offer lapses: a sale for it is
+-- due by then (decision.schedule).
+CREATE TABLE IF NOT EXISTS dec_offer (
+    player TEXT PRIMARY KEY,
+    until  TEXT NOT NULL
+);
 DROP TABLE IF EXISTS dec_lock;
 CREATE TABLE dec_lock (
     jornada INTEGER PRIMARY KEY,
@@ -108,6 +114,13 @@ SELECT player, strftime('%Y-%m-%dT%H:%MZ', t) AS close FROM listing_close;
 DROP VIEW IF EXISTS dec_lock_seen;
 CREATE VIEW dec_lock_seen AS
 SELECT jornada, strftime('%Y-%m-%dT%H:%MZ', stamp_jd(lock)) AS lock FROM round_locks WHERE lock > (SELECT cut());
+
+DROP VIEW IF EXISTS dec_offer_seen;
+CREATE VIEW dec_offer_seen AS
+SELECT t.player, strftime('%Y-%m-%dT%H:%MZ', min(julianday(o.expires_at))) AS until
+FROM offers o JOIN squads t ON t.player_team_id = o.player_team_id JOIN sale_odds s ON s.player = t.player
+WHERE o.status = 'pending' AND o.money = s.offer AND s.offer >= coalesce(s.waiting, 0) AND coalesce(o.expires_at, '') <> ''
+GROUP BY t.player;
 
 -- The bids you have placed, as seen.
 DROP VIEW IF EXISTS dec_bid_seen;
