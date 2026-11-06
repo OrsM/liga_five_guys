@@ -170,7 +170,7 @@ Rule for each: the page decides nothing; any new number is a column from Decisio
 
 **Then: make the plan more right**
 4. ~~Offer-lapse risk (6.1)~~ decided 2026-11-06: accepted, no haircut (a 5.7% wobble on one small sale is below forecast noise). Revisit only if a lock actually fails on it. Lost bids and the cap are already handled in `worth_on` and `after`.
-5. ~~Search caps~~ measured 2026-11-06 with `_selftest_search(n=1000, seed=7, strict=False)` (3 min): the plan misses the best mix in 1.6% of random leagues, by 1.1 points on average (max 3.0). Left as they are. Still open: the board price view (cash at each jornada start, bid against asking, points per euro, needed against optional sale).
+5. ~~Search caps~~ measured 2026-11-06 with `_selftest_search(n=1000, seed=7, strict=False)` (3 min): the plan misses the best mix in 1.6% of random leagues, by 1.1 points on average (max 3.0). Left as they are. Board price view dropped 2026-11-06: it would lengthen a page already too long, and its numbers are on the plan rows.
 6. Relist against wait; unlisted players' proceeds in the plan.
 
 **Then: know whether it worked**
