@@ -75,8 +75,8 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
 
     def lose(squad: frozenset[str]) -> Callable[[frozenset[str]], float]:
         """lost(R) for cover: the points the squad loses without R; no eleven to field is a loss without end."""
-        have = Counter(pos.get(k) for k in squad)
-        return lambda R: pts(squad) - pts(squad - R) if can_field(have - Counter(pos.get(k) for k in R)) else float("inf")
+        have = Counter(pos[k] for k in squad if k in pos)
+        return lambda R: pts(squad) - pts(squad - R) if can_field(have - Counter(pos[k] for k in R if k in pos)) else float("inf")
 
     def total(steps: list[tuple[Any, ...]]) -> float:
         return worth_on(inp, steps, e, js, pts)[1]
@@ -219,7 +219,7 @@ def can_field(count: Counter[str]) -> bool:
 
 def fieldable(pos: dict[str, str], squad: set[str] | frozenset[str]) -> bool:
     """Whether some formation can be fielded from the squad (pos: each player's position)."""
-    return can_field(Counter(pos.get(k) for k in squad))
+    return can_field(Counter(pos[k] for k in squad if k in pos))
 
 
 class After(NamedTuple):
