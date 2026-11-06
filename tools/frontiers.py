@@ -1,4 +1,4 @@
-"""Frontier check (docs/notes/simplify.md, "Modules and contracts"): read-only.
+"""Frontier check (docs/notes/lfg.md, "Architecture"): read-only.
 Builds a scratch DB from the schema, finds what each view reads (names after FROM/JOIN, CTEs
 skipped) and prints every read past the frontier: a read of a later module, or of a scraped
 table from outside ingest. Any module may read the facts and t (look) and an earlier module's contract. Exit 1 if there is one.

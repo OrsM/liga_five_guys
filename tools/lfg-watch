@@ -75,16 +75,17 @@ if [ -f "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
     echo "a run is already in flight"; exit 0
 fi
 
-# The request, and its removal, in one round trip: taking it before the run
+# The request, and its removal, in one round trip (a mv first, so a press between the read and the removal is
+# kept for the next round, not lost): taking it before the run
 # means a button pressed during the run queues the next one rather than being
 # silently eaten.
-REQ=$(ssh_phone "cat '$DEST/rerun.json' 2>/dev/null && rm -f '$DEST/rerun.json'" || true)
+REQ=$(ssh_phone "mv '$DEST/rerun.json' '$DEST/rerun.taken' 2>/dev/null && cat '$DEST/rerun.taken' && rm -f '$DEST/rerun.taken'" || true)
 [ -n "$REQ" ] || exit 0
 echo "requested: $REQ"
 
 # What the page asked to hold back or let go (hold.json: changes, in order), taken as the request is and applied
 # before the run; a request that says "quick" only re-plans (the data as it is), not the whole chain.
-HOLD=$(ssh_phone "cat '$DEST/hold.json' 2>/dev/null && rm -f '$DEST/hold.json'" || true)
+HOLD=$(ssh_phone "mv '$DEST/hold.json' '$DEST/hold.taken' 2>/dev/null && cat '$DEST/hold.taken' && rm -f '$DEST/hold.taken'" || true)
 if [ -n "$HOLD" ]; then
     printf '%s' "$HOLD" > "$STATE/hold.json"
     (cd "$HOME/claude_projects/liga_five_guys" && PYTHONPATH=src FF_ROOT=./data "$HOME/.local/bin/uv" run --frozen python src/hold.py "$STATE/hold.json") || true

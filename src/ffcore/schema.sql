@@ -1,5 +1,5 @@
 -- data/lfg.db, applied on every connect (ffcore/db.py). Only adds: a
--- changed table is dropped by hand and rebuilt (docs/plan-datasette.md).
+-- changed table is dropped by hand and rebuilt (docs/notes/lfg.md).
 
 -- One row per run of src/run.py. finished and ok stay NULL while it runs.
 CREATE TABLE IF NOT EXISTS runs (

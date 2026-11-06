@@ -1,5 +1,5 @@
 """The decision's snapshot of the league at t: the market and the league as seen at a cut
-(docs/notes/simplify.md, "Modules and contracts")."""
+(docs/notes/lfg.md, "Architecture")."""
 from __future__ import annotations
 
 from contextlib import closing

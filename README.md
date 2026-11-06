@@ -90,7 +90,7 @@ Every forecast is the same product, for every player and jornada
   of real single-match scores, and one persistent per-player error
   (`PERSISTENT_SHARE`, measured by the backtest). A move's expected gain
   and its chance of helping, and the standings if nobody moves, are
-  worked out from them in SQL (`ffcore/gain.py`, docs/notes/gain.md). A
+  worked out from them in SQL (`ffcore/gain.py`, docs/notes/lfg.md). A
   jornada under way keeps the elevens that fielded it.
 - **Prices** (`ffcore/pricing.py`): values keep their trend; the next h
   updates move by a fitted multiple of the last one, h being the longest

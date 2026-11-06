@@ -1,4 +1,4 @@
--- The decision (docs/notes/simplify.md). The aim is
+-- The decision (docs/notes/lfg.md). The aim is
 -- to finish first, so every move is worth its points and nothing else;
 -- money is a limit, never a goal:
 --

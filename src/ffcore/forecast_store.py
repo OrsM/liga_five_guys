@@ -1,4 +1,4 @@
-"""The forecast module's store and what it keeps (docs/notes/simplify.md, "Modules and contracts"):
+"""The forecast module's store and what it keeps (docs/notes/lfg.md, "Architecture"):
 the moments forecast() writes, the price momentum read for a decision's odds, and the closed
 days of the price series kept so a question is a lookup (price_step, momentum_day; keep())."""
 from __future__ import annotations

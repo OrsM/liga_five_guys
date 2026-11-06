@@ -1,6 +1,6 @@
-# liga_five_guys: everything we know, once (DRAFT for review, 2026-11-06)
+# liga_five_guys: everything we know, once (2026-11-06)
 
-Merged from `simplify.md`, `model.md`, `plan.md`, `gain.md`, `plan-datasette.md`, `next-steps.md` and the working
+Merged on 2026-11-06 from `simplify.md`, `model.md`, `plan.md`, `gain.md`, `plan-datasette.md`, `next-steps.md` and the working
 agreements in memory. Each section says where it came from `[source]`. Nothing is deleted yet: the last section lists
 what this draft leaves out and why. Review it; what you cut here is cut for good once the old files go.
 
@@ -191,19 +191,16 @@ the `READ` list so the live plan sees locks, closes and offers.
 **Yours, not engineering:** account actions (bids, accepting offers, listing players: the game only offers for listed
 players). Market closes daily 22:24 CET.
 
-## 8. Possibly still open: verify against the code, or cut [simplify "bugs found"]
+## 8. The 2026-11-01 "bugs found" list, checked against the code (2026-11-06)
 
-Ten bugs were listed on 2026-11-01. I could not tell from the docs which are fixed. Candidates to check:
-- The line-up reminder and the board's Field line can name different elevens before the night's auctions
-  (`lineup_alert` 'now' vs `field_basis` 'plan').
-- `lfg-watch` reads then deletes `accept.json` in two steps: a press between them is lost; the server's queue write is
-  read-modify-write. (The hold file reuses the same pattern.)
-- Grading values money over `hmax` updates, the plan over `MONEY_H` (7).
-- `p_now` may land on a jornada already behind (a postponed match); none on the data.
-- `board_json` joins a buy's asking and win by name, not player.
-- Players a manager lists for sale are never offered by the backtest (`acquire()` drops owned players).
-- Fixed per the notes: a second league overwriting the first; ruff never run; the backtest's forecast differing from the
-  board's; `replay_forecast` keyed by variant not code.
+- **Fixed 2026-11-06:** `lfg-watch` took `rerun.json` and `hold.json` with `cat && rm`, so a tap between the two was lost;
+  it now `mv`s first (accept was already atomic).
+- **Gone from the code, so dropped:** `lineup_alert` vs `field_basis` (`field_basis` no longer exists); money over
+  `hmax` vs `MONEY_H` (`MONEY_H` no longer exists; the money replay was deleted); `p_now` behind a jornada (no longer
+  in `src`); the backtest never offering listed players (`acquire` is gone with the money replay); `board_json` joining
+  a buy's asking and win by name (rows now carry `key`).
+- **Fixed earlier, per the notes:** a second league overwriting the first; ruff never run; the backtest's forecast
+  differing from the board's; `replay_forecast` keyed by variant not code.
 
 ## 9. Working agreements [memory]
 
@@ -241,6 +238,5 @@ Ten bugs were listed on 2026-11-01. I could not tell from the docs which are fix
 | `archive/simplify-log.md` | everything | already an archive |
 | memory | kids' games, bandkit, RetroArch, Luanti | unrelated to this project |
 
-**Proposed next step once you've reviewed:** this file replaces `simplify.md`, `model.md`, `next-steps.md`, `plan.md`,
-`gain.md` and `plan-datasette.md` (kept in git history), leaving `README.md` and this one. Datasette's own docs and the
-code comments stay.
+**Decision (mine, reverse any):** every row of this table is cut. The six old docs are deleted once you have read
+this one; they stay in git history. The "Later" ideas are not in the list because nobody agreed to them.

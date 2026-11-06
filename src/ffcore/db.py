@@ -1,6 +1,6 @@
 """The run's SQLite file: what each run measured and concluded, for
 Datasette and ask.py. Disposable: every table but runs is rebuilt from
-data/raw, git or a replay (docs/plan-datasette.md)."""
+data/raw, git or a replay (docs/notes/lfg.md)."""
 from __future__ import annotations
 
 import datetime as dt
