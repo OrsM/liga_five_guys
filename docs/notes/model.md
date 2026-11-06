@@ -75,7 +75,7 @@ the chance of first" was loose.)
 2. **Unlisted players have no sale at all** until listed (then an offer at the next close: list before the last close
    before the lock, or there is none).
 3. **The cap and the debt limit count pending bids**; `after()` checks the cap on won players, at the end.
-4. **Squad after moves is written four times** (`fund`, `after`, the recommender, `dec_squad`) and running cash twice
+4. **Squad after moves is written four times** (the plan's loop, `after`, the recommender, `dec_squad`) and running cash twice
    (`fund`, `after`; tied by a property test). Fixed so far: the debt limit (`rules.bid_limit`), the measure's
    step order (`in_groups`).
 5. (done) `settlement_moves` deleted: it timed a sale differently from `schedule` and nothing read it.

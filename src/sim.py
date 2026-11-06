@@ -421,25 +421,28 @@ def _selftest() -> None:
             "the chance he plays next, his expected points next and over the ten jornadas left"
 
     debt = {**put(ub, "value", {**get(ub, "value"), "k": 4e6, "d1": 9e6, "m1": 1e6}), "cash": -5e6}
-    owed = report(debt)
-    assert [d["name"] for d in owed["do"] if d["what"] in ("buy", "sell")] == ["Dead", "D1"] \
-        and owed["cash_after"] == 5e6, "in debt: sales only, the least bad first, until clear (5M short: 1M, then 9M)"
-    assert [d["detail"]["cash_then"] for d in owed["do"] if d["what"] in ("buy", "sell")] == [-4e6, 5e6], \
-        "each step of the plan says the cash it leaves, running from today's: -5M, then +1M, then +9M"
+    owed = report({**debt, "cash": -1e6})
+    assert [d["name"] for d in owed["do"] if d["what"] in ("buy", "sell")] == ["Dead"] \
+        and owed["cash_after"] == 0.0, "in debt: sales only, the fewest points lost, until clear (1M short: Dead's 1M)"
+    assert [d["detail"]["cash_then"] for d in owed["do"] if d["what"] in ("buy", "sell")] == [0.0], \
+        "each step of the plan says the cash it leaves, running from today's: -1M, then +1M"
+    big = report(debt)
+    assert [d["name"] for d in big["do"] if d["what"] in ("buy", "sell")] == ["Star"] \
+        and big["blockers"] == [{"future": "nothing", "blocker": "debt", "label": "if you do nothing: in debt at the lock",
+                                 "amount": -5e6}], \
+        "5M short: the fewest points lost among the sales that clear it and leave an eleven (Star's 20M), no blocker left"
     assert all("detail" not in d for d in owed["do"] if d["what"] not in ("buy", "sell")), \
         "a line that moves no money says none"
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        seed(debt)
+        seed({**debt, "cash": -1e6})
         record_run(7)
         assert rows("SELECT future, blocker, amount FROM decision_blocker WHERE run_id = 7 ORDER BY future") \
-            == [("nothing", "debt", -5e6), ("plan", "eleven", None)], \
-            "the run keeps the plan's check: doing nothing stays 5M in debt; the plan sells its way out but its two " \
-            "sales (a defender among them) leave this squad two defenders, short of any formation"
+            == [("nothing", "debt", -1e6)], \
+            "the run keeps the plan's check: doing nothing stays 1M in debt; the plan (Dead's sale) clears it, no blocker"
         assert rows("SELECT player, kind, blocker, amount FROM decision_skip WHERE run_id = 7 ORDER BY player") \
-            == [("d1", "sell", "debt", -4e6), ("dead", "sell", "eleven", None)], \
-            "what skipping each step of the plan leaves, kept for every step: without D1's 9M sale 4M is still owed; " \
-            "without Dead's, the squad keeps its defender but the plan's other sale leaves two"
+            == [("dead", "sell", "debt", -1e6)], \
+            "what skipping each step of the plan leaves, kept for every step: without Dead's sale 1M is still owed"
 
     _selftest_lineup()
     print("sim self-test OK")

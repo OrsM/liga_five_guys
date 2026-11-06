@@ -31,7 +31,7 @@ NAMES = {
     "forecast": "cell cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
     "decision": "bid_odds recent_offers offer_spread sale_odds waiting nights_left player_facts "
-                "next_cell my_squad my_cash my_xi look_players formation slot_bounds decision_sale decision_blocker decision_skip "
+                "next_cell my_squad my_cash my_xi look_players formation slot_bounds decision_sale decision_blocker decision_skip decision_flip "
                 "decision_option decision_plan decision_facts decision_players decision_waiting decision_run "
                 "decision_standings",
     "board": "lock_due lineup_alert board_blockers",

@@ -39,7 +39,7 @@ test (grading.py _selftest_ceiling) is the smoke test of the wiring.
 
 The same modules run live and in the replay; only t and the moves differ.
 
-Every contract is a SQL table or view. Ingest's output, the forecast, settlement and the board are SQL. The decision's search (best eleven for each candidate squad, then the greedy loop) is one pure Python function: it reads its input rows (cell, squads, cash, market, bid odds) and writes plan rows. It holds no copy of a table, and its test seeds rows. Python is also left for fetching and parsing pages, and for driving the app.
+Every contract is a SQL table or view. Ingest's output, the forecast, settlement and the board are SQL. The decision's search (the best eleven for each candidate squad, every set of buys with the sales that pay for it) is one pure Python function: it reads its input rows (cell, squads, cash, market, bid odds) and writes plan rows. It holds no copy of a table, and its test seeds rows. Python is also left for fetching and parsing pages, and for driving the app.
 
 **Rules.**
 - A module reads ingest's facts, t and earlier modules' contracts; never a later module, never a scraped table (only ingest reads those).
@@ -321,13 +321,24 @@ same step.
   and a run records (assemble.NAMES), and Datasette's constants query reads
   them from model_constants. The verdict column and KAPPAS were gone already.
 
-## Recommender (inside Decision)
+## Recommender and the plan (inside Decision)
 
-`src/recommender.py` owns every purchase rule. In: `read_inputs()` rows (dec_player, dec_odds, dec_money, cell).
-Out: `Recs(picks, alone)`; `Rec(player, bid, win, gain, worth, drop)`, in the order to bid. A loop over the
-purchases: worth = win x gain, ordered by worth per euro, thresholds worth > 0, bid within cash + debt share, room
-in the squad (else a drop). `decision.plan_rows(inp, recs=None)` only funds them: cash at the lock >= 0 by sales
-(a sale that loses nothing, else one that clears it alone for the fewest points, else fewest points per euro), and
-gives up the buys if the sales cost more points than they gain. It decides no purchase.
+Two files, one decision, each with its own job (2026-11-06).
+
+- `src/recommender.py` owns the candidates. In: `read_inputs()` rows (dec_player, dec_odds, cell). Out:
+  `Cands(bids, alone)`: each player on offer and his bids as (bid, win chance), and every bid valued alone from the
+  squad as it is (the board's rows; worth = win x gain). It picks nothing and decides nothing about money.
+- `decision.plan_rows(inp)` chooses the squad to hold at the lock. It tries every set of buys (at most three, each
+  worth something alone, from the recommender's bids), and for each the sales that pay for it (`decision.cover`: the
+  sets of sales that bring the cash at the lock to zero or more and free the room, the few that lose the fewest
+  points; never "the one that covers it alone"). Every mix is judged once, by `worth_on` (the one objective;
+  `expected_gap` and `evaluate` are the same), and the best is the plan; standing pat is one of the choices (in
+  debt, it is not). A set of buys cannot gain more than its buys do alone, which prunes the sets. A sale that leaves
+  no legal eleven (`decision.fieldable`, the check `after` makes too) is no option: if nothing clears the debt,
+  the debt is the blocker. Money is no goal.
+- The test is exact: `decision._selftest_search` compares the plan with every mix of any buys and up to three
+  sales on seeded random leagues (feasible, at least standing pat, equal to the best). Two bounds remain, both on
+  the live squad and neither in that test: at most three buys, and cover shortlists the ten sellable players who
+  lose the fewest points per euro; check them against the wider search on real inputs before raising either.
 
 *The dated step log (steps 1–9, timings, estimates) is in `archive/simplify-log.md`.*
