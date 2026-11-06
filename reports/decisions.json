@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-06T12:51Z",
+ "generated_at": "2026-11-06T13:11Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 224626.0,
  "cash_locked": 0.0,
@@ -481,108 +481,11 @@
      "value": 5095615.0
     }
    ]
-  },
-  {
-   "name": null,
-   "pos": null,
-   "what": "list",
-   "label": "list Pepelu, Georges Mikautadze, German Valera, Natan, Marcos Alonso, Mathew Ryan, Miguel Roman",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": null,
-   "per": "season",
-   "facts": [
-    [
-     "rising",
-     "Pepelu, Georges Mikautadze, German Valera, Natan",
-     "names"
-    ]
-   ],
-   "trace": [
-    51147329.0,
-    50381032.0,
-    49657041.0,
-    49426124.0,
-    49543920.0,
-    49777931.0,
-    50145529.0,
-    50603091.0,
-    51002239.0,
-    51304573.0,
-    51431572.0,
-    51468502.0,
-    51546607.0,
-    51491812.0
-   ],
-   "flip": null,
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 51491812.0
-    },
-    {
-     "player_team": "95426553",
-     "player": "2771",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 43844382.0
-    },
-    {
-     "player_team": "44068749",
-     "player": "2639",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 9195919.0
-    },
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": null,
-     "bid": null,
-     "pos": "POR",
-     "value": 18863704.0
-    },
-    {
-     "player_team": "24338726",
-     "player": "2464",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 42283223.0
-    },
-    {
-     "player_team": "37280098",
-     "player": "3123",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 23826561.0
-    },
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 19494604.0
-    }
-   ]
   }
  ],
  "cash_after": 158143.140021449,
  "can_bid": 70371437.5400214,
- "ping": "buy Guido Rodriguez; sell Arnau Ortiz; sell Raul Garcia; sell Robin Le Normand; sell Justin de Haas; list Pepelu, Georges Mikautadze, German Valera, Natan, Marcos Alonso, Mathew Ryan, Miguel Roman",
+ "ping": "buy Guido Rodriguez; sell Arnau Ortiz; sell Raul Garcia; sell Robin Le Normand; sell Justin de Haas",
  "plan_flip": {
   "cash": 158143.140021449,
   "points": 15.1918536963487,
@@ -629,6 +532,18 @@
      "trend"
     ]
    ],
+   "detail": {
+    "cash_then": -12553937.8599786,
+    "due": "2026-11-06T21:24Z",
+    "why": "auction closes",
+    "skip": [
+     {
+      "blocker": "none",
+      "label": "safe to skip",
+      "amount": null
+     }
+    ]
+   },
    "trace": [
     12320789.0,
     12503550.0,
@@ -808,6 +723,18 @@
      "trend"
     ]
    ],
+   "detail": {
+    "cash_then": -10941384.8599786,
+    "due": "2026-11-06T21:24Z",
+    "why": "offer expires",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -795510.859978551
+     }
+    ]
+   },
    "trace": [
     1027829.0,
     1014495.0,
@@ -877,6 +804,18 @@
      "trend"
     ]
    ],
+   "detail": {
+    "cash_then": -11895038.8599786,
+    "due": "2026-11-06T21:24Z",
+    "why": "after the auctions",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -500755.859978551
+     }
+    ]
+   },
    "trace": [
     669004.0,
     670023.0,
@@ -1126,6 +1065,18 @@
      "trend"
     ]
    ],
+   "detail": {
+    "cash_then": -5256913.85997855,
+    "due": "2026-11-06T21:24Z",
+    "why": "offer expires",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -5526327.85997855
+     }
+    ]
+   },
    "trace": [
     7421533.0,
     7277211.0,
@@ -1220,6 +1171,18 @@
      "trend"
     ]
    ],
+   "detail": {
+    "cash_then": 158143.140021449,
+    "due": "2026-11-06T21:24Z",
+    "why": "offer expires",
+    "skip": [
+     {
+      "blocker": "debt",
+      "label": "if you skip this: in debt at the lock",
+      "amount": -5256913.85997855
+     }
+    ]
+   },
    "trace": [
     4219704.0,
     4340288.0,
@@ -1619,8 +1582,8 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "what": "list",
-   "label": "list Miguel Roman",
+   "what": "sell",
+   "label": "sell Miguel Roman",
    "step": "take offer",
    "offer": 9973630.0,
    "waiting": 0.0,
@@ -1688,17 +1651,21 @@
     9401186.0,
     9195919.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 10131773.1400214,
+    "points": 2.63900966701863,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
-    null
+    9973630.0
    ],
    "act": [
     {
      "player_team": "44068749",
      "player": "2639",
-     "market": null,
-     "bid": null,
+     "market": "50121404",
+     "bid": "",
      "pos": "MED",
      "value": 9195919.0
     }
@@ -1707,8 +1674,8 @@
   {
    "name": "Marcos Alonso",
    "pos": "DEF",
-   "what": "list",
-   "label": "list Marcos Alonso",
+   "what": "sell",
+   "label": "sell Marcos Alonso",
    "step": "take offer",
    "offer": 23448916.0,
    "waiting": 0.0,
@@ -1776,17 +1743,21 @@
     23978057.0,
     23826561.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 23607059.1400215,
+    "points": -15.6147098540218,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
-    null
+    23448916.0
    ],
    "act": [
     {
      "player_team": "37280098",
      "player": "3123",
-     "market": null,
-     "bid": null,
+     "market": "51255255",
+     "bid": "",
      "pos": "DEF",
      "value": 23826561.0
     }
@@ -1795,8 +1766,8 @@
   {
    "name": "Georges Mikautadze",
    "pos": "DEL",
-   "what": "list",
-   "label": "list Georges Mikautadze",
+   "what": "sell",
+   "label": "sell Georges Mikautadze",
    "step": "take offer",
    "offer": 42843632.0,
    "waiting": 0.0,
@@ -1864,17 +1835,21 @@
     43132805.0,
     43844382.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 43001775.1400215,
+    "points": -8.07703086788752,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
-    null
+    42843632.0
    ],
    "act": [
     {
      "player_team": "95426553",
      "player": "2771",
-     "market": null,
-     "bid": null,
+     "market": "51255290",
+     "bid": "",
      "pos": "DEL",
      "value": 43844382.0
     }
@@ -2067,8 +2042,8 @@
   {
    "name": "German Valera",
    "pos": "MED",
-   "what": "list",
-   "label": "list German Valera",
+   "what": "sell",
+   "label": "sell German Valera",
    "step": "take offer",
    "offer": 20875642.0,
    "waiting": 0.0,
@@ -2136,17 +2111,21 @@
     19304082.0,
     19494604.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 21033785.1400215,
+    "points": -7.20905657988419,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
-    null
+    20875642.0
    ],
    "act": [
     {
      "player_team": "90937863",
      "player": "3074",
-     "market": null,
-     "bid": null,
+     "market": "50121325",
+     "bid": "",
      "pos": "MED",
      "value": 19494604.0
     }
@@ -2155,8 +2134,8 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "what": "list",
-   "label": "list Pepelu",
+   "what": "sell",
+   "label": "sell Pepelu",
    "step": "take offer",
    "offer": 38392433.0,
    "waiting": 0.0,
@@ -2214,17 +2193,21 @@
     41372826.0,
     42283223.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 38550576.1400215,
+    "points": -8.30064849182077,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
-    null
+    38392433.0
    ],
    "act": [
     {
      "player_team": "24338726",
      "player": "2464",
-     "market": null,
-     "bid": null,
+     "market": "54752027",
+     "bid": "",
      "pos": "MED",
      "value": 42283223.0
     }
@@ -2325,8 +2308,8 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "what": "list",
-   "label": "list Natan",
+   "what": "sell",
+   "label": "sell Natan",
    "step": "take offer",
    "offer": 48702422.0,
    "waiting": 0.0,
@@ -2394,17 +2377,21 @@
     51546607.0,
     51491812.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 48860565.1400215,
+    "points": -27.6425115340837,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
-    null
+    48702422.0
    ],
    "act": [
     {
      "player_team": "47459928",
      "player": "2543",
-     "market": null,
-     "bid": null,
+     "market": "51255271",
+     "bid": "",
      "pos": "DEF",
      "value": 51491812.0
     }
@@ -2505,8 +2492,8 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "what": "list",
-   "label": "list Mathew Ryan",
+   "what": "sell",
+   "label": "sell Mathew Ryan",
    "step": "take offer",
    "offer": 18129729.0,
    "waiting": 0.0,
@@ -2574,17 +2561,21 @@
     19060188.0,
     18863704.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 18287872.1400215,
+    "points": -76.988604723522,
+    "blockers": []
+   },
    "more": true,
    "accepts": [
-    null
+    18129729.0
    ],
    "act": [
     {
      "player_team": "64086240",
      "player": "2755",
-     "market": null,
-     "bid": null,
+     "market": "54892898",
+     "bid": "",
      "pos": "POR",
      "value": 18863704.0
     }
