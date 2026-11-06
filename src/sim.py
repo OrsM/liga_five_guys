@@ -557,7 +557,8 @@ def _selftest_board_contract() -> None:
                 {"blocker": "eleven", "label": "if you skip this: no eleven can be fielded", "amount": None}], \
             "what skipping a step leaves (decision_skip), worded once by the board, by blocker"
         assert all("detail" not in d for d in doc["do"] if d["what"] not in ("buy", "sell")) \
-            and all("detail" not in d for d in doc["buys"] + doc["sells"]), "only the plan's buys and sales carry detail"
+            and all(("detail" in d) == d["plan"] for d in doc["buys"] + doc["sells"]), \
+            "only the plan's buys and sales carry detail, in the rankings too: the page dates them from there"
         got = {f[0]: f[1] for f in sell["facts"]}
         assert got["the game's recent offers"] == 0.75 and got["more offers before the lock"] == 2 \
             and got["waiting is worth"] == 1.0e6, \

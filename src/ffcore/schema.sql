@@ -1944,7 +1944,8 @@ rows AS (
            coalesce(p.step, CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END),
            coalesce(p.amount, b.cost), coalesce(p.done, b.my_bid = b.cost, 0),
            b.gain, 'season', b.facts, json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
-           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan, NULL
+           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan,
+           (SELECT d.detail FROM board_step d WHERE d.player = b.player AND d.kind = 'buy')
     FROM board_buy_facts b
     LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
     WHERE b.gain > 0
@@ -1955,7 +1956,8 @@ rows AS (
            s.name, s.pos, coalesce(p.step, CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait' END),
            CASE WHEN p.label IS NOT NULL THEN p.amount WHEN s.takes THEN s.offer ELSE s.waiting END, coalesce(p.done, 0),
            s.gain, 'season', s.facts, json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
-           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell, NULL
+           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell,
+           (SELECT d.detail FROM board_step d WHERE d.player = s.player AND d.kind = 'sell')
     FROM board_sell_facts s
     LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
 lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extract(o, '$.detail') IS NULL THEN '$.detail' ELSE '$.none' END)) AS o
