@@ -736,13 +736,14 @@ def _selftest_ledger() -> None:
     print("ledger self-test OK")
 
 
-def _selftest_search() -> None:
+def _selftest_search(n: int = 12, seed: int = 1, strict: bool = True) -> list[float]:
     """The loop against every mix there is, on seeded random leagues (12 players, 2 or 3 on offer, offers of 0.5M
     # to 25M, cash short or not): the plan is feasible (cash at the lock, a legal eleven, the bid limit), gains
     # at least what standing pat does, and is the best of all the mixes of up to three sales and any buys. The
     # loop is a search, not a proof: about one league in seventy has a better mix (two sales it does not shortlist)."""
-    rng = random.Random(1)
-    for _ in range(12):
+    rng = random.Random(seed)
+    misses: list[float] = []     # strict off: the points the plan leaves on each league it does not solve (the search's own measure)
+    for _ in range(n):
         layout = ["POR"] + ["DEF"] * 4 + ["MED"] * 4 + ["DEL"] * 3
         own = {"m%02d" % i: p for i, p in enumerate(layout)}
         offer = {"c%d" % i: rng.choice(["DEF", "MED", "DEL"]) for i in range(rng.randint(2, 3))}
@@ -768,9 +769,15 @@ def _selftest_search() -> None:
         best = max((expected_gap(inp, m) for nb in range(len(offer) + 1) for B in combinations(offer, nb)
                     for ns in range(4) for R in combinations(own, ns) if feasible(m := mix(B, R))), default=0.0)
         plan_steps, _ = plan_rows(inp)
-        assert (feasible(plan_steps) or best == 0.0) and abs(expected_gap(inp, plan_steps) - max(best, 0.0)) < 1e-6, \
-            "the plan is feasible and as good as the best mix of any buys and up to three sales"
-    print("search self-test OK")
+        gap = max(best, 0.0) - expected_gap(inp, plan_steps)
+        if strict:
+            assert (feasible(plan_steps) or best == 0.0) and abs(gap) < 1e-6, \
+                "the plan is feasible and as good as the best mix of any buys and up to three sales"
+        elif gap > 1e-6:
+            misses.append(gap)
+    if strict:
+        print("search self-test OK")
+    return misses
 
 
 def _selftest_blockers() -> None:
