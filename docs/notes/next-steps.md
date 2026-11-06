@@ -1,4 +1,4 @@
-# Next steps (2026-11-05, evening)
+# Next steps (2026-11-06) — the one list
 
 ## Where we are
 
@@ -24,39 +24,39 @@ Cash must be ≥ 0 by Fri 2026-11-06 20:00Z (21:00 CET) or the matchday scores 0
 +3.5M only through the Julián Álvarez offer, 63.4M, your call). Listing Carreras, Yeray Álvarez, Raúl García and
 Dani Martínez (zero points; the game only offers for listed players) is also yours.
 
-## Open, in order
-
-0. The stress test's findings are in `model.md`, ranked: first, a stated policy for a sale whose offer lapses at the
-   close (sell before the bids settle, or to a later offer), then lost bids as a branch, then the cap on pending bids.
-
-1. Done: the per-row board fields are one `detail` object (`board_step`); `settlement_moves` is deleted (nothing read it).
-3. **Hold / not this**: a `decision_hold` input so one tap re-plans without a move (Álvarez against holding), with the
-   chance of first before and after. Skip says only what is left, and judges each step alone, not summed.
-4. Done: **offer expiry**: a sale to a standing offer is due when it lapses (`dec_offer`, `decision.lapses`).
-5. Relist against wait (the chance a listed player gets an offer on a night); unlisted players' proceeds in the plan.
-6. Recommender cut-offs from data; pin legacy forecast moments; re-read the early non-TDD tests.
-7. Sibling worktrees (`act`, `squad-cap`, `fast-plan`, `fast-int`, `move-cost` dirty; `position-baseline` has two
-   parked October commits); stale agent patches are in `~/.local/share/lfg-stale-patches/`.
-
-## The website, against what you do to win
-
-What you do: not lose by default (cash ≥ 0, a legal eleven, no bid left open); bid before the close; judge nightly
-offers; field the best eleven; watch rivals; know whether it worked. The page's gaps, and what is done:
-
-| # | Gap | State |
-|---|-----|-------|
-| U1 | deadline strip: next deadline with a countdown, blockers | done: blockers, each step's due, the countdown strip |
-| U2 | "Do this" in the order to do it, cash after each step | done (order, `cash_then`, due) |
-| U3 | a move's effect | cash and points per move are in (`decision_flip`, `evaluate`); the chance of first per move is open |
-| U4 | no way to say "not this one" | open: item 3 above |
-| U5 | facts formatted (`sd`, counts) | done: one `show` for every unit |
-| U6 | the eleven as a pitch | done (`board_squad`, the page's "Your eleven") |
-| U7 | open bids marked on their buy line; lost bids told | open: lost bids |
-| U8 | the cash path against the debt limit | partly: per-step cash |
-| U9 | confirm sheet with cash after and chance | open |
-| U10 | rivals ranked by the chance above you; exposure ranked | open |
-| U11 | one ping with the next deadline | open: reads the same `due` rows |
-| U12 | how old is this board against the close | open |
-| U13 | history: bids won/lost, sale made against plan | open |
+## The list (one list; work top to bottom; mark done here, nowhere else)
 
 Rule for each: the page decides nothing; any new number is a column from Decision.
+
+**Now: what wins the league**
+1. **Chance of first per move (U3).** Each move's chance of first with and without it, computed in Decision
+   (`flips`), read by the page beside "plan without it". This is the mix and match: you pick, you see what it does.
+2. **The plan block as one compact table (U1–U3 as presentation).** One row per move: action and price, points,
+   the "plan without it" column with its red blocker, bid chips, a small × for hold; facts behind a tap. Head as one
+   dense line. Built on 1, so it is built once. Check with `shot` (page height, first screen).
+3. **Confirm sheet (U9).** Before a bid or an accepted offer: cash after, chance of first.
+
+**Then: make the plan more right**
+4. Policy for a sale whose offer lapses at the close, then lost bids as a branch, then a cap on pending bids (`model.md`).
+5. Search caps (3 buys, 10/4 shortlist) with a time budget; test first, profile before commit. Then the board price view
+   (cash at each jornada start, bid against asking, points per euro, needed against optional sale).
+6. Relist against wait; unlisted players' proceeds in the plan.
+
+**Then: know whether it worked**
+7. Lost bids told (U7), the cash path against the debt limit (U8), rivals ranked by the chance above you (U10),
+   one ping with the next deadline (U11), board age against the close (U12), history of bids won/lost (U13).
+
+**Housekeeping, when idle**
+8. Recommender cut-offs from data; pin legacy forecast moments; sibling worktrees (`act`, `squad-cap`, `fast-plan`,
+   `fast-int`, `move-cost` dirty; `position-baseline` has two parked October commits); stale agent patches in
+   `~/.local/share/lfg-stale-patches/`; `late_arrivals` redundancy; grade-stage speed (~250 s).
+
+## Done (kept short)
+Per-row `detail`; offer expiry (`dec_offer`); the plan in order with `cash_then` and due; blockers; deadline strip;
+one `show` formatter; the eleven as a pitch; **hold / "not this one"** end to end (page sends changes, the box owns the
+set, `lfg-watch` re-plans quick); one `Move` component for buys and sales; the plan fitting the first phone screen;
+`READ` list so the live plan sees locks, closes and offers.
+
+## Yours, not engineering
+Account actions are yours: bids, accepting offers, listing players (Carreras, Yeray Álvarez, Raúl García, Dani
+Martínez: the game only offers for listed players). Tonight: market closes 22:24 CET, lock 21:00 CET.
