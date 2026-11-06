@@ -1,12 +1,12 @@
 {
- "generated_at": "2026-11-06T17:06Z",
+ "generated_at": "2026-11-06T19:27Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 6593337.0,
  "cash_locked": 11883998.0,
  "finish": 2.26,
- "p_win": 0.096,
+ "p_win": 0.094,
  "finish_after": 2.18,
- "p_win_after": 0.119,
+ "p_win_after": 0.116,
  "band": [
   1999.00174840632,
   2261.98171881312
@@ -288,11 +288,62 @@
      "value": 5876589.0
     }
    ]
+  },
+  {
+   "name": null,
+   "pos": null,
+   "what": "list",
+   "label": "list Fernando Niño, Iñigo Vicente",
+   "step": null,
+   "amount": null,
+   "done": false,
+   "gain": null,
+   "per": "season",
+   "facts": [],
+   "trace": [
+    27803096.0,
+    27500138.0,
+    27161349.0,
+    26828180.0,
+    26463608.0,
+    26131000.0,
+    25872201.0,
+    25677986.0,
+    25482327.0,
+    25151046.0,
+    24785035.0,
+    24389478.0,
+    24092003.0,
+    23887482.0
+   ],
+   "flip": null,
+   "ranked": false,
+   "accepts": [
+    null
+   ],
+   "act": [
+    {
+     "player_team": "24338723",
+     "player": "3002",
+     "market": null,
+     "bid": null,
+     "pos": "DEL",
+     "value": 23887482.0
+    },
+    {
+     "player_team": "107909858",
+     "player": "3147",
+     "market": null,
+     "bid": null,
+     "pos": "DEL",
+     "value": 49592028.0
+    }
+   ]
   }
  ],
  "cash_after": 158132.387273205,
  "can_bid": 75543756.1872732,
- "ping": "buy Guido Rodriguez; sell Arnau Ortiz; sell Robin Le Normand",
+ "ping": "buy Guido Rodriguez; sell Arnau Ortiz; sell Robin Le Normand; list Fernando Niño, Iñigo Vicente",
  "held": [],
  "plan_flip": {
   "cash": 158132.387273205,
@@ -1119,8 +1170,8 @@
   {
    "name": "Iñigo Vicente",
    "pos": "DEL",
-   "what": "sell",
-   "label": "sell Iñigo Vicente",
+   "what": "list",
+   "label": "list Iñigo Vicente",
    "step": "take offer",
    "offer": 25152658.0,
    "waiting": 0.0,
@@ -1128,8 +1179,6 @@
    "plan": false,
    "amount": 25152658.0,
    "done": false,
-   "key": "6442",
-   "held": false,
    "gain": -14.3231802582823,
    "per": "season",
    "facts": [
@@ -1180,21 +1229,17 @@
     24092003.0,
     23887482.0
    ],
-   "flip": {
-    "cash": 25310790.3872732,
-    "points": 7.43886971407187,
-    "blockers": []
-   },
+   "flip": null,
    "more": true,
    "accepts": [
-    25152658.0
+    null
    ],
    "act": [
     {
      "player_team": "24338723",
      "player": "3002",
-     "market": "54752103",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 23887482.0
     }
@@ -1579,8 +1624,8 @@
   {
    "name": "Fernando Niño",
    "pos": "DEL",
-   "what": "sell",
-   "label": "sell Fernando Niño",
+   "what": "list",
+   "label": "list Fernando Niño",
    "step": "take offer",
    "offer": 50047014.0,
    "waiting": 0.0,
@@ -1588,8 +1633,6 @@
    "plan": false,
    "amount": 50047014.0,
    "done": false,
-   "key": "7081",
-   "held": false,
    "gain": -28.8267754979031,
    "per": "season",
    "facts": [
@@ -1650,21 +1693,17 @@
     50143799.0,
     49592028.0
    ],
-   "flip": {
-    "cash": 50205146.3872732,
-    "points": -6.97720424366798,
-    "blockers": []
-   },
+   "flip": null,
    "more": true,
    "accepts": [
-    50047014.0
+    null
    ],
    "act": [
     {
      "player_team": "107909858",
      "player": "3147",
-     "market": "61763382",
-     "bid": "",
+     "market": null,
+     "bid": null,
      "pos": "DEL",
      "value": 49592028.0
     }
@@ -2470,11 +2509,11 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 568.0,
-   "lo": 2176.96952884507,
-   "hi": 2472.19031470061,
+   "lo": 2179.51055496629,
+   "hi": 2474.76803268826,
    "cash": 16414428.0,
    "estimated": true,
-   "p_above": 0.895849121756227
+   "p_above": 0.898801595413169
   },
   {
    "manager": "miguel_autentico",
@@ -2500,21 +2539,21 @@
    "manager": "SusoGattuso",
    "me": false,
    "now": 416.0,
-   "lo": 1789.27902818498,
-   "hi": 2038.82666231009,
+   "lo": 1784.59339262658,
+   "hi": 2034.19505529056,
    "cash": 9808831.0,
    "estimated": true,
-   "p_above": 0.0629828239890242
+   "p_above": 0.0590283965258525
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 443.0,
-   "lo": 1590.51869330456,
-   "hi": 1812.65045887905,
+   "lo": 1601.32168014813,
+   "hi": 1823.70510986417,
    "cash": 64193671.0,
    "estimated": true,
-   "p_above": 0.000702770337430492
+   "p_above": 0.000933316246672145
   }
  ]
 }
