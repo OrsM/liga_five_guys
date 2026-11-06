@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-06T12:23Z",
+ "generated_at": "2026-11-06T12:51Z",
  "lock_at": "2026-11-06T20:00:00+00:00",
  "cash": 224626.0,
  "cash_locked": 0.0,
@@ -181,8 +181,8 @@
    "pos": "DEL",
    "what": "sell",
    "label": "sell Raul Garcia",
-   "step": "sell after the auctions",
-   "amount": 886293.0,
+   "step": "take offer",
+   "amount": 953654.0,
    "done": false,
    "gain": 0.0,
    "per": "season",
@@ -231,7 +231,7 @@
    "detail": {
     "cash_then": -10941384.8599786,
     "due": "2026-11-06T21:24Z",
-    "why": "after the auctions",
+    "why": "offer expires",
     "skip": [
      {
       "blocker": "debt",
@@ -264,7 +264,9 @@
     ]
    },
    "ranked": true,
-   "accepts": [],
+   "accepts": [
+    953654.0
+   ],
    "act": [
     {
      "player_team": "110441714",
@@ -281,8 +283,8 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Robin Le Normand",
-   "step": "sell after the auctions",
-   "amount": 5876589.0,
+   "step": "take offer",
+   "amount": 5684471.0,
    "done": false,
    "gain": -1.10962495005333,
    "per": "season",
@@ -331,7 +333,7 @@
    "detail": {
     "cash_then": -5256913.85997855,
     "due": "2026-11-06T21:24Z",
-    "why": "after the auctions",
+    "why": "offer expires",
     "skip": [
      {
       "blocker": "debt",
@@ -364,7 +366,9 @@
     ]
    },
    "ranked": true,
-   "accepts": [],
+   "accepts": [
+    5684471.0
+   ],
    "act": [
     {
      "player_team": "109094609",
@@ -381,8 +385,8 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Justin de Haas",
-   "step": "sell after the auctions",
-   "amount": 5095615.0,
+   "step": "take offer",
+   "amount": 5415057.0,
    "done": false,
    "gain": -3.15735049921091,
    "per": "season",
@@ -431,7 +435,7 @@
    "detail": {
     "cash_then": 158143.140021449,
     "due": "2026-11-06T21:24Z",
-    "why": "after the auctions",
+    "why": "offer expires",
     "skip": [
      {
       "blocker": "debt",
@@ -464,7 +468,9 @@
     ]
    },
    "ranked": true,
-   "accepts": [],
+   "accepts": [
+    5415057.0
+   ],
    "act": [
     {
      "player_team": "111936049",
@@ -751,12 +757,12 @@
    "pos": "DEL",
    "what": "sell",
    "label": "sell Raul Garcia",
-   "step": "sell after the auctions",
+   "step": "take offer",
    "offer": 953654.0,
    "waiting": 0.0,
    "trend": -15.0835332799737,
    "plan": true,
-   "amount": 886293.0,
+   "amount": 953654.0,
    "done": false,
    "gain": 0.0,
    "per": "season",
@@ -826,7 +832,9 @@
     ]
    },
    "more": false,
-   "accepts": [],
+   "accepts": [
+    953654.0
+   ],
    "act": [
     {
      "player_team": "110441714",
@@ -1067,12 +1075,12 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Robin Le Normand",
-   "step": "sell after the auctions",
+   "step": "take offer",
    "offer": 5684471.0,
    "waiting": 0.0,
    "trend": -22.7408425625677,
    "plan": true,
-   "amount": 5876589.0,
+   "amount": 5684471.0,
    "done": false,
    "gain": -1.10962495005333,
    "per": "season",
@@ -1142,7 +1150,9 @@
     ]
    },
    "more": false,
-   "accepts": [],
+   "accepts": [
+    5684471.0
+   ],
    "act": [
     {
      "player_team": "109094609",
@@ -1159,12 +1169,12 @@
    "pos": "DEF",
    "what": "sell",
    "label": "sell Justin de Haas",
-   "step": "sell after the auctions",
+   "step": "take offer",
    "offer": 5415057.0,
    "waiting": 0.0,
    "trend": -13.8477745792683,
    "plan": true,
-   "amount": 5095615.0,
+   "amount": 5415057.0,
    "done": false,
    "gain": -3.15735049921091,
    "per": "season",
@@ -1234,7 +1244,9 @@
     ]
    },
    "more": false,
-   "accepts": [],
+   "accepts": [
+    5415057.0
+   ],
    "act": [
     {
      "player_team": "111936049",
