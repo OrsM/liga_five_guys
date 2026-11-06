@@ -453,7 +453,56 @@ def _selftest_measure_log() -> None:
         assert rows("SELECT key, value, previous, change FROM measure_latest") == [("share", 0.5, 0.25, 0.25)]
 
 
+def locks_report() -> str:
+    """How each jornada played went (lock_record): the chance of first and the finish the last decision before its
+    lock saw, with its plan; whether anything could still stop you then; what you scored (a zero is a matchday
+    lost). The league's real criterion, jornada after jornada; the totals say how many were lost."""
+    def pct(x: float | None) -> str:
+        return "   -" if x is None else "%3.0f%%" % (100 * x)
+    got = rows("SELECT jornada, p_first, p_first_after, finish, finish_after, exposed, scored, lost FROM lock_record ORDER BY lock")
+    lines = ["jornada  first  with plan  finish  with plan  exposed  scored"]
+    lines += ["%7d  %s  %s  %6s  %9s  %7s  %6s%s" % (j, pct(p), pct(pa), "-" if f is None else "%.2f" % f,
+                                                  "-" if fa is None else "%.2f" % fa, "-" if p is None else str(ex),
+                                                  "-" if sc is None else "%.0f" % sc, "   LOST" if lost else "")
+              for j, p, pa, f, fa, ex, sc, lost in got]
+    lines.append("lost matchdays: %d of %d; exposed at the last decision: %d" % (
+        sum(bool(r[7]) for r in got), len(got), sum(1 for r in got if r[1] is not None and r[5])))
+    return "\n".join(lines)
+
+
+def _selftest_locks() -> None:
+    """lock_record: for each jornada played, the last decision before its lock (not a later one), what could still
+    stop you there, and what you scored before the next lock (the last seen)."""
+    import re
+    import sqlite3
+    from ffcore.db import stamp_jd
+    sql = Path(__file__).parent / "ffcore" / "schema.sql"
+    view = re.search(r"CREATE VIEW lock_record AS\n(.*?);\n", sql.read_text(), re.S)
+    assert view
+    db = sqlite3.connect(":memory:")
+    db.create_function("stamp_jd", 1, stamp_jd)
+    db.create_function("cut", 0, lambda: "2026-11-30T0000Z")
+    db.executescript("""
+        CREATE TABLE round_locks (jornada, lock);
+        CREATE TABLE decision_run (run_id, cut, p_first_after, finish_after);
+        CREATE TABLE decision_standings (run_id, manager, me, p_first, finish);
+        CREATE TABLE decision_blocker (run_id, future, blocker, amount);
+        CREATE TABLE api_standings (observed_at, manager, fixture_points);
+    """)
+    db.executemany("INSERT INTO round_locks VALUES (?, ?)", [(1, "2026-11-06T2000Z"), (2, "2026-11-13T2000Z"), (3, "2026-11-20T2000Z")])
+    db.executemany("INSERT INTO decision_run VALUES (?, ?, ?, ?)", [(1, "2026-11-05T1000Z", 0.2, 3.0), (2, "2026-11-06T0900Z", 0.3, 2.0),
+                                                                   (3, "2026-11-07T0900Z", 0.9, 1.0)])
+    db.executemany("INSERT INTO decision_standings VALUES (?, 'me', 1, ?, ?)", [(1, 0.1, 3.5), (2, 0.15, 2.5), (3, 0.5, 1.5)])
+    db.execute("INSERT INTO decision_blocker VALUES (2, 'nothing', 'debt', -1.0)")
+    db.executemany("INSERT INTO api_standings VALUES (?, 'me', ?)", [("2026-11-10T1000Z", 40.0), ("2026-11-12T1000Z", 50.0),
+                                                                    ("2026-11-14T1000Z", 0.0), ("2026-11-19T1000Z", 0.0)])
+    got = db.execute("SELECT jornada, run_id, p_first, p_first_after, exposed, scored, lost FROM (%s) ORDER BY jornada" % view.group(1)).fetchall()
+    assert got == [(1, 2, 0.15, 0.3, 1, 50.0, 0), (2, 3, 0.5, 0.9, 0, 0.0, 1)], \
+        "jornada 1: the decision of 09:00 that morning (not the one before or the day after), exposed once, 50 scored; jornada 2: a zero is a lost matchday"
+
+
 def _selftest() -> None:
+    _selftest_locks()
     _selftest_ceiling()
     _selftest_measure_log()
     import tempfile
@@ -648,5 +697,8 @@ if __name__ == "__main__":
         # Out without freeing what it made one object at a time: ~8 s of a
         # backtest's exit (2026-10-31), every file already closed and written.
         os._exit(0)
-    print("grading.py --selftest | accuracy | ceiling (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
+    if sys.argv[1:2] == ["locks"]:
+        print(locks_report())
+        raise SystemExit(0)
+    print("grading.py --selftest | accuracy | locks | ceiling (LFG_VARIANT=name) | replay [JOBS] (LFG_VARIANT=name) | variant NAME CONSTANT=VALUE ...")
     raise SystemExit(2)

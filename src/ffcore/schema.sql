@@ -43,6 +43,26 @@ SELECT a.measure, a.key, a.value, a.at, a.commit_sha, p.value AS previous, p.at 
 FROM r a LEFT JOIN r p ON p.measure = a.measure AND p.key = a.key AND p.n = 2
 WHERE a.n = 1;
 
+-- How each jornada that has been played went for you, one row each: the last decision before its lock (the
+-- chance of first it saw, the finish and what could still stop you if you did nothing), and what you scored
+-- (the game's fixture_points for you, the last seen before the next jornada locks; a zero is a matchday lost).
+-- The league's real criterion, run after run (grading.py locks).
+DROP VIEW IF EXISTS lock_record;
+CREATE VIEW lock_record AS
+WITH l AS (SELECT jornada, lock, stamp_jd(lock) AS t, lead(stamp_jd(lock)) OVER (ORDER BY lock) AS until FROM round_locks),
+d AS (SELECT l.jornada, r.run_id, s.p_first, r.p_first_after, s.finish, r.finish_after,
+             row_number() OVER (PARTITION BY l.jornada ORDER BY stamp_jd(r.cut) DESC) AS n
+      FROM l JOIN decision_run r ON stamp_jd(r.cut) < l.t
+      JOIN decision_standings s ON s.run_id = r.run_id AND s.me = 1),
+p AS (SELECT l.jornada, a.fixture_points, row_number() OVER (PARTITION BY l.jornada ORDER BY stamp_jd(a.observed_at) DESC) AS n
+      FROM l JOIN api_standings a ON stamp_jd(a.observed_at) < l.until AND stamp_jd(a.observed_at) > l.t
+      WHERE a.manager = (SELECT manager FROM decision_standings WHERE me = 1 ORDER BY run_id DESC LIMIT 1))
+SELECT l.jornada, l.lock, d.run_id, d.p_first, d.p_first_after, d.finish, d.finish_after,
+       (SELECT count(*) FROM decision_blocker b WHERE b.run_id = d.run_id AND b.future = 'nothing' AND b.blocker <> 'none') AS exposed,
+       p.fixture_points AS scored, p.fixture_points = 0 AS lost
+FROM l LEFT JOIN d ON d.jornada = l.jornada AND d.n = 1 LEFT JOIN p ON p.jornada = l.jornada AND p.n = 1
+WHERE l.until IS NOT NULL AND l.until < stamp_jd((SELECT cut()));
+
 -- The decision a run made (decision.plan, ffcore/decide.sql), which the
 -- board reads: the decision's plan-detail contract, a run each (decision.record).
 -- Every single move valued from the squad as it is (dec_rows), and the plan's
