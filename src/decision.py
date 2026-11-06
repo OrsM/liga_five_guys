@@ -150,7 +150,8 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
     """The measure: the real points (real: (player, jornada) -> points, 0 if
     he did not play) of the best eleven of the squad over the jornadas js:
     as it stands (inp's dec_player), and once the plan's steps are made,
-    each step's change counted at its win chance as the plan's worth does. A step counts only for the jornadas
+    each step's change counted at its win chance as the plan's worth does; a sale made before its bid's result is
+    known (to an offer that lapses with the auction) is made whether the bid is won or lost. A step counts only for the jornadas
     that lock after it is made (rules.in_force: your eleven is frozen at the lock). score: a squad's best eleven in
     each jornada, if the caller has it (and has it cached); else made here from real."""
     pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
@@ -166,13 +167,17 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
     total = floor = sum(points(squad)[j] for j in js)
     for group in in_groups(inp, steps):
         win, before = 1.0, {j: points(sq)[j] for j, sq in squads.items()}
+        won, lost = dict(squads), dict(squads)
         for step, kind, k, _, w, _ in group:
             if kind == "buy":
                 win = 1.0 if w is None else w
             for j in js:
                 if in_force(locks, j, due[step, kind].due):
-                    squads[j] = squads[j] | {k} if kind == "buy" else squads[j] - {k}
-        total += win * sum(points(sq)[j] - before[j] for j, sq in squads.items())
+                    won[j] = won[j] | {k} if kind == "buy" else won[j] - {k}
+                    if kind == "sell" and due[step, kind].why == OFFER_EXPIRES:     # made before the bid's result is known
+                        lost[j] = lost[j] - {k}
+        total += sum(win * (points(won[j])[j] - before[j]) + (1 - win) * (points(lost[j])[j] - before[j]) for j in js)
+        squads = won
     return floor, total
 
 
@@ -271,7 +276,7 @@ def after(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], w
     (player -> amount) taken as won beside the steps' buys, one the steps buy too counted once. cash_then: the cash
     each step leaves running from today's, in the plan's order (step, a buy before a sale). Blockers (blocker,
     amount): 'debt' (cash below zero at a jornada's lock, counting the steps made by it, or once all are made: the
-    matchday scores 0; amount the lowest), 'eleven' (no formation can be fielded from the squad then), 'squad'
+    matchday scores 0; amount the lowest), 'eleven' (no formation can be fielded from the squad then, or if every bid is lost after the sales made before the result), 'squad'
     (players over the cap once all are made, amount how many)."""
     (cash, _, _, squad_max, _), = inp["dec_money"]
     pos = {k: p for k, p, *_ in inp["dec_player"]}
@@ -303,7 +308,8 @@ def after(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], w
     out: list[tuple[str, float | None]] = []
     if low < 0:
         out.append(("debt", low))
-    if not all(fieldable(pos, sq) for _, sq in seen):
+    sure = {k for step, kind, k, *_ in steps if kind == "sell" and due[step, kind].why == OFFER_EXPIRES}
+    if not all(fieldable(pos, sq) for _, sq in seen) or not fieldable(pos, squad - sure):   # or every bid lost
         out.append(("eleven", None))
     if len(final[1]) > squad_max:
         out.append(("squad", float(len(final[1]) - squad_max)))
@@ -704,6 +710,15 @@ def _selftest_ledger() -> None:
     early = {**inp, "dec_offer": [("z_now", "2026-11-06T18:00Z")]}
     assert worth_on(early, sale, real, [1, 2])[1] < worth_on(inp, sale, real, [1, 2])[1], \
         "an offer that lapses before tonight's lock: the sale is made before it, and costs tonight's points"
+    half = [(0, "buy", "star", 5e6, 0.5, 0.0), (0, "sell", "a_later", 5e6, 1.0, 0.0)]
+    offered = {**inp, "dec_offer": [("a_later", late)]}
+    assert worth_on(offered, half, real, [1, 2])[1] - worth_on(inp, half, real, [1, 2])[1] == -4.0, \
+        "a sale to an offer lapsing at the close is made whether the bid is won or lost: half the time for nobody (8 x 0.5)"
+    swap = [(0, "buy", "star", 5e6, 1.0, 0.0), (0, "sell", "k", 5e6, 1.0, 0.0)]
+    keeper = [("star", "POR", m, a, pr) if k == "star" else (k, p, m, a, pr) for k, p, m, a, pr in inp["dec_player"]]
+    assert after({**inp, "dec_player": keeper}, swap).blockers == [], "a keeper bought for the keeper sold, after the auction: fine"
+    assert after({**inp, "dec_player": keeper, "dec_offer": [("k", late)]}, swap).blockers == [("eleven", None)], \
+        "sold to an offer that lapses with the auction: a lost bid leaves no keeper, said"
     tight = {**inp, "dec_close": [("star", "2026-11-05T22:24Z")]}
     assert schedule(tight, [buy_star, sell("z_now")])[0, "sell"] == Due(lock1, "before the lock") and \
         after(tight, [buy_star]).blockers == [("debt", 0.2e6 - 5e6)], \
