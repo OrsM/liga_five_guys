@@ -172,6 +172,12 @@ def in_groups(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]
     return [[s for s in ordered if s[0] == step] for step in dict.fromkeys(s[0] for s in ordered)]
 
 
+def fieldable(pos: dict[str, str], squad: set[str] | frozenset[str]) -> bool:
+    """Whether some formation can be fielded from the squad (pos: each player's position)."""
+    count = {p: sum(pos.get(k) == p for k in squad) for p in POSITIONS}
+    return any(all(count[p] >= n for p, n in shape.items()) for shape in SHAPES)
+
+
 class After(NamedTuple):
     cash_then: list[float]                      # the cash each step leaves, in the plan's order
     cash: float                                 # at the lock
@@ -198,10 +204,9 @@ def after(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], w
             here -= amount
             squad = squad | {k}
     out: list[tuple[str, float | None]] = []
-    count = {p: sum(pos.get(k) == p for k in squad) for p in POSITIONS}
     if here < 0:
         out.append(("debt", here))
-    if not any(all(count[p] >= n for p, n in shape.items()) for shape in SHAPES):
+    if not fieldable(pos, squad):
         out.append(("eleven", None))
     if len(squad) > squad_max:
         out.append(("squad", float(len(squad) - squad_max)))

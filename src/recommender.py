@@ -52,8 +52,15 @@ def cells_of(inp: Rows) -> tuple[dict[str, str], dict[int, dict[str, float]]]:
 def points(pos: dict[str, str], cells: dict[int, dict[str, float]], squad: set[str],
            js: set[int] | None = None) -> float:
     """The best legal eleven's points over the jornadas (js: only these) of a squad."""
-    return sum(best_eleven({p: sorted((-e[k], k) for k in squad if k in e and pos[k] == p) for p in POSITIONS})
-               for j, e in cells.items() if js is None or j in js)
+    total = 0.0
+    for j, e in cells.items():
+        if js is None or j in js:
+            by: dict[str, list[tuple[float, str]]] = {p: [] for p in POSITIONS}
+            for k in squad:
+                if k in e:
+                    by[pos[k]].append((-e[k], k))
+            total += best_eleven({p: sorted(v) for p, v in by.items()})
+    return total
 
 
 def recommend(inp: Rows) -> Recs:
