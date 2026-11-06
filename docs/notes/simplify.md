@@ -336,6 +336,17 @@ Two files, one decision, each with its own job (2026-11-06).
   debt, it is not). A set of buys cannot gain more than its buys do alone, which prunes the sets. A sale that leaves
   no legal eleven (`decision.fieldable`, the check `after` makes too) is no option: if nothing clears the debt,
   the debt is the blocker. Money is no goal.
+- **The ledger (2026-11-06).** Your eleven is frozen at a jornada's lock, for every player. So a move counts for the
+  jornadas that lock after it is made (`rules.in_force(locks, jornada, due)`; locks = `dec_lock`, (jornada, lock) for
+  each jornada still to lock), and the cash must be zero or more at each lock, counting the moves made by it (and
+  once all are made): `after` reads `dec_lock` that way, `worth_on` scores each jornada from the squad as the moves
+  in force there make it, and the recommender's values (`alone`) and the plan's step worths count only those
+  jornadas. A buy closing after tonight's lock is no debt tonight and scores from the next jornada; a sale made
+  after tonight's lock still scores tonight. `decision.sale_due` is the one rule for when a sale is due: after the
+  last auction of its bids, unless the bids closing by the next lock leave the cash short there, then by the lock.
+  No second place knows about locks: the board and the page read the due and the blockers.
+  Still the forecast's own rule, `late_arrivals` (a player who joins after his club's kickoff plays none of it), is
+  looser than the frozen eleven; it matters only for jornadas already locked, and the plan no longer needs it.
 - The test is exact: `decision._selftest_search` compares the plan with every mix of any buys and up to three
   sales on seeded random leagues (feasible, at least standing pat, equal to the best). Two bounds remain, both on
   the live squad and neither in that test: at most three buys, and cover shortlists the ten sellable players who

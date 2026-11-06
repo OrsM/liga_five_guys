@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
-from ffcore.rules import POSITIONS, best_eleven
+from ffcore.rules import POSITIONS, best_eleven, in_force
 
 Rows = dict[str, list[tuple[Any, ...]]]
 
@@ -34,18 +34,24 @@ def cells_of(inp: Rows) -> tuple[dict[str, str], dict[int, dict[str, float]]]:
     return pos, cells
 
 
-def points(pos: dict[str, str], cells: dict[int, dict[str, float]], squad: set[str],
-           js: set[int] | None = None) -> float:
-    """The best legal eleven's points over the jornadas (js: only these) of a squad."""
-    total = 0.0
+def by_jornada(pos: dict[str, str], cells: dict[int, dict[str, float]], squad: set[str],
+               js: set[int] | None = None) -> dict[int, float]:
+    """The best legal eleven's points of a squad in each jornada (js: only these)."""
+    out: dict[int, float] = {}
     for j, e in cells.items():
         if js is None or j in js:
             by: dict[str, list[tuple[float, str]]] = {p: [] for p in POSITIONS}
             for k in squad:
                 if k in e:
                     by[pos[k]].append((-e[k], k))
-            total += best_eleven({p: sorted(v) for p, v in by.items()})
-    return total
+            out[j] = best_eleven({p: sorted(v) for p, v in by.items()})
+    return out
+
+
+def points(pos: dict[str, str], cells: dict[int, dict[str, float]], squad: set[str],
+           js: set[int] | None = None) -> float:
+    """The best legal eleven's points over the jornadas (js: only these) of a squad."""
+    return sum(by_jornada(pos, cells, squad, js).values())
 
 
 def candidates(inp: Rows) -> Cands:
@@ -56,13 +62,17 @@ def candidates(inp: Rows) -> Cands:
         ratios.setdefault(k, []).append((r, w))
     bids = {k: [(a * r, w) for r, w in ratios.get(k, [(1.0, 1.0)])]
             for k, _, _, a, _ in inp["dec_player"] if a is not None and k in pos and k not in mine}
-    where = {k: {j for j, e in cells.items() if k in e} for k in pos}
+    locks: dict[int, str] = dict(inp.get("dec_lock", []))
+    closes: dict[str, str] = dict(inp.get("dec_close", []))
+    soon = min(locks.values(), default=None)      # a move with no auction is made by the next lock
     alone: list[tuple[Any, ...]] = []
-    for b in sorted(bids):
-        g = points(pos, cells, set(mine) | {b}, where[b]) - points(pos, cells, set(mine), where[b])
+    for b in sorted(bids):    # a buy counts for the jornadas that lock after his auction closes
+        where = {j for j in cells if in_force(locks, j, closes.get(b) or soon)}
+        g = points(pos, cells, set(mine) | {b}, where) - points(pos, cells, set(mine), where)
         alone += [(b, "", bid, win, None, g, win * g) for bid, win in bids[b]]
-    now = points(pos, cells, set(mine))
-    alone += [("", s, None, None, mine[s], g, g) for s in sorted(mine) for g in [points(pos, cells, set(mine) - {s}) - now]]
+    where = {j for j in cells if in_force(locks, j, soon)}
+    now = points(pos, cells, set(mine), where)
+    alone += [("", s, None, None, mine[s], g, g) for s in sorted(mine) for g in [points(pos, cells, set(mine) - {s}, where) - now]]
     return Cands(bids, alone)
 
 
@@ -95,6 +105,16 @@ def _selftest() -> None:
     sales = {a[1]: (a[4], a[5]) for a in candidates(rows(10e6, {})).alone if a[1]}
     assert sales["m4"] == (5e6, -2.0) and sales["k"][1] == -4.0, \
         "each sale alone from the squad as it is, what he brings and the points the eleven loses: m4 2, k 4 (one jornada, 11 players)"
+    two = rows(10e6, {"star": 8e6})
+    two["cell"] = [(k, j, v) for k, j, v in two["cell"] for j in (1, 2)]
+    flat = candidates(two).alone
+    two["dec_lock"] = [(1, "2026-11-06T20:00Z"), (2, "2026-11-13T20:00Z")]
+    two["dec_close"] = [("star", "2026-11-06T21:24Z")]
+    late = candidates(two).alone
+    assert [a[5] for a in flat if a[0]] == [12.0] and [a[5] for a in late if a[0]] == [6.0], \
+        "a buy closing after jornada 1's lock counts for jornada 2 only: your eleven is frozen at the lock"
+    sold = {a[1]: a[5] for a in late if a[1]}
+    assert sold["m4"] == -4.0, "a sale by the next lock counts for both jornadas"
     print("recommender self-test OK")
 
 

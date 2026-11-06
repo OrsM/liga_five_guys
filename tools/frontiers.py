@@ -39,7 +39,7 @@ NAMES = {
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_points season_record
-        club_fixture club_rating jornada_calendar kickoffs next_lock look
+        club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look
         listings listing_ends listing_close offers offer_ratios price_history price_paid auction_results
         squads owners cash standings league_config app_lineup lineup_snapshots""",  # app_lineup: the lineup facts, player resolved
     "forecast": "cell standin_cell market_daily forecast_e price_carry price_trend price_trend_daily",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read

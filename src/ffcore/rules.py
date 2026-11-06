@@ -90,6 +90,18 @@ DEBT_SHARE = 0.2  # bids may take you this share of your squad's value into debt
 def bid_limit(cash: float, team_value: float, debt: float = DEBT_SHARE) -> float:
     """What bids can total: your cash and the debt the game allows (debt, a share of your team's value)."""
     return cash + debt * team_value
+def in_force(locks: dict[int, str], jornada: int, due: str | None) -> bool:
+    """Whether a move made at due counts for a jornada: your eleven is frozen at its lock, so only a move made by
+    then does (the game's clock, YYYY-MM-DDTHH:MMZ). locks: each jornada still to lock, its lock. A jornada before
+    the first of them has locked already: nothing counts. One after the last has no lock known: every move counts,
+    and with no lock known at all, so does every move. A move with no time known counts wherever a lock is ahead."""
+    if not locks:
+        return True
+    if jornada < min(locks):
+        return False
+    return jornada not in locks or due is None or due <= locks[jornada]
+
+
 # Players a squad may hold, its bids in counted: the app refuses a bid past
 # it ("Bid or offer for more players is not allowed", 23 and a bid, 2026-10-30).
 SQUAD_MAX = 24
@@ -106,6 +118,11 @@ def _selftest() -> None:
     for cash in (-30e6, 0.0, 12e6):      # bids reach past your cash by the debt share of the team, never less, and grow with it
         assert bid_limit(cash, 0.0) == cash and bid_limit(cash, 100e6) == cash + DEBT_SHARE * 100e6
         assert bid_limit(cash, 50e6) < bid_limit(cash, 60e6) and bid_limit(cash, 50e6, 0.0) == cash
+    locks = {3: "2026-11-06T20:00Z", 4: "2026-11-13T20:00Z"}
+    assert [in_force(locks, j, "2026-11-06T21:24Z") for j in (2, 3, 4, 5)] == [False, False, True, True], \
+        "a buy closing after tonight's lock: not for the locked jornada, for the next; a locked one before it never"
+    assert [in_force(locks, j, "2026-11-06T20:00Z") for j in (3, 4)] == [True, True], "due at the lock still counts"
+    assert in_force(locks, 3, None) and in_force({}, 3, "2026-11-06T21:24Z"), "no time or no lock known: counts"
     assert slot("Centrocampista") == slot("mediocampista") == slot("MED") == "MED"
     assert slot(None) == slot("") == slot("utillero") == "", "unknown is empty, never guessed"
     assert POSITIONS == ("POR", "DEF", "MED", "DEL")

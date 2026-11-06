@@ -11,7 +11,7 @@ What the Decision keeps per run (all in its tables, all read as they are):
 |---|---|---|
 | order (`ord`), `cash_then` | `decision_plan` | in what order, and the cash each step leaves |
 | `due`, `why` | `decision_plan` (`decision.schedule`) | by when each step must be done and what sets it: the auction closes, after the auctions, before the lock |
-| blockers | `decision_blocker` (`decision.after`) | what stops you if you do nothing, and if you do the plan: debt at the lock, no eleven, squad over the cap |
+| blockers | `decision_blocker` (`decision.after`) | what stops you if you do nothing, and if you do the plan: debt at a jornada's lock (the moves made by it) or once all are made, no eleven, squad over the cap |
 | skip | `decision_skip` | what skipping one step leaves, judged alone |
 | sale assessment | `decision_sale` | offer against paid, against the usual, the chance a better one comes |
 
@@ -50,7 +50,7 @@ offers; field the best eleven; watch rivals; know whether it worked. The page's 
 | U3 | a move's effect | cash and points per move are in (`decision_flip`, `evaluate`); the chance of first per move is open |
 | U4 | no way to say "not this one" | open: item 3 above |
 | U5 | facts formatted (`sd`, counts) | done: one `show` for every unit |
-| U6 | the eleven as a pitch | open (the warning to field the best eleven is in) |
+| U6 | the eleven as a pitch | done (`board_squad`, the page's "Your eleven") |
 | U7 | open bids marked on their buy line; lost bids told | open: lost bids |
 | U8 | the cash path against the debt limit | partly: per-step cash |
 | U9 | confirm sheet with cash after and chance | open |

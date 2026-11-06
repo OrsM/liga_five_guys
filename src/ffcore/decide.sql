@@ -16,7 +16,7 @@
 -- The plan: the recommender (src/recommender.py) picks the buys, a loop
 -- over the purchases by worth per euro of bid, each valued again once the
 -- one before is in; the plan funds them (src/decision.py plan_rows): where
--- cash at the lock would be below zero, sales until it is zero or more (one
+-- cash at a lock would be below zero, sales until it is zero or more (one
 -- that loses nothing; else the one that clears it alone for the fewest
 -- points; else the fewest points per euro), and no buy that the sales cost
 -- more points than it gains. In debt with no buy: the same sales.
@@ -56,8 +56,10 @@ CREATE TABLE IF NOT EXISTS dec_close (
     player TEXT PRIMARY KEY,
     close  TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS dec_lock (
-    lock TEXT NOT NULL
+DROP TABLE IF EXISTS dec_lock;
+CREATE TABLE dec_lock (
+    jornada INTEGER PRIMARY KEY,
+    lock    TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS dec_money (
     cash       REAL NOT NULL,
@@ -97,14 +99,15 @@ DROP VIEW IF EXISTS dec_odds_seen;
 CREATE VIEW dec_odds_seen AS
 SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN look l ON o.cut = l.cut AND o.variant = l.variant;
 
--- When each market player's auction closes (the game's listings, the last close seen), and the lock the
--- cash is due by (ingest's next_lock), as the game's clock; the plan's steps are due by them (decision.schedule).
+-- When each market player's auction closes (the game's listings, the last close seen), and when each jornada
+-- still to lock does (ingest's round_locks), as the game's clock; the plan's steps are due by them
+-- (decision.schedule) and count for a jornada if made by its lock (rules.in_force).
 DROP VIEW IF EXISTS dec_close_seen;
 CREATE VIEW dec_close_seen AS
 SELECT player, strftime('%Y-%m-%dT%H:%MZ', t) AS close FROM listing_close;
 DROP VIEW IF EXISTS dec_lock_seen;
 CREATE VIEW dec_lock_seen AS
-SELECT strftime('%Y-%m-%dT%H:%MZ', t) AS lock FROM next_lock WHERE t IS NOT NULL;
+SELECT jornada, strftime('%Y-%m-%dT%H:%MZ', stamp_jd(lock)) AS lock FROM round_locks WHERE lock > (SELECT cut());
 
 -- The bids you have placed, as seen.
 DROP VIEW IF EXISTS dec_bid_seen;

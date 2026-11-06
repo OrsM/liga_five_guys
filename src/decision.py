@@ -14,9 +14,8 @@ from itertools import combinations, product
 from typing import Any, Callable, NamedTuple
 
 from ffcore.db import connect, rows
-from ffcore.rules import DEBT_SHARE, bid_limit, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
-from recommender import candidates, cells_of
-from recommender import points as eleven_points
+from ffcore.rules import DEBT_SHARE, bid_limit, in_force, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
+from recommender import by_jornada, candidates, cells_of
 
 __all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
 
@@ -69,14 +68,26 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     js = sorted({j for _, j in e})
     limit = bid_limit(cash, team_value, debt)
 
-    @lru_cache(maxsize=None)
-    def pts(squad: frozenset[str]) -> float:
-        return eleven_points(pos, cells, set(squad))
+    locks, closes = dict(inp.get("dec_lock", [])), dict(inp.get("dec_close", []))
+    soon = min(locks.values(), default=None)
 
-    def lose(squad: frozenset[str]) -> Callable[[frozenset[str]], float]:
-        """lost(R) for cover: the points the squad loses without R; no eleven to field is a loss without end."""
+    @lru_cache(maxsize=None)
+    def pts(squad: frozenset[str]) -> dict[int, float]:
+        return by_jornada(pos, cells, set(squad))
+
+    def span(squad: frozenset[str], due: str | None) -> float:
+        """The squad's points in the jornadas that lock after due: what a move made then can change."""
+        return sum(v for j, v in pts(squad).items() if in_force(locks, j, due))
+
+    def sale_when(buys: list[tuple[str, float, float]]) -> Due:
+        due = [closes.get(b) or soon for b, *_ in buys]
+        return sale_due(cash, [(bid, d) for (_, bid, _), d in zip(buys, due)], max((d for d in due if d), default=soon), soon)
+
+    def lose(squad: frozenset[str], due: str | None) -> Callable[[frozenset[str]], float]:
+        """lost(R) for cover: the points the squad loses without R in the jornadas a sale made at due reaches; no
+        eleven to field is a loss without end."""
         have = Counter(pos[k] for k in squad if k in pos)
-        return lambda R: pts(squad) - pts(squad - R) if can_field(have - Counter(pos[k] for k in R if k in pos)) else float("inf")
+        return lambda R: span(squad, due) - span(squad - R, due) if can_field(have - Counter(pos[k] for k in R if k in pos)) else float("inf")
 
     def total(steps: list[tuple[Any, ...]]) -> float:
         return worth_on(inp, steps, e, js, pts)[1]
@@ -86,13 +97,15 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
         squad lacks room beside the buys (made once the bid is won, the least lost first), the rest each a step of
         their own."""
         here = frozenset(mine) | {k for k, *_ in buys}
-        order = sorted(sold, key=lambda k: (pts(here) - pts(here - {k}), k))
+        due = sale_when(buys).due
+        order = sorted(sold, key=lambda k: (span(here, due) - span(here - {k}, due), k))
         room = max(len(here) - squad_max, 0)
         steps: list[tuple[Any, ...]] = []
         for n, (k, bid, win) in enumerate(buys):
-            steps.append((n, "buy", k, bid, win, win * (pts(frozenset(mine) | {k}) - pts(frozenset(mine)))))
+            when = closes.get(k) or soon
+            steps.append((n, "buy", k, bid, win, win * (span(frozenset(mine) | {k}, when) - span(frozenset(mine), when))))
         for n, s in enumerate(order):
-            steps.append((n if n < room else len(buys) + n - room, "sell", s, mine[s], 1.0, pts(here - {s}) - pts(here)))
+            steps.append((n if n < room else len(buys) + n - room, "sell", s, mine[s], 1.0, span(here - {s}, due) - span(here, due)))
             here = here - {s}
         return steps
 
@@ -100,6 +113,7 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     # the sales that pay for them (cover), the whole mix judged once by worth_on. A mix cannot gain more than its
     # buys do alone (a sale never raises the eleven, and a buy adds less once another is in), which prunes the sets.
     most = 3
+    sets_for = lru_cache(maxsize=None)(lambda here, due: sale_sets(lru_cache(maxsize=None)(lose(here, due)), mine, len(here) - squad_max))
     worth = {(a, bid, win): w for a, s, bid, win, _, _, w in cands.alone if a}
     alone = {b: max(w for (a, *_), w in worth.items() if a == b) for b in cands.bids}
     wanted = sorted((b for b in alone if alone[b] > 0), key=lambda b: (-alone[b], b))
@@ -110,13 +124,12 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
             if best and sum(alone[b] for b in B) <= best[0] + 1e-9:
                 continue
             here = frozenset(mine) | set(B)
-            sets = sale_sets(lru_cache(maxsize=None)(lose(here)), mine, len(here) - squad_max)  # for every bid on these buys
             for bids in product(*(cands.bids[b] for b in B)):
                 spend = sum(bid for bid, _ in bids)
                 buys = [(b, bid, win) for b, (bid, win) in zip(B, bids)]
                 if spend > limit or best and sum(worth[buy] for buy in buys) <= best[0] + 1e-9:
                     continue
-                for R in cover(sets, spend - cash):
+                for R in cover(sets_for(here, sale_when(buys).due), spend - cash):
                     steps = moves(buys, R)
                     gain = total(steps) - floor
                     if best is None or gain > best[0] + 1e-9:
@@ -126,32 +139,33 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
 
 
 def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], real: dict[tuple[str, int], float],
-             js: list[int], score: Callable[[frozenset[str]], float] | None = None) -> tuple[float, float]:
+             js: list[int], score: Callable[[frozenset[str]], dict[int, float]] | None = None) -> tuple[float, float]:
     """The measure: the real points (real: (player, jornada) -> points, 0 if
     he did not play) of the best eleven of the squad over the jornadas js:
     as it stands (inp's dec_player), and once the plan's steps are made,
-    each step's change counted at its win chance as the plan's worth does. score: a squad's best eleven over js, if
-    the caller has it (and has it cached); else made here from real."""
+    each step's change counted at its win chance as the plan's worth does. A step counts only for the jornadas
+    that lock after it is made (rules.in_force: your eleven is frozen at the lock). score: a squad's best eleven in
+    each jornada, if the caller has it (and has it cached); else made here from real."""
     pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
-    squad = {k for k, _, m, *_ in inp["dec_player"] if m}
-
+    squad = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
+    locks = dict(inp.get("dec_lock", []))
+    due = schedule(inp, steps)
     played = {j: {k: real.get((k, j), 0.0) for k in pos} for j in js}     # 0 if he did not play
 
-    def points(sq: set[str]) -> float:
-        return score(frozenset(sq)) if score else eleven_points(pos, played, sq)
-    floor = here = points(squad)
-    total = floor
+    @lru_cache(maxsize=None)
+    def points(sq: frozenset[str]) -> dict[int, float]:
+        return score(sq) if score else by_jornada(pos, played, set(sq))
+    squads = {j: squad for j in js}
+    total = floor = sum(points(squad)[j] for j in js)
     for group in in_groups(inp, steps):
-        win = 1.0
-        for _, kind, k, _, w, _ in group:
+        win, before = 1.0, {j: points(sq)[j] for j, sq in squads.items()}
+        for step, kind, k, _, w, _ in group:
             if kind == "buy":
-                squad.add(k)
                 win = 1.0 if w is None else w
-            else:
-                squad.discard(k)
-        now = points(squad)
-        total += win * (now - here)
-        here = now
+            for j in js:
+                if in_force(locks, j, due[step, kind].due):
+                    squads[j] = squads[j] | {k} if kind == "buy" else squads[j] - {k}
+        total += win * sum(points(sq)[j] - before[j] for j, sq in squads.items())
     return floor, total
 
 
@@ -183,19 +197,26 @@ class Due(NamedTuple):
 AFTER_AUCTIONS = "after the auctions"
 
 
+def sale_due(cash: float, buys: list[tuple[float, str | None]], closes_last: str | None, lock: str | None) -> Due:
+    """When a sale is due. With bids: after the last of their auctions, once you know they are won (a sale made for
+    a bid then lost is a player gone for nobody; the game still buys him at his value after the auctions), unless
+    the bids closing by the next lock leave the cash below zero there: then by the lock. With no bid: by the lock.
+    buys: each bid with when its auction closes."""
+    if buys and (lock is None or cash - sum(a for a, due in buys if due is not None and due <= lock) >= 0):
+        return Due(closes_last, AFTER_AUCTIONS)
+    return Due(lock, "before the lock")
+
+
 def schedule(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> dict[tuple[int, str], Due]:
-    """When each step of the plan is due, by (step, kind). A buy: when his auction closes. A sale, when the plan
-    bids: after the last of its auctions, once you know they are won (a sale made for a bid then lost is a player
-    gone for nobody; the game still buys him at his value after the auctions). A sale with no bid: before the
-    lock, the last moment the cash counts. inp: dec_close (player, close) and dec_lock (lock), each as it is
-    known."""
+    """When each step of the plan is due, by (step, kind). A buy: when his auction closes. A sale: sale_due. inp:
+    dec_close (player, close), dec_lock (jornada, lock) and dec_money, each as it is known."""
     closes = dict(inp.get("dec_close", []))
-    lock = next((at for (at,) in inp.get("dec_lock", [])), None)
-    buys = {k: Due(closes.get(k) or lock, "auction closes" if closes.get(k) else "before the lock")
-            for _, kind, k, *_ in steps if kind == "buy"}
-    last = max((d.due for d in buys.values() if d.due), default=lock)
-    return {(step, kind): buys[k] if kind == "buy" else Due(last, AFTER_AUCTIONS) if buys else Due(lock, "before the lock")
-            for step, kind, k, *_ in steps}
+    lock = min((at for _, at in inp.get("dec_lock", [])), default=None)
+    buys = {k: (a, Due(closes.get(k) or lock, "auction closes" if closes.get(k) else "before the lock"))
+            for _, kind, k, a, *_ in steps if kind == "buy"}
+    last = max((d.due for _, d in buys.values() if d.due), default=lock)
+    sell = sale_due(inp["dec_money"][0][0] if inp.get("dec_money") else 0.0, [(a, d.due) for a, d in buys.values()], last, lock)
+    return {(step, kind): buys[k][1] if kind == "buy" else sell for step, kind, k, *_ in steps}
 
 
 def in_order(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
@@ -224,37 +245,53 @@ def fieldable(pos: dict[str, str], squad: set[str] | frozenset[str]) -> bool:
 
 class After(NamedTuple):
     cash_then: list[float]                      # the cash each step leaves, in the plan's order
-    cash: float                                 # at the lock
-    squad: set[str]
+    cash: float                                 # once every step is made
+    squad: set[str]                             # the same
     blockers: list[tuple[str, float | None]]    # (blocker, amount), what stops you
 
 
 def after(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], won: dict[str, float] | None = None) -> After:
-    """The cash and squad once steps (dec_plan rows) are made, every buy won, and what stops you there. won: bids
-    placed (player -> amount) taken as won beside the steps' buys, one the steps buy too counted once. cash_then:
-    the cash each step leaves running from today's, in the plan's order (step, a buy before a sale). Blockers
-    (blocker, amount): 'debt' (cash below zero at the lock: the matchday scores 0; amount the cash), 'eleven' (no
-    formation can be fielded from the squad), 'squad' (players over the cap, amount how many)."""
+    """The cash and squad once steps (dec_plan rows) are made, every buy won, and what stops you. won: bids placed
+    (player -> amount) taken as won beside the steps' buys, one the steps buy too counted once. cash_then: the cash
+    each step leaves running from today's, in the plan's order (step, a buy before a sale). Blockers (blocker,
+    amount): 'debt' (cash below zero at a jornada's lock, counting the steps made by it, or once all are made: the
+    matchday scores 0; amount the lowest), 'eleven' (no formation can be fielded from the squad then), 'squad'
+    (players over the cap once all are made, amount how many)."""
     (cash, _, _, squad_max, _), = inp["dec_money"]
     pos = {k: p for k, p, *_ in inp["dec_player"]}
+    closes, locks = dict(inp.get("dec_close", [])), dict(inp.get("dec_lock", []))
+    soon = min(locks.values(), default=None)
     squad = {k for k, _, m, *_ in inp["dec_player"] if m}
-    here, then = cash, []
-    for _, kind, k, amount, *_ in in_order(inp, steps):
+    due = schedule(inp, steps)
+    # every move as (when, buy?, player, amount): the plan's steps, then the bids placed beside them
+    moves = [(due[step, kind].due, kind == "buy", k, amount) for step, kind, k, amount, *_ in in_order(inp, steps)]
+    moves += [(closes.get(k) or soon, True, k, amount) for k, amount in (won or {}).items()
+              if not any(m[1] and m[2] == k for m in moves)]
+
+    def position(lock: str | None = None) -> tuple[float, set[str]]:
+        """Cash and squad with the moves made by the lock (all of them if none)."""
+        here, sq = cash, set(squad)
+        for when, buy, k, amount in moves:
+            if lock is None or when is None or when <= lock:
+                here += -amount if buy else amount
+                sq = sq | {k} if buy else sq - {k}
+        return here, sq
+
+    then, here = [], cash
+    for _, kind, _, amount, *_ in in_order(inp, steps):
         here += -amount if kind == "buy" else amount
-        squad = squad | {k} if kind == "buy" else squad - {k}
         then.append(here)
-    for k, amount in (won or {}).items():
-        if k not in squad:
-            here -= amount
-            squad = squad | {k}
+    final = position()
+    seen = [position(lock) for lock in sorted(locks.values())] + [final]
+    low = min(c for c, _ in seen)
     out: list[tuple[str, float | None]] = []
-    if here < 0:
-        out.append(("debt", here))
-    if not fieldable(pos, squad):
+    if low < 0:
+        out.append(("debt", low))
+    if not all(fieldable(pos, sq) for _, sq in seen):
         out.append(("eleven", None))
-    if len(squad) > squad_max:
-        out.append(("squad", float(len(squad) - squad_max)))
-    return After(then, here, squad, out)
+    if len(final[1]) > squad_max:
+        out.append(("squad", float(len(final[1]) - squad_max)))
+    return After(then, final[0], final[1], out)
 
 
 def without(steps: list[tuple[Any, ...]], kind: str, player: str) -> list[tuple[Any, ...]]:
@@ -608,8 +645,47 @@ def _selftest() -> None:
             assert vs > 0 and abs(sd - math.sqrt((1 + s * s) * vs + s * s * e2)) < 1e-9, \
                 "a jornada's variance: (1 + share^2) x the cells' + share^2 x the squares of their e (the persistent share)"
     _selftest_blockers()
+    _selftest_ledger()
     _selftest_search()
     print("decision self-test OK")
+
+
+def _selftest_ledger() -> None:
+    """Your eleven is frozen at a jornada's lock: a move counts for the jornadas that lock after it is made.
+    Jornada 1 locks tonight, jornada 2 next week; the star's auction closes after tonight's lock."""
+    lock1, lock2, late = "2026-11-06T20:00Z", "2026-11-13T20:00Z", "2026-11-06T21:24Z"
+    layout = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED",
+              "f1": "DEL", "f2": "DEL", "f3": "DEL"}
+    e = {**{k: 1.0 if p != "DEF" else 4.0 for k, p in layout.items()}, "z_now": 9.0, "a_later": 9.0, "star": 8.0}
+    gone = {("z_now", 2), ("a_later", 1)}        # z_now plays tonight only, a_later next week only
+    sq = {**layout, "z_now": "DEF", "a_later": "DEF"}
+    inp: dict[str, list[tuple[Any, ...]]] = {
+        "dec_player": [(k, p, 1, None, 5e6 if p == "DEF" else 0.5e6) for k, p in sq.items()] + [("star", "MED", 0, 5e6, None)],
+        "dec_odds": [], "dec_bid": [], "dec_money": [(0.2e6, 5e6 * len(sq), DEBT_SHARE, SQUAD_MAX, XI_SIZE)],
+        "dec_lock": [(1, lock1), (2, lock2)], "dec_close": [("star", late)],
+        "cell": [(k, j, 0.0 if (k, j) in gone else v) for j in (1, 2) for k, v in e.items()]}
+    real = {(k, j): v for k, j, v in inp["cell"]}
+    buy_star, sell = (0, "buy", "star", 5e6, 1.0, 0.0), lambda k: (0, "sell", k, 5e6, 1.0, 0.0)
+    floor, ours = worth_on(inp, [buy_star], real, [1, 2])
+    assert ours - floor == 7.0, "a buy closing after tonight's lock counts for jornada 2 only: 8 for a 1"
+    assert worth_on(inp, [buy_star, sell("z_now")], real, [1, 2])[1] - floor == 7.0, \
+        "a sale after the auctions keeps him for tonight; he scores nothing next week: free"
+    assert worth_on(inp, [buy_star, sell("a_later")], real, [1, 2])[1] - floor < 0.0, "next week's scorer: the sale costs"
+    flat = {k: v for k, v in inp.items() if k != "dec_lock"}
+    assert worth_on(flat, [buy_star, sell("z_now")], real, [1, 2])[1] - floor < 7.0, \
+        "without the locks every move counts everywhere: his sale costs tonight's points too"
+    steps, _ = plan_rows(inp)
+    assert [(kind, k) for _, kind, k, *_ in steps] == [("buy", "star"), ("sell", "z_now")], \
+        "the buy is paid for by the sale that costs the fewest points in the jornadas it reaches"
+    due = schedule(inp, steps)
+    assert due[0, "buy"].due == late and due[1, "sell"] == Due(late, AFTER_AUCTIONS), "cash at the lock is fine: sell after"
+    assert after(inp, steps).blockers == [] and after(inp, [buy_star]).blockers == [("debt", 0.2e6 - 5e6)], \
+        "bought and not paid for: owed once the auction is won, not at tonight's lock"
+    tight = {**inp, "dec_close": [("star", "2026-11-05T22:24Z")]}
+    assert schedule(tight, [buy_star, sell("z_now")])[0, "sell"] == Due(lock1, "before the lock") and \
+        after(tight, [buy_star]).blockers == [("debt", 0.2e6 - 5e6)], \
+        "a bid closing before the lock is charged to it: the sale that pays for it is due by the lock"
+    print("ledger self-test OK")
 
 
 def _selftest_search() -> None:
@@ -629,6 +705,9 @@ def _selftest_search() -> None:
         inp: dict[str, list[tuple[Any, ...]]] = {"dec_player": [(k, p, 1, None, got[k]) for k, p in own.items()] + [(k, p, 0, ask[k], None) for k, p in offer.items()],
                "dec_odds": [], "dec_money": [(cash, sum(got.values()), DEBT_SHARE, SQUAD_MAX, XI_SIZE)],
                "cell": [(k, j, e[k]) for j in (1, 2, 3) for k in e]}
+        if rng.random() < 0.6:    # half of the leagues with locks: jornada 1 locks tonight, the auctions close either side
+            inp["dec_lock"] = [(1, "2026-11-06T20:00Z"), (2, "2026-11-13T20:00Z")]
+            inp["dec_close"] = [(k, rng.choice(["2026-11-06T18:00Z", "2026-11-06T21:24Z"])) for k in offer]
 
         def mix(buys: tuple[str, ...], sells: tuple[str, ...]) -> list[tuple[Any, ...]]:
             return [(n, "buy" if n < len(buys) else "sell", k, (ask if n < len(buys) else got)[k], 1.0, 0.0)
@@ -709,19 +788,28 @@ def _selftest_blockers() -> None:
     lock = "2026-11-06T20:00Z"
     swap = [(0, "buy", "a", 5e6, 1.0, 1.0), (0, "sell", "x", 5e6, 1.0, 0.0), (1, "buy", "b", 4e6, 1.0, 1.0)]
     for ca, cb in (("2026-11-04T22:24Z", "2026-11-05T22:24Z"), ("2026-11-05T22:24Z", "2026-11-04T22:24Z")):
-        sched: dict[str, list[tuple[Any, ...]]] = {"dec_close": [("a", ca), ("b", cb)], "dec_lock": [(lock,)]}
+        sched: dict[str, list[tuple[Any, ...]]] = {"dec_close": [("a", ca), ("b", cb)], "dec_lock": [(1, lock)],
+                                                   "dec_money": [(20e6, 0.0, 0.0, SQUAD_MAX, XI_SIZE)]}
         due = schedule(sched, swap)
         assert due[0, "buy"] == Due(ca, "auction closes") and due[1, "buy"] == Due(cb, "auction closes")
         assert due[0, "sell"] == Due(max(ca, cb), AFTER_AUCTIONS), "a sale: after the last auction, once the bids are won"
         order = [(k, kind) for _, kind, k, *_ in in_order(sched, swap)]
         assert order[:2] == sorted([("a", "buy"), ("b", "buy")], key=lambda x: {"a": ca, "b": cb}[x[0]]) and order[2] == ("x", "sell"), order
-    assert schedule({"dec_lock": [(lock,)]}, [(0, "sell", "x", 1e6, 1.0, 0.0)])[0, "sell"] == Due(lock, "before the lock")
+    assert schedule({"dec_lock": [(1, lock)]}, [(0, "sell", "x", 1e6, 1.0, 0.0)])[0, "sell"] == Due(lock, "before the lock")
+    # The sale beside a bid waits for the auctions unless the bids closing by the lock leave the cash short there.
+    late = "2026-11-06T21:24Z"
+    for cash, close, want in ((0.2e6, late, Due(late, AFTER_AUCTIONS)), (0.2e6, "2026-11-05T22:24Z", Due(lock, "before the lock")),
+                              (9e6, "2026-11-05T22:24Z", Due("2026-11-05T22:24Z", AFTER_AUCTIONS))):
+        due = schedule({"dec_close": [("a", close)], "dec_lock": [(1, lock)], "dec_money": [(cash, 0.0, 0.0, SQUAD_MAX, XI_SIZE)]},
+                       [(0, "buy", "a", 5e6, 1.0, 1.0), (0, "sell", "x", 5e6, 1.0, 0.0)])
+        assert due[0, "sell"] == want, (cash, close, due[0, "sell"])
     assert schedule({}, swap)[0, "buy"] == Due(None, "before the lock"), "nothing known: no time, not a guess"
     assert [k for _, _, k, *_ in in_order({}, swap)] == ["a", "b", "x"], "no times: the buys by step, then the sale made after them"
 
     # The groups: every step once, a pair together, the groups in in_order's order, for any closes.
     for ca, cb in (("2026-11-04T22:24Z", "2026-11-05T22:24Z"), ("2026-11-05T22:24Z", "2026-11-04T22:24Z")):
-        sched2: dict[str, list[tuple[Any, ...]]] = {"dec_close": [("a", ca), ("b", cb)], "dec_lock": [(lock,)]}
+        sched2: dict[str, list[tuple[Any, ...]]] = {"dec_close": [("a", ca), ("b", cb)], "dec_lock": [(1, lock)],
+                                                    "dec_money": [(20e6, 0.0, 0.0, SQUAD_MAX, XI_SIZE)]}
         groups = in_groups(sched2, swap)
         assert sorted(s for g in groups for s in g) == sorted(swap) and all(len({s[0] for s in g}) == 1 for g in groups)
         firsts = [in_order(sched2, swap).index(g[0]) for g in groups]
