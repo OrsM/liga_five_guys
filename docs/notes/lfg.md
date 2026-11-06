@@ -169,7 +169,7 @@ Rule for each: the page decides nothing; any new number is a column from Decisio
 2. ~~Confirm sheet (U9)~~ done 2026-11-06: the confirm says points and cash after, from the board's numbers.
 
 **Then: make the plan more right**
-4. Offer-lapse policy (6.1), lost bids as a branch, a cap on pending bids.
+4. Offer-lapse risk (6.1): the lock's cash check uses a lower quantile of the waiting offer. Checked in the code 2026-11-06: lost bids are already a branch in `worth_on` (won/lost squads) and `after` already counts every bid as won for cash and the cap.
 5. Search caps (3 buys, 10/4 shortlist) with a time budget; test first, profile before commit. Then the board price view
    (cash at each jornada start, bid against asking, points per euro, needed against optional sale).
 6. Relist against wait; unlisted players' proceeds in the plan.
