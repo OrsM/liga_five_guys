@@ -166,7 +166,7 @@ Rule for each: the page decides nothing; any new number is a column from Decisio
 1. The plan block as one compact table (one row per move: action and price, points, "plan without it" column with red
    blocker, bid chips, a small x for hold; facts behind a tap; head as one dense line). Points only: chance of first
    per move was considered and dropped 2026-11-06 (too complex, forecasts too noisy). Check with `shot`.
-2. 2. Confirm sheet (U9): before a bid or an accepted offer, cash after and points.
+2. Confirm sheet (U9): before a bid or an accepted offer, cash after and points.
 
 **Then: make the plan more right**
 4. Offer-lapse policy (6.1), lost bids as a branch, a cap on pending bids.
