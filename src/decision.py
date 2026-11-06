@@ -17,7 +17,7 @@ from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, bid_limit, in_force, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
 from recommender import by_jornada, candidates, cells_of
 
-__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN"]
+__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN", "READ"]
 
 INPUTS = ("dec_hold", "dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_plan", "dec_start")
 
@@ -381,8 +381,8 @@ def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
     return read_made()
 
 
-# What plan_rows reads: every input its choice depends on (the jornadas' locks, the closes, the offers, the holds too).
-READ = ("dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_hold", "cell")
+# What plan_rows reads: every input inputs() makes (not the plan it writes, the state it fixes) and the cells.
+READ = tuple(t for t in INPUTS if t not in ("dec_state", "dec_plan", "dec_start")) + ("cell",)
 
 
 def read_made(only: tuple[str, ...] = READ) -> dict[str, list[tuple[Any, ...]]]:
@@ -480,7 +480,7 @@ def record(run: int) -> list[tuple[Any, ...]]:
     with closing(connect()) as db, db:
         db.execute(STANDINGS, (run,))
     acts = plan()
-    inp = read_made(("dec_player", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "cell"))
+    inp = read_made()
     (cash, team_value, debt, _, _), = inp["dec_money"]
     placed = dict(inp["dec_bid"])
     planned = after(inp, acts)
@@ -675,8 +675,6 @@ def _selftest() -> None:
     _selftest_blockers()
     _selftest_ledger()
     _selftest_search()
-    assert set(INPUTS) - {"dec_state", "dec_plan", "dec_start"} <= set(READ), \
-        "the plan reads every input inputs() makes: one left out plans without it (the locks were, until 2026-11-06)"
     print("decision self-test OK")
 
 

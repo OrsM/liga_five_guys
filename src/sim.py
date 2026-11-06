@@ -145,7 +145,7 @@ def _selftest() -> None:
                     db.executemany("INSERT INTO dec_plan VALUES (?, ?, ?, ?, ?, ?)",
                                    [(i, *p) for i, p in enumerate(plan)])
                     db.execute(decision.KEEP_PLAN, (7,))
-                    inp = decision.read_made(("dec_player", "dec_money", "dec_bid", "dec_close", "dec_lock"))
+                    inp = decision.read_made(tuple(t for t in decision.READ if t != "cell"))
                     steps = db.execute("SELECT * FROM dec_plan").fetchall()
                     decision.stamp_plan(db, 7, inp, steps, decision.after(inp, steps).cash_then)
                 db.execute("UPDATE decision_option SET in_plan = EXISTS (SELECT 1 FROM decision_plan p"
