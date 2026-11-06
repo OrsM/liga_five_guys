@@ -1608,6 +1608,17 @@ SELECT p.*, coalesce(f.name, p.player) AS name, coalesce(f.pos, '') AS pos,
        coalesce(f.fetches = f.offer, 0) AS takes
 FROM decision_players p JOIN board_run USING (run_id) LEFT JOIN decision_facts f USING (run_id, player);
 
+-- Your squad as the page draws it, the eleven first (best of each line, as the app lines them up), then the
+-- bench: each one's points next jornada (decision_players), whether he is in the eleven, and whether the plan
+-- sells him (decision_plan). The eleven here is board_eleven's, from the same rows.
+DROP VIEW IF EXISTS board_squad;
+CREATE VIEW board_squad AS
+SELECT row_number() OVER (ORDER BY NOT p.xi, CASE p.pos WHEN 'POR' THEN 0 WHEN 'DEF' THEN 1 WHEN 'MED' THEN 2 ELSE 3 END,
+                          -p.next, p.player) - 1 AS ord,
+       p.name, p.pos, p.next, p.xi,
+       p.player IN (SELECT d.player FROM decision_plan d WHERE d.run_id = p.run_id AND d.kind = 'sell') AS sold
+FROM board_players p WHERE p.mine;
+
 -- Every buy the last run valued (decision_option: each player on the
 -- market you could get), with what the run saw of him: what he is listed at
 -- (asking), the bid (the plan's, or the lowest his odds offer) and its
@@ -1977,6 +1988,9 @@ SELECT json_object(
                                                       'amount', amount) ORDER BY ord) FROM board_blockers),
     'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
                                         ORDER BY ord) FROM board_clauses),
+    'squad', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'next', next,
+                  'xi', json(CASE WHEN xi THEN 'true' ELSE 'false' END),
+                  'sold', json(CASE WHEN sold THEN 'true' ELSE 'false' END)) ORDER BY ord) FROM board_squad),
     'standings', (SELECT json_group_array(json_object(
                       'manager', manager, 'me', json(CASE WHEN me THEN 'true' ELSE 'false' END),
                       'now', now, 'lo', lo, 'hi', hi, 'cash', cash,

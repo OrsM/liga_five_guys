@@ -543,6 +543,10 @@ def _selftest_board_contract() -> None:
             and sell["flip"] == {"cash": 6e6, "points": -1.0, "blockers": []}, \
             "what flipping each move leaves: its cash, points and what stops you, worded once (decision_flip)"
         assert board_doc()["plan_flip"] == {"cash": 3e6, "points": 4.0, "blockers": []}, "the plan's own, to read a flip against"
+        assert board_doc()["squad"] == [
+            {"name": "Beto", "pos": "DEF", "next": 3.0, "xi": True, "sold": False},
+            {"name": "Ana", "pos": "MED", "next": 1.0, "xi": False, "sold": True}], \
+            "your squad, the eleven first: each one's points next jornada, in the eleven or not, and whether the plan sells him"
         assert [(d["detail"]["due"], d["detail"]["why"]) for d in (buy, sell)] == [
             ("2026-11-04T22:24Z", "auction closes"), ("2026-11-06T20:00Z", "before the lock")], \
             "each step carries when it is due and what sets it (decision_plan)"
