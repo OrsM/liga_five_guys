@@ -129,8 +129,17 @@ golden compares decisions exactly and floats with `isclose`. Pages stay one rend
   the club's first jornada: 61 players, 14% of graded error); ABSENT_START 15 -> 2 (1.8% of 4192 cells played).
   Measured and not done: home/away edge (goals 1.44x but points 1.13x; a 6% edge cuts RMSE 3.626 -> 3.616, goalkeepers
   worse); shrinking the start % toward the base rate by distance (helps only from 3 jornadas out, by under 1.5% Brier).
-  Open, needs its formulation agreed first: shrinking a move's gain for selection (plan buys of 3+ points earn about 19%
-  less than predicted, sales about 54% less: from grade_decisions, not re-checked).
+  Second audit (grading, price, plan gain, money; each claim re-measured): the earlier 'plan moves lose 19-54%' was the
+  price columns, not points, and 231 distinct moves not 21119 rows (about 3 players behind the sales gap); in points plan
+  buys 16.9 pred vs 16.4 real, sales -13.2 vs -11.9. Real wrong logic found: a move's gain was computed three ways (buys
+  alone, sales in sequence, the plan once by `worth_on`) and they disagreed by 10% on runs with overlapping buys. Fixed:
+  `plan_rows` stamps each step with its marginal, plan less plan without it, from `worth_on` alone (selftest: for any
+  plan, step worth == that difference). Open: (1) the grader scores raw player points, not the team's gain with the lock
+  rule and bid wins, and repeats the same moves across runs; (2) `recent_offers` orders by created_at, ratio so its 50-row
+  cut keeps the highest of the oldest batch (mean 1.008 vs 0.9975: `waiting` about 0.9% high, flips 2 marginal sales);
+  (3) the trend term in `waiting` is fitted and scored on the same days (4 of 17 take-or-wait choices turn on it);
+  (4) a later move assumes every earlier uncertain bid was won. Bid win chances (941 auctions) and offer sizes (553, sd
+  0.056) are calibrated.
 - **Constants:** `PERSISTENT_SHARE`, `CONFIDENCE` etc. set vs measured (0.08 vs 0.087; 0.70 vs 0.719).
 
 ## 5. The reasoning behind the plan [plan, gain]

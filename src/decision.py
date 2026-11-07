@@ -103,19 +103,16 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     def moves(buys: list[tuple[str, float, float]], sold: frozenset[str]) -> list[tuple[Any, ...]]:
         """The steps of one choice from the squad as it is: each buy (player, bid, win) a step; as many sales as the
         squad lacks room beside the buys (made once the bid is won, the least lost first), the rest each a step of
-        their own."""
+        their own. A step's worth is left to the chosen plan: its marginal by worth_on, the one measure."""
         here = frozenset(mine) | {k for k, *_ in buys}
         base = sale_when(buys)
         order = sorted(sold, key=lambda k: (span(here, base.due) - span(here - {k}, base.due), k))
         room = max(len(here) - squad_max, 0)
         steps: list[tuple[Any, ...]] = []
         for n, (k, bid, win) in enumerate(buys):
-            when = closes.get(k) or soon
-            steps.append((n, "buy", k, bid, win, win * (span(frozenset(mine) | {k}, when) - span(frozenset(mine), when))))
+            steps.append((n, "buy", k, bid, win, 0.0))
         for n, s in enumerate(order):
-            due = lapses(base, until.get(s)).due
-            steps.append((n if n < room else len(buys) + n - room, "sell", s, mine[s], 1.0, span(here - {s}, due) - span(here, due)))
-            here = here - {s}
+            steps.append((n if n < room else len(buys) + n - room, "sell", s, mine[s], 1.0, 0.0))
         return steps
 
     # The squad to hold: a set of buys (at most `most`, each from the recommender's bids and worth something alone),
@@ -144,6 +141,8 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
                     if best is None or gain > best[0] + 1e-9:
                         best = (gain, steps)
     steps = best[1] if best else []
+    whole = total(steps)
+    steps = [(*step[:5], whole - total(without(steps, step[1], step[2]))) for step in steps]    # each its marginal in the plan
     return steps, cands.alone
 
 
@@ -771,6 +770,9 @@ def _selftest_search(n: int = 12, seed: int = 1, strict: bool = True) -> list[fl
         plan_steps, _ = plan_rows(inp)
         gap = max(best, 0.0) - expected_gap(inp, plan_steps)
         if strict:
+            for step in plan_steps:     # a step's worth is its marginal in the plan: the plan's less the plan without it
+                assert abs(step[5] - (expected_gap(inp, plan_steps) - expected_gap(inp, without(plan_steps, step[1], step[2])))) < 1e-9, \
+                    "each step's worth is what the plan loses without it, from the one measure"
             assert (feasible(plan_steps) or best == 0.0) and abs(gap) < 1e-6, \
                 "the plan is feasible and as good as the best mix of any buys and up to three sales"
         elif gap > 1e-6:
