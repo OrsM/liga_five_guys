@@ -1,29 +1,29 @@
 {
- "generated_at": "2026-11-07T06:36Z",
+ "generated_at": "2026-11-07T06:39Z",
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -5290661.0,
  "cash_locked": 0.0,
  "finish": 2.33,
- "p_win": 0.112,
- "finish_after": 2.13,
- "p_win_after": 0.172,
+ "p_win": 0.109,
+ "finish_after": 2.14,
+ "p_win_after": 0.168,
  "band": [
-  1833.89269263365,
-  2087.79375325204
+  1831.71218416124,
+  2085.26629456025
  ],
  "do": [
   {
    "what": "field",
-   "label": "field Pepelu",
+   "label": "field Pepelu, Guido Rodriguez",
    "step": null,
    "amount": null,
    "done": false,
-   "gain": 0.122803545689713,
+   "gain": 3.07804449587478,
    "per": "next",
    "facts": [
     [
      "bench",
-     "Adria Pedrosa",
+     "Adria Pedrosa, Miguel Roman",
      "names"
     ]
    ],
@@ -74,14 +74,6 @@
      "value": 45181907.0
     },
     {
-     "player_team": "44068749",
-     "player": "2639",
-     "market": "50121404",
-     "bid": "",
-     "pos": "MED",
-     "value": 9195919.0
-    },
-    {
      "player_team": "109094608",
      "player": "3137",
      "market": "62681662",
@@ -128,6 +120,14 @@
      "bid": "",
      "pos": "MED",
      "value": 42283223.0
+    },
+    {
+     "player_team": "112907378",
+     "player": "3128",
+     "market": null,
+     "bid": null,
+     "pos": "MED",
+     "value": 11883998.0
     },
     {
      "player_team": "107331405",
@@ -898,7 +898,7 @@
  ],
  "cash_after": 1812331.20200767,
  "can_bid": 25968078.680964,
- "ping": "field Pepelu; buy Aitor Paredes; buy Gabriel Suazo; buy Ferran Jutgla; relist Pablo Fornals, Dani Martinez, Augusto Batalla, Robin Le Normand, Adria Pedrosa, Martin Satriano, Gerard Martin, Roger Hinojo, Georges Mikautadze, Natan, Pepelu, Marcos Alonso, Mathew Ryan, Miguel Roman, German Valera, Iñigo Vicente, Fernando Niño; list Guido Rodriguez, Arnau Ortiz, Thomas Lemar",
+ "ping": "field Pepelu, Guido Rodriguez; buy Aitor Paredes; buy Gabriel Suazo; buy Ferran Jutgla; relist Pablo Fornals, Dani Martinez, Augusto Batalla, Robin Le Normand, Adria Pedrosa, Martin Satriano, Gerard Martin, Roger Hinojo, Georges Mikautadze, Natan, Pepelu, Marcos Alonso, Mathew Ryan, Miguel Roman, German Valera, Iñigo Vicente, Fernando Niño; list Guido Rodriguez, Arnau Ortiz, Thomas Lemar",
  "held": [],
  "plan_flip": {
   "cash": 1812331.20200767,
@@ -3327,14 +3327,14 @@
    "clause": 11884008.0
   },
   {
-   "name": "Miguel Roman",
-   "pos": "MED",
-   "clause": 9195952.0
-  },
-  {
    "name": "Fernando Niño",
    "pos": "DEL",
    "clause": 49592310.0
+  },
+  {
+   "name": "Miguel Roman",
+   "pos": "MED",
+   "clause": 9195952.0
   },
   {
    "name": "Georges Mikautadze",
@@ -3429,13 +3429,6 @@
    "sold": false
   },
   {
-   "name": "Miguel Roman",
-   "pos": "MED",
-   "next": 5.30922453228434,
-   "xi": true,
-   "sold": false
-  },
-  {
    "name": "German Valera",
    "pos": "MED",
    "next": 4.17865291595167,
@@ -3446,6 +3439,13 @@
    "name": "Pepelu",
    "pos": "MED",
    "next": 3.0166710674682,
+   "xi": true,
+   "sold": false
+  },
+  {
+   "name": "Guido Rodriguez",
+   "pos": "MED",
+   "next": 2.95524095018506,
    "xi": true,
    "sold": false
   },
@@ -3506,9 +3506,9 @@
    "sold": false
   },
   {
-   "name": "Guido Rodriguez",
+   "name": "Miguel Roman",
    "pos": "MED",
-   "next": 2.95524095018506,
+   "next": 0.0,
    "xi": false,
    "sold": false
   },
@@ -3543,14 +3543,14 @@
    "hi": 2275.27385443553,
    "cash": 14753736.0,
    "estimated": true,
-   "p_above": 0.873710296538388
+   "p_above": 0.877088086731719
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 573.0,
-   "lo": 1833.89269263365,
-   "hi": 2087.79375325204,
+   "lo": 1831.71218416124,
+   "hi": 2085.26629456025,
    "cash": -5290661.0,
    "estimated": false,
    "p_above": null
@@ -3563,17 +3563,17 @@
    "hi": 2039.84893554985,
    "cash": 64003462.0,
    "estimated": true,
-   "p_above": 0.354016493286918
+   "p_above": 0.360058014099306
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 416.0,
-   "lo": 1657.14021106946,
-   "hi": 1900.76627893093,
+   "lo": 1654.30809226841,
+   "hi": 1897.34371065361,
    "cash": 9808831.0,
    "estimated": true,
-   "p_above": 0.0926034825497833
+   "p_above": 0.0912622836901018
   },
   {
    "manager": "Magic Mike 333",
@@ -3583,7 +3583,7 @@
    "hi": 1733.11382869261,
    "cash": 64193671.0,
    "estimated": true,
-   "p_above": 0.00497604422197673
+   "p_above": 0.00521091518266004
   }
  ]
 }
