@@ -1,15 +1,15 @@
 {
- "generated_at": "2026-11-07T06:42Z",
+ "generated_at": "2026-11-07T07:13Z",
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -5290661.0,
  "cash_locked": 0.0,
  "finish": 2.43,
- "p_win": 0.069,
+ "p_win": 0.07,
  "finish_after": 2.31,
- "p_win_after": 0.098,
+ "p_win_after": 0.099,
  "band": [
-  1798.30937307147,
-  2049.06484323536
+  1800.25771453665,
+  2051.71569374409
  ],
  "do": [
   {
@@ -2051,6 +2051,118 @@
    ]
   },
   {
+   "name": "Georges Mikautadze",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Georges Mikautadze",
+   "step": "wait",
+   "offer": 40356264.0,
+   "waiting": 53877579.7204319,
+   "trend": 25.0946438380129,
+   "plan": false,
+   "amount": 53877579.7204319,
+   "done": false,
+   "key": "12139",
+   "held": false,
+   "gain": -13.9811494493813,
+   "per": "season",
+   "facts": [
+    [
+     "value",
+     43844382.0,
+     "money"
+    ],
+    [
+     "offer",
+     40356264.0,
+     "money"
+    ],
+    [
+     "paid",
+     42016585.0,
+     "money"
+    ],
+    [
+     "made on the sale",
+     -1660321.0,
+     "money"
+    ],
+    [
+     "the game's recent offers",
+     0.06,
+     "beats"
+    ],
+    [
+     "offer vs the usual (sd)",
+     -1.4610113722255,
+     "sd"
+    ],
+    [
+     "waiting is worth",
+     53877579.7204319,
+     "money"
+    ],
+    [
+     "waiting less the offer",
+     13521315.7204319,
+     "money"
+    ],
+    [
+     "a better offer comes",
+     1.0,
+     "chance"
+    ],
+    [
+     "more offers before the lock",
+     13,
+     "count"
+    ],
+    [
+     "points",
+     -13.9811494493813,
+     "points"
+    ],
+    [
+     "",
+     25.0946438380129,
+     "trend"
+    ]
+   ],
+   "trace": [
+    34400497.0,
+    34132683.0,
+    34424932.0,
+    34968496.0,
+    35645836.0,
+    36338400.0,
+    37050871.0,
+    37793288.0,
+    38843329.0,
+    40096845.0,
+    41320692.0,
+    42282083.0,
+    43132805.0,
+    43844382.0
+   ],
+   "flip": {
+    "cash": 53926044.8463598,
+    "points": 14.5977821259573,
+    "blockers": []
+   },
+   "more": true,
+   "accepts": [],
+   "act": [
+    {
+     "player_team": "95426553",
+     "player": "2771",
+     "market": "51255290",
+     "bid": "",
+     "pos": "DEL",
+     "value": 43844382.0
+    }
+   ]
+  },
+  {
    "name": "Marcos Alonso",
    "pos": "DEF",
    "what": "sell",
@@ -2160,118 +2272,6 @@
    ]
   },
   {
-   "name": "Georges Mikautadze",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Georges Mikautadze",
-   "step": "wait",
-   "offer": 40356264.0,
-   "waiting": 53877579.7204319,
-   "trend": 25.0946438380129,
-   "plan": false,
-   "amount": 53877579.7204319,
-   "done": false,
-   "key": "12139",
-   "held": false,
-   "gain": -14.2571755822944,
-   "per": "season",
-   "facts": [
-    [
-     "value",
-     43844382.0,
-     "money"
-    ],
-    [
-     "offer",
-     40356264.0,
-     "money"
-    ],
-    [
-     "paid",
-     42016585.0,
-     "money"
-    ],
-    [
-     "made on the sale",
-     -1660321.0,
-     "money"
-    ],
-    [
-     "the game's recent offers",
-     0.06,
-     "beats"
-    ],
-    [
-     "offer vs the usual (sd)",
-     -1.4610113722255,
-     "sd"
-    ],
-    [
-     "waiting is worth",
-     53877579.7204319,
-     "money"
-    ],
-    [
-     "waiting less the offer",
-     13521315.7204319,
-     "money"
-    ],
-    [
-     "a better offer comes",
-     1.0,
-     "chance"
-    ],
-    [
-     "more offers before the lock",
-     13,
-     "count"
-    ],
-    [
-     "points",
-     -14.2571755822944,
-     "points"
-    ],
-    [
-     "",
-     25.0946438380129,
-     "trend"
-    ]
-   ],
-   "trace": [
-    34400497.0,
-    34132683.0,
-    34424932.0,
-    34968496.0,
-    35645836.0,
-    36338400.0,
-    37050871.0,
-    37793288.0,
-    38843329.0,
-    40096845.0,
-    41320692.0,
-    42282083.0,
-    43132805.0,
-    43844382.0
-   ],
-   "flip": {
-    "cash": 53926044.8463598,
-    "points": 14.5257893844955,
-    "blockers": []
-   },
-   "more": true,
-   "accepts": [],
-   "act": [
-    {
-     "player_team": "95426553",
-     "player": "2771",
-     "market": "51255290",
-     "bid": "",
-     "pos": "DEL",
-     "value": 43844382.0
-    }
-   ]
-  },
-  {
    "name": "Fernando Niño",
    "pos": "DEL",
    "what": "sell",
@@ -2285,7 +2285,7 @@
    "done": false,
    "key": "7081",
    "held": false,
-   "gain": -16.3360968985178,
+   "gain": -16.0600707656047,
    "per": "season",
    "facts": [
     [
@@ -2335,7 +2335,7 @@
     ],
     [
      "points",
-     -16.3360968985178,
+     -16.0600707656047,
      "points"
     ],
     [
@@ -2362,7 +2362,7 @@
    ],
    "flip": {
     "cash": 52965332.1259279,
-    "points": 11.4460468787074,
+    "points": 11.5180396201692,
     "blockers": []
    },
    "more": true,
@@ -2394,7 +2394,7 @@
    "done": false,
    "key": "6442",
    "held": false,
-   "gain": -24.5547063249016,
+   "gain": -24.2786801919883,
    "per": "season",
    "facts": [
     [
@@ -2439,7 +2439,7 @@
     ],
     [
      "points",
-     -24.5547063249016,
+     -24.2786801919883,
      "points"
     ],
     [
@@ -2466,7 +2466,7 @@
    ],
    "flip": {
     "cash": 25073885.6524749,
-    "points": 4.15491588226473,
+    "points": 4.22690862372656,
     "blockers": []
    },
    "more": true,
@@ -2608,7 +2608,7 @@
    "done": false,
    "key": "8496",
    "held": false,
-   "gain": -35.5003737525449,
+   "gain": -37.7003543752046,
    "per": "season",
    "facts": [
     [
@@ -2663,7 +2663,7 @@
     ],
     [
      "points",
-     -35.5003737525449,
+     -37.7003543752046,
      "points"
     ],
     [
@@ -2690,7 +2690,7 @@
    ],
    "flip": {
     "cash": 24364047.4330811,
-    "points": -6.71636781097891,
+    "points": -8.91634843363863,
     "blockers": []
    },
    "more": true,
@@ -3499,7 +3499,7 @@
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "next": 5.10490767560633,
+   "next": 5.20452303990072,
    "xi": true,
    "sold": false
   },
@@ -3579,18 +3579,18 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 569.0,
-   "lo": 1988.4130498059,
-   "hi": 2275.27385443553,
+   "lo": 1989.51610650244,
+   "hi": 2276.91246327191,
    "cash": 14753736.0,
    "estimated": true,
-   "p_above": 0.919288275637168
+   "p_above": 0.917870956542068
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 573.0,
-   "lo": 1798.30937307147,
-   "hi": 2049.06484323536,
+   "lo": 1800.25771453665,
+   "hi": 2051.71569374409,
    "cash": -5290661.0,
    "estimated": false,
    "p_above": null
@@ -3599,31 +3599,31 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 464.0,
-   "lo": 1774.52184686202,
-   "hi": 2039.84893554985,
+   "lo": 1776.70292424322,
+   "hi": 2042.77590809492,
    "cash": 64003462.0,
    "estimated": true,
-   "p_above": 0.453883391434977
+   "p_above": 0.454717872490222
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 416.0,
-   "lo": 1595.64335682394,
-   "hi": 1832.20676461774,
+   "lo": 1595.49124568299,
+   "hi": 1832.35887575869,
    "cash": 9808831.0,
    "estimated": true,
-   "p_above": 0.0594283058891638
+   "p_above": 0.0578127817784932
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 441.0,
-   "lo": 1414.61760446994,
-   "hi": 1622.18627446601,
+   "lo": 1422.3035377185,
+   "hi": 1631.66482292893,
    "cash": 64193671.0,
    "estimated": true,
-   "p_above": 0.000708496440174677
+   "p_above": 0.000887472290098223
   }
  ]
 }
