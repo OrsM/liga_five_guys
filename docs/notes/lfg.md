@@ -134,10 +134,17 @@ golden compares decisions exactly and floats with `isclose`. Pages stay one rend
   buys 16.9 pred vs 16.4 real, sales -13.2 vs -11.9. Real wrong logic found: a move's gain was computed three ways (buys
   alone, sales in sequence, the plan once by `worth_on`) and they disagreed by 10% on runs with overlapping buys. Fixed:
   `plan_rows` stamps each step with its marginal, plan less plan without it, from `worth_on` alone (selftest: for any
-  plan, step worth == that difference). Open: (1) the grader scores raw player points, not the team's gain with the lock
-  rule and bid wins, and repeats the same moves across runs; (2) ~~`recent_offers` cut a night's batch by ratio~~ fixed 2026-11-07: the window keeps whole nights (selftest: any window,
-  whole batches only); (3) the trend term in `waiting` is fitted and scored on the same days (4 of 17 take-or-wait choices turn on it);
-  (4) a later move assumes every earlier uncertain bid was won. Bid win chances (941 auctions) and offer sizes (553, sd
+  plan, step worth == that difference). Fixed 2026-11-07: (1) the grader
+  scored raw player points and repeated moves across locks; it now grades each plan step by its marginal in the plan
+  (`decision.marginals`, the one formula `plan_rows` stamps), on the forecast against what was scored (48 steps over 10
+  locks: forecast +180.6, scored +300.5), with no move semantics of its own; (2) ~~`recent_offers` cut a night's batch by ratio~~ fixed: the window
+  keeps whole nights (selftest: any window, whole batches only); (3) the trend term in `waiting` is not fitted and scored on
+  the same days: its slope is fitted on pairs that ended before each day (stable, 8.7 -> 12.9, 41.7% less squared error than
+  zero on 29,010 pairs, halves 41.0% / 43.6%), so a replay is out of sample; dropping it flips 3 of 17 choices, all near
+  ties; kept; (4) a later step assumed every earlier uncertain bid won: a sale made once the bids are won now counts only
+  at their joint chance (`worth_on`'s `reach`; selftest `_selftest_bids`: mean error against an exact enumeration of the
+  outcomes 2.4 -> 0.24 points). Not done: a full scenario tree (the rest is the eleven not being additive; 8 of 10 past
+  locks differ by under 0.3 points), and the plan's mix choice under the change is not measured. Bid win chances (941 auctions) and offer sizes (553, sd
   0.056) are calibrated.
 - **Constants:** `PERSISTENT_SHARE`, `CONFIDENCE` etc. set vs measured (0.08 vs 0.087; 0.70 vs 0.719).
 

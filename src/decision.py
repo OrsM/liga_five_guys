@@ -173,12 +173,16 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
         return score(sq) if score else by_jornada(pos, played, set(sq))
     squads = {j: squad for j in js}
     total = floor = sum(points(squad)[j] for j in js)
+    reach = 1.0     # the chance every bid so far was won: a sale made once the bids are won is made only then
     for group in in_groups(inp, steps):
         win, before = 1.0, {j: points(sq)[j] for j, sq in squads.items()}
         won, lost = dict(squads), dict(squads)
+        bid = 1.0
         for step, kind, k, _, w, _ in group:
             if kind == "buy":
-                win = 1.0 if w is None else w
+                win = bid = 1.0 if w is None else w
+            elif due[step, kind].why == AFTER_AUCTIONS:
+                win = reach * win
             for j in js:
                 if in_force(locks, j, due[step, kind].due):
                     won[j] = won[j] | {k} if kind == "buy" else won[j] - {k}
@@ -186,6 +190,7 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
                         lost[j] = lost[j] - {k}
         total += sum(win * (points(won[j])[j] - before[j]) + (1 - win) * (points(lost[j])[j] - before[j]) for j in js)
         squads = won
+        reach *= bid
     return floor, total
 
 
@@ -681,6 +686,7 @@ def _selftest() -> None:
     _selftest_blockers()
     _selftest_ledger()
     _selftest_search()
+    _selftest_bids()
     _selftest_offers()
     print("decision self-test OK")
 
@@ -822,6 +828,42 @@ def _selftest_search(n: int = 12, seed: int = 1, strict: bool = True) -> list[fl
     if strict:
         print("search self-test OK")
     return misses
+
+
+def _selftest_bids() -> None:
+    """worth_on against every outcome of the bids, each weighed by its chance: a sale made for the bids is made
+    once they are won (every one before it), so it counts only in those outcomes. Over random small leagues of
+    two uncertain bids and a sale after the auctions. Not exact (the eleven is not additive: worth_on weighs
+    each step on its own: 1.6% of the plan's gain off on average, 13% at the worst; counting the sale always made was ten times further off)."""
+    rng = random.Random(3)
+    for _ in range(30):
+        own = {"m%02d" % i: p for i, p in enumerate(["POR"] + ["DEF"] * 4 + ["MED"] * 4 + ["DEL"] * 3)}
+        offer = {"c0": "DEL", "c1": "DEF"}
+        pos = own | offer
+        e = {k: rng.choice([0, 1, 2, 3, 5]) * 1.0 for k in own} | {k: rng.choice([4, 7, 9, 12]) * 1.0 for k in offer}
+        wins = [rng.choice([0.2, 0.5, 0.8]), rng.choice([0.3, 0.6, 0.9])]
+        sold = rng.choice(list(own))
+        inp: dict[str, list[tuple[Any, ...]]] = {
+            "dec_player": [(k, p, 1, None, 5e6) for k, p in own.items()] + [(k, p, 0, 6e6, None) for k, p in offer.items()],
+            "dec_odds": [], "dec_money": [(20e6, 60e6, DEBT_SHARE, SQUAD_MAX, XI_SIZE)],
+            "cell": [(k, j, e[k]) for j in (1, 2) for k in e],
+            "dec_lock": [(1, "2026-11-06T20:00Z"), (2, "2026-11-13T20:00Z")],
+            "dec_close": [("c0", "2026-11-06T18:00Z"), ("c1", "2026-11-06T19:00Z")]}
+        steps = [(0, "buy", "c0", 6e6, wins[0], 0.0), (1, "buy", "c1", 6e6, wins[1], 0.0), (2, "sell", sold, 5e6, 1.0, 0.0)]
+        assert schedule(inp, steps)[2, "sell"].why == AFTER_AUCTIONS
+        on_e = {(k, j): x for k, j, x in inp["cell"]}
+        played = {j: {k: on_e.get((k, j), 0.0) for k in pos} for j in (1, 2)}
+        exact = 0.0
+        for won in product((True, False), repeat=2):
+            squad = set(own) | {k for k, w in zip(offer, won) if w}
+            if all(won):
+                squad.discard(sold)
+            chance = (wins[0] if won[0] else 1 - wins[0]) * (wins[1] if won[1] else 1 - wins[1])
+            exact += chance * sum(by_jornada(pos, played, squad).values())
+        floor, total = worth_on(inp, steps, on_e, [1, 2])
+        assert abs(total - exact) <= 0.2 * max(abs(exact - floor), 1.0), \
+            "the plan's worth is near the outcomes' average (a later sale counted only when the bids are won)"
+    print("bids self-test OK")
 
 
 def _selftest_blockers() -> None:
