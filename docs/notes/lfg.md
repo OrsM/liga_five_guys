@@ -118,10 +118,11 @@ golden compares decisions exactly and floats with `isclose`. Pages stay one rend
 - **Exact test:** `_selftest_search` compares the plan with every mix of any buys and up to three sales on seeded
   random leagues. Two bounds remain, neither in that test: at most three buys, and `cover` shortlists the ten
   sellable players who lose the fewest points per euro. Check them on real inputs before raising either.
-- **Start chance:** the site's start % is taken as it says (unflagged: all of it; flagged: for the next jornada not yet
-  locked). Measured 2026-11-07 on 4465 player-jornadas: raw site Brier 0.147, the old pull toward his record of selection
-  (PICK_K) 0.168, and the pull inflated low listings (site 5% -> model 12%, site 26% -> 41%, they started 19%).
-  PICK_K and NEUTRAL_START now apply only to a player listed with no % or not listed.
+- **Start chance:** one rule: the site's start % is his chance, whatever his status (injured, doubtful, suspended or
+  none), every jornada; the status's return date only counts for a player listed with no %. Measured 2026-11-07 on 4465
+  player-jornadas: raw site Brier 0.147, the old pull toward his record of selection (PICK_K) 0.168, and the pull
+  inflated low listings (site 5% -> model 12%, site 26% -> 41%, they started 19%). PICK_K and NEUTRAL_START apply only to
+  a player listed with no %, or not listed.
 - **Constants:** `PERSISTENT_SHARE`, `CONFIDENCE` etc. set vs measured (0.08 vs 0.087; 0.70 vs 0.719).
 
 ## 5. The reasoning behind the plan [plan, gain]

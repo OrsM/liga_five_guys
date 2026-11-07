@@ -1552,10 +1552,10 @@ WHERE observed_at <= (SELECT cut());
 -- Each player's rates: ppm, his points per match, what his value says
 -- (ppm_prior) pulled toward last season's points per match, then toward
 -- this season's, each by SHRINK_K matches; and picked, the chance he is
--- picked if fit, his listing's start % (NEUTRAL_START if listed with none
--- or flagged, whose listing speaks of the injury; ABSENT_START if not
--- listed) pulled toward his appearances over his matchday squads by PICK_K;
--- a listed start %, unflagged, is taken as it is (measured: it beats the pull).
+-- picked: his listing's start %, as the site says, whatever his status.
+-- With no % (listed with none, injured or not, or not listed) it is
+-- NEUTRAL_START (ABSENT_START if not listed) pulled toward his appearances
+-- over his matchday squads by PICK_K. Measured: the listing beats the pull.
 DROP VIEW IF EXISTS forecast_ppm;
 DROP VIEW IF EXISTS forecast_picked;
 DROP VIEW IF EXISTS forecast_rate;
@@ -1567,14 +1567,15 @@ s AS MATERIALIZED (SELECT * FROM player_status)
 SELECT c.player,
        shrink(shrink(coalesce(p.prior, 0.0), k.shrink_k, coalesce(l.pts, 0.0), coalesce(l.pj, 0.0)),
               k.shrink_k, coalesce(r.pts, 0.0), coalesce(r.apps, 0.0)) AS ppm,
-       CASE WHEN s.status IS NULL AND s.pct IS NOT NULL THEN s.pct / 100.0     -- his listing's start %, as it says
-            ELSE shrink(CASE WHEN s.status IS NOT NULL OR s.listed THEN k.neutral_start ELSE k.absent_start END / 100.0,
-                        k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) END AS picked
+       CASE WHEN s.pct IS NOT NULL THEN s.pct / 100.0     -- his listing's start %, as the site says, whatever his status
+            ELSE shrink(CASE WHEN s.listed OR s.status IS NOT NULL THEN k.neutral_start ELSE k.absent_start END / 100.0,
+                        k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) END AS picked,
+       s.pct IS NOT NULL AS listed_pct
 FROM c CROSS JOIN k LEFT JOIN p USING (player) LEFT JOIN last_season l ON l.ff_id = c.player
 LEFT JOIN r USING (player) LEFT JOIN s USING (player);
 
--- The chance he is fit each jornada his club has left: 1 unless flagged;
--- if flagged, his prognosis (prognosis()) read literally against the
+-- The chance he is fit each jornada his club has left: 1 unless he has a status
+-- (injured, doubtful, suspended); if so, his prognosis (prognosis()) read literally against the
 -- jornada (a jornada not named: his club's next) or his match's date: out
 -- 0, a doubt 0.5, back 1.
 DROP VIEW IF EXISTS forecast_fit;
@@ -1608,17 +1609,12 @@ f AS MATERIALIZED (SELECT * FROM club_fixture),
 o AS MATERIALIZED (SELECT * FROM club_rating),
 rt AS MATERIALIZED (SELECT * FROM forecast_rate),
 ft AS MATERIALIZED (SELECT * FROM forecast_fit),
-nx AS MATERIALIZED (SELECT jornada AS nx FROM round_locks WHERE lock > (SELECT cut()) ORDER BY lock LIMIT 1),
-st AS MATERIALIZED (SELECT player, pct FROM player_status WHERE status IS NOT NULL AND status <> 'gone' AND pct IS NOT NULL),
-x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, ft.fit,
-             -- a flagged player's listing gives his start % for the next jornada not yet locked: that, as it says
-             CASE WHEN st.pct IS NOT NULL AND f.jornada = nx.nx THEN st.pct / 100.0 END AS says,
+x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, rt.listed_pct, ft.fit,
              coalesce(CASE WHEN c.pos IN ('POR', 'DEF') THEN 1.0 / o.attack ELSE o.defence END, 1.0) AS fixture
       FROM c JOIN f ON f.club = c.club JOIN rt USING (player)
       JOIN ft ON ft.player = c.player AND ft.jornada = f.jornada
-      LEFT JOIN nx ON 1 LEFT JOIN st ON st.player = c.player
       LEFT JOIN o ON o.club = f.opp)
-SELECT player, jornada, max(0.0, ppm * fixture) AS pts, coalesce(says, picked * fit) AS p, ppm, fixture, picked, fit FROM x;
+SELECT player, jornada, max(0.0, ppm * fixture) AS pts, CASE WHEN listed_pct THEN picked ELSE picked * fit END AS p, ppm, fixture, picked, fit FROM x;
 
 
 -- The board: the last run's decisions and the facts it saw (the decision's

@@ -301,19 +301,19 @@ def _selftest_forecast() -> None:
             assert rate["hurt"][0] == prior["hurt"], "no record at all: his value's"
             assert rate["fwd"][1] == 0.8 and rate["back"][1] == model.NEUTRAL_START / 100, \
                 "his listing's start %; listed with none, NEUTRAL_START"
-            assert rate["hurt"][1] == rate["dbt"][1] == model.NEUTRAL_START / 100, \
-                "flagged: his listing speaks of the injury, not of selection"
+            assert (rate["hurt"][1], rate["susp"][1], rate["dbt"][1]) == (0.0, 0.0, 0.5), \
+                "his listing's start %, injured, suspended or doubtful or not"
             assert rate["cee"][1] == model.ABSENT_START / 100 and pk > 0, "not listed: ABSENT_START"
 
             cells = {(p, j): r for p, j, *r in rows("SELECT player, jornada, pts, p, ppm, fixture, picked, fit"
                                                      " FROM forecast_now")}
             assert set(cells) == {(p, j) for p in ("fwd", "back", "hurt", "susp", "dbt", "gone") for j in (2, 3)} \
                 | {("cee", 3)}, "every jornada left his club plays; a coach, a player with no club: none"
-            site = {("hurt", 2): 0.0, ("susp", 2): 0.0, ("dbt", 2): 0.5}   # flagged, with a start % for his next match
+            says = {"fwd": 0.8, "hurt": 0.0, "susp": 0.0, "dbt": 0.5}      # the listed start %, whatever his status
             for (p, j), (pts, pr, ppm, fix, picked, fit) in cells.items():
                 assert abs(pts - max(0.0, ppm * fix)) < 1e-12, "points if he plays = ppm x fixture"
-                assert abs(pr - site.get((p, j), picked * fit)) < 1e-12, \
-                    "the chance he plays = picked x fit; for a flagged player's next match, the listing's start %, as it says"
+                assert abs(pr - says.get(p, picked * fit)) < 1e-12, \
+                    "the chance he plays is the listing's start % if it has one; else picked x fit"
             assert abs(cells["fwd", 2][3] - rating["b"][1]) < 1e-12, "an attacker: his opponent's defence"
             assert abs(cells["back", 2][3] - 1 / rating["b"][0]) < 1e-12, "a defender: 1 / its attack"
             assert cells["cee", 3][3] == 1.0, "an opponent with no rating: 1"
