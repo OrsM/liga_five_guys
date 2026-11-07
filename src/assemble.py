@@ -279,6 +279,11 @@ def _selftest_points() -> None:
                 "a starter the match unless he came off, a sub from when he came on"
             assert abs(got["1"][3] - (model.PICK_K * model.NEUTRAL_START / 100 + 2) / (model.PICK_K + 2)) < 1e-12, \
                 "his record pulled toward NEUTRAL_START, worth PICK_K matches"
+            # a listed start %, unflagged, is the chance he is picked as it says, whatever his record (he has started both)
+            store_sql("lineups", [{"observed_at": later, "source": "futbolfantasy", "team_slug": "x", "player_slug": "uno",
+                                   "player_name": "1", "start_pct": "10", "status": "ok", "note": ""}])
+            assert dict(rows("SELECT player, picked FROM forecast_rate")).get("1") == 0.10, \
+                "the listing's start %, not pulled toward his record of selection"
         finally:
             set_now(None)
 

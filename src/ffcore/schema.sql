@@ -1554,7 +1554,8 @@ WHERE observed_at <= (SELECT cut());
 -- this season's, each by SHRINK_K matches; and picked, the chance he is
 -- picked if fit, his listing's start % (NEUTRAL_START if listed with none
 -- or flagged, whose listing speaks of the injury; ABSENT_START if not
--- listed) pulled toward his appearances over his matchday squads by PICK_K.
+-- listed) pulled toward his appearances over his matchday squads by PICK_K;
+-- a listed start %, unflagged, is taken as it is (measured: it beats the pull).
 DROP VIEW IF EXISTS forecast_ppm;
 DROP VIEW IF EXISTS forecast_picked;
 DROP VIEW IF EXISTS forecast_rate;
@@ -1566,9 +1567,9 @@ s AS MATERIALIZED (SELECT * FROM player_status)
 SELECT c.player,
        shrink(shrink(coalesce(p.prior, 0.0), k.shrink_k, coalesce(l.pts, 0.0), coalesce(l.pj, 0.0)),
               k.shrink_k, coalesce(r.pts, 0.0), coalesce(r.apps, 0.0)) AS ppm,
-       shrink(CASE WHEN s.status IS NOT NULL OR (s.listed AND s.pct IS NULL) THEN k.neutral_start
-                   WHEN s.listed THEN s.pct ELSE k.absent_start END / 100.0,
-              k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) AS picked
+       CASE WHEN s.status IS NULL AND s.pct IS NOT NULL THEN s.pct / 100.0     -- his listing's start %, as it says
+            ELSE shrink(CASE WHEN s.status IS NOT NULL OR s.listed THEN k.neutral_start ELSE k.absent_start END / 100.0,
+                        k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) END AS picked
 FROM c CROSS JOIN k LEFT JOIN p USING (player) LEFT JOIN last_season l ON l.ff_id = c.player
 LEFT JOIN r USING (player) LEFT JOIN s USING (player);
 
