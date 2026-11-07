@@ -674,7 +674,36 @@ def _selftest() -> None:
     _selftest_blockers()
     _selftest_ledger()
     _selftest_search()
+    _selftest_offers()
     print("decision self-test OK")
+
+
+def _selftest_offers() -> None:
+    """recent_offers: the last PRICE_WINDOW offers, a night's batch (offers sharing a timestamp) whole or not at all,
+    so which of a batch's offers the cut keeps never depends on their size."""
+    import tempfile
+    from pathlib import Path
+
+    from ffcore.db import set_constants
+    from ffcore.tidy import store_sql, tables_in
+
+    nights = {"2026-09-01": (0.80, 0.85, 0.90, 0.95), "2026-09-02": (1.00, 1.05, 1.10, 1.15)}     # shares of a 10M value
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        for day, ratios in nights.items():
+            store_sql("api_teams", [{"observed_at": day + "T1000Z", "player_id": str(n), "manager": "me",
+                                     "market_value": "10000000", "player_team_id": "%s-%d" % (day, n)} for n in range(len(ratios))])
+            store_sql("api_offers", [{"observed_at": day + "T1000Z", "player_team_id": "%s-%d" % (day, n), "offer_id": "%s-%d" % (day, n),
+                                      "from_market": "true", "money": str(int(r * 1e7)), "status": "pending",
+                                      "created_at": day + "T09:00:00+02:00"} for n, r in enumerate(ratios)])
+        every = sorted(r for rs in nights.values() for r in rs)
+        for window in (1.0, 2.0, 5.0, 6.0):    # a cut inside a batch keeps the whole batch, the newer ones first
+            with set_constants(PRICE_WINDOW=window):
+                got = sorted(r for (r,) in rows("SELECT ratio FROM recent_offers"))
+            kept = sorted(nights["2026-09-02"] + (nights["2026-09-01"] if window > 4 else ()))
+            assert got == kept, "a window of %s offers: %s, whole nights only" % (window, got)
+        with set_constants(PRICE_WINDOW=100.0):
+            assert sorted(r for (r,) in rows("SELECT ratio FROM recent_offers")) == every, "fewer offers than the window: all"
+    print("offers self-test OK")
 
 
 def _selftest_ledger() -> None:

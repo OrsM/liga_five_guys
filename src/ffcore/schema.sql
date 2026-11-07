@@ -1179,11 +1179,15 @@ o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value 
 SELECT created_at, ratio FROM o WHERE first = 1 ORDER BY created_at, ratio;
 
 -- The game's last PRICE_WINDOW offers as shares of value (every one with
--- no constants set): what an offer to come is drawn from.
+-- no constants set), a night's batch (offers sharing a timestamp) whole: a cut
+-- inside one would keep its highest or lowest by the order. What an offer to
+-- come is drawn from.
 DROP VIEW IF EXISTS recent_offers;
 CREATE VIEW recent_offers AS
-SELECT ratio FROM offer_ratios ORDER BY created_at DESC, ratio DESC
-LIMIT coalesce((SELECT CAST(price_window AS INTEGER) FROM k), -1);
+SELECT ratio FROM offer_ratios
+WHERE created_at >= CASE WHEN (SELECT price_window FROM k) < 1 THEN ''
+    ELSE coalesce((SELECT created_at FROM offer_ratios ORDER BY created_at DESC
+                   LIMIT 1 OFFSET (SELECT CAST(price_window AS INTEGER) - 1 FROM k)), '') END;
 
 -- The jornada calendar, as of t. Each fixture's kickoff as last seen
 -- (a played match's page drops it) and its jornada, as a UTC stamp (as

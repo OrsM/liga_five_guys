@@ -135,9 +135,8 @@ golden compares decisions exactly and floats with `isclose`. Pages stay one rend
   alone, sales in sequence, the plan once by `worth_on`) and they disagreed by 10% on runs with overlapping buys. Fixed:
   `plan_rows` stamps each step with its marginal, plan less plan without it, from `worth_on` alone (selftest: for any
   plan, step worth == that difference). Open: (1) the grader scores raw player points, not the team's gain with the lock
-  rule and bid wins, and repeats the same moves across runs; (2) `recent_offers` orders by created_at, ratio so its 50-row
-  cut keeps the highest of the oldest batch (mean 1.008 vs 0.9975: `waiting` about 0.9% high, flips 2 marginal sales);
-  (3) the trend term in `waiting` is fitted and scored on the same days (4 of 17 take-or-wait choices turn on it);
+  rule and bid wins, and repeats the same moves across runs; (2) ~~`recent_offers` cut a night's batch by ratio~~ fixed 2026-11-07: the window keeps whole nights (selftest: any window,
+  whole batches only); (3) the trend term in `waiting` is fitted and scored on the same days (4 of 17 take-or-wait choices turn on it);
   (4) a later move assumes every earlier uncertain bid was won. Bid win chances (941 auctions) and offer sizes (553, sd
   0.056) are calibrated.
 - **Constants:** `PERSISTENT_SHARE`, `CONFIDENCE` etc. set vs measured (0.08 vs 0.087; 0.70 vs 0.719).
