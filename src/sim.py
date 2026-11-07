@@ -331,15 +331,15 @@ def _selftest() -> None:
     assert (made["paid"], made["made on the sale"], made["waiting less the offer"]) == (0.7e6, 0.2e6, 0.1e6), \
         "what you make on an offer is the decision's (decision_sale): the offer less what you paid, waiting less the offer"
 
-    def relists(ends: str, nights: int) -> list[tuple[Any, ...]]:
+    def listed_again(ends: str, nights: int) -> list[tuple[Any, ...]]:
         doc = report(put(ub, "route", {"dead": "listed"}),
                      nights=nights, listings=[("dead", ends)])
-        return [(d["label"], d["facts"]) for d in doc["do"] if d["what"] == "relist"]
-    assert relists("2026-08-03T10:00:00+02:00", 3) == [
-        ("relist Dead", [["once the listing ends", "2026-08-03T10:00:00+02:00", "time"]])], \
-        "his listing ends before two of the three offers to come: relist him once it does"
-    assert relists("2026-08-03T10:00:00+02:00", 1) == relists("2026-08-05T10:00:00+02:00", 3) == [], \
-        "a listing that outlasts the offers to come needs nothing"
+        return [(d["what"], "dead" in d["label"], d["players"] if "players" in d else None) for d in doc["do"]
+                if d["what"] == "list" and "Dead" in d["label"].title()]
+    soon, late = listed_again("2026-08-03T10:00:00+02:00", 3), listed_again("2026-08-05T10:00:00+02:00", 3)
+    assert [w for w, *_ in soon] == ["list"] and late == [], \
+        "one rule: a listing that ends before the offers to come is listed again like one that is not listed, one line"
+    assert listed_again("2026-08-03T10:00:00+02:00", 1) == [], "a listing that outlasts the offers to come needs nothing"
 
     # a sale beside the plan's buy
     def hedge(offer: float, waits: float, nights: int, win: float = 0.5, worth: float = -5.0) -> Doc:

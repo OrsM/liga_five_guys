@@ -1814,10 +1814,10 @@ FROM decision_plan p JOIN board_run USING (run_id);
 --   (a sale: after the auctions when the plan bids (decision.schedule: once you
 --   know they are won, to the game at his value), else take tonight's
 --   offer, or wait for what waiting is worth, or it is listed, or list
---   it); your players not listed, rising first: the game
+--   it); your players to list, rising first: those not listed and those whose
+--   listing ends before the last offer before the lock (when, as a fact); the game
 --   offers only for those listed, listing costs nothing and a listed player
---   still plays for you; and those whose listing ends before the last
---   offer before the lock, to relist once it does.
+--   still plays for you.
 DROP VIEW IF EXISTS board_rows;
 CREATE VIEW board_rows AS
 WITH gap AS MATERIALIZED (SELECT * FROM lineup_gap),
@@ -1868,22 +1868,19 @@ unlisted AS (
     SELECT 2000, 'list',
            'list ' || group_concat(name, ', ' ORDER BY -coalesce(trend, 0.0), player), NULL, NULL,
            NULL, NULL, 0, NULL, 'season',
-           (SELECT json_group_array(json_array('rising', rising, 'names')) FROM (
-                SELECT group_concat(name, ', ' ORDER BY -trend, player) AS rising
-                FROM bm WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL),
+           (SELECT json_group_array(json(f)) FROM (
+                SELECT json_array('rising', rising, 'names') AS f FROM (
+                    SELECT group_concat(name, ', ' ORDER BY -trend, player) AS rising
+                    FROM bm WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL
+                UNION ALL
+                SELECT json_array('once the listing ends', min(relist_after), 'time')
+                FROM bm WHERE relist_after IS NOT NULL HAVING count(*) > 0)),
            json_group_array(player)
-    FROM bm WHERE NOT listed AND NOT sell HAVING count(*) > 0),
-relist AS (
-    SELECT 1999, 'relist',
-           'relist ' || group_concat(name, ', ' ORDER BY relist_after, -coalesce(trend, 0.0), player), NULL, NULL,
-           NULL, NULL, 0, NULL, 'season',
-           json_array(json_array('once the listing ends', min(relist_after), 'time')),
-           json_group_array(player)
-    FROM bm WHERE relist_after IS NOT NULL HAVING count(*) > 0)
+    FROM bm WHERE (NOT listed OR relist_after IS NOT NULL) AND NOT sell HAVING count(*) > 0)
 SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name,
        pos, step, amount, done, gain, per, facts, players
 FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM pulled UNION ALL SELECT * FROM sells
-      UNION ALL SELECT * FROM unlisted UNION ALL SELECT * FROM relist);
+      UNION ALL SELECT * FROM unlisted);
 
 -- The board's headline: when the next jornada locks (next_lock), your money, where you
 -- are expected to finish and your chance of first, now and once the plan
