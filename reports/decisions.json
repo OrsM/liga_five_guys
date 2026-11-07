@@ -1,15 +1,15 @@
 {
- "generated_at": "2026-11-07T13:25Z",
+ "generated_at": "2026-11-07T14:43Z",
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -5190661.0,
  "cash_locked": 52686546.0,
- "finish": 2.44,
- "p_win": 0.068,
- "finish_after": 2.34,
- "p_win_after": 0.091,
+ "finish": 2.42,
+ "p_win": 0.1,
+ "finish_after": 2.32,
+ "p_win_after": 0.128,
  "band": [
-  1800.29333711545,
-  2051.75204845379
+  1890.41626078783,
+  2159.28664737814
  ],
  "do": [
   {
@@ -21,7 +21,7 @@
    "amount": 8489093.55499251,
    "done": false,
    "key": "12358",
-   "gain": 21.8922301742141,
+   "gain": 21.2396996768935,
    "per": "season",
    "facts": [
     [
@@ -46,7 +46,7 @@
     ],
     [
      "points",
-     21.8922301742141,
+     21.2396996768935,
      "points"
     ],
     [
@@ -210,7 +210,7 @@
    ],
    "flip": {
     "cash": -6262934.55499251,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": [
      "in debt at the lock"
     ]
@@ -286,7 +286,7 @@
    ],
    "flip": {
     "cash": -4531375.33975736,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": [
      "in debt at the lock"
     ]
@@ -586,7 +586,7 @@
  "ping": "buy Gabriel Suazo; sell Thomas Lemar; withdraw bid on Ferran Jutgla; withdraw bid on Aitor Paredes; list Martin Satriano, Pablo Fornals, Pepelu, Georges Mikautadze, German Valera, Guido Rodriguez, Adria Pedrosa, Dani Martinez, Arnau Ortiz, Natan, Marcos Alonso, Iñigo Vicente, Fernando Niño, Mathew Ryan, Gerard Martin, Robin Le Normand, Roger Hinojo, Augusto Batalla",
  "plan_flip": {
   "cash": 2885444.66024264,
-  "points": 21.8922301742143,
+  "points": 21.2396996768935,
   "blockers": []
  },
  "buys": [
@@ -602,7 +602,7 @@
    "amount": 8489093.55499251,
    "done": false,
    "key": "12358",
-   "gain": 21.8922301742141,
+   "gain": 21.2396996768935,
    "per": "season",
    "facts": [
     [
@@ -627,7 +627,7 @@
     ],
     [
      "points",
-     21.8922301742141,
+     21.2396996768935,
      "points"
     ],
     [
@@ -747,7 +747,7 @@
    ],
    "flip": {
     "cash": -10870953.3397574,
-    "points": 24.9995683765937,
+    "points": 24.3470378792729,
     "blockers": [
      "in debt at the lock"
     ]
@@ -879,7 +879,7 @@
    ],
    "flip": {
     "cash": -6262934.55499251,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": [
      "in debt at the lock"
     ]
@@ -959,7 +959,7 @@
    ],
    "flip": {
     "cash": -4531375.33975736,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": [
      "in debt at the lock"
     ]
@@ -1067,7 +1067,7 @@
    ],
    "flip": {
     "cash": 8932101.66024264,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": []
    },
    "more": false,
@@ -1180,7 +1180,7 @@
    ],
    "flip": {
     "cash": 7166568.44200926,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": []
    },
    "more": true,
@@ -1286,7 +1286,7 @@
    ],
    "flip": {
     "cash": 4634210.66024264,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": []
    },
    "more": true,
@@ -1399,7 +1399,7 @@
    ],
    "flip": {
     "cash": 3554504.93569694,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": []
    },
    "more": true,
@@ -1465,7 +1465,7 @@
    ],
    "flip": {
     "cash": 3544992.66024264,
-    "points": 21.8922301742143,
+    "points": 21.2396996768935,
     "blockers": []
    },
    "more": true,
@@ -1494,7 +1494,7 @@
    "amount": 3574742.72161563,
    "done": false,
    "key": "5587",
-   "gain": -10.8057047055006,
+   "gain": -10.8057047055004,
    "per": "season",
    "facts": [
     [
@@ -1549,7 +1549,7 @@
     ],
     [
      "points",
-     -10.8057047055006,
+     -10.8057047055004,
      "points"
     ],
     [
@@ -1576,7 +1576,7 @@
    ],
    "flip": {
     "cash": 6460187.38185826,
-    "points": 17.5959214276929,
+    "points": 17.1884924849653,
     "blockers": []
    },
    "more": true,
@@ -1605,7 +1605,7 @@
    "amount": 53088568.4074324,
    "done": false,
    "key": "12139",
-   "gain": -14.0329086737079,
+   "gain": -14.0329086737077,
    "per": "season",
    "facts": [
     [
@@ -1660,7 +1660,7 @@
     ],
     [
      "points",
-     -14.0329086737079,
+     -14.0329086737077,
      "points"
     ],
     [
@@ -1687,7 +1687,7 @@
    ],
    "flip": {
     "cash": 55974013.067675,
-    "points": 8.48118770439373,
+    "points": 8.13569089796556,
     "blockers": []
    },
    "more": true,
@@ -1793,7 +1793,7 @@
    ],
    "flip": {
     "cash": 28381025.6602426,
-    "points": 16.3879612773496,
+    "points": 16.1428597227564,
     "blockers": []
    },
    "more": true,
@@ -1824,7 +1824,7 @@
    "amount": 52916867.0,
    "done": false,
    "key": "7081",
-   "gain": -15.9524501031121,
+   "gain": -15.9524501031119,
    "per": "season",
    "facts": [
     [
@@ -1874,7 +1874,7 @@
     ],
     [
      "points",
-     -15.9524501031121,
+     -15.9524501031119,
      "points"
     ],
     [
@@ -1901,7 +1901,7 @@
    ],
    "flip": {
     "cash": 55802311.6602426,
-    "points": 6.07263455225075,
+    "points": 5.55857389001653,
     "blockers": []
    },
    "more": true,
@@ -2004,7 +2004,7 @@
    ],
    "flip": {
     "cash": 27784344.2977014,
-    "points": -1.82036785548121,
+    "points": -2.30433449699603,
     "blockers": []
    },
    "more": true,
@@ -2033,7 +2033,7 @@
    "amount": 55164221.5703321,
    "done": false,
    "key": "11813",
-   "gain": -34.5937170291529,
+   "gain": -34.5937170291527,
    "per": "season",
    "facts": [
     [
@@ -2088,7 +2088,7 @@
     ],
     [
      "points",
-     -34.5937170291529,
+     -34.5937170291527,
      "points"
     ],
     [
@@ -2144,7 +2144,7 @@
    "amount": 24587647.6237906,
    "done": false,
    "key": "8496",
-   "gain": -37.8320678796404,
+   "gain": -37.8320678796401,
    "per": "season",
    "facts": [
     [
@@ -2199,7 +2199,7 @@
     ],
     [
      "points",
-     -37.8320678796404,
+     -37.8320678796401,
      "points"
     ],
     [
@@ -2226,7 +2226,7 @@
    ],
    "flip": {
     "cash": 27473092.2840333,
-    "points": -15.3104005824375,
+    "points": -15.6558973888657,
     "blockers": []
    },
    "more": true,
@@ -2255,7 +2255,7 @@
    "amount": 39017276.1344736,
    "done": false,
    "key": "12641",
-   "gain": -39.3896125254635,
+   "gain": -39.3896125254632,
    "per": "season",
    "facts": [
     [
@@ -2310,7 +2310,7 @@
     ],
     [
      "points",
-     -39.3896125254635,
+     -39.3896125254632,
      "points"
     ],
     [
@@ -2337,7 +2337,7 @@
    ],
    "flip": {
     "cash": 41902720.7947162,
-    "points": -4.27221273899886,
+    "points": -4.27221273899863,
     "blockers": []
    },
    "more": true,
@@ -2366,7 +2366,7 @@
    "amount": null,
    "done": false,
    "key": "7676",
-   "gain": -50.6558749476608,
+   "gain": -73.6548640650037,
    "per": "season",
    "facts": [
     [
@@ -2376,7 +2376,7 @@
     ],
     [
      "points",
-     -50.6558749476608,
+     -73.6548640650037,
      "points"
     ],
     [
@@ -2403,7 +2403,7 @@
    ],
    "flip": {
     "cash": 14875836.6602426,
-    "points": -15.074322519109,
+    "points": -38.073311636452,
     "blockers": []
    },
    "more": true,
@@ -2432,7 +2432,7 @@
    "amount": 22478920.6837923,
    "done": false,
    "key": "7658",
-   "gain": -52.1332220599259,
+   "gain": -75.4276805997217,
    "per": "season",
    "facts": [
     [
@@ -2487,7 +2487,7 @@
     ],
     [
      "points",
-     -52.1332220599259,
+     -75.4276805997217,
      "points"
     ],
     [
@@ -2514,7 +2514,7 @@
    ],
    "flip": {
     "cash": 25364365.3440349,
-    "points": -16.5516696313741,
+    "points": -39.84612817117,
     "blockers": []
    },
    "more": true,
@@ -2543,7 +2543,7 @@
    "amount": 53632639.1417026,
    "done": false,
    "key": "2715",
-   "gain": -53.0476445621487,
+   "gain": -76.5249876023893,
    "per": "season",
    "facts": [
     [
@@ -2588,7 +2588,7 @@
     ],
     [
      "points",
-     -53.0476445621487,
+     -76.5249876023893,
      "points"
     ],
     [
@@ -2615,7 +2615,7 @@
    ],
    "flip": {
     "cash": 56518083.8019453,
-    "points": -17.4660921335969,
+    "points": -40.9434351738373,
     "blockers": []
    },
    "more": true,
@@ -2643,7 +2643,7 @@
    "plan": false,
    "amount": 57892003.4231206,
    "done": false,
-   "gain": -65.3283896671594,
+   "gain": -91.2618817284019,
    "per": "season",
    "facts": [
     [
@@ -2698,7 +2698,7 @@
     ],
     [
      "points",
-     -65.3283896671594,
+     -91.2618817284019,
      "points"
     ],
     [
@@ -2834,7 +2834,7 @@
    ],
    "flip": {
     "cash": 22357465.9410378,
-    "points": -147.227674961173,
+    "points": -147.880205458494,
     "blockers": []
    },
    "more": true,
@@ -2871,16 +2871,6 @@
    "clause": 46177257.0
   },
   {
-   "name": "Martin Satriano",
-   "pos": "DEL",
-   "clause": 19454339.0
-  },
-  {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
-   "clause": 31271675.0
-  },
-  {
    "name": "German Valera",
    "pos": "MED",
    "clause": 19674724.0
@@ -2894,6 +2884,16 @@
    "name": "Guido Rodriguez",
    "pos": "MED",
    "clause": 11990392.0
+  },
+  {
+   "name": "Martin Satriano",
+   "pos": "DEL",
+   "clause": 19454339.0
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "clause": 31271675.0
   },
   {
    "name": "Fernando Niño",
@@ -2993,28 +2993,28 @@
   {
    "name": "Pablo Fornals",
    "pos": "MED",
-   "next": 5.46936646419192,
+   "next": 6.5632397570303,
    "xi": true,
    "sold": false
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "next": 4.17927118077837,
+   "next": 5.01512541693404,
    "xi": true,
    "sold": false
   },
   {
    "name": "Pepelu",
    "pos": "MED",
-   "next": 3.01761972436687,
+   "next": 3.62114366924025,
    "xi": true,
    "sold": false
   },
   {
    "name": "Guido Rodriguez",
    "pos": "MED",
-   "next": 2.95613532936997,
+   "next": 3.54736239524396,
    "xi": true,
    "sold": false
   },
@@ -3108,18 +3108,18 @@
    "manager": "BurtonGM89",
    "me": false,
    "now": 573.0,
-   "lo": 1991.19151841465,
-   "hi": 2279.31738416912,
+   "lo": 2056.90150032771,
+   "hi": 2355.17038627207,
    "cash": 14853736.0,
    "estimated": true,
-   "p_above": 0.919590912503809
+   "p_above": 0.876252962926663
   },
   {
    "manager": "miguel_autentico",
    "me": true,
    "now": 573.0,
-   "lo": 1800.29333711545,
-   "hi": 2051.75204845379,
+   "lo": 1890.41626078783,
+   "hi": 2159.28664737814,
    "cash": -5190661.0,
    "estimated": false,
    "p_above": null
@@ -3128,31 +3128,31 @@
    "manager": "Albert Laporta",
    "me": false,
    "now": 464.0,
-   "lo": 1777.52171365874,
-   "hi": 2043.72086110023,
+   "lo": 1870.88933621624,
+   "hi": 2160.75877605552,
    "cash": 64103462.0,
    "estimated": true,
-   "p_above": 0.457076791516889
+   "p_above": 0.476665969804644
   },
   {
    "manager": "SusoGattuso",
    "me": false,
    "now": 416.0,
-   "lo": 1596.53596186705,
-   "hi": 1833.96040918516,
+   "lo": 1677.07007152182,
+   "hi": 1929.39683204174,
    "cash": 9908831.0,
    "estimated": true,
-   "p_above": 0.0591295140032071
+   "p_above": 0.0617176585975177
   },
   {
    "manager": "Magic Mike 333",
    "me": false,
    "now": 460.0,
-   "lo": 1444.14979694214,
-   "hi": 1656.71721874433,
+   "lo": 1504.02338553505,
+   "hi": 1730.3349500239,
    "cash": 64293671.0,
    "estimated": true,
-   "p_above": 0.00172953172274104
+   "p_above": 0.00147338971200373
   }
  ]
 }
