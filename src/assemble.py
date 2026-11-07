@@ -244,17 +244,24 @@ def _selftest_points() -> None:
             set_now(snapshot_stamp("2026-08-04T0000Z"))
             store_sql("market", [
                 {"observed_at": a, "ff_id": "1", "club": "x"},
-                {"observed_at": a, "ff_id": "2", "club": "y"}])
+                {"observed_at": a, "ff_id": "2", "club": "y"},
+                {"observed_at": a, "ff_id": "3", "club": "w"}, {"observed_at": a, "ff_id": "4", "club": "w"}])
             store_sql("matches", [
                 {"observed_at": a, "match_id": "m1", "jornada": "1", "home": "x",
                  "away": "y", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"},
                 {"observed_at": later, "match_id": "m2", "jornada": "2",
-                 "home": "x", "away": "z", "score": "1-0", "kickoff": ""}])
+                 "home": "x", "away": "z", "score": "1-0", "kickoff": ""},
+                {"observed_at": a, "match_id": "m3", "jornada": "1", "home": "w",
+                 "away": "v", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"}])
             store_sql("points", [
                 {"observed_at": a, "season": "2025-26", "ff_id": "1",
                  "points": "90", "games": "30"},
                 *({"observed_at": a, "season": "2026-27", "ff_id": k,
                    "points": "0", "games": "0"} for k in "12"),
+                # the first fetch of the season is the season so far: one game is that game's (3 played jornada 1),
+                # more is no one jornada's (4 started the tool mid-season)
+                {"observed_at": a, "season": "2026-27", "ff_id": "3", "points": "4", "games": "1"},
+                {"observed_at": a, "season": "2026-27", "ff_id": "4", "points": "60", "games": "20"},
                 {"observed_at": b, "season": "2026-27", "ff_id": "1",
                  "points": "5", "games": "1"},
                 {"observed_at": later, "season": "2026-27", "ff_id": "1",
@@ -262,7 +269,7 @@ def _selftest_points() -> None:
                 {"observed_at": later, "season": "2026-27", "ff_id": "2",
                  "points": "3", "games": "1"}])
             assert set(rows("SELECT player, jornada, pts, at FROM scored")) == {
-                ("1", 1, 5.0, b), ("1", 2, 7.0, later), ("2", 1, 3.0, later)}
+                ("1", 1, 5.0, b), ("1", 2, 7.0, later), ("2", 1, 3.0, later), ("3", 1, 4.0, a)}
             record([{"player_id": k, "ff_slug": slug} for k, slug in
                     [("1", "uno"), ("2", "dos"), ("3", "tres")]], "crosswalk")
             store_sql("starters", [
@@ -275,7 +282,7 @@ def _selftest_points() -> None:
             assert set(rows("SELECT player, jornada FROM appearances")) == {("1", 1), ("1", 2), ("2", 1)}, \
                 "started or came on, not an unused sub"
             got = {k: r for k, *r in rows("SELECT player, pts, apps, squads, pick FROM season_record")}
-            assert {k: tuple(r[:3]) for k, r in got.items()} == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0)}, \
+            assert {k: tuple(r[:3]) for k, r in got.items()} == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0), "3": (4.0, 0.0, 1.0)}, \
                 "a starter the match unless he came off, a sub from when he came on"
             assert abs(got["1"][3] - (model.PICK_K * model.NEUTRAL_START / 100 + 2) / (model.PICK_K + 2)) < 1e-12, \
                 "his record pulled toward NEUTRAL_START, worth PICK_K matches"

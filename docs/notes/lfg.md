@@ -123,6 +123,14 @@ golden compares decisions exactly and floats with `isclose`. Pages stay one rend
   player-jornadas: raw site Brier 0.147, the old pull toward his record of selection (PICK_K) 0.168, and the pull
   inflated low listings (site 5% -> model 12%, site 26% -> 41%, they started 19%). PICK_K and NEUTRAL_START apply only to
   a player listed with no %, or not listed.
+- **Forecast audit 2026-11-07** (four agents, then each claim re-measured): calibration is good (slope 0.98); the
+  biggest misses are noise (31 of the 40 worst over-forecasts played and scored 0 or less; all 40 worst under-forecasts
+  were real 13-24 point games). Fixed: `scored` dropped jornada 1's points (the first fetch holds one game, credited to
+  the club's first jornada: 61 players, 14% of graded error); ABSENT_START 15 -> 2 (1.8% of 4192 cells played).
+  Measured and not done: home/away edge (goals 1.44x but points 1.13x; a 6% edge cuts RMSE 3.626 -> 3.616, goalkeepers
+  worse); shrinking the start % toward the base rate by distance (helps only from 3 jornadas out, by under 1.5% Brier).
+  Open, needs its formulation agreed first: shrinking a move's gain for selection (plan buys of 3+ points earn about 19%
+  less than predicted, sales about 54% less: from grade_decisions, not re-checked).
 - **Constants:** `PERSISTENT_SHARE`, `CONFIDENCE` etc. set vs measured (0.08 vs 0.087; 0.70 vs 0.719).
 
 ## 5. The reasoning behind the plan [plan, gain]

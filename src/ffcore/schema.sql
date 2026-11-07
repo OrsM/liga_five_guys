@@ -1271,8 +1271,9 @@ UNION ALL SELECT away, jornada, at FROM g WHERE away <> '';
 
 -- Points: each change in a player's points total this season, credited
 -- to the jornada of his club's last match by then (any club's, if his club
--- is not known); not the first fetch's, which is the season so far. id
--- is the points row's: the order they were stored.
+-- is not known); not the first fetch's, which is the season so far, unless
+-- it holds a single game (the season's first, a jornada's). id is the points
+-- row's: the order they were stored.
 DROP VIEW IF EXISTS scored;
 CREATE VIEW scored AS
 WITH s AS (SELECT max(season) AS season, min(observed_at) AS first FROM points
@@ -1288,10 +1289,12 @@ g AS MATERIALIZED (SELECT club, jornada, at FROM club_games
                    UNION ALL SELECT '*', jornada, at FROM club_games),
 credited AS (
     SELECT p.ff_id AS player, p.at, p.id, p.points - p.points0 AS pts, p.games - p.games0 AS games,
-           (SELECT g.jornada FROM g WHERE g.club = coalesce(c.club, '*') AND g.at <= p.at
-            ORDER BY g.at DESC, g.jornada DESC LIMIT 1) AS jornada
+           CASE WHEN p.at = s.first     -- a single game seen at the first fetch: his club's first jornada
+                THEN (SELECT min(g.jornada) FROM g WHERE g.club = coalesce(c.club, '*'))
+                ELSE (SELECT g.jornada FROM g WHERE g.club = coalesce(c.club, '*') AND g.at <= p.at
+                      ORDER BY g.at DESC, g.jornada DESC LIMIT 1) END AS jornada
     FROM p, s LEFT JOIN c ON c.ff_id = p.ff_id
-    WHERE p.at > s.first AND NOT (p.points IS p.points0 AND p.games IS p.games0))
+    WHERE (p.at > s.first OR p.games <= 1) AND NOT (p.points IS p.points0 AND p.games IS p.games0))
 SELECT player, jornada, pts, at, id FROM credited WHERE jornada IS NOT NULL;
 
 -- Who was in each matchday squad (starters and subs) and his minutes: a
