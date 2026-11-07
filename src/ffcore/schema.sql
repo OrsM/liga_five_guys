@@ -1607,12 +1607,17 @@ f AS MATERIALIZED (SELECT * FROM club_fixture),
 o AS MATERIALIZED (SELECT * FROM club_rating),
 rt AS MATERIALIZED (SELECT * FROM forecast_rate),
 ft AS MATERIALIZED (SELECT * FROM forecast_fit),
+nx AS MATERIALIZED (SELECT jornada AS nx FROM round_locks WHERE lock > (SELECT cut()) ORDER BY lock LIMIT 1),
+st AS MATERIALIZED (SELECT player, pct FROM player_status WHERE status IS NOT NULL AND status <> 'gone' AND pct IS NOT NULL),
 x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, ft.fit,
+             -- a flagged player's listing gives his start % for the next jornada not yet locked: that, as it says
+             CASE WHEN st.pct IS NOT NULL AND f.jornada = nx.nx THEN st.pct / 100.0 END AS says,
              coalesce(CASE WHEN c.pos IN ('POR', 'DEF') THEN 1.0 / o.attack ELSE o.defence END, 1.0) AS fixture
       FROM c JOIN f ON f.club = c.club JOIN rt USING (player)
       JOIN ft ON ft.player = c.player AND ft.jornada = f.jornada
+      LEFT JOIN nx ON 1 LEFT JOIN st ON st.player = c.player
       LEFT JOIN o ON o.club = f.opp)
-SELECT player, jornada, max(0.0, ppm * fixture) AS pts, picked * fit AS p, ppm, fixture, picked, fit FROM x;
+SELECT player, jornada, max(0.0, ppm * fixture) AS pts, coalesce(says, picked * fit) AS p, ppm, fixture, picked, fit FROM x;
 
 
 -- The board: the last run's decisions and the facts it saw (the decision's

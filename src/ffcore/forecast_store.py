@@ -309,9 +309,11 @@ def _selftest_forecast() -> None:
                                                      " FROM forecast_now")}
             assert set(cells) == {(p, j) for p in ("fwd", "back", "hurt", "susp", "dbt", "gone") for j in (2, 3)} \
                 | {("cee", 3)}, "every jornada left his club plays; a coach, a player with no club: none"
+            site = {("hurt", 2): 0.0, ("susp", 2): 0.0, ("dbt", 2): 0.5}   # flagged, with a start % for his next match
             for (p, j), (pts, pr, ppm, fix, picked, fit) in cells.items():
-                assert abs(pts - max(0.0, ppm * fix)) < 1e-12 and abs(pr - picked * fit) < 1e-12, \
-                    "points if he plays = ppm x fixture; the chance he plays = picked x fit"
+                assert abs(pts - max(0.0, ppm * fix)) < 1e-12, "points if he plays = ppm x fixture"
+                assert abs(pr - site.get((p, j), picked * fit)) < 1e-12, \
+                    "the chance he plays = picked x fit; for a flagged player's next match, the listing's start %, as it says"
             assert abs(cells["fwd", 2][3] - rating["b"][1]) < 1e-12, "an attacker: his opponent's defence"
             assert abs(cells["back", 2][3] - 1 / rating["b"][0]) < 1e-12, "a defender: 1 / its attack"
             assert cells["cee", 3][3] == 1.0, "an opponent with no rating: 1"
