@@ -141,9 +141,16 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
                     if best is None or gain > best[0] + 1e-9:
                         best = (gain, steps)
     steps = best[1] if best else []
-    whole = total(steps)
-    steps = [(*step[:5], whole - total(without(steps, step[1], step[2]))) for step in steps]    # each its marginal in the plan
+    steps = [(*step[:5], w) for step, w in zip(steps, marginals(inp, steps, e, js, pts))]     # each its marginal in the plan
     return steps, cands.alone
+
+
+def marginals(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], real: dict[tuple[str, int], float],
+              js: list[int], score: Callable[[frozenset[str]], dict[int, float]] | None = None) -> list[float]:
+    """Each step's worth: the plan's less the plan without it (without), by worth_on. real is the points
+    to judge by: the forecast (what the plan stamps) or what was scored (what grading sets against it)."""
+    whole = worth_on(inp, steps, real, js, score)[1]
+    return [whole - worth_on(inp, without(steps, step[1], step[2]), real, js, score)[1] for step in steps]
 
 
 def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], real: dict[tuple[str, int], float],
@@ -802,6 +809,12 @@ def _selftest_search(n: int = 12, seed: int = 1, strict: bool = True) -> list[fl
             for step in plan_steps:     # a step's worth is its marginal in the plan: the plan's less the plan without it
                 assert abs(step[5] - (expected_gap(inp, plan_steps) - expected_gap(inp, without(plan_steps, step[1], step[2])))) < 1e-9, \
                     "each step's worth is what the plan loses without it, from the one measure"
+            on_e = {(k, j): x for k, j, x in inp["cell"]}
+            assert marginals(inp, plan_steps, on_e, [1, 2, 3]) == [step[5] for step in plan_steps], \
+                "the marginals on the forecast are the worth the plan stamped"
+            blank = {key: 0.0 for key in on_e}
+            for step, got_ in zip(plan_steps, marginals(inp, plan_steps, blank, [1, 2, 3])):
+                assert got_ <= 1e-9, "when nobody scores, no step of the plan is worth anything"
             assert (feasible(plan_steps) or best == 0.0) and abs(gap) < 1e-6, \
                 "the plan is feasible and as good as the best mix of any buys and up to three sales"
         elif gap > 1e-6:

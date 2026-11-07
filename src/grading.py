@@ -137,50 +137,44 @@ def label(kind: str, k: str, names: dict[str, str]) -> str:
 
 
 def decisions() -> list[dict[str, Any]]:
-    """Make each past lock's decision again with this code (decision.plan)
-    and set every move it valued alone (decision.options) against what its players
-    then scored: the change in points it forecast (players got minus players
-    sold) over the jornadas played since, and the change that happened; and
-    the value its players were to gain (bought) or lose (sold) over the
-    price horizon, in millions, against what they did."""
+    """Make each past lock's plan again with this code (decision.plan_rows) and set each of its steps, as the
+    plan values it (decision.marginals: the plan's worth less the plan without the step, by worth_on), against
+    the same on what its players then scored: the points the step was forecast to add over the jornadas played
+    since, and what it added; and the value its player was to gain (bought) or lose (sold) over the price
+    horizon, in millions, against what he did."""
     locks, actual = round_locks(), jornada_points()
     done = done_jornadas()
     made = []
     for i in at_locks():
-        decision.plan()
-        moved = decision.options()
-        moving = {k for _kind, k, *_ in moved}
-        e = {(k, j): x for k, j, x in rows("SELECT player, jornada, e FROM cell") if k in moving}
+        inp = decision.read_inputs()
+        steps, _ = decision.plan_rows(inp)
+        e = {(k, j): x for k, j, x in inp["cell"]}
         seen = {k: (name, value or 0.0, trend or 0.0) for k, name, value, trend in rows(
             "SELECT r.player, name_shown(coalesce(nullif(r.name, ''), r.player)), r.value, t.trend"
             " FROM player_roster r LEFT JOIN price_trend t ON t.ff_id = r.player")}
-        made.append((i, moved, e, seen, set(rounds().rem), price_momentum().horizon))
+        made.append((i, inp, steps, e, seen, set(rounds().rem), price_momentum().horizon))
     out = []
-    for i, moved, e, seen, rem, horizon in made:
+    for i, inp, steps, e, seen, rem, horizon in made:
         # what happened is read with t put back: as of the lock, no later price is seen
         rose = price_change(locks[i].strftime("%Y-%m-%d"), horizon)
         later = sorted(j for j in done if j >= i and j in rem)
         names = {k: f[0] for k, f in seen.items()}
+        forecast = decision.marginals(inp, steps, e, later)
+        happened = decision.marginals(inp, steps, actual, later)
 
         def worth(kind: str, k: str, pct: Callable[[str], float | None]) -> float | None:
-            """What the move's player was worth more (bought) or less
+            """What the step's player was worth more (bought) or less
             (sold) after the horizon, in millions; None until it has passed."""
             got = pct(k)
             if got is None:
                 return None
             value = seen[k][1] if k in seen else 0.0
             return (1 if kind == "buy" else -1) * value * got / 100e6
-
-        def change(kind: str, k: str, pts: Callable[[str, int], float]) -> float:
-            return (1 if kind == "buy" else -1) * sum(pts(k, j) for j in later)
-        for kind, k, amount, in_plan in moved:
+        for (_, kind, k, *_), pred, real in zip(steps, forecast, happened):
             out.append({
                 "lock": i, "jornadas": len(later), "move": label(kind, k, names),
-                "group": "plan" if in_plan else "left out",
-                "kind": "sell" if kind == "sell" else "get",
-                "chance": None,
-                "pred": change(kind, k, lambda k, j: e.get((k, j), 0.0)),
-                "real": change(kind, k, lambda k, j: actual.get((k, j), 0.0)),
+                "group": "plan", "kind": "sell" if kind == "sell" else "get",
+                "chance": None, "pred": pred, "real": real,
                 "value_pred": worth(kind, k, lambda k: seen[k][2] if k in seen else 0.0),
                 "value_real": worth(kind, k, lambda k: rose.get(k))})
     return out

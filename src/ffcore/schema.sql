@@ -438,18 +438,18 @@ CREATE TABLE IF NOT EXISTS board_history_moves (
     PRIMARY KEY (generated_at, ord)
 );
 
--- Every move each replayed board ranked, against what its players then did.
+-- Every step of each replayed lock's plan, against what its players then did.
 CREATE TABLE IF NOT EXISTS grade_decisions (
     run_id     INTEGER NOT NULL REFERENCES runs(run_id),
     ord        INTEGER NOT NULL,
     lock       INTEGER NOT NULL,   -- the jornada whose lock it was ranked at
     move       TEXT NOT NULL,
-    reached    TEXT NOT NULL,      -- plan, left out (cleared, rejected before 2026-10-28)
+    reached    TEXT NOT NULL,      -- plan (left out: graded alone before this code; cleared, rejected before 2026-10-28)
     kind       TEXT NOT NULL,      -- get, sell
     chance     REAL,               -- chance it leaves you better off (ffcore.gain)
     jornadas   INTEGER,            -- jornadas played since
-    pred       REAL,               -- points change forecast over them
-    real       REAL,               -- points change that happened
+    pred       REAL,               -- the step's marginal in the plan on the forecast over them (worth_on)
+    real       REAL,               -- the same on the points scored
     value_pred REAL,               -- value change forecast, millions
     value_real REAL,
     PRIMARY KEY (run_id, ord)
