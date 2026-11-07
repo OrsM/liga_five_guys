@@ -19,7 +19,7 @@ from recommender import by_jornada, candidates, cells_of
 
 __all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN", "READ"]
 
-INPUTS = ("dec_hold", "dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_plan", "dec_start")
+INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_plan", "dec_start")
 
 
 def inputs() -> None:
@@ -30,7 +30,7 @@ def inputs() -> None:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
         db.execute("INSERT INTO dec_state VALUES (?, ?, ?)", (DEBT_SHARE, SQUAD_MAX, XI_SIZE))
-        for t in ("dec_hold", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer"):
+        for t in ("dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer"):
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 
 
@@ -67,8 +67,6 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     e = {(k, j): x for k, j, x in inp["cell"]}
     js = sorted({j for _, j in e})
     limit = bid_limit(cash, team_value, debt)
-    held = {k for k, in inp.get("dec_hold", [])}     # players you hold back: neither bought nor sold
-    sellable = {k: got for k, got in mine.items() if k not in held}
 
     locks, closes, until = dict(inp.get("dec_lock", [])), dict(inp.get("dec_close", [])), dict(inp.get("dec_offer", []))
     soon = min(locks.values(), default=None)
@@ -119,10 +117,10 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     # the sales that pay for them (cover), the whole mix judged once by worth_on. A mix cannot gain more than its
     # buys do alone (a sale never raises the eleven, and a buy adds less once another is in), which prunes the sets.
     most = 3
-    sets_for = lru_cache(maxsize=None)(lambda here, due: sale_sets(lru_cache(maxsize=None)(lose(here, due)), sellable, len(here) - squad_max))
+    sets_for = lru_cache(maxsize=None)(lambda here, due: sale_sets(lru_cache(maxsize=None)(lose(here, due)), mine, len(here) - squad_max))
     worth = {(a, bid, win): w for a, s, bid, win, _, _, w in cands.alone if a}
     alone = {b: max(w for (a, *_), w in worth.items() if a == b) for b in cands.bids}
-    wanted = sorted((b for b in alone if alone[b] > 0 and b not in held), key=lambda b: (-alone[b], b))
+    wanted = sorted((b for b in alone if alone[b] > 0), key=lambda b: (-alone[b], b))
     floor = total([])
     best: tuple[float, list[tuple[Any, ...]]] | None = (0.0, []) if cash >= 0 else None  # standing pat, unless in debt
     for n in range(most + 1):
@@ -746,10 +744,6 @@ def _selftest_ledger() -> None:
     steps, _ = plan_rows(inp)
     assert [(kind, k) for _, kind, k, *_ in steps] == [("buy", "star"), ("sell", "z_now")], \
         "the buy is paid for by the sale that costs the fewest points in the jornadas it reaches"
-    held = plan_rows({**inp, "dec_hold": [("z_now",)]})[0]
-    assert [kind for _, kind, *_ in held] == ["buy", "sell"] and "z_now" not in {k for _, _, k, *_ in held}, \
-        "a player you hold back is not sold: the buy is paid for by another sale"
-    assert plan_rows({**inp, "dec_hold": [("star",)]})[0] == [], "nor is he bought: standing pat"
     due = schedule(inp, steps)
     assert due[0, "buy"].due == late and due[1, "sell"] == Due(late, AFTER_AUCTIONS), "cash at the lock is fine: sell after"
     assert after(inp, steps).blockers == [] and after(inp, [buy_star]).blockers == [("debt", 0.2e6 - 5e6)], \

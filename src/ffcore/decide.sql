@@ -62,10 +62,6 @@ CREATE TABLE IF NOT EXISTS dec_offer (
     player TEXT PRIMARY KEY,
     until  TEXT NOT NULL
 );
--- Players you hold back (hold): the plan neither buys nor sells them.
-CREATE TABLE IF NOT EXISTS dec_hold (
-    player TEXT PRIMARY KEY
-);
 DROP TABLE IF EXISTS dec_lock;
 CREATE TABLE dec_lock (
     jornada INTEGER PRIMARY KEY,
@@ -119,8 +115,6 @@ DROP VIEW IF EXISTS dec_lock_seen;
 CREATE VIEW dec_lock_seen AS
 SELECT jornada, strftime('%Y-%m-%dT%H:%MZ', stamp_jd(lock)) AS lock FROM round_locks WHERE lock > (SELECT cut());
 
-DROP VIEW IF EXISTS dec_hold_seen;
-CREATE VIEW dec_hold_seen AS SELECT player FROM hold;
 
 DROP VIEW IF EXISTS dec_offer_seen;
 CREATE VIEW dec_offer_seen AS

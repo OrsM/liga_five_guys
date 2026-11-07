@@ -83,13 +83,7 @@ REQ=$(ssh_phone "mv '$DEST/rerun.json' '$DEST/rerun.taken' 2>/dev/null && cat '$
 [ -n "$REQ" ] || exit 0
 echo "requested: $REQ"
 
-# What the page asked to hold back or let go (hold.json: changes, in order), taken as the request is and applied
-# before the run; a request that says "quick" only re-plans (the data as it is), not the whole chain.
-HOLD=$(ssh_phone "mv '$DEST/hold.json' '$DEST/hold.taken' 2>/dev/null && cat '$DEST/hold.taken' && rm -f '$DEST/hold.taken'" || true)
-if [ -n "$HOLD" ]; then
-    printf '%s' "$HOLD" > "$STATE/hold.json"
-    (cd "$HOME/claude_projects/liga_five_guys" && PYTHONPATH=src FF_ROOT=./data "$HOME/.local/bin/uv" run --frozen python src/hold.py "$STATE/hold.json") || true
-fi
+# A request that says "quick" only re-plans (the data as it is), not the whole chain.
 case "$REQ" in *'"quick"'*) export LFG_STAGES="sim publish" ;; esac
 
 echo $$ > "$LOCK"

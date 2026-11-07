@@ -113,8 +113,7 @@ golden compares decisions exactly and floats with `isclose`. Pages stay one rend
 - **The ledger:** `decision.sale_due` is the one rule for when a sale is due: after the last auction of its bids,
   unless the bids closing by the next lock leave cash short, then by the lock. A sale to a standing offer is due when
   the offer lapses (`dec_offer`, `lapses`): offers expire at the close, so such a sale cannot follow the auctions.
-- **Hold ("not this one"):** table `hold`, `dec_hold`; held players are neither bought nor sold; the page sends
-  changes, the box owns the set, `lfg-watch` re-plans quick (`LFG_STAGES="sim publish"`, ~40 s).
+- **Hold ("not this one") removed 2026-11-07:** a manual veto made the board disagree with itself (a +22 buy listed while the plan said to withdraw his bid); the objective decides, you decline a move by not pressing its button. Table `hold`, `dec_hold`, `src/hold.py`, the `held` board fields and `/api/fantasy-hold` are gone.
 - **Exact test:** `_selftest_search` compares the plan with every mix of any buys and up to three sales on seeded
   random leagues. Two bounds remain, neither in that test: at most three buys, and `cover` shortlists the ten
   sellable players who lose the fewest points per euro. Check them on real inputs before raising either.
@@ -192,7 +191,7 @@ Rule for each: the page decides nothing; any new number is a column from Decisio
 
 **Now: what wins the league**
 1. The plan block as one compact table (one row per move: action and price, points, "plan without it" column with red
-   blocker, bid chips, a small x for hold; facts behind a tap; head as one dense line). Points only: chance of first
+   blocker, bid chips, facts behind a tap; head as one dense line). Points only: chance of first
    per move was considered and dropped 2026-11-06 (too complex, forecasts too noisy). Check with `shot`.
 2. ~~Confirm sheet (U9)~~ done 2026-11-06: the confirm says points and cash after, from the board's numbers.
 
@@ -211,7 +210,7 @@ Rule for each: the page decides nothing; any new number is a column from Decisio
    `~/.local/share/lfg-stale-patches/`; `late_arrivals` redundancy; grade-stage speed (~250 s).
 
 **Done:** per-row `detail`; offer expiry; the plan in order with `cash_then` and due; blockers; deadline strip; one
-`show` formatter; the eleven as a pitch; hold end to end; one `Move` component; the plan on the first phone screen;
+`show` formatter; the eleven as a pitch; one `Move` component; the plan on the first phone screen;
 the `READ` list so the live plan sees locks, closes and offers.
 
 **Yours, not engineering:** account actions (bids, accepting offers, listing players: the game only offers for listed
