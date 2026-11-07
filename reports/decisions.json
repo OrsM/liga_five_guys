@@ -1,8 +1,8 @@
 {
- "generated_at": "2026-11-07T08:47Z",
+ "generated_at": "2026-11-07T09:04Z",
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -5190661.0,
- "cash_locked": 38930148.0,
+ "cash_locked": 52686546.0,
  "finish": 2.44,
  "p_win": 0.068,
  "finish_after": 2.42,
@@ -13,140 +13,13 @@
  ],
  "do": [
   {
-   "what": "field",
-   "label": "field Guido Rodriguez",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": 0.0613596599729331,
-   "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Adria Pedrosa",
-     "names"
-    ]
-   ],
-   "trace": [
-    21624801.0,
-    21530747.0,
-    21326915.0,
-    21029920.0,
-    20764366.0,
-    20512914.0,
-    20271021.0,
-    20014428.0,
-    19759822.0,
-    19481131.0,
-    19255695.0,
-    19060188.0,
-    18863704.0,
-    18637733.0
-   ],
-   "flip": null,
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": "54892898",
-     "bid": "",
-     "pos": "POR",
-     "value": 18637733.0
-    },
-    {
-     "player_team": "24338723",
-     "player": "3002",
-     "market": "54752103",
-     "bid": "",
-     "pos": "DEL",
-     "value": 23703605.0
-    },
-    {
-     "player_team": "111434450",
-     "player": "3099",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 46177257.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": "62681662",
-     "bid": "",
-     "pos": "DEL",
-     "value": 19454339.0
-    },
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": "50121325",
-     "bid": "",
-     "pos": "MED",
-     "value": 19674724.0
-    },
-    {
-     "player_team": "107909858",
-     "player": "3147",
-     "market": "61763382",
-     "bid": "",
-     "pos": "DEL",
-     "value": 48910208.0
-    },
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": "51255271",
-     "bid": "",
-     "pos": "DEF",
-     "value": 51320140.0
-    },
-    {
-     "player_team": "37280098",
-     "player": "3123",
-     "market": "51255255",
-     "bid": "",
-     "pos": "DEF",
-     "value": 23702133.0
-    },
-    {
-     "player_team": "24338726",
-     "player": "2464",
-     "market": "54752027",
-     "bid": "",
-     "pos": "MED",
-     "value": 43037578.0
-    },
-    {
-     "player_team": "112907378",
-     "player": "3128",
-     "market": "66158905",
-     "bid": "",
-     "pos": "MED",
-     "value": 11990392.0
-    },
-    {
-     "player_team": "107331405",
-     "player": "2757",
-     "market": "61356752",
-     "bid": "",
-     "pos": "DEF",
-     "value": 37608719.0
-    }
-   ]
-  },
-  {
    "name": "Ferran Jutgla",
    "pos": "DEL",
    "what": "buy",
    "label": "buy Ferran Jutgla",
-   "step": "bid up to",
+   "step": "bid in",
    "amount": 13756398.0,
-   "done": false,
+   "done": true,
    "key": "7842",
    "held": false,
    "gain": 3.10733820237942,
@@ -159,7 +32,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -223,7 +96,7 @@
      "player_team": null,
      "player": "2603",
      "market": "592885374",
-     "bid": "",
+     "bid": "57377635",
      "pos": "DEL",
      "value": 13754771.0
     }
@@ -640,7 +513,7 @@
    "name": null,
    "pos": null,
    "what": "relist",
-   "label": "relist Dani Martinez, Augusto Batalla, Robin Le Normand, Adria Pedrosa, Martin Satriano, Gerard Martin, Roger Hinojo, Georges Mikautadze, Natan, Pepelu, Marcos Alonso, Mathew Ryan, Miguel Roman, German Valera, Iñigo Vicente, Fernando Niño, Guido Rodriguez",
+   "label": "relist Dani Martinez, Augusto Batalla, Robin Le Normand, Adria Pedrosa, Martin Satriano, Gerard Martin, Roger Hinojo, Georges Mikautadze, Natan, Pepelu, Marcos Alonso, Mathew Ryan, Miguel Roman, German Valera, Iñigo Vicente, Fernando Niño, Guido Rodriguez, Arnau Ortiz",
    "step": null,
    "amount": null,
    "done": false,
@@ -654,25 +527,33 @@
     ]
    ],
    "trace": [
-    50381032.0,
-    49657041.0,
-    49426124.0,
-    49543920.0,
-    49777931.0,
-    50145529.0,
-    50603091.0,
-    51002239.0,
-    51304573.0,
-    51431572.0,
-    51468502.0,
-    51546607.0,
-    51491812.0,
-    51320140.0
+    670023.0,
+    669617.0,
+    668504.0,
+    666421.0,
+    663985.0,
+    661619.0,
+    659955.0,
+    661538.0,
+    661800.0,
+    661301.0,
+    660036.0,
+    659163.0,
+    658899.0,
+    659548.0
    ],
    "flip": null,
    "ranked": false,
    "accepts": [],
    "act": [
+    {
+     "player_team": "112496645",
+     "player": "3194",
+     "market": "66261317",
+     "bid": "",
+     "pos": "DEL",
+     "value": 659548.0
+    },
     {
      "player_team": "47459928",
      "player": "2543",
@@ -815,7 +696,7 @@
    "name": null,
    "pos": null,
    "what": "list",
-   "label": "list Pablo Fornals, Arnau Ortiz",
+   "label": "list Pablo Fornals",
    "step": null,
    "amount": null,
    "done": false,
@@ -829,20 +710,20 @@
     ]
    ],
    "trace": [
-    670023.0,
-    669617.0,
-    668504.0,
-    666421.0,
-    663985.0,
-    661619.0,
-    659955.0,
-    661538.0,
-    661800.0,
-    661301.0,
-    660036.0,
-    659163.0,
-    658899.0,
-    659548.0
+    41836807.0,
+    42082997.0,
+    42037202.0,
+    41720198.0,
+    41250796.0,
+    40916093.0,
+    40588348.0,
+    40398752.0,
+    41121791.0,
+    42115651.0,
+    43138395.0,
+    44188684.0,
+    45181907.0,
+    46177257.0
    ],
    "flip": null,
    "ranked": false,
@@ -850,14 +731,6 @@
     null
    ],
    "act": [
-    {
-     "player_team": "112496645",
-     "player": "3194",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 659548.0
-    },
     {
      "player_team": "111434450",
      "player": "3099",
@@ -871,7 +744,7 @@
  ],
  "cash_after": 1899263.99700177,
  "can_bid": 26353590.2,
- "ping": "field Guido Rodriguez; buy Ferran Jutgla; sell Thomas Lemar; withdraw bid on Gabriel Suazo; withdraw bid on Aitor Paredes; relist Dani Martinez, Augusto Batalla, Robin Le Normand, Adria Pedrosa, Martin Satriano, Gerard Martin, Roger Hinojo, Georges Mikautadze, Natan, Pepelu, Marcos Alonso, Mathew Ryan, Miguel Roman, German Valera, Iñigo Vicente, Fernando Niño, Guido Rodriguez; list Pablo Fornals, Arnau Ortiz",
+ "ping": "sell Thomas Lemar; withdraw bid on Gabriel Suazo; withdraw bid on Aitor Paredes; relist Dani Martinez, Augusto Batalla, Robin Le Normand, Adria Pedrosa, Martin Satriano, Gerard Martin, Roger Hinojo, Georges Mikautadze, Natan, Pepelu, Marcos Alonso, Mathew Ryan, Miguel Roman, German Valera, Iñigo Vicente, Fernando Niño, Guido Rodriguez, Arnau Ortiz; list Pablo Fornals",
  "held": [
   {
    "key": "12358",
@@ -977,12 +850,12 @@
    "pos": "DEL",
    "what": "buy",
    "label": "buy Ferran Jutgla",
-   "step": "bid up to",
+   "step": "bid in",
    "price": 13756398.0,
    "trend": -0.514779189449551,
    "plan": true,
    "amount": 13756398.0,
-   "done": false,
+   "done": true,
    "key": "7842",
    "held": false,
    "gain": 3.10733820237942,
@@ -995,7 +868,7 @@
     ],
     [
      "bids",
-     "none yet",
+     "only yours",
      "count"
     ],
     [
@@ -1059,7 +932,7 @@
      "player_team": null,
      "player": "2603",
      "market": "592885374",
-     "bid": "",
+     "bid": "57377635",
      "pos": "DEL",
      "value": 13754771.0
     }
@@ -1733,8 +1606,8 @@
   {
    "name": "Arnau Ortiz",
    "pos": "DEL",
-   "what": "list",
-   "label": "list Arnau Ortiz",
+   "what": "sell",
+   "label": "sell Arnau Ortiz",
    "step": null,
    "offer": null,
    "waiting": null,
@@ -1742,6 +1615,8 @@
    "plan": false,
    "amount": null,
    "done": false,
+   "key": "11579",
+   "held": false,
    "gain": 0.0,
    "per": "season",
    "facts": [
@@ -1777,17 +1652,19 @@
     658899.0,
     659548.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 2558811.99700177,
+    "points": 3.10733820237942,
+    "blockers": []
+   },
    "more": true,
-   "accepts": [
-    null
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "112496645",
      "player": "3194",
-     "market": null,
-     "bid": null,
+     "market": "66261317",
+     "bid": "",
      "pos": "DEL",
      "value": 659548.0
     }
@@ -3182,7 +3059,7 @@
    "future": "nothing",
    "blocker": "debt",
    "label": "if you do nothing: in debt at the lock",
-   "amount": -44120809.0
+   "amount": -57877207.0
   }
  ],
  "exposed": [
