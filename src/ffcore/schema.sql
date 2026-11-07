@@ -923,10 +923,6 @@ CREATE VIEW k AS SELECT
     const('ABSENT_START') AS absent_start,
     const('SHRINK_K') AS shrink_k,
     const('FIXTURE_K') AS fixture_k,
-    const('POR_SCALE') AS por_scale,
-    const('DEF_SCALE') AS def_scale,
-    const('MED_SCALE') AS med_scale,
-    const('DEL_SCALE') AS del_scale,
     const('PICK_K') AS pick_k,
     const('REMIND_HOURS') AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
@@ -1566,13 +1562,13 @@ DROP VIEW IF EXISTS forecast_ppm;
 DROP VIEW IF EXISTS forecast_picked;
 DROP VIEW IF EXISTS forecast_rate;
 CREATE VIEW forecast_rate AS
-WITH c AS MATERIALIZED (SELECT player, pos FROM player_club),
+WITH c AS MATERIALIZED (SELECT player FROM player_club),
 r AS MATERIALIZED (SELECT * FROM season_record),
 p AS MATERIALIZED (SELECT * FROM ppm_prior),
 s AS MATERIALIZED (SELECT * FROM player_status)
 SELECT c.player,
        shrink(shrink(coalesce(p.prior, 0.0), k.shrink_k, coalesce(l.pts, 0.0), coalesce(l.pj, 0.0)),
-              k.shrink_k, coalesce(r.pts, 0.0), coalesce(r.apps, 0.0)) * CASE c.pos WHEN 'POR' THEN k.por_scale WHEN 'DEF' THEN k.def_scale WHEN 'MED' THEN k.med_scale WHEN 'DEL' THEN k.del_scale ELSE 1.0 END AS ppm,
+              k.shrink_k, coalesce(r.pts, 0.0), coalesce(r.apps, 0.0)) AS ppm,
        CASE WHEN s.pct IS NOT NULL THEN s.pct / 100.0     -- his listing's start %, as the site says, whatever his status
             ELSE shrink(CASE WHEN s.listed OR s.status IS NOT NULL THEN k.neutral_start ELSE k.absent_start END / 100.0,
                         k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) END AS picked,

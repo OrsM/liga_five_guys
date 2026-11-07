@@ -3,19 +3,12 @@ const(), as k)."""
 from __future__ import annotations
 
 __all__ = ["SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE",
-           "SHRINK_K", "PICK_K", "NEUTRAL_START", "ABSENT_START", "FIXTURE_K", "POR_SCALE", "DEF_SCALE", "MED_SCALE", "DEL_SCALE"]
+           "SHRINK_K", "PICK_K", "NEUTRAL_START", "ABSENT_START", "FIXTURE_K"]
 
 SHRINK_K = 16.0       # matches a prior of points per match is worth (forecast_ppm)
 PICK_K = 4.0          # matches his listing is worth against his record of selection (forecast_picked)
 NEUTRAL_START = 60.0  # the start % of a player listed with none, or flagged
 ABSENT_START = 2.0    # the start % of a player not listed (measured: 1.8% of 4192 graded cells played)
-# A position's points per match against the forecast's: actual over forecast, least squares through the origin on the
-# graded cells (jornadas 3-11, forecast_ppm x its scale). Held out (fit on 2-6, tested on 7-10) it cuts the rmse
-# 0.6%; 90% intervals (jornadas resampled): POR .90-.94, DEF .94-1.00, MED 1.08-1.12, DEL 1.20-1.33.
-POR_SCALE = 0.92
-DEF_SCALE = 0.97
-MED_SCALE = 1.09
-DEL_SCALE = 1.26
 FIXTURE_K = 10.0      # matches at the league's rate a club's goals for and against are pulled toward (club_rating)
 
 SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,

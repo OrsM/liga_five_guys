@@ -10,7 +10,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import NamedTuple
 
-from ffcore.db import connect, named, rows, set_constants
+from ffcore.db import connect, named, rows
 
 __all__ = ["keep", "migrate", "forecast", "price_momentum", "price_change", "seed_cells", "Prices"]
 
@@ -272,10 +272,10 @@ def _selftest_forecast() -> None:
                                  for k, c, p in [("fwd", "a", "delantero"), ("back", "a", "defensa"),
                                                  ("hurt", "b", "delantero"), ("susp", "b", "delantero"),
                                                  ("dbt", "b", "delantero"), ("gone", "b", "delantero"),
-                                                 ("cee", "c", "delantero"), ("mid", "a", "centrocampista"), ("coach", "a", "entrenador"),
+                                                 ("cee", "c", "delantero"), ("coach", "a", "entrenador"),
                                                  ("nocl", "", "delantero")]])
             record([{"player_id": k, "ff_slug": k, "app_id": "9" if k == "gone" else ""}
-                    for k in ("fwd", "back", "hurt", "susp", "dbt", "gone", "cee", "mid")], "crosswalk")
+                    for k in ("fwd", "back", "hurt", "susp", "dbt", "gone", "cee")], "crosswalk")
             store_sql("lineups", [{"observed_at": seen, "source": "futbolfantasy", "team_slug": c, "player_slug": k,
                                    "player_name": k, "start_pct": pct, "status": st, "note": note}
                                   for k, c, pct, st, note in [
@@ -296,23 +296,18 @@ def _selftest_forecast() -> None:
             prior = dict(rows("SELECT player, prior FROM ppm_prior"))
             rate = {p: (ppm, pk) for p, ppm, pk in rows("SELECT player, ppm, picked FROM forecast_rate")}
             sk, pk = model.SHRINK_K, model.PICK_K
-            assert abs(rate["fwd"][0] - model.DEL_SCALE * shrink(shrink(prior["fwd"], sk, 150.0, 30.0), sk, 0.0, 0.0)) < 1e-12, \
-                "his value's prior, pulled toward last season's 5 a match, x his position's scale"
-            assert abs(rate["hurt"][0] - model.DEL_SCALE * prior["hurt"]) < 1e-12, "no record at all: his value's, x his position's scale"
+            assert abs(rate["fwd"][0] - shrink(shrink(prior["fwd"], sk, 150.0, 30.0), sk, 0.0, 0.0)) < 1e-12, \
+                "his value's prior, pulled toward last season's 5 a match"
+            assert rate["hurt"][0] == prior["hurt"], "no record at all: his value's"
             assert rate["fwd"][1] == 0.8 and rate["back"][1] == model.NEUTRAL_START / 100, \
                 "his listing's start %; listed with none, NEUTRAL_START"
             assert (rate["hurt"][1], rate["susp"][1], rate["dbt"][1]) == (0.0, 0.0, 0.5), \
                 "his listing's start %, injured, suspended or doubtful or not"
             assert rate["cee"][1] == model.ABSENT_START / 100 and pk > 0, "not listed: ABSENT_START"
-            with set_constants(POR_SCALE=1.0, DEF_SCALE=1.0, MED_SCALE=1.0, DEL_SCALE=1.0):
-                flat = dict(rows("SELECT player, ppm FROM forecast_rate"))
-            scale = {"fwd": model.DEL_SCALE, "back": model.DEF_SCALE, "mid": model.MED_SCALE}
-            assert all(abs(rate[q][0] - scale[q] * flat[q]) < 1e-12 and flat[q] > 0 for q in scale), \
-                "a position's points per match are the model's x its scale"
 
             cells = {(p, j): r for p, j, *r in rows("SELECT player, jornada, pts, p, ppm, fixture, picked, fit"
                                                      " FROM forecast_now")}
-            assert set(cells) == {(p, j) for p in ("fwd", "back", "hurt", "susp", "dbt", "gone", "mid") for j in (2, 3)} \
+            assert set(cells) == {(p, j) for p in ("fwd", "back", "hurt", "susp", "dbt", "gone") for j in (2, 3)} \
                 | {("cee", 3)}, "every jornada left his club plays; a coach, a player with no club: none"
             says = {"fwd": 0.8, "hurt": 0.0, "susp": 0.0, "dbt": 0.5}      # the listed start %, whatever his status
             for (p, j), (pts, pr, ppm, fix, picked, fit) in cells.items():
