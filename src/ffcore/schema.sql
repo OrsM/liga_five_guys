@@ -477,6 +477,11 @@ FROM u CROSS JOIN score_spread w;
 DROP VIEW IF EXISTS cell;
 CREATE VIEW cell AS SELECT jornada, player, p, e, v FROM cell_pool WHERE player IS NOT NULL;
 
+-- Each player's forecast over the jornadas left: his expected points, their variance (each jornada's, summed)
+-- and how many jornadas.
+DROP VIEW IF EXISTS cell_total;
+CREATE VIEW cell_total AS SELECT player, sum(e) AS e, sum(v) AS v, count(*) AS jornadas FROM cell GROUP BY player;
+
 -- The game's nightly offers still to come before the lock (next_lock): one
 -- as each standing offer expires, then one a day (0 with none standing),
 -- and when the first of them comes (first, a julian day).
@@ -635,6 +640,8 @@ CREATE VIEW k AS SELECT
     const('FIXTURE_K') AS fixture_k,
     const('PICK_K') AS pick_k,
     const('P_LIFT') AS p_lift,
+    const('P_LISTING') AS p_listing,
+    const('P_DECAY') AS p_decay,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
     printf('%.9g|%.9g|%.9g|%.9g', const('CLIP'), const('PRICE_W0'), const('PRICE_W1'), const('PRICE_W2')) AS ckey;
 
@@ -1259,9 +1266,10 @@ s AS MATERIALIZED (SELECT * FROM player_status)
 SELECT c.player,
        shrink(shrink(coalesce(p.prior, 0.0), k.shrink_k, coalesce(l.pts, 0.0), coalesce(l.pj, 0.0)),
               k.shrink_k, coalesce(r.pts, 0.0), coalesce(r.apps, 0.0)) AS ppm,
-       CASE WHEN s.pct IS NOT NULL THEN s.pct / 100.0     -- his listing's start %, as the site says, whatever his status
-            ELSE shrink(CASE WHEN s.listed OR s.status IS NOT NULL THEN k.neutral_start ELSE k.absent_start END / 100.0,
-                        k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) END AS picked,
+       coalesce(s.pct / 100.0, shrink(CASE WHEN s.listed OR s.status IS NOT NULL THEN k.neutral_start ELSE k.absent_start END / 100.0,
+                                      k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0))) AS picked,
+       shrink(CASE WHEN s.listed OR s.status IS NOT NULL THEN k.neutral_start ELSE k.absent_start END / 100.0,
+              k.pick_k, coalesce(r.apps, 0.0), coalesce(r.squads, 0.0)) AS record,
        s.pct IS NOT NULL AS listed_pct
 FROM c CROSS JOIN k LEFT JOIN p USING (player) LEFT JOIN last_season l ON l.ff_id = c.player
 LEFT JOIN r USING (player) LEFT JOIN s USING (player);
@@ -1301,11 +1309,13 @@ f AS MATERIALIZED (SELECT * FROM club_fixture),
 o AS MATERIALIZED (SELECT * FROM club_rating),
 rt AS MATERIALIZED (SELECT * FROM forecast_rate),
 ft AS MATERIALIZED (SELECT * FROM forecast_fit),
-x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, rt.listed_pct, ft.fit,
+x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, rt.record, rt.listed_pct, ft.fit,
+             f.jornada - min(f.jornada) OVER (PARTITION BY c.club) AS h,
              coalesce(CASE WHEN c.pos IN ('POR', 'DEF') THEN 1.0 / o.attack ELSE o.defence END, 1.0) AS fixture
       FROM c JOIN f ON f.club = c.club JOIN rt USING (player)
       JOIN ft ON ft.player = c.player AND ft.jornada = f.jornada
       LEFT JOIN o ON o.club = f.opp)
 SELECT player, jornada, max(0.0, ppm * fixture) AS pts,
        min(1.0, q + p_lift * q * (1.0 - q)) AS p, ppm, fixture, picked, fit
-FROM (SELECT x.*, k.p_lift, CASE WHEN listed_pct THEN picked ELSE picked * fit END AS q FROM x, k);
+FROM (SELECT y.*, k.p_lift, y.w * y.picked * CASE WHEN y.listed_pct THEN 1.0 ELSE y.fit END + (1.0 - y.w) * y.record * y.fit AS q
+      FROM (SELECT x.*, k.p_listing * pow(k.p_decay, x.h) AS w FROM x, k) y, k);
