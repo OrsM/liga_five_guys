@@ -152,6 +152,8 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
 ## Checking it
     python src/grading.py accuracy                # the forecast at each past lock against what was scored: the star group (e >= 4) and all players
     bash tools/selftests.sh                       # every module's self-test
+    python tools/cases.py report                  # seven real players end to end (tools/cases/league.json.xz, a
+                                                  # slice of the league as ingest stored it): expected vs actual by stage
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
