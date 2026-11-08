@@ -19,7 +19,7 @@ from assemble import applied, built, forecast, price_change, price_momentum
 import decision
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.parse import snapshot_stamp
-__all__ = ["backtest", "clean_windows", "calibration_rows", "sim_calibration", "replay", "decision_rows", "decisions", "superseded", "view_table",
+__all__ = ["backtest", "clean_windows", "calibration_rows", "grade_locks", "replay", "decision_rows", "superseded", "view_table",
            "record_grades"]
 
 REPLAY_VARIANT = "live"
@@ -48,7 +48,7 @@ def before_locks() -> dict[dt.datetime, int]:
 def at_locks(only: set[int] | None = None) -> Iterator[int]:
     """Each finished jornada (of only, if given) where the league could be
     made a minute before its lock, with t there (at); t put back after:
-    decisions and sim_calibration stand there."""
+    decisions and ceiling stand there."""
     with replaying():
         for t, j in before_locks().items():
             if (only is None or j in only) and at(t) is not None:
@@ -136,23 +136,27 @@ def label(kind: str, k: str, names: dict[str, str]) -> str:
     return "%s %s" % (kind, names.get(k, k))
 
 
-def decisions() -> list[dict[str, Any]]:
-    """Make each past lock's plan again with this code (decision.plan_rows) and set each of its steps, as the
-    plan values it (decision.marginals: the plan's worth less the plan without the step, by worth_on), against
+def lock_plan() -> tuple[Any, ...]:
+    """The plan at t, the lock being made again (decision.plan_rows), with what
+    its moves are valued on: the cells' e, each player as seen (name, value,
+    trend), the jornadas still to come and the price horizon."""
+    inp = decision.read_inputs()
+    steps, _ = decision.plan_rows(inp)
+    e = {(k, j): x for k, j, x in inp["cell"]}
+    seen = {k: (name, value or 0.0, trend or 0.0) for k, name, value, trend in rows(
+        "SELECT r.player, name_shown(coalesce(nullif(r.name, ''), r.player)), r.value, t.trend"
+        " FROM player_roster r LEFT JOIN price_trend t ON t.ff_id = r.player")}
+    return inp, steps, e, seen, set(rounds().rem), price_momentum().horizon
+
+
+def decisions(made: list[tuple[Any, ...]]) -> list[dict[str, Any]]:
+    """Each past lock's plan (lock_plan, by lock jornada) with each of its steps set, as the plan values it
+    (decision.marginals: the plan's worth less the plan without the step, by worth_on), against
     the same on what its players then scored: the points the step was forecast to add over the jornadas played
     since, and what it added; and the value its player was to gain (bought) or lose (sold) over the price
     horizon, in millions, against what he did."""
     locks, actual = round_locks(), jornada_points()
     done = done_jornadas()
-    made = []
-    for i in at_locks():
-        inp = decision.read_inputs()
-        steps, _ = decision.plan_rows(inp)
-        e = {(k, j): x for k, j, x in inp["cell"]}
-        seen = {k: (name, value or 0.0, trend or 0.0) for k, name, value, trend in rows(
-            "SELECT r.player, name_shown(coalesce(nullif(r.name, ''), r.player)), r.value, t.trend"
-            " FROM player_roster r LEFT JOIN price_trend t ON t.ff_id = r.player")}
-        made.append((i, inp, steps, e, seen, set(rounds().rem), price_momentum().horizon))
     out = []
     for i, inp, steps, e, seen, rem, horizon in made:
         # what happened is read with t put back: as of the lock, no later price is seen
@@ -265,27 +269,47 @@ def points_at(t: dt.datetime) -> dict[str, float]:
     return {m: p for m, p in rows("SELECT manager, CAST(team_points AS REAL) FROM standings") if p is not None}
 
 
-def sim_calibration() -> list[dict[str, Any]]:
-    """The standings forecast held to account one jornada at a time: at each
-    clean lock of a finished jornada, every manager's points that jornada
-    (his best eleven of his squad then, the forecast then: league_jornada)
-    against what he scored (his team_points over the window, standings)."""
-    locks = round_locks()
+def lock_calibration(j: int, window: tuple[dt.datetime, dt.datetime]) -> list[dict[str, Any]]:
+    """Where what happened in jornada j's clean window falls in the forecast
+    at its lock (calibration_rows): every manager's points that jornada (his
+    best eleven of his squad then, the forecast then: league_jornada) against
+    what he scored (his team_points over the window, standings). t is left at
+    the window's end."""
+    start, end = window
+    decision.inputs()
+    dist = {m: (mean, sd) for m, mean, sd in rows("SELECT manager, mean, sd FROM league_jornada"
+                                                  " WHERE jornada = ?", (j, ))}
+    me = rows("SELECT me FROM look")[0][0]
+    a0, a1 = points_at(start), points_at(end)
+    actual = {m: a1[m] - a0[m] for m in dist if m in a0 and m in a1}
+    return calibration_rows(j, dist, actual, me)
+
+
+def grade_locks(ahead: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Every grade of the past locks in one pass, the forecast of each made
+    once: backtest's cells, decisions' moves and sim_calibration's rows (the
+    standings forecast held to account one jornada at a time, at each clean
+    lock of a finished jornada). A lock where no board could be made (at) still
+    has its cells."""
+    done = done_jornadas()
     with closing(connect()) as db:
         kicks = [(j, snapshot_stamp(k) or dt.datetime.min.replace(tzinfo=dt.timezone.utc))
                  for j, k in db.execute("SELECT jornada, kick FROM kickoffs")]
-    out: list[dict[str, Any]] = []
-    windows = clean_windows(locks, kicks)
-    for j in at_locks(set(windows)):
-        start, end = windows[j]
-        decision.inputs()
-        dist = {m: (mean, sd) for m, mean, sd in rows("SELECT manager, mean, sd FROM league_jornada"
-                                                      " WHERE jornada = ?", (j, ))}
-        me = rows("SELECT me FROM look")[0][0]
-        a0, a1 = points_at(start), points_at(end)     # t moves on to the window's ends; the next lock sets it again
-        actual = {m: a1[m] - a0[m] for m in dist if m in a0 and m in a1}
-        out += calibration_rows(j, dist, actual, me)
-    return out
+    windows = clean_windows(round_locks(), kicks)
+    cells: list[dict[str, Any]] = []
+    made: list[tuple[Any, ...]] = []
+    calibration: list[dict[str, Any]] = []
+    with replaying():
+        for t, i in before_locks().items():
+            board = at(t) is not None
+            if board:
+                made.append((i, *lock_plan()))
+            else:
+                set_look(moment=forecast())
+            cells += [{"from_j": i, **c} for c in lock_cells(i, ahead, done)]
+            if board and i in windows:
+                calibration += lock_calibration(i, windows[i])
+    return cells, decision_rows(decisions(made)), calibration
 
 
 def decision_rows(moves: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -331,11 +355,11 @@ def record_grades() -> dict[str, int]:
     if run is not None and done and graded(run, max(done)):
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, "moves": 0}
-    fc, moves = backtest(GRADE_AHEAD), decision_rows(decisions())
+    fc, moves, calibration = grade_locks(GRADE_AHEAD)
     if run is not None:
         record([{"run_id": run, **r} for r in fc], "grade_cell")
         record([{"run_id": run, **r} for r in moves], "grade_decisions")
-        record([{"run_id": run, **r} for r in sim_calibration()], "sim_calibration")
+        record([{"run_id": run, **r} for r in calibration], "sim_calibration")
         superseded(run)
     forecasts = len({(r["from_j"], r["jornada"]) for r in fc})     # lock moments a jornada
     print("  grade: %d forecasts, %d moves over %d jornadas" % (forecasts, len(moves), resolved))
