@@ -17,7 +17,7 @@ from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, bid_limit, in_force, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
 from recommender import by_jornada, candidates, cells_of
 
-__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "expected_gap", "options", "record", "KEEP_PLAN", "READ"]
+__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "fund", "Funding", "cheapest", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "expected_gap", "options", "record", "KEEP_PLAN", "READ"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_plan", "dec_start")
 
@@ -141,6 +141,77 @@ def plan_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[tuple[Any, ..
     steps = best[1] if best else []
     steps = [(*step[:5], w) for step, w in zip(steps, marginals(inp, steps, e, js, pts))]     # each its marginal in the plan
     return steps, cands.alone
+
+
+class Funding(NamedTuple):
+    tonight: frozenset[str]
+    if_won: frozenset[str]
+    if_lost: frozenset[str]
+    won: float
+    lost: float
+    ev: float
+    cash_if_lost: float
+
+
+def cheapest(score: Callable[[frozenset[str]], float], legal: Callable[[frozenset[str]], bool], squad: frozenset[str],
+             price: dict[str, float], need: float) -> tuple[float, frozenset[str]] | None:
+    order = sorted((k for k in squad if price.get(k, 0.0) > 0),
+                   key=lambda k: ((score(squad) - score(squad - {k})) / price[k], k))
+    left = [sum(price[k] for k in order[i:]) for i in range(len(order) + 1)]
+    best: tuple[float, frozenset[str]] | None = None
+    stack: list[tuple[int, frozenset[str], float]] = [(0, frozenset(), 0.0)]
+    while stack:
+        i, gone, got = stack.pop()
+        if got >= need - 1e-6:
+            pts = score(squad - gone)
+            if best is None or pts > best[0]:
+                best = (pts, gone)
+            continue
+        if i == len(order) or got + left[i] < need - 1e-6 or best is not None and score(squad - gone) <= best[0]:
+            continue
+        stack.append((i + 1, gone, got))
+        nxt = squad - gone - {order[i]}
+        if legal(nxt):
+            stack.append((i + 1, gone | {order[i]}, got + price[order[i]]))
+    return best
+
+
+def fund(inp: dict[str, list[tuple[Any, ...]]], buy: tuple[str, float, float], offers: dict[str, float],
+         worth: dict[str, float]) -> Funding | None:
+    (cash, team_value, debt, squad_max, _), = inp["dec_money"]
+    k, bid, win = buy
+    pos, cells = cells_of(inp)
+    locks = dict(inp.get("dec_lock", []))
+    js = {j for j in cells if not locks or j >= min(locks)}
+    later = {p: got or 0.0 for p, _, m, _, got in inp["dec_player"] if m}
+    squad, here = frozenset(later), frozenset(later) | {k}
+    score = lru_cache(maxsize=None)(lambda sq: sum(by_jornada(pos, cells, set(sq), js).values()))
+    legal = lambda sq: can_field(Counter(pos[p] for p in sq if p in pos))
+    memo: dict[tuple[frozenset[str], int], tuple[float, frozenset[str]] | None] = {}
+
+    def need_of(base: frozenset[str], gap: float) -> tuple[float, frozenset[str]] | None:
+        if (base, round(gap)) not in memo:
+            memo[base, round(gap)] = cheapest(score, legal, base, later, gap) if gap > 0 else (score(base), frozenset())
+        return memo[base, round(gap)]
+
+    pool = sorted((p for p in squad if p in offers), key=lambda p: ((score(here) - score(here - {p})) / max(offers[p], 1.0), p))
+    best: Funding | None = None
+    stack: list[tuple[int, frozenset[str]]] = [(0, frozenset())]
+    while stack:
+        i, A = stack.pop()
+        pa, va = sum(offers[p] for p in A), sum(worth[p] for p in A)
+        if cash + pa + debt * (team_value - va) >= bid - 1e-6:
+            won = need_of(here - A, bid - cash - pa)
+            lost = need_of(squad - A, -(cash + pa))
+            if won and lost and len(here - A - won[1]) <= squad_max and legal(here - A - won[1]):
+                ev = win * won[0] + (1 - win) * lost[0]
+                if best is None or ev > best.ev:
+                    best = Funding(A, won[1], lost[1], won[0], lost[0], ev, cash + pa + sum(later[p] for p in lost[1]))
+        for j in range(i, len(pool)):
+            nxt = A | {pool[j]}
+            if legal(squad - nxt) and (best is None or win * score(here - nxt) + (1 - win) * score(squad - nxt) > best.ev):
+                stack.append((j + 1, nxt))
+    return best
 
 
 def marginals(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]], real: dict[tuple[str, int], float],
