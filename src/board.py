@@ -35,7 +35,7 @@ def squad_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[Doc], dict[s
     pos, cells = decision.cells_of(inp)
     mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
     names = {k: n for k, n in rows("SELECT player, name_shown(name) FROM player_facts")}
-    e = cells.get(min(cells, default=0), {})
+    e = cells.get(min((j for j, _ in inp["dec_lock"]), default=min(cells, default=0)), {})
     settled = eleven.best_eleven(mine, pos, e)
     xi = settled.eleven if settled else frozenset()
     order = sorted(mine, key=lambda k: (k not in xi, POSITIONS.index(pos[k]) if k in pos else len(POSITIONS), -e.get(k, 0.0), k))
