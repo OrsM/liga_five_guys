@@ -312,8 +312,9 @@ def _selftest_forecast() -> None:
             says = {"fwd": 0.8, "hurt": 0.0, "susp": 0.0, "dbt": 0.5}      # the listed start %, whatever his status
             for (p, j), (pts, pr, ppm, fix, picked, fit) in cells.items():
                 assert abs(pts - max(0.0, ppm * fix)) < 1e-12, "points if he plays = ppm x fixture"
-                assert abs(pr - says.get(p, picked * fit)) < 1e-12, \
-                    "the chance he plays is the listing's start % if it has one; else picked x fit"
+                q = says.get(p, picked * fit)
+                assert abs(pr - (q + model.P_LIFT * q * (1 - q))) < 1e-12, \
+                    "the chance he plays is the listing's start % if it has one, else picked x fit, lifted by P_LIFT"
             assert abs(cells["fwd", 2][3] - rating["b"][1]) < 1e-12, "an attacker: his opponent's defence"
             assert abs(cells["back", 2][3] - 1 / rating["b"][0]) < 1e-12, "a defender: 1 / its attack"
             assert cells["cee", 3][3] == 1.0, "an opponent with no rating: 1"

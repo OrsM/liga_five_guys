@@ -924,6 +924,7 @@ CREATE VIEW k AS SELECT
     const('SHRINK_K') AS shrink_k,
     const('FIXTURE_K') AS fixture_k,
     const('PICK_K') AS pick_k,
+    const('P_LIFT') AS p_lift,
     const('REMIND_HOURS') AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
     printf('%.9g|%.9g|%.9g|%.9g', const('CLIP'), const('PRICE_W0'), const('PRICE_W1'), const('PRICE_W2')) AS ckey;
@@ -1616,7 +1617,9 @@ x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, rt.listed_pct, ft.fit,
       FROM c JOIN f ON f.club = c.club JOIN rt USING (player)
       JOIN ft ON ft.player = c.player AND ft.jornada = f.jornada
       LEFT JOIN o ON o.club = f.opp)
-SELECT player, jornada, max(0.0, ppm * fixture) AS pts, CASE WHEN listed_pct THEN picked ELSE picked * fit END AS p, ppm, fixture, picked, fit FROM x;
+SELECT player, jornada, max(0.0, ppm * fixture) AS pts,
+       min(1.0, q + p_lift * q * (1.0 - q)) AS p, ppm, fixture, picked, fit
+FROM (SELECT x.*, k.p_lift, CASE WHEN listed_pct THEN picked ELSE picked * fit END AS q FROM x, k);
 
 
 -- The board: the last run's decisions and the facts it saw (the decision's
