@@ -416,7 +416,7 @@ CREATE TABLE IF NOT EXISTS sim_calibration (
 
 
 -- The boards published before the board was kept as rows, from git
--- (tools/board_history.py): head and moves, one board a generated_at.
+-- (the published board's history): head and moves, one board a generated_at.
 CREATE TABLE IF NOT EXISTS board_history (
     generated_at TEXT PRIMARY KEY,
     commit_sha   TEXT NOT NULL,

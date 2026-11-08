@@ -55,7 +55,7 @@ One copy of each fact: what is fetched is ingest's tables; the forecast is
 the cut) and kept while a run or a grade points to it; a run records what
 it decided and what it read by reference. Everything else is a view.
 A past universe is built once and kept (`ffcore/kept.py`), so the live
-grade, the backtests, the replays and golden boards share it.
+grade and the backtests share it.
 
 ## The model
 
@@ -206,7 +206,6 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     python src/grading.py replay [JOBS]           # the forecast at every past line-up snapshot (view replayed)
     bash tools/selftests.sh                       # every module's self-test
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
-    python tools/golden.py freeze|check           # a refactor must rebuild the same board
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
     python tools/q.py --time                      # every saved Datasette query, timed
