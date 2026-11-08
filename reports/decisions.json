@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-08T05:39Z",
+ "generated_at": "2026-11-08T08:24Z",
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -49572707.0,
  "cash_locked": 0.0,
@@ -12,133 +12,6 @@
   2035.03182830489
  ],
  "do": [
-  {
-   "what": "field",
-   "label": "field Ferran Jutgla",
-   "step": null,
-   "amount": null,
-   "done": false,
-   "gain": 0.375053758738927,
-   "per": "next",
-   "facts": [
-    [
-     "bench",
-     "Fernando Niño",
-     "names"
-    ]
-   ],
-   "trace": [
-    21530747.0,
-    21326915.0,
-    21029920.0,
-    20764366.0,
-    20512914.0,
-    20271021.0,
-    20014428.0,
-    19759822.0,
-    19481131.0,
-    19255695.0,
-    19060188.0,
-    18863704.0,
-    18637733.0,
-    18428989.0
-   ],
-   "flip": null,
-   "ranked": false,
-   "accepts": [
-    null
-   ],
-   "act": [
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": "54892898",
-     "bid": "",
-     "pos": "POR",
-     "value": 18428989.0
-    },
-    {
-     "player_team": "111434450",
-     "player": "3099",
-     "market": "65063644",
-     "bid": "",
-     "pos": "MED",
-     "value": 47233702.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": "62681662",
-     "bid": "",
-     "pos": "DEL",
-     "value": 19860605.0
-    },
-    {
-     "player_team": "24338723",
-     "player": "3002",
-     "market": "54752103",
-     "bid": "",
-     "pos": "DEL",
-     "value": 23345857.0
-    },
-    {
-     "player_team": "113276670",
-     "player": "2603",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 13611534.0
-    },
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": "50121325",
-     "bid": "",
-     "pos": "MED",
-     "value": 19784210.0
-    },
-    {
-     "player_team": "24338726",
-     "player": "2464",
-     "market": "54752027",
-     "bid": "",
-     "pos": "MED",
-     "value": 44184826.0
-    },
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": "51255271",
-     "bid": "",
-     "pos": "DEF",
-     "value": 50914818.0
-    },
-    {
-     "player_team": "112907378",
-     "player": "3128",
-     "market": "66158905",
-     "bid": "",
-     "pos": "MED",
-     "value": 12041290.0
-    },
-    {
-     "player_team": "37280098",
-     "player": "3123",
-     "market": "51255255",
-     "bid": "",
-     "pos": "DEF",
-     "value": 23365029.0
-    },
-    {
-     "player_team": "107331405",
-     "player": "2757",
-     "market": "61356752",
-     "bid": "",
-     "pos": "DEF",
-     "value": 37069771.0
-    }
-   ]
-  },
   {
    "name": "Miguel Roman",
    "pos": "MED",
@@ -497,11 +370,6 @@
    "per": "season",
    "facts": [
     [
-     "rising",
-     "Dani Martinez",
-     "names"
-    ],
-    [
      "once the listing ends",
      "2026-11-08T21:02:51+01:00",
      "time"
@@ -548,8 +416,8 @@
     {
      "player_team": "109094611",
      "player": "2881",
-     "market": null,
-     "bid": null,
+     "market": "62682353",
+     "bid": "",
      "pos": "DEF",
      "value": 613301.0
     },
@@ -660,8 +528,8 @@
     {
      "player_team": "113276670",
      "player": "2603",
-     "market": null,
-     "bid": null,
+     "market": "66688242",
+     "bid": "",
      "pos": "DEL",
      "value": 13611534.0
     },
@@ -678,7 +546,7 @@
  ],
  "cash_after": 265193.0,
  "can_bid": 43286574.2,
- "ping": "field Ferran Jutgla; sell Miguel Roman; sell Augusto Batalla; sell Thomas Lemar; sell Aitor Paredes; list Pablo Fornals, Martin Satriano, Pepelu, Georges Mikautadze, German Valera, Guido Rodriguez, Dani Martinez, Arnau Ortiz, Adria Pedrosa, Ferran Jutgla, Natan, Marcos Alonso, Iñigo Vicente, Mathew Ryan, Gerard Martin, Fernando Niño, Robin Le Normand, Roger Hinojo",
+ "ping": "sell Miguel Roman; sell Augusto Batalla; sell Thomas Lemar; sell Aitor Paredes; list Pablo Fornals, Martin Satriano, Pepelu, Georges Mikautadze, German Valera, Guido Rodriguez, Dani Martinez, Arnau Ortiz, Adria Pedrosa, Ferran Jutgla, Natan, Marcos Alonso, Iñigo Vicente, Mathew Ryan, Gerard Martin, Fernando Niño, Robin Le Normand, Roger Hinojo",
  "plan_flip": {
   "cash": 265193.0,
   "points": 0.0,
@@ -1710,8 +1578,8 @@
   {
    "name": "Dani Martinez",
    "pos": "DEF",
-   "what": "list",
-   "label": "list Dani Martinez",
+   "what": "sell",
+   "label": "sell Dani Martinez",
    "step": null,
    "offer": null,
    "waiting": null,
@@ -1719,6 +1587,7 @@
    "plan": false,
    "amount": null,
    "done": false,
+   "key": "11861",
    "gain": 0.0,
    "per": "season",
    "facts": [
@@ -1754,17 +1623,19 @@
     608322.0,
     613301.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 878494.0,
+    "points": 0.0,
+    "blockers": []
+   },
    "more": true,
-   "accepts": [
-    null
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "109094611",
      "player": "2881",
-     "market": null,
-     "bid": null,
+     "market": "62682353",
+     "bid": "",
      "pos": "DEF",
      "value": 613301.0
     }
@@ -1773,8 +1644,8 @@
   {
    "name": "Ferran Jutgla",
    "pos": "DEL",
-   "what": "list",
-   "label": "list Ferran Jutgla",
+   "what": "sell",
+   "label": "sell Ferran Jutgla",
    "step": null,
    "offer": null,
    "waiting": null,
@@ -1782,6 +1653,7 @@
    "plan": false,
    "amount": null,
    "done": false,
+   "key": "7842",
    "gain": -3.12472413285832,
    "per": "season",
    "facts": [
@@ -1817,17 +1689,19 @@
     13754771.0,
     13611534.0
    ],
-   "flip": null,
+   "flip": {
+    "cash": 13876727.0,
+    "points": -3.12472413285832,
+    "blockers": []
+   },
    "more": true,
-   "accepts": [
-    null
-   ],
+   "accepts": [],
    "act": [
     {
      "player_team": "113276670",
      "player": "2603",
-     "market": null,
-     "bid": null,
+     "market": "66688242",
+     "bid": "",
      "pos": "DEL",
      "value": 13611534.0
     }
