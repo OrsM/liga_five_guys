@@ -7,9 +7,8 @@ import sys
 
 
 def _selftest() -> None:
-    """The view build (connect), assemble.built (seen, the forecast moment, look),
-    sim.record_run (decision.plan and what the run saw) and the board_json view:
-    a forecast, a plan and a board come out."""
+    """The view build (connect), assemble.built (seen, the forecast moment, look) and board.board (the decision's
+    inputs, your squad and its eleven, the standing offers ranked): a forecast and a board come out."""
     import contextlib
     import tempfile
     from pathlib import Path
@@ -19,7 +18,8 @@ def _selftest() -> None:
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import store_sql, tables_in
     from ffcore.league import Config
-    from sim import board_doc, record_run
+    import decision
+    from board import board
 
     ME = Config.me
 
@@ -59,15 +59,23 @@ def _selftest() -> None:
                                       "sale_price": "3000000", "market_value": "3000000",
                                       "expires_at": "2026-09-21T22:00:00+02:00"}
                                      for n, (k, _c, _p) in enumerate(players, 1) if k in listed])
+            store_sql("api_offers", [{"observed_at": seen_at, "money": "3300000", "player_team_id": "t1", "offer_id": "o1",
+                                      "status": "pending", "expires_at": "2026-09-21T22:00:00+02:00"}])
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
 
             b = built()
             assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (b.moment,))[0][0] > 0, "a forecast"
             assert len(rows("SELECT player FROM my_squad")) == len(mine), "your squad as the app showed it"
-            acts = record_run(1, b.params, b.moment)
-            assert acts and {a[2] for a in acts if a[1] == "buy"} <= set(listed), acts
-            assert rows("SELECT count(*) FROM dec_plan")[0][0] == len(acts)
-            assert board_doc() and rows("SELECT count(*) FROM decision_players WHERE run_id = 1 AND mine")[0][0] == len(mine)
+            doc = board(decision.read_inputs())
+            assert len(doc["squad"]) == len(mine) and sum(r["xi"] for r in doc["squad"]) == 11, "your squad and its eleven"
+            assert {"generated_at", "cash", "can_bid", "lock_at", "do", "buys", "sells", "finish", "band"} <= set(doc), doc
+            (line,) = doc["sells"]
+            assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
+            assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"
+            (listing,) = doc["do"]
+            assert listing["what"] == "list" and listing["accepts"] == [None] and len(listing["act"]) == len(mine), \
+                "no one of yours is listed yet: one line lists them all, each with his place in your team"
+            assert {a["player_team"] for a in listing["act"]} == {"t%d" % n for n in range(1, len(mine) + 1)}, listing["act"]
         finally:
             set_now(None)
     print("endtoend self-test OK")

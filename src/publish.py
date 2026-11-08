@@ -1,6 +1,5 @@
 """The publish stage: the report to the phone (~/.local/bin/lfg-publish),
-then its ping: the board's (LFG_NOTIFY=1) or the line-up reminder
-(LFG_REMIND=1). LFG_NO_PUBLISH=1 sends nothing. A ping never fails a run."""
+then its ping: the board's (LFG_NOTIFY=1). LFG_NO_PUBLISH=1 sends nothing. A ping never fails a run."""
 from __future__ import annotations
 
 import json
@@ -10,7 +9,6 @@ import urllib.request
 from collections.abc import Callable
 from pathlib import Path
 
-import remind
 
 __all__ = ["main", "notify"]
 
@@ -71,12 +69,6 @@ def main() -> dict[str, int]:
     sent = 0
     if os.environ.get("LFG_NOTIFY") == "1":
         sent = int(notify())
-    elif os.environ.get("LFG_REMIND") == "1":
-        said = remind.text()
-        if said:
-            sent = int(notify(said))
-        else:
-            print("  reminder: the line-up is your best eleven, nothing to say")
     return {"published": 1, "pinged": sent}
 
 

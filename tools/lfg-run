@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# liga_five_guys end to end, on this box (lfg.service, lfg-remind.service,
+# liga_five_guys end to end, on this box (lfg.service,
 # lfg-watch): self-tests alongside the fetch, then src/run.py (every stage:
 # STAGES there), then the report committed and, with LFG_PUSH=1, pushed.
 # Exit 1 if a step that makes the report failed. Why each step is as it is:

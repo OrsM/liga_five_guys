@@ -11,7 +11,6 @@ from pathlib import Path
 from collections.abc import Sequence
 from typing import Any, NamedTuple
 
-import remind
 from ffcore import forecast as model, pricing, rules
 from ffcore.db import connect, query, record, rows, set_constants, set_look
 from ffcore.forecast_store import Prices, forecast, price_change, price_momentum
@@ -31,11 +30,10 @@ NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS", ),
     "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_LIFT", "SHRINK_K"),
     "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
-    "remind": ("REMIND_HOURS",),
     "rules": ("DEBT_SHARE", "MATCH_LEN"),
 }
 MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "forecast": model, "pricing": pricing,
-                           "remind": remind, "rules": rules}
+                           "rules": rules}
 
 
 def constants() -> dict[str, dict[str, float]]:
