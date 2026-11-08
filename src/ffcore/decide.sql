@@ -124,3 +124,41 @@ CREATE VIEW dec_money_seen AS
 SELECT c.cash, (SELECT total(s.value) FROM my_squad m JOIN look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant
                  AND s.player = m.player) AS team_value, st.debt, st.squad_max, st.xi_size
 FROM dec_state st, my_cash c;
+
+CREATE TABLE IF NOT EXISTS dec_opportunity (
+    cut         TEXT NOT NULL,
+    player      TEXT NOT NULL,
+    pos         TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    asking      REAL,
+    close_at    TEXT,
+    from_j      INTEGER NOT NULL,
+    replaces    TEXT,
+    gain        REAL NOT NULL,
+    per_million REAL,
+    price_next  REAL,
+    price_lock  REAL,
+    bid         REAL,
+    win         REAL,
+    placed      REAL,
+    PRIMARY KEY (cut, player)
+) WITHOUT ROWID;
+
+DROP VIEW IF EXISTS dec_opportunities;
+CREATE VIEW dec_opportunities AS
+SELECT *, row_number() OVER (ORDER BY gain DESC, player) AS rank
+FROM dec_opportunity WHERE cut = (SELECT cut()) AND status = 'market' AND gain > 0;
+
+DROP VIEW IF EXISTS dec_targets;
+CREATE VIEW dec_targets AS
+SELECT *, row_number() OVER (ORDER BY gain DESC, player) AS rank
+FROM dec_opportunity WHERE cut = (SELECT cut()) AND gain > 0;
+
+DROP VIEW IF EXISTS dec_arrivals;
+CREATE VIEW dec_arrivals AS
+SELECT t.* FROM dec_targets t
+WHERE t.status = 'market'
+  AND EXISTS (SELECT 1 FROM dec_opportunity WHERE cut < (SELECT cut()))
+  AND NOT EXISTS (SELECT 1 FROM dec_opportunity p
+                  WHERE p.player = t.player AND p.status = 'market'
+                    AND p.cut = (SELECT max(cut) FROM dec_opportunity WHERE cut < (SELECT cut())));
