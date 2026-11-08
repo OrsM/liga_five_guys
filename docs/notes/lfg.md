@@ -82,7 +82,7 @@ rows and writes plan rows.
 |---|---|---|---|
 | 1 | Ingest | facts: player_club/value/status/points, club_fixture, owners, cash, listings, offers, auction closes (timestamped) | parser health |
 | 2 | Forecast | `cell(player, jornada, pts, p)` from facts at t | RMSE and r, next jornada and five ahead |
-| 3 | Decision | the plan, kept per run: order, cash after, `due`/`why`, blockers on two futures, what skipping each step leaves | `grading.py ceiling` (floor / ours / ceiling on real points) and checks: cash ≥ 0 at the lock, squad ≤ cap, legal eleven |
+| 3 | Decision | the plan, kept per run: order, cash after, `due`/`why`, blockers on two futures, what skipping each step leaves | checks: cash ≥ 0 at the lock, squad ≤ cap, legal eleven |
 | 4 | Board | `board_json` (the phone's JSON) | correctness only |
 | 5 | Grading | replays the same views at a past t | its own |
 
