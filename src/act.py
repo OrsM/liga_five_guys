@@ -44,6 +44,7 @@ LINEUP_URL = "{base}/v1/competition/1/teams/{team}/lineup?x-lang=es"
 # The app's line-up, slot by position.
 SLOTS = {"POR": "goalkeeper", "DEF": "defender", "MED": "midfield", "DEL": "striker"}
 OK = (200, 201, 204)
+ALREADY_LISTED = "030.01.52"
 
 REPORT = Path("reports/decisions.json")
 
@@ -147,17 +148,17 @@ def list_all(app: App, line: dict[str, Any], _amount: float | None) -> tuple[boo
     app's now if it has risen since the board (it refuses a price under it:
     Lemar, 2026-10-30). Offers on them are yours to take; a listed player
     still plays for you."""
-    listed: list[str] = []
-    failed: list[str] = []
+    refused: list[str] = []
     for p in line["act"]:
         now = (app.get(PLAYER_URL, player=p["player"]) or {}).get("playerMaster") or {}
         why = app.send("POST", SELL_URL, {"playerId": int(p["player_team"]),
                                           "salePrice": int(round(max(p["value"] or 0, now.get("marketValue") or 0)))})
-        (failed if why else listed).append("%s (%s)" % (p["player"], why) if why else p["player"])
-    names = line["label"].removeprefix("list ")
-    if failed:
-        return False, "listed %d of %s; not %s" % (len(listed), names, "; ".join(failed))
-    return True, "listed %s at their value, the app took each" % names
+        if why and ALREADY_LISTED not in why:
+            refused.append(why)
+    if refused:
+        return False, "listed %d of %d; the app refused %d: %s" % (
+            len(line["act"]) - len(refused), len(line["act"]), len(refused), refused[0])
+    return True, "listed %s: on the market at their value" % line["label"].removeprefix("list ")
 
 
 def field(app: App, line: dict[str, Any], _amount: float | None) -> tuple[bool, str]:
@@ -267,7 +268,7 @@ def _selftest() -> None:
         return {"requested_at": "t", "generated_at": board["generated_at"], "label": label, "amount": amount, **more}
 
     def app(bid: dict[str, Any] | None = None, answer: int = 200, shown_after: int = 0, confirm: bool = False,
-            offers: list[dict[str, Any]] | None = None, squad: list[str] | None = None
+            offers: list[dict[str, Any]] | None = None, squad: list[str] | None = None, refusal: Any = None
             ) -> tuple[Call, list[tuple[str, str, Any]]]:
         """A fake app: the league, the market (your bid on Lemar, shown shown_after reads late), offers,
         players' values, your squad and line-up; changes answered with answer."""
@@ -298,7 +299,7 @@ def _selftest() -> None:
                                    for s, v in body.items() if s in SLOTS.values()}
                 state["hidden"] = shown_after
             return answer, ({"id": "5", "money": body["money"], "status": "pending"}
-                            if confirm and body and "money" in body else {})
+                            if confirm and body and "money" in body else refusal or {})
         return call, sent
 
     def changes(sent: list[tuple[str, str, Any]]) -> list[tuple[str, str, Any]]:
@@ -369,6 +370,14 @@ def _selftest() -> None:
         ("POST", base + "/v1/competition/1/league/77/market/sell?x-lang=es", {"playerId": 108468054, "salePrice": 9697829}),
         ("POST", base + "/v1/competition/1/league/77/market/sell?x-lang=es", {"playerId": 108468059, "salePrice": 600000})], \
         ("each at his value, the app's now if it has risen since the board (Lemar, 2026-10-30)", sent)
+    call, sent = app(answer=409, refusal={"code": 409, "message": "Player already added to the market", "errorCode": ALREADY_LISTED})
+    got = accept(ask("list Bil Nsongo, Manu Bueno"), board, call, base)
+    assert got["state"] == "placed" and len(changes(sent)) == 2, \
+        ("already on the market is listed, not a failure: every one is still tried", got)
+    call, sent = app(answer=400)
+    got = accept(ask("list Bil Nsongo, Manu Bueno"), board, call, base)
+    assert got["state"] == "failed" and got["message"].startswith("listed 0 of 2; the app refused 2: the app said 400"), \
+        ("a real refusal says how many and why once, not each player's", got)
     # field
     every = [p["player_team"] for p in xi] + ["999"]
     call, sent = app(squad=every)
