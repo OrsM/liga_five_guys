@@ -30,7 +30,7 @@ NAMES = {
               "player_jornadas season_record season_points next_lock listing_ends listing_close price_paid",
     "forecast": "cell cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
-    "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts my_squad my_cash formation slot_bounds",
+    "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts my_squad my_cash",
     "board": "",
     "grading": "measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.

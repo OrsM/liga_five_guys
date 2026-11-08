@@ -109,15 +109,22 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
   offer on your players ranked by the points the best eleven loses per million it raises: next 4, next 8, season), and
   `buys` (`decision.opportunities`: the players on the market who add points to your best eleven, most first; the bid is
-  `decision.recommended`, the least bid as likely to win as any; the first three carry `funding` from `decision.fund`:
-  the sales tonight, the margin under the bid limit, the sales if won, the cash if lost). `finish` and `band` are
+  `decision.recommended`, the least bid as likely to win as any; the first three carry `funding` from `approach.approach`:
+  the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.
-- **`decision.fund`** (priced for the first three buys of the board): for one buy (bid, win chance) the sales that pay for it, in
-  two stages: tonight on the real offers (they raise cash and the debt limit), and after the auctions the rest by the
-  lock; the objective is the expected best-eleven points over all jornadas left; no cap on sales; checked against brute
-  force on small leagues. Slower than a plan (18 s on the live case).
-- **`decision.read_inputs`**: the league at t as `dec_*` rows and the cells; `cells_of`, `by_jornada` and `eleven` are
-  the best eleven of a squad. Nothing else of the old decision survives.
+- **`eleven.py`** (pure, no database): the eleven is fixed, never searched by formation. `best_eleven` builds the best eleven of
+  a squad by a value (a player's e over the jornadas that count) and settles it (`settle`: a bench player who improves it
+  swaps in, until none does); `swap` is "does this player improve my eleven, for whom, by how much"; `remove`/`remove_all`
+  is what selling costs (the cover from the bench, then settled); `removal_cost` the one-swap cover. A squad with no legal
+  eleven answers `None`. Checked against brute force over every eleven.
+- **`approach.approach(club, player, bid, win, value)`**: how to get a buy: the sales tonight on the standing offers (they raise
+  cash and the debt limit, `rules.bid_margin`), the sales after the auction by the lock (`rules.cash_at_lock`; the price of a
+  player with no offer is `SALE_ESTIMATE` x his value, and the lock margin is also shown with those sales `SALE_SD` lower),
+  the offers to hold, the cash left if the bid is lost, and the net gain: the win-weighted points the buy adds less the points
+  the sales cost (by `eleven.remove_all`). No cap on the sales; squad max counts pending bids; a legal eleven always remains;
+  checked against brute force on small leagues.
+- **`decision.read_inputs`**: the league at t as `dec_*` rows and the cells; `cells_of`, `window_value` and `opportunities`
+  (each market player by `eleven.swap`). Nothing else of the old decision survives.
 - **Taps:** only `list` is done from the phone (`act.py`; an already-listed player, error 030.01.52, counts as listed).
 - **Not true any more:** the recommender, `plan_rows`, `worth_on`, the ledger and sale due times, `sim_*` and
   `decision_*` tables, the hold, the line-up reminder (`remind.py`, `lock_due`, `lineup_alert`).

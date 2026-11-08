@@ -40,9 +40,9 @@ Everything else comes from the app's API and public pages.
    pages.
 2. **crosswalk** (`crosswalk.py`): the registry, lfg.db's `crosswalk` table,
    one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
-3. **board** (`board.py`, `decision.py`, `ffcore/decide.sql`): `reports/decisions.json`: your cash and what you
+3. **board** (`board.py`, `decision.py`, `approach.py`, `eleven.py`, `ffcore/decide.sql`): `reports/decisions.json`: your cash and what you
    can bid, your squad and its eleven, the line that lists your players for sale, and each standing offer on them
-   ranked by what taking it costs the eleven. `decision.fund` prices a buy with the sales that pay for it.
+   ranked by what taking it costs the eleven. `approach.approach` says how to get a buy: the bid, the sales that pay for it, and what they cost the eleven.
 4. **publish** (`publish.py`): the report to the phone, and its ping.
 5. **grade** (`grading.py`: each past lock's forecast, kept as `grade_cell`, read through `grade_forecast` and
    `grade_accuracy`, star group first), **health** (`health.py`). A failure from here on is noted and the run goes
