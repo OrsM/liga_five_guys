@@ -124,11 +124,3 @@ CREATE VIEW dec_money_seen AS
 SELECT c.cash, (SELECT total(s.value) FROM my_squad m JOIN look l JOIN seen s ON s.cut = l.cut AND s.variant = l.variant
                  AND s.player = m.player) AS team_value, st.debt, st.squad_max, st.xi_size
 FROM dec_state st, my_cash c;
-
--- The game's formations (rules.FORMATIONS, put in where it is named below
--- as connect() applies this file): each one's players by position, f its
--- order in the rules; each position's least and most in any of them.
-DROP VIEW IF EXISTS formation;
-CREATE VIEW formation AS /* rules.FORMATIONS */;
-DROP VIEW IF EXISTS slot_bounds;
-CREATE VIEW slot_bounds AS SELECT pos, min(n) AS lo, max(n) AS hi FROM formation GROUP BY pos;

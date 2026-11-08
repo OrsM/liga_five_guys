@@ -26,7 +26,7 @@ from ffcore.names import Name
 from ffcore.parse import snapshot_stamp, stamp, year_for
 from stats import shrink
 from ffcore.forecast import SEED_POOL
-from ffcore.rules import ELEVEN, FORMATIONS, position, slot
+from ffcore.rules import position, slot
 from ffcore.text import stems_meet
 
 __all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "cut",
@@ -255,8 +255,7 @@ def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
 
 
 # The Python constants the SQL names, put in where it names them.
-PUT = {"/* rules.ELEVEN */": ELEVEN, "/* rules.FORMATIONS */": FORMATIONS,
-       "/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x in SEED_POOL)}
+PUT = {"/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x in SEED_POOL)}
 
 
 # "Each source's last snapshot as of t", said once: `WHERE /* latest TABLE */`

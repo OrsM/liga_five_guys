@@ -1,5 +1,7 @@
 -- What earlier versions made and nothing reads now: a database made by them drops it here.
 DROP VIEW IF EXISTS app_lineup;
+DROP VIEW IF EXISTS formation;
+DROP VIEW IF EXISTS slot_bounds;
 DROP VIEW IF EXISTS board_blocker_word;
 DROP VIEW IF EXISTS board_blockers;
 DROP VIEW IF EXISTS board_buy_facts;
