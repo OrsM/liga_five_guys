@@ -72,6 +72,7 @@ def _selftest() -> None:
             (line,) = doc["sells"]
             assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
             assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"
+            assert all(b["win"] > 0 and b["gain"] > 0 and b["accepts"] == [] for b in doc["buys"]), doc["buys"]
             (listing,) = doc["do"]
             assert listing["what"] == "list" and listing["accepts"] == [None] and len(listing["act"]) == len(mine), \
                 "no one of yours is listed yet: one line lists them all, each with his place in your team"

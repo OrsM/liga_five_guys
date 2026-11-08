@@ -108,8 +108,11 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada, `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
   offer on your players ranked by the points the best eleven loses per million it raises: next 4, next 8, season), and
-  `buys` (empty: the targets watch is not built). `finish` and `band` are placeholders the page still reads.
-- **`decision.fund`** (a function, not on the board yet): for one buy (bid, win chance) the sales that pay for it, in
+  `buys` (`decision.opportunities`: the players on the market who add points to your best eleven, most first; the bid is
+  `decision.recommended`, the least bid as likely to win as any; the first three carry `funding` from `decision.fund`:
+  the sales tonight, the margin under the bid limit, the sales if won, the cash if lost). `finish` and `band` are
+  placeholders the page still reads.
+- **`decision.fund`** (priced for the first three buys of the board): for one buy (bid, win chance) the sales that pay for it, in
   two stages: tonight on the real offers (they raise cash and the debt limit), and after the auctions the rest by the
   lock; the objective is the expected best-eleven points over all jornadas left; no cap on sales; checked against brute
   force on small leagues. Slower than a plan (18 s on the live case).
