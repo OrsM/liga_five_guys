@@ -1,5 +1,6 @@
 {
- "generated_at": "2026-11-08T21:41Z",
+ "generated_at": "2026-11-08T22:22Z",
+ "market_at": "2026-11-08T22:21Z",
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": 120411615.0,
  "cash_locked": 51951261.0,
@@ -12,13 +13,13 @@
    "pos": "DEL",
    "what": "buy",
    "label": "buy Mikel Oyarzabal",
-   "step": "bid",
+   "step": "placed",
    "price": 51951261.0,
    "asking": 51951261.0,
    "amount": 51951261.0,
    "win": 1.0,
    "plan": false,
-   "done": false,
+   "done": true,
    "key": "2675",
    "gain": 39.240618300461705,
    "per": "season",
@@ -26,6 +27,10 @@
    "detail": null,
    "trace": null,
    "flip": null,
+   "replaces": "Ferran Jutgla",
+   "per_million": 0.7553352420158137,
+   "price_next": -0.009273761195395469,
+   "price_lock": -0.09826320699351598,
    "facts": [
     [
      "asking",
@@ -53,7 +58,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 75008347.0,
+    "margin": 126959608.0,
     "lock_margin": 68460354.0,
     "lock_margin_low": 68460354.0,
     "if_won": [],
@@ -88,8 +93,8 @@
    "step": "bid",
    "price": 44184826.0,
    "asking": 44184826.0,
-   "amount": 56875214.12914435,
-   "win": 1.0,
+   "amount": 48628459.99379217,
+   "win": 0.9,
    "plan": false,
    "done": false,
    "key": "2715",
@@ -99,6 +104,10 @@
    "detail": null,
    "trace": null,
    "flip": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 0.7888989503530317,
+   "price_next": 0.019362674752325892,
+   "price_lock": 0.20516363070472488,
    "facts": [
     [
      "asking",
@@ -107,12 +116,12 @@
     ],
     [
      "bid",
-     56875214.12914435,
+     48628459.99379217,
      "money"
     ],
     [
      "chance to win",
-     1.0,
+     0.9,
      "chance"
     ],
     [
@@ -126,9 +135,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 70084393.87085566,
-    "lock_margin": 63536400.87085565,
-    "lock_margin_low": 63536400.87085565,
+    "margin": 78331148.00620782,
+    "lock_margin": 71783155.00620782,
+    "lock_margin_low": 71783155.00620782,
     "if_won": [],
     "if_lost": [],
     "held": [
@@ -148,7 +157,7 @@
     "gain": 34.857362852931374,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 34.857362852931374
+    "net": 31.371626567638238
    },
    "accepts": [],
    "act": []
@@ -172,6 +181,10 @@
    "detail": null,
    "trace": null,
    "flip": null,
+   "replaces": "Ferran Jutgla",
+   "per_million": 0.6355237685234116,
+   "price_next": -0.012055174128211776,
+   "price_lock": -0.12773458856062814,
    "facts": [
     [
      "asking",
@@ -234,8 +247,8 @@
    "step": "bid",
    "price": 13845773.0,
    "asking": 13845773.0,
-   "amount": 17822437.597887687,
-   "win": 1.0,
+   "amount": 15344112.24489057,
+   "win": 0.9,
    "plan": false,
    "done": false,
    "key": "17275",
@@ -245,6 +258,10 @@
    "detail": null,
    "trace": null,
    "flip": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 1.471339330599204,
+   "price_next": 0.021024238020749708,
+   "price_lock": 0.22276927440611982,
    "facts": [
     [
      "asking",
@@ -253,12 +270,12 @@
     ],
     [
      "bid",
-     17822437.597887687,
+     15344112.24489057,
      "money"
     ],
     [
      "chance to win",
-     1.0,
+     0.9,
      "chance"
     ],
     [
@@ -290,6 +307,10 @@
    "detail": null,
    "trace": null,
    "flip": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 1.01466478392516,
+   "price_next": -0.009954865123756318,
+   "price_lock": -0.10548006915833463,
    "facts": [
     [
      "asking",
@@ -317,6 +338,149 @@
    "act": []
   }
  ],
+ "targets": [
+  {
+   "name": "Lamine Yamal",
+   "pos": "DEL",
+   "status": "rival",
+   "gain": 180.20789100065693,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Ferran Jutgla",
+   "per_million": 0.9796212690201731,
+   "price_next": -0.00454975648317657,
+   "price_lock": -0.048208451097322524,
+   "available": false
+  },
+  {
+   "name": "Kylian Mbappe",
+   "pos": "DEL",
+   "status": "unlisted",
+   "gain": 156.44737382953926,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Ferran Jutgla",
+   "per_million": 0.8661733451932472,
+   "price_next": -0.000703683446218073,
+   "price_lock": -0.007456110921636783,
+   "available": false
+  },
+  {
+   "name": "Raphinha",
+   "pos": "DEL",
+   "status": "rival",
+   "gain": 151.47781097626083,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Ferran Jutgla",
+   "per_million": 0.8685322772757512,
+   "price_next": -0.0009041920702546058,
+   "price_lock": -0.009580666429650608,
+   "available": false
+  },
+  {
+   "name": "Arda Guler",
+   "pos": "MED",
+   "status": "unlisted",
+   "gain": 107.92830772514003,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 0.8263591503153638,
+   "price_next": 0.007530143507717302,
+   "price_lock": 0.07978812852730122,
+   "available": false
+  },
+  {
+   "name": "Alex Grimaldo",
+   "pos": "DEF",
+   "status": "unlisted",
+   "gain": 107.46071323849736,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 1.0960125534777843,
+   "price_next": 0.0025220864483019856,
+   "price_lock": 0.026723601945679798,
+   "available": false
+  },
+  {
+   "name": "Jude Bellingham",
+   "pos": "MED",
+   "status": "rival",
+   "gain": 103.62618290838282,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 0.7338355483032188,
+   "price_next": 0.008453712002403746,
+   "price_lock": 0.08957410427693868,
+   "available": false
+  },
+  {
+   "name": "Fermin Lopez",
+   "pos": "MED",
+   "status": "rival",
+   "gain": 96.30007103223107,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 0.8536980975961934,
+   "price_next": 0.012348210095633583,
+   "price_lock": 0.1308395481683453,
+   "available": false
+  },
+  {
+   "name": "Marcos Llorente",
+   "pos": "DEF",
+   "status": "rival",
+   "gain": 72.75096416113544,
+   "asking": 61188470.0,
+   "bid": null,
+   "win": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 1.1889652439607568,
+   "price_next": -0.0040753211322285265,
+   "price_lock": -0.04318141426588029,
+   "available": false
+  },
+  {
+   "name": "David Hancko",
+   "pos": "DEF",
+   "status": "rival",
+   "gain": 72.28308152279268,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 1.1903101541806294,
+   "price_next": 0.0069718839962127355,
+   "price_lock": 0.0738729050511655,
+   "available": false
+  },
+  {
+   "name": "Pedri Gonzalez",
+   "pos": "MED",
+   "status": "rival",
+   "gain": 70.8430647856811,
+   "asking": 86641768.0,
+   "bid": null,
+   "win": null,
+   "replaces": "Thomas Lemar",
+   "per_million": 0.8176548842549138,
+   "price_next": -0.004853219137060716,
+   "price_lock": -0.05142389011339554,
+   "available": false
+  }
+ ],
+ "alerts": [],
  "sells": [
   {
    "name": "Dani Martinez",
@@ -377,7 +541,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Augusto Batalla",
@@ -438,7 +603,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Thomas Lemar",
@@ -499,7 +665,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Aitor Paredes",
@@ -560,7 +727,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Pablo Fornals",
@@ -621,7 +789,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Natan",
@@ -682,7 +851,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Iñigo Vicente",
@@ -743,7 +913,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Ferran Jutgla",
@@ -804,7 +975,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "German Valera",
@@ -865,7 +1037,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Guido Rodriguez",
@@ -926,7 +1099,8 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   },
   {
    "name": "Mathew Ryan",
@@ -987,84 +1161,85 @@
     ]
    ],
    "accepts": [],
-   "act": []
+   "act": [],
+   "for": []
   }
  ],
  "squad": [
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "next": 6.144870704893879,
+   "next": 6.362260082216076,
    "xi": true,
    "sold": false
   },
   {
    "name": "Natan",
    "pos": "DEF",
-   "next": 5.842043855641212,
+   "next": 6.101543416035681,
    "xi": true,
    "sold": false
   },
   {
    "name": "Gerard Martin",
    "pos": "DEF",
-   "next": 4.092645783227176,
+   "next": 4.04847987133083,
    "xi": true,
    "sold": false
   },
   {
    "name": "Adria Pedrosa",
    "pos": "DEF",
-   "next": 3.222819415537667,
+   "next": 3.8123382297230894,
    "xi": true,
    "sold": false
   },
   {
-   "name": "Robin Le Normand",
+   "name": "Aitor Paredes",
    "pos": "DEF",
-   "next": 0.48793907413909604,
-   "xi": true,
-   "sold": false
-  },
-  {
-   "name": "Dani Martinez",
-   "pos": "DEF",
-   "next": 0.15502652157819583,
+   "next": 2.3332061221547833,
    "xi": true,
    "sold": false
   },
   {
    "name": "Pablo Fornals",
    "pos": "MED",
-   "next": 6.044084526508861,
+   "next": 6.031125244114138,
    "xi": true,
    "sold": false
   },
   {
    "name": "German Valera",
    "pos": "MED",
-   "next": 4.385206811686921,
+   "next": 5.604077609057769,
    "xi": true,
    "sold": false
   },
   {
-   "name": "Thomas Lemar",
+   "name": "Guido Rodriguez",
    "pos": "MED",
-   "next": 0.0,
+   "next": 3.926278958378595,
+   "xi": true,
+   "sold": false
+  },
+  {
+   "name": "Iñigo Vicente",
+   "pos": "DEL",
+   "next": 4.707993952852213,
    "xi": true,
    "sold": false
   },
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "next": 5.45094137382525,
+   "next": 3.939434602571542,
    "xi": true,
    "sold": false
   },
   {
    "name": "Ferran Jutgla",
    "pos": "DEL",
-   "next": 3.7053197161803624,
+   "next": 2.158122449949989,
    "xi": true,
    "sold": false
   },
@@ -1076,22 +1251,22 @@
    "sold": false
   },
   {
-   "name": "Aitor Paredes",
+   "name": "Robin Le Normand",
    "pos": "DEF",
-   "next": 0.0,
+   "next": 1.7307080773457884,
    "xi": false,
    "sold": false
   },
   {
-   "name": "Guido Rodriguez",
+   "name": "Dani Martinez",
+   "pos": "DEF",
+   "next": 0.5559080918612422,
+   "xi": false,
+   "sold": false
+  },
+  {
+   "name": "Thomas Lemar",
    "pos": "MED",
-   "next": 0.0,
-   "xi": false,
-   "sold": false
-  },
-  {
-   "name": "Iñigo Vicente",
-   "pos": "DEL",
    "next": 0.0,
    "xi": false,
    "sold": false
