@@ -70,11 +70,10 @@ def lock_cells(i: int, ahead: int, done: set[int]) -> list[dict[str, Any]]:
     """The forecast at t (the cell contract) for the lock of jornada i and, with ahead, the next ones, each one
     done: a row a player and jornada, his expected points, the chance he plays and whether he is flagged
     (player_status: injured, doubtful, suspended)."""
-    return [{"jornada": j, "player": k, "predicted": e, "plays": p, "flagged": int(f)}
-            for j, k, e, p, f in rows(
-                "SELECT c.jornada, c.player, c.e, c.p, EXISTS (SELECT 1 FROM player_status s"
-                " WHERE s.player = c.player AND s.status IS NOT NULL) FROM cell c WHERE c.jornada BETWEEN ? AND ?",
-                (i, i + ahead)) if j in done]
+    flagged = {k for (k,) in rows("SELECT player FROM player_status WHERE status IS NOT NULL")}
+    return [{"jornada": j, "player": k, "predicted": e, "plays": p, "flagged": int(k in flagged)}
+            for j, k, e, p in rows("SELECT jornada, player, e, p FROM cell WHERE jornada BETWEEN ? AND ?",
+                                   (i, i + ahead)) if j in done]
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
