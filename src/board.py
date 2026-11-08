@@ -25,6 +25,7 @@ Doc = dict[str, Any]
 AHEAD = (4, 8, 0)
 TOP_BUYS = 10
 TOP_FUNDED = 3
+TOP_TARGETS = 10
 
 
 def stamped(t: str) -> str:
@@ -95,25 +96,40 @@ def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: 
             "gain": found.gain, "points_lost_if_won": found.cost_won, "points_lost_if_lost": found.cost_lost, "net": found.net}
 
 
-def buy_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], club: Club) -> list[Doc]:
+def buy_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
     pos, cells = decision.cells_of(inp)
-    kind = {k: p for k, p, *_ in inp["dec_player"]}
-    asking = {k: a for k, _, _, a, _ in inp["dec_player"] if a is not None}
-    placed = dict(inp["dec_bid"])
-    out: list[Doc] = []
-    for k, bids, gain, where in decision.opportunities(inp)[:TOP_BUYS]:
-        bid, win = decision.recommended(bids)
-        funding = funding_doc(club, names, approach(club, k, bid, win, decision.window_value(pos, cells, where)), bid) \
-            if k not in placed and sum(1 for d in out if d["funding"]) < TOP_FUNDED else None
+    odds: dict[str, list[tuple[float, float]]] = {}
+    for k, r, w in sorted(inp["dec_odds"]):
+        odds.setdefault(k, []).append((r, w))
+    bids = {k: amount for k, amount in inp["dec_bid"]}
+    out = []
+    for i, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:TOP_BUYS]):
+        k, placed = r["player"], r["placed"]
+        amount = placed if placed is not None else r["bid"]
+        win = decision.win_at(r["asking"], odds.get(k, []), placed) if placed is not None else r["win"]
+        others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
+        where = frozenset(j for j in cells if j >= r["from_j"])
+        funding = funding_doc(club, names, approach(club._replace(pending=others), k, amount, win,
+                                                    decision.window_value(pos, cells, where)), amount) if i < TOP_FUNDED else None
         name = names.get(k, k)
         out.append({
-            "name": name, "pos": kind.get(k, ""), "what": "buy", "label": "buy " + name, "step": "bid", "price": asking[k],
-            "asking": asking[k], "amount": placed.get(k, bid), "win": win, "plan": False, "done": k in placed, "key": k, "gain": gain,
-            "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
-            "facts": [["asking", asking[k], "money"], ["bid", bid, "money"], ["chance to win", win, "chance"],
-                      ["points added", gain, "points"]],
+            "name": name, "pos": r["pos"], "what": "buy", "label": "buy " + name, "step": "placed" if placed is not None else "bid",
+            "price": r["asking"], "asking": r["asking"], "amount": amount, "win": win, "plan": False, "done": placed is not None,
+            "key": k, "gain": r["gain"], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
+            "replaces": names.get(r["replaces"], r["replaces"]), "per_million": r["per_million"],
+            "price_next": r["price_next"], "price_lock": r["price_lock"],
+            "facts": [["asking", r["asking"], "money"], ["bid", amount, "money"], ["chance to win", win, "chance"],
+                      ["points added", r["gain"], "points"]],
             "funding": funding, "accepts": [], "act": []})
     return out
+
+
+def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
+    return [{"name": names.get(r["player"], r["player"]), "pos": r["pos"], "status": r["status"], "gain": r["gain"],
+             "asking": r["asking"], "bid": r["bid"], "win": r["win"], "replaces": names.get(r["replaces"], r["replaces"]),
+             "per_million": r["per_million"], "price_next": r["price_next"], "price_lock": r["price_lock"],
+             "available": r["status"] == "market"}
+            for r in [r for r in got if r["gain"] > 0][:TOP_TARGETS]]
 
 
 def list_line(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> list[Doc]:
@@ -144,24 +160,30 @@ def market_at() -> str | None:
     return stamped(at) if at else None
 
 
-def board(inp: dict[str, list[tuple[Any, ...]]]) -> Doc:
+def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arrivals: list[str]) -> Doc:
     (cash, team_value, debt, _squad_max, _xi), = inp["dec_money"]
     locks = [lock for _, lock in inp["dec_lock"]]
     bids = sum(amount for _, amount in inp["dec_bid"])
     squad, names = squad_rows(inp)
     mine = {k for k, _, m, *_ in inp["dec_player"] if m}
-    got = standing(mine)
+    offered = standing(mine)
     pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
     club = Club(frozenset(mine), pos, {k: value for k, value, *_ in rows("SELECT player, market_value FROM squads") if k in mine},
-                {k: money for k, _, money, *_ in got}, cash, team_value, (len(inp["dec_bid"]), bids), debt=debt)
-    buys = buy_lines(inp, names, club)
-    sells = offer_lines(inp, names, got)
+                {k: money for k, _, money, *_ in offered}, cash, team_value, (len(inp["dec_bid"]), bids), debt=debt)
+    top = [r for r in got if r["gain"] > 0][:TOP_TARGETS]
+    alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
+               "win": r["win"]} for r in top if r["player"] in arrivals]
+    buys = buy_lines(inp, names, club, got)
+    sells = offer_lines(inp, names, offered)
     funds(buys, sells)
     return {
         "generated_at": stamped(cut()), "market_at": market_at(),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
-        "ping": "", "do": list_line(inp, names), "buys": buys, "sells": sells,
+        "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
+        "do": list_line(inp, names), "buys": buys, "targets": target_lines(names, got),
+        "alerts": alerts,
+        "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad],
         "finish": 0.0, "band": [0.0, 0.0]}
 
@@ -179,7 +201,10 @@ def main() -> None:
     record([{"run_id": run, **r} for r in b.params], "params")
     with closing(connect()) as db, db:
         db.execute("UPDATE forecast_moment SET pinned = 1 WHERE moment = ?", (b.moment,))
-    doc = board(decision.read_inputs())
+    inp = decision.read_inputs()
+    got = decision.opportunity_rows(inp)
+    decision.keep_opportunities(cut(), got)
+    doc = board(inp, got, decision.read_arrivals())
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
@@ -188,7 +213,7 @@ def main() -> None:
 def _selftest() -> None:
     assert stamped("2026-10-30T1809Z") == "2026-10-30T18:09Z"
     buys: list[Doc] = [{"name": "Raphinha", "funding": {"tonight": [{"name": "Pepelu"}, {"name": "Alonso"}]}},
-            {"name": "Gueye", "funding": None}, {"name": "Nobody", "funding": {"feasible": False}}]
+                       {"name": "Gueye", "funding": None}, {"name": "Nobody", "funding": {"feasible": False}}]
     sells: list[Doc] = [{"name": "Pepelu"}, {"name": "Ryan"}]
     funds(buys, sells)
     assert [s["for"] for s in sells] == [["Raphinha"], []], "an offer is taken tonight when a funded buy sells him tonight"

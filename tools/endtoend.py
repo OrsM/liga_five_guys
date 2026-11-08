@@ -14,7 +14,7 @@ def _selftest() -> None:
     from pathlib import Path
 
     from assemble import built
-    from ffcore.db import record, rows, set_now
+    from ffcore.db import cut, record, rows, set_now
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import store_sql, tables_in
     from ffcore.league import Config
@@ -66,13 +66,23 @@ def _selftest() -> None:
             b = built()
             assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (b.moment,))[0][0] > 0, "a forecast"
             assert len(rows("SELECT player FROM my_squad")) == len(mine), "your squad as the app showed it"
-            doc = board(decision.read_inputs())
+            inp = decision.read_inputs()
+            got = decision.opportunity_rows(inp)
+            decision.keep_opportunities(cut(), got)
+            doc = board(inp, got, decision.read_arrivals())
             assert len(doc["squad"]) == len(mine) and sum(r["xi"] for r in doc["squad"]) == 11, "your squad and its eleven"
             assert {"generated_at", "cash", "can_bid", "lock_at", "do", "buys", "sells", "finish", "band"} <= set(doc), doc
             (line,) = doc["sells"]
             assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
             assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"
             assert all(b["win"] > 0 and b["gain"] > 0 and b["accepts"] == [] for b in doc["buys"]), doc["buys"]
+            kinds = {r["player"]: r["status"] for r in got}
+            assert {kinds[k] for k in rivals} == {"rival"} and {kinds[k] for k in listed} <= {"market"}, \
+                "the market's players are on sale, the rivals' are not: both are judged"
+            assert all(b["amount"] >= b["asking"] for b in doc["buys"]), "never a bid below the asking price"
+            assert {t["status"] for t in doc["targets"]} >= {"rival"} or not doc["targets"], doc["targets"]
+            assert rows("SELECT count(*) FROM dec_targets")[0][0] == sum(1 for r in got if r["gain"] > 0), "the targets view"
+            assert rows("SELECT count(*) FROM dec_opportunities")[0][0] == sum(1 for r in got if r["gain"] > 0 and r["status"] == "market")
             (listing,) = doc["do"]
             assert listing["what"] == "list" and listing["accepts"] == [None] and len(listing["act"]) == len(mine), \
                 "no one of yours is listed yet: one line lists them all, each with his place in your team"

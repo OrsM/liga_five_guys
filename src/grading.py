@@ -7,9 +7,11 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from assemble import forecast
+import decision
+from assemble import built, forecast
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.jornadas import round_locks
+from ffcore.parse import snapshot_stamp
 
 __all__ = ["backtest", "superseded", "view_table", "record_grades"]
 
@@ -52,6 +54,58 @@ def backtest(ahead: int = 0) -> list[dict[str, Any]]:
             set_look(moment=forecast())
             out += [{"from_j": i, **c} for c in lock_cells(i, ahead, done)]
     return out
+
+
+def opportunity_grade(top: int = 5, span: int = 4) -> list[dict[str, Any]]:
+    done = done_jornadas()
+    actual = {(k, j): x for k, j, x in rows("SELECT player, jornada, sum(pts) FROM scored GROUP BY player, jornada")}
+    out = []
+    with replaying():
+        for c in decision.seen_cuts():
+            set_now(snapshot_stamp(c))
+            try:
+                built()
+            except SystemExit:
+                continue
+            inp = decision.read_inputs()
+            pos, cells = decision.cells_of(inp)
+            got = decision.opportunity_rows(inp)
+            band = [(k, p, asking if asking is not None else value) for k, p, _, asking, value in inp["dec_universe"] if k in pos]
+            for rank, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:top], 1):
+                span_j = [j for j in range(r["from_j"], r["from_j"] + span) if j in done]
+                if not span_j or r["replaces"] is None:
+                    continue
+                gone, k = r["replaces"], r["player"]
+                lost = sum(actual.get((gone, j), 0.0) for j in span_j)
+                price = r["asking"]
+                peers = [b for b, p, pr in band if p == r["pos"] and b != k and pr and abs(pr / price - 1) <= 0.3]
+                out.append({
+                    "cut": c, "player": k, "rank": rank, "n_peers": len(peers), "jornadas": len(span_j),
+                    "forecast": sum(cells.get(j, {}).get(k, 0.0) - cells.get(j, {}).get(gone, 0.0) for j in span_j),
+                    "realised": sum(actual.get((k, j), 0.0) for j in span_j) - lost,
+                    "control": (sum(actual.get((b, j), 0.0) for b in peers for j in span_j) / len(peers) - lost) if peers else None})
+    return out
+
+
+def opportunity_report(got: list[dict[str, Any]]) -> str:
+    import statistics as st
+
+    def mean(xs: list[float]) -> float:
+        return st.mean(xs) if xs else float("nan")
+
+    def sem(xs: list[float]) -> float:
+        return st.stdev(xs) / len(xs) ** 0.5 if len(xs) > 1 else float("nan")
+    lines = ["%-15s %-4s %3s %5s %9s %9s %9s" % ("cut", "rank", "n", "jorn", "forecast", "realised", "control")]
+    lines += ["%-15s %-4d %3d %5d %9.1f %9.1f %9s" % (g["cut"], g["rank"], g["n_peers"], g["jornadas"], g["forecast"], g["realised"],
+                                                    "-" if g["control"] is None else "%.1f" % g["control"]) for g in got]
+    both = [g for g in got if g["control"] is not None]
+    diff = [g["realised"] - g["control"] for g in both]
+    lines.append("cases %d (with a control %d), cuts %d: mean forecast %.1f, realised %.1f, control %.1f; realised less control %+.1f (se %.1f), "
+                 "share beating control %.0f%%, realised above 0 in %.0f%%" % (
+                     len(got), len(both), len({g["cut"] for g in got}), mean([g["forecast"] for g in got]),
+                     mean([g["realised"] for g in got]), mean([g["control"] for g in both]), mean(diff), sem(diff),
+                     100 * mean([float(d > 0) for d in diff]), 100 * mean([float(g["realised"] > 0) for g in got])))
+    return "\n".join(lines)
 
 
 # What the grade stage keeps, a set a run.
@@ -208,5 +262,8 @@ if __name__ == "__main__":
             print("%-5s h=%2d  n=%d  rmse=%.2f  none=%.2f  again=%.2f  predicted=%+.2f  actual=%+.2f" % (
                 scope, h, n, rmse, none, again, predicted, actual), flush=True)
         os._exit(0)
-    print("grading.py --selftest | accuracy | price")
+    if sys.argv[1:2] == ["opportunities"]:
+        print(opportunity_report(opportunity_grade()), flush=True)
+        os._exit(0)
+    print("grading.py --selftest | accuracy | price | opportunities")
     raise SystemExit(2)
