@@ -115,8 +115,9 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
         windows = {"next4": next_four, "season": frozenset(cells)}
         values = {w: decision.window_value(pos, cells, js) for w, js in windows.items()}
         settled = {w: eleven.best_eleven(mine, pos, v) for w, v in values.items()}
-        opportunities = set() if degraded else {k for k, *_ in decision.opportunities(inp)}
-        doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp)
+        got = [] if degraded else decision.opportunity_rows(inp)
+        opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
+        doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [])
         seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp["dec_money"][0],
                       "squad": len(mine), "offers": rows("SELECT count(*) FROM offers WHERE status = 'pending'")[0][0],
                       "cases": {}}
