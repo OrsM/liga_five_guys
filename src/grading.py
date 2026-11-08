@@ -285,11 +285,6 @@ def lock_calibration(j: int, window: tuple[dt.datetime, dt.datetime]) -> list[di
 
 
 def grade_locks(ahead: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Every grade of the past locks in one pass, the forecast of each made
-    once: backtest's cells, decisions' moves and sim_calibration's rows (the
-    standings forecast held to account one jornada at a time, at each clean
-    lock of a finished jornada). A lock where no board could be made (at) still
-    has its cells."""
     done = done_jornadas()
     with closing(connect()) as db:
         kicks = [(j, snapshot_stamp(k) or dt.datetime.min.replace(tzinfo=dt.timezone.utc))
