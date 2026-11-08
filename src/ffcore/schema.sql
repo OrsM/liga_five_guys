@@ -628,6 +628,7 @@ CREATE VIEW k AS SELECT
     const('PRICE_W0') AS price_w0,
     const('PRICE_W1') AS price_w1,
     const('PRICE_W2') AS price_w2,
+    const('PRICE_FOCUS') AS price_focus,
     const('MATCH_LEN') AS match_len,
     const('NEUTRAL_START') AS neutral_start,
     const('ABSENT_START') AS absent_start,
@@ -636,7 +637,7 @@ CREATE VIEW k AS SELECT
     const('PICK_K') AS pick_k,
     const('P_LIFT') AS p_lift,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
-    printf('%.9g|%.9g|%.9g|%.9g', const('CLIP'), const('PRICE_W0'), const('PRICE_W1'), const('PRICE_W2')) AS ckey;
+    printf('%.9g|%.9g|%.9g|%.9g|%.9g', const('CLIP'), const('PRICE_W0'), const('PRICE_W1'), const('PRICE_W2'), const('PRICE_FOCUS')) AS ckey;
 
 -- Every valued day of every player as of t: the closed days kept in
 -- price_step, and the day of the cut (the last snapshot of it up to the cut)
@@ -706,7 +707,7 @@ WITH RECURSIVE n(h) AS (SELECT 1 UNION ALL SELECT h + 1 FROM n WHERE h < 200) SE
 
 DROP VIEW IF EXISTS price_ahead;
 CREATE VIEW price_ahead AS
-SELECT a.ff_id, a.i, a.day, a.x, hs.h, b.observed_at AS end_at,
+SELECT a.ff_id, a.i, a.day, a.x, a.value, hs.h, b.observed_at AS end_at,
        b.day AS end_day, 100 * (b.value / a.value - 1) AS change
 FROM price_series b JOIN horizons hs ON hs.h <= (SELECT hmax FROM price_hmax) + hpad()
 JOIN price_series a ON a.ff_id = b.ff_id AND a.i = b.i - hs.h;
@@ -715,19 +716,24 @@ JOIN price_series a ON a.ff_id = b.ff_id AND a.i = b.i - hs.h;
 -- h (up to price_hmax), the move over h clipped at CLIP an update.
 DROP VIEW IF EXISTS momentum_pairs;
 CREATE VIEW momentum_pairs AS
-SELECT p.h, p.ff_id, p.i, p.end_day, p.x,
+SELECT p.h, p.ff_id, p.i, p.end_day, p.x, p.value >= k.price_focus AS focus,
        max(-k.clip * p.h, min(k.clip * p.h, p.change)) AS y
 FROM price_ahead p, k;
 
 -- What each closed day adds to the momentum fit, per horizon: the sums of x*y
--- and x*x of the pairs that end that day, written once (facts.MOMENTUM_DAY)
--- for the constants they were made with (ckey).
+-- and x*x of the pairs that end that day, and of x*y, x*x, y*y and the count
+-- of those from players worth PRICE_FOCUS or more (f...), written once
+-- (facts.MOMENTUM_DAY) for the constants they were made with (ckey).
 CREATE TABLE IF NOT EXISTS momentum_day (
     ckey    TEXT NOT NULL,
     h       INTEGER NOT NULL,
     end_day TEXT NOT NULL,
     sxy     REAL NOT NULL,
     sxx     REAL NOT NULL,
+    fxy     REAL NOT NULL DEFAULT 0,
+    fxx     REAL NOT NULL DEFAULT 0,
+    fyy     REAL NOT NULL DEFAULT 0,
+    fn      INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (ckey, h, end_day)
 ) WITHOUT ROWID;
 
@@ -736,18 +742,24 @@ CREATE TABLE IF NOT EXISTS momentum_day (
 DROP VIEW IF EXISTS momentum_sums;
 CREATE VIEW momentum_sums AS
 WITH parts AS (
-    SELECT h, sxy, sxx FROM momentum_day
+    SELECT h, sxy, sxx, fxy, fxx, fyy, fn FROM momentum_day
     WHERE ckey = (SELECT ckey FROM k) AND end_day < (SELECT d FROM price_day_now)
       AND h <= (SELECT hmax FROM price_hmax)
     UNION ALL
-    SELECT h, sum(x * y), sum(x * x) FROM momentum_pairs
+    SELECT h, sum(x * y), sum(x * x), coalesce(sum(CASE WHEN focus THEN x * y END), 0),
+           coalesce(sum(CASE WHEN focus THEN x * x END), 0), coalesce(sum(CASE WHEN focus THEN y * y END), 0),
+           coalesce(sum(focus), 0) FROM momentum_pairs
     WHERE end_day = (SELECT d FROM price_day_now) GROUP BY h)
-SELECT h, sum(sxy) AS sxy, sum(sxx) AS sxx FROM parts GROUP BY h;
+SELECT h, sum(sxy) AS sxy, sum(sxx) AS sxx, sum(fxy) AS fxy, sum(fxx) AS fxx, sum(fyy) AS fyy, sum(fn) AS fn
+FROM parts GROUP BY h;
 
--- One least-squares slope through the origin per horizon.
+-- One least-squares slope through the origin per horizon, and the spread
+-- (rmse, in %) of a change over h updates around it for players worth
+-- PRICE_FOCUS or more (NULL where there are none).
 DROP VIEW IF EXISTS momentum;
 CREATE VIEW momentum AS
-SELECT h, sxy / sxx AS slope
+SELECT h, sxy / sxx AS slope,
+       CASE WHEN fn > 0 THEN sqrt(max(fyy - 2 * sxy / sxx * fxy + sxy * sxy / (sxx * sxx) * fxx, 0) / fn) END AS rmse
 FROM momentum_sums WHERE sxx <> 0;
 
 DROP TABLE IF EXISTS momentum_fit;
@@ -791,6 +803,48 @@ FROM price_series s LEFT JOIN price_slope l ON l.day = s.day;
 DROP VIEW IF EXISTS price_trend;
 CREATE VIEW price_trend AS
 SELECT ff_id, trend FROM price_trend_daily WHERE day = (SELECT d FROM price_day_now);
+
+-- Each player's expected value, night by night from the day of the cut to the
+-- next lock (at most the longest horizon fitted): h updates on, the value then
+-- and its spread (one rmse of the fit at that h, as a value; NULL for a player
+-- worth less than PRICE_FOCUS, whom it is not measured for). The signal is
+-- his last three changes (price_series.x), the slope is momentum's.
+DROP VIEW IF EXISTS price_forecast;
+CREATE VIEW price_forecast AS
+WITH nights AS (
+    SELECT max(1, min((SELECT hmax FROM price_hmax),
+                      coalesce(CAST(ceil((SELECT t FROM next_lock) - julianday((SELECT d FROM price_day_now))) AS INTEGER),
+                               (SELECT hmax FROM price_hmax)))) AS n),
+now AS (SELECT ff_id, x, value FROM price_series WHERE day = (SELECT d FROM price_day_now))
+SELECT n.ff_id, m.h, date((SELECT d FROM price_day_now), '+' || m.h || ' days') AS day, n.value,
+       n.value * (1 + m.slope * n.x / 100) AS expected_value,
+       CASE WHEN n.value >= k.price_focus THEN n.value * m.rmse / 100 END AS spread
+FROM now n JOIN momentum m ON m.h <= (SELECT n FROM nights), k;
+
+-- Momentum's forecasts of a change over h updates, each day refitted on what
+-- was known then (the fit from the third day on), against what happened,
+-- by horizon: for players worth PRICE_FOCUS or more on the day, and for all;
+-- rmse and mean abs error in %, with 'no change' and 'the last change
+-- again every update' to beat.
+DROP VIEW IF EXISTS price_grade;
+CREATE VIEW price_grade AS
+WITH days AS MATERIALIZED (SELECT day, row_number() OVER (ORDER BY day) - 1 AS r, count(*) OVER () AS m
+                           FROM (SELECT DISTINCT day FROM price_series WHERE observed_at <= (SELECT cut()))),
+daily AS MATERIALIZED (SELECT h, end_day, sxy, sxx FROM momentum_day WHERE ckey = (SELECT ckey FROM k)),
+fit AS (SELECT d.day, p.h, sum(p.sxy) / sum(p.sxx) AS slope
+        FROM days d JOIN daily p ON p.end_day <= d.day WHERE d.r >= d.m / 4
+        GROUP BY d.day, p.h HAVING sum(p.sxx) <> 0),
+pred AS (SELECT a.h, s.value, f.slope * a.x AS p, a.change AS act, a.h * max(-k.clip, min(k.clip, s.step)) AS again
+         FROM price_ahead a JOIN fit f ON f.day = a.day AND f.h = a.h
+         JOIN price_series s ON s.ff_id = a.ff_id AND s.i = a.i, k
+         WHERE a.end_at <= (SELECT cut()) AND a.h IN (1, 2, 3, 5, 7, 10)),
+scoped AS (SELECT 'focus' AS scope, * FROM pred WHERE value >= (SELECT price_focus FROM k)
+           UNION ALL SELECT 'all', * FROM pred)
+SELECT scope, h, count(*) AS n,
+       sqrt(avg((p - act) * (p - act))) AS rmse, sqrt(avg(act * act)) AS rmse_none,
+       sqrt(avg((again - act) * (again - act))) AS rmse_again,
+       avg(abs(p - act)) AS mae, avg(abs(act)) AS mae_none, avg(p) AS predicted, avg(act) AS actual
+FROM scoped GROUP BY scope, h;
 
 -- How each listing's auction went, once it has closed (by t): every
 -- listing on the market (the game's or a manager's) by player and close

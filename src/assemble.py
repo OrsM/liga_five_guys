@@ -29,7 +29,7 @@ APP_FRESH_HOURS = 14.4
 NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS", ),
     "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_LIFT", "SHRINK_K"),
-    "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
+    "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_FOCUS", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "rules": ("DEBT_SHARE", "MATCH_LEN"),
 }
 MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "forecast": model, "pricing": pricing,
@@ -422,9 +422,8 @@ def _selftest_facts() -> None:
 
 def _selftest_market() -> None:
     """The market's SQL (schema.sql: price_obs, auction_results,
-    offer_ratios, momentum, bid_odds; datasette.json: price_forecast_error)
+    offer_ratios, momentum, bid_odds, price_grade)
     as assemble reads it."""
-    import json
     import tempfile
     from pathlib import Path
 
@@ -537,12 +536,19 @@ def _selftest_market() -> None:
         for n in range(20):
             store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": k,
                                   "value": str(v[n])} for k, v in by.items()])
-        meta = Path(__file__).resolve().parent.parent / "datasette.json"
-        with closing(connect()) as db:
-            graded = {h: (n, mae, zero) for h, n, mae, zero in db.execute(
-                json.loads(meta.read_text())["databases"]["lfg"]["queries"]
-                ["price_forecast_error"]["sql"])}
-        assert graded[1][1] < graded[1][2] and graded[3][0] > 0, graded
+        graded = {h: (n, rmse, none) for h, n, rmse, none in rows(
+            "SELECT h, n, rmse, rmse_none FROM price_grade WHERE scope = 'all'")}
+        assert graded[1][1] < graded[1][2] and graded[3][0] > 0, "momentum beats no change on rising and falling series"
+        with set_constants(PRICE_FOCUS=0.0):
+            fc = {(k, h): (v, e, sp) for k, h, v, e, sp in rows("SELECT ff_id, h, value, expected_value, spread FROM price_forecast")}
+            sl = dict(rows("SELECT h, slope FROM momentum"))
+            x = dict(rows("SELECT ff_id, x FROM price_series WHERE day = (SELECT d FROM price_day_now)"))
+        assert fc and all(abs(e - v * (1 + sl[h] * x[k] / 100)) < 1e-6 for (k, h), (v, e, sp) in fc.items()), \
+            "the expected value is the value times one plus slope times signal"
+        assert max(h for _, h in fc) <= max(sl) and all(sp is not None and sp >= 0 for *_, sp in fc.values()), \
+            "nights up to the horizon, each with a spread for a player worth the focus"
+        assert all(sp is None for (sp,) in rows("SELECT spread FROM price_forecast")), \
+            "no spread for a player worth less than the focus"
 
     def odds(past: list[tuple[float, float | None, bool]]) -> dict[str, tuple[tuple[float, float], ...]]:
         """bid_odds for a player rising 5% listed now, after these past

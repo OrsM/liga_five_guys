@@ -19,6 +19,7 @@ BID_NEIGHBOURS = 30
 PRICE_W0 = 0.4
 PRICE_W1 = 0.4
 PRICE_W2 = 0.2
+PRICE_FOCUS = 20e6
 
 
 def _selftest() -> None:

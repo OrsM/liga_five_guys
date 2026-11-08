@@ -201,5 +201,12 @@ if __name__ == "__main__":
         for g, a, n, rmse, mae, bias, r, slope in accuracy():
             print("%-4s ahead %d  n=%d  rmse=%.4f  mae=%.4f  bias=%+.4f  r=%.4f  slope=%.3f" % (g, a, n, rmse, mae, bias, r, slope), flush=True)
         os._exit(0)
-    print("grading.py --selftest | accuracy")
+    if sys.argv[1:2] == ["price"]:
+        # price: momentum's price forecasts against what happened, by horizon (rmse in %, with 'no change' and 'the last change again')
+        for scope, h, n, rmse, none, again, predicted, actual in rows(
+                "SELECT scope, h, n, rmse, rmse_none, rmse_again, predicted, actual FROM price_grade ORDER BY scope DESC, h"):
+            print("%-5s h=%2d  n=%d  rmse=%.2f  none=%.2f  again=%.2f  predicted=%+.2f  actual=%+.2f" % (
+                scope, h, n, rmse, none, again, predicted, actual), flush=True)
+        os._exit(0)
+    print("grading.py --selftest | accuracy | price")
     raise SystemExit(2)
