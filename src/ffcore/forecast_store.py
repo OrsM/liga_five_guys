@@ -296,7 +296,7 @@ def _selftest_forecast() -> None:
             assert set(rating) == {"a", "b"}, "a club with no results has no rating"
 
             prior = dict(rows("SELECT player, prior FROM ppm_prior"))
-            rate = {p: (ppm, pk) for p, ppm, pk in rows("SELECT player, ppm, picked FROM forecast_rate")}
+            rate = {p: (ppm, pk, rec) for p, ppm, pk, rec in rows("SELECT player, ppm, picked, record FROM forecast_rate")}
             sk, pk = model.SHRINK_K, model.PICK_K
             assert abs(rate["fwd"][0] - shrink(shrink(prior["fwd"], sk, 150.0, 30.0), sk, 0.0, 0.0)) < 1e-12, \
                 "his value's prior, pulled toward last season's 5 a match"
@@ -312,11 +312,15 @@ def _selftest_forecast() -> None:
             assert set(cells) == {(p, j) for p in ("fwd", "back", "hurt", "susp", "dbt", "gone") for j in (2, 3)} \
                 | {("cee", 3)}, "every jornada left his club plays; a coach, a player with no club: none"
             says = {"fwd": 0.8, "hurt": 0.0, "susp": 0.0, "dbt": 0.5}      # the listed start %, whatever his status
+            club_start = {"a": 2, "b": 2, "c": 3}
+            club = {"fwd": "a", "back": "a", "hurt": "b", "susp": "b", "dbt": "b", "gone": "b", "cee": "c"}
             for (p, j), (pts, pr, ppm, fix, picked, fit) in cells.items():
                 assert abs(pts - max(0.0, ppm * fix)) < 1e-12, "points if he plays = ppm x fixture"
-                q = says.get(p, picked * fit)
+                w = model.P_LISTING * model.P_DECAY ** (j - club_start[club[p]])
+                q = w * rate[p][1] * (1.0 if p in says else fit) + (1 - w) * rate[p][2] * fit
                 assert abs(pr - (q + model.P_LIFT * q * (1 - q))) < 1e-12, \
-                    "the chance he plays is the listing's start % if it has one, else picked x fit, lifted by P_LIFT"
+                    "the chance he plays is his listing's start % (or picked) blended with his record, the listing's share" \
+                    " P_LISTING falling by P_DECAY a jornada, his record x fit, lifted by P_LIFT"
             assert abs(cells["fwd", 2][3] - rating["b"][1]) < 1e-12, "an attacker: his opponent's defence"
             assert abs(cells["back", 2][3] - 1 / rating["b"][0]) < 1e-12, "a defender: 1 / its attack"
             assert cells["cee", 3][3] == 1.0, "an opponent with no rating: 1"
