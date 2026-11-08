@@ -482,16 +482,21 @@ SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
        avg(CASE WHEN flagged = 1 THEN predicted - actual END) AS flagged_bias
 FROM grade_forecast g GROUP BY run_id, from_j, jornada;
 
--- A grade's accuracy at each distance (ahead: jornadas past the lock), over
--- every player forecast: n, RMSE, MAE and the correlation r of predicted
--- against actual points. grading.py accuracy prints it.
+-- A grade's accuracy at each distance (ahead: jornadas past the lock) for the
+-- players who could be in a winning eleven (grp 'star': forecast e of 4 or
+-- more) and for every player forecast (grp 'all'): n, RMSE, MAE, bias
+-- (predicted less actual), the correlation r and the slope of actual
+-- points on predicted. grading.py accuracy prints it.
 DROP VIEW IF EXISTS grade_accuracy;
 CREATE VIEW grade_accuracy AS
-WITH g AS (SELECT run_id, jornada - from_j AS ahead, predicted AS x, actual AS y FROM grade_forecast)
-SELECT run_id, ahead, count(*) AS n, sqrt(avg((x - y) * (x - y))) AS rmse, avg(abs(x - y)) AS mae,
+WITH g AS (SELECT run_id, jornada - from_j AS ahead, predicted AS x, actual AS y FROM grade_forecast),
+u AS (SELECT 'all' AS grp, * FROM g UNION ALL SELECT 'star', * FROM g WHERE x >= 4)
+SELECT run_id, grp, ahead, count(*) AS n, sqrt(avg((x - y) * (x - y))) AS rmse, avg(abs(x - y)) AS mae,
+       avg(x - y) AS bias,
        (avg(x * y) - avg(x) * avg(y))
-       / sqrt((avg(x * x) - avg(x) * avg(x)) * (avg(y * y) - avg(y) * avg(y))) AS r
-FROM g GROUP BY run_id, ahead;
+       / sqrt((avg(x * x) - avg(x) * avg(x)) * (avg(y * y) - avg(y) * avg(y))) AS r,
+       (avg(x * y) - avg(x) * avg(y)) / (avg(x * x) - avg(x) * avg(x)) AS slope
+FROM u GROUP BY run_id, grp, ahead;
 
 -- The moments to replay at: each line-up snapshot (one a time) belongs to
 -- the jornada that was next then, from the previous lock to its own.

@@ -385,16 +385,16 @@ def ceiling_headline(got: list[dict[str, Any]]) -> dict[str, float]:
 def accuracy(ahead: int = 5) -> list[tuple[Any, ...]]:
     """The forecast at each lock (backtest) graded as a run of its own
     (trigger 'accuracy'): at the next jornada and at ahead, the rows
-    (ahead, n, rmse, mae, r) of grade_accuracy."""
+    (grp, ahead, n, rmse, mae, bias, r, slope) of grade_accuracy, the star group first."""
     with closing(connect()) as db, db:
         run = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
                          " VALUES ('', '', 'accuracy', '', 1)").lastrowid
     assert run is not None
     record([{"run_id": run, **r} for r in backtest(ahead)], "grade_cell")
-    got = [tuple(r) for r in rows("SELECT ahead, n, rmse, mae, r FROM grade_accuracy"
-                                  " WHERE run_id = ? AND ahead IN (0, ?) ORDER BY ahead", (run, ahead))]
-    log_measure("accuracy", {"%s@%d" % (k, a): v for a, n, rmse, mae, r in got
-                             for k, v in (("n", n), ("rmse", rmse), ("mae", mae), ("r", r))})
+    got = [tuple(r) for r in rows("SELECT grp, ahead, n, rmse, mae, bias, r, slope FROM grade_accuracy"
+                                  " WHERE run_id = ? AND ahead IN (0, ?) ORDER BY grp DESC, ahead", (run, ahead))]
+    log_measure("accuracy", {"%s%s@%d" % ("" if g == "all" else "star_", k, a): v for g, a, n, rmse, mae, bias, r, slope in got
+                             for k, v in (("n", n), ("rmse", rmse), ("mae", mae), ("bias", bias), ("r", r), ("slope", slope))})
     return got
 
 
@@ -695,8 +695,8 @@ if __name__ == "__main__":
         # (records a run of trigger 'accuracy' in the database it reads)
         held = applied(os.environ.get("LFG_VARIANT", "live"))
         held.__enter__()
-        for a, n, rmse, mae, r in accuracy():
-            print("ahead %d  n=%d  rmse=%.4f  mae=%.4f  r=%.4f" % (a, n, rmse, mae, r), flush=True)
+        for g, a, n, rmse, mae, bias, r, slope in accuracy():
+            print("%-4s ahead %d  n=%d  rmse=%.4f  mae=%.4f  bias=%+.4f  r=%.4f  slope=%.3f" % (g, a, n, rmse, mae, bias, r, slope), flush=True)
         os._exit(0)
     if sys.argv[1:2] == ["ceiling"]:
         # ceiling: at each past lock, standing still, this code's plan and the plan on real points
