@@ -41,7 +41,9 @@ FROM base b LEFT JOIN changes c ON c.ff_id = b.ff_id AND c.n = b.n
 MOMENTUM_DAY = """
 DELETE FROM momentum_day WHERE ckey = (SELECT ckey FROM k);
 INSERT INTO momentum_day
-SELECT (SELECT ckey FROM k), h, end_day, coalesce(sum(x * y), 0), sum(x * x)
+SELECT (SELECT ckey FROM k), h, end_day, coalesce(sum(x * y), 0), sum(x * x),
+       coalesce(sum(CASE WHEN focus THEN x * y END), 0), coalesce(sum(CASE WHEN focus THEN x * x END), 0),
+       coalesce(sum(CASE WHEN focus THEN y * y END), 0), coalesce(sum(focus), 0)
 FROM momentum_pairs GROUP BY h, end_day
 """
 FAR = "9999-12-31T2359Z"
