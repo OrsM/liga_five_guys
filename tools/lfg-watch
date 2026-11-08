@@ -84,7 +84,7 @@ REQ=$(ssh_phone "mv '$DEST/rerun.json' '$DEST/rerun.taken' 2>/dev/null && cat '$
 echo "requested: $REQ"
 
 # A request that says "quick" only re-plans (the data as it is), not the whole chain.
-case "$REQ" in *'"quick"'*) export LFG_STAGES="sim publish" ;; esac
+case "$REQ" in *'"quick"'*) export LFG_STAGES="board publish" ;; esac
 
 echo $$ > "$LOCK"
 trap 'rm -f "$LOCK"' EXIT

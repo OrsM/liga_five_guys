@@ -27,7 +27,7 @@ from ffcore.db import RUN_ENV, connect, set_now, this_run
 STAGES: list[tuple[str, str, bool]] = [
     ("parse", "ingest:parse", True),
     ("crosswalk", "crosswalk:main", True),
-    ("sim", "sim:main", True),
+    ("board", "board:main", True),
     ("publish", "publish:main", False),
     ("grade", "grading:record_grades", False),
     ("health", "health:main", False),

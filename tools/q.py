@@ -85,92 +85,8 @@ def _selftest() -> None:
                                       from_market="")])
         _compiles(Path(tmp2) / "lfg.db")
     _selftest_queries()
-    _selftest_changes()
     _selftest_paired()
-    _selftest_variant_gap()
-    _selftest_board_history()
-    _selftest_sim_calibration()
     print("q.py self-test OK")
-
-
-def _selftest_changes() -> None:
-    """what_changed and cash_cliffs, against rows whose answers are worked out
-    by hand."""
-    import tempfile
-    from datetime import datetime, timezone
-
-    from ffcore.db import set_now
-    from ffcore.db import record
-    from ffcore.tidy import store_sql, tables_in
-
-    def asked(name: str, given: dict[str, object] | None = None) -> list[dict[str, Any]]:
-        cols, got = named(name, given or {})
-        return [dict(zip(cols, r)) for r in got]
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
-            record([{"run_id": i, "started": s, "as_of": "t", "trigger": "service", "commit_sha": "c"}
-                    for i, s in ((1, "2026-10-13T08:00:00Z"), (2, "2026-10-14T08:00:00Z"),
-                                 (3, "2026-10-14T11:00:00Z"))], "runs")
-            record([{"player_id": k, "name": k.upper()} for k in "abcdef"], "crosswalk")
-
-            record([{"moment": i, "code": "c", "as_of": str(i)} for i in (1, 3)],
-                   "forecast_moment")
-            record([{"run_id": i, "moment": i} for i in (1, 3)], "sim_runs")
-
-            def cell(run: int, j: int, k: str, ppm: float, picked: float, fit: float) -> dict[str, Any]:
-                return {"moment": run, "jornada": j, "player": k, "ppm": ppm, "fixture": 1.0,
-                        "picked": picked, "fit": fit, "pts": ppm, "p": picked * fit}
-            record([cell(1, 9, "a", 4, .5, 1), cell(1, 9, "b", 4, .5, 1), cell(1, 9, "c", 4, 1.0, 1),
-                    cell(1, 9, "e", 3, 1.0, 1), cell(1, 10, "a", 9, 1, 1),
-                    cell(3, 9, "a", 5, .5, 1), cell(3, 9, "b", 4, 1.0, 1), cell(3, 9, "c", 4, 1.0, .5),
-                    cell(3, 9, "d", 2, 1.0, 1), cell(3, 10, "a", 1, 1, 1),
-                    cell(1, 9, "f", 4, .5, 1.0), cell(3, 9, "f", 4, 1.0, .8)], "forecast_cell")
-            # run 3 against the latest run at least 12 hours before it (run 1): the next jornada, 9
-            got = {r["name"]: r for r in asked("what_changed")}
-            assert set(got) == {"A", "B", "C", "D", "E", "F"}, got.keys()
-            assert (got["A"]["was"], got["A"]["now"], got["A"]["change"]) == (2.0, 2.5, 0.5)
-            assert (got["A"]["from_points"], got["A"]["from_selection"], got["A"]["from_fitness"]) \
-                == (0.5, 0.0, 0.0), "he scores more when he plays: 5 against 4, at half a chance"
-            assert (got["B"]["from_points"], got["B"]["from_selection"], got["B"]["from_fitness"]) \
-                == (0.0, 2.0, 0.0), "picked half as often again: 4 points, +0.5 chance"
-            assert (got["C"]["from_points"], got["C"]["from_selection"], got["C"]["from_fitness"]) \
-                == (0.0, 0.0, -2.0), "half as likely to be fit: 4 points x half a chance lost"
-            assert (got["F"]["from_points"], got["F"]["from_selection"], got["F"]["from_fitness"]) \
-                == (0.0, 2.0, -0.8), "both move: picked more (4 x +0.5 x the old fitness 1) and less fit (4 x 1 x -0.2)"
-            assert all(abs(g["change"] - (g["from_points"] + g["from_selection"] + g["from_fitness"])) < 1e-9
-                       for n, g in got.items() if n in "ABCF"), "the three parts add up to the change"
-            assert (got["D"]["was"], got["D"]["now"], got["D"]["scope"]) == (None, 2.0, "new in the forecast")
-            assert (got["E"]["was"], got["E"]["now"], got["E"]["scope"]) == (3.0, None, "gone from the forecast")
-            explicit = asked("what_changed", {"old": 1, "new": 3, "jornada": 10})
-            assert [(r["name"], r["was"], r["now"]) for r in explicit] == [("A", 9.0, 1.0)], \
-                "any two runs, any jornada"
-        finally:
-            set_now(None)
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(datetime(2026, 10, 14, 12, tzinfo=timezone.utc))
-            record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "service", "commit_sha": "c"}], "runs")
-            record([{"run_id": 1, "cut": "q"}], "decision_run")
-            record([{"run_id": 1, "manager": m, "me": 0, "now": 0.0, "mean": 0.0, "cash": c}
-                    for m, c in (("debtor", -5e6), ("fine", 4e6), ("nearly", -1e6))], "decision_standings")
-            store_sql("api_teams", [{"observed_at": "2026-10-14T1000Z", "player_id": a, "manager": m,
-                                     "player_team_id": "t" + a}
-                                    for a, m in (("1", "debtor"), ("2", "debtor"), ("3", "debtor"),
-                                                 ("4", "fine"), ("5", "nearly"))])
-            record([{"player_id": k, "name": "P" + k, "app_id": k} for k in "12345"], "crosswalk")
-            record([{"cut": "q", "variant": "live", "player": k, "name": "P" + k, "value": v}
-                    for k, v in (("1", 1e6), ("2", 1e6), ("3", 6e6), ("4", 9e6), ("5", 1e6))], "seen")
-            got = {r["manager"]: r for r in asked("cash_cliffs")}
-            assert set(got) == {"debtor", "nearly"}, "nobody in credit"
-            assert (got["debtor"]["debt_m"], got["debtor"]["squad_value_m"], got["debtor"]["players"],
-                    got["debtor"]["fewest_sales"]) == (5.0, 8.0, 3, 1), \
-                "5M to raise from players worth 6, 1 and 1: the 6M one alone does it (the cheap ones first would need all three)"
-            assert (got["nearly"]["debt_m"], got["nearly"]["fewest_sales"]) == (1.0, 1)
-        finally:
-            set_now(None)
 
 
 def _selftest_paired() -> None:
@@ -211,105 +127,15 @@ def _selftest_paired() -> None:
         assert far["all"][1] == 1 and far["all"][2] == 81.0, "ahead picks the horizon: 81 -> 0 is a gain of +81"
 
 
-def _selftest_variant_gap() -> None:
-    """variant_gap: two variants' replays of one jornada, at the last moment
-    at least :hours before its lock, set against each other."""
-    import tempfile
-
-    from ffcore.db import record
-    from ffcore.tidy import tables_in
-    from grading import view_table
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        def row(v: str, at: str, j: int, k: str, pred: float, fl: int, h: float) -> dict[str, Any]:
-            return {"variant": v, "as_of": at, "jornada": j, "player": k, "predicted": pred,
-                    "actual": 3.0, "flagged": fl, "lead_h": h}
-        # actual 3 throughout. Jornada 2: moments 50h, 30h, 10h out; with hours=24 the 30h one counts.
-        # live errors^2 at 30h: a 4, b 1, c 0; challenger: a 1, b 4, c 0 (and different at the others)
-        record([row("live", "m1", 2, "a", 1, 0, 50), row("slow", "m1", 2, "a", 3, 0, 50),
-                row("live", "m2", 2, "a", 1, 0, 30), row("slow", "m2", 2, "a", 2, 0, 30),
-                row("live", "m2", 2, "b", 4, 1, 30), row("slow", "m2", 2, "b", 5, 1, 30),
-                row("live", "m2", 2, "c", 3, 0, 30), row("slow", "m2", 2, "c", 3, 0, 30),
-                row("live", "m3", 2, "a", 1, 0, 10), row("slow", "m3", 2, "a", 3, 0, 10),
-                # jornada 3: only a moment inside the window: nothing to compare
-                row("live", "m4", 3, "a", 0, 0, 5), row("slow", "m4", 3, "a", 3, 0, 5),
-                # jornada 4: a moment exactly :hours out counts (same error either way)
-                row("live", "m5", 4, "z", 1, 0, 24), row("slow", "m5", 4, "z", 1, 0, 24)], view_table("replayed"))
-        got = {r[0]: r for r in named("variant_gap", {"old": "live", "new": "slow", "hours": 24})[1]}
-        assert set(got) == {"all", "flagged", "not flagged"}, got
-        # old - new squared error: a 4 - 1 = 3, b 1 - 4 = -3, c 0 - 0 = 0
-        assert got["all"][1] == 4 and abs(got["all"][2]) < 1e-9, got["all"]
-        assert got["not flagged"][1] == 3 and got["not flagged"][2] == 1.0, got["not flagged"]
-        assert got["flagged"][1] == 1 and got["flagged"][2] == -3.0 and got["flagged"][6] == "too few"
-        assert got["all"][6] == "not established"
-        far = {r[0]: r for r in named("variant_gap", {"old": "live", "new": "slow", "hours": 0})[1]}
-        assert far["all"][1] == 3 and abs(far["all"][2] - 13 / 3) < 1e-3, "the last moment of each jornada: 4, 9 and 0"
-        assert named("variant_gap", {"old": "live", "new": "slow", "hours": 60})[1] == [], \
-            "no moment that early: nothing to compare"
-
-
-def _selftest_board_history() -> None:
-    """board_history: how long a move stayed on the published board."""
-    import tempfile
-
-    from ffcore.db import record
-    from ffcore.tidy import tables_in
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        record([{"generated_at": at, "commit_sha": "c"} for at in ("a1", "a2", "a3")], "board_history")
-        record([{"generated_at": at, "ord": i, "what": w, "name": n, "gain": g}
-                for at, i, w, n, g in (("a1", 0, "buy", "X", 10.0), ("a2", 0, "buy", "X", 20.0),
-                                       ("a3", 0, "buy", "X", 30.0), ("a1", 1, "sell", "Y", -4.0),
-                                       ("a2", 1, "sell", "Y", -6.0), ("a3", 1, "field", None, 1.0),
-                                       ("a1", 2, "buy", "Z", 5.0), ("a3", 2, "buy", "W", 1.0))], "board_history_moves")
-        cols, got = named("board_history", {})
-        rows_ = [dict(zip(cols, r)) for r in got]
-        assert [(r["what"], r["name"], r["boards"], r["first_seen"], r["last_seen"], r["avg_gain"], r["on_latest"])
-                for r in rows_] == [("buy", "X", 3, "a1", "a3", 20.0, 1), ("sell", "Y", 2, "a1", "a2", -5.0, 0),
-                                    ("buy", "W", 1, "a3", "a3", 1.0, 1), ("buy", "Z", 1, "a1", "a1", 5.0, 0)], rows_
-
-
-def _selftest_sim_calibration() -> None:
-    """sim_calibration: coverage and z of the simulation's draws."""
-    import tempfile
-
-    from ffcore.db import record
-    from ffcore.tidy import tables_in
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        record([{"run_id": i, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"} for i in (1, 2)], "runs")
-
-        def row(run: int, j: int, m: str, actual: float, mean: float, sd: float, pit: float,
-                d: tuple[float, float, float, float] | None = None) -> dict[str, Any]:
-            r = {"run_id": run, "jornada": j, "manager": m, "actual": actual, "mean": mean, "sd": sd, "pit": pit}
-            if d:
-                r.update(diff_actual=d[0], diff_mean=d[1], diff_sd=d[2], diff_pit=d[3])
-            return r
-        # totals: z = +1, -2, 0.5, and one with no spread (dropped); pit in the 10-90 band for 2 of 3
-        record([row(1, 2, "a", 60, 50, 10, 0.84, (20, 10, 10, 0.84)), row(1, 2, "b", 30, 50, 10, 0.02, (-10, 10, 5, 0.02)),
-                row(1, 3, "a", 55, 50, 10, 0.72), row(1, 3, "c", 9, 9, 0, 0.5),
-                row(2, 2, "z", 1, 1, 1, 0.5)], "sim_calibration")
-        cols, got = named("sim_calibration", {"run": 1})
-        rows_ = {r[0]: dict(zip(cols, r)) for r in got}
-        t = rows_["totals"]
-        assert (t["n"], t["jornadas"], t["in_10_90"], t["in_25_75"]) == (3, 2, 0.67, 0.33), t
-        assert t["z_mean"] == -0.17 and t["z_sd"] == 1.61, t      # z = 1, -2, .5: mean -.1667, sd sqrt(5.1667 / 2) = 1.607
-        dd = rows_["you minus him"]
-        assert (dd["n"], dd["in_10_90"], dd["z_mean"], dd["z_sd"]) == (2, 0.5, -1.5, 3.54), dd   # diff z = 1, -4: mean -1.5, sd 3.54
-        assert [r[0] for r in named("sim_calibration", {})[1]] == ["totals"], "no run named: the latest, run 2"
-
-
 def _selftest_queries() -> None:
     """The saved queries that answer a question, against rows whose answers
-    can be worked out by hand: unmatched_players, constants_vs_measured (and
-    persistence), bench_points, rivals."""
+    can be worked out by hand: unmatched_players, bench_points."""
     import tempfile
     from datetime import datetime, timezone
 
     from ffcore.db import set_now
     from ffcore.db import record
     from ffcore.tidy import store_sql, tables_in
-    from grading import view_table
 
     def asked(name: str, given: dict[str, object] | None = None) -> list[tuple[Any, ...]]:
         return [tuple(r) for r in named(name, given or {})[1]]
@@ -326,19 +152,6 @@ def _selftest_queries() -> None:
             assert asked("unmatched_players") == [
                 ("Cy", None, 9.0, "no line-up page"), ("Bo", None, 5.0, "no app id"),
                 ("Di", None, None, "neither")], asked("unmatched_players")
-
-            # persistence and constants_vs_measured: a and b miss the same way in both jornadas
-            record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-            record([{"run_id": 1, "from_j": j, "jornada": j, "player": k, "predicted": 2.0,
-                     "actual": a, "flagged": 0} for j in (1, 2) for k, a in (("a", 3.0), ("b", 1.0))],
-                   view_table("grade_forecast"))
-            record([{"run_id": 1, "ord": i, "lock": 1, "move": m, "reached": r, "kind": "get", "real": v}
-                    for i, (m, r, v) in enumerate([("x", "plan", 3.0), ("y", "cleared", -1.0),
-                                                   ("z", "rejected", 5.0)])], "grade_decisions")
-            assert asked("persistence") == [(0.5,)], "misses of +1 and -1 repeat: sqrt(2 / 8)"
-            assert asked("constants_vs_measured") == [
-                ("PERSISTENT_SHARE", 0.08, 0.5, 2, "share of a player's miss that repeats the next jornada")], \
-                asked("constants_vs_measured")
         finally:
             set_now(None)
 
@@ -363,32 +176,6 @@ def _selftest_queries() -> None:
                                      for at, ids in (("2026-08-19T1000Z", "12"), ("2026-08-20T1800Z", "13"),
                                                      ("2026-08-21T1000Z", "23")) for a in ids])
             assert asked("bench_points") == [(1, 7.0, 3.0, 2, "Y Man", 3.0)], asked("bench_points")
-
-            # rivals: riv bought one player and sold another this week and an old one a month ago
-            record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-            record([{"run_id": 1, "cut": "q"}], "decision_run")
-            record([{"run_id": 1, "manager": m, "me": me, "now": 100.0 * i, "mean": 1000.0 * i,
-                     "finish": float(i), "p_above": None if me else 0.25, "cash": 5e6 * i}
-                    for i, (m, me) in enumerate((("me", 1), ("riv", 0)), 1)], "decision_standings")
-            store_sql("api_standings", [{"observed_at": "2026-08-24T1000Z", "user_id": u, "manager": m}
-                                        for u, m in (("1", "me"), ("2", "riv"))])
-            store_sql("api_teams", [{"observed_at": "2026-08-24T1000Z", "player_id": a, "manager": "riv",
-                                     "player_team_id": "r" + a} for a in "56"])
-            record([{"cut": "q", "variant": "live", "player": k, "name": k, "value": v}
-                    for k, v in (("5", 2e6), ("6", 3e6))], "seen")
-            record([{"player_id": k, "app_id": k} for k in "56"], "crosswalk")
-            store_sql("api_activity", [
-                {"observed_at": "2026-08-24T1000Z", "activity_id": i, "kind": kind, "user_id": "2",
-                 "player_id": "7", "at": at, "amount": amt, "counterparty": ""}
-                for i, kind, at, amt in [("a", "buy", "2026-08-22T10:00:00+02:00", "3000000"),
-                                         ("b", "sell", "2026-08-23T10:00:00+02:00", "1000000"),
-                                         ("c", "buy", "2026-07-20T10:00:00+02:00", "9000000")]])
-            got = {r[0]: r for r in asked("rivals")}
-            riv = got["riv"]
-            assert (riv[1], riv[2], riv[4], riv[5], riv[6]) == (0, 200.0, 2.0, 25.0, 10.0), riv
-            assert (riv[7], riv[8], riv[9], riv[10], riv[11]) == (2, 5.0, 1, 1, -2.0), \
-                "two players worth 5M; this week one buy (3M) and one sale (1M); the old buy is not counted"
-            assert got["me"][5] is None, "no chance he is above himself"
         finally:
             set_now(None)
 

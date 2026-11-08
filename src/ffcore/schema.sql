@@ -1,3 +1,66 @@
+-- What earlier versions made and nothing reads now: a database made by them drops it here.
+DROP VIEW IF EXISTS app_lineup;
+DROP VIEW IF EXISTS board_blocker_word;
+DROP VIEW IF EXISTS board_blockers;
+DROP VIEW IF EXISTS board_buy_facts;
+DROP VIEW IF EXISTS board_buys;
+DROP VIEW IF EXISTS board_clauses;
+DROP VIEW IF EXISTS board_eleven;
+DROP VIEW IF EXISTS board_flip;
+DROP VIEW IF EXISTS board_head;
+DROP VIEW IF EXISTS board_json;
+DROP VIEW IF EXISTS board_league;
+DROP VIEW IF EXISTS board_mine;
+DROP VIEW IF EXISTS board_plan;
+DROP VIEW IF EXISTS board_players;
+DROP VIEW IF EXISTS board_rows;
+DROP VIEW IF EXISTS board_run;
+DROP VIEW IF EXISTS board_sell_facts;
+DROP VIEW IF EXISTS board_skip;
+DROP VIEW IF EXISTS board_squad;
+DROP VIEW IF EXISTS board_step;
+DROP VIEW IF EXISTS board_trace;
+DROP VIEW IF EXISTS dec_rows;
+DROP VIEW IF EXISTS dec_squad;
+DROP VIEW IF EXISTS decision_facts;
+DROP VIEW IF EXISTS grade_error;
+DROP VIEW IF EXISTS league_jornada;
+DROP VIEW IF EXISTS league_season;
+DROP VIEW IF EXISTS league_squad;
+DROP VIEW IF EXISTS league_standings;
+DROP VIEW IF EXISTS league_xi;
+DROP VIEW IF EXISTS lineup_alert;
+DROP VIEW IF EXISTS lineup_gap;
+DROP VIEW IF EXISTS lineup_names;
+DROP VIEW IF EXISTS listing_ends;
+DROP VIEW IF EXISTS lock_due;
+DROP VIEW IF EXISTS lock_record;
+DROP VIEW IF EXISTS look_players;
+DROP VIEW IF EXISTS my_xi;
+DROP VIEW IF EXISTS next_cell;
+DROP VIEW IF EXISTS offer_spread;
+DROP VIEW IF EXISTS persistence_by_run;
+DROP VIEW IF EXISTS sim_forecast;
+DROP VIEW IF EXISTS standin_cell;
+DROP TABLE IF EXISTS board_history;
+DROP TABLE IF EXISTS board_history_moves;
+DROP TABLE IF EXISTS board_xi;
+DROP TABLE IF EXISTS dec_plan;
+DROP TABLE IF EXISTS dec_start;
+DROP TABLE IF EXISTS decision_blocker;
+DROP TABLE IF EXISTS decision_flip;
+DROP TABLE IF EXISTS decision_option;
+DROP TABLE IF EXISTS decision_plan;
+DROP TABLE IF EXISTS decision_players;
+DROP TABLE IF EXISTS decision_run;
+DROP TABLE IF EXISTS decision_sale;
+DROP TABLE IF EXISTS decision_skip;
+DROP TABLE IF EXISTS decision_standings;
+DROP TABLE IF EXISTS decision_waiting;
+DROP TABLE IF EXISTS grade_decisions;
+DROP TABLE IF EXISTS sim_calibration;
+DROP TABLE IF EXISTS sim_runs;
+
 -- data/lfg.db, applied on every connect (ffcore/db.py). Only adds: a
 -- changed table is dropped by hand and rebuilt (docs/notes/lfg.md).
 
@@ -22,8 +85,8 @@ CREATE TABLE IF NOT EXISTS run_measures (
     PRIMARY KEY (run_id, stage, measure)
 );
 
--- The headline numbers of `grading.py accuracy` and `grading.py ceiling`, kept a run at a time:
--- measure ('accuracy', 'ceiling', each with ':variant' unless live), key (rmse@5, share...), the
+-- The headline numbers of `grading.py accuracy`, kept a run at a time:
+-- measure ('accuracy'), key (rmse@5, star_rmse@5...), the
 -- code's short commit. (commit_sha: COMMIT is an SQL keyword.)
 CREATE TABLE IF NOT EXISTS measure_log (
     at         TEXT NOT NULL,     -- wall clock, UTC
@@ -43,58 +106,6 @@ SELECT a.measure, a.key, a.value, a.at, a.commit_sha, p.value AS previous, p.at 
 FROM r a LEFT JOIN r p ON p.measure = a.measure AND p.key = a.key AND p.n = 2
 WHERE a.n = 1;
 
--- How each jornada that has been played went for you, one row each: the last decision before its lock (the
--- chance of first it saw, the finish and what could still stop you if you did nothing), and what you scored
--- (the game's fixture_points for you, the last seen before the next jornada locks; a zero is a matchday lost).
--- The league's real criterion, run after run (grading.py locks).
-DROP VIEW IF EXISTS lock_record;
-CREATE VIEW lock_record AS
-WITH l AS (SELECT jornada, lock, stamp_jd(lock) AS t, lead(stamp_jd(lock)) OVER (ORDER BY lock) AS until FROM round_locks),
-d AS (SELECT l.jornada, r.run_id, s.p_first, r.p_first_after, s.finish, r.finish_after,
-             row_number() OVER (PARTITION BY l.jornada ORDER BY stamp_jd(r.cut) DESC) AS n
-      FROM l JOIN decision_run r ON stamp_jd(r.cut) < l.t
-      JOIN decision_standings s ON s.run_id = r.run_id AND s.me = 1),
-p AS (SELECT l.jornada, a.fixture_points, row_number() OVER (PARTITION BY l.jornada ORDER BY stamp_jd(a.observed_at) DESC) AS n
-      FROM l JOIN api_standings a ON stamp_jd(a.observed_at) < l.until AND stamp_jd(a.observed_at) > l.t
-      WHERE a.manager = (SELECT manager FROM decision_standings WHERE me = 1 ORDER BY run_id DESC LIMIT 1))
-SELECT l.jornada, l.lock, d.run_id, d.p_first, d.p_first_after, d.finish, d.finish_after,
-       (SELECT count(*) FROM decision_blocker b WHERE b.run_id = d.run_id AND b.future = 'nothing' AND b.blocker <> 'none') AS exposed,
-       p.fixture_points AS scored, p.fixture_points = 0 AS lost
-FROM l LEFT JOIN d ON d.jornada = l.jornada AND d.n = 1 LEFT JOIN p ON p.jornada = l.jornada AND p.n = 1
-WHERE l.until IS NOT NULL AND l.until < stamp_jd((SELECT cut()));
-
--- The decision a run made (decision.plan, ffcore/decide.sql), which the
--- board reads: the decision's plan-detail contract, a run each (decision.record).
--- Every single move valued from the squad as it is (dec_rows), and the plan's
--- moves in order (dec_plan; a swap is a buy and a sale of one step), in points.
-CREATE TABLE IF NOT EXISTS decision_option (
-    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
-    kind    TEXT NOT NULL,           -- buy, sell
-    player  TEXT NOT NULL,
-    amount  REAL,                    -- the bid, or what the sale gets
-    win     REAL NOT NULL,
-    gain    REAL NOT NULL,           -- points
-    worth   REAL NOT NULL,
-    in_plan INTEGER NOT NULL,
-    asking_win REAL,                 -- a buy: the chance of winning at his asking price (bid_odds at ratio 1)
-    beats   REAL,                    -- a sale: the share of the game's recent offers the offer standing on him beats
-    PRIMARY KEY (run_id, kind, player)
-);
-CREATE TABLE IF NOT EXISTS decision_plan (
-    run_id INTEGER NOT NULL REFERENCES runs(run_id),
-    step   INTEGER NOT NULL,
-    kind   TEXT NOT NULL,
-    player TEXT NOT NULL,
-    amount REAL NOT NULL,
-    win    REAL NOT NULL,
-    worth  REAL NOT NULL,            -- the step's, in points
-    due    TEXT,                       -- when the step is due (decision.schedule), the game's clock
-    why    TEXT,                       -- what sets it: auction closes, after the auctions, before the lock
-    cash_then REAL,                    -- the cash this step leaves, running from today's (decision.after)
-    ord    INTEGER,                    -- the step's place in the plan's order, from 0 (decision.in_order); everything reads this
-    PRIMARY KEY (run_id, step, kind)
-);
-
 -- Every constant and fitted value a run was built with (assemble.params),
 -- broom's tidy(): drift and "what changed" are queries over this.
 CREATE TABLE IF NOT EXISTS params (
@@ -105,39 +116,6 @@ CREATE TABLE IF NOT EXISTS params (
     kind      TEXT NOT NULL,     -- constant, fitted
     n         INTEGER,           -- observations behind it, where known
     PRIMARY KEY (run_id, component, term)
-);
-
--- What the decision saw and decided, a run each (decision.record): the
--- rest of its plan-detail contract, which the board views read.
--- Each manager's season if you do nothing: mean points, 10th and 90th
--- percentile, expected final position, the chance of first, and the
--- chance he finishes above you (NULL for you).
-CREATE TABLE IF NOT EXISTS decision_standings (
-    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
-    manager  TEXT NOT NULL,
-    me       INTEGER NOT NULL,
-    now      REAL,                 -- points so far
-    mean     REAL,
-    lo       REAL,
-    hi       REAL,
-    finish   REAL,
-    p_first  REAL,
-    p_above  REAL,
-    cash     REAL,                 -- yours from the app, a rival's estimated from the feed
-    PRIMARY KEY (run_id, manager)
-);
-
--- Your squad (mine), the market and the plan's buys: the chance he plays
--- next, expected points next and over the season, in the best eleven now (xi).
-CREATE TABLE IF NOT EXISTS decision_players (
-    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
-    player      TEXT NOT NULL,
-    start       REAL,
-    next        REAL,
-    season      REAL,
-    mine        INTEGER NOT NULL,
-    xi          INTEGER NOT NULL,
-    PRIMARY KEY (run_id, player)
 );
 
 -- The market and the league as a universe was built on them, a cut's and
@@ -200,112 +178,6 @@ CREATE VIEW my_cash AS
 SELECT coalesce((SELECT c.cash FROM look l JOIN seen_cash c ON c.cut = l.cut AND c.variant = l.variant
                  AND c.manager = l.me), 0.0) AS cash;
 
--- What waiting to sell was worth as the run saw it (waiting as of its cut),
--- a row a player of yours with an offer standing (kind 'sale'): the board's sales read it.
-CREATE TABLE IF NOT EXISTS decision_waiting (
-    run_id INTEGER NOT NULL REFERENCES runs(run_id),
-    player TEXT NOT NULL,
-    kind   TEXT NOT NULL,
-    later  REAL,
-    PRIMARY KEY (run_id, player, kind)
-);
-
--- What stops you at the plan's end (decision.after), on two futures: 'nothing' (you do nothing) and
--- 'plan' (you do all it says). blocker: debt (amount: cash at the lock), eleven, squad (amount: players over).
-CREATE TABLE IF NOT EXISTS decision_blocker (
-    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
-    future  TEXT NOT NULL,
-    blocker TEXT NOT NULL,
-    amount  REAL,
-    PRIMARY KEY (run_id, future, blocker)
-);
-
--- What skipping one step of the plan leaves (decision.after): do the rest of the plan as written, without this
--- step (a buy goes with its paired sale, the same step). One row a blocker the skip leaves, as decision_blocker's;
--- blocker 'none' (amount NULL) when skipping leaves nothing. kind: the skipped step's.
--- What flipping one move leaves, from the plan as it stands (decision.flips): a move in the plan is taken out, one
--- not in it is added; kind 'plan' (no player) is the plan itself, to read them against. cash at the lock, the season's points against standing pat, and what stops you (a JSON array of blocker names).
-CREATE TABLE IF NOT EXISTS decision_flip (
-    run_id   INTEGER NOT NULL REFERENCES runs(run_id),
-    player   TEXT NOT NULL,
-    kind     TEXT NOT NULL,
-    cash     REAL NOT NULL,
-    points   REAL NOT NULL,
-    blockers TEXT NOT NULL,
-    PRIMARY KEY (run_id, kind, player)
-);
-CREATE TABLE IF NOT EXISTS decision_skip (
-    run_id  INTEGER NOT NULL REFERENCES runs(run_id),
-    player  TEXT NOT NULL,
-    kind    TEXT NOT NULL,
-    blocker TEXT NOT NULL,
-    amount  REAL,
-    PRIMARY KEY (run_id, player, kind, blocker)
-);
-
--- Each offer standing on one of your players, assessed (decision.assess_sale): what you make on it over
--- what you paid, how far it is from the recent offers' mean in standard deviations, the chance a better
--- one comes before the lock, what waiting is worth less the offer.
-CREATE TABLE IF NOT EXISTS decision_sale (
-    run_id       INTEGER NOT NULL REFERENCES runs(run_id),
-    player       TEXT NOT NULL,
-    offer        REAL NOT NULL,
-    paid         REAL,
-    made         REAL,
-    z            REAL,
-    p_better     REAL,
-    waiting_less REAL,
-    PRIMARY KEY (run_id, player)
-);
-
--- The forecast moment a run was built on (forecast_cell keeps it while a
--- run points to it).
-DROP TABLE IF EXISTS hold;     -- a manual veto on the plan, removed 2026-11-07: the objective decides
-
-CREATE TABLE IF NOT EXISTS sim_runs (
-    run_id        INTEGER PRIMARY KEY REFERENCES runs(run_id),
-    moment        INTEGER REFERENCES forecast_moment(moment)
-);
-
--- What the decision left of a run: the market as seen (seen, at its cut), your
--- chance of first and expected finish once the plan is made, every bid won
--- (decide.sql league_standings on its squad), your cash and what more you can bid
--- then, and the game's offers still to come before the lock (nights_left: how many,
--- and the julian day of the first).
-CREATE TABLE IF NOT EXISTS decision_run (
-    run_id        INTEGER PRIMARY KEY REFERENCES runs(run_id),
-    cut           TEXT,
-    p_first_after REAL,
-    finish_after  REAL,
-    cash_after    REAL,
-    can_bid       REAL,
-    nights        INTEGER,
-    first         REAL,
-    offer_mean    REAL,                -- the recent offers (recent_offers) as shares of value: mean and
-    offer_sd      REAL                 -- standard deviation, what an offer is read against
-);
-
--- Each run's forecast, every cell with factors (ffcore.schedule.Factors):
--- points = ppm x fixture, plays = picked x fit, expected from the two.
-DROP VIEW IF EXISTS sim_forecast;
-CREATE VIEW sim_forecast AS
-SELECT r.run_id, c.jornada, c.player, c.ppm, c.fixture, c.picked, c.fit,
-       c.pts AS points, c.p AS plays, c.e AS expected
-FROM sim_runs r JOIN forecast_e c ON c.moment = r.moment WHERE c.ppm IS NOT NULL;
-
--- The market's and the league's facts as each run saw them (seen at its
--- cut), every player: the board shows these, and a past run's board is
--- these and its decisions. fetches is what a sale of one of yours gets
--- (the offer or what waiting is worth, else his value; NULL if not yours).
-DROP VIEW IF EXISTS sim_facts;
-DROP VIEW IF EXISTS decision_facts;
-CREATE VIEW decision_facts AS
-SELECT r.run_id, s.player, name_shown(s.name) AS name, coalesce(s.pos, '') AS pos, s.value, s.trend, s.paid,
-       s.offer, s.clause, s.price, s.route, s.my_bid,
-       CASE WHEN p.mine THEN coalesce(s.fetches, s.value, 0.0) END AS fetches
-FROM decision_run r JOIN seen s ON s.cut = r.cut AND s.variant = 'live'
-LEFT JOIN decision_players p ON p.run_id = r.run_id AND p.player = s.player;
-
 -- grading, when run.py grade finds something new: each past lock's forecast
 -- (the cell contract, read at the lock by grading.backtest), a row a player and
 -- jornada done up to GRADE_AHEAD past the lock: what was expected of him (e),
@@ -320,19 +192,6 @@ CREATE TABLE IF NOT EXISTS grade_cell (
     plays     REAL,
     flagged   INTEGER NOT NULL,
     PRIMARY KEY (run_id, from_j, jornada, player)
-) WITHOUT ROWID;
-
--- The next jornada's forecast at every replay moment (grading.replay), a row a
--- variant, moment and player: the cell contract read at that t, kept as the
--- replay's own record.
-CREATE TABLE IF NOT EXISTS replay_cell (
-    variant   TEXT NOT NULL,
-    as_of     TEXT NOT NULL,         -- the line-up snapshot (lineup_snapshots) it was made at
-    jornada   INTEGER NOT NULL,
-    player    TEXT NOT NULL,
-    predicted REAL NOT NULL,
-    flagged   INTEGER NOT NULL,
-    PRIMARY KEY (variant, as_of, player)
 ) WITHOUT ROWID;
 
 -- The forecast (forecast_now) as a decision at t reads it, made into a
@@ -395,61 +254,6 @@ SELECT l.src, l.at AS last_at, l.n AS rows, round(u.usual_rows, 1) AS usual_rows
        (SELECT max(g.at) FROM r g WHERE g.src = l.src AND g.n >= 0.5 * u.usual_rows) AS last_good
 FROM r l JOIN usual u USING (src), now WHERE l.k = 1;
 
--- The standings forecast held to account (grading.sim_calibration): each
--- manager's points in a clean jornada against the forecast of it
--- at the lock (pit: where he fell, 0..1; calibrated is uniform), and you
--- minus him the same way (diff_*), which is what who-finishes-above uses.
-CREATE TABLE IF NOT EXISTS sim_calibration (
-    run_id      INTEGER NOT NULL REFERENCES runs(run_id),
-    jornada     INTEGER NOT NULL,
-    manager     TEXT NOT NULL,
-    actual      REAL NOT NULL,
-    mean        REAL NOT NULL,
-    sd          REAL NOT NULL,
-    pit         REAL NOT NULL,
-    diff_actual REAL,
-    diff_mean   REAL,
-    diff_sd     REAL,
-    diff_pit    REAL,
-    PRIMARY KEY (run_id, jornada, manager)
-);
-
-
--- The boards published before the board was kept as rows, from git
--- (tools/board_history.py): head and moves, one board a generated_at.
-CREATE TABLE IF NOT EXISTS board_history (
-    generated_at TEXT PRIMARY KEY,
-    commit_sha   TEXT NOT NULL,
-    plan_gain    REAL,
-    finish       REAL,
-    p_win        REAL
-);
-CREATE TABLE IF NOT EXISTS board_history_moves (
-    generated_at TEXT NOT NULL REFERENCES board_history(generated_at),
-    ord          INTEGER NOT NULL,
-    what         TEXT NOT NULL,    -- field, buy, sell
-    name         TEXT,
-    gain         REAL,
-    PRIMARY KEY (generated_at, ord)
-);
-
--- Every step of each replayed lock's plan, against what its players then did.
-CREATE TABLE IF NOT EXISTS grade_decisions (
-    run_id     INTEGER NOT NULL REFERENCES runs(run_id),
-    ord        INTEGER NOT NULL,
-    lock       INTEGER NOT NULL,   -- the jornada whose lock it was ranked at
-    move       TEXT NOT NULL,
-    reached    TEXT NOT NULL,      -- plan (left out: graded alone before this code; cleared, rejected before 2026-10-28)
-    kind       TEXT NOT NULL,      -- get, sell
-    chance     REAL,               -- chance it leaves you better off (ffcore.gain)
-    jornadas   INTEGER,            -- jornadas played since
-    pred       REAL,               -- the step's marginal in the plan on the forecast over them (worth_on)
-    real       REAL,               -- the same on the points scored
-    value_pred REAL,               -- value change forecast, millions
-    value_real REAL,
-    PRIMARY KEY (run_id, ord)
-);
-
 -- Views are recreated on every connect: a changed one replaces the old.
 
 -- Each graded lock and jornada: forecast error over every player forecast,
@@ -468,103 +272,31 @@ SELECT g.run_id, g.from_j, g.jornada, g.player, g.predicted, coalesce(a.pts, 0.0
        g.flagged, g.plays
 FROM grade_cell g LEFT JOIN pts a ON a.player = g.player AND a.jornada = g.jornada;
 
-DROP VIEW IF EXISTS grade_error;
-CREATE VIEW grade_error AS
-SELECT run_id, from_j, jornada, jornada - from_j AS ahead, count(*) AS n,
-       sqrt(avg((predicted - actual) * (predicted - actual))) AS rmse,
-       avg(predicted - actual) AS bias,
-       (SELECT avg(actual) FROM (SELECT x.actual FROM grade_forecast x
-                                 WHERE x.run_id = g.run_id AND x.from_j = g.from_j AND x.jornada = g.jornada
-                                 ORDER BY x.predicted DESC, x.player LIMIT 50)) AS top50,
-       sum(flagged) AS flagged_n,
-       sqrt(avg(CASE WHEN flagged = 1 THEN (predicted - actual) * (predicted - actual) END))
-           AS flagged_rmse,
-       avg(CASE WHEN flagged = 1 THEN predicted - actual END) AS flagged_bias
-FROM grade_forecast g GROUP BY run_id, from_j, jornada;
-
--- A grade's accuracy at each distance (ahead: jornadas past the lock), over
--- every player forecast: n, RMSE, MAE and the correlation r of predicted
--- against actual points. grading.py accuracy prints it.
+-- A grade's accuracy at each distance (ahead: jornadas past the lock) for the
+-- players who could be in a winning eleven (grp 'star': forecast e of 4 or
+-- more) and for every player forecast (grp 'all'): n, RMSE, MAE, bias
+-- (predicted less actual), the correlation r and the slope of actual
+-- points on predicted. grading.py accuracy prints it.
 DROP VIEW IF EXISTS grade_accuracy;
 CREATE VIEW grade_accuracy AS
-WITH g AS (SELECT run_id, jornada - from_j AS ahead, predicted AS x, actual AS y FROM grade_forecast)
-SELECT run_id, ahead, count(*) AS n, sqrt(avg((x - y) * (x - y))) AS rmse, avg(abs(x - y)) AS mae,
+WITH g AS (SELECT run_id, jornada - from_j AS ahead, predicted AS x, actual AS y FROM grade_forecast),
+u AS (SELECT 'all' AS grp, * FROM g UNION ALL SELECT 'star', * FROM g WHERE x >= 4)
+SELECT run_id, grp, ahead, count(*) AS n, sqrt(avg((x - y) * (x - y))) AS rmse, avg(abs(x - y)) AS mae,
+       avg(x - y) AS bias,
        (avg(x * y) - avg(x) * avg(y))
-       / sqrt((avg(x * x) - avg(x) * avg(x)) * (avg(y * y) - avg(y) * avg(y))) AS r
-FROM g GROUP BY run_id, ahead;
+       / sqrt((avg(x * x) - avg(x) * avg(x)) * (avg(y * y) - avg(y) * avg(y))) AS r,
+       (avg(x * y) - avg(x) * avg(y)) / (avg(x * x) - avg(x) * avg(x)) AS slope
+FROM u GROUP BY run_id, grp, ahead;
 
--- The moments to replay at: each line-up snapshot (one a time) belongs to
--- the jornada that was next then, from the previous lock to its own.
-DROP VIEW IF EXISTS replay_moments;
-CREATE VIEW replay_moments AS
-WITH snaps AS MATERIALIZED (SELECT at FROM lineup_snapshots),
-w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS opens FROM jornada_calendar
-      WHERE lock IS NOT NULL)
-SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens AND s.at < w.lock
-ORDER BY w.lock, s.at;
 
--- The forecast of the next jornada at every replay moment, for each variant
--- as last forecast (replay_cell; grading.replay makes them), a row a player,
--- with what he scored (0 if nothing) and how many hours
--- before the lock: how far from the lock the error is acceptable. The same
--- outcomes as grade_forecast, forecast again under the information of each
--- moment, so it says how early a forecast is good, not which model is
--- (paired_gain).
-DROP VIEW IF EXISTS replayed;
-CREATE VIEW replayed AS
-WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
-SELECT c.variant, c.as_of, c.jornada, c.player, c.predicted,
-       coalesce(a.pts, 0.0) AS actual, c.flagged,
-       24 * (stamp_jd(r.lock)
-           - stamp_jd(c.as_of))
-           AS lead_h
-FROM replay_cell c JOIN replay_moments r ON r.as_of = c.as_of AND r.jornada = c.jornada
-LEFT JOIN pts a ON a.player = c.player AND a.jornada = c.jornada
-WHERE c.jornada IN (SELECT jornada FROM jornada_calendar WHERE state = 'done');
-
--- How far from the lock a replayed forecast was made, in buckets.
-DROP VIEW IF EXISTS lead_buckets;
-CREATE VIEW lead_buckets AS
-SELECT 0 AS from_h, 3 AS to_h, '0-3h' AS lead UNION ALL SELECT 3, 12, '3-12h'
-UNION ALL SELECT 12, 24, '12-24h' UNION ALL SELECT 24, 48, '24-48h'
-UNION ALL SELECT 48, 96, '48-96h' UNION ALL SELECT 96, 1e9, '96h+';
-
--- Replayed error against how far from the lock: per variant and lead
--- bucket, the outcomes, the moments, rmse and the flagged players' rmse.
--- Buckets hold different jornadas, so compare them with replay_gap.
-DROP VIEW IF EXISTS replay_lead;
-CREATE VIEW replay_lead AS
-SELECT variant, b.from_h, b.lead,
-       count(*) AS n, count(DISTINCT as_of) AS moments,
-       sqrt(avg((predicted - actual) * (predicted - actual))) AS rmse,
-       avg(predicted - actual) AS bias,
-       sqrt(avg(CASE WHEN flagged = 1 THEN (predicted - actual) * (predicted - actual) END)) AS flagged_rmse
-FROM replayed f JOIN lead_buckets b ON f.lead_h >= b.from_h AND f.lead_h < b.to_h
-GROUP BY variant, b.from_h, b.lead;
-
--- What forecasting earlier costs: the same player-jornadas forecast at each
--- lead and at the jornada's last replayed moment; the mean squared error
--- earlier minus last (positive: earlier is worse) with its interval (claim).
 DROP VIEW IF EXISTS replay_gap;
-CREATE VIEW replay_gap AS
-WITH fin AS (SELECT variant, jornada, max(as_of) AS at FROM replayed GROUP BY variant, jornada),
-d AS (SELECT f.variant, f.lead_h, f.flagged,
-             (f.predicted - f.actual) * (f.predicted - f.actual)
-           - (g.predicted - g.actual) * (g.predicted - g.actual) AS d
-      FROM replayed f JOIN fin ON fin.variant = f.variant AND fin.jornada = f.jornada
-      JOIN replayed g ON g.variant = f.variant AND g.jornada = f.jornada
-                            AND g.as_of = fin.at AND g.player = f.player
-      WHERE f.as_of < fin.at),
-s AS (SELECT d.variant, b.from_h, b.lead, sc.scope, count(*) AS n, avg(d.d) AS m,
-             (sum(d.d * d.d) - count(*) * avg(d.d) * avg(d.d)) / (count(*) - 1) AS var
-      FROM d JOIN lead_buckets b ON d.lead_h >= b.from_h AND d.lead_h < b.to_h
-      JOIN (SELECT 'all' AS scope UNION ALL SELECT 'flagged') sc ON sc.scope = 'all' OR d.flagged = 1
-      GROUP BY d.variant, b.from_h, b.lead, sc.scope),
-t AS (SELECT *, sqrt(max(var, 0) / n) AS se FROM s)
-SELECT variant, from_h, lead, scope, n, m AS extra_mse, se,
-       lo95(m, se) AS lo, hi95(m, se) AS hi, claim(m, se) AS claim
-FROM t;
-
+DROP VIEW IF EXISTS replay_lead;
+DROP VIEW IF EXISTS lead_buckets;
+DROP VIEW IF EXISTS replayed;
+DROP VIEW IF EXISTS replay_moments;
+DROP VIEW IF EXISTS lineup_snapshots;
+DROP TABLE IF EXISTS replay_cell;
+DROP TABLE IF EXISTS variants;
 
 -- The league's money, as SQL over the app's tables (current_/history_ views
 -- read as of t, each row with its player). League writes the one
@@ -745,10 +477,6 @@ FROM u CROSS JOIN score_spread w;
 DROP VIEW IF EXISTS cell;
 CREATE VIEW cell AS SELECT jornada, player, p, e, v FROM cell_pool WHERE player IS NOT NULL;
 
--- Each position's stand-in each jornada left, his e and v as a cell's.
-DROP VIEW IF EXISTS standin_cell;
-CREATE VIEW standin_cell AS SELECT jornada, pos, e, v FROM cell_pool WHERE player IS NULL;
-
 -- The game's nightly offers still to come before the lock (next_lock): one
 -- as each standing offer expires, then one a day (0 with none standing),
 -- and when the first of them comes (first, a julian day).
@@ -760,16 +488,6 @@ l AS (SELECT t AS lock FROM next_lock)
 SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights,
        ends AS first
 FROM e, l;
-
--- When each manager's listing on the game's market ends, as of t (t, a
--- julian day): a listing runs three days, and the game offers for a player
--- at each close only while he is listed.
-DROP VIEW IF EXISTS listing_ends;
-CREATE VIEW listing_ends AS
-SELECT player, max(expires_at) AS ends, max(julianday(expires_at)) AS t
-FROM listings
-WHERE player IS NOT NULL AND seller = 'marketPlayerTeam' AND expires_at <> ''
-GROUP BY player;
 
 -- What waiting to sell a player of yours with an offer standing is worth,
 -- over the nights before the lock (next_lock, nights_left): each night's
@@ -901,14 +619,6 @@ FROM (SELECT ff_id, observed_at, value, id,
 -- (model_constants, once a table of the constants per variant, is gone: the views read const(NAME), the module's value.)
 DROP TABLE IF EXISTS model_constants;
 
--- A challenger: the constants it sets differently from live's.
-CREATE TABLE IF NOT EXISTS variants (
-    variant TEXT NOT NULL,
-    name    TEXT NOT NULL,
-    value   REAL NOT NULL,
-    PRIMARY KEY (variant, name)
-);
-
 -- The constants the views use, one row: each named once, here.
 DROP VIEW IF EXISTS k;
 CREATE VIEW k AS SELECT
@@ -925,7 +635,6 @@ CREATE VIEW k AS SELECT
     const('FIXTURE_K') AS fixture_k,
     const('PICK_K') AS pick_k,
     const('P_LIFT') AS p_lift,
-    const('REMIND_HOURS') AS remind_hours,
     -- what price_series and momentum_pairs are made with: the key of momentum_day's rows
     printf('%.9g|%.9g|%.9g|%.9g', const('CLIP'), const('PRICE_W0'), const('PRICE_W1'), const('PRICE_W2')) AS ckey;
 
@@ -1378,13 +1087,6 @@ WITH last AS (SELECT ff_id, trim(name) AS name, club,
 SELECT l.ff_id AS player_id, l.name, l.club AS club_id, coalesce(a.app_id, '') AS app_id
 FROM last l LEFT JOIN app_links a ON a.player = l.ff_id WHERE l.n = 1;
 
--- When the line-ups were taken, as of t: each futbolfantasy snapshot (one a time):
--- the moments a forecast can be replayed at.
-DROP VIEW IF EXISTS lineup_snapshots;
-CREATE VIEW lineup_snapshots AS
-SELECT DISTINCT observed_at AS at FROM lineups
-WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut());
-
 -- The jornadas every match of which has a score (jornada_calendar): what a
 -- forecast is graded on (one under way, or with a match postponed, is not).
 DROP VIEW IF EXISTS jornadas_done;
@@ -1530,19 +1232,6 @@ DROP VIEW IF EXISTS standings;
 CREATE VIEW standings AS
 SELECT user_id, manager, position, team_points, fixture_points, team_value, team_money FROM current_api_standings;
 
--- Your line-up in the app at t (each source's last snapshot), i its order there,
--- and player: who each is (identity.sql), by app id else by the name one player
--- has (short, else full); NULL when nothing names exactly one.
-DROP VIEW IF EXISTS app_lineup;
-CREATE VIEW app_lineup AS
-SELECT t.rowid AS i, t.source, t.player_id, t.player_name, t.player_name_full,
-       coalesce(a.player, n.player, f.player) AS player
-FROM api_lineup t
-LEFT JOIN app_player a ON a.app_id = t.player_id
-LEFT JOIN name_player n ON n.name_key = name_key(t.player_name)
-LEFT JOIN name_player f ON f.name_key = name_key(t.player_name_full)
-WHERE /* latest api_lineup */;
-
 -- Every snapshot of futbolfantasy's market up to t: a player's value at each,
 -- id the order they were kept in.
 DROP VIEW IF EXISTS price_history;
@@ -1620,484 +1309,3 @@ x AS (SELECT c.player, f.jornada, rt.ppm, rt.picked, rt.listed_pct, ft.fit,
 SELECT player, jornada, max(0.0, ppm * fixture) AS pts,
        min(1.0, q + p_lift * q * (1.0 - q)) AS p, ppm, fixture, picked, fit
 FROM (SELECT x.*, k.p_lift, CASE WHEN listed_pct THEN picked ELSE picked * fit END AS q FROM x, k);
-
-
--- The board: the last run's decisions and the facts it saw (the decision's
--- plan-detail contract: decision_*), the app's line-up and the next kickoff
--- as of t.
--- board_json is decisions.json, the phone's copy; sim.main writes it from
--- here. A do row of a buy or a sale also carries `skip`: what skipping that step leaves, doing the rest of the
--- plan (decision_skip, worded by board_skip): a list of {blocker, label, amount} by blocker, 'none' = safe to
--- skip; absent when the run recorded nothing for the step. The buys and sells rankings do not carry it. Names, not keys: the board is what the phone shows.
-DROP VIEW IF EXISTS board_run;
-CREATE VIEW board_run AS SELECT max(run_id) AS run_id FROM decision_run;
-
--- Each player the last run decided about, with his facts and name as shown;
--- if yours, what selling him raises and whether that takes tonight's offer.
-DROP VIEW IF EXISTS board_players;
-CREATE VIEW board_players AS
-SELECT p.*, coalesce(f.name, p.player) AS name, coalesce(f.pos, '') AS pos,
-       f.value, f.trend, f.paid, f.offer, f.clause, f.price, f.route, f.my_bid,
-       CASE WHEN p.mine THEN coalesce(f.fetches, 0.0) END AS raises,
-       coalesce(f.fetches = f.offer, 0) AS takes
-FROM decision_players p JOIN board_run USING (run_id) LEFT JOIN decision_facts f USING (run_id, player);
-
--- Your squad as the page draws it, the eleven first (best of each line, as the app lines them up), then the
--- bench: each one's points next jornada (decision_players), whether he is in the eleven, and whether the plan
--- sells him (decision_plan). The eleven here is board_eleven's, from the same rows.
-DROP VIEW IF EXISTS board_squad;
-CREATE VIEW board_squad AS
-SELECT row_number() OVER (ORDER BY NOT p.xi, CASE p.pos WHEN 'POR' THEN 0 WHEN 'DEF' THEN 1 WHEN 'MED' THEN 2 ELSE 3 END,
-                          -p.next, p.player) - 1 AS ord,
-       p.name, p.pos, p.next, p.xi,
-       p.player IN (SELECT d.player FROM decision_plan d WHERE d.run_id = p.run_id AND d.kind = 'sell') AS sold
-FROM board_players p WHERE p.mine;
-
--- Every buy the last run valued (decision_option: each player on the
--- market you could get), with what the run saw of him: what he is listed at
--- (asking), the bid (the plan's, or the lowest his odds offer) and its
--- chance of winning (win), your bid if it is in, what you pay (cost), his
--- value and trend, his points alone, and whether the plan buys him.
-DROP VIEW IF EXISTS board_buys;
-CREATE VIEW board_buys AS
-SELECT o.player, coalesce(s.name, o.player) AS name, coalesce(s.pos, '') AS pos,
-       coalesce(s.price, o.amount) AS asking, o.amount AS bid, s.my_bid, o.amount AS cost,
-       s.value, s.trend, o.gain, o.worth, o.in_plan, o.win, o.asking_win
-FROM decision_option o JOIN board_run USING (run_id)
-LEFT JOIN decision_facts s ON s.run_id = o.run_id AND s.player = o.player
-WHERE o.kind = 'buy';
-
--- Each of your players: his facts (board_players), whether he is listed,
--- the game's offer standing on him and the share of its recent offers, as a
--- share of value, it beats (decision_option.beats); what selling him alone
--- does (decision_option: points, worth), whether the plan sells
--- him, and what turning the offer down is worth (the best of the
--- game's offers still to come before the lock, decision_waiting).
--- relist_after: when his listing ends, if before the last of those offers.
-DROP VIEW IF EXISTS board_mine;
-CREATE VIEW board_mine AS
-WITH n AS (SELECT run_id, nights, first FROM decision_run)
-SELECT b.player, b.name, b.pos, b.value, b.paid, b.trend, b.offer, b.raises, b.takes,
-       b.route IS 'listed' AS listed,
-       CASE WHEN b.offer IS NOT NULL AND b.value > 0 THEN f.beats END AS beats,
-       f.gain, f.worth, coalesce(f.in_plan, 0) AS sell,
-       w.later AS waiting,
-       CASE WHEN b.route IS 'listed' AND l.t < n.first + n.nights - 1 THEN l.ends END AS relist_after,
-       n.nights, d.made, d.z, d.p_better, d.waiting_less
-FROM board_players b JOIN n USING (run_id)
-LEFT JOIN decision_sale d ON d.run_id = b.run_id AND d.player = b.player
-LEFT JOIN decision_option f ON f.run_id = b.run_id AND f.kind = 'sell' AND f.player = b.player
-LEFT JOIN decision_waiting w ON w.run_id = b.run_id AND w.player = b.player AND w.kind = 'sale'
-LEFT JOIN listing_ends l ON l.player = b.player
-WHERE b.mine;
-
--- Each buy (board_buys) and each of your players (board_mine) with what the
--- board says of him, for the plan's
--- line on him and his row in the rankings alike: a buy's asking price,
--- your bid, how many bid, the chance to win, his points and trend; a
--- sale's value, the offer standing (when not taken), how it ranks among
--- the game's recent offers, what waiting is worth and how many offers come
--- before the lock, his points and trend.
-DROP VIEW IF EXISTS board_buy_facts;
-CREATE VIEW board_buy_facts AS
-SELECT b.*,
-       (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
-                SELECT 0 AS n, 'listed at' AS l, b.asking AS v, 'money' AS u
-                UNION ALL SELECT 0.4, 'your bid', b.my_bid, 'money' WHERE b.my_bid <> b.cost
-                UNION ALL SELECT 0.45, 'bids', CASE WHEN n.bids = 0 THEN 'none yet'
-                                                   WHEN b.my_bid IS NULL THEN CAST(n.bids AS TEXT)
-                                                   WHEN n.bids = 1 THEN 'only yours'
-                                                   ELSE n.bids || ', yours among them' END, 'count'
-                    FROM (SELECT CAST(max(m.bids) AS INTEGER) AS bids FROM listings m
-                          WHERE m.player = b.player AND m.bids <> '') n WHERE n.bids IS NOT NULL
-                UNION ALL SELECT 0.5, 'chance to win', round(b.win, 3), 'chance'
-                UNION ALL SELECT 3, 'points', b.gain, 'points'
-                UNION ALL SELECT 4, '', b.trend, 'trend')
-            WHERE v IS NOT NULL) AS facts
-FROM board_buys b;
-
-DROP VIEW IF EXISTS board_sell_facts;
-CREATE VIEW board_sell_facts AS
-SELECT s.*,
-       (SELECT json_group_array(json_array(l, v, u) ORDER BY n) FROM (
-                SELECT 0 AS n, 'value' AS l, s.value AS v, 'money' AS u
-                UNION ALL SELECT 1, 'offer', CASE WHEN NOT s.takes THEN s.offer END, 'money'
-                UNION ALL SELECT 2, 'the game''s recent offers', round(s.beats, 3), 'beats'
-                UNION ALL SELECT 2.2, 'waiting is worth', s.waiting, 'money'
-                    WHERE s.offer IS NOT NULL AND s.nights > 0
-                UNION ALL SELECT 2.4, 'more offers before the lock', s.nights, 'count'
-                    WHERE s.offer IS NOT NULL
-                UNION ALL SELECT 1.1, 'paid', s.paid, 'money' WHERE s.offer IS NOT NULL
-                UNION ALL SELECT 1.2, 'made on the sale', s.made, 'money'
-                UNION ALL SELECT 2.1, 'offer vs the usual (sd)', s.z, 'sd'
-                UNION ALL SELECT 2.25, 'waiting less the offer', s.waiting_less, 'money'
-                UNION ALL SELECT 2.3, 'a better offer comes', s.p_better, 'chance'
-                UNION ALL SELECT 3, 'points', s.gain, 'points'
-                UNION ALL SELECT 4, '', s.trend, 'trend')
-            WHERE v IS NOT NULL) AS facts
-FROM board_mine s;
-
--- Your players a rival can take now by paying their clause (any can: a sale
--- to the game pays at once, so cash is no limit), most valuable first.
-DROP VIEW IF EXISTS board_clauses;
-CREATE VIEW board_clauses AS
-SELECT row_number() OVER (ORDER BY -season, player) - 1 AS ord, name, pos, clause
-FROM board_players WHERE mine AND clause IS NOT NULL;
-
--- Every manager's season if you do nothing, most points first; a rival's
--- cash is estimated from the feed.
-DROP VIEW IF EXISTS board_league;
-CREATE VIEW board_league AS
-SELECT row_number() OVER (ORDER BY -s.mean, s.manager) - 1 AS ord, s.manager, s.me, s.now,
-       s.mean, s.lo, s.hi, coalesce(s.cash, 0.0) AS cash, NOT s.me AS estimated, s.p_above,
-       s.finish, s.p_first
-FROM decision_standings s JOIN board_run USING (run_id);
-
--- The eleven to field at the lock: the best of your squad now, each with his
--- place in your team, as the app lines him up. The line-up reminder and the
--- board's field line both read it.
-DROP VIEW IF EXISTS board_eleven;
-CREATE VIEW board_eleven AS
-SELECT p.player, p.name, p.pos, p.next FROM board_players p WHERE p.xi;
-
--- Your line-up in the app against the best eleven of your squad now
--- (decision_players.xi): a line-up is of players you hold, so a buy is in it only
--- once he is yours, at the run after his auction closes. The app's line-up
--- is its players (app_lineup.player), and counts only if every one is yours and there are as many as the eleven;
--- otherwise it is unknown (legal 0) and the whole eleven is to set. 'in'
--- are the eleven's players not in it, 'out' (i, its order in the app) those
--- in it that are not in the eleven.
-DROP VIEW IF EXISTS lineup_gap;
-CREATE VIEW lineup_gap AS
-WITH bp AS MATERIALIZED (SELECT * FROM board_players),
-app AS MATERIALIZED (SELECT i, player FROM app_lineup),
-fielded AS (SELECT i, player FROM app
-            WHERE NOT EXISTS (SELECT 1 FROM app a LEFT JOIN bp b
-                              ON b.player = a.player AND b.mine WHERE b.player IS NULL)),
-legal AS (SELECT (SELECT count(*) FROM fielded) > 0
-                 AND (SELECT count(*) FROM fielded) = (SELECT count(*) FROM bp WHERE xi) AS ok)
-SELECT 'in' AS side, NULL AS i, e.player, e.name, e.next, l.ok AS legal
-FROM bp e, legal l
-WHERE e.xi AND (NOT l.ok OR e.player NOT IN (SELECT player FROM fielded))
-UNION ALL
-SELECT 'out', f.i, b.player, b.name, b.next, l.ok
-FROM fielded f JOIN bp b USING (player), legal l
-WHERE l.ok AND f.player NOT IN (SELECT player FROM bp WHERE xi);
-
--- The players of each side of lineup_gap as named in one line: those to
--- field, the best first, and those to take out, as the app has them.
-DROP VIEW IF EXISTS lineup_names;
-CREATE VIEW lineup_names AS
-WITH gap AS MATERIALIZED (SELECT * FROM lineup_gap)
-SELECT 'in' AS side, group_concat(name, ', ' ORDER BY -next, player) AS names FROM gap WHERE side = 'in'
-UNION ALL
-SELECT 'out', group_concat(name, ', ' ORDER BY i) FROM gap WHERE side = 'out';
-
--- The plan's moves, in its order (a swap's buy, then its sale), and what
--- each spends (a sale's is negative).
-DROP VIEW IF EXISTS board_plan;
-CREATE VIEW board_plan AS
-SELECT p.ord, p.step, p.kind, p.player, p.amount, p.win, p.worth, p.due, p.why, p.cash_then
-FROM decision_plan p JOIN board_run USING (run_id);
-
--- Every line of the board, each once: what to do now, each with the step
--- it takes in the app and the amount that step names, whether it is done,
--- its points (over the season, or next for the line-up) and the numbers
--- that made it (facts: [label, value, unit], none without a value). The
--- plan is the one judgement: no line shows a move it does not make.
---   The line-up the plan wants; the plan's moves in its order (a buy:
---   bid up to the plan's bid, yours shown if it is another, or yours is
---   in at it); each bid of yours the plan does not make, to withdraw (it
---   would win beside the plan's: the plan weighs every bid, yours or not);
---   (a sale: after the auctions when the plan bids (decision.schedule: once you
---   know they are won, to the game at his value), else take tonight's
---   offer, or wait for what waiting is worth, or it is listed, or list
---   it); your players to list, rising first: those not listed and those whose
---   listing ends before the last offer before the lock (when, as a fact); the game
---   offers only for those listed, listing costs nothing and a listed player
---   still plays for you.
-DROP VIEW IF EXISTS board_rows;
-CREATE VIEW board_rows AS
-WITH gap AS MATERIALIZED (SELECT * FROM lineup_gap),
-bm AS MATERIALIZED (SELECT * FROM board_mine),
-ins AS (SELECT * FROM gap WHERE side = 'in'),
-outs AS (SELECT * FROM gap WHERE side = 'out'),
-legal AS (SELECT coalesce(max(legal), 0) AS ok FROM gap),
-field AS (
-    SELECT -1 AS ord, 'field' AS what,
-           'field ' || (SELECT names FROM lineup_names WHERE side = 'in') AS label,
-           NULL AS name, NULL AS pos,
-           CASE WHEN legal.ok THEN NULL ELSE 'check line-up' END AS step, NULL AS amount,
-           0 AS done,
-           CASE WHEN legal.ok THEN (SELECT total(next) FROM ins) - (SELECT total(next) FROM outs) END AS gain,
-           'next' AS per,
-           (SELECT json_group_array(json_array('bench', bench, 'names')) FROM (
-                SELECT group_concat(name, ', ' ORDER BY i) AS bench FROM outs
-                WHERE player NOT IN (SELECT player FROM bm WHERE sell)) WHERE bench IS NOT NULL) AS facts,
-           (SELECT json_group_array(player ORDER BY -next, player) FROM board_eleven) AS players
-    FROM legal
-    WHERE EXISTS (SELECT 1 FROM ins) OR EXISTS (SELECT 1 FROM outs)),
-buys AS (
-    SELECT p.ord, 'buy', 'buy ' || b.name, b.name, b.pos,
-           CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END, b.cost, coalesce(b.my_bid = b.cost, 0),
-           b.worth, 'season',
-           b.facts,
-           json_array(b.player)
-    FROM board_buy_facts b JOIN board_plan p ON p.kind = 'buy' AND p.player = b.player
-    WHERE b.in_plan),
-sells AS (
-    SELECT p.ord, 'sell',
-           'sell ' || s.name, s.name, s.pos,
-           CASE WHEN p.why = 'after the auctions' THEN 'sell after the auctions'
-                WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait'
-                WHEN s.listed THEN 'listed' ELSE 'list' END,
-           CASE WHEN p.why = 'after the auctions' THEN s.value WHEN s.offer IS NOT NULL THEN s.raises END,
-           s.listed AND NOT s.takes AND p.why IS NOT 'after the auctions', s.worth, 'season',
-           s.facts,
-           json_array(s.player)
-    FROM board_sell_facts s JOIN board_plan p ON p.kind = 'sell' AND p.player = s.player
-    WHERE s.sell),
-pulled AS (
-    SELECT 900 + row_number() OVER (ORDER BY f.player), 'withdraw', 'withdraw bid on ' || f.name, f.name, f.pos,
-           'withdraw bid', f.my_bid, 0, NULL, 'season', '[]', json_array(f.player)
-    FROM decision_facts f JOIN board_run USING (run_id)
-    WHERE f.my_bid > 0 AND f.player NOT IN (SELECT player FROM board_plan WHERE kind = 'buy')),
-unlisted AS (
-    SELECT 2000, 'list',
-           'list ' || group_concat(name, ', ' ORDER BY -coalesce(trend, 0.0), player), NULL, NULL,
-           NULL, NULL, 0, NULL, 'season',
-           (SELECT json_group_array(json(f)) FROM (
-                SELECT json_array('rising', rising, 'names') AS f FROM (
-                    SELECT group_concat(name, ', ' ORDER BY -trend, player) AS rising
-                    FROM bm WHERE NOT listed AND NOT sell AND trend > 0) WHERE rising IS NOT NULL
-                UNION ALL
-                SELECT json_array('once the listing ends', min(relist_after), 'time')
-                FROM bm WHERE relist_after IS NOT NULL HAVING count(*) > 0)),
-           json_group_array(player)
-    FROM bm WHERE (NOT listed OR relist_after IS NOT NULL) AND NOT sell HAVING count(*) > 0)
-SELECT row_number() OVER (ORDER BY ord) - 1 AS ord, what, label, name,
-       pos, step, amount, done, gain, per, facts, players
-FROM (SELECT * FROM field UNION ALL SELECT * FROM buys UNION ALL SELECT * FROM pulled UNION ALL SELECT * FROM sells
-      UNION ALL SELECT * FROM unlisted);
-
--- The board's headline: when the next jornada locks (next_lock), your money, where you
--- are expected to finish and your chance of first, now and once the plan
--- is made (every bid won), your season's points band, what the plan
--- leaves you, what more you could bid after
--- it and your bids it does not make (into the debt the game allows, to
--- clear by selling before the lock), and what is still to do.
-DROP VIEW IF EXISTS board_head;
-CREATE VIEW board_head AS
-WITH me AS (SELECT * FROM board_league WHERE me),
-lock AS (SELECT lock AS kick FROM next_lock)
-SELECT (SELECT run_id FROM board_run) AS run_id,
-       substr((SELECT cut()), 1, 13) || ':' || substr((SELECT cut()), 14) AS generated_at,
-       (SELECT substr(kick, 1, 13) || ':' || substr(kick, 14, 2) || ':00+00:00' FROM lock) AS lock_at,
-       me.cash, (SELECT total(my_bid) FROM decision_facts JOIN board_run USING (run_id)) AS cash_locked,
-       round(me.finish, 2) AS finish, round(me.p_first, 3) AS p_win,
-       (SELECT round(finish_after, 2) FROM decision_run JOIN board_run USING (run_id)) AS finish_after,
-       (SELECT round(p_first_after, 3) FROM decision_run JOIN board_run USING (run_id)) AS p_win_after,
-       me.lo AS band_lo, me.hi AS band_hi,
-       CASE WHEN EXISTS (SELECT 1 FROM board_plan) THEN (SELECT cash_after FROM decision_run JOIN board_run USING (run_id)) END
-           AS cash_after,
-       (SELECT max(0.0, can_bid) FROM decision_run JOIN board_run USING (run_id)) AS can_bid,
-       (SELECT group_concat(label, '; ' ORDER BY ord) FROM board_rows
-        WHERE NOT done) AS ping
-FROM me;
-
--- decisions.json: the board as one JSON document, the phone's copy: its
--- lines (board_rows), as the phone draws them; a bid's also at its asking
--- price, with the chance of winning at each (bid_odds; sure with no past);
--- and the two rankings each move of the plan is chosen from, valued alone
--- from the squad as it is (decision_option.gain, the eleven's points
--- week by week): every buy that adds points, most first, and every sale,
--- the fewest points lost first (more: past the first three of each and not
--- the plan's, to fold away); each a line as the plan's are, to accept on
--- the phone (a bid; the game's offer on him taken, or he listed). A move of the plan is drawn in its ranking,
--- as the plan's line says it (ranked, on that line of do).
--- what a step of the plan leaves, one object a line: the cash after it, when it is due and what sets that,
--- and what skipping it leaves (the Decision's rows, only gathered)
-DROP VIEW IF EXISTS board_step;
-CREATE VIEW board_step AS
-SELECT p.player, p.kind, json_object('cash_then', p.cash_then, 'due', p.due, 'why', p.why,
-           'skip', (SELECT json_group_array(json_object('blocker', k.blocker, 'label', k.label, 'amount', k.amount)
-                                            ORDER BY k.blocker)
-                    FROM board_skip k WHERE k.player = p.player AND k.kind = p.kind)) AS detail
-FROM board_plan p;
-
--- Each player's value over the last fortnight's closed days, oldest first, a JSON array: what the page draws as
--- his line, with the offer or price as a dot on it (a fact, read as it is: nothing is decided here).
-DROP VIEW IF EXISTS board_trace;
-CREATE VIEW board_trace AS
-SELECT ff_id AS player, json_group_array(value ORDER BY observed_at) AS trace
-FROM market_daily
-WHERE substr(observed_at, 1, 10) > date((SELECT max(substr(observed_at, 1, 10)) FROM market_daily), '-14 day')
-GROUP BY ff_id;
-
--- What flipping one move leaves (decision_flip), blockers worded once (board_blocker_word): a buy or sell row's `flip`.
-DROP VIEW IF EXISTS board_flip;
-CREATE VIEW board_flip AS
-SELECT f.player, f.kind, json_object('cash', f.cash, 'points', f.points,
-           'blockers', (SELECT json_group_array(w.phrase ORDER BY w.phrase)
-                        FROM json_each(f.blockers) e JOIN board_blocker_word w ON w.blocker = e.value)) AS flip
-FROM decision_flip f JOIN board_run USING (run_id);
-
-DROP VIEW IF EXISTS board_json;
-CREATE VIEW board_json AS
-WITH br AS MATERIALIZED (SELECT * FROM board_rows),
-rows AS (
-    SELECT 'do' AS list, ord, what, label, name, pos, step, amount, done, gain, per, facts, players,
-           NULL AS money, NULL AS waiting, NULL AS trend, NULL AS plan, what IN ('buy', 'sell') AS fold,
-           (SELECT s.detail FROM board_step s WHERE s.player = json_extract(br.players, '$[0]') AND s.kind = br.what) AS detail
-    FROM br
-    UNION ALL
-    SELECT 'buys', row_number() OVER (ORDER BY -b.gain, b.player), 'buy', coalesce(p.label, 'buy ' || b.name), b.name, b.pos,
-           coalesce(p.step, CASE WHEN b.my_bid = b.cost THEN 'bid in' ELSE 'bid up to' END),
-           coalesce(p.amount, b.cost), coalesce(p.done, b.my_bid = b.cost, 0),
-           b.gain, 'season', b.facts, json_array(b.player), b.asking, NULL, b.trend, b.in_plan,
-           row_number() OVER (ORDER BY -b.gain, b.player) > 3 AND NOT b.in_plan,
-           (SELECT d.detail FROM board_step d WHERE d.player = b.player AND d.kind = 'buy')
-    FROM board_buy_facts b
-    LEFT JOIN br p ON p.what = 'buy' AND p.players = json_array(b.player)
-    WHERE b.gain > 0
-    UNION ALL
-    SELECT 'sells', row_number() OVER (ORDER BY -s.gain, -s.raises, s.player),
-           CASE WHEN s.listed OR p.label IS NOT NULL THEN 'sell' ELSE 'list' END,
-           coalesce(p.label, CASE WHEN s.listed THEN 'sell ' ELSE 'list ' END || s.name),
-           s.name, s.pos, coalesce(p.step, CASE WHEN s.takes THEN 'take offer' WHEN s.offer IS NOT NULL THEN 'wait' END),
-           CASE WHEN p.label IS NOT NULL THEN p.amount WHEN s.takes THEN s.offer ELSE s.waiting END, coalesce(p.done, 0),
-           s.gain, 'season', s.facts, json_array(s.player), s.offer, s.waiting, s.trend, s.sell,
-           row_number() OVER (ORDER BY -s.gain, -s.raises, s.player) > 3 AND NOT s.sell,
-           (SELECT d.detail FROM board_step d WHERE d.player = s.player AND d.kind = 'sell')
-    FROM board_sell_facts s
-    LEFT JOIN br p ON p.what = 'sell' AND p.players = json_array(s.player)),
-lines AS MATERIALIZED (SELECT list, ord, json(json_remove(o, CASE WHEN json_extract(o, '$.detail') IS NULL THEN '$.detail' ELSE '$.none' END)) AS o
-          FROM (SELECT list, ord, json(CASE list WHEN 'do' THEN json_remove(o, '$.price', '$.offer', '$.waiting', '$.trend', '$.plan')
-                                      WHEN 'buys' THEN json_remove(o, '$.waiting') ELSE o END) AS o
-          FROM (SELECT list, ord, json(CASE WHEN what = 'field'
-                                             THEN json_remove(o, '$.name', '$.pos', '$.key', '$.asking', '$.win', '$.asking_win')
-                                             WHEN what NOT IN ('buy', 'sell') THEN json_remove(o, '$.key', '$.asking', '$.win', '$.asking_win')
-                                             WHEN what <> 'buy' THEN json_remove(o, '$.asking', '$.win', '$.asking_win')
-                                             ELSE o END) AS o
-               FROM (SELECT r.list, r.ord, r.what, json_object(
-                         'name', r.name, 'pos', r.pos, 'what', r.what, 'label', r.label, 'step', r.step,
-                         CASE r.list WHEN 'buys' THEN 'price' ELSE 'offer' END, r.money, 'waiting', r.waiting, 'trend', r.trend,
-                         'plan', json(CASE WHEN r.plan THEN 'true' ELSE 'false' END),
-                         'amount', r.amount, 'done', json(CASE WHEN r.done THEN 'true' ELSE 'false' END),
-                         'key', json_extract(r.players, '$[0]'),
-                         'gain', r.gain, 'per', r.per, 'facts', json(coalesce(r.facts, '[]')), 'detail', json(r.detail),
-                         'trace', json((SELECT t.trace FROM board_trace t WHERE t.player = json_extract(r.players, '$[0]'))),
-                         'flip', json((SELECT f.flip FROM board_flip f WHERE f.player = json_extract(r.players, '$[0]') AND f.kind = r.what)),
-                         CASE r.list WHEN 'do' THEN 'ranked' ELSE 'more' END,
-                         json(CASE WHEN r.fold THEN 'true' ELSE 'false' END),
-                         'asking', b.asking, 'win', round(b.win, 3),
-                         'asking_win', CASE WHEN b.player IS NOT NULL THEN round(coalesce(b.asking_win, 1.0), 3) END,
-                         -- what the line is accepted at on the phone (act.py does it): a bid at
-                         -- its amount or his asking price, an offer to take at its amount, a
-                         -- withdrawal, listing or line-up as it is (null); nothing else.
-                         'accepts', json(CASE WHEN r.what = 'buy' AND b.asking IS NOT NULL AND b.asking <> r.amount
-                                                  THEN json_array(b.asking, r.amount)
-                                              WHEN r.what = 'buy' OR (r.what = 'sell' AND r.step = 'take offer')
-                                                  THEN json_array(r.amount)
-                                              WHEN r.what IN ('withdraw', 'list', 'field') THEN json_array(NULL)
-                                              ELSE '[]' END),
-                         'act', (SELECT json_group_array(json_object(
-                                     'player_team', t.player_team_id, 'player', coalesce(t.player_id, m.player_id),
-                                     'market', m.market_id, 'bid', m.bid_id, 'pos', f.pos, 'value', f.value))
-                                 FROM json_each(r.players) e LEFT JOIN decision_facts f ON f.run_id = (SELECT run_id FROM board_run) AND f.player = e.value
-                                 LEFT JOIN squads t ON t.player = e.value
-                                 LEFT JOIN listings m ON m.player = e.value)) AS o
-                     FROM rows r LEFT JOIN board_buys b ON r.what = 'buy'
-                                                AND b.player = json_extract(r.players, '$[0]')))))
-SELECT json_object(
-    'generated_at', h.generated_at, 'lock_at', h.lock_at,
-    'cash', h.cash, 'cash_locked', h.cash_locked, 'finish', h.finish, 'p_win', h.p_win,
-    'finish_after', h.finish_after, 'p_win_after', h.p_win_after,
-    'band', json_array(h.band_lo, h.band_hi),
-    'do', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'do'),
-    'cash_after', h.cash_after, 'can_bid', h.can_bid, 'ping', coalesce(h.ping, ''),
-    'plan_flip', json((SELECT flip FROM board_flip WHERE kind = 'plan')),
-    'buys', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'buys'),
-    'sells', (SELECT json_group_array(json(o) ORDER BY ord) FROM lines WHERE list = 'sells'),
-    'blockers', (SELECT json_group_array(json_object('future', future, 'blocker', blocker, 'label', label,
-                                                      'amount', amount) ORDER BY ord) FROM board_blockers),
-    'exposed', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'clause', clause)
-                                        ORDER BY ord) FROM board_clauses),
-    'squad', (SELECT json_group_array(json_object('name', name, 'pos', pos, 'next', next,
-                  'xi', json(CASE WHEN xi THEN 'true' ELSE 'false' END),
-                  'sold', json(CASE WHEN sold THEN 'true' ELSE 'false' END)) ORDER BY ord) FROM board_squad),
-    'standings', (SELECT json_group_array(json_object(
-                      'manager', manager, 'me', json(CASE WHEN me THEN 'true' ELSE 'false' END),
-                      'now', now, 'lo', lo, 'hi', hi, 'cash', cash,
-                      'estimated', json(CASE WHEN estimated THEN 'true' ELSE 'false' END),
-                      'p_above', p_above) ORDER BY ord) FROM board_league)) AS json
-FROM board_head h;
-
--- A run to remind you of your line-up is due once the next jornada's lock is
--- within REMIND_HOURS, and only once: not if a run was asked for it
--- (trigger 'reminder', as_of the window's opening or later).
--- Each blocker's words, once; the views below add what the blocker is about.
-DROP VIEW IF EXISTS board_blocker_word;
-CREATE VIEW board_blocker_word AS
-SELECT 'debt' AS blocker, 'in debt at the lock' AS phrase
-UNION ALL SELECT 'eleven', 'no eleven can be fielded'
-UNION ALL SELECT 'squad', 'more players than the squad holds';
-
--- The last run's blockers, each worded once for the page.
-DROP VIEW IF EXISTS board_blockers;
-CREATE VIEW board_blockers AS
-SELECT row_number() OVER (ORDER BY b.future = 'plan', b.blocker) AS ord, b.future, b.blocker, b.amount,
-       CASE b.future WHEN 'nothing' THEN 'if you do nothing: ' ELSE 'if you do the plan: ' END
-       || w.phrase AS label
-FROM decision_blocker b JOIN board_run USING (run_id) JOIN board_blocker_word w USING (blocker);
-
--- What skipping one step of the plan leaves (decision_skip), worded once for the page; a do row's `skip`
--- in board_json (buy and sell rows only; none when the run recorded nothing for the step).
-DROP VIEW IF EXISTS board_skip;
-CREATE VIEW board_skip AS
-SELECT s.player, s.kind, s.blocker, s.amount,
-       CASE s.blocker WHEN 'none' THEN 'safe to skip'
-                      ELSE 'if you skip this: ' || w.phrase END AS label
-FROM decision_skip s JOIN board_run USING (run_id) LEFT JOIN board_blocker_word w USING (blocker);
-
-DROP VIEW IF EXISTS lock_due;
-CREATE VIEW lock_due AS
-WITH w AS (
-    SELECT lock, strftime('%Y-%m-%dT%H%MZ', stamp_jd(lock) - (SELECT remind_hours FROM k) / 24.0) AS opens
-    FROM next_lock WHERE lock IS NOT NULL)
-SELECT lock FROM w
-WHERE opens <= (SELECT cut())
-  AND NOT EXISTS (SELECT 1 FROM runs WHERE trigger = 'reminder' AND as_of >= w.opens);
-
--- What to tell you about your line-up before the next lock, from the last
--- run: set it, if the app's is not one I can match, or change it to your
--- best eleven. No row when the line-up set is that eleven.
-DROP VIEW IF EXISTS lineup_alert;
-CREATE VIEW lineup_alert AS
-WITH g AS (SELECT * FROM lineup_gap),
-ins AS (SELECT names FROM lineup_names WHERE side = 'in'),
-outs AS (SELECT names FROM lineup_names WHERE side = 'out'),
-left AS (SELECT CAST(round((
-             stamp_jd(lock)
-             - stamp_jd((SELECT cut()))
-         ) * 1440) AS INTEGER) AS minutes FROM next_lock)
-SELECT CASE WHEN (SELECT max(legal) FROM g)
-            THEN 'Change your line-up: field ' || ins.names || ' for ' || outs.names
-            ELSE 'Set your line-up: ' || ins.names END
-       || ' — locks in ' || (left.minutes / 60) || 'h' || printf('%02d', left.minutes % 60) AS text
-FROM ins, outs, left WHERE EXISTS (SELECT 1 FROM g);
-
--- How much of a player's miss (actual less forecast, the bias taken out)
--- carries from one jornada to the next, over the squares of what was
--- expected: what forecast.PERSISTENT_SHARE is checked against. One row a
--- graded run; the next-jornada forecast of every player (from_j = jornada).
-DROP VIEW IF EXISTS persistence_by_run;
-CREATE VIEW persistence_by_run AS
-WITH g AS MATERIALIZED (SELECT run_id, player, jornada, actual - predicted AS r, predicted AS e
-                        FROM grade_forecast WHERE from_j = jornada),
-b AS (SELECT run_id, avg(r) AS bias FROM g GROUP BY run_id),
-pairs AS (SELECT x.run_id, sum((x.r - b.bias) * (y.r - b.bias)) AS num, sum(x.e * y.e) AS den
-          FROM g x JOIN g y ON y.run_id = x.run_id AND x.player = y.player AND x.jornada < y.jornada
-          JOIN b ON b.run_id = x.run_id GROUP BY x.run_id)
-SELECT run_id, CASE WHEN den > 0 THEN round(sqrt(max(0.0, num) / den), 3) ELSE 0.0 END AS persistent_share
-FROM pairs;

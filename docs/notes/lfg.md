@@ -82,7 +82,7 @@ rows and writes plan rows.
 |---|---|---|---|
 | 1 | Ingest | facts: player_club/value/status/points, club_fixture, owners, cash, listings, offers, auction closes (timestamped) | parser health |
 | 2 | Forecast | `cell(player, jornada, pts, p)` from facts at t | RMSE and r, next jornada and five ahead |
-| 3 | Decision | the plan, kept per run: order, cash after, `due`/`why`, blockers on two futures, what skipping each step leaves | `grading.py ceiling` (floor / ours / ceiling on real points) and checks: cash ≥ 0 at the lock, squad ≤ cap, legal eleven |
+| 3 | Decision | the plan, kept per run: order, cash after, `due`/`why`, blockers on two futures, what skipping each step leaves | checks: cash ≥ 0 at the lock, squad ≤ cap, legal eleven |
 | 4 | Board | `board_json` (the phone's JSON) | correctness only |
 | 5 | Grading | replays the same views at a past t | its own |
 
@@ -99,53 +99,30 @@ simulation and the plan search. One SQLite file `data/lfg.db`, rebuilt from `dat
 in `datasette.json`, `tools/q.py` runs them in a terminal. Money is whole euros as INTEGER; SQLite SUM is compensated;
 golden compares decisions exactly and floats with `isclose`. Pages stay one renderer (`Fantasy.jsx`).
 
-## 4. Decision: the recommender, the plan, the ledger [simplify, plan]
+## 4. The board: cash, offers, funding a buy (2026-11-08)
 
-- `recommender.py` owns the candidates: each player on offer, his bids as (bid, win chance), each bid valued alone
-  (worth = win × gain). It picks nothing and decides nothing about money.
-- `decision.plan_rows` chooses the squad to hold at the lock: every set of buys (at most three, each worth something
-  alone), and for each the sales that pay for it (`cover`: sets of sales that bring cash at the lock to ≥ 0 and free
-  the room, the few that lose the fewest points). Every mix is judged once by `worth_on` (the one objective);
-  standing pat is one of the choices. A sale that leaves no legal eleven is no option. Money is no goal.
-- **The objective:** the best eleven's expected points over the jornadas left, each buy at its win chance; the chance
-  of first is reported on those points. Optimisation lives in one place on one objective; everything else only reads
-  it. [model, memory]
-- **The ledger:** `decision.sale_due` is the one rule for when a sale is due: after the last auction of its bids,
-  unless the bids closing by the next lock leave cash short, then by the lock. A sale to a standing offer is due when
-  the offer lapses (`dec_offer`, `lapses`): offers expire at the close, so such a sale cannot follow the auctions.
-- **Hold ("not this one") removed 2026-11-07:** a manual veto made the board disagree with itself (a +22 buy listed while the plan said to withdraw his bid); the objective decides, you decline a move by not pressing its button. Table `hold`, `dec_hold`, `src/hold.py`, the `held` board fields and `/api/fantasy-hold` are gone.
-- **Exact test:** `_selftest_search` compares the plan with every mix of any buys and up to three sales on seeded
-  random leagues. Two bounds remain, neither in that test: at most three buys, and `cover` shortlists the ten
-  sellable players who lose the fewest points per euro. Check them on real inputs before raising either.
-- **Start chance:** one rule: the site's start % is his chance, whatever his status (injured, doubtful, suspended or
-  none), every jornada; the status's return date only counts for a player listed with no %. Measured 2026-11-07 on 4465
-  player-jornadas: raw site Brier 0.147, the old pull toward his record of selection (PICK_K) 0.168, and the pull
-  inflated low listings (site 5% -> model 12%, site 26% -> 41%, they started 19%). PICK_K and NEUTRAL_START apply only to
-  a player listed with no %, or not listed.
-- **Forecast audit 2026-11-07** (four agents, then each claim re-measured): calibration is good (slope 0.98); the
-  biggest misses are noise (31 of the 40 worst over-forecasts played and scored 0 or less; all 40 worst under-forecasts
-  were real 13-24 point games). Fixed: `scored` dropped jornada 1's points (the first fetch holds one game, credited to
-  the club's first jornada: 61 players, 14% of graded error); ABSENT_START 15 -> 2 (1.8% of 4192 cells played).
-  Measured and not done: home/away edge (goals 1.44x but points 1.13x; a 6% edge cuts RMSE 3.626 -> 3.616, goalkeepers
-  worse); shrinking the start % toward the base rate by distance (helps only from 3 jornadas out, by under 1.5% Brier).
-  Second audit (grading, price, plan gain, money; each claim re-measured): the earlier 'plan moves lose 19-54%' was the
-  price columns, not points, and 231 distinct moves not 21119 rows (about 3 players behind the sales gap); in points plan
-  buys 16.9 pred vs 16.4 real, sales -13.2 vs -11.9. Real wrong logic found: a move's gain was computed three ways (buys
-  alone, sales in sequence, the plan once by `worth_on`) and they disagreed by 10% on runs with overlapping buys. Fixed:
-  `plan_rows` stamps each step with its marginal, plan less plan without it, from `worth_on` alone (selftest: for any
-  plan, step worth == that difference). Fixed 2026-11-07: (1) the grader
-  scored raw player points and repeated moves across locks; it now grades each plan step by its marginal in the plan
-  (`decision.marginals`, the one formula `plan_rows` stamps), on the forecast against what was scored (48 steps over 10
-  locks: forecast +180.6, scored +300.5), with no move semantics of its own; (2) ~~`recent_offers` cut a night's batch by ratio~~ fixed: the window
-  keeps whole nights (selftest: any window, whole batches only); (3) the trend term in `waiting` is not fitted and scored on
-  the same days: its slope is fitted on pairs that ended before each day (stable, 8.7 -> 12.9, 41.7% less squared error than
-  zero on 29,010 pairs, halves 41.0% / 43.6%), so a replay is out of sample; dropping it flips 3 of 17 choices, all near
-  ties; kept; (4) a later step assumed every earlier uncertain bid won: a sale made once the bids are won now counts only
-  at their joint chance (`worth_on`'s `reach`; selftest `_selftest_bids`: mean error against an exact enumeration of the
-  outcomes 2.4 -> 0.24 points). Not done: a full scenario tree (the rest is the eleven not being additive; 8 of 10 past
-  locks differ by under 0.3 points), and the plan's mix choice under the change is not measured. Bid win chances (941 auctions) and offer sizes (553, sd
-  0.056) are calibrated.
-- **Constants:** `PERSISTENT_SHARE`, `CONFIDENCE` etc. set vs measured (0.08 vs 0.087; 0.70 vs 0.719).
+The long-horizon planner, the season simulation (`sim.py`, p_win, standings), the plan board and the line-up reminder
+were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is what a decision needs:
+
+- **`board.py`** (stage `board`): `decisions.json` from the league at t: `cash`, `can_bid` (cash plus 20% of team
+  value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada, `do`
+  (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
+  offer on your players ranked by the points the best eleven loses per million it raises: next 4, next 8, season), and
+  `buys` (`decision.opportunities`: the players on the market who add points to your best eleven, most first; the bid is
+  `decision.recommended`, the least bid as likely to win as any; the first three carry `funding` from `decision.fund`:
+  the sales tonight, the margin under the bid limit, the sales if won, the cash if lost). `finish` and `band` are
+  placeholders the page still reads.
+- **`decision.fund`** (priced for the first three buys of the board): for one buy (bid, win chance) the sales that pay for it, in
+  two stages: tonight on the real offers (they raise cash and the debt limit), and after the auctions the rest by the
+  lock; the objective is the expected best-eleven points over all jornadas left; no cap on sales; checked against brute
+  force on small leagues. Slower than a plan (18 s on the live case).
+- **`decision.read_inputs`**: the league at t as `dec_*` rows and the cells; `cells_of`, `by_jornada` and `eleven` are
+  the best eleven of a squad. Nothing else of the old decision survives.
+- **Taps:** only `list` is done from the phone (`act.py`; an already-listed player, error 030.01.52, counts as listed).
+- **Not true any more:** the recommender, `plan_rows`, `worth_on`, the ledger and sale due times, `sim_*` and
+  `decision_*` tables, the hold, the line-up reminder (`remind.py`, `lock_due`, `lineup_alert`).
+
+Sections 5, 7 and 8 describe the planner removed on 2026-11-08; they are kept as the record of why it was built.
 
 ## 5. The reasoning behind the plan [plan, gain]
 

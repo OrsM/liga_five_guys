@@ -4,7 +4,7 @@
 # For checking and timing a change; the tracked repo is never touched.
 #
 #     tools/lfg-dry-run              every stage
-#     tools/lfg-dry-run sim grade    just those, as run.py takes them
+#     tools/lfg-dry-run board grade  just those, as run.py takes them
 
 set -euo pipefail
 

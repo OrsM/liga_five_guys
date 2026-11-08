@@ -8,8 +8,8 @@ redistribute the scraped data.
 
 On the Asus box under systemd. `tools/lfg-run` (linked from
 `~/.local/bin/lfg-run`) runs the self-tests and the fetch, then `src/run.py`,
-then commits. Every run, whoever asks for it (timer, phone button, line-up
-reminder), runs every stage of `src/run.py` in one process; the report is
+then commits. Every run, whoever asks for it (timer, phone button),
+runs every stage of `src/run.py` in one process; the report is
 published to the phone (notes.lemonworlds.com/fantasy) as soon as it is made. The phone's "Run again" button leaves
 a request that `lfg-watch.timer` picks up within a minute.
 
@@ -40,22 +40,20 @@ Everything else comes from the app's API and public pages.
    pages.
 2. **crosswalk** (`crosswalk.py`): the registry, lfg.db's `crosswalk` table,
    one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
-3. **sim** (`sim.py`, `decision.py`, `ffcore/decide.sql`): the decision,
-   and what the board reads: the run's moves, the facts it saw (`decision_facts`,
-   `decision_waiting`), its forecast moment (`sim_runs.moment`).
-4. **publish** (`publish.py`): the board (`board_json`) to the phone, and its ping.
-5. **grade** (`grading.py`: each past lock forecast and decided again with
-   this code, one set kept a code version; the forecasts graded are the
-   lock moments, `grade_cell`, read through `grade_forecast`), **health**
-   (`health.py`). A failure from here on is noted and the run goes on;
-   before it, the run stops.
+3. **board** (`board.py`, `decision.py`, `ffcore/decide.sql`): `reports/decisions.json`: your cash and what you
+   can bid, your squad and its eleven, the line that lists your players for sale, and each standing offer on them
+   ranked by what taking it costs the eleven. `decision.fund` prices a buy with the sales that pay for it.
+4. **publish** (`publish.py`): the report to the phone, and its ping.
+5. **grade** (`grading.py`: each past lock's forecast, kept as `grade_cell`, read through `grade_forecast` and
+   `grade_accuracy`, star group first), **health** (`health.py`). A failure from here on is noted and the run goes
+   on; before it, the run stops.
 
 One copy of each fact: what is fetched is ingest's tables; the forecast is
 `forecast_cell`, made once a moment (the forecast's code, its constants and
 the cut) and kept while a run or a grade points to it; a run records what
 it decided and what it read by reference. Everything else is a view.
 A past universe is built once and kept (`ffcore/kept.py`), so the live
-grade, the backtests, the replays and golden boards share it.
+grade and the backtests share it.
 
 ## The model
 
@@ -108,56 +106,9 @@ Every forecast is the same product, for every player and jornada
   (`Market.fetches`; schema.sql's `waiting`: each later night's offer, at
   his value then (`price_carry`), taken when it beats waiting on, the last
   before the lock always); with no offer yet, his value.
-- **When a sale is made** (decide.sql `dec_when`): at once, but when the
-  plan bids, after the auctions, once you know the bids are won (a sale
-  made for a bid then lost is a player gone for nobody; after the auctions
-  the game still buys him at his value). The board says it, the backtest
-  does it. A player bought is listed and sold like any other when an offer
-  beats waiting: there is no separate buy to resell.
 - **Assembly** (`assemble.py`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.
-- **Moves** (`ffcore/decide.sql`, its maths at the top of the file): the
-  aim is to finish first, so every move is worth its points and nothing
-  else; money is a limit, never a goal. A buy is its chance of winning
-  times the points it adds to the best eleven of each jornada left; a sale
-  the points it costs (never more than nothing, so made only to pay for a
-  buy, make room for one, or clear a debt); a swap both, on the squad they
-  make together. The plan takes the best move worth more
-  than nothing, then again on the squad and cash it leaves, while the squad
-  fits, cash at the lock stays at zero or more and bids stay within cash
-  and the game's debt; in debt, the least bad sale until clear.
-  `decision.py` writes the universe's squad, market and forecast as its
-  inputs (`dec_*`) and reads the moves back. A player comes from the
-  market, at the bid it takes to win the auction; never from a rival by his
-  release clause (you do not shoot first). The `Universe` (`decide.py`)
-  joins an `Outlook` (`ffcore/outlook.py`: expected points and the best
-  eleven, no money) to a `Market` (`ffcore/market.py`: names, prices,
-  values, your cash and bids, no points).
-
-  Each line of the board is one row of `board_rows` (schema.sql), worded
-  there once: the move, the step it takes in the app and its amount,
-  whether it is done, its points and the numbers that made it, and the
-  amounts it is accepted at (`accepts`, which act.py, the server and the
-  page read). They come from what the run recorded (`decision_option`,
-  `decision_plan`, `decision_facts`, `decision_waiting`). The board also lists your
-  players a rival can take by clause now (`board_clauses`): all of them,
-  since a sale to the game pays at once and any rival can raise a clause
-  that way. The page lays rows out and decides nothing.
-- **The ledger** (`ffcore/league.py`, `ledger`): the activity feed read
-  once, each event keyed like every other table. Rival cash and the price
-  paid (each owned player's last buy or transfer to his owner) are both
-  read from it (`price_paid` on the box).
-- **What the board says** (`board_rows`), one list: the line-up, the
-  plan's moves (a buy: what he is listed at and the bid to make; a sale:
-  after the auctions, take the offer, wait, or list him), and your players
-  not listed, rising first: the game offers only for listed players,
-  listing costs nothing and a listed player still plays. No line shows a
-  move the plan does not make. Every ranked buy and offer is on the box
-  (`market`, `offers`).
-- **Rival cash**: budget plus their sales, bonuses and
-  transfer income, less buys and transfer payments, plus the income the feed
-  never records (your real balance minus the same sum for you).
 
 ## League rules
 
@@ -199,14 +150,9 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
 [blindaje](https://www.guiafantasy.com/noticias/1686/como-funciona-el-blindaje-la-nueva-regla-que-revoluciona-laliga-fantasy).
 
 ## Checking it
-    python src/grading.py ceiling                # the decision's measure: at each past lock, standing still, the plan and the plan
-                                                  # on real points (floor, ours, ceiling, share) (LFG_VARIANT=name)
-                                                  # points and money against standing still (LFG_VARIANT=name)
-    python src/grading.py variant NAME K=V ...    # a challenger's constants, for money and replay
-    python src/grading.py replay [JOBS]           # the forecast at every past line-up snapshot (view replayed)
+    python src/grading.py accuracy                # the forecast at each past lock against what was scored: the star group (e >= 4) and all players
     bash tools/selftests.sh                       # every module's self-test
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
-    python tools/golden.py freeze|check           # a refactor must rebuild the same board
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
     python tools/q.py --time                      # every saved Datasette query, timed
@@ -221,10 +167,9 @@ rather than reaching through them; ruff flags reads of private members.
 
 ## Layout
 
-    src/            run, ingest, sources, crosswalk, assemble, decide (Universe),
-                    decision (decide.sql's inputs and moves), sim, publish,
-                    grading, act, remind, health, stats
-    src/ffcore/     schema.sql (the views), decide.sql (the decision),
+    src/            run, ingest, sources, crosswalk, assemble, decision (the
+                    inputs and fund), board, publish, grading, act, health, stats
+    src/ffcore/     schema.sql (the views), decide.sql (the decision's inputs),
                     tables.sql and identity.sql (what parse fills), db, kept,
                     tidy (paths, current/history: rows with their numbers
                     parsed, per Table.numbers), clock (now, stamps),

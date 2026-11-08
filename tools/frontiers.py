@@ -27,39 +27,30 @@ NAMES = {
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
-              "player_jornadas season_record season_points next_lock listing_ends listing_close price_paid lineup_snapshots",
+              "player_jornadas season_record season_points next_lock listing_ends listing_close price_paid",
     "forecast": "cell cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
-    "decision": "bid_odds recent_offers offer_spread sale_odds waiting nights_left player_facts "
-                "next_cell my_squad my_cash my_xi look_players formation slot_bounds decision_sale decision_blocker decision_skip decision_flip "
-                "decision_option decision_plan decision_facts decision_players decision_waiting decision_run "
-                "decision_standings",
-    "board": "lock_due lineup_alert board_blockers",
-    "grading": "replayed lead_buckets measure_log measure_latest"}
+    "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts my_squad my_cash formation slot_bounds",
+    "board": "",
+    "grading": "measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_points season_record
         club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look
-        listings listing_ends listing_close offers offer_ratios price_history price_paid auction_results
-        squads owners cash standings league_config app_lineup lineup_snapshots""",  # app_lineup: the lineup facts, player resolved
-    "forecast": "cell standin_cell market_daily forecast_e price_carry price_trend price_trend_daily",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read
-    # plan(step, kind, player, amount, win, worth) and its detail, a run each (decision.record): every move alone
-    # (decision_option, with the chance at the asking price and where an offer ranks), the players it looked at
-    # and their facts (decision_players, decision_facts), what waiting is worth, the standings forecast, what
-    # the plan leaves; league_jornada: each manager's points a jornada as a normal, what that forecast is graded on
-    "decision": "decision_plan decision_sale decision_blocker decision_skip decision_flip decision_option decision_players decision_facts decision_waiting decision_standings "
-                "decision_run league_jornada",
-    "board": "board_json",
+        listings listing_close offers offer_ratios price_history price_paid auction_results
+        squads owners cash standings league_config""",
+    "forecast": "cell market_daily forecast_e price_carry price_trend price_trend_daily",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read
+    "decision": "player_facts",  # the facts of each player the board shows; the decision's inputs are dec_* tables, read by decision.py only
+    "board": "",
     "grading": "",  # a measure: nothing downstream reads it
 }
 EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
 # Python files that are wholly one module's: their reads are judged as that module's. A file not here (assemble,
 # sim, db, facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
 OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest",
-        "forecast": "forecast", "forecast_store": "forecast", "seen": "decision", "decision": "decision", "recommender": "decision", "remind": "board", "grading": "grading"}
+        "forecast": "forecast", "forecast_store": "forecast", "seen": "decision", "decision": "decision", "board": "board", "grading": "grading"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
-SKIP = {"k", "model_constants", "variants", "params", "runs", "run_measures", "facts_meta", "parser_health",
-        "persistence_by_run", "board_history", "board_history_moves"}  # no module: config, bookkeeping
+SKIP = {"k", "model_constants", "params", "runs", "run_measures", "facts_meta", "parser_health"}  # no module: config, bookkeeping
 
 
 def module(name: str) -> str | None:
@@ -137,11 +128,10 @@ def table() -> str:
 
 def _selftest() -> None:
     """The rule is enforced: a later module, a scraped table and an unexported name are crossings; an export is not."""
-    assert crossing("forecast", "decision_plan")  # a later module
+    assert crossing("forecast", "dec_player")  # a later module
     assert crossing("decision", "market")  # a scraped table
     assert crossing("ingest", "market") is None  # ingest reads its own
     assert crossing(None, "score_spread")  # a forecast internal, not exported
-    assert crossing(None, "standin_cell") is None  # exported: a position's cell, for the rival's holes
     assert crossing(None, "price_trend") is None  # exported: the trend the decision's odds read
     assert crossing(None, "cell") is None  # exported
     assert lines("select 1\nfrom a join cell c -- from cell", "cell") == [2]
