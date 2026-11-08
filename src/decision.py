@@ -9,7 +9,7 @@ import eleven
 from ffcore.db import connect, record
 from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, bid_to_use, in_force
 
-__all__ = ["inputs", "read_inputs", "cells_of", "window_value", "win_at", "opportunity_rows", "keep_opportunities", "read_arrivals"]
+__all__ = ["inputs", "read_inputs", "cells_of", "window_value", "win_at", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer")
 
@@ -110,6 +110,11 @@ def keep_opportunities(cut: str, got: list[dict[str, Any]]) -> None:
     with closing(connect()) as db, db:
         db.execute("DELETE FROM dec_opportunity WHERE cut = ?", (cut,))
     record([{"cut": cut, **r} for r in got], "dec_opportunity")
+
+
+def seen_cuts() -> list[str]:
+    with closing(connect()) as db:
+        return [c for (c,) in db.execute("SELECT DISTINCT cut FROM seen ORDER BY cut")]
 
 
 def read_arrivals() -> list[str]:
