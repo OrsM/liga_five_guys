@@ -88,7 +88,7 @@ def board(inp: dict[str, list[tuple[Any, ...]]]) -> Doc:
     squad, names = squad_rows(inp)
     return {
         "generated_at": stamped(cut()),
-        "lock_at": stamped(min(locks)).replace("Z", ":00+00:00") if locks else None,
+        "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "", "do": list_line(inp, names), "buys": [], "sells": offer_lines(inp, names),
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad],
