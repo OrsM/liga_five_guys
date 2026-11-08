@@ -9,7 +9,7 @@ import random
 import sqlite3
 from contextlib import closing
 from collections import Counter
-from functools import lru_cache
+from functools import lru_cache, partial
 from itertools import combinations, product
 from typing import Any, Callable, NamedTuple
 
@@ -186,7 +186,7 @@ def fund(inp: dict[str, list[tuple[Any, ...]]], buy: tuple[str, float, float], o
     later = {p: got or 0.0 for p, _, m, _, got in inp["dec_player"] if m}
     squad, here = frozenset(later), frozenset(later) | {k}
     score = lru_cache(maxsize=None)(lambda sq: sum(by_jornada(pos, cells, set(sq), js).values()))
-    legal = lambda sq: can_field(Counter(pos[p] for p in sq if p in pos))
+    legal = partial(fieldable, pos)
     memo: dict[tuple[frozenset[str], int], tuple[float, frozenset[str]] | None] = {}
 
     def need_of(base: frozenset[str], gap: float) -> tuple[float, frozenset[str]] | None:
@@ -746,6 +746,7 @@ def _selftest() -> None:
     _selftest_ledger()
     _selftest_search()
     _selftest_bids()
+    _selftest_fund()
     _selftest_offers()
     print("decision self-test OK")
 
@@ -883,6 +884,52 @@ def _selftest_search(n: int = 12, seed: int = 1, strict: bool = True) -> list[fl
     if strict:
         print("search self-test OK")
     return misses
+
+
+def _selftest_fund() -> None:
+    rng = random.Random(5)
+    made = 0
+    for _ in range(8):
+        own = {"m%02d" % i: p for i, p in enumerate(["POR"] + ["DEF"] * 4 + ["MED"] * 4 + ["DEL"] * 3)}
+        pos = own | {"star": "DEL"}
+        e = {k: rng.choice([0, 1, 2, 3, 5]) * 1.0 for k in own} | {"star": 9.0}
+        got = {k: rng.choice([2e6, 4e6, 6e6]) for k in own}
+        offers = {k: got[k] * rng.choice([0.9, 1.0, 1.05]) for k in rng.sample(sorted(own), 4)}
+        cash, bid, win = rng.choice([-6e6, -2e6, 3e6]), rng.choice([9e6, 14e6, 20e6]), rng.choice([0.3, 0.7, 0.95])
+        inp: dict[str, list[tuple[Any, ...]]] = {
+            "dec_player": [(k, p, 1, None, got[k]) for k, p in own.items()] + [("star", "DEL", 0, bid, None)],
+            "dec_odds": [], "dec_money": [(cash, 5e6 * len(own), DEBT_SHARE, SQUAD_MAX, XI_SIZE)],
+            "cell": [(k, j, e[k]) for j in (1, 2) for k in e], "dec_lock": [(1, "2026-11-06T20:00Z"), (2, "2026-11-13T20:00Z")]}
+        worth = {k: 5e6 for k in own}
+        found = fund(inp, ("star", bid, win), offers, worth)
+        squad, here = frozenset(own), frozenset(own) | {"star"}
+        score = lru_cache(maxsize=None)(lambda sq: sum(by_jornada(pos, {j: dict(e) for j in (1, 2)}, set(sq)).values()))
+        legal = partial(fieldable, pos)
+        best: float | None = None
+        for n in range(len(offers) + 1):
+            for sold in combinations(sorted(offers), n):
+                A = frozenset(sold)
+                pa, va = sum(offers[k] for k in A), sum(worth[k] for k in A)
+                if cash + pa + DEBT_SHARE * (5e6 * len(own) - va) < bid - 1e-6 or not legal(squad - A):
+                    continue
+                rest = sorted(squad - A)
+                won = max((score(here - A - frozenset(B)) for m in range(len(rest) + 1) for B in combinations(rest, m)
+                           if cash + pa - bid + sum(got[k] for k in B) >= -1e-6 and legal(here - A - frozenset(B))), default=None)
+                lost = max((score(squad - A - frozenset(L)) for m in range(len(rest) + 1) for L in combinations(rest, m)
+                            if cash + pa + sum(got[k] for k in L) >= -1e-6 and legal(squad - A - frozenset(L))), default=None)
+                if won is not None and lost is not None:
+                    ev = win * won + (1 - win) * lost
+                    best = ev if best is None else max(best, ev)
+        assert (found is None) == (best is None), (cash, bid, offers)
+        if found and best is not None:
+            assert abs(found.ev - best) < 1e-9, (found.ev, best)
+            assert found.tonight <= set(offers) and not found.tonight & found.if_won
+            assert cash + sum(offers[k] for k in found.tonight) - bid + sum(got[k] for k in found.if_won) >= -1e-6, "cash at the lock if won"
+            assert cash + sum(offers[k] for k in found.tonight) + sum(got[k] for k in found.if_lost) >= -1e-6, "cash at the lock if lost"
+            assert cash + sum(offers[k] for k in found.tonight) + DEBT_SHARE * (5e6 * len(own) - sum(worth[k] for k in found.tonight)) >= bid - 1e-6
+            assert min(found.won, found.lost) - 1e-9 <= found.ev <= max(found.won, found.lost) + 1e-9
+            made += 1
+    assert made >= 3, "the leagues are not all infeasible"
 
 
 def _selftest_bids() -> None:
