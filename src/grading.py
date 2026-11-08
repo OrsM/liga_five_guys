@@ -272,10 +272,10 @@ def lock_calibration(j: int, window: tuple[dt.datetime, dt.datetime]) -> list[di
     """Where what happened in jornada j's clean window falls in the forecast
     at its lock (calibration_rows): every manager's points that jornada (his
     best eleven of his squad then, the forecast then: league_jornada) against
-    what he scored (his team_points over the window, standings). t is left at
-    the window's end."""
+    what he scored (his team_points over the window, standings), on the
+    decision's inputs at the lock (lock_plan made them). t is left at the
+    window's end."""
     start, end = window
-    decision.inputs()
     dist = {m: (mean, sd) for m, mean, sd in rows("SELECT manager, mean, sd FROM league_jornada"
                                                   " WHERE jornada = ?", (j, ))}
     me = rows("SELECT me FROM look")[0][0]
