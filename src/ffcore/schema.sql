@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS run_measures (
     PRIMARY KEY (run_id, stage, measure)
 );
 
--- The headline numbers of `grading.py accuracy` and `grading.py ceiling`, kept a run at a time:
--- measure ('accuracy', 'ceiling', each with ':variant' unless live), key (rmse@5, share...), the
+-- The headline numbers of `grading.py accuracy`, kept a run at a time:
+-- measure ('accuracy'), key (rmse@5, star_rmse@5...), the
 -- code's short commit. (commit_sha: COMMIT is an SQL keyword.)
 CREATE TABLE IF NOT EXISTS measure_log (
     at         TEXT NOT NULL,     -- wall clock, UTC
@@ -322,19 +322,6 @@ CREATE TABLE IF NOT EXISTS grade_cell (
     PRIMARY KEY (run_id, from_j, jornada, player)
 ) WITHOUT ROWID;
 
--- The next jornada's forecast at every replay moment (grading.replay), a row a
--- variant, moment and player: the cell contract read at that t, kept as the
--- replay's own record.
-CREATE TABLE IF NOT EXISTS replay_cell (
-    variant   TEXT NOT NULL,
-    as_of     TEXT NOT NULL,         -- the line-up snapshot (lineup_snapshots) it was made at
-    jornada   INTEGER NOT NULL,
-    player    TEXT NOT NULL,
-    predicted REAL NOT NULL,
-    flagged   INTEGER NOT NULL,
-    PRIMARY KEY (variant, as_of, player)
-) WITHOUT ROWID;
-
 -- The forecast (forecast_now) as a decision at t reads it, made into a
 -- moment each time (assemble.forecast): every player's cell a jornada and
 -- its factors, and who was flagged then. code says what made a moment kept
@@ -498,78 +485,15 @@ SELECT run_id, grp, ahead, count(*) AS n, sqrt(avg((x - y) * (x - y))) AS rmse, 
        (avg(x * y) - avg(x) * avg(y)) / (avg(x * x) - avg(x) * avg(x)) AS slope
 FROM u GROUP BY run_id, grp, ahead;
 
--- The moments to replay at: each line-up snapshot (one a time) belongs to
--- the jornada that was next then, from the previous lock to its own.
-DROP VIEW IF EXISTS replay_moments;
-CREATE VIEW replay_moments AS
-WITH snaps AS MATERIALIZED (SELECT at FROM lineup_snapshots),
-w AS (SELECT jornada, lock, coalesce(lag(lock) OVER (ORDER BY lock), '') AS opens FROM jornada_calendar
-      WHERE lock IS NOT NULL)
-SELECT w.jornada, s.at AS as_of, w.lock FROM w JOIN snaps s ON s.at >= w.opens AND s.at < w.lock
-ORDER BY w.lock, s.at;
 
--- The forecast of the next jornada at every replay moment, for each variant
--- as last forecast (replay_cell; grading.replay makes them), a row a player,
--- with what he scored (0 if nothing) and how many hours
--- before the lock: how far from the lock the error is acceptable. The same
--- outcomes as grade_forecast, forecast again under the information of each
--- moment, so it says how early a forecast is good, not which model is
--- (paired_gain).
-DROP VIEW IF EXISTS replayed;
-CREATE VIEW replayed AS
-WITH pts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada)
-SELECT c.variant, c.as_of, c.jornada, c.player, c.predicted,
-       coalesce(a.pts, 0.0) AS actual, c.flagged,
-       24 * (stamp_jd(r.lock)
-           - stamp_jd(c.as_of))
-           AS lead_h
-FROM replay_cell c JOIN replay_moments r ON r.as_of = c.as_of AND r.jornada = c.jornada
-LEFT JOIN pts a ON a.player = c.player AND a.jornada = c.jornada
-WHERE c.jornada IN (SELECT jornada FROM jornada_calendar WHERE state = 'done');
-
--- How far from the lock a replayed forecast was made, in buckets.
-DROP VIEW IF EXISTS lead_buckets;
-CREATE VIEW lead_buckets AS
-SELECT 0 AS from_h, 3 AS to_h, '0-3h' AS lead UNION ALL SELECT 3, 12, '3-12h'
-UNION ALL SELECT 12, 24, '12-24h' UNION ALL SELECT 24, 48, '24-48h'
-UNION ALL SELECT 48, 96, '48-96h' UNION ALL SELECT 96, 1e9, '96h+';
-
--- Replayed error against how far from the lock: per variant and lead
--- bucket, the outcomes, the moments, rmse and the flagged players' rmse.
--- Buckets hold different jornadas, so compare them with replay_gap.
-DROP VIEW IF EXISTS replay_lead;
-CREATE VIEW replay_lead AS
-SELECT variant, b.from_h, b.lead,
-       count(*) AS n, count(DISTINCT as_of) AS moments,
-       sqrt(avg((predicted - actual) * (predicted - actual))) AS rmse,
-       avg(predicted - actual) AS bias,
-       sqrt(avg(CASE WHEN flagged = 1 THEN (predicted - actual) * (predicted - actual) END)) AS flagged_rmse
-FROM replayed f JOIN lead_buckets b ON f.lead_h >= b.from_h AND f.lead_h < b.to_h
-GROUP BY variant, b.from_h, b.lead;
-
--- What forecasting earlier costs: the same player-jornadas forecast at each
--- lead and at the jornada's last replayed moment; the mean squared error
--- earlier minus last (positive: earlier is worse) with its interval (claim).
 DROP VIEW IF EXISTS replay_gap;
-CREATE VIEW replay_gap AS
-WITH fin AS (SELECT variant, jornada, max(as_of) AS at FROM replayed GROUP BY variant, jornada),
-d AS (SELECT f.variant, f.lead_h, f.flagged,
-             (f.predicted - f.actual) * (f.predicted - f.actual)
-           - (g.predicted - g.actual) * (g.predicted - g.actual) AS d
-      FROM replayed f JOIN fin ON fin.variant = f.variant AND fin.jornada = f.jornada
-      JOIN replayed g ON g.variant = f.variant AND g.jornada = f.jornada
-                            AND g.as_of = fin.at AND g.player = f.player
-      WHERE f.as_of < fin.at),
-s AS (SELECT d.variant, b.from_h, b.lead, sc.scope, count(*) AS n, avg(d.d) AS m,
-             (sum(d.d * d.d) - count(*) * avg(d.d) * avg(d.d)) / (count(*) - 1) AS var
-      FROM d JOIN lead_buckets b ON d.lead_h >= b.from_h AND d.lead_h < b.to_h
-      JOIN (SELECT 'all' AS scope UNION ALL SELECT 'flagged') sc ON sc.scope = 'all' OR d.flagged = 1
-      GROUP BY d.variant, b.from_h, b.lead, sc.scope),
-t AS (SELECT *, sqrt(max(var, 0) / n) AS se FROM s)
-SELECT variant, from_h, lead, scope, n, m AS extra_mse, se,
-       lo95(m, se) AS lo, hi95(m, se) AS hi, claim(m, se) AS claim
-FROM t;
-
+DROP VIEW IF EXISTS replay_lead;
+DROP VIEW IF EXISTS lead_buckets;
+DROP VIEW IF EXISTS replayed;
+DROP VIEW IF EXISTS replay_moments;
+DROP VIEW IF EXISTS lineup_snapshots;
+DROP TABLE IF EXISTS replay_cell;
+DROP TABLE IF EXISTS variants;
 
 -- The league's money, as SQL over the app's tables (current_/history_ views
 -- read as of t, each row with its player). League writes the one
@@ -905,14 +829,6 @@ FROM (SELECT ff_id, observed_at, value, id,
 
 -- (model_constants, once a table of the constants per variant, is gone: the views read const(NAME), the module's value.)
 DROP TABLE IF EXISTS model_constants;
-
--- A challenger: the constants it sets differently from live's.
-CREATE TABLE IF NOT EXISTS variants (
-    variant TEXT NOT NULL,
-    name    TEXT NOT NULL,
-    value   REAL NOT NULL,
-    PRIMARY KEY (variant, name)
-);
 
 -- The constants the views use, one row: each named once, here.
 DROP VIEW IF EXISTS k;
@@ -1382,13 +1298,6 @@ WITH last AS (SELECT ff_id, trim(name) AS name, club,
               FROM market WHERE ff_id <> '')
 SELECT l.ff_id AS player_id, l.name, l.club AS club_id, coalesce(a.app_id, '') AS app_id
 FROM last l LEFT JOIN app_links a ON a.player = l.ff_id WHERE l.n = 1;
-
--- When the line-ups were taken, as of t: each futbolfantasy snapshot (one a time):
--- the moments a forecast can be replayed at.
-DROP VIEW IF EXISTS lineup_snapshots;
-CREATE VIEW lineup_snapshots AS
-SELECT DISTINCT observed_at AS at FROM lineups
-WHERE source = 'futbolfantasy' AND observed_at <= (SELECT cut());
 
 -- The jornadas every match of which has a score (jornada_calendar): what a
 -- forecast is graded on (one under way, or with a match postponed, is not).

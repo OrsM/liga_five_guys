@@ -27,7 +27,7 @@ NAMES = {
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
-              "player_jornadas season_record season_points next_lock listing_ends listing_close price_paid lineup_snapshots",
+              "player_jornadas season_record season_points next_lock listing_ends listing_close price_paid",
     "forecast": "cell cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior last_season fitted horizons market_daily",
     "decision": "bid_odds recent_offers offer_spread sale_odds waiting nights_left player_facts "
@@ -35,13 +35,13 @@ NAMES = {
                 "decision_option decision_plan decision_facts decision_players decision_waiting decision_run "
                 "decision_standings",
     "board": "lock_due lineup_alert board_blockers",
-    "grading": "replayed lead_buckets measure_log measure_latest"}
+    "grading": "measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_points season_record
         club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look
         listings listing_ends listing_close offers offer_ratios price_history price_paid auction_results
-        squads owners cash standings league_config app_lineup lineup_snapshots""",  # app_lineup: the lineup facts, player resolved
+        squads owners cash standings league_config app_lineup""",  # app_lineup: the lineup facts, player resolved
     "forecast": "cell standin_cell market_daily forecast_e price_carry price_trend price_trend_daily",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read
     # plan(step, kind, player, amount, win, worth) and its detail, a run each (decision.record): every move alone
     # (decision_option, with the chance at the asking price and where an offer ranks), the players it looked at
@@ -58,7 +58,7 @@ EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
 OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest",
         "forecast": "forecast", "forecast_store": "forecast", "seen": "decision", "decision": "decision", "recommender": "decision", "remind": "board", "grading": "grading"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
-SKIP = {"k", "model_constants", "variants", "params", "runs", "run_measures", "facts_meta", "parser_health",
+SKIP = {"k", "model_constants", "params", "runs", "run_measures", "facts_meta", "parser_health",
         "persistence_by_run", "board_history", "board_history_moves"}  # no module: config, bookkeeping
 
 

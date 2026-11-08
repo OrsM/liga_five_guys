@@ -6,14 +6,13 @@ from __future__ import annotations
 
 import hashlib
 import sys
-from contextlib import closing, contextmanager
+from contextlib import closing
 from pathlib import Path
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 import remind
 from ffcore import forecast as model, pricing, rules
-from ffcore.clock import set_variant
 from ffcore.db import connect, query, record, rows, set_constants, set_look
 from ffcore.forecast_store import Prices, forecast, price_change, price_momentum
 from ffcore.seen import see as see_at
@@ -21,14 +20,13 @@ from ffcore.league import write_config
 from ffcore.tidy import age_hours
 from stats import percentile
 
-__all__ = ["applied", "constants", "built", "forecast", "params", "price_momentum",
+__all__ = ["constants", "built", "forecast", "params", "price_momentum",
            "price_change", "market_offer_ratios",
            "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
 
-# The constants a run is built with, by module: what params records as such,
-# and what a variant may set (variants).
+# The constants a run is built with, by module: what params records as such.
 NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS", ),
     "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_LIFT", "SHRINK_K"),
@@ -43,27 +41,6 @@ MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "forecast": model,
 def constants() -> dict[str, dict[str, float]]:
     """The constants in force now, by module (a variant applies its own)."""
     return {m: {n: getattr(MODULES[m], n) for n in names} for m, names in NAMES.items()}
-
-
-@contextmanager
-def applied(variant: str) -> Iterator[None]:
-    """The model as a variant sets it (variants): its constants on the
-    modules that own them, the clock's variant for the views, all put back on
-    leaving. A variant with no rows (but live) or a name that is no constant
-    raises."""
-    owner = {n: m for m, names in NAMES.items() for n in names}
-    over = rows("SELECT name, value FROM variants WHERE variant = ? ORDER BY name", (variant,))
-    if not over and variant != "live":
-        raise ValueError("no variant %s (grading.py variant %s CONSTANT=VALUE)" % (variant, variant))
-    unknown = [n for n, _v in over if n not in owner]
-    if unknown:
-        raise ValueError("variant %s sets %s, which no module has as a constant" % (variant, unknown))
-    try:
-        with set_constants(**dict(over)):
-            set_variant(variant)
-            yield
-    finally:
-        set_variant("live")
 
 
 def see() -> str:
@@ -145,7 +122,6 @@ def _selftest() -> None:
     _selftest_market()
     _selftest_facts()
     _selftest_sale()
-    _selftest_variants()
     _selftest_prior()
     _selftest_points()
     print("assemble self-test OK")
@@ -293,39 +269,6 @@ def _selftest_points() -> None:
                 "the listing's start %, not pulled toward his record of selection"
         finally:
             set_now(None)
-
-
-def _selftest_variants() -> None:
-    """A variant is a second set of constants, applied to the modules that
-    own them and to the views, beside the live one."""
-    import tempfile
-    from pathlib import Path
-
-    from ffcore.tidy import tables_in
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        record([{"variant": v, "name": n, "value": x} for v, n, x in (
-            ("slow", "SHRINK_K", 9.0), ("slow", "PERSISTENT_SHARE", 0.5),
-            ("slow", "NEUTRAL_START", 33.0), ("typo", "AVIAL_K", 1.0))], "variants")
-        live_shrink = model.SHRINK_K
-        assert rows("SELECT neutral_start, shrink_k FROM k") == [(60.0, live_shrink)]
-        with applied("slow"):
-            assert constants()["forecast"]["SHRINK_K"] == 9.0 and model.PERSISTENT_SHARE == 0.5
-            assert rows("SELECT neutral_start, shrink_k FROM k") == [(33.0, 9.0)], "the views read the variant's constants"
-        assert model.SHRINK_K == live_shrink and model.PERSISTENT_SHARE == 0.08, "restored on leaving"
-        assert rows("SELECT neutral_start FROM k") == [(60.0,)], "the live values were never touched"
-        try:
-            with applied("typo"):
-                raise AssertionError("a name that is no constant must not apply quietly")
-        except ValueError as e:
-            assert "AVIAL_K" in str(e)
-        try:
-            with applied("slwo"):
-                raise AssertionError("a misspelt variant must not run as live")
-        except ValueError as e:
-            assert "no variant slwo" in str(e)
-        with applied("live"):
-            assert model.SHRINK_K == live_shrink, "live has no rows and is the model as it stands"
 
 
 def _selftest_sale() -> None:

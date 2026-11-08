@@ -17,7 +17,7 @@ from ffcore.db import connect, rows
 from ffcore.rules import DEBT_SHARE, bid_limit, in_force, POSITIONS, SHAPES, SQUAD_MAX, XI_SIZE
 from recommender import by_jornada, candidates, cells_of
 
-__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "measure", "expected_gap", "options", "record", "KEEP_PLAN", "READ"]
+__all__ = ["in_groups", "schedule", "stamp_plan", "plan", "plan_rows", "after", "evaluate", "flips", "skip_rows", "inputs", "read_inputs", "worth_on", "expected_gap", "options", "record", "KEEP_PLAN", "READ"]
 
 INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_plan", "dec_start")
 
@@ -190,16 +190,6 @@ def worth_on(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]]
         squads = won
         reach *= bid
     return floor, total
-
-
-def measure(inp: dict[str, list[tuple[Any, ...]]], real: dict[tuple[str, int], float], js: list[int]) -> dict[str, float]:
-    """floor, ours and ceiling at one lock: worth_on of standing still, of
-    plan_rows(inp), and of plan_rows on inp with each cell's e the real
-    points in the jornadas js (0 if he did not play; 0 in any later jornada,
-    not yet known)."""
-    floor, ours = worth_on(inp, plan_rows(inp)[0], real, js)
-    best = {**inp, "cell": [(k, j, real.get((k, j), 0.0) if j in js else 0.0) for k, j, _ in inp["cell"]]}
-    return {"floor": floor, "ours": ours, "ceiling": worth_on(inp, plan_rows(best)[0], real, js)[1]}
 
 
 def expected_gap(inp: dict[str, list[tuple[Any, ...]]], steps: list[tuple[Any, ...]] | None = None) -> float:
