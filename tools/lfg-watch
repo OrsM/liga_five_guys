@@ -30,43 +30,7 @@ if ! ssh_phone true 2>/dev/null; then
     echo "phone unreachable — nothing to check"; exit 0
 fi
 
-# Lines accepted on the phone, a file a press in accept/ (the server renames
-# each in whole): each taken by renaming it into taken/, so a press landing
-# meanwhile stays for the next round, then read and removed there, where
-# nothing but this writes. Placed by act.py (each checked against the board
-# it was accepted on, and read back from the market), and the results put
-# back beside the report as act.json. Not held behind a run in flight: a bid
-# waits for nothing the run makes. accept.json is the server's queue before
-# accept/ (2026-10-31), taken the same way until the phone runs the new one.
-ACC=$(ssh_phone "cd '$DEST' 2>/dev/null && mkdir -p taken && \
-    for f in accept/*.json accept.json; do [ -e \"\$f\" ] && mv \"\$f\" taken/; done; \
-    cat taken/* 2>/dev/null && rm -f taken/*" || true)
-if [ -n "$ACC" ]; then
-    echo "accepted: $ACC"
-    # One request a line, or (accept.json) a list of them: act.py takes a list.
-    printf '%s\n' "$ACC" | python3 -c '
-import json, sys
-out = []
-for line in sys.stdin:
-    if line.strip():
-        got = json.loads(line)
-        out.extend(got if isinstance(got, list) else [got])
-json.dump(out, sys.stdout)' > "$STATE/accept.json"
-    REPO="${LFG_REPO:-$HOME/claude_projects/liga_five_guys}"
-    if ! (cd "$REPO" && PYTHONPATH=src "$HOME/.local/bin/uv" run --frozen python src/act.py accept \
-            "$STATE/accept.json" > "$STATE/act.json" 2> "$STATE/act.err"); then
-        python3 - "$STATE/accept.json" "$STATE/act.err" "$STATE/act.json" <<'PYEOF'
-import datetime, json, sys
-asked = json.load(open(sys.argv[1]))
-err = open(sys.argv[2], encoding="utf-8").read().strip().splitlines()[-1:] or ["no output"]
-at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-json.dump([{**r, "state": "failed", "message": "the box could not act: " + err[0][:200], "at": at}
-           for r in (asked if isinstance(asked, list) else [asked])], open(sys.argv[3], "w"))
-PYEOF
-    fi
-    cat "$STATE/act.json"; echo
-    scp -q -P "$PORT" -o BatchMode=yes "$STATE/act.json" "$PHONE:$DEST/act.json" || true
-fi
+"${LFG_REPO:-$HOME/claude_projects/liga_five_guys}/tools/lfg-accept"
 
 # A run already in flight: leave it alone rather than stacking a second one on
 # top of it. The lock is the pid file, and a stale one is ignored.
