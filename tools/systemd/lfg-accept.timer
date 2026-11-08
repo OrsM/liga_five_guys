@@ -1,0 +1,10 @@
+[Unit]
+Description=Check every few seconds whether a line was accepted on the phone
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

@@ -1,8 +1,8 @@
 """Act on the board: the one thing done from the phone, listing your players for sale at their value, done in the
 app when you accept it on the phone (lfg-watch hands the request here).
 
-A request names the board it was made on (generated_at) and the line (its label). It is acted on only if that is still
-the board and the line one the app can do. A line carries what it acts on as the app knows it (board.py's act: each
+A request names the line (its label). It is acted on if that line is still on the board as it stands now, whatever board the
+phone saw it on, and is one the app can do. A line carries what it acts on as the app knows it (board.py's act: each
 player's place in your team, value), so nothing here reads lfg.db. The calls are the app's own
 (fantasy-api.llt-services.com, as LaLigaApp makes them).
 
@@ -92,12 +92,12 @@ def accept(req: dict[str, Any], board: dict[str, Any], call: Call, base: str) ->
     def done(ok: bool, message: str) -> dict[str, Any]:
         return {**out, "state": "placed" if ok else "failed", "message": message, "at": _now()}
 
-    if req.get("generated_at") != board.get("generated_at"):
-        return done(False, "the board has changed since: refresh and accept again")
     line = next((d for d in board.get("do") or [] if d.get("label") == req.get("label") and d.get("what") == "list"
                  and d.get("act") and d.get("accepts") == [None]), None)
-    if line is None or req.get("amount") is not None:
-        return done(False, "not a line of this board the app can do")
+    if line is None:
+        return done(False, "that line is no longer on the board: refresh")
+    if req.get("amount") is not None:
+        return done(False, "a list line takes no amount")
     h = home(call, base)
     if isinstance(h, str):
         return done(False, h[1:])
@@ -164,12 +164,17 @@ def _selftest() -> None:
     assert got["state"] == "failed" and got["message"].startswith("listed 0 of 2; the app refused 2: the app said 400"), \
         ("a real refusal says how many and why once, not each player's", got)
     call, sent = app()
-    for bad, why in ((ask("list Bil Nsongo, Manu Bueno", generated_at="older"), "a board since"),
-                     (ask("list Bil Nsongo, Manu Bueno", 5.0), "a list line takes no amount"),
+    for bad, why in ((ask("list Bil Nsongo, Manu Bueno", 5.0), "a list line takes no amount"),
                      (ask("sell Pablo Fornals", 44133958.0), "an offer is not taken from the phone"),
                      (ask("list nobody"), "no such line")):
         assert accept(bad, board, call, base)["state"] == "failed", why
     assert sent == [], "refused before any call to the app"
+    got = accept(ask("list nobody"), board, call, base)
+    assert got["message"] == "that line is no longer on the board: refresh", got
+    call, sent = app()
+    got = accept(ask("list Bil Nsongo, Manu Bueno", generated_at="an older board"), board, call, base)
+    assert got["state"] == "placed" and len(changes(sent)) == 2, \
+        ("a tap made on an older board is done while its line is still on the board as it stands", got)
     print("act self-test OK")
 
 

@@ -1,0 +1,9 @@
+[Unit]
+Description=liga_five_guys — do the lines accepted on the phone
+After=network-online.target
+
+[Service]
+Type=oneshot
+NoNewPrivileges=yes
+ExecStart=%h/claude_projects/liga_five_guys/tools/lfg-accept
+TimeoutStartSec=120

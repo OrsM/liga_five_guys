@@ -236,6 +236,9 @@ DROP TABLE IF EXISTS forecast_variant;
 -- three of the usual gaps (and 6 hours), thin when under half the usual
 -- rows. last_good is the newest snapshot of the usual size: where to start
 -- looking (src/health.py tells you).
+DROP VIEW IF EXISTS market_read;
+CREATE VIEW market_read AS SELECT max(observed_at) AS at FROM api_market WHERE observed_at <= (SELECT cut());
+
 DROP VIEW IF EXISTS parser_health;
 CREATE VIEW parser_health AS
 WITH snaps AS (
