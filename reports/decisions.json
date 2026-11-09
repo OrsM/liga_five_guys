@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-09T22:11Z",
- "market_at": "2026-11-09T22:11Z",
+ "generated_at": "2026-11-09T22:15Z",
+ "market_at": "2026-11-09T22:15Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-09T22:11Z",
+   "at": "2026-11-09T22:15Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,76 +56,30 @@
  "cash_locked": 0,
  "can_bid": 58388116.2,
  "ping": "",
- "do": [
-  {
-   "name": "Guido Rodriguez",
-   "pos": "",
-   "what": "list",
-   "label": "list Guido Rodriguez",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "112907378",
-     "player": "3128",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 11949062.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
    "Natan",
+   "Fran Garcia",
    "Adria Pedrosa",
    "Gerard Martin",
-   "Robin Le Normand",
    "Pablo Fornals",
    "German Valera",
    "Guido Rodriguez",
+   "Mikel Oyarzabal",
    "Iñigo Vicente",
-   "Martin Satriano",
-   "Ferran Jutgla"
+   "Antony"
   ],
   "message": "",
   "unmapped": [],
-  "points": 49.84492256498051,
+  "points": 57.09338918773988,
   "best": 58.02703039855234,
   "advice": [
-   {
-    "in": "Mikel Oyarzabal",
-    "out": "Ferran Jutgla",
-    "gain": 5.380261003098253
-   },
-   {
-    "in": "Fran Garcia",
-    "out": "Robin Le Normand",
-    "gain": 1.5572340207640734
-   },
    {
     "in": "Pepelu",
     "out": "Gerard Martin",
     "gain": 0.9336412108124583
-   },
-   {
-    "in": "Antony",
-    "out": "Martin Satriano",
-    "gain": 0.3109715988970483
    }
   ]
  },
@@ -1443,6 +1397,14 @@
    "sold": false
   },
   {
+   "name": "Fran Garcia",
+   "pos": "DEF",
+   "next": 4.717910213097708,
+   "xi": true,
+   "best": true,
+   "sold": false
+  },
+  {
    "name": "Adria Pedrosa",
    "pos": "DEF",
    "next": 3.7956908489585746,
@@ -1454,14 +1416,6 @@
    "name": "Gerard Martin",
    "pos": "DEF",
    "next": 3.4120163322968806,
-   "xi": true,
-   "best": false,
-   "sold": false
-  },
-  {
-   "name": "Robin Le Normand",
-   "pos": "DEF",
-   "next": 3.160676192333635,
    "xi": true,
    "best": false,
    "sold": false
@@ -1491,6 +1445,14 @@
    "sold": false
   },
   {
+   "name": "Mikel Oyarzabal",
+   "pos": "DEL",
+   "next": 7.41534915733979,
+   "xi": true,
+   "best": true,
+   "sold": false
+  },
+  {
    "name": "Iñigo Vicente",
    "pos": "DEL",
    "next": 4.688485717162641,
@@ -1499,19 +1461,11 @@
    "sold": false
   },
   {
-   "name": "Martin Satriano",
+   "name": "Antony",
    "pos": "DEL",
-   "next": 3.933581290867702,
+   "next": 4.24455288976475,
    "xi": true,
-   "best": false,
-   "sold": false
-  },
-  {
-   "name": "Ferran Jutgla",
-   "pos": "DEL",
-   "next": 2.0350881542415373,
-   "xi": true,
-   "best": false,
+   "best": true,
    "sold": false
   },
   {
@@ -1523,11 +1477,11 @@
    "sold": false
   },
   {
-   "name": "Fran Garcia",
+   "name": "Robin Le Normand",
    "pos": "DEF",
-   "next": 4.717910213097708,
+   "next": 3.160676192333635,
    "xi": false,
-   "best": true,
+   "best": false,
    "sold": false
   },
   {
@@ -1563,19 +1517,19 @@
    "sold": false
   },
   {
-   "name": "Mikel Oyarzabal",
+   "name": "Martin Satriano",
    "pos": "DEL",
-   "next": 7.41534915733979,
+   "next": 3.933581290867702,
    "xi": false,
-   "best": true,
+   "best": false,
    "sold": false
   },
   {
-   "name": "Antony",
+   "name": "Ferran Jutgla",
    "pos": "DEL",
-   "next": 4.24455288976475,
+   "next": 2.0350881542415373,
    "xi": false,
-   "best": true,
+   "best": false,
    "sold": false
   }
  ],
