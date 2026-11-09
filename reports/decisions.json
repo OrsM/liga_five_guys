@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-09T21:35Z",
- "market_at": "2026-11-09T21:35Z",
+ "generated_at": "2026-11-09T22:11Z",
+ "market_at": "2026-11-09T22:11Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-09T21:35Z",
+   "at": "2026-11-09T22:11Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -58,10 +58,10 @@
  "ping": "",
  "do": [
   {
-   "name": "Antony, Fran Garcia, Mikel Oyarzabal, Pepelu",
+   "name": "Guido Rodriguez",
    "pos": "",
    "what": "list",
-   "label": "list Antony, Fran Garcia, Mikel Oyarzabal, Pepelu",
+   "label": "list Guido Rodriguez",
    "step": "list",
    "amount": null,
    "done": false,
@@ -78,36 +78,12 @@
    "plan": false,
    "act": [
     {
-     "player_team": "114200862",
-     "player": "2770",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 39682384.0
-    },
-    {
-     "player_team": "114200865",
-     "player": "2429",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 19514323.0
-    },
-    {
-     "player_team": "114200866",
-     "player": "3091",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 51083628.0
-    },
-    {
-     "player_team": "114200863",
-     "player": "2464",
+     "player_team": "112907378",
+     "player": "3128",
      "market": null,
      "bid": null,
      "pos": "MED",
-     "value": 44843418.0
+     "value": 11949062.0
     }
    ]
   }
@@ -407,83 +383,113 @@
   "brier": [
    {
     "scope": "backtest:all",
-    "n": 2982,
-    "model": 0.03568433051904418,
-    "pooled": 0.04632694430082309
+    "n": 3032,
+    "model": 0.03559062738317574,
+    "pooled": 0.045895141841406514
    },
    {
     "scope": "backtest:big",
-    "n": 262,
-    "model": 0.1085435310094509,
-    "pooled": 0.121488131628262
+    "n": 268,
+    "model": 0.10507551858488096,
+    "pooled": 0.11889972850116007
    },
    {
     "scope": "backtest:norival",
-    "n": 2780,
-    "model": 0.02375097745158471,
-    "pooled": 0.027133378472899265
+    "n": 2820,
+    "model": 0.0234968048251515,
+    "pooled": 0.02709280376369709
    },
    {
     "scope": "backtest:ours",
-    "n": 251,
-    "model": 0.1997849288954841,
-    "pooled": 0.27647343244816214
+    "n": 274,
+    "model": 0.18738935419992084,
+    "pooled": 0.2595852688086928
    },
    {
     "scope": "backtest:rival",
-    "n": 202,
-    "model": 0.19991562520982303,
-    "pooled": 0.3104760185663094
+    "n": 212,
+    "model": 0.19646128593802648,
+    "pooled": 0.2960017143845225
    },
    {
     "scope": "backtest:small",
-    "n": 2720,
-    "model": 0.028666275177688827,
-    "pooled": 0.03908715346266537
+    "n": 2764,
+    "model": 0.02885330797577451,
+    "pooled": 0.03881654950247238
+   },
+   {
+    "scope": "live:all",
+    "n": 50,
+    "model": 0.033521599012872424,
+    "pooled": 0.033521599012872424
+   },
+   {
+    "scope": "live:norival",
+    "n": 40,
+    "model": 0.010647133682971821,
+    "pooled": 0.010647133682971821
+   },
+   {
+    "scope": "live:ours",
+    "n": 18,
+    "model": 0.026352742301198346,
+    "pooled": 0.026352742301198346
+   },
+   {
+    "scope": "live:rival",
+    "n": 10,
+    "model": 0.12501946033247485,
+    "pooled": 0.12501946033247485
+   },
+   {
+    "scope": "live:small",
+    "n": 50,
+    "model": 0.033521599012872424,
+    "pooled": 0.033521599012872424
    }
   ],
   "drift": [
    {
     "scope": "backtest:big",
     "bin": "0.99-1.00",
-    "n": 26,
+    "n": 48,
     "stated": 1.0,
-    "observed": 0.8846153846153846
+    "observed": 0.9375
    },
    {
     "scope": "backtest:ours",
     "bin": "0.50-0.80",
-    "n": 36,
-    "stated": 0.6791661856169472,
-    "observed": 0.4444444444444444
+    "n": 39,
+    "stated": 0.6786206149557424,
+    "observed": 0.4358974358974359
    },
    {
     "scope": "backtest:ours",
     "bin": "0.80-0.90",
-    "n": 65,
-    "stated": 0.8409162981602158,
-    "observed": 0.6307692307692307
+    "n": 68,
+    "stated": 0.8425733823294214,
+    "observed": 0.6470588235294118
    },
    {
     "scope": "backtest:ours",
     "bin": "0.90-0.95",
-    "n": 43,
-    "stated": 0.9320612287244991,
-    "observed": 0.7906976744186046
+    "n": 44,
+    "stated": 0.931591900566465,
+    "observed": 0.7954545454545454
    },
    {
     "scope": "backtest:ours",
     "bin": "0.95-0.99",
-    "n": 40,
-    "stated": 0.9745026472298512,
-    "observed": 0.825
+    "n": 38,
+    "stated": 0.9744236205083366,
+    "observed": 0.8157894736842105
    },
    {
     "scope": "backtest:ours",
     "bin": "0.99-1.00",
-    "n": 48,
-    "stated": 0.9994751910850979,
-    "observed": 0.9375
+    "n": 66,
+    "stated": 0.9998692452113837,
+    "observed": 0.9545454545454546
    }
   ]
  },
