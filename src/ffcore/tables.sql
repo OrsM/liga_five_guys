@@ -255,8 +255,8 @@ CREATE INDEX IF NOT EXISTS api_lineup_at ON src_api_lineup (source, observed_at)
 CREATE UNIQUE INDEX IF NOT EXISTS api_lineup_unique ON src_api_lineup (source, observed_at, player_id);
 DROP VIEW IF EXISTS current_api_lineup;
 CREATE VIEW current_api_lineup AS
-SELECT t.observed_at, t.source, t.week, t.market_value, t.points, t.player_id, t.slot, t.formation, t.player_name, t.player_name_full, t.position_id, t.snapshot_at, a.player
-FROM api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
+SELECT t.observed_at, t.source, t.market_value, t.points, t.player_id, t.slot, t.formation, t.player_name, t.player_name_full, a.player
+FROM src_api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
 WHERE /* latest api_lineup */
 ORDER BY t.rowid;
 
