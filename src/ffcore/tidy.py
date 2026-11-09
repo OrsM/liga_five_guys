@@ -56,27 +56,25 @@ def _cols(parse: Callable[[object], Any], *cols: str
 # Each table's numeric columns and the parser each is read by: stored typed,
 # so no reader parses a number. The tables themselves are tables.sql's.
 NUMBERS: dict[str, tuple[tuple[str, Callable[[object], Any]], ...]] = {
-    "market": _cols(money, "value", "delta_1d") + _cols(ratio, "delta_pct_1d"),
+    "market": _cols(money, "value"),
     "lineups": _cols(pct100, "start_pct"),
     "matches": _cols(count, "jornada"),
     "points": _cols(ratio, "points", "games", "avg"),
     "api_teams": _cols(money, "market_value", "buyout") + _cols(ratio, "points"),
-    "api_standings": _cols(count, "position", "previous_position")
+    "api_standings": _cols(count, "position")
                            + _cols(ratio, "team_points", "fixture_points")
                            + _cols(money, "team_value", "team_money"),
     "api_market": _cols(money, "market_value", "sale_price", "bid_money")
                         + _cols(count, "bids"),
     "api_offers": _cols(money, "money"),
-    "api_lineup": _cols(count, "week") + _cols(money, "market_value")
+    "api_lineup": _cols(money, "market_value")
                         + _cols(ratio, "points"),
     "api_leagues": _cols(count, "managers") + _cols(money, "money", "team_value")
                          + _cols(ratio, "team_points"),
     "api_players_all": _cols(money, "market_value"),
-    "results_history": _cols(ratio, "home_goals", "away_goals", "home_xg", "away_xg",
-                                   "home_shots", "away_shots", "home_shots_on_target",
-                                   "away_shots_on_target", "home_corners", "away_corners"),
+    "results_history": _cols(ratio, "home_goals", "away_goals"),
     "starters": _cols(ratio, "minute"),
-    "api_activity": _cols(money, "amount") + _cols(count, "week"),
+    "api_activity": _cols(money, "amount"),
 }
 
 

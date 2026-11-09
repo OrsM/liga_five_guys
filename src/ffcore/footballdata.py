@@ -21,8 +21,7 @@ FD_SOURCE = "football-data"
 
 FD_SEASONS_BACK = 3
 
-FD_FIELDS = ("FTHG", "FTAG", "HxG", "AxG", "HS", "AS", "HST", "AST",
-            "HC", "AC")
+FD_FIELDS = ("FTHG", "FTAG")
 
 
 def _season_start_year(now: datetime | None = None) -> int:
@@ -77,11 +76,7 @@ def parse_fd_results(text: str, observed_at: str,
             "home_name": home, "away_name": away,
             "home": club_slug(home), "away": club_slug(away),
         }
-        for col, out_key in zip(FD_FIELDS,
-                                ("home_goals", "away_goals", "home_xg",
-                                 "away_xg", "home_shots", "away_shots",
-                                 "home_shots_on_target", "away_shots_on_target",
-                                 "home_corners", "away_corners")):
+        for col, out_key in zip(FD_FIELDS, ("home_goals", "away_goals")):
             row[out_key] = (r.get(col) or "").strip()
         rows.append(row)
     return rows
@@ -102,12 +97,11 @@ def _selftest() -> None:
     assert len(cur) == 2, cur
     assert cur[0]["season"] == "2627" and cur[0]["date"] == "2026-08-15"
     assert cur[0]["home"] == "alaves" and cur[0]["away"] == "getafe"
-    assert cur[0]["home_goals"] == "3" and cur[0]["home_xg"] == "1.93"
+    assert cur[0]["home_goals"] == "3"
     assert cur[1]["home"] == "sevilla" and cur[1]["away"] == "rayo-vallecano"
 
     old = parse_fd_results(_FD_OLD, "2026-08-20T1200Z", "fd_2223")
     assert len(old) == 1, old
-    assert old[0]["home_xg"] == "" and old[0]["away_xg"] == ""
     assert old[0]["home"] == "athletic"
     assert old[0]["away"] == "", old[0]
     assert old[0]["away_name"] == "Girona"

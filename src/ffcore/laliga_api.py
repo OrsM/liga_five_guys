@@ -68,7 +68,6 @@ def _player_identity(pm: dict[str, Any]) -> dict[str, str]:
         "player_id": str(pm.get("id") or ""),
         "player_name": nick or name,
         "player_name_full": name if nick else "",
-        "position_id": str(pm.get("positionId") or ""),
         "market_value": str(pm.get("marketValue") or ""),
     }
 
@@ -89,7 +88,6 @@ def _league_row(lg: dict[str, Any]) -> list[Row]:
         return []
     t = lg.get("team") or {}
     return [{"league_id": str(lg["id"]), "league_name": lg.get("name") or "",
-            "access": lg.get("access") or "",
             "managers": str(lg.get("managersNumber") or ""),
             "team_id": str(t.get("id") or ""),
             "money": str(t.get("money") or ""),
@@ -116,9 +114,6 @@ def _market_row(it: dict[str, Any]) -> list[Row]:
         "seller": it.get("discr") or "",
         "status": it.get("status") or "",
         "player_status": pm.get("playerStatus") or "",
-        "shielded": "" if (it.get("playerTeam") or {}).get("isShielded")
-                          is None else
-                    str((it["playerTeam"]["isShielded"])).lower(),
         "expires_at": it.get("expirationDate") or "",
         "bid_id": str((it.get("bid") or {}).get("id") or ""),
         "bid_money": str((it.get("bid") or {}).get("money") or ""),
@@ -144,7 +139,6 @@ def _activity_row(a: dict[str, Any]) -> list[Row]:
         "counterparty": str(a.get("user2Id") or ""),
         "player_id": str(a.get("playerMasterId") or ""),
         "amount": str(a.get("amount") or ""),
-        "week": str(a.get("weekNumber") or ""),
     }]
 
 
@@ -163,14 +157,10 @@ def _team_rows(t: dict[str, Any], observed_at: str) -> list[Row]:
             "user_id": str(m.get("id") or ""),
             "manager": m.get("managerName") or "",
             "position": str(t.get("position") or ""),
-            "previous_position": str(t.get("previousPosition") or ""),
             "team_points": str(t.get("teamPoints") or ""),
             "fixture_points": str(t.get("fixturePoints") or ""),
             "team_value": str(t.get("teamValue") or ""),
             "team_money": str(t.get("teamMoney") or ""),
-            "banned": "" if t.get("banned") is None
-                      else str(t["banned"]).lower(),
-            "starting_week": str(t.get("startingWeek") or ""),
         })
     for p in (t.get("players") or []):
         pm = _pm(p)
@@ -183,7 +173,6 @@ def _team_rows(t: dict[str, Any], observed_at: str) -> list[Row]:
             **_player_identity(pm),
             "points": str(pm.get("points") or ""),
             "buyout": str(p.get("buyoutClause") or ""),
-            "buyout_until": str(p.get("buyoutClauseLockedEndTime") or ""),
             "player_status": pm.get("playerStatus") or "",
             "player_team_id": str(p.get("playerTeamId") or ""),
         })
@@ -198,8 +187,6 @@ def parse_api_teams(text: str, observed_at: str,
 LINEUP_SLOTS = {"goalkeeper": "POR", "defender": "DEF",
                 "midfield": "MED", "striker": "DEL"}
 
-LINEUP_WEEK_RE = re.compile(r"api_lineup_(\d+)$")
-
 
 def parse_api_lineup(text: str, observed_at: str,
                      key: str = "api_lineup_1") -> list[Row]:
@@ -208,7 +195,6 @@ def parse_api_lineup(text: str, observed_at: str,
         return []
     form = d.get("formation") or {}
     tactical = form.get("tacticalFormation") or []
-    m = LINEUP_WEEK_RE.search(key or "")
     rows = []
     for slot, men in form.items():
         if slot not in LINEUP_SLOTS or not isinstance(men, list):
@@ -220,11 +206,9 @@ def parse_api_lineup(text: str, observed_at: str,
             rows.append({
                 "observed_at": observed_at,
                 "source": "laliga",
-                "week": m.group(1) if m else "",
                 "slot": LINEUP_SLOTS[slot],
                 "formation": "-".join(str(n) for n in tactical),
                 **_player_identity(pm),
-                "snapshot_at": str(d.get("teamSnapshotTookOn") or ""),
                 "points": str(d.get("points") if d.get("points") is not None
                               else ""),
             })
@@ -459,7 +443,6 @@ def _selftest() -> None:
     assert mk[1]["bids"] == "3" and mk[1]["seller"] == "marketPlayerTeam", mk[1]
     assert parse_api_market(
         _API_MARKET_FIXTURE.replace('"numberOfOffers":3,', ""), "t")[1]["bids"] == ""
-    assert mk[1]["shielded"] == "true" and mk[0]["shielded"] == "", mk[1]
     assert mk[0]["player_status"] == "ok" and mk[1]["player_status"] == ""
     assert mk[0]["player_name"] == "Simeone", mk[0]
     assert mk[0]["player_name_full"] == "Giuliano Simeone", mk[0]
@@ -473,8 +456,8 @@ def _selftest() -> None:
             ["buy", "sell", "joined", "unknown:77", "bonus", "bonus",
              "transfer"]), ac
     assert ac[0]["amount"] == "58220110" and ac[0]["user_id"] == "11881989"
-    assert ac[4]["week"] == "2" and ac[4]["amount"] == "2200000", ac[4]
-    assert ac[5]["week"] == "3" and ac[5]["amount"] == "", ac[5]
+    assert ac[4]["amount"] == "2200000", ac[4]
+    assert ac[5]["amount"] == "", ac[5]
 
     moved = ac[6]
     assert moved["kind"] == "transfer", moved
@@ -499,8 +482,6 @@ def _selftest() -> None:
     assert len(tm) == 2, tm
     assert tm[0]["manager"] == "miguel_autentico"
     assert tm[0]["buyout"] == "47000000", tm[0]
-    assert tm[0]["buyout_until"] == "2026-08-25T14:07:38+02:00", tm[0]
-    assert tm[1]["buyout_until"] == ""
     assert tm[1]["manager"] == "BurtonGM89" and tm[1]["buyout"] == ""
     assert tm[0]["player_name"] == "Fornals", tm[0]
     assert tm[0]["player_name_full"] == "Pablo Fornals Malla", tm[0]
@@ -513,9 +494,7 @@ def _selftest() -> None:
     assert sd[0]["manager"] == "miguel_autentico" and sd[0]["position"] == "3"
     assert sd[0]["team_points"] == "17" and sd[0]["team_money"] == "23596582"
     assert sd[0]["user_id"] == "11881989" and sd[0]["team_id"] == "38091967"
-    assert sd[0]["previous_position"] == "5", sd[0]
     assert sd[0]["team_value"] == "236374060" and sd[0]["fixture_points"] == "17"
-    assert sd[0]["banned"] == "false" and sd[0]["starting_week"] == "1"
     assert sd[1]["team_money"] == "" and sd[1]["manager"] == "BurtonGM89"
     lonely = parse_api_teams(
         '[{"id":"9","position":5,"manager":{"id":"7","managerName":"Empty"},'
@@ -558,7 +537,6 @@ def _selftest() -> None:
     assert len(pa) == 2, pa
     assert pa[0]["player_id"] == "1191", pa
     assert pa[0]["player_name"] == "Hugo Duro", pa
-    assert pa[0]["position_id"] == "3", pa
     assert pa[0]["team_id"] == "12", pa
     assert pa[0]["market_value"] == "8534068", pa
     assert pa[0]["player_status"] == "ok", pa
@@ -591,10 +569,9 @@ def _selftest() -> None:
     assert len(ln) == 4, ln
     assert [r["slot"] for r in ln] == ["POR", "DEF", "MED", "DEL"], ln
     assert {r["formation"] for r in ln} == {"4-5-1"}
-    assert ln[0]["week"] == "38" and ln[0]["player_id"] == "1070"
+    assert ln[0]["player_id"] == "1070"
     assert ln[2]["player_name"] == "Pepelu"
     assert ln[2]["player_name_full"].startswith("Jos")
-    assert ln[0]["snapshot_at"].startswith("2026-08-19T20:26")
     assert parse_api_lineup("not json", "t1") == []
 
     # The contract: one row per key, and no key empty (an offers page with no
@@ -610,7 +587,7 @@ def _selftest() -> None:
     one_per_key(sd, "user_id")
     one_per_key(pa, "player_id")
     one_per_key(off, "offer_id")
-    one_per_key(ln, "week", "slot", "player_id")
+    one_per_key(ln, "player_id")
 
     print("ffcore.laliga_api self-test OK")
 

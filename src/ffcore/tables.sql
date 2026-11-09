@@ -15,8 +15,6 @@ CREATE TABLE IF NOT EXISTS market (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
     value REAL,
-    delta_1d REAL,
-    delta_pct_1d REAL,
     ff_id TEXT NOT NULL DEFAULT '',
     name TEXT NOT NULL DEFAULT '',
     position TEXT NOT NULL DEFAULT '',
@@ -28,7 +26,7 @@ CREATE INDEX IF NOT EXISTS market_at ON market (source, observed_at);
 DROP VIEW IF EXISTS history_market;
 DROP VIEW IF EXISTS current_market;
 CREATE VIEW current_market AS
-SELECT t.observed_at, t.source, t.value, t.delta_1d, t.delta_pct_1d, t.ff_id, t.name, t.position, t.team_id, t.team, t.club
+SELECT t.observed_at, t.source, t.value, t.ff_id, t.name, t.position, t.team_id, t.team, t.club
 FROM market t
 WHERE /* latest market */
 ORDER BY t.rowid;
@@ -135,20 +133,18 @@ CREATE TABLE IF NOT EXISTS api_teams (
     manager TEXT NOT NULL DEFAULT '',
     player_name TEXT NOT NULL DEFAULT '',
     player_name_full TEXT NOT NULL DEFAULT '',
-    position_id TEXT NOT NULL DEFAULT '',
-    buyout_until TEXT NOT NULL DEFAULT '',
     player_status TEXT NOT NULL DEFAULT '',
     player_team_id TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_teams_at ON api_teams (source, observed_at);
 DROP VIEW IF EXISTS history_api_teams;
 CREATE VIEW history_api_teams AS
-SELECT t.observed_at, t.source, t.market_value, t.buyout, t.points, t.player_id, t.team_id, t.manager, t.player_name, t.player_name_full, t.position_id, t.buyout_until, t.player_status, t.player_team_id, a.player
+SELECT t.observed_at, t.source, t.market_value, t.buyout, t.points, t.player_id, t.team_id, t.manager, t.player_name, t.player_name_full, t.player_status, t.player_team_id, a.player
 FROM api_teams t LEFT JOIN app_player a ON a.app_id = t.player_id
 WHERE t.observed_at <= (SELECT cut()) ORDER BY t.rowid;
 DROP VIEW IF EXISTS current_api_teams;
 CREATE VIEW current_api_teams AS
-SELECT t.observed_at, t.source, t.market_value, t.buyout, t.points, t.player_id, t.team_id, t.manager, t.player_name, t.player_name_full, t.position_id, t.buyout_until, t.player_status, t.player_team_id, a.player
+SELECT t.observed_at, t.source, t.market_value, t.buyout, t.points, t.player_id, t.team_id, t.manager, t.player_name, t.player_name_full, t.player_status, t.player_team_id, a.player
 FROM api_teams t LEFT JOIN app_player a ON a.app_id = t.player_id
 WHERE /* latest api_teams */
 ORDER BY t.rowid;
@@ -158,21 +154,18 @@ CREATE TABLE IF NOT EXISTS api_standings (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
     position INTEGER,
-    previous_position INTEGER,
     team_points REAL,
     fixture_points REAL,
     team_value REAL,
     team_money REAL,
     team_id TEXT NOT NULL DEFAULT '',
     user_id TEXT NOT NULL DEFAULT '',
-    manager TEXT NOT NULL DEFAULT '',
-    banned TEXT NOT NULL DEFAULT '',
-    starting_week TEXT NOT NULL DEFAULT ''
+    manager TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_standings_at ON api_standings (source, observed_at);
 DROP VIEW IF EXISTS current_api_standings;
 CREATE VIEW current_api_standings AS
-SELECT t.observed_at, t.source, t.position, t.previous_position, t.team_points, t.fixture_points, t.team_value, t.team_money, t.team_id, t.user_id, t.manager, t.banned, t.starting_week
+SELECT t.observed_at, t.source, t.position, t.team_points, t.fixture_points, t.team_value, t.team_money, t.team_id, t.user_id, t.manager
 FROM api_standings t
 WHERE /* latest api_standings */
 ORDER BY t.rowid;
@@ -189,11 +182,9 @@ CREATE TABLE IF NOT EXISTS api_market (
     market_id TEXT NOT NULL DEFAULT '',
     player_name TEXT NOT NULL DEFAULT '',
     player_name_full TEXT NOT NULL DEFAULT '',
-    position_id TEXT NOT NULL DEFAULT '',
     seller TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT '',
     player_status TEXT NOT NULL DEFAULT '',
-    shielded TEXT NOT NULL DEFAULT '',
     expires_at TEXT NOT NULL DEFAULT '',
     bid_id TEXT NOT NULL DEFAULT '',
     bid_status TEXT NOT NULL DEFAULT ''
@@ -201,7 +192,7 @@ CREATE TABLE IF NOT EXISTS api_market (
 CREATE INDEX IF NOT EXISTS api_market_at ON api_market (source, observed_at);
 DROP VIEW IF EXISTS current_api_market;
 CREATE VIEW current_api_market AS
-SELECT t.observed_at, t.source, t.market_value, t.sale_price, t.bid_money, t.bids, t.player_id, t.market_id, t.player_name, t.player_name_full, t.position_id, t.seller, t.status, t.player_status, t.shielded, t.expires_at, t.bid_id, t.bid_status, a.player
+SELECT t.observed_at, t.source, t.market_value, t.sale_price, t.bid_money, t.bids, t.player_id, t.market_id, t.player_name, t.player_name_full, t.seller, t.status, t.player_status, t.expires_at, t.bid_id, t.bid_status, a.player
 FROM api_market t LEFT JOIN app_player a ON a.app_id = t.player_id
 WHERE /* latest api_market */
 ORDER BY t.rowid;
@@ -230,16 +221,13 @@ ORDER BY t.rowid;
 CREATE TABLE IF NOT EXISTS api_lineup (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
-    week INTEGER,
     market_value REAL,
     points REAL,
     player_id TEXT NOT NULL DEFAULT '',
     slot TEXT NOT NULL DEFAULT '',
     formation TEXT NOT NULL DEFAULT '',
     player_name TEXT NOT NULL DEFAULT '',
-    player_name_full TEXT NOT NULL DEFAULT '',
-    position_id TEXT NOT NULL DEFAULT '',
-    snapshot_at TEXT NOT NULL DEFAULT ''
+    player_name_full TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_lineup_at ON api_lineup (source, observed_at);
 DROP VIEW IF EXISTS current_api_lineup;
@@ -254,7 +242,6 @@ CREATE TABLE IF NOT EXISTS api_leagues (
     team_points REAL,
     league_id TEXT NOT NULL DEFAULT '',
     league_name TEXT NOT NULL DEFAULT '',
-    access TEXT NOT NULL DEFAULT '',
     team_id TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_leagues_at ON api_leagues (source, observed_at);
@@ -268,7 +255,6 @@ CREATE TABLE IF NOT EXISTS api_players_all (
     team_id TEXT NOT NULL DEFAULT '',
     player_name TEXT NOT NULL DEFAULT '',
     player_name_full TEXT NOT NULL DEFAULT '',
-    position_id TEXT NOT NULL DEFAULT '',
     player_status TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_players_all_at ON api_players_all (source, observed_at);
@@ -281,12 +267,11 @@ WHEN EXISTS (SELECT 1 FROM api_players_all o WHERE o.rowid = (SELECT max(rowid) 
          AND o.team_id IS NEW.team_id
          AND o.player_name IS NEW.player_name
          AND o.player_name_full IS NEW.player_name_full
-         AND o.position_id IS NEW.position_id
          AND o.player_status IS NEW.player_status)
 BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS current_api_players_all;
 CREATE VIEW current_api_players_all AS
-SELECT t.observed_at, t.source, t.market_value, t.player_id, t.team_id, t.player_name, t.player_name_full, t.position_id, t.player_status, a.player
+SELECT t.observed_at, t.source, t.market_value, t.player_id, t.team_id, t.player_name, t.player_name_full, t.player_status, a.player
 FROM api_players_all t LEFT JOIN app_player a ON a.app_id = t.player_id
 WHERE t.player_id <> ''
   AND t.rowid = (SELECT max(rowid) FROM api_players_all x WHERE x.player_id = t.player_id AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;
@@ -297,14 +282,6 @@ CREATE TABLE IF NOT EXISTS results_history (
     source TEXT NOT NULL DEFAULT '',
     home_goals REAL,
     away_goals REAL,
-    home_xg REAL,
-    away_xg REAL,
-    home_shots REAL,
-    away_shots REAL,
-    home_shots_on_target REAL,
-    away_shots_on_target REAL,
-    home_corners REAL,
-    away_corners REAL,
     season TEXT NOT NULL DEFAULT '',
     date TEXT NOT NULL DEFAULT '',
     home_name TEXT NOT NULL DEFAULT '',
@@ -319,14 +296,6 @@ WHEN EXISTS (SELECT 1 FROM results_history o WHERE o.rowid = (SELECT max(rowid) 
          AND o.source IS NEW.source
          AND o.home_goals IS NEW.home_goals
          AND o.away_goals IS NEW.away_goals
-         AND o.home_xg IS NEW.home_xg
-         AND o.away_xg IS NEW.away_xg
-         AND o.home_shots IS NEW.home_shots
-         AND o.away_shots IS NEW.away_shots
-         AND o.home_shots_on_target IS NEW.home_shots_on_target
-         AND o.away_shots_on_target IS NEW.away_shots_on_target
-         AND o.home_corners IS NEW.home_corners
-         AND o.away_corners IS NEW.away_corners
          AND o.season IS NEW.season
          AND o.date IS NEW.date
          AND o.home_name IS NEW.home_name
@@ -336,7 +305,7 @@ WHEN EXISTS (SELECT 1 FROM results_history o WHERE o.rowid = (SELECT max(rowid) 
 BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS current_results_history;
 CREATE VIEW current_results_history AS
-SELECT t.observed_at, t.source, t.home_goals, t.away_goals, t.home_xg, t.away_xg, t.home_shots, t.away_shots, t.home_shots_on_target, t.away_shots_on_target, t.home_corners, t.away_corners, t.season, t.date, t.home_name, t.away_name, t.home, t.away
+SELECT t.observed_at, t.source, t.home_goals, t.away_goals, t.season, t.date, t.home_name, t.away_name, t.home, t.away
 FROM results_history t
 WHERE t.season <> '' AND t.date <> '' AND t.home_name <> '' AND t.away_name <> ''
   AND t.rowid = (SELECT max(rowid) FROM results_history x WHERE x.season = t.season AND x.date = t.date AND x.home_name = t.home_name AND x.away_name = t.away_name AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;
@@ -376,7 +345,6 @@ CREATE TABLE IF NOT EXISTS api_activity (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
     amount REAL,
-    week INTEGER,
     player_id TEXT NOT NULL DEFAULT '',
     activity_id TEXT NOT NULL DEFAULT '',
     at TEXT NOT NULL DEFAULT '',
@@ -390,7 +358,6 @@ CREATE TRIGGER IF NOT EXISTS api_activity_unchanged BEFORE INSERT ON api_activit
 WHEN EXISTS (SELECT 1 FROM api_activity o WHERE o.rowid = (SELECT max(rowid) FROM api_activity WHERE activity_id IS NEW.activity_id)
          AND o.source IS NEW.source
          AND o.amount IS NEW.amount
-         AND o.week IS NEW.week
          AND o.player_id IS NEW.player_id
          AND o.activity_id IS NEW.activity_id
          AND o.at IS NEW.at
@@ -401,7 +368,7 @@ BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS history_api_activity;
 DROP VIEW IF EXISTS current_api_activity;
 CREATE VIEW current_api_activity AS
-SELECT t.observed_at, t.source, t.amount, t.week, t.player_id, t.activity_id, t.at, t.kind, t.user_id, t.counterparty, a.player
+SELECT t.observed_at, t.source, t.amount, t.player_id, t.activity_id, t.at, t.kind, t.user_id, t.counterparty, a.player
 FROM api_activity t LEFT JOIN app_player a ON a.app_id = t.player_id
 WHERE t.activity_id <> ''
   AND t.rowid = (SELECT max(rowid) FROM api_activity x WHERE x.activity_id = t.activity_id AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;
