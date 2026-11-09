@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-09T18:05Z",
- "market_at": "2026-11-09T18:05Z",
+ "generated_at": "2026-11-09T18:07Z",
+ "market_at": "2026-11-09T18:07Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-09T18:05Z",
+   "at": "2026-11-09T18:07Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,54 +56,7 @@
  "cash_locked": 170070914.0,
  "can_bid": 15283837.599999994,
  "ping": "",
- "do": [
-  {
-   "name": "German Valera, Mathew Ryan, Natan",
-   "pos": "",
-   "what": "list",
-   "label": "list German Valera, Mathew Ryan, Natan",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 19878610.0
-    },
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": null,
-     "bid": null,
-     "pos": "POR",
-     "value": 18206119.0
-    },
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 50637231.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
