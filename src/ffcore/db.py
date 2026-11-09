@@ -38,6 +38,26 @@ SCHEMA = Path(__file__).with_name("schema.sql")
 IDENTITY = Path(__file__).with_name("identity.sql")
 TABLES_SQL = Path(__file__).with_name("tables.sql")
 DECIDE_SQL = Path(__file__).with_name("decide.sql")     # the decision: its views read schema.sql's
+SOURCE = ("market", "lineups", "matches", "points", "api_teams", "api_standings", "api_market", "api_offers",
+          "api_lineup", "api_leagues", "api_players_all", "results_history", "starters", "api_activity")
+
+
+def source_table(name: str) -> str:
+    return "src_" + name
+
+
+def migrate(db: sqlite3.Connection) -> None:
+    """A database whose source tables have the names before their layer's prefix (src_): renamed, their
+    views and triggers dropped first (the schema texts make them again)."""
+    old = [t for t in SOURCE if db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (t,)).fetchone()]
+    if not old:
+        return
+    for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
+        db.execute('DROP VIEW "%s"' % v)
+    for t in old:
+        for (trigger,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?", (t,)).fetchall():
+            db.execute('DROP TRIGGER "%s"' % trigger)
+        db.execute('ALTER TABLE "%s" RENAME TO "%s"' % (t, source_table(t)))
 RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
 
@@ -226,8 +246,9 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
 def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
     """The columns these schema texts give a table that db's copy of it lacks,
     added, and those it has that they no longer give, dropped (CREATE TABLE
-    IF NOT EXISTS leaves a kept table as it was made; a drop drops every
-    view first, a view the texts no longer make with it). A column a table
+    IF NOT EXISTS leaves a kept table as it was made; a table whose columns
+    change loses its triggers first, the texts make them again; a drop drops
+    every view first, a view the texts no longer make with it). A column a table
     cannot gain (NOT NULL without a default) raises."""
     with closing(sqlite3.connect(":memory:")) as want:
         functions(want)
@@ -237,13 +258,17 @@ def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
             have = {r[1] for r in db.execute('PRAGMA table_info("%s")' % t)}
             if not have:
                 continue
-            gone = have - {r[1] for r in want.execute('PRAGMA table_info("%s")' % t)}
+            wanted = want.execute('PRAGMA table_info("%s")' % t).fetchall()
+            gone = have - {r[1] for r in wanted}
+            if gone or {r[1] for r in wanted} - have:    # a trigger on the old columns would stop the drop, or miss the new
+                for (trigger,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?", (t,)).fetchall():
+                    db.execute('DROP TRIGGER "%s"' % trigger)
             if gone:    # a view on the column would stop the drop: the texts make every view again
                 for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
                     db.execute('DROP VIEW "%s"' % v)
             for col in sorted(gone):
                 db.execute('ALTER TABLE "%s" DROP COLUMN "%s"' % (t, col))
-            for _cid, col, typ, notnull, dflt, _pk in want.execute('PRAGMA table_info("%s")' % t).fetchall():
+            for _cid, col, typ, notnull, dflt, _pk in wanted:
                 if col in have:
                     continue
                 if notnull and dflt is None:
@@ -270,7 +295,8 @@ def _put(sql: str) -> str:
         sql = sql.replace(name, text)
     sql = _NEWEST.sub(lambda m: "row_number() OVER (PARTITION BY %s ORDER BY observed_at DESC, rowid DESC)" % m[1], sql)
     return _LATEST.sub(lambda m: "(t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM %s "
-                                 "WHERE observed_at <= (SELECT cut()) GROUP BY source)" % m[1], sql)
+                                 "WHERE observed_at <= (SELECT cut()) GROUP BY source)"
+                       % (source_table(m[1]) if m[1] in SOURCE else m[1]), sql)
 
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
@@ -288,7 +314,6 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
-            from ffcore.forecast_store import migrate   # not at the top: it imports this module
             texts = [_put(sql.read_text(encoding="utf-8"))
                      for sql in (IDENTITY, TABLES_SQL, schema) + ((DECIDE_SQL, ) if schema == SCHEMA else ())]
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
@@ -411,7 +436,9 @@ def _selftest() -> None:
         with closing(connect(path, schema)) as db, db:
             db.execute("INSERT INTO kept VALUES (1)")
         schema.write_text("CREATE TABLE IF NOT EXISTS kept (a INTEGER NOT NULL, b REAL, c TEXT NOT NULL DEFAULT '');"
-                          " CREATE VIEW IF NOT EXISTS kb AS SELECT b, c FROM kept;")
+                          " CREATE VIEW IF NOT EXISTS kb AS SELECT b, c FROM kept;"
+                          " CREATE TRIGGER IF NOT EXISTS kept_same BEFORE INSERT ON kept"
+                          " WHEN EXISTS (SELECT 1 FROM kept o WHERE o.a IS NEW.a AND o.b IS NEW.b) BEGIN SELECT RAISE(IGNORE); END;")
         _APPLIED.clear()
         with closing(connect(path, schema)) as db:
             assert db.execute("SELECT a, b, c FROM kept").fetchall() == [(1, None, "")], \
@@ -426,11 +453,15 @@ def _selftest() -> None:
         else:
             raise AssertionError("a NOT NULL column with no default cannot be added to kept rows")
         schema.write_text("CREATE TABLE IF NOT EXISTS kept (a INTEGER NOT NULL, c TEXT NOT NULL DEFAULT '');"
-                          " DROP VIEW IF EXISTS kb;")
+                          " DROP VIEW IF EXISTS kb;"
+                          " CREATE TRIGGER IF NOT EXISTS kept_same BEFORE INSERT ON kept"
+                          " WHEN EXISTS (SELECT 1 FROM kept o WHERE o.a IS NEW.a AND o.c IS NEW.c) BEGIN SELECT RAISE(IGNORE); END;")
         _APPLIED.clear()
-        with closing(connect(path, schema)) as db:
+        with closing(connect(path, schema)) as db, db:
             assert db.execute("SELECT * FROM kept").fetchall() == [(1, "")], \
-                "a column the schema no longer gives is dropped, the rows kept"
+                "a column the schema no longer gives is dropped, the rows kept, its trigger made again on the new columns"
+            db.execute("INSERT INTO kept VALUES (1, '')")
+            assert db.execute("SELECT count(*) FROM kept").fetchone() == (1,), "the new trigger skips a row its key already has"
 
     def says(status: str, note: str = "", seen: str = "2026-09-28T1000Z") -> Any:
         got = prognosis(status, note, seen)

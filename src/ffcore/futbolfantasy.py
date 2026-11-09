@@ -13,7 +13,7 @@ from ffcore.clock import MADRID
 from ffcore.rules import XI_SIZE
 from ffcore.names import Name
 from ffcore.text import norm
-from ffcore.parse import Row, ratio, year_for
+from ffcore.parse import Row, year_for
 
 from ffcore.source import Source, _once, _rebuild
 
@@ -106,8 +106,6 @@ def parse_market(html: str, observed_at: str, key: str = "market") -> list[Row]:
             "team": teams.get(team_id or "", ""),
             "club": club_slug(teams.get(team_id or "", "")),
             "value": int(value),
-            "delta_1d": ratio(el.get("data-diferencia1")),
-            "delta_pct_1d": ratio(el.get("data-diferencia-pct1")),
         })
     return rows
 

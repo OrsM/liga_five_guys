@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterable, Iterator, Mapping
-from contextlib import closing
+from collections.abc import Iterable, Iterator
 import functools
 import hashlib
 import io
@@ -11,7 +10,6 @@ import json
 import lzma
 import os
 import random
-import re
 import sys
 import tarfile
 import time
@@ -24,11 +22,10 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
-from ffcore.db import TABLES_SQL, connect
+from ffcore.db import TABLES_SQL
 from ffcore.tidy import (NUMBERS, ROOT, TIDY, clear_sql, store_sql, stored,
                          csv_string)
-from ffcore.futbolfantasy import (MATCH_KEY_RE, POINTS_URL, parse_points,
-                                  season_label)
+from ffcore.futbolfantasy import MATCH_KEY_RE
 from ffcore.laliga_api import ROW_TABLE
 from sources import source, source_for, sources
 
@@ -36,7 +33,7 @@ from ffcore.parse import Row, snapshot_stamp
 from ffcore.parse import stamp as to_stamp
 from ffcore.source import Source
 __all__ = ["snapshots", "state", "doc_keys", "documents", "due",
-          "fetch", "parse", "baseline"]
+          "fetch", "parse"]
 
 RAW = ROOT / "raw"
 
@@ -335,42 +332,10 @@ def _version() -> str:
                            digest_size=8).hexdigest()
 
 
-def season_rows(rows: Iterable[Mapping[str, Any]]) -> int:
-    """These rows (parse_points') into season_points, replacing their
-    season's; how many."""
-    got = [{"season": r["season"], "ff_id": r["ff_id"], "points": float(r["points"] or 0),
-            "games": float(r["games"] or 0)} for r in rows if r.get("ff_id")]
-    with closing(connect()) as db, db:
-        db.executemany("DELETE FROM season_points WHERE season = ?", {(r["season"],) for r in got})
-        db.executemany("INSERT OR REPLACE INTO season_points VALUES (:season, :ff_id, :points, :games)", got)
-    return len(got)
-
-
-def archive_season(html: str, label: str, raw: Path = RAW) -> Path:
-    """A season's points page into the raw archive (season=<label>.tar.xz),
-    what season_points is restored from."""
-    path = raw / f"season={label}.tar.xz"
-    _write(path, {"points.html": html,
-                  MANIFEST: csv_string([{"page": "points", "sig": "", "stored": label,
-                                         "seen": label}], MANIFEST_FIELDS)})
-    return path
-
-
-def load_season(archives: Iterable[Path] | None = None) -> int:
-    """An empty season_points (a rebuilt lfg.db) restored from the archived
-    season pages; how many rows, 0 when it held some."""
-    if stored("season_points"):
-        return 0
-    return season_rows(dict(r, season=path.name.removeprefix("season=").removesuffix(".tar.xz"))
-                       for path in (sorted(RAW.glob("season=*.tar.xz")) if archives is None else archives)
-                       for r in parse_points(_read(path, {"points.html"})["points.html"]))
-
-
 def parse() -> dict[str, int]:
     """Fold new snapshots into the tidy tables (an empty lfg.db first gets
     last season's points from the raw archive: load_season); how many
     snapshots, documents parsed and rows routed."""
-    load_season()
     version = _version()
     walk = doc_keys()
     state = _read_json(TIDY / _STATE, {})
@@ -549,47 +514,7 @@ def route(tables: dict[str, list[Row]], rows: list[Row], default: str, stamp: st
         tables.setdefault(table, []).append(d)
 
 
-def baseline(url: str = "", label: str = "") -> None:
-    import httpx
-
-    url = url or POINTS_URL
-
-    with httpx.Client(headers=HEADERS, timeout=45,
-                      follow_redirects=True) as c:
-        r = c.get(url)
-        r.raise_for_status()
-        html = r.text
-
-    label = re.sub(r"[^0-9A-Za-z._-]", "", label or season_label(html)) or "unknown"
-
-    rows = parse_points(html)
-    if not rows:
-        sys.exit("PARSE FAILED — no table matched, so nothing was written. The "
-                 "markup has probably changed: fix ffcore.futbolfantasy.parse_points.")
-    archive_season(html, label)
-    season_rows([dict(r, season=label) for r in rows])
-    played = sum(1 for r in rows if (r["games"] or "0") != "0")
-    print(f"season {label}: {len(rows)} players, {played} with minutes, into season_points")
-    print("Spot-check a few names against the app before trusting the report.")
-
-
-def _selftest_season() -> None:
-    import tempfile
-    from ffcore.db import rows
-    from ffcore.futbolfantasy import _POINTS_FIXTURE
-    from ffcore.tidy import tables_in
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        arc = archive_season(_POINTS_FIXTURE, "2025-26", Path(tmp))
-        assert arc.name == "season=2025-26.tar.xz"
-        assert load_season([arc]) == 1, "an empty table restored from the archived page"
-        assert rows("SELECT ff_id, pts, pj FROM last_season") == [("4242", 156.0, 34.0)]
-        assert load_season([arc]) == 0, "the table owns it: the archive is not read again"
-        assert season_rows([{"season": "2025-26", "ff_id": "3", "points": "8", "games": "2"}]) == 1
-        assert rows("SELECT ff_id FROM last_season") == [("3",)], "a fetch replaces its season"
-
-
 def _selftest() -> None:
-    _selftest_season()
     uses = compile("mod.thing", "<fp>", "eval")
     at = {}
     for where in ("/repo/.venv", "/elsewhere/.venv"):
@@ -737,12 +662,7 @@ if __name__ == "__main__":
     cmd = argv[0] if argv else "fetch"
     if cmd in ("--selftest", "selftest"):
         _selftest()
-    elif cmd == "baseline":
-        url = argv[argv.index("--url") + 1] if "--url" in argv else ""
-        label = argv[argv.index("--label") + 1] if "--label" in argv else ""
-        baseline(url, label)
     elif cmd in ("fetch", "parse"):
         {"fetch": fetch, "parse": parse}[cmd]()
     else:
-        sys.exit("usage: ingest.py fetch | parse | baseline [--url U] "
-                 "[--label L] | --selftest")
+        sys.exit("usage: ingest.py fetch | parse | --selftest")

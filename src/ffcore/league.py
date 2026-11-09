@@ -85,7 +85,7 @@ def _selftest() -> None:
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             store_sql("api_activity", [{"at": "", "counterparty": "", "player_id": "", **r,
                                         "observed_at": a} for r in activity])
-            store_sql("api_standings", [dict(r, observed_at=b) for r in standings])
+            store_sql("api_standings", [dict(r, team_id="t" + r["user_id"], observed_at=b) for r in standings])
             for stamp in (a, b):
                 store_sql("api_teams", [r for r in teams if r["observed_at"] == stamp]
                           or [{"observed_at": stamp, "manager": "", "player_id": ""}])

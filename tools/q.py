@@ -129,7 +129,7 @@ def _selftest_paired() -> None:
 
 def _selftest_queries() -> None:
     """The saved queries that answer a question, against rows whose answers
-    can be worked out by hand: unmatched_players, bench_points."""
+    can be worked out by hand: bench_points."""
     import tempfile
     from datetime import datetime, timezone
 
@@ -139,21 +139,6 @@ def _selftest_queries() -> None:
 
     def asked(name: str, given: dict[str, object] | None = None) -> list[tuple[Any, ...]]:
         return [tuple(r) for r in named(name, given or {})[1]]
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(datetime(2026, 10, 12, tzinfo=timezone.utc))
-            # unmatched_players: the dearest first, a player with no value last, the matched one absent
-            record([{"player_id": k, "name": n, "app_id": app, "ff_slug": slug} for k, n, app, slug in [
-                ("p1", "Ana", "1", "ana"), ("p2", "Bo", "", "bo"), ("p3", "Cy", "3", ""),
-                ("p4", "Di", "", "")]], "crosswalk")
-            store_sql("market", [{"observed_at": "2026-10-11T1000Z", "ff_id": k, "value": v}
-                                 for k, v in (("p1", "1000000"), ("p2", "5000000"), ("p3", "9000000"))])
-            assert asked("unmatched_players") == [
-                ("Cy", None, 9.0, "no line-up page"), ("Bo", None, 5.0, "no app id"),
-                ("Di", None, None, "neither")], asked("unmatched_players")
-        finally:
-            set_now(None)
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:

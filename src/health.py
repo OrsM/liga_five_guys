@@ -16,10 +16,12 @@ from publish import notify
 __all__ = ["main", "text"]
 
 SENT = Path.home() / ".local/state/lfg/health.sent"
+UNMATCHED_FROM = 5e6
 
 
 def text() -> str:
-    """One line a source that is not ok, empty if all are."""
+    """One line a source that is not ok, and one a player worth UNMATCHED_FROM or more the app or the line-ups do
+    not reach; empty if all is well."""
     lines = []
     for src, last_at, n, usual, hours, gap, status, good in rows(
             "SELECT src, last_at, rows, usual_rows, hours_since, usual_gap_h, status, last_good"
@@ -28,6 +30,9 @@ def text() -> str:
                 else "%d rows against the usual %.0f" % (n, usual))
         lines.append("%s: %s; last good snapshot %s (data/raw/dt=%s.tar.xz)"
                      % (src, what, good, good))
+    for name, club, value, no_app in rows("SELECT name, club, value, no_app FROM unmatched WHERE value >= ? ORDER BY value DESC",
+                                          (UNMATCHED_FROM,)):
+        lines.append("unmatched: %s (%s, %.1fM) has no %s" % (name, club, value / 1e6, "app id" if no_app else "probable-XI slug"))
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
 
 
@@ -46,10 +51,11 @@ def main(sent: Path = SENT) -> dict[str, int]:
 
 def _selftest() -> None:
     import tempfile
+    from contextlib import closing
     from datetime import datetime, timedelta, timezone
     from pathlib import Path
 
-    from ffcore.db import set_now
+    from ffcore.db import connect, set_now
     from ffcore.tidy import store_sql, tables_in
 
     now = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
@@ -73,14 +79,30 @@ def _selftest() -> None:
             feed("api_teams", "player_id", last=8, n=10, gap=4.0)   # 8h late of every 4h: under 3 gaps, ok
             feed("api_lineup", "player_id", last=4, n=10, gap=0.5)  # 4h late of every half hour: under 6h, ok
             feed("api_leagues", "league_id", last=1, n=10, count=4)    # too few to know the usual: not judged
+            feed("api_market", "market_id", last=1, n=2)            # thin: 2 rows against 10
             got = {r[0]: r for r in rows("SELECT src, status, last_good FROM parser_health")}
             assert {s: v[1] for s, v in got.items()} == {
                 "market": "ok", "lineups": "thin", "api_standings": "stale", "api_teams": "ok",
-                "api_lineup": "ok"}, got
+                "api_lineup": "ok", "api_market": "thin"}, got
             assert got["lineups"][2] == stamp(3), "the last good one is the newest of the usual size"
             out = text()
             assert out.startswith("parser trouble:") and "lineups: 3 rows against the usual 10" in out \
-                and "api_standings: no snapshot for 30h" in out and "market" not in out, out
+                and "api_standings: no snapshot for 30h" in out and "\nmarket:" not in out, out
+        finally:
+            set_now(None)
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(now)
+            store_sql("market", [{"observed_at": stamp(1), "ff_id": i, "name": n, "club": "x", "value": v}
+                                 for i, n, v in [("s", "Star Man", "6000000"), ("t", "Cheap Man", "1000000"),
+                                                 ("m", "Matched Man", "9000000")]])
+            with closing(connect()) as db, db:
+                db.executemany("INSERT INTO crosswalk (player_id, name, club_id, ff_slug, app_id) VALUES (?, ?, 'x', 'slug', ?)",
+                               [("s", "Star Man", ""), ("t", "Cheap Man", ""), ("m", "Matched Man", "7")])
+            out = text()
+            assert "unmatched: Star Man (x, 6.0M) has no app id" in out and "Cheap Man" not in out and "Matched" not in out, \
+                "a player of UNMATCHED_FROM or more the app does not reach is told; a cheap one or a matched one is not"
         finally:
             set_now(None)
     print("health self-test OK")

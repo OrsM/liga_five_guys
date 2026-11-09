@@ -195,6 +195,11 @@ def market_at() -> str | None:
     return stamped(at) if at else None
 
 
+def sources() -> list[Doc]:
+    return [{"src": src, "at": stamped(at), "hours": hours, "status": status}
+            for src, at, hours, status in rows("SELECT src, last_at, hours_since, status FROM parser_health ORDER BY src")]
+
+
 def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arrivals: list[str]) -> Doc:
     (cash, team_value, debt, _squad_max, _xi), = inp["dec_money"]
     locks = [lock for _, lock in inp["dec_lock"]]
@@ -212,7 +217,7 @@ def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arri
     sells = offer_lines(inp, names, offered)
     funds(buys, sells)
     return {
-        "generated_at": stamped(cut()), "market_at": market_at(),
+        "generated_at": stamped(cut()), "market_at": market_at(), "sources": sources(),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",

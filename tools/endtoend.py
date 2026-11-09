@@ -49,13 +49,13 @@ def _selftest() -> None:
                                   "points": str(float(g) * (1 + n % 7) * 2)}
                                  for at, g in (("2026-09-06T0800Z", "0"), ("2026-09-14T0800Z", "1"))
                                  for n, (k, _c, _p) in enumerate(players)])
-            store_sql("api_standings", [{"observed_at": seen_at, "user_id": u, "manager": m, "position": i}
+            store_sql("api_standings", [{"observed_at": seen_at, "team_id": "t" + u, "user_id": u, "manager": m, "position": i}
                                         for i, (u, m) in enumerate((("1", ME), ("2", "riv")), 1)])
             store_sql("api_teams", [{"observed_at": seen_at, "player_id": str(n), "manager": m,
                                      "player_team_id": "t%d" % n, "market_value": "3000000"}
                                     for n, (k, _c, _p) in enumerate(players, 1)
                                     for m in [ME if k in mine else "riv" if k in rivals else ""] if m])
-            store_sql("api_market", [{"observed_at": seen_at, "player_id": str(n), "seller": "marketPlayerTeam",
+            store_sql("api_market", [{"observed_at": seen_at, "player_id": str(n), "market_id": "m%d" % n, "seller": "marketPlayerTeam",
                                       "sale_price": "3000000", "market_value": "3000000",
                                       "expires_at": "2026-09-21T22:00:00+02:00"}
                                      for n, (k, _c, _p) in enumerate(players, 1) if k in listed])
@@ -71,7 +71,7 @@ def _selftest() -> None:
             decision.keep_opportunities(cut(), got)
             doc = board(inp, got, decision.read_arrivals())
             assert len(doc["squad"]) == len(mine) and sum(r["xi"] for r in doc["squad"]) == 11, "your squad and its eleven"
-            assert {"generated_at", "cash", "can_bid", "lock_at", "do", "buys", "sells", "finish", "band"} <= set(doc), doc
+            assert {"generated_at", "market_at", "sources", "cash", "can_bid", "lock_at", "do", "buys", "sells", "finish", "band"} <= set(doc), doc
             (line,) = doc["sells"]
             assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
             assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"

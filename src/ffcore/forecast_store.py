@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from ffcore.db import connect, named, rows
 
-__all__ = ["keep", "migrate", "forecast", "price_momentum", "price_change", "seed_cells", "Prices"]
+__all__ = ["keep", "forecast", "price_momentum", "price_change", "seed_cells", "Prices"]
 
 # Each player's valued days (each day's last snapshot: market_daily), numbered (n); the
 # change in % on his previous valued day (NULL for the first, or after a
@@ -83,24 +83,6 @@ def keep(db: sqlite3.Connection, now: Callable[[], str]) -> None:
     finally:
         db.create_function("cut", 0, now)
         db.create_function("hpad", 0, lambda: 0)
-
-
-def migrate(db: sqlite3.Connection) -> None:
-    """The forecast's store as it was when a code hash keyed it (2026-11-04)
-    made the SQL forecast's: its moments and cells kept, the fits and
-    variants tables gone."""
-    if "made" not in {r[1] for r in db.execute("PRAGMA table_info(forecast_moment)")}:
-        return
-    for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
-        db.execute('DROP VIEW "%s"' % v)
-    for t in ("forecast_cell", "forecast_player"):
-        db.execute("DELETE FROM %s WHERE moment NOT IN (SELECT moment FROM forecast_moment)" % t)
-    db.executescript("""
-        DROP TABLE IF EXISTS forecast_fit; DROP TABLE IF EXISTS forecast_variant;
-        CREATE TABLE forecast_moment_new (moment INTEGER PRIMARY KEY, code TEXT NOT NULL DEFAULT 'sql',
-                                          as_of TEXT NOT NULL, variant TEXT NOT NULL DEFAULT 'live');
-        INSERT INTO forecast_moment_new SELECT moment, code, as_of, 'live' FROM forecast_moment;
-        DROP TABLE forecast_moment; ALTER TABLE forecast_moment_new RENAME TO forecast_moment;""")
 
 
 def forecast() -> int:
@@ -285,7 +267,8 @@ def _selftest_forecast() -> None:
                 ("hurt", "b", "0", "injured", "Lesión Desde 10/09 Baja hasta finales de septiembre"),
                 ("susp", "b", "0", "suspended", ""), ("dbt", "b", "50", "doubt", "x Duda para la jornada 3")]])
             store_sql("api_players_all", [{"observed_at": seen, "player_id": "9", "player_status": "out_of_league"}])
-            record([{"season": "2025-26", "ff_id": "fwd", "points": 150.0, "games": 30.0}], "season_points")
+            store_sql("points", [{"observed_at": seen, "season": "2025-26", "ff_id": "fwd", "points": 150.0, "games": 30.0},
+                                 {"observed_at": seen, "season": "2026-27", "ff_id": "fwd", "points": 0.0, "games": 0.0}])
 
             mu = 2.0
             rating = {c: (a, d) for c, _n, a, d in rows("SELECT club, n, attack, defence FROM club_rating")}

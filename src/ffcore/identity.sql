@@ -56,8 +56,8 @@ DROP VIEW IF EXISTS ff_identity_now;
 CREATE VIEW ff_identity_now AS
 SELECT d.player_slug, d.player_name, d.team_slug,
        coalesce(s.player, c.player_id, nm.player, nc.player) AS player
-FROM (SELECT player_slug, player_name, team_slug FROM lineups
-      UNION SELECT player_slug, player_name, team_slug FROM starters) d
+FROM (SELECT player_slug, player_name, team_slug FROM src_lineups
+      UNION SELECT player_slug, player_name, team_slug FROM src_starters) d
 LEFT JOIN slug_player s ON s.ff_slug = d.player_slug
 LEFT JOIN crosswalk c ON c.player_id = name_key(d.player_name)
 LEFT JOIN name_player nm ON nm.name_key = name_key(d.player_name)
@@ -72,3 +72,13 @@ CREATE TABLE IF NOT EXISTS ff_identity_kept (
     PRIMARY KEY (player_slug, player_name, team_slug)
 ) WITHOUT ROWID;
 CREATE VIEW ff_identity AS SELECT * FROM ff_identity_kept;
+
+-- Players the registry names that the app, or the probable line-ups, do not
+-- reach: kept in crosswalk with the id empty, never dropped; value is his
+-- latest (0 if none).
+DROP VIEW IF EXISTS unmatched;
+CREATE VIEW unmatched AS
+SELECT c.player_id AS player, c.name, c.club_id AS club, coalesce(m.value, 0) AS value,
+       c.app_id = '' AS no_app, c.ff_slug = '' AS no_slug
+FROM crosswalk c LEFT JOIN current_market m ON m.ff_id = c.player_id
+WHERE c.app_id = '' OR c.ff_slug = '';
