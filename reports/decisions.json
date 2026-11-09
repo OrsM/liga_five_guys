@@ -1,62 +1,93 @@
 {
- "generated_at": "2026-11-09T18:07Z",
- "market_at": "2026-11-09T18:07Z",
+ "generated_at": "2026-11-09T20:40Z",
+ "market_at": "2026-11-09T20:40Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-09T18:07Z",
+   "at": "2026-11-09T20:40Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": 127111615.0,
- "cash_locked": 170070914.0,
- "can_bid": 15283837.599999994,
+ "cash_locked": 172070914.0,
+ "can_bid": 13283837.599999994,
  "ping": "",
- "do": [],
+ "do": [
+  {
+   "name": "Iñigo Vicente",
+   "pos": "",
+   "what": "list",
+   "label": "list Iñigo Vicente",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "accepts": [
+    null
+   ],
+   "gain": null,
+   "per": null,
+   "facts": [],
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "plan": false,
+   "act": [
+    {
+     "player_team": "24338723",
+     "player": "3002",
+     "market": null,
+     "bid": null,
+     "pos": "DEL",
+     "value": 23017260.0
+    }
+   ]
+  }
+ ],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
@@ -141,7 +172,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 15283837.599999994,
+    "margin": 13283837.599999994,
     "lock_margin": 75160354.0,
     "lock_margin_low": 75160354.0,
     "if_won": [],
@@ -176,8 +207,8 @@
    "step": "placed",
    "price": 44843418.0,
    "asking": 44843418.0,
-   "amount": 44843418.0,
-   "win": 0.3614457831325301,
+   "amount": 46843418.0,
+   "win": 0.6038355749141886,
    "plan": false,
    "done": true,
    "key": "2715",
@@ -199,12 +230,12 @@
     ],
     [
      "bid",
-     44843418.0,
+     46843418.0,
      "money"
     ],
     [
      "chance to win",
-     0.3614457831325301,
+     0.6038355749141886,
      "chance"
     ],
     [
@@ -225,9 +256,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 15283837.599999994,
-    "lock_margin": 82268197.0,
-    "lock_margin_low": 82268197.0,
+    "margin": 13283837.599999994,
+    "lock_margin": 80268197.0,
+    "lock_margin_low": 80268197.0,
     "if_won": [],
     "if_lost": [],
     "held": [
@@ -247,7 +278,7 @@
     "gain": 34.48217507657023,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 12.463436774663938
+    "net": 20.82156401165249
    },
    "accepts": [],
    "act": []
@@ -309,7 +340,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 15283837.599999994,
+    "margin": 13283837.599999994,
     "lock_margin": 87429231.0,
     "lock_margin_low": 87429231.0,
     "if_won": [],
