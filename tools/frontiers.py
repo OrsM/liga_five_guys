@@ -18,12 +18,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ORDER = ["ingest", "forecast", "decision", "board"]
 ORDER_ALL = ORDER + ["grading"]  # grading, the measure, is last: it reads contracts like the rest
-PREFIX = {"api_": "ingest", "current_": "ingest", "history_": "ingest", "ff_identity": "ingest",
+PREFIX = {"src_": "ingest", "current_": "ingest", "history_": "ingest", "ff_identity": "ingest",
           "name_": "ingest", "forecast_": "forecast", "price_": "forecast", "momentum": "forecast",
           "dec_": "decision", "seen": "decision", "my_": "decision", "league_": "decision",
           "board_": "board", "lineup_": "board", "grade_": "grading", "replay": "grading", "sim_": "grading"}
 NAMES = {
-    "ingest": "market lineups matches points results_history starters crosswalk app_player slug_player id_clashes "
+    "ingest": "crosswalk app_player slug_player id_clashes "
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
@@ -59,12 +59,9 @@ def module(name: str) -> str | None:
     return next((m for p, m in PREFIX.items() if name.startswith(p)), None)
 
 
-RAW = {"market", "lineups", "matches", "points", "results_history", "starters"}
-
-
 def raw(name: str) -> bool:
     """A scraped table: only ingest's views read it; the rest read ingest's facts."""
-    return name in RAW or name.startswith(("api_", "current_", "history_"))
+    return name.startswith(("src_", "current_", "history_"))
 
 
 def reads(sql: str, own: str) -> set[str]:
@@ -129,8 +126,8 @@ def table() -> str:
 def _selftest() -> None:
     """The rule is enforced: a later module, a scraped table and an unexported name are crossings; an export is not."""
     assert crossing("forecast", "dec_player")  # a later module
-    assert crossing("decision", "market")  # a scraped table
-    assert crossing("ingest", "market") is None  # ingest reads its own
+    assert crossing("decision", "src_market")  # a scraped table
+    assert crossing("ingest", "src_market") is None  # ingest reads its own
     assert crossing(None, "score_spread")  # a forecast internal, not exported
     assert crossing(None, "price_trend") is None  # exported: the trend the decision's odds read
     assert crossing(None, "cell") is None  # exported

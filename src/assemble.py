@@ -174,10 +174,10 @@ def _selftest_prior() -> None:
 
     db = sqlite3.connect(":memory:")
     functions(db)
-    db.execute("CREATE TABLE points (observed_at, season, ff_id, points, games)")
+    db.execute("CREATE TABLE src_points (observed_at, season, ff_id, points, games)")
     db.execute("CREATE TABLE player_club (player, pos)")
     db.execute("CREATE TABLE player_value (player, value)")
-    db.executemany("INSERT INTO points VALUES ('2026-01-01T0000Z', ?, ?, ?, ?)", [
+    db.executemany("INSERT INTO src_points VALUES ('2026-01-01T0000Z', ?, ?, ?, ?)", [
         ("2024-25", "a", 999.0, 30.0),                        # an older season: not read
         ("2025-26", "a", 60.0, 30.0), ("2025-26", "b", 90.0, 30.0),
         ("2025-26", "c", 150.0, 30.0), ("2025-26", "d", 210.0, 30.0),

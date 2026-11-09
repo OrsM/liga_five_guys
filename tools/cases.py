@@ -25,25 +25,25 @@ Check = tuple[str, str, str, Callable[[Seen], bool], Callable[[Seen], Any]]
 
 
 def extract(me: str, as_of: str = AS_OF) -> dict[str, Any]:
-    from ffcore.db import rows
+    from ffcore.db import rows, source_table
 
     def table(name: str, where: str = "", args: tuple[object, ...] = ()) -> dict[str, Any]:
-        cols = [r[1] for r in rows("SELECT * FROM pragma_table_info('%s')" % name)]
-        got = rows("SELECT %s FROM %s %s ORDER BY rowid" % (", ".join(cols), name, where), args)
+        cols = [r[1] for r in rows("SELECT * FROM pragma_table_info('%s')" % source_table(name))]
+        got = rows("SELECT %s FROM %s %s ORDER BY rowid" % (", ".join(cols), source_table(name), where), args)
         return {"columns": cols, "rows": [list(r) for r in got]}
 
     def at(name: str, stamps: list[str]) -> dict[str, Any]:
         return table(name, "WHERE observed_at IN (%s)" % ",".join("?" * len(stamps)), tuple(stamps))
 
-    recent = [r[0] for r in rows("SELECT DISTINCT observed_at FROM api_teams WHERE observed_at <= ? ORDER BY 1 DESC LIMIT ?",
+    recent = [r[0] for r in rows("SELECT DISTINCT observed_at FROM src_api_teams WHERE observed_at <= ? ORDER BY 1 DESC LIMIT ?",
                                  (as_of, RECENT_COUNT))]
-    daily = [r[0] for r in rows("SELECT max(observed_at) FROM market WHERE observed_at <= ? GROUP BY substr(observed_at, 1, 10)",
+    daily = [r[0] for r in rows("SELECT max(observed_at) FROM src_market WHERE observed_at <= ? GROUP BY substr(observed_at, 1, 10)",
                                 (as_of,))]
     out = {t: table(t, "WHERE observed_at <= ?", (as_of,)) for t in WHOLE}
     out.update({t: at(t, recent) for t in RECENT})
     marks = ",".join("?" * len(recent))
-    app = {r[0] for r in rows("SELECT player_id FROM api_teams WHERE observed_at IN (%s)" % marks, tuple(recent))}
-    app |= {r[0] for r in rows("SELECT player_id FROM api_market WHERE observed_at IN (%s)" % marks, tuple(recent))}
+    app = {r[0] for r in rows("SELECT player_id FROM src_api_teams WHERE observed_at IN (%s)" % marks, tuple(recent))}
+    app |= {r[0] for r in rows("SELECT player_id FROM src_api_market WHERE observed_at IN (%s)" % marks, tuple(recent))}
     link = {k: a for k, a in rows("SELECT player_id, app_id FROM crosswalk")}
     app |= {link[k] for k in CASES.values() if link.get(k)}
     ff = {k for k, a in link.items() if a in app} | set(CASES.values())
@@ -86,7 +86,7 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
     import eleven
     from assemble import built
     from board import board
-    from ffcore.db import connect, record, rows, set_now
+    from ffcore.db import connect, record, rows, set_now, source_table
     from ffcore.league import write_config
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import tables_in
@@ -95,9 +95,9 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
         with closing(connect()) as db, db:
             for name, t in doc["tables"].items():
                 cols = t["columns"]
-                db.executemany("INSERT INTO %s (%s) VALUES (%s)" % (name, ", ".join(cols), ", ".join("?" * len(cols))), t["rows"])
+                db.executemany("INSERT INTO %s (%s) VALUES (%s)" % (source_table(name), ", ".join(cols), ", ".join("?" * len(cols))), t["rows"])
             if degraded:
-                db.execute("DELETE FROM lineups WHERE team_slug = ? AND observed_at = ?", (DEGRADED_CLUB, doc["as_of"]))
+                db.execute("DELETE FROM src_lineups WHERE team_slug = ? AND observed_at = ?", (DEGRADED_CLUB, doc["as_of"]))
         write_config()
         stamp = snapshot_stamp(doc["as_of"])
         assert stamp is not None
@@ -129,8 +129,8 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
                 out[r[0]].append(tuple(r[1:]))
             return out
 
-        market = each("SELECT ff_id, value FROM market WHERE ff_id IN (%s) ORDER BY observed_at")
-        points = each("SELECT ff_id, games, points FROM points WHERE ff_id IN (%s) AND season = (SELECT max(season) FROM points)"
+        market = each("SELECT ff_id, value FROM src_market WHERE ff_id IN (%s) ORDER BY observed_at")
+        points = each("SELECT ff_id, games, points FROM src_points WHERE ff_id IN (%s) AND season = (SELECT max(season) FROM src_points)"
                       " ORDER BY observed_at")
         known = each("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk WHERE player_id IN (%s)")
         status = each("SELECT player, listed, pct, status, note FROM player_status WHERE player IN (%s)")

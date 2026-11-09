@@ -73,7 +73,7 @@ def _selftest() -> None:
         assert ask("SELECT observed_at FROM current_market", at="2026-09-01T1200Z")[1] == [("2026-09-01T1000Z",)], \
             "--at: the views as they stood then"
         assert ask("SELECT cut()")[1][0][0] != "2026-09-01T1200Z", "t is put back afterwards"
-        for bad in ("DELETE FROM market", "CREATE TABLE x (a)", "INSERT INTO market (observed_at) VALUES ('t')"):
+        for bad in ("DELETE FROM src_market", "CREATE TABLE x (a)", "INSERT INTO src_market (observed_at) VALUES ('t')"):
             try:
                 ask(bad)
             except sqlite3.Error:

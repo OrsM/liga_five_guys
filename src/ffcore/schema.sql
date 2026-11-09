@@ -244,17 +244,17 @@ DROP TABLE IF EXISTS forecast_variant;
 -- rows. last_good is the newest snapshot of the usual size: where to start
 -- looking (src/health.py tells you).
 DROP VIEW IF EXISTS market_read;
-CREATE VIEW market_read AS SELECT max(observed_at) AS at FROM api_market WHERE observed_at <= (SELECT cut());
+CREATE VIEW market_read AS SELECT max(observed_at) AS at FROM src_api_market WHERE observed_at <= (SELECT cut());
 
 DROP VIEW IF EXISTS parser_health;
 CREATE VIEW parser_health AS
 WITH snaps AS (
-  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM lineups WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM api_standings WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
+  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM src_market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM src_lineups WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM src_api_standings WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM src_api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM src_api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM src_api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
 r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, stamp_jd(at) AS jd FROM snaps),
 usual AS (SELECT src, avg(n) AS usual_rows, (max(jd) - min(jd)) * 24 / (count(*) - 1) AS gap_h
           FROM r WHERE k BETWEEN 2 AND 21 GROUP BY src HAVING count(*) >= 5),
@@ -578,7 +578,7 @@ LEFT JOIN offer f USING (player) LEFT JOIN price_paid p USING (player)
 LEFT JOIN price_trend t ON t.ff_id = w.player;
 
 -- market_daily picks a few snapshots out of all of them by time alone.
-CREATE INDEX IF NOT EXISTS market_observed ON market (observed_at);
+CREATE INDEX IF NOT EXISTS market_observed ON src_market (observed_at);
 
 -- The market as it closed each day: the rows of each day's last snapshot
 -- (each snapshot holds the whole market). Values move once a day; the
@@ -880,21 +880,21 @@ FROM scoped GROUP BY scope, h;
 -- past t never sees a result the feed told of later.
 DROP VIEW IF EXISTS auction_results;
 CREATE VIEW auction_results AS
-WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM api_standings s, league_config c
+WITH mine AS (SELECT DISTINCT s.user_id AS uid FROM src_api_standings s, league_config c
               WHERE s.manager = c.me),
 ends AS (SELECT pid, player, close, at, asking, seller FROM (
              SELECT m.player_id AS pid, a.player, julianday(m.expires_at) AS close,
                     m.expires_at AS at, m.sale_price AS asking, m.seller,
                     row_number() OVER (PARTITION BY m.player_id, julianday(m.expires_at)
                                        ORDER BY m.observed_at DESC, m.rowid) AS pick
-             FROM api_market m JOIN app_player a ON a.app_id = m.player_id
+             FROM src_api_market m JOIN app_player a ON a.app_id = m.player_id
              WHERE m.observed_at <= (SELECT cut()) AND m.seller IN ('marketPlayerLeague', 'marketPlayerTeam')
                AND coalesce(m.expires_at, '') <> '' AND coalesce(m.sale_price, 0) > 0)
          WHERE pick = 1),
 buys AS (SELECT player_id AS pid, julianday(at) AS t, amount, user_id IN (SELECT uid FROM mine) AS me
          FROM (SELECT player_id, at, amount, user_id,
                       row_number() OVER (PARTITION BY activity_id ORDER BY rowid DESC) AS last
-               FROM api_activity WHERE kind = 'buy' AND activity_id <> '' AND observed_at <= (SELECT cut()))
+               FROM src_api_activity WHERE kind = 'buy' AND activity_id <> '' AND observed_at <= (SELECT cut()))
          WHERE last = 1),
 won AS (SELECT * FROM (
             SELECT e.*, b.amount AS won, b.me,
@@ -905,7 +905,7 @@ SELECT w.player, w.at AS close, strftime('%Y-%m-%dT%H%MZ', w.at) AS closed, w.as
        CASE WHEN w.seller <> 'marketPlayerLeague' THEN NULL
             WHEN w.won IS NULL OR w.me THEN 1.0 ELSE w.won / w.asking END AS bar
 FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut())
-  AND stamp_jd((SELECT max(observed_at) FROM api_activity WHERE observed_at <= (SELECT cut())))
+  AND stamp_jd((SELECT max(observed_at) FROM src_api_activity WHERE observed_at <= (SELECT cut())))
       >= w.close + 600.0 / 86400;
 
 -- What a bid wins on the game's market now, for each player listed there:
@@ -946,11 +946,11 @@ WITH v AS (SELECT observed_at, player_team_id, market_value FROM (
                SELECT observed_at, player_team_id, coalesce(market_value, 0.0) AS market_value,
                       row_number() OVER (PARTITION BY observed_at, player_team_id
                                          ORDER BY rowid DESC) AS last
-               FROM api_teams WHERE observed_at <= (SELECT cut()))
+               FROM src_api_teams WHERE observed_at <= (SELECT cut()))
            WHERE last = 1),
 o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value AS ratio,
              row_number() OVER (PARTITION BY o.offer_id ORDER BY o.rowid) AS first
-      FROM api_offers o JOIN v ON v.observed_at = o.observed_at
+      FROM src_api_offers o JOIN v ON v.observed_at = o.observed_at
        AND v.player_team_id IS o.player_team_id
       WHERE o.observed_at <= (SELECT cut()) AND o.from_market = 'true' AND o.money <> 0
         AND v.market_value <> 0 AND coalesce(o.offer_id, '') <> '')
@@ -975,7 +975,7 @@ CREATE VIEW kickoffs AS
 SELECT home, away, jornada, kick, t FROM (
     SELECT home, away, jornada, strftime('%Y-%m-%dT%H%MZ', kickoff) AS kick, julianday(kickoff) AS t,
            /* newest home, away */ AS n
-    FROM matches
+    FROM src_matches
     WHERE observed_at <= (SELECT cut()) AND jornada IS NOT NULL
       AND strftime('%Y-%m-%dT%H%MZ', kickoff) IS NOT NULL)
 WHERE n = 1;
@@ -984,7 +984,7 @@ WHERE n = 1;
 -- scraped after it was played), with when each was first seen.
 DROP VIEW IF EXISTS blind_results;
 CREATE VIEW blind_results AS
-SELECT home, away, jornada, min(observed_at) AS seen FROM matches m
+SELECT home, away, jornada, min(observed_at) AS seen FROM src_matches m
 WHERE observed_at <= (SELECT cut()) AND score <> '' AND jornada IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM kickoffs k WHERE k.home = m.home AND k.away = m.away)
 GROUP BY home, away;
@@ -1058,14 +1058,14 @@ UNION ALL SELECT away, jornada, at FROM g WHERE away <> '';
 -- row's: the order they were stored.
 DROP VIEW IF EXISTS scored;
 CREATE VIEW scored AS
-WITH s AS (SELECT max(season) AS season, min(observed_at) AS first FROM points
+WITH s AS (SELECT max(season) AS season, min(observed_at) AS first FROM src_points
            WHERE observed_at <= (SELECT cut())
-             AND season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut()))),
-p AS (SELECT ff_id, observed_at AS at, points, games, points.rowid AS id,
+             AND season = (SELECT max(season) FROM src_points WHERE observed_at <= (SELECT cut()))),
+p AS (SELECT ff_id, observed_at AS at, points, games, src_points.rowid AS id,
              lag(points, 1, 0.0) OVER w AS points0, lag(games, 1, 0.0) OVER w AS games0
-      FROM points, s
-      WHERE observed_at <= (SELECT cut()) AND points.season = s.season AND ff_id <> ''
-      WINDOW w AS (PARTITION BY ff_id ORDER BY observed_at, points.rowid)),
+      FROM src_points, s
+      WHERE observed_at <= (SELECT cut()) AND src_points.season = s.season AND ff_id <> ''
+      WINDOW w AS (PARTITION BY ff_id ORDER BY observed_at, src_points.rowid)),
 c AS (SELECT player AS ff_id, club FROM player_club),
 g AS MATERIALIZED (SELECT club, jornada, at FROM club_games
                    UNION ALL SELECT '*', jornada, at FROM club_games),
@@ -1118,19 +1118,19 @@ SELECT r.*, shrink(k.neutral_start / 100.0, k.pick_k, apps, squads) AS pick FROM
 -- at the most market snapshots (an all-players row holds until his next),
 -- then the most name stems shared (stems_meet); each app id's unique best,
 -- then per player the unique best. Over all rows, not as of t.
-CREATE INDEX IF NOT EXISTS market_by_value ON market (value);
+CREATE INDEX IF NOT EXISTS market_by_value ON src_market (value);
 DROP VIEW IF EXISTS app_links;
 CREATE VIEW app_links AS
 WITH snap AS (SELECT observed_at, player_id AS aid, market_value AS v, player_name AS n1, player_name_full AS n2
-              FROM api_teams WHERE market_value > 0
+              FROM src_api_teams WHERE market_value > 0
               UNION ALL SELECT observed_at, player_id, market_value, player_name, player_name_full
-              FROM api_market WHERE market_value > 0),
+              FROM src_api_market WHERE market_value > 0),
 held AS (SELECT * FROM (SELECT player_id AS aid, market_value AS v, player_name AS n1, player_name_full AS n2,
                                observed_at AS since,
                                coalesce(lead(observed_at) OVER (PARTITION BY player_id ORDER BY observed_at, rowid),
                                         '9999') AS until
-                        FROM api_players_all) WHERE v > 0),
-ff AS (SELECT observed_at, ff_id, value AS v, name FROM market WHERE ff_id <> '' AND value > 0),
+                        FROM src_api_players_all) WHERE v > 0),
+ff AS (SELECT observed_at, ff_id, value AS v, name FROM src_market WHERE ff_id <> '' AND value > 0),
 met AS MATERIALIZED (SELECT a.aid, f.ff_id, f.observed_at AS at, a.n1, a.n2, f.name
         FROM snap a JOIN ff f ON f.observed_at = a.observed_at AND f.v = a.v
         UNION ALL
@@ -1156,7 +1156,7 @@ DROP VIEW IF EXISTS registry;
 CREATE VIEW registry AS
 WITH last AS (SELECT ff_id, trim(name) AS name, club,
                      /* newest ff_id */ AS n
-              FROM market WHERE ff_id <> '')
+              FROM src_market WHERE ff_id <> '')
 SELECT l.ff_id AS player_id, l.name, l.club AS club_id, coalesce(a.app_id, '') AS app_id
 FROM last l LEFT JOIN app_links a ON a.player = l.ff_id WHERE l.n = 1;
 
@@ -1172,11 +1172,11 @@ SELECT jornada FROM jornada_calendar WHERE state = 'done' ORDER BY jornada;
 -- latest one as of t, each player's last.
 DROP VIEW IF EXISTS last_season;
 CREATE VIEW last_season AS
-SELECT p.ff_id, p.points AS pts, p.games AS pj FROM points p
+SELECT p.ff_id, p.points AS pts, p.games AS pj FROM src_points p
 WHERE p.observed_at <= (SELECT cut())
-  AND p.season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut())
-                  AND season < (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut())))
-  AND p.rowid = (SELECT max(rowid) FROM points x WHERE x.season = p.season AND x.ff_id = p.ff_id AND x.observed_at <= (SELECT cut()));
+  AND p.season = (SELECT max(season) FROM src_points WHERE observed_at <= (SELECT cut())
+                  AND season < (SELECT max(season) FROM src_points WHERE observed_at <= (SELECT cut())))
+  AND p.rowid = (SELECT max(rowid) FROM src_points x WHERE x.season = p.season AND x.ff_id = p.ff_id AND x.observed_at <= (SELECT cut()));
 
 -- What a player's points per match is pulled toward (forecast_ppm): what
 -- his price says, the least-squares line of last season's points per match
@@ -1304,7 +1304,7 @@ SELECT user_id, manager, position, team_points, fixture_points, team_value, team
 -- id the order they were kept in.
 DROP VIEW IF EXISTS price_history;
 CREATE VIEW price_history AS
-SELECT rowid AS id, observed_at, ff_id, name, position, club, value FROM market
+SELECT rowid AS id, observed_at, ff_id, name, position, club, value FROM src_market
 WHERE observed_at <= (SELECT cut());
 
 -- The forecast, as SQL over those.

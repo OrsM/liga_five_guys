@@ -56,8 +56,8 @@ DROP VIEW IF EXISTS ff_identity_now;
 CREATE VIEW ff_identity_now AS
 SELECT d.player_slug, d.player_name, d.team_slug,
        coalesce(s.player, c.player_id, nm.player, nc.player) AS player
-FROM (SELECT player_slug, player_name, team_slug FROM lineups
-      UNION SELECT player_slug, player_name, team_slug FROM starters) d
+FROM (SELECT player_slug, player_name, team_slug FROM src_lineups
+      UNION SELECT player_slug, player_name, team_slug FROM src_starters) d
 LEFT JOIN slug_player s ON s.ff_slug = d.player_slug
 LEFT JOIN crosswalk c ON c.player_id = name_key(d.player_name)
 LEFT JOIN name_player nm ON nm.name_key = name_key(d.player_name)

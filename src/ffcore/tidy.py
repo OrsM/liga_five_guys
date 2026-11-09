@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any
 
 from ffcore import db as lfg
-from ffcore.db import ROOT
+from ffcore.db import ROOT, source_table
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "REPORTS",
@@ -79,7 +79,7 @@ NUMBERS: dict[str, tuple[tuple[str, Callable[[object], Any]], ...]] = {
 
 
 def _columns(db: sqlite3.Connection, name: str) -> list[str]:
-    return [r[1] for r in db.execute('PRAGMA table_info("%s")' % name)]
+    return [r[1] for r in db.execute('PRAGMA table_info("%s")' % source_table(name))]
 
 
 def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
@@ -98,14 +98,14 @@ def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
         if extra:
             print("  warn: %s: columns not in tables.sql, not kept: %s" % (name, ", ".join(extra)))
         db.executemany(
-            "INSERT OR IGNORE INTO %s (%s) VALUES (%s)" % (name, ", ".join(cols), ", ".join("?" * len(cols))),
+            "INSERT OR IGNORE INTO %s (%s) VALUES (%s)" % (source_table(name), ", ".join(cols), ", ".join("?" * len(cols))),
             [[r.get(c) if c in nums else (r.get(c) or "") for c in cols] for r in fresh])
 
 
 def stored(name: str) -> int:
     """How many rows a table keeps."""
     try:
-        got: int = lfg.rows('SELECT count(*) FROM "%s"' % name)[0][0]
+        got: int = lfg.rows('SELECT count(*) FROM "%s"' % source_table(name))[0][0]
         return got
     except sqlite3.OperationalError:
         return 0
@@ -114,7 +114,7 @@ def stored(name: str) -> int:
 def clear_sql(name: str) -> None:
     """Empty a table, for a parse that starts over."""
     with closing(lfg.connect()) as db, db:
-        db.execute("DELETE FROM %s" % name)
+        db.execute("DELETE FROM %s" % source_table(name))
 
 
 def _read_sql(view: str) -> list[dict[str, Any]]:
@@ -219,13 +219,13 @@ def _selftest_tables() -> None:
             store_sql("api_activity", [
                 {"observed_at": "2026-08-03T1000Z", "activity_id": "9", "kind": "3"},
                 {"observed_at": "2026-08-03T1100Z", "activity_id": "9", "kind": "2"}])
-            assert rows("SELECT activity_id, kind FROM api_activity ORDER BY rowid") == [
+            assert rows("SELECT activity_id, kind FROM src_api_activity ORDER BY rowid") == [
                 ("1", "0"), ("1", "1"), ("2", "5"), ("9", "2"), ("9", "3"), ("9", "2")], \
                 "a keyed row is kept once, and again only when it changes (back included)"
             store_sql("market", [{"observed_at": b, "ff_id": "x", "value": "5"}] * 2
                       + [{"observed_at": b, "ff_id": "y", "value": "5"}])
             store_sql("market", [{"observed_at": b, "ff_id": "x", "value": "6"}])
-            assert rows("SELECT ff_id, value FROM market ORDER BY rowid") == [("x", 5.0), ("y", 5.0)], \
+            assert rows("SELECT ff_id, value FROM src_market ORDER BY rowid") == [("x", 5.0), ("y", 5.0)], \
                 "a snapshot holds a key once: the same (source, observed_at, ff_id) again is skipped, a stored fetch is not stored twice"
         finally:
             set_now(None)

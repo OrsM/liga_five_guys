@@ -38,8 +38,8 @@ def identity(db: sqlite3.Connection) -> None:
     reg = db.execute("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk ORDER BY 1").fetchall()
     through = "%08x:%d:%d" % (
         zlib.crc32(repr(reg).encode()),
-        db.execute("SELECT coalesce(max(rowid), 0) FROM lineups").fetchone()[0],
-        db.execute("SELECT coalesce(max(rowid), 0) FROM starters").fetchone()[0])
+        db.execute("SELECT coalesce(max(rowid), 0) FROM src_lineups").fetchone()[0],
+        db.execute("SELECT coalesce(max(rowid), 0) FROM src_starters").fetchone()[0])
     version = "%08x" % zlib.crc32(db.execute(
         "SELECT sql FROM sqlite_master WHERE name = 'ff_identity_now'").fetchone()[0].encode())
     if db.execute("SELECT version, through FROM facts_meta WHERE name = 'ff_identity'").fetchone() == (version, through):

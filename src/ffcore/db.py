@@ -38,6 +38,26 @@ SCHEMA = Path(__file__).with_name("schema.sql")
 IDENTITY = Path(__file__).with_name("identity.sql")
 TABLES_SQL = Path(__file__).with_name("tables.sql")
 DECIDE_SQL = Path(__file__).with_name("decide.sql")     # the decision: its views read schema.sql's
+SOURCE = ("market", "lineups", "matches", "points", "api_teams", "api_standings", "api_market", "api_offers",
+          "api_lineup", "api_leagues", "api_players_all", "results_history", "starters", "api_activity")
+
+
+def source_table(name: str) -> str:
+    return "src_" + name
+
+
+def migrate(db: sqlite3.Connection) -> None:
+    """A database whose source tables have the names before their layer's prefix (src_): renamed, their
+    views and triggers dropped first (the schema texts make them again)."""
+    old = [t for t in SOURCE if db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (t,)).fetchone()]
+    if not old:
+        return
+    for (v,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'view'").fetchall():
+        db.execute('DROP VIEW "%s"' % v)
+    for t in old:
+        for (trigger,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?", (t,)).fetchall():
+            db.execute('DROP TRIGGER "%s"' % trigger)
+        db.execute('ALTER TABLE "%s" RENAME TO "%s"' % (t, source_table(t)))
 RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
 
@@ -275,7 +295,8 @@ def _put(sql: str) -> str:
         sql = sql.replace(name, text)
     sql = _NEWEST.sub(lambda m: "row_number() OVER (PARTITION BY %s ORDER BY observed_at DESC, rowid DESC)" % m[1], sql)
     return _LATEST.sub(lambda m: "(t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM %s "
-                                 "WHERE observed_at <= (SELECT cut()) GROUP BY source)" % m[1], sql)
+                                 "WHERE observed_at <= (SELECT cut()) GROUP BY source)"
+                       % (source_table(m[1]) if m[1] in SOURCE else m[1]), sql)
 
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
@@ -293,7 +314,6 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
     if key not in _APPLIED:
         with open(path.with_name(path.name + ".schema.lock"), "w") as held:
             fcntl.flock(held, fcntl.LOCK_EX)    # one process recreates the views at a time
-            from ffcore.forecast_store import migrate   # not at the top: it imports this module
             texts = [_put(sql.read_text(encoding="utf-8"))
                      for sql in (IDENTITY, TABLES_SQL, schema) + ((DECIDE_SQL, ) if schema == SCHEMA else ())]
             version = zlib.crc32("\0".join(texts).encode()) & 0x7FFFFFFF
