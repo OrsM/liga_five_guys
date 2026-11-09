@@ -9,6 +9,7 @@ from typing import Any
 
 import decision
 from assemble import built, forecast
+from ffcore import auction
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.jornadas import round_locks
 from ffcore.parse import snapshot_stamp
@@ -132,22 +133,36 @@ def graded(run: int, last: int, path: Path | None = None) -> bool:
                           " GROUP BY g.run_id HAVING max(g.jornada) >= ? LIMIT 1", (run, last)).fetchone() is not None
 
 
+def record_auction(run: int | None) -> dict[str, int]:
+    with closing(connect()) as db:
+        ls = auction.looks(db)
+        live = auction.stored_points(db)
+    back = auction.backtest(ls)
+    cal = auction.calibration(back, "backtest:") + auction.calibration(live, "live:")
+    brier = auction.briers(back, "backtest:") + auction.briers(live, "live:")
+    if run is not None:
+        record([{"run_id": run, **r} for r in cal], "auction_calibration")
+        record([{"run_id": run, **r} for r in brier], "auction_brier")
+    return {"auction_points": len(back), "auction_live": len(live), "auction_drift": sum(r["drift"] for r in cal)}
+
+
 def record_grades() -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code, and keep every player forecast against
     what then happened (one set a code: superseded), unless this code has graded them on every jornada done (graded)."""
     done = done_jornadas()
     resolved = len(done)
     run = this_run()
+    scored = record_auction(run)
     if run is not None and done and graded(run, max(done)):
         print("  grade: this code's grades stand (every jornada done graded)")
-        return {"resolved": resolved, "forecasts": 0}
+        return {"resolved": resolved, "forecasts": 0, **scored}
     fc = backtest(GRADE_AHEAD)
     if run is not None:
         record([{"run_id": run, **r} for r in fc], "grade_cell")
         superseded(run)
     forecasts = len({(r["from_j"], r["jornada"]) for r in fc})     # lock moments a jornada
     print("  grade: %d forecasts over %d jornadas" % (forecasts, resolved))
-    return {"resolved": resolved, "forecasts": forecasts}
+    return {"resolved": resolved, "forecasts": forecasts, **scored}
 
 
 def log_measure(measure: str, values: dict[str, float]) -> None:
@@ -255,6 +270,22 @@ if __name__ == "__main__":
         for g, a, n, rmse, mae, bias, r, slope in accuracy():
             print("%-4s ahead %d  n=%d  rmse=%.4f  mae=%.4f  bias=%+.4f  r=%.4f  slope=%.3f" % (g, a, n, rmse, mae, bias, r, slope), flush=True)
         os._exit(0)
+    if sys.argv[1:2] == ["auction"]:
+        with closing(connect()) as db:
+            recs = auction.backtest_records(auction.looks(db))
+        pts = auction.points(recs)
+        print("Brier, expanding time-split over %d closed auctions (model vs the pooled distribution):" % len(recs))
+        for b in auction.briers(pts, ""):
+            print("  %-10s n %5d  model %.4f  pooled %.4f" % (b["scope"], b["n"], b["model"], b["pooled"]))
+        print("calibration (stated chance against what happened):")
+        for c in auction.calibration(pts, ""):
+            print("  %-10s %-10s n %5d  stated %.3f  observed %.3f%s" % (c["scope"], c["bin"], c["n"], c["stated"], c["observed"], "  DRIFT" if c["drift"] else ""))
+        print("the 20 largest auctions: ask, rival bids seen, the forecast at the ask / 1.05 / 1.10, what happened")
+        for r in sorted(recs, key=lambda r: -r.ask)[:20]:
+            what = "unsold" if r.sample.kind == "none" else "%s %.3fx" % ("we won" if r.sample.kind == "me" else "rival won", r.sample.ratio or 0)
+            at = [auction.chance(r.curve, x) for x in (1.0, 1.05, 1.10)]
+            print("  %s %-6s ask %6.1fM rival %d  %.2f / %.2f / %.2f  -> %s" % (r.close[:10], r.player, r.ask / 1e6, r.rival, at[0], at[1], at[2], what))
+        raise SystemExit(0)
     if sys.argv[1:2] == ["price"]:
         # price: momentum's price forecasts against what happened, by horizon (rmse in %, with 'no change' and 'the last change again')
         for scope, h, n, rmse, none, again, predicted, actual in rows(

@@ -41,12 +41,24 @@ CREATE TABLE IF NOT EXISTS dec_player (
     asking   REAL,
     proceeds REAL
 );
-CREATE TABLE IF NOT EXISTS dec_odds (
+CREATE TABLE IF NOT EXISTS dec_curve (
     player TEXT NOT NULL,
     ratio  REAL NOT NULL,
-    p_win  REAL NOT NULL,
+    p      REAL NOT NULL,
     PRIMARY KEY (player, ratio)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS dec_auction (
+    player TEXT PRIMARY KEY,
+    ask    REAL NOT NULL,
+    mins   REAL NOT NULL,
+    bids   INTEGER NOT NULL,
+    rival  INTEGER NOT NULL,
+    mine   INTEGER NOT NULL,
+    trend  REAL,
+    cell   TEXT NOT NULL,
+    n      INTEGER NOT NULL,
+    thin   INTEGER NOT NULL
+);
 -- The bids you have placed (seen), what the plan's checks (decision.after) take as won.
 CREATE TABLE IF NOT EXISTS dec_bid (
     player TEXT PRIMARY KEY,
@@ -98,8 +110,13 @@ WHERE s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player
 
 -- Each buy's bids and their chance of winning, as seen.
 DROP VIEW IF EXISTS dec_odds_seen;
-CREATE VIEW dec_odds_seen AS
-SELECT o.player, o.ratio, o.p_win FROM seen_odds o JOIN look l ON o.cut = l.cut AND o.variant = l.variant;
+DROP VIEW IF EXISTS dec_curve_seen;
+CREATE VIEW dec_curve_seen AS
+SELECT o.player, o.ratio, o.p FROM seen_curve o JOIN look l ON o.cut = l.cut AND o.variant = l.variant;
+DROP VIEW IF EXISTS dec_auction_seen;
+CREATE VIEW dec_auction_seen AS
+SELECT o.player, o.ask, o.mins, o.bids, o.rival, o.mine, o.trend, o.cell, o.n, o.thin
+FROM seen_auction o JOIN look l ON o.cut = l.cut AND o.variant = l.variant;
 
 -- When each market player's auction closes (the game's listings, the last close seen), and when each jornada
 -- still to lock does (ingest's round_locks), as the game's clock; the plan's steps are due by them

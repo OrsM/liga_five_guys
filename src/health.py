@@ -33,6 +33,10 @@ def text() -> str:
     for name, club, value, no_app in rows("SELECT name, club, value, no_app FROM unmatched WHERE value >= ? ORDER BY value DESC",
                                           (UNMATCHED_FROM,)):
         lines.append("unmatched: %s (%s, %.1fM) has no %s" % (name, club, value / 1e6, "app id" if no_app else "probable-XI slug"))
+    for scope, bin_, n, stated, observed in rows(
+            "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE drift = 1"
+            " AND run_id = (SELECT max(run_id) FROM auction_calibration) ORDER BY scope, bin"):
+        lines.append("auction forecast drifting: %s, chance %s stated %.2f, observed %.2f over %d" % (scope, bin_, stated, observed, n))
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
 
 

@@ -14,6 +14,7 @@ import decision
 import eleven
 from approach import Approach, Club, approach
 from assemble import built
+from ffcore.auction import chance
 from ffcore.db import connect, cut, record, rows, this_run
 from ffcore.jornadas import rounds
 from ffcore.rules import POSITIONS, bid_limit
@@ -133,15 +134,15 @@ def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: 
 
 def buy_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
     pos, cells = decision.cells_of(inp)
-    odds: dict[str, list[tuple[float, float]]] = {}
-    for k, r, w in sorted(inp["dec_odds"]):
-        odds.setdefault(k, []).append((r, w))
+    curves = decision.curves_of(inp)
+    seen = {k: (bids_seen, mine, n, thin, cell) for k, _, _, bids_seen, _, mine, _, cell, n, thin in inp["dec_auction"]}
     bids = {k: amount for k, amount in inp["dec_bid"]}
     out = []
     for i, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:TOP_BUYS]):
         k, placed = r["player"], r["placed"]
         amount = placed if placed is not None else r["bid"]
-        win = decision.win_at(r["asking"], odds.get(k, []), placed) if placed is not None else r["win"]
+        win = chance(curves[k], placed / r["asking"]) if placed is not None and k in curves else r["win"]
+        bids_seen, mine, n, thin, cell = seen.get(k, (None, None, 0, True, ""))
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         where = frozenset(j for j in cells if j >= r["from_j"])
         funding = funding_doc(club, names, approach(club._replace(pending=others), k, amount, win,
@@ -155,6 +156,7 @@ def buy_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], club
             "price_next": r["price_next"], "price_lock": r["price_lock"],
             "facts": [["asking", r["asking"], "money"], ["bid", amount, "money"], ["chance to win", win, "chance"],
                       ["points added", r["gain"], "points"]],
+            "bids": bids_seen, "auction": {"yours": bool(mine), "listings": n, "thin": bool(thin), "cell": cell},
             "funding": funding, "accepts": [], "act": []})
     return out
 
@@ -200,6 +202,16 @@ def sources() -> list[Doc]:
             for src, at, hours, status in rows("SELECT src, last_at, hours_since, status FROM parser_health ORDER BY src")]
 
 
+def auction_card() -> Doc:
+    (run,), = rows("SELECT max(run_id) FROM auction_brier")
+    if run is None:
+        return {"brier": [], "drift": []}
+    return {"brier": [{"scope": s, "n": n, "model": m, "pooled": p} for s, n, m, p in rows(
+                "SELECT scope, n, model, pooled FROM auction_brier WHERE run_id = ? ORDER BY scope", (run,))],
+            "drift": [{"scope": s, "bin": b, "n": n, "stated": st, "observed": ob} for s, b, n, st, ob in rows(
+                "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE run_id = ? AND drift = 1 ORDER BY scope, bin", (run,))]}
+
+
 def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arrivals: list[str]) -> Doc:
     (cash, team_value, debt, _squad_max, _xi), = inp["dec_money"]
     locks = [lock for _, lock in inp["dec_lock"]]
@@ -222,7 +234,7 @@ def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arri
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
         "do": list_line(inp, names), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
-        "alerts": alerts,
+        "alerts": alerts, "auction": auction_card(),
         "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad],
         "finish": 0.0, "band": [0.0, 0.0]}
