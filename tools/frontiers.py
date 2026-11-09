@@ -38,7 +38,7 @@ EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_record last_season
         club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look unmatched
         listings listing_close offers offer_ratios price_history price_paid auction_results market_read
-        squads owners cash standings league_config""",
+        squads owners cash standings league_config app_lineup""",
     "forecast": "cell market_daily forecast_e price_carry price_trend price_trend_daily price_forecast price_grade",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read; price_forecast: each player's expected value night by night to the next lock; price_grade: its error against what happened
     "decision": "player_facts",  # the facts of each player the board shows; the decision's inputs are dec_* tables, read by decision.py only
     "board": "",

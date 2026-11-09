@@ -32,16 +32,50 @@ def stamped(t: str) -> str:
     return t[:13] + ":" + t[13:]
 
 
+def next_value(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, float]:
+    _, cells = decision.cells_of(inp)
+    return cells.get(min((j for j, _ in inp["dec_lock"]), default=min(cells, default=0)), {})
+
+
 def squad_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[Doc], dict[str, str]]:
-    pos, cells = decision.cells_of(inp)
+    pos, _ = decision.cells_of(inp)
     mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
     names = {k: n for k, n in rows("SELECT player, name_shown(name) FROM player_facts")}
-    e = cells.get(min((j for j, _ in inp["dec_lock"]), default=min(cells, default=0)), {})
-    settled = eleven.best_eleven(mine, pos, e)
-    xi = settled.eleven if settled else frozenset()
+    e = next_value(inp)
+    fielded = decision.lineup_of(inp, pos).eleven
+    settled = eleven.best_eleven(mine, pos, e, fielded)
+    best = settled.eleven if settled else frozenset()
+    xi = fielded if fielded is not None else best
     order = sorted(mine, key=lambda k: (k not in xi, POSITIONS.index(pos[k]) if k in pos else len(POSITIONS), -e.get(k, 0.0), k))
-    return [{"name": names.get(k, k), "pos": pos.get(k, ""), "next": e.get(k, 0.0), "xi": k in xi, "sold": False,
-             "key": k} for k in order], names
+    return [{"name": names.get(k, k), "pos": pos.get(k, ""), "next": e.get(k, 0.0), "xi": k in xi, "best": k in best,
+             "sold": False, "key": k} for k in order], names
+
+
+def advice(swaps: tuple[tuple[str, str, float], ...], names: dict[str, str]) -> list[Doc]:
+    steps: list[list[Any]] = []
+    for into, out, gain in swaps:
+        for step in steps:
+            if step[0] == out:
+                step[0], step[2] = into, step[2] + gain
+                break
+        else:
+            steps.append([into, out, gain])
+    return [{"in": names.get(i, i), "out": names.get(o, o), "gain": g} for i, o, g in steps if g > 0]
+
+
+def lineup_doc(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> Doc:
+    pos, _ = decision.cells_of(inp)
+    mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
+    e = next_value(inp)
+    got = decision.lineup_of(inp, pos)
+    settled = eleven.best_eleven(mine, pos, e, got.eleven)
+    if got.eleven is None or settled is None:
+        return {"eleven": None, "message": got.message or "the squad cannot field a legal eleven", "unmapped": list(got.unmapped),
+                "points": None, "best": eleven.total(settled.eleven, e) if settled else None, "advice": []}
+    slots = {player: slot for _, player, slot, _ in inp["dec_lineup"]}
+    order = sorted(got.eleven, key=lambda k: (POSITIONS.index(slots[k]) if slots[k] in POSITIONS else len(POSITIONS), -e.get(k, 0.0), k))
+    return {"eleven": [names.get(k, k) for k in order], "message": "", "unmapped": list(got.unmapped),
+            "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
 def standing(mine: set[str]) -> list[tuple[Any, ...]]:
@@ -55,10 +89,11 @@ def offer_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], go
     pos, cells = decision.cells_of(inp)
     mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
     js = sorted(cells)
+    fielded = decision.lineup_of(inp, pos).eleven
     sides = {}
     for n in AHEAD:
         value = decision.window_value(pos, cells, frozenset(js[:n or len(js)]))
-        sides[n] = (value, eleven.best_eleven(mine, pos, value))
+        sides[n] = (value, eleven.best_eleven(mine, pos, value, fielded))
     out = []
     for k, value, money, p, trend in got:
         lost = {}
@@ -186,7 +221,7 @@ def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arri
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
-        "do": list_line(inp, names), "buys": buys, "targets": target_lines(names, got),
+        "do": list_line(inp, names), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
         "alerts": alerts,
         "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad],
@@ -222,6 +257,8 @@ def _selftest() -> None:
     sells: list[Doc] = [{"name": "Pepelu"}, {"name": "Ryan"}]
     funds(buys, sells)
     assert [s["for"] for s in sells] == [["Raphinha"], []], "an offer is taken tonight when a funded buy sells him tonight"
+    assert advice((("c", "b", 2.0), ("d", "c", 1.0), ("e", "x", 0.5)), {"d": "D"}) == [
+        {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"
     print("board self-test OK")
 
 

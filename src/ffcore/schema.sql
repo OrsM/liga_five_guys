@@ -1,5 +1,4 @@
 -- What earlier versions made and nothing reads now: a database made by them drops it here.
-DROP VIEW IF EXISTS app_lineup;
 DROP VIEW IF EXISTS formation;
 DROP VIEW IF EXISTS slot_bounds;
 DROP VIEW IF EXISTS board_blocker_word;
@@ -330,6 +329,12 @@ DROP VIEW IF EXISTS owners;
 CREATE VIEW owners AS
 SELECT player, manager FROM current_api_teams
 WHERE manager <> '' AND player IS NOT NULL GROUP BY player;
+
+-- The eleven the app has fielded for you (its last line-up seen), each by the player it is: none for an app id the
+-- crosswalk does not name.
+DROP VIEW IF EXISTS app_lineup;
+CREATE VIEW app_lineup AS
+SELECT player_id AS app_id, player, slot, player_name AS name FROM current_api_lineup;
 
 -- The activity feed, each event once, with who paid (buyer: a buy's or a
 -- clause's manager) and who was paid (seller: a sale's manager, a clause's
