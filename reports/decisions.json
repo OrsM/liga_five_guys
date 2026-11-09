@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-09T07:47Z",
- "market_at": "2026-11-09T07:46Z",
+ "generated_at": "2026-11-09T07:54Z",
+ "market_at": "2026-11-09T07:53Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-09T07:46Z",
+   "at": "2026-11-09T07:53Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": 127111615.0,
- "cash_locked": 85545112.0,
- "can_bid": 99809639.6,
+ "cash_locked": 130388530.0,
+ "can_bid": 54966221.599999994,
  "ping": "",
  "do": [],
  "lineup": {
@@ -134,7 +134,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 99809639.6,
+    "margin": 54966221.599999994,
     "lock_margin": 75160354.0,
     "lock_margin_low": 75160354.0,
     "if_won": [],
@@ -166,13 +166,13 @@
    "pos": "MED",
    "what": "buy",
    "label": "buy Pepelu",
-   "step": "bid",
+   "step": "placed",
    "price": 44843418.0,
    "asking": 44843418.0,
-   "amount": 48572159.84304774,
-   "win": 0.9,
+   "amount": 44843418.0,
+   "win": 0.3333333333333333,
    "plan": false,
-   "done": false,
+   "done": true,
    "key": "2715",
    "gain": 35.04994198598315,
    "per": "season",
@@ -192,12 +192,12 @@
     ],
     [
      "bid",
-     48572159.84304774,
+     44843418.0,
      "money"
     ],
     [
      "chance to win",
-     0.9,
+     0.3333333333333333,
      "chance"
     ],
     [
@@ -211,9 +211,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 51237479.756952256,
-    "lock_margin": 78539455.15695226,
-    "lock_margin_low": 78539455.15695226,
+    "margin": 54966221.599999994,
+    "lock_margin": 82268197.0,
+    "lock_margin_low": 82268197.0,
     "if_won": [],
     "if_lost": [],
     "held": [
@@ -233,7 +233,7 @@
     "gain": 35.049941985983196,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 31.544947787384878
+    "net": 11.683313995327731
    },
    "accepts": [],
    "act": []
@@ -288,7 +288,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 59465839.599999994,
+    "margin": 14622421.599999994,
     "lock_margin": 86767815.0,
     "lock_margin_low": 86767815.0,
     "if_won": [],
