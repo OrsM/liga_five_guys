@@ -51,6 +51,7 @@ DROP TABLE IF EXISTS dec_shape;
 DROP TABLE IF EXISTS dec_xp;
 DROP TABLE IF EXISTS moves;
 DROP TABLE IF EXISTS phantom_jornadas;
+DROP TABLE IF EXISTS season_points;
 DROP TABLE IF EXISTS board_history_moves;
 DROP TABLE IF EXISTS board_xi;
 DROP TABLE IF EXISTS dec_plan;
@@ -1167,20 +1168,15 @@ SELECT jornada FROM jornada_calendar WHERE state = 'done' ORDER BY jornada;
 
 -- Last season's points per player and pj, the games the page gives: the
 -- one count of matches played that is not appearances, for no line-ups of
--- last season are kept. ingest.baseline writes it; an empty table is
--- restored from the archived page, raw/season=<season>.tar.xz. The latest
--- season's is last_season.
-CREATE TABLE IF NOT EXISTS season_points (
-    season TEXT NOT NULL,
-    ff_id  TEXT NOT NULL,
-    points REAL NOT NULL,
-    games  REAL NOT NULL,
-    PRIMARY KEY (season, ff_id)
-);
+-- last season are kept. It is points' own rows of the season before the
+-- latest one as of t, each player's last.
 DROP VIEW IF EXISTS last_season;
 CREATE VIEW last_season AS
-SELECT ff_id, points AS pts, games AS pj FROM season_points
-WHERE season = (SELECT max(season) FROM season_points);
+SELECT p.ff_id, p.points AS pts, p.games AS pj FROM points p
+WHERE p.observed_at <= (SELECT cut())
+  AND p.season = (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut())
+                  AND season < (SELECT max(season) FROM points WHERE observed_at <= (SELECT cut())))
+  AND p.rowid = (SELECT max(rowid) FROM points x WHERE x.season = p.season AND x.ff_id = p.ff_id AND x.observed_at <= (SELECT cut()));
 
 -- What a player's points per match is pulled toward (forecast_ppm): what
 -- his price says, the least-squares line of last season's points per match

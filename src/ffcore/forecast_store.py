@@ -285,7 +285,8 @@ def _selftest_forecast() -> None:
                 ("hurt", "b", "0", "injured", "Lesión Desde 10/09 Baja hasta finales de septiembre"),
                 ("susp", "b", "0", "suspended", ""), ("dbt", "b", "50", "doubt", "x Duda para la jornada 3")]])
             store_sql("api_players_all", [{"observed_at": seen, "player_id": "9", "player_status": "out_of_league"}])
-            record([{"season": "2025-26", "ff_id": "fwd", "points": 150.0, "games": 30.0}], "season_points")
+            store_sql("points", [{"observed_at": seen, "season": "2025-26", "ff_id": "fwd", "points": 150.0, "games": 30.0},
+                                 {"observed_at": seen, "season": "2026-27", "ff_id": "fwd", "points": 0.0, "games": 0.0}])
 
             mu = 2.0
             rating = {c: (a, d) for c, _n, a, d in rows("SELECT club, n, attack, defence FROM club_rating")}

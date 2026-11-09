@@ -52,7 +52,6 @@ def extract(me: str, as_of: str = AS_OF) -> dict[str, Any]:
                           % (",".join("?" * len(stamps)), ",".join("?" * len(ff)), marks), (*stamps, *sorted(ff), *recent))
     out["api_players_all"] = table("api_players_all", "WHERE observed_at <= ? AND player_id IN (%s)" % ",".join("?" * len(app)),
                                    (as_of, *sorted(app)))
-    out["season_points"] = table("season_points")
     for r in out["api_leagues"]["rows"]:
         r[out["api_leagues"]["columns"].index("league_name")] = "league"
     names: dict[str, str] = {}

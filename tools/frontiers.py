@@ -27,15 +27,15 @@ NAMES = {
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
-              "player_jornadas season_record season_points next_lock listing_ends listing_close price_paid market_read",
+              "player_jornadas season_record last_season next_lock listing_ends listing_close price_paid market_read",
     "forecast": "cell cell_pool standin_cell score_spread forecast_used "
-                "late_arrivals ppm_prior last_season fitted horizons market_daily",
+                "late_arrivals ppm_prior fitted horizons market_daily",
     "decision": "bid_odds recent_offers sale_odds waiting nights_left player_facts my_squad my_cash",
     "board": "",
     "grading": "measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
-    "ingest": """player_club player_value player_status player_roster appearances scored season_points season_record
+    "ingest": """player_club player_value player_status player_roster appearances scored season_record last_season
         club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look
         listings listing_close offers offer_ratios price_history price_paid auction_results market_read
         squads owners cash standings league_config""",

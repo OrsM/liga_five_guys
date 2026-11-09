@@ -185,7 +185,6 @@ rather than reaching through them; ruff flags reads of private members.
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      parse caches (what parse fills is rebuilt from raw: the
-                    registry each run, last season from
-                    raw/season=<season>.tar.xz; runs, their decisions,
+                    registry each run; runs, their decisions,
                     forecasts and grades are records, kept)
     reports/        decisions.json, what the phone draws

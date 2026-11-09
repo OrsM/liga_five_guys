@@ -163,7 +163,7 @@ def _selftest_price_at_t(by: dict[str, list[float]]) -> None:
 
 
 def _selftest_prior() -> None:
-    """schema.sql's last_season and ppm_prior on season_points, player_club
+    """schema.sql's last_season and ppm_prior on points, player_club
     and player_value as tables: in his position, the least-squares line of
     last season's points per match (10+ matches) on log value, at his value;
     a position with fewer than three, its mean; no position, everyone's
@@ -174,14 +174,15 @@ def _selftest_prior() -> None:
 
     db = sqlite3.connect(":memory:")
     functions(db)
-    db.execute("CREATE TABLE season_points (season, ff_id, points, games)")
+    db.execute("CREATE TABLE points (observed_at, season, ff_id, points, games)")
     db.execute("CREATE TABLE player_club (player, pos)")
     db.execute("CREATE TABLE player_value (player, value)")
-    db.executemany("INSERT INTO season_points VALUES (?, ?, ?, ?)", [
+    db.executemany("INSERT INTO points VALUES ('2026-01-01T0000Z', ?, ?, ?, ?)", [
         ("2024-25", "a", 999.0, 30.0),                        # an older season: not read
         ("2025-26", "a", 60.0, 30.0), ("2025-26", "b", 90.0, 30.0),
         ("2025-26", "c", 150.0, 30.0), ("2025-26", "d", 210.0, 30.0),
-        ("2025-26", "e", 300.0, 9.0), ("2025-26", "f", 40.0, 10.0)])
+        ("2025-26", "e", 300.0, 9.0), ("2025-26", "f", 40.0, 10.0),
+        ("2026-27", "a", 5.0, 1.0)])                          # the season under way: not last season
     market = [("a", "DEF", 1e6), ("b", "DEF", 2e6), ("c", "DEF", 50e6), ("d", "DEF", 60e6),
               ("e", "DEF", 70e6), ("f", "POR", 3e6), ("x", "", 5e6), ("z", "DEF", None)]
     db.executemany("INSERT INTO player_club VALUES (?, ?)", [(k, p) for k, p, _v in market])
