@@ -85,7 +85,8 @@ def _columns(db: sqlite3.Connection, name: str) -> list[str]:
 def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
     """Add rows to a table tables.sql declares: numbers typed, text stripped
     (so no reader trims). A keyed table's trigger skips a row its key's last
-    already says; a column the table does not declare is reported, not kept."""
+    already says, and a row its unique key already holds is skipped; a column
+    the table does not declare is reported, not kept."""
     nums = dict(NUMBERS.get(name, ()))
     fresh = typed(name, [{k: v.strip() if isinstance(v, str) else v for k, v in r.items()}
                          for r in rows])
@@ -97,7 +98,7 @@ def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
         if extra:
             print("  warn: %s: columns not in tables.sql, not kept: %s" % (name, ", ".join(extra)))
         db.executemany(
-            "INSERT INTO %s (%s) VALUES (%s)" % (name, ", ".join(cols), ", ".join("?" * len(cols))),
+            "INSERT OR IGNORE INTO %s (%s) VALUES (%s)" % (name, ", ".join(cols), ", ".join("?" * len(cols))),
             [[r.get(c) if c in nums else (r.get(c) or "") for c in cols] for r in fresh])
 
 
@@ -221,6 +222,11 @@ def _selftest_tables() -> None:
             assert rows("SELECT activity_id, kind FROM api_activity ORDER BY rowid") == [
                 ("1", "0"), ("1", "1"), ("2", "5"), ("9", "2"), ("9", "3"), ("9", "2")], \
                 "a keyed row is kept once, and again only when it changes (back included)"
+            store_sql("market", [{"observed_at": b, "ff_id": "x", "value": "5"}] * 2
+                      + [{"observed_at": b, "ff_id": "y", "value": "5"}])
+            store_sql("market", [{"observed_at": b, "ff_id": "x", "value": "6"}])
+            assert rows("SELECT ff_id, value FROM market ORDER BY rowid") == [("x", 5.0), ("y", 5.0)], \
+                "a snapshot holds a key once: the same (source, observed_at, ff_id) again is skipped, a stored fetch is not stored twice"
         finally:
             set_now(None)
 

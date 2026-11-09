@@ -11,6 +11,7 @@
 
 
 -- market: futbolfantasy's market page: every player's value, a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, ff_id)
 CREATE TABLE IF NOT EXISTS market (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS market (
     club TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS market_at ON market (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS market_unique ON market (source, observed_at, ff_id);
 DROP VIEW IF EXISTS history_market;
 DROP VIEW IF EXISTS current_market;
 CREATE VIEW current_market AS
@@ -32,6 +34,7 @@ WHERE /* latest market */
 ORDER BY t.rowid;
 
 -- lineups: probable line-ups and injury notes (futbolfantasy, analitica), a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, player_slug, player_name, team_slug)
 CREATE TABLE IF NOT EXISTS lineups (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -44,6 +47,7 @@ CREATE TABLE IF NOT EXISTS lineups (
     note TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS lineups_at ON lineups (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS lineups_unique ON lineups (source, observed_at, player_slug, player_name, team_slug);
 -- Who each row is (ff_identity's distinct rows) and each club's listings in order.
 CREATE INDEX IF NOT EXISTS lineups_who ON lineups (player_slug, player_name, team_slug);
 CREATE INDEX IF NOT EXISTS lineups_club ON lineups (team_slug, observed_at);
@@ -60,6 +64,7 @@ WHERE /* latest lineups */
 ORDER BY t.rowid;
 
 -- matches: fixtures and results, a row a match.
+-- grain: per match, a row again when it changes; key (match_id, observed_at)
 CREATE TABLE IF NOT EXISTS matches (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -72,6 +77,7 @@ CREATE TABLE IF NOT EXISTS matches (
     kickoff TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS matches_at ON matches (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS matches_unique ON matches (match_id, observed_at);
 CREATE INDEX IF NOT EXISTS matches_key ON matches (match_id);
 CREATE TRIGGER IF NOT EXISTS matches_unchanged BEFORE INSERT ON matches
 WHEN EXISTS (SELECT 1 FROM matches o WHERE o.rowid = (SELECT max(rowid) FROM matches WHERE match_id IS NEW.match_id)
@@ -93,6 +99,7 @@ WHERE t.match_id <> ''
   AND t.rowid = (SELECT max(rowid) FROM matches x WHERE x.match_id = t.match_id AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;
 
 -- points: each player's season points total, a row a season and player.
+-- grain: per season and player, a row again when it changes; key (season, ff_id, observed_at)
 CREATE TABLE IF NOT EXISTS points (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -106,6 +113,7 @@ CREATE TABLE IF NOT EXISTS points (
     season TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS points_at ON points (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS points_unique ON points (season, ff_id, observed_at);
 CREATE INDEX IF NOT EXISTS points_key ON points (season, ff_id);
 CREATE TRIGGER IF NOT EXISTS points_unchanged BEFORE INSERT ON points
 WHEN EXISTS (SELECT 1 FROM points o WHERE o.rowid = (SELECT max(rowid) FROM points WHERE season IS NEW.season AND ff_id IS NEW.ff_id)
@@ -122,6 +130,7 @@ BEGIN SELECT RAISE(IGNORE); END;
 DROP VIEW IF EXISTS history_points;
 
 -- api_teams: the app's squads: who owns whom, values and clauses, a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, team_id, player_id)
 CREATE TABLE IF NOT EXISTS api_teams (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -137,6 +146,7 @@ CREATE TABLE IF NOT EXISTS api_teams (
     player_team_id TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_teams_at ON api_teams (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_teams_unique ON api_teams (source, observed_at, team_id, player_id);
 DROP VIEW IF EXISTS history_api_teams;
 CREATE VIEW history_api_teams AS
 SELECT t.observed_at, t.source, t.market_value, t.buyout, t.points, t.player_id, t.team_id, t.manager, t.player_name, t.player_name_full, t.player_status, t.player_team_id, a.player
@@ -150,6 +160,7 @@ WHERE /* latest api_teams */
 ORDER BY t.rowid;
 
 -- api_standings: the app's standings: points, value, cash, a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, team_id)
 CREATE TABLE IF NOT EXISTS api_standings (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -163,6 +174,7 @@ CREATE TABLE IF NOT EXISTS api_standings (
     manager TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_standings_at ON api_standings (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_standings_unique ON api_standings (source, observed_at, team_id);
 DROP VIEW IF EXISTS current_api_standings;
 CREATE VIEW current_api_standings AS
 SELECT t.observed_at, t.source, t.position, t.team_points, t.fixture_points, t.team_value, t.team_money, t.team_id, t.user_id, t.manager
@@ -171,6 +183,7 @@ WHERE /* latest api_standings */
 ORDER BY t.rowid;
 
 -- api_market: the app's market listings and your bids, a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, market_id, bid_id)
 CREATE TABLE IF NOT EXISTS api_market (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -190,6 +203,7 @@ CREATE TABLE IF NOT EXISTS api_market (
     bid_status TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_market_at ON api_market (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_market_unique ON api_market (source, observed_at, market_id, bid_id);
 DROP VIEW IF EXISTS current_api_market;
 CREATE VIEW current_api_market AS
 SELECT t.observed_at, t.source, t.market_value, t.sale_price, t.bid_money, t.bids, t.player_id, t.market_id, t.player_name, t.player_name_full, t.seller, t.status, t.player_status, t.expires_at, t.bid_id, t.bid_status, a.player
@@ -198,6 +212,7 @@ WHERE /* latest api_market */
 ORDER BY t.rowid;
 
 -- api_offers: the game's nightly offers for your listed players, a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, player_team_id, offer_id)
 CREATE TABLE IF NOT EXISTS api_offers (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -210,6 +225,7 @@ CREATE TABLE IF NOT EXISTS api_offers (
     from_market TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_offers_at ON api_offers (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_offers_unique ON api_offers (source, observed_at, player_team_id, offer_id);
 DROP VIEW IF EXISTS current_api_offers;
 CREATE VIEW current_api_offers AS
 SELECT t.observed_at, t.source, t.money, t.player_team_id, t.offer_id, t.status, t.created_at, t.expires_at, t.from_market
@@ -218,6 +234,7 @@ WHERE /* latest api_offers */
 ORDER BY t.rowid;
 
 -- api_lineup: your line-up as the app has it, a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, player_id)
 CREATE TABLE IF NOT EXISTS api_lineup (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -230,9 +247,11 @@ CREATE TABLE IF NOT EXISTS api_lineup (
     player_name_full TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_lineup_at ON api_lineup (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_lineup_unique ON api_lineup (source, observed_at, player_id);
 DROP VIEW IF EXISTS current_api_lineup;
 
 -- api_leagues: the leagues you are in, a snapshot each fetch.
+-- grain: snapshot; key (source, observed_at, league_id)
 CREATE TABLE IF NOT EXISTS api_leagues (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -245,8 +264,10 @@ CREATE TABLE IF NOT EXISTS api_leagues (
     team_id TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_leagues_at ON api_leagues (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_leagues_unique ON api_leagues (source, observed_at, league_id);
 
 -- api_players_all: every player the app lists, a row a player.
+-- grain: per player, a row again when it changes; key (player_id, observed_at)
 CREATE TABLE IF NOT EXISTS api_players_all (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -258,6 +279,7 @@ CREATE TABLE IF NOT EXISTS api_players_all (
     player_status TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_players_all_at ON api_players_all (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_players_all_unique ON api_players_all (player_id, observed_at);
 CREATE INDEX IF NOT EXISTS api_players_all_key ON api_players_all (player_id);
 CREATE TRIGGER IF NOT EXISTS api_players_all_unchanged BEFORE INSERT ON api_players_all
 WHEN EXISTS (SELECT 1 FROM api_players_all o WHERE o.rowid = (SELECT max(rowid) FROM api_players_all WHERE player_id IS NEW.player_id)
@@ -277,6 +299,7 @@ WHERE t.player_id <> ''
   AND t.rowid = (SELECT max(rowid) FROM api_players_all x WHERE x.player_id = t.player_id AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;
 
 -- results_history: past seasons' results with xG (football-data), a row a match.
+-- grain: per match, a row again when it changes; key (season, date, home_name, away_name, observed_at)
 CREATE TABLE IF NOT EXISTS results_history (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -290,6 +313,7 @@ CREATE TABLE IF NOT EXISTS results_history (
     away TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS results_history_at ON results_history (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS results_history_unique ON results_history (season, date, home_name, away_name, observed_at);
 CREATE INDEX IF NOT EXISTS results_history_key ON results_history (season, date, home_name, away_name);
 CREATE TRIGGER IF NOT EXISTS results_history_unchanged BEFORE INSERT ON results_history
 WHEN EXISTS (SELECT 1 FROM results_history o WHERE o.rowid = (SELECT max(rowid) FROM results_history WHERE season IS NEW.season AND date IS NEW.date AND home_name IS NEW.home_name AND away_name IS NEW.away_name)
@@ -311,6 +335,7 @@ WHERE t.season <> '' AND t.date <> '' AND t.home_name <> '' AND t.away_name <> '
   AND t.rowid = (SELECT max(rowid) FROM results_history x WHERE x.season = t.season AND x.date = t.date AND x.home_name = t.home_name AND x.away_name = t.away_name AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;
 
 -- starters: who started or came on, a row a match, team and player.
+-- grain: per match, team and player, a row again when it changes; key (match_id, team_slug, player_slug, observed_at)
 CREATE TABLE IF NOT EXISTS starters (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -322,6 +347,7 @@ CREATE TABLE IF NOT EXISTS starters (
     role TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS starters_at ON starters (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS starters_unique ON starters (match_id, team_slug, player_slug, observed_at);
 CREATE INDEX IF NOT EXISTS starters_key ON starters (match_id, team_slug, player_slug);
 CREATE TRIGGER IF NOT EXISTS starters_unchanged BEFORE INSERT ON starters
 WHEN EXISTS (SELECT 1 FROM starters o WHERE o.rowid = (SELECT max(rowid) FROM starters WHERE match_id IS NEW.match_id AND team_slug IS NEW.team_slug AND player_slug IS NEW.player_slug)
@@ -341,6 +367,7 @@ WHERE t.match_id <> '' AND t.team_slug <> '' AND t.player_slug <> ''
   AND t.rowid = (SELECT max(rowid) FROM starters x WHERE x.match_id = t.match_id AND x.team_slug = t.team_slug AND x.player_slug = t.player_slug AND x.observed_at <= (SELECT cut())) ORDER BY t.rowid;
 
 -- api_activity: the league's activity feed, a row an event.
+-- grain: per event, a row again when it changes; key (activity_id, observed_at)
 CREATE TABLE IF NOT EXISTS api_activity (
     observed_at TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
@@ -353,6 +380,7 @@ CREATE TABLE IF NOT EXISTS api_activity (
     counterparty TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS api_activity_at ON api_activity (source, observed_at);
+CREATE UNIQUE INDEX IF NOT EXISTS api_activity_unique ON api_activity (activity_id, observed_at);
 CREATE INDEX IF NOT EXISTS api_activity_key ON api_activity (activity_id);
 CREATE TRIGGER IF NOT EXISTS api_activity_unchanged BEFORE INSERT ON api_activity
 WHEN EXISTS (SELECT 1 FROM api_activity o WHERE o.rowid = (SELECT max(rowid) FROM api_activity WHERE activity_id IS NEW.activity_id)

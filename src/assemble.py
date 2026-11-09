@@ -370,12 +370,12 @@ def _selftest_facts() -> None:
                                   ("p7", "Fa Siete", "defensa", "590000")]])
             store_sql("lineups", [{"observed_at": a, "source": "futbolfantasy", "team_slug": "c",
                                    "player_slug": "cai", "player_name": "Cai Cuatro"}])
-            store_sql("api_standings", [{"observed_at": a, "user_id": u, "manager": m}
+            store_sql("api_standings", [{"observed_at": a, "team_id": "t" + u, "user_id": u, "manager": m}
                                         for u, m in (("1", "me"), ("2", "riv"))])
             store_sql("api_teams", [{"observed_at": a, "player_id": app, "manager": m,
                                      "buyout": b, "player_team_id": pt} for app, m, b, pt in
                                     [("1", "me", "9000000", "t1"), ("3", "riv", "", "t3")]])
-            store_sql("api_market", [{"observed_at": a, "player_id": app, "sale_price": price,
+            store_sql("api_market", [{"observed_at": a, "player_id": app, "market_id": "m" + app, "sale_price": price,
                                       "seller": seller, "bid_status": st, "bid_money": bid,
                                       "market_value": mv}
                                      for app, price, seller, st, bid, mv in
@@ -462,12 +462,12 @@ def _selftest_market() -> None:
 
         close, a = "2026-09-02T22:24:00+02:00", "2026-09-02T1000Z"
         store_sql("api_market", [
-            {"observed_at": a, "seller": "marketPlayerLeague", "player_id": "7",
+            {"observed_at": a, "seller": "marketPlayerLeague", "player_id": "7", "market_id": "m7",
              "expires_at": close, "sale_price": "10000000"},
-            {"observed_at": a, "seller": "marketPlayerTeam", "player_id": "8",
+            {"observed_at": a, "seller": "marketPlayerTeam", "player_id": "8", "market_id": "m8",
              "expires_at": close, "sale_price": "10000000"}])
-        store_sql("api_standings", [{"observed_at": a, "user_id": "1", "manager": "me"},
-                                    {"observed_at": a, "user_id": "2", "manager": "riv"}])
+        store_sql("api_standings", [{"observed_at": a, "team_id": "t1", "user_id": "1", "manager": "me"},
+                                    {"observed_at": a, "team_id": "t2", "user_id": "2", "manager": "riv"}])
         store_sql("api_activity", [
             {"observed_at": "2026-09-02T2100Z", "activity_id": i, "kind": "buy", "user_id": u, "player_id": p,
              "at": at, "amount": amt, "counterparty": ""}
@@ -558,8 +558,8 @@ def _selftest_market() -> None:
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), set_constants(BID_NEIGHBOURS=3):
             at = "2026-09-0%dT1000Z"
             listed = [(str(i), "2026-09-02T22:%02d:00+02:00" % i, str(i)) for i in range(len(past))]
-            store_sql("api_standings", [{"observed_at": at % 1, "user_id": "1", "manager": "me"},
-                                        {"observed_at": at % 1, "user_id": "2", "manager": "riv"}])
+            store_sql("api_standings", [{"observed_at": at % 1, "team_id": "t1", "user_id": "1", "manager": "me"},
+                                        {"observed_at": at % 1, "team_id": "t2", "user_id": "2", "manager": "riv"}])
             # each listed player changed t% a day for three days before his close (08-30 .. 09-02): trend t
             # (momentum fits slope 1); the player listed now rises 5% a day to 09-05
             store_sql("market", [{"observed_at": "2026-%s-%02dT1000Z" % (("08", 30 + n) if n < 2 else ("09", n - 1)),
@@ -567,9 +567,9 @@ def _selftest_market() -> None:
                                  for (i, _c, _), (t, _w, _m) in zip(listed, past) for n in range(4)]
                       + [{"observed_at": "2026-%s-%02dT1000Z" % (("08", 30 + n) if n < 2 else ("09", n - 1)),
                           "ff_id": "p99", "value": str(100 * 1.05 ** n)} for n in range(7)])
-            store_sql("api_market", [{"observed_at": at % 1, "seller": "marketPlayerLeague", "player_id": i,
+            store_sql("api_market", [{"observed_at": at % 1, "seller": "marketPlayerLeague", "player_id": i, "market_id": "m" + i,
                                       "expires_at": close, "sale_price": "100"} for i, close, _ in listed])
-            store_sql("api_market", [{"observed_at": at % 5, "seller": "marketPlayerLeague", "player_id": "99",
+            store_sql("api_market", [{"observed_at": at % 5, "seller": "marketPlayerLeague", "player_id": "99", "market_id": "m99",
                                       "expires_at": "2026-09-05T22:24:00+02:00", "sale_price": "100"}])
             store_sql("api_activity", [
                 {"observed_at": at % 3, "activity_id": i, "kind": "buy", "user_id": "1" if mine else "2",
