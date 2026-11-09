@@ -178,6 +178,13 @@ def checks() -> list[Check]:
         ("context", "tables", "team value about 464M", lambda s: 460e6 < s["money"][1] < 470e6, lambda s: s["money"][1]),
         ("context", "tables", "22 players and 17 standing offers", lambda s: (s["squad"], s["offers"]) == (22, 17), lambda s: (s["squad"], s["offers"])),
         ("context", "board", "bid limit about 43.4M", lambda s: 43e6 < s["board"]["can_bid"] < 44e6, lambda s: s["board"]["can_bid"]),
+        ("context", "lineup", "the app's eleven is read: 11 fielded players all matched, or the board says why there is none",
+         lambda s: (len(s["board"]["lineup"]["eleven"]) == 11 and s["board"]["lineup"]["unmapped"] == [])
+         if s["board"]["lineup"]["eleven"] is not None else bool(s["board"]["lineup"]["message"]),
+         lambda s: (s["board"]["lineup"]["eleven"], s["board"]["lineup"]["message"], s["board"]["lineup"]["unmapped"])),
+        ("context", "lineup", "the advice is swaps of a bench player for a fielded one, each worth points",
+         lambda s: all(a["gain"] > 0 and a["in"] != a["out"] for a in s["board"]["lineup"]["advice"]),
+         lambda s: s["board"]["lineup"]["advice"]),
         ("raphinha", "tables", "price 150-200M, 8+ games at 12+ a game",
          lambda s: 150e6 < c(s, "raphinha")["value"] < 200e6 and c(s, "raphinha")["points"][0] >= 8
          and c(s, "raphinha")["points"][1] / c(s, "raphinha")["points"][0] >= 12, lambda s: (c(s, "raphinha")["value"], c(s, "raphinha")["points"])),

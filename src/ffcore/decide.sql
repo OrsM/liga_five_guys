@@ -67,6 +67,13 @@ CREATE TABLE dec_lock (
     jornada INTEGER PRIMARY KEY,
     lock    TEXT NOT NULL
 );
+DROP TABLE IF EXISTS dec_lineup;
+CREATE TABLE dec_lineup (
+    app_id TEXT PRIMARY KEY,
+    player TEXT,
+    slot   TEXT NOT NULL,
+    name   TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS dec_money (
     cash       REAL NOT NULL,
     team_value REAL NOT NULL,
@@ -116,6 +123,11 @@ GROUP BY t.player;
 DROP VIEW IF EXISTS dec_bid_seen;
 CREATE VIEW dec_bid_seen AS
 SELECT s.player, s.my_bid AS amount FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant WHERE s.my_bid > 0;
+
+-- The eleven the app has fielded for you, as seen (app_lineup).
+DROP VIEW IF EXISTS dec_lineup_seen;
+CREATE VIEW dec_lineup_seen AS
+SELECT app_id, player, slot, name FROM app_lineup;
 
 -- Your cash, squad value (seen), the game's debt share and squad cap, the
 -- eleven's size.
