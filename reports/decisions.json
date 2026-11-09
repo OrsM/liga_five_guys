@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-09T20:45Z",
- "market_at": "2026-11-09T20:45Z",
+ "generated_at": "2026-11-09T20:48Z",
+ "market_at": "2026-11-09T20:48Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-09T20:45Z",
+   "at": "2026-11-09T20:48Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,38 +56,7 @@
  "cash_locked": 172070914.0,
  "can_bid": 13283837.599999994,
  "ping": "",
- "do": [
-  {
-   "name": "Iñigo Vicente",
-   "pos": "",
-   "what": "list",
-   "label": "list Iñigo Vicente",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "24338723",
-     "player": "3002",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 23017260.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
