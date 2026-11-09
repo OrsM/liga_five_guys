@@ -68,6 +68,9 @@ DROP TABLE IF EXISTS decision_waiting;
 DROP TABLE IF EXISTS grade_decisions;
 DROP TABLE IF EXISTS sim_calibration;
 DROP TABLE IF EXISTS sim_runs;
+DROP TABLE IF EXISTS seen_odds;
+DROP TABLE IF EXISTS dec_odds;
+DROP VIEW IF EXISTS bid_odds;
 
 -- data/lfg.db, applied on every connect (ffcore/db.py). Only adds: a
 -- changed table is dropped by hand and rebuilt (docs/notes/lfg.md).
@@ -128,7 +131,7 @@ CREATE TABLE IF NOT EXISTS params (
 
 -- The market and the league as a universe was built on them, a cut's and
 -- a variant's: player_facts with what a sale of each gets (sale_odds), and
--- each buy's bids and their chance (bid_odds). Written by assemble.see,
+-- the clearing-price forecast of each listing (auction). Written by assemble.see,
 -- read by the decision (decide.sql) and a run's facts.
 CREATE TABLE IF NOT EXISTS seen (
     cut     TEXT NOT NULL,
@@ -158,13 +161,53 @@ CREATE TABLE IF NOT EXISTS seen_cash (
     cash    REAL NOT NULL,
     PRIMARY KEY (cut, variant, manager)
 ) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS seen_odds (
+-- The clearing-price forecast of each open game-market listing at a cut (ffcore/auction.py), with the
+-- inputs it was made from (the look: minutes to the close, rival bids seen, whether one is yours, the
+-- trend) and how well founded it is (the cell it read, its listings, thin): auction_curve is the chance
+-- a bid of ratio x the ask wins.
+CREATE TABLE IF NOT EXISTS seen_auction (
+    cut     TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    player  TEXT NOT NULL,
+    ask     REAL NOT NULL,
+    close   TEXT NOT NULL,
+    mins    REAL NOT NULL,
+    bids    INTEGER NOT NULL,
+    rival   INTEGER NOT NULL,
+    mine    INTEGER NOT NULL,
+    trend   REAL,
+    cell    TEXT NOT NULL,
+    n       INTEGER NOT NULL,
+    thin    INTEGER NOT NULL,
+    PRIMARY KEY (cut, variant, player)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS seen_curve (
     cut     TEXT NOT NULL,
     variant TEXT NOT NULL,
     player  TEXT NOT NULL,
     ratio   REAL NOT NULL,
-    p_win   REAL NOT NULL,
+    p       REAL NOT NULL,
     PRIMARY KEY (cut, variant, player, ratio)
+) WITHOUT ROWID;
+-- How the forecast did, each run: calibration of the stated chance against what happened (by scope and bin of the
+-- stated chance; drift flags a gap the counts cannot explain) and the Brier score against the pooled distribution.
+CREATE TABLE IF NOT EXISTS auction_calibration (
+    run_id   INTEGER NOT NULL,
+    scope    TEXT NOT NULL,
+    bin      TEXT NOT NULL,
+    n        INTEGER NOT NULL,
+    stated   REAL NOT NULL,
+    observed REAL NOT NULL,
+    drift    INTEGER NOT NULL,
+    PRIMARY KEY (run_id, scope, bin)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS auction_brier (
+    run_id INTEGER NOT NULL,
+    scope  TEXT NOT NULL,
+    n      INTEGER NOT NULL,
+    model  REAL NOT NULL,
+    pooled REAL NOT NULL,
+    PRIMARY KEY (run_id, scope)
 ) WITHOUT ROWID;
 
 -- What the model looks at, as t: the cut, the variant's constants, the
@@ -648,7 +691,6 @@ DROP VIEW IF EXISTS k;
 CREATE VIEW k AS SELECT
     const('CLIP') AS clip,
     const('PRICE_WINDOW') AS price_window,
-    const('BID_NEIGHBOURS') AS bid_neighbours,
     const('PRICE_W0') AS price_w0,
     const('PRICE_W1') AS price_w1,
     const('PRICE_W2') AS price_w2,
@@ -880,8 +922,8 @@ FROM scoped GROUP BY scope, h;
 -- to reach, over asking: the winner's bid; asking where nobody bought or
 -- the winner was you (the bids you beat are not seen); NULL for a
 -- manager's listing (no one's deal with him is seen). The one auction
--- outcome: what bids win now (bid_odds) and a path's bids (my_bids) both
--- read it, and no bar before its close. Cut-bound: only what was observed
+-- outcome: the clearing-price forecast (auction_looks) reads it, and no
+-- bar before its close. Cut-bound: only what was observed
 -- by t counts, and an outcome appears once the activity feed has been seen
 -- ten minutes past the close (the window its buy is looked for in), so a
 -- past t never sees a result the feed told of later.
@@ -915,35 +957,23 @@ FROM won w WHERE strftime('%Y-%m-%dT%H%MZ', w.at) <= (SELECT cut())
   AND stamp_jd((SELECT max(observed_at) FROM src_api_activity WHERE observed_at <= (SELECT cut())))
       >= w.close + 600.0 / 86400;
 
--- What a bid wins on the game's market now, for each player listed there:
--- his BID_NEIGHBOURS past listings closest to him in price trend (the
--- trend each had on the last day with a change up to its close; before
--- t, none you won: what you beat is not seen), and for each bid over
--- asking that reached one of their bars (and asking itself) the share it
--- would have won (p_win; 1 with no past to go on).
-DROP VIEW IF EXISTS bid_odds;
-CREATE VIEW bid_odds AS
-WITH hist AS MATERIALIZED (SELECT ff_id, day, trend FROM price_trend_daily),
-days AS MATERIALIZED (SELECT DISTINCT day FROM hist),
-closed AS MATERIALIZED (
-    SELECT player, bar, by_me, (SELECT max(day) FROM days WHERE day <= substr(closed, 1, 10)) AS day
-    FROM auction_results),
-past AS MATERIALIZED (
-    SELECT h.trend, c.bar FROM closed c JOIN hist h ON h.ff_id = c.player AND h.day = c.day
-    WHERE c.bar IS NOT NULL AND NOT coalesce(c.by_me, 0)),
-now AS (SELECT DISTINCT s.player, coalesce(t.trend, 0.0) AS trend
-        FROM listings s LEFT JOIN price_trend t ON t.ff_id = s.player
-        WHERE s.seller = 'marketPlayerLeague' AND s.player IS NOT NULL AND s.sale_price <> 0),
-near AS MATERIALIZED (
-    SELECT player, bar FROM (
-        SELECT n.player, p.bar,
-               row_number() OVER (PARTITION BY n.player ORDER BY abs(p.trend - n.trend), p.bar) AS r
-        FROM now n, past p)
-    WHERE r <= (SELECT CAST(bid_neighbours AS INTEGER) FROM k)),
-levels AS (SELECT player, max(bar, 1.0) AS ratio FROM near UNION SELECT player, 1.0 FROM now)
-SELECT l.player, l.ratio,
-       coalesce((SELECT avg(n.bar <= l.ratio) FROM near n WHERE n.player = l.player), 1.0) AS p_win
-FROM levels l;
+-- Every look at a game-market listing (the game's, not a manager's), with what was visible then and
+-- how it ended: the examples the clearing-price forecast (ffcore/auction.py) is made of. mins: minutes
+-- before the close; rival: the bids seen less ours (the game's count includes your own bid). won / by_me:
+-- the auction's outcome (auction_results; NULL won: nobody bought), is_open: the close is still to come
+-- at t. A closed listing whose outcome is not yet seen is left out.
+DROP VIEW IF EXISTS auction_looks;
+CREATE VIEW auction_looks AS
+SELECT a.player, m.expires_at AS close, m.observed_at AS look,
+       (julianday(m.expires_at) - stamp_jd(m.observed_at)) * 1440.0 AS mins,
+       m.sale_price AS ask, coalesce(m.bids, 0) AS bids, m.bid_id <> '' AS mine,
+       coalesce(m.bids, 0) - (m.bid_id <> '') AS rival, m.bid_money AS my_bid,
+       r.won, r.by_me, r.player IS NULL AS is_open
+FROM src_api_market m JOIN app_player a ON a.app_id = m.player_id
+LEFT JOIN auction_results r ON r.player = a.player AND r.close = m.expires_at AND r.seller = 'marketPlayerLeague'
+WHERE m.seller = 'marketPlayerLeague' AND coalesce(m.sale_price, 0) > 0 AND coalesce(m.expires_at, '') <> ''
+  AND m.observed_at <= (SELECT cut())
+  AND (r.player IS NOT NULL OR julianday(m.expires_at) > stamp_jd((SELECT cut())));
 
 -- The game's nightly offers for listed players, each once (its first
 -- sighting), over the player's value when it was made; by when made.

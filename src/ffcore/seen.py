@@ -5,27 +5,28 @@ from __future__ import annotations
 from contextlib import closing
 from pathlib import Path
 
+from ffcore import auction
 from ffcore.db import connect, cut
 
 __all__ = ["see"]
 
 
 def see(key: str) -> str:
-    """The market and the league as of t into seen, seen_cash and seen_odds (views player_facts,
-    sale_odds, cash, bid_odds): what a decision at t reads. Made once a cut, variant and key (the
+    """The market and the league as of t into seen, seen_cash and seen_auction / seen_curve (views player_facts,
+    sale_odds, cash, auction_looks): what a decision at t reads. Made once a cut, variant and key (the
     caller's stamp of the SQL and constants it was made with). The cut."""
     with closing(connect()) as db, db:
         c = cut()
         if db.execute("SELECT 1 FROM seen WHERE cut = ? AND variant = variant() AND code = ? LIMIT 1",
                       (c, key)).fetchone():
             return c
-        for t in ("seen", "seen_cash", "seen_odds"):
+        for t in ("seen", "seen_cash", "seen_auction", "seen_curve"):
             db.execute("DELETE FROM %s WHERE cut = ? AND variant = variant()" % t, (c, ))
         db.execute("INSERT INTO seen SELECT ?, variant(), f.player, f.name, f.pos, f.owner, f.value, f.trend, f.paid,"
                    " f.offer, f.clause, f.price, f.route, f.my_bid, s.fetches, ?"
                    " FROM player_facts f LEFT JOIN sale_odds s USING (player)", (c, key))
         db.execute("INSERT INTO seen_cash SELECT ?, variant(), manager, cash FROM cash", (c, ))
-        db.execute("INSERT INTO seen_odds SELECT ?, variant(), player, ratio, p_win FROM bid_odds", (c, ))
+        auction.write(db, c)
     return c
 
 

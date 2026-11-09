@@ -18,7 +18,7 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
     writes it: seen (a row a player, PLAYER_COLUMNS; name defaults to his
     key, your squad is those he owns by `me`), your cash (seen_cash),
     forecast_cell at moment 0 (cells: jornada -> player -> (points if he
-    plays, chance he plays)), bid odds (player -> ((ratio, p_win), ...)),
+    plays, chance he plays)), clearing-price curves (player -> ((ratio, p), ...)),
     and look on them."""
     from contextlib import closing
 
@@ -28,12 +28,12 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
 
     set_look(moment=0, me=me)
     with closing(connect()) as db, db:
-        for t in ("seen", "seen_cash", "seen_odds"):
+        for t in ("seen", "seen_cash", "seen_auction", "seen_curve"):
             db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)
         db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
                        [(k, p.get("name", k), *(p.get(c) for c in PLAYER_COLUMNS[1:])) for k, p in sorted(players.items())])
         db.execute("INSERT INTO seen_cash VALUES ((SELECT cut()), variant(), ?, ?)", (me, cash))
-        db.executemany("INSERT INTO seen_odds VALUES ((SELECT cut()), variant(), ?, ?, ?)",
+        db.executemany("INSERT INTO seen_curve VALUES ((SELECT cut()), variant(), ?, ?, ?)",
                        [(k, r, p) for k, o in (odds or {}).items() for r, p in o])
         seed_cells(db, 0, [(k, j, pts, p) for j, per in cells.items() for k, (pts, p) in per.items()])
         # the ingest facts under them, as the app and the market page give them: a position, a squad

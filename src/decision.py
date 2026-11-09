@@ -7,16 +7,17 @@ from typing import Any, NamedTuple
 
 import eleven
 from ffcore.db import connect, record
-from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, bid_to_use, in_force, win_cap
+from ffcore.auction import Curve, bid_for
+from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
-__all__ = ["inputs", "read_inputs", "Lineup", "lineup_of", "cells_of", "window_value", "win_at", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
+__all__ = ["inputs", "read_inputs", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
 
-INPUTS = ("dec_state", "dec_player", "dec_odds", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_lineup")
+INPUTS = ("dec_state", "dec_player", "dec_curve", "dec_auction", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_offer", "dec_lineup")
 
 
 def inputs() -> None:
     """What the decision looks at, the league at t (look: the market seen, the forecast, your squad and cash then),
-    made once a decision (decide.sql dec_player_seen, dec_odds_seen, dec_money_seen, dec_bid_seen)."""
+    made once a decision (decide.sql dec_player_seen, dec_curve_seen, dec_money_seen, dec_bid_seen)."""
     with closing(connect()) as db, db:
         for t in INPUTS:
             db.execute("DELETE FROM %s" % t)
@@ -78,18 +79,17 @@ def window_value(pos: dict[str, str], cells: dict[int, dict[str, float]], where:
     return {k: sum(cells[j].get(k, 0.0) for j in where) for k in pos}
 
 
-def win_at(asking: float, odds: list[tuple[float, float]], amount: float) -> float:
-    below = [(r, w) for r, w in sorted(odds) if asking * r <= amount + 1e-6]
-    got = below[-1][1] if below else (min(odds)[1] if odds else 1.0)
-    return win_cap(asking, amount / asking, got)
+def curves_of(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, Curve]:
+    out: dict[str, list[tuple[float, float]]] = {}
+    for k, r, p in sorted(inp["dec_curve"]):
+        out.setdefault(k, []).append((r, p))
+    return {k: tuple(v) for k, v in out.items()}
 
 
 def opportunity_rows(inp: dict[str, list[tuple[Any, ...]]]) -> list[dict[str, Any]]:
     pos, cells = cells_of(inp)
     mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
-    odds: dict[str, list[tuple[float, float]]] = {}
-    for k, r, w in sorted(inp["dec_odds"]):
-        odds.setdefault(k, []).append((r, w))
+    curves = curves_of(inp)
     locks, closes, placed = dict(inp["dec_lock"]), dict(inp["dec_close"]), dict(inp["dec_bid"])
     soon = min(locks.values(), default=None)
     ahead: dict[str, dict[int, tuple[float, float]]] = {}
@@ -120,7 +120,8 @@ def opportunity_rows(inp: dict[str, list[tuple[Any, ...]]]) -> list[dict[str, An
         bid: float | None = None
         win: float | None = None
         if status == "market" and asking is not None:
-            bid, win = bid_to_use(asking, odds.get(k, []))
+            ratio, win = bid_for(curves[k], BID_TARGET) if k in curves else (1.0, 1.0)
+            bid = asking * ratio
         out.append({
             "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": min(where),
             "replaces": got.replaces, "gain": got.gain, "per_million": got.gain / (price / 1e6) if price else None,
@@ -157,7 +158,7 @@ def _selftest_opportunities() -> None:
         "dec_universe": [("star", "MED", "market", 8e6, 8e6), ("good", "MED", "market", 5e6, 5e6),
                          ("keeper", "POR", "market", 3e6, 3e6), ("late", "MED", "market", 6e6, 6e6),
                          ("rival", "MED", "rival", None, 9e6), ("free", "MED", "unlisted", None, 1e6)],
-        "dec_odds": [("star", 1.0, 0.25), ("star", 1.25, 1.0), ("star", 1.3, 1.0), ("good", 1.0, 0.5), ("good", 1.2, 0.7)],
+        "dec_curve": [("star", 1.0, 0.25), ("star", 1.25, 1.0), ("star", 1.3, 1.0), ("good", 1.0, 0.5), ("good", 1.2, 0.7)],
         "dec_bid": [("good", 5.5e6)],
         "price": [("star", 1, 10.5e6, 10e6), ("star", 3, 11e6, 10e6)],
         "cell": [(k, j, v) for k, v in e.items() for j in (1, 2)],
@@ -167,7 +168,7 @@ def _selftest_opportunities() -> None:
     assert got["star"]["gain"] == 12.0 and got["star"]["replaces"] == "m4", "star for m4 is 6 a jornada"
     assert (got["star"]["bid"], got["star"]["win"]) == (10e6, 1.0), "the least bid that reaches the target chance"
     assert got["good"]["gain"] == 6.0 and got["good"]["placed"] == 5.5e6, "a bid placed is kept"
-    assert win_at(5e6, [(1.0, 0.5), (1.2, 0.7)], 5.5e6) == 0.5 and win_at(5e6, [(1.0, 0.5), (1.2, 0.7)], 6e6) == 0.7
+    assert (got["good"]["bid"], got["good"]["win"]) == (6e6, 0.7), "none reaches the target: the likeliest"
     assert got["keeper"]["gain"] == -2.0 and got["keeper"]["replaces"] == "k", "a worse keeper would replace the keeper, for less"
     assert got["late"]["gain"] == 7.0 and got["late"]["from_j"] == 2, "an auction closing after jornada 1's lock counts from jornada 2: your eleven is frozen at the lock"
     assert got["rival"]["status"] == "rival" and got["rival"]["bid"] is None and got["rival"]["gain"] == 10.0, "a target is judged without being on sale"
@@ -175,9 +176,6 @@ def _selftest_opportunities() -> None:
     assert abs(got["star"]["price_next"] - 0.05) < 1e-12 and abs(got["star"]["price_lock"] - 0.10) < 1e-12 and got["good"]["price_next"] is None
     assert got["star"]["per_million"] == 12.0 / 8.0, "points a million of his asking price"
     assert [r["player"] for r in opportunity_rows(inp)][0] == "star", "most points first"
-    assert bid_to_use(10.0, [(1.0, 0.5), (1.1, 0.95), (1.2, 0.99)]) == (11.0, 0.95)
-    assert bid_to_use(10.0, [(1.0, 0.5), (1.1, 0.7)]) == (11.0, 0.7), "none reaches the target: the likeliest"
-    assert bid_to_use(10.0, []) == (10.0, 1.0) and bid_to_use(10.0, [(0.9, 1.0)]) == (10.0, 1.0), "never below the asking price"
     short = dict(inp, dec_player=[row for row in inp["dec_player"] if row[0] != "k"])
     assert opportunity_rows(short) == [], "no eleven: no opportunities"
 

@@ -29,7 +29,7 @@ APP_FRESH_HOURS = 14.4
 NAMES: dict[str, tuple[str, ...]] = {
     "assemble": ("APP_FRESH_HOURS", ),
     "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_DECAY", "P_LIFT", "P_LISTING", "SHRINK_K"),
-    "pricing": ("BID_NEIGHBOURS", "CLIP", "PRICE_FOCUS", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
+    "pricing": ("AUCTION_MIN", "CLIP", "PRICE_FOCUS", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "rules": ("DEBT_SHARE", "MATCH_LEN"),
 }
 MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "forecast": model, "pricing": pricing,
@@ -551,54 +551,47 @@ def _selftest_market() -> None:
         assert all(sp is None for (sp,) in rows("SELECT spread FROM price_forecast")), \
             "no spread for a player worth less than the focus"
 
-    def odds(past: list[tuple[float, float | None, bool]]) -> dict[str, tuple[tuple[float, float], ...]]:
-        """bid_odds for a player rising 5% listed now, after these past
-        listings at 100 (trend, the winning bid or None, whether it was
-        yours), BID_NEIGHBOURS of 3."""
-        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), set_constants(BID_NEIGHBOURS=3):
-            at = "2026-09-0%dT1000Z"
-            listed = [(str(i), "2026-09-02T22:%02d:00+02:00" % i, str(i)) for i in range(len(past))]
-            store_sql("api_standings", [{"observed_at": at % 1, "team_id": "t1", "user_id": "1", "manager": "me"},
-                                        {"observed_at": at % 1, "team_id": "t2", "user_id": "2", "manager": "riv"}])
-            # each listed player changed t% a day for three days before his close (08-30 .. 09-02): trend t
-            # (momentum fits slope 1); the player listed now rises 5% a day to 09-05
-            store_sql("market", [{"observed_at": "2026-%s-%02dT1000Z" % (("08", 30 + n) if n < 2 else ("09", n - 1)),
-                                  "ff_id": "p" + i, "value": str(100 * (1 + t / 100) ** n)}
-                                 for (i, _c, _), (t, _w, _m) in zip(listed, past) for n in range(4)]
-                      + [{"observed_at": "2026-%s-%02dT1000Z" % (("08", 30 + n) if n < 2 else ("09", n - 1)),
-                          "ff_id": "p99", "value": str(100 * 1.05 ** n)} for n in range(7)])
-            store_sql("api_market", [{"observed_at": at % 1, "seller": "marketPlayerLeague", "player_id": i, "market_id": "m" + i,
-                                      "expires_at": close, "sale_price": "100"} for i, close, _ in listed])
-            store_sql("api_market", [{"observed_at": at % 5, "seller": "marketPlayerLeague", "player_id": "99", "market_id": "m99",
-                                      "expires_at": "2026-09-05T22:24:00+02:00", "sale_price": "100"}])
+    def clearing() -> dict[str, tuple[tuple[int, int, int], tuple[tuple[float, float], ...]]]:
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), set_constants(AUCTION_MIN=3):
+            closes = ["2026-09-0%dT22:24:00+02:00" % (1 + i // 2) for i in range(6)]
+            ids = [str(i) for i in range(1, 7)]
+            store_sql("api_standings", [{"observed_at": "2026-09-01T0900Z", "team_id": "t1", "user_id": "1", "manager": "me"},
+                                        {"observed_at": "2026-09-01T0900Z", "team_id": "t2", "user_id": "2", "manager": "riv"}])
+            store_sql("api_market", [
+                {"observed_at": at, "seller": "marketPlayerLeague", "player_id": i, "market_id": "m" + i, "expires_at": close,
+                 "sale_price": "100", "bids": str(int(n < 3 and at.endswith("1945Z"))), "bid_id": "", "bid_money": ""}
+                for n, (i, close) in enumerate(zip(ids, closes))
+                for at in ("2026-09-01T0800Z", "2026-09-0%dT1945Z" % (1 + n // 2))]
+                + [{"observed_at": "2026-09-05T1945Z", "seller": "marketPlayerLeague", "player_id": "9", "market_id": "m9",
+                    "expires_at": "2026-09-05T22:24:00+02:00", "sale_price": "100", "bids": "1", "bid_id": "", "bid_money": ""},
+                   {"observed_at": "2026-09-05T1945Z", "seller": "marketPlayerLeague", "player_id": "8", "market_id": "m8",
+                    "expires_at": "2026-09-05T22:24:00+02:00", "sale_price": "100", "bids": "1", "bid_id": "b8", "bid_money": "100"}])
             store_sql("api_activity", [
-                {"observed_at": at % 3, "activity_id": i, "kind": "buy", "user_id": "1" if mine else "2",
-                 "player_id": i, "at": close, "amount": str(won), "counterparty": ""}
-                for (i, close, _), (_t, won, mine) in zip(listed, past) if won is not None]
-                or [{"observed_at": at % 3, "activity_id": "x", "kind": "", "user_id": "",
-                     "player_id": "", "at": "", "counterparty": ""}])
+                {"observed_at": "2026-09-0%dT2100Z" % (1 + n // 2), "activity_id": "a" + i, "kind": "buy", "user_id": "2", "player_id": i,
+                 "at": close, "amount": "110", "counterparty": ""}
+                for n, (i, close) in enumerate(zip(ids, closes)) if n < 3]
+                + [{"observed_at": "2026-09-04T2100Z", "activity_id": "z", "kind": "joined", "user_id": "2", "player_id": "", "at": "", "counterparty": ""}])
             with closing(connect()) as db, db:
                 db.execute("INSERT INTO league_config VALUES ('me', 100.0)")
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)",
-                               [("p" + i, i) for i, _c, _ in listed] + [("p99", "99")])
+                               [("p" + i, i) for i in ids + ["8", "9"]])
             try:
-                set_now(datetime(2026, 9, 5, 12, tzinfo=timezone.utc))
-                c = see()
-                out: dict[str, tuple[tuple[float, float], ...]] = {}
-                for k, ratio, p in rows("SELECT player, ratio, p_win FROM seen_odds WHERE cut = ?"
-                                        " ORDER BY player, ratio", (c, )):
-                    out[k] = (*out.get(k, ()), (ratio, p))
-                return out
+                set_now(datetime(2026, 9, 5, 19, 50, tzinfo=timezone.utc))
+                see()
+                got = {k: ((rival, mine, n), ()) for k, rival, mine, n in rows("SELECT player, rival, mine, n FROM seen_auction")}
+                return {k: (v[0], tuple((r, p) for r, p in rows("SELECT ratio, p FROM seen_curve WHERE player = ? ORDER BY ratio", (k, ))))
+                        for k, v in got.items()}
             finally:
                 set_now(None)
 
-    got = odds([(4.0, 110, False), (6.0, 130, False), (5.0, None, False), (-3.0, None, False)])
-    assert got == {"p99": ((1.0, 1 / 3), (1.1, 2 / 3), (1.3, 1.0))}, \
-        ("the three nearest in trend: one unsold (asking wins), rivals won at 1.1x and 1.3x; "
-         "the falling player's unsold listing is not near", got)
-    assert odds([(5.0, 150, True), (5.0, None, False)]) == {"p99": ((1.0, 1.0), )}, \
-        "a listing you won says nothing of what rivals bid: left out"
-    assert odds([]) == {"p99": ((1.0, 1.0), )}, "no past auctions: asking"
+    got = clearing()
+    assert sorted(got) == ["p8", "p9"], "a forecast for each open listing, none for the closed"
+    assert got["p9"][0] == (1, 0, 3) and got["p8"][0] == (0, 1, 6), \
+        ("a rival bid seen is one over what the game counts less yours: p8's one bid is yours, so no rival", got)
+    at9, at8 = dict(got["p9"][1]), dict(got["p8"][1])
+    assert at9[1.0] == 0.0 and at9[1.1] == 1.0, "where a rival bid was seen the auctions all sold, over the ask"
+    assert at8[1.0] == 0.5 and at8[1.1] == 1.0 and at8[0.9] == 0.0, \
+        "none seen: half the listings sold late at 1.1 (the rival bid came after the look), half did not sell; nothing is known of a bid under the ask"
 
 if __name__ == "__main__":
     _selftest()
