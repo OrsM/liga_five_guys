@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-09T07:54Z",
- "market_at": "2026-11-09T07:53Z",
+ "generated_at": "2026-11-09T08:35Z",
+ "market_at": "2026-11-09T08:35Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-09T07:53Z",
+   "at": "2026-11-09T08:35Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": 127111615.0,
- "cash_locked": 130388530.0,
- "can_bid": 54966221.599999994,
+ "cash_locked": 170070914.0,
+ "can_bid": 15283837.599999994,
  "ping": "",
  "do": [],
  "lineup": {
@@ -134,7 +134,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 54966221.599999994,
+    "margin": 15283837.599999994,
     "lock_margin": 75160354.0,
     "lock_margin_low": 75160354.0,
     "if_won": [],
@@ -211,7 +211,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 54966221.599999994,
+    "margin": 15283837.599999994,
     "lock_margin": 82268197.0,
     "lock_margin_low": 82268197.0,
     "if_won": [],
@@ -243,13 +243,13 @@
    "pos": "DEL",
    "what": "buy",
    "label": "buy Antony",
-   "step": "bid",
+   "step": "placed",
    "price": 40343800.0,
    "asking": 40343800.0,
-   "amount": 40343800.0,
+   "amount": 39682384.0,
    "win": 1.0,
    "plan": false,
-   "done": false,
+   "done": true,
    "key": "8405",
    "gain": 28.82412431914547,
    "per": "season",
@@ -269,7 +269,7 @@
     ],
     [
      "bid",
-     40343800.0,
+     39682384.0,
      "money"
     ],
     [
@@ -288,9 +288,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 14622421.599999994,
-    "lock_margin": 86767815.0,
-    "lock_margin_low": 86767815.0,
+    "margin": 15283837.599999994,
+    "lock_margin": 87429231.0,
+    "lock_margin_low": 87429231.0,
     "if_won": [],
     "if_lost": [],
     "held": [
