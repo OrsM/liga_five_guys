@@ -7,7 +7,7 @@ from typing import Any
 
 import eleven
 from ffcore.db import connect, record
-from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, bid_to_use, in_force
+from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, bid_to_use, in_force, win_cap
 
 __all__ = ["inputs", "read_inputs", "cells_of", "window_value", "win_at", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
 
@@ -58,7 +58,8 @@ def window_value(pos: dict[str, str], cells: dict[int, dict[str, float]], where:
 
 def win_at(asking: float, odds: list[tuple[float, float]], amount: float) -> float:
     below = [(r, w) for r, w in sorted(odds) if asking * r <= amount + 1e-6]
-    return below[-1][1] if below else (min(odds)[1] if odds else 1.0)
+    got = below[-1][1] if below else (min(odds)[1] if odds else 1.0)
+    return win_cap(asking, amount / asking, got)
 
 
 def opportunity_rows(inp: dict[str, list[tuple[Any, ...]]]) -> list[dict[str, Any]]:
