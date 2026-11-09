@@ -23,7 +23,7 @@ PREFIX = {"src_": "ingest", "current_": "ingest", "history_": "ingest", "ff_iden
           "dec_": "decision", "seen": "decision", "my_": "decision", "league_": "decision",
           "board_": "board", "lineup_": "board", "grade_": "grading", "replay": "grading", "sim_": "grading"}
 NAMES = {
-    "ingest": "crosswalk app_player slug_player id_clashes "
+    "ingest": "unmatched crosswalk app_player slug_player id_clashes "
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
               "look auction_results player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
@@ -36,7 +36,7 @@ NAMES = {
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_record last_season
-        club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look
+        club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look unmatched
         listings listing_close offers offer_ratios price_history price_paid auction_results market_read
         squads owners cash standings league_config""",
     "forecast": "cell market_daily forecast_e price_carry price_trend price_trend_daily price_forecast price_grade",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read; price_forecast: each player's expected value night by night to the next lock; price_grade: its error against what happened

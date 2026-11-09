@@ -254,7 +254,9 @@ WITH snaps AS (
   UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM src_api_standings WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
   UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM src_api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
   UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM src_api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM src_api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
+  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM src_api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_market' AS src, observed_at AS at, count(*) AS n FROM src_api_market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
+  UNION ALL SELECT 'api_offers' AS src, observed_at AS at, count(*) AS n FROM src_api_offers WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
 r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, stamp_jd(at) AS jd FROM snaps),
 usual AS (SELECT src, avg(n) AS usual_rows, (max(jd) - min(jd)) * 24 / (count(*) - 1) AS gap_h
           FROM r WHERE k BETWEEN 2 AND 21 GROUP BY src HAVING count(*) >= 5),

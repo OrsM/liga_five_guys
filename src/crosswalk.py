@@ -67,12 +67,36 @@ def build(db: sqlite3.Connection) -> None:
     identity(db)
 
 
+IDENTITIES = (
+    "SELECT DISTINCT ff_id, name, club FROM src_market ORDER BY 1, 2, 3",
+    "SELECT player_id, player_name, player_name_full FROM src_api_teams UNION SELECT player_id, player_name, player_name_full"
+    " FROM src_api_market UNION SELECT player_id, player_name, player_name_full FROM src_api_players_all ORDER BY 1, 2, 3",
+    "SELECT player_slug, player_name, team_slug FROM src_lineups UNION SELECT player_slug, player_name, team_slug"
+    " FROM src_starters ORDER BY 1, 2, 3")
+
+
+def through(db: sqlite3.Connection) -> str:
+    """Who the sources name, and the day: the crosswalk is made again when either changes (a value that links an
+    app id to a player can arrive any day; a new name, id or slug is made at once)."""
+    names = repr([db.execute(sql).fetchall() for sql in IDENTITIES])
+    return "%08x:%s" % (zlib.crc32(names.encode()), lfg.cut()[:10])
+
+
 def main() -> None:
     with closing(lfg.connect()) as db, db:
-        build(db)
+        now = through(db)
+        if db.execute("SELECT through FROM facts_meta WHERE name = 'crosswalk'").fetchone() == (now,):
+            print("crosswalk: the sources name the same players as at its last build today")
+        else:
+            build(db)
+            db.execute("INSERT OR REPLACE INTO facts_meta VALUES ('crosswalk', '0', ?)", (now,))
         n, ff, app = db.execute("SELECT count(*), sum(ff_slug <> ''), sum(app_id <> '') FROM crosswalk").fetchone()
     print("registry: %d players — %.0f%% carry a probable-XI slug, %.0f%% an app id"
           % (n, 100 * ff / (n or 1), 100 * app / (n or 1)))
+    for player, name, club, value, no_app, no_slug in rows(
+            "SELECT player, name, club, value, no_app, no_slug FROM unmatched ORDER BY value DESC, player LIMIT 5"):
+        print("  unmatched: %s (%s, %.1fM) has no %s" % (name, club, value / 1e6, " or ".join(
+            w for w, no in (("app id", no_app), ("probable-XI slug", no_slug)) if no)))
     clashes: dict[str, list[str]] = {}
     for idx, value in rows("SELECT id, value FROM id_clashes ORDER BY id, value"):
         clashes.setdefault(idx, []).append(value)
@@ -160,6 +184,28 @@ def _selftest() -> None:
             db.execute("UPDATE crosswalk SET ff_slug = 'y', name = 'Z'")
             identity(db)
         assert who() == [("x", None)], "a changed registry refills it in the caller's transaction"
+
+    import contextlib
+    import io
+
+    def stage() -> str:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            main()
+        return buf.getvalue()
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        store_sql("market", [{"observed_at": a, "ff_id": i, "name": n, "club": "c", "value": v}
+                             for i, n, v in [("x", "Xavi Uno", "9000000"), ("y", "Yago Dos", "1000000")]])
+        first = stage()
+        assert "same players" not in first and "unmatched: Xavi Uno (c, 9.0M) has no app id or probable-XI slug" in first, first
+        assert first.index("Xavi Uno") < first.index("Yago Dos"), "the dearest unmatched first"
+        assert "same players" in stage(), "the sources name nobody new: not made again"
+        store_sql("market", [{"observed_at": b, "ff_id": "x", "name": "Xavi Uno", "club": "c", "value": "9100000"}])
+        assert "same players" in stage(), "a new value names nobody new"
+        store_sql("market", [{"observed_at": b, "ff_id": "z", "name": "Zeno Tres", "club": "c", "value": "500000"}])
+        assert "same players" not in stage() and rows("SELECT count(*) FROM crosswalk") == [(3,)], \
+            "a player the sources have not named before is made at once"
 
     print("crosswalk self-test OK")
 
