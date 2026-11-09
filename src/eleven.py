@@ -121,8 +121,8 @@ def points_without(ranked: Mapping[str, list[str]], value: Value, gone: frozense
     return top
 
 
-def best_eleven(squad: frozenset[str], pos: Pos, value: Value) -> Settled | None:
-    start = build(squad, pos, value)
+def best_eleven(squad: frozenset[str], pos: Pos, value: Value, fielded: frozenset[str] | None = None) -> Settled | None:
+    start = fielded if fielded is not None and fielded <= squad and legal(fielded, pos) else build(squad, pos, value)
     return None if start is None else settle(start, squad - start, pos, value)
 
 
@@ -218,6 +218,11 @@ def _selftest() -> None:
         fit = best_eleven(every, pos, value)
         top = best_total(every, pos, value)
         assert fit is not None and top is not None and abs(total(fit.eleven, value) - top) < 1e-9, "build + settle is the best eleven"
+        from_app = best_eleven(every, pos, value, eleven)
+        assert from_app is not None and abs(total(from_app.eleven, value) - top) < 1e-9, "settling from the fielded eleven reaches the best"
+        assert from_app.swaps == () or total(from_app.eleven, value) >= total(eleven, value) - 1e-9
+        foreign = best_eleven(every, pos, value, frozenset(list(eleven)[:-1] + ["nobody"]))
+        assert foreign is not None and abs(total(foreign.eleven, value) - top) < 1e-9, "a fielded eleven not in the squad is built over"
         gone = frozenset(rng.sample(sorted(every), rng.randint(1, min(3, len(every) - 1))))
         out = remove_all(gone, fit.eleven, fit.bench, pos, value)
         rest = best_total(every - gone, pos, value)

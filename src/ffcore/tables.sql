@@ -243,6 +243,11 @@ CREATE TABLE IF NOT EXISTS api_lineup (
 );
 CREATE INDEX IF NOT EXISTS api_lineup_at ON api_lineup (source, observed_at);
 DROP VIEW IF EXISTS current_api_lineup;
+CREATE VIEW current_api_lineup AS
+SELECT t.observed_at, t.source, t.week, t.market_value, t.points, t.player_id, t.slot, t.formation, t.player_name, t.player_name_full, t.position_id, t.snapshot_at, a.player
+FROM api_lineup t LEFT JOIN app_player a ON a.app_id = t.player_id
+WHERE /* latest api_lineup */
+ORDER BY t.rowid;
 
 -- api_leagues: the leagues you are in, a snapshot each fetch.
 CREATE TABLE IF NOT EXISTS api_leagues (
