@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-10T20:45Z",
- "market_at": "2026-11-10T20:45Z",
+ "generated_at": "2026-11-10T20:48Z",
+ "market_at": "2026-11-10T20:48Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-10T20:45Z",
+   "at": "2026-11-10T20:48Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -30679771.0,
- "cash_locked": 53056717.0,
- "can_bid": 5166578.800000012,
+ "cash_locked": 53472414.0,
+ "can_bid": 4750881.800000012,
  "ping": "",
  "do": [],
  "lineup": {
@@ -86,8 +86,8 @@
    "step": "placed",
    "price": 44584303.0,
    "asking": 44584303.0,
-   "amount": 44584303.0,
-   "win": 0.3764705882352941,
+   "amount": 45000000.0,
+   "win": 0.43131671806238225,
    "plan": false,
    "done": true,
    "key": "3738",
@@ -109,12 +109,12 @@
     ],
     [
      "bid",
-     44584303.0,
+     45000000.0,
      "money"
     ],
     [
      "chance to win",
-     0.3764705882352941,
+     0.43131671806238225,
      "chance"
     ],
     [
@@ -135,9 +135,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 5166578.800000012,
-    "lock_margin": 20726650.0,
-    "lock_margin_low": 15255178.731999993,
+    "margin": 4750881.800000012,
+    "lock_margin": 20310953.0,
+    "lock_margin_low": 14839481.731999993,
     "if_won": [
      "Dani Martinez",
      "Augusto Batalla",
@@ -178,7 +178,7 @@
     "gain": 19.95487894745588,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 7.512425015512802
+    "net": 8.606872896948795
    },
    "accepts": [],
    "act": []
