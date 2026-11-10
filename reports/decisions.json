@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-10T06:45Z",
- "market_at": "2026-11-10T06:44Z",
+ "generated_at": "2026-11-10T09:03Z",
+ "market_at": "2026-11-10T09:03Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-10T06:44Z",
+   "at": "2026-11-10T09:03Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
- "cash": -30879771.0,
- "cash_locked": 0,
- "can_bid": 58023295.80000001,
+ "cash": -30679771.0,
+ "cash_locked": 53056717.0,
+ "can_bid": 5166578.800000012,
  "ping": "",
  "do": [],
  "lineup": {
@@ -89,13 +89,13 @@
    "pos": "MED",
    "what": "buy",
    "label": "buy Edu Exposito",
-   "step": "bid",
+   "step": "placed",
    "price": 44584303.0,
    "asking": 44584303.0,
-   "amount": 48596890.27,
-   "win": 0.9444444444444444,
+   "amount": 44584303.0,
+   "win": 0.6938775510204082,
    "plan": false,
-   "done": false,
+   "done": true,
    "key": "3738",
    "gain": 19.95487894745594,
    "per": "season",
@@ -115,12 +115,12 @@
     ],
     [
      "bid",
-     48596890.27,
+     44584303.0,
      "money"
     ],
     [
      "chance to win",
-     0.9444444444444444,
+     0.6938775510204082,
      "chance"
     ],
     [
@@ -129,9 +129,9 @@
      "points"
     ]
    ],
-   "bids": 0,
+   "bids": 1,
    "auction": {
-    "yours": false,
+    "yours": true,
     "listings": 55,
     "thin": false,
     "cell": "0/3/2"
@@ -141,9 +141,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 9426405.530000009,
-    "lock_margin": 16514062.72999999,
-    "lock_margin_low": 11042591.461999983,
+    "margin": 5166578.800000012,
+    "lock_margin": 20726650.0,
+    "lock_margin_low": 15255178.731999993,
     "if_won": [
      "Dani Martinez",
      "Augusto Batalla",
@@ -180,11 +180,11 @@
      "Aitor Paredes",
      "Martin Satriano"
     ],
-    "cash_if_lost": 11357384.0,
+    "cash_if_lost": 11557384.0,
     "gain": 19.95487894745588,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 18.84627456148611
+    "net": 13.846242534969386
    },
    "accepts": [],
    "act": []
