@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-10T17:46Z",
- "market_at": "2026-11-10T17:45Z",
+ "generated_at": "2026-11-10T19:57Z",
+ "market_at": "2026-11-10T19:57Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-10T17:45Z",
+   "at": "2026-11-10T19:57Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -87,7 +87,7 @@
    "price": 44584303.0,
    "asking": 44584303.0,
    "amount": 44584303.0,
-   "win": 0.6938775510204082,
+   "win": 0.3764705882352941,
    "plan": false,
    "done": true,
    "key": "3738",
@@ -114,7 +114,7 @@
     ],
     [
      "chance to win",
-     0.6938775510204082,
+     0.3764705882352941,
      "chance"
     ],
     [
@@ -123,12 +123,12 @@
      "points"
     ]
    ],
-   "bids": 1,
+   "bids": 2,
    "auction": {
     "yours": true,
-    "listings": 55,
+    "listings": 92,
     "thin": false,
-    "cell": "0/3/2"
+    "cell": "1"
    },
    "funding": {
     "feasible": true,
@@ -178,7 +178,7 @@
     "gain": 19.95487894745588,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 13.846242534969386
+    "net": 7.512425015512802
    },
    "accepts": [],
    "act": []
