@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-10T09:03Z",
- "market_at": "2026-11-10T09:03Z",
+ "generated_at": "2026-11-10T09:53Z",
+ "market_at": "2026-11-10T09:53Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-10T09:03Z",
+   "at": "2026-11-10T09:53Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,16 +56,47 @@
  "cash_locked": 53056717.0,
  "can_bid": 5166578.800000012,
  "ping": "",
- "do": [],
+ "do": [
+  {
+   "name": "Pablo Fornals",
+   "pos": "",
+   "what": "list",
+   "label": "list Pablo Fornals",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "accepts": [
+    null
+   ],
+   "gain": null,
+   "per": null,
+   "facts": [],
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "plan": false,
+   "act": [
+    {
+     "player_team": "111434450",
+     "player": "3099",
+     "market": null,
+     "bid": null,
+     "pos": "MED",
+     "value": 49520027.0
+    }
+   ]
+  }
+ ],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
    "Natan",
    "Fran Garcia",
    "Adria Pedrosa",
-   "Gerard Martin",
    "Pablo Fornals",
    "German Valera",
+   "Pepelu",
    "Guido Rodriguez",
    "Mikel Oyarzabal",
    "Iñigo Vicente",
@@ -73,15 +104,9 @@
   ],
   "message": "",
   "unmapped": [],
-  "points": 57.08432544586448,
+  "points": 58.02008596102482,
   "best": 58.02008596102482,
-  "advice": [
-   {
-    "in": "Pepelu",
-    "out": "Gerard Martin",
-    "gain": 0.9357605151603345
-   }
-  ]
+  "advice": []
  },
  "buys": [
   {
@@ -1413,14 +1438,6 @@
    "sold": false
   },
   {
-   "name": "Gerard Martin",
-   "pos": "DEF",
-   "next": 3.4108788489375583,
-   "xi": true,
-   "best": false,
-   "sold": false
-  },
-  {
    "name": "Pablo Fornals",
    "pos": "MED",
    "next": 6.034274569097992,
@@ -1432,6 +1449,14 @@
    "name": "German Valera",
    "pos": "MED",
    "next": 5.60973525441571,
+   "xi": true,
+   "best": true,
+   "sold": false
+  },
+  {
+   "name": "Pepelu",
+   "pos": "MED",
+   "next": 4.346639364097893,
    "xi": true,
    "best": true,
    "sold": false
@@ -1477,6 +1502,14 @@
    "sold": false
   },
   {
+   "name": "Gerard Martin",
+   "pos": "DEF",
+   "next": 3.4108788489375583,
+   "xi": false,
+   "best": false,
+   "sold": false
+  },
+  {
    "name": "Robin Le Normand",
    "pos": "DEF",
    "next": 3.1590820703815155,
@@ -1498,14 +1531,6 @@
    "next": 0.9038454960516603,
    "xi": false,
    "best": false,
-   "sold": false
-  },
-  {
-   "name": "Pepelu",
-   "pos": "MED",
-   "next": 4.346639364097893,
-   "xi": false,
-   "best": true,
    "sold": false
   },
   {
