@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-10T09:53Z",
- "market_at": "2026-11-10T09:53Z",
+ "generated_at": "2026-11-10T17:46Z",
+ "market_at": "2026-11-10T17:45Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-10T09:53Z",
+   "at": "2026-11-10T17:45Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,38 +56,7 @@
  "cash_locked": 53056717.0,
  "can_bid": 5166578.800000012,
  "ping": "",
- "do": [
-  {
-   "name": "Pablo Fornals",
-   "pos": "",
-   "what": "list",
-   "label": "list Pablo Fornals",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "111434450",
-     "player": "3099",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 49520027.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
