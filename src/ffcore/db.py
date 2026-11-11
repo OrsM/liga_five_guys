@@ -543,9 +543,10 @@ def _selftest() -> None:
         assert this_run() == want, (env, this_run())
     os.environ.pop(RUN_ENV)
     assert this_run() is None, "outside run.py there is no run"
-    assert rows("SELECT name_key(' Iñigo  VICENTE '), name_shown('nico van gaal')",
-                path=Path(tempfile.mkdtemp()) / "f.db") == [("inigo vicente", "Nico van Gaal")], \
-        "names are compared and shown in SQL by the same rules as Name"
+    with tempfile.TemporaryDirectory() as tmp:
+        assert rows("SELECT name_key(' Iñigo  VICENTE '), name_shown('nico van gaal')",
+                    path=Path(tmp) / "f.db") == [("inigo vicente", "Nico van Gaal")], \
+            "names are compared and shown in SQL by the same rules as Name"
     import re
     from collections import Counter
     made = Counter(re.findall(r"CREATE (?:VIEW|TABLE IF NOT EXISTS) (\w+)",
