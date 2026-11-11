@@ -35,12 +35,12 @@ def text() -> str:
         lines.append("unmatched: %s (%s, %.1fM) has no %s" % (name, club, value / 1e6, "app id" if no_app else "probable-XI slug"))
     drift = list(rows(
             "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE drift = 1"
-            " AND run_id = (SELECT max(run_id) FROM auction_calibration) ORDER BY scope, bin"))
+            " AND run_id = (SELECT max(run_id) FROM auction_calibration) ORDER BY abs(stated - observed) DESC, scope, bin"))
     if drift:
-        worst_scope, worst_bin, worst_n, worst_stated, worst_observed = max(drift, key=lambda r: abs(r[3] - r[4]))
-        scopes = ", ".join(sorted({r[0] for r in drift}))
+        scope, bin_, n, stated, observed = drift[0]
+        scopes = ", ".join(sorted({scope for scope, _, _, _, _ in drift}))
         lines.append("auction forecast drifting in %d bins (%s); worst %s, chance %s: stated %.2f, observed %.2f over %d"
-                     % (len(drift), scopes, worst_scope, worst_bin, worst_stated, worst_observed, worst_n))
+                     % (len(drift), scopes, scope, bin_, stated, observed, n))
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
 
 
@@ -75,7 +75,6 @@ def _selftest() -> None:
         try:
             set_now(now)
             assert text() == "", "nothing fetched yet: nothing to say"
-            assert "drifting" not in text()
             # 21 snapshots `gap` hours apart, the newest `last` hours ago with `n` rows (the rest `usual`)
             def feed(table: str, key: str, last: float, n: int, usual: int = 10, gap: float = 2.0,
                      count: int = 21) -> None:
