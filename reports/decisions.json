@@ -1,62 +1,109 @@
 {
- "generated_at": "2026-11-11T09:00Z",
- "market_at": "2026-11-11T09:00Z",
+ "generated_at": "2026-11-11T12:33Z",
+ "market_at": "2026-11-11T12:32Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-11T09:00Z",
+   "at": "2026-11-11T12:32Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
- "cash": -39152185.0,
- "cash_locked": 0,
- "can_bid": 51144221.60000001,
+ "cash": -39052185.0,
+ "cash_locked": 18185815.0,
+ "can_bid": 33058406.60000001,
  "ping": "",
- "do": [],
+ "do": [
+  {
+   "name": "Aitor Paredes, Augusto Batalla, Thomas Lemar",
+   "pos": "",
+   "what": "list",
+   "label": "list Aitor Paredes, Augusto Batalla, Thomas Lemar",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "accepts": [
+    null
+   ],
+   "gain": null,
+   "per": null,
+   "facts": [],
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "plan": false,
+   "act": [
+    {
+     "player_team": "113276669",
+     "player": "2315",
+     "market": null,
+     "bid": null,
+     "pos": "DEF",
+     "value": 27202706.0
+    },
+    {
+     "player_team": "109094612",
+     "player": "2519",
+     "market": null,
+     "bid": null,
+     "pos": "POR",
+     "value": 3819983.0
+    },
+    {
+     "player_team": "109094606",
+     "player": "3182",
+     "market": null,
+     "bid": null,
+     "pos": "MED",
+     "value": 6775821.0
+    }
+   ]
+  }
+ ],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
@@ -83,13 +130,13 @@
    "pos": "DEF",
    "what": "buy",
    "label": "buy Zaid Romero",
-   "step": "bid",
+   "step": "placed",
    "price": 18652148.0,
    "asking": 18652148.0,
-   "amount": 18652148.0,
-   "win": 1.0,
+   "amount": 18185815.0,
+   "win": 0.4590394103889878,
    "plan": false,
-   "done": false,
+   "done": true,
    "key": "14210",
    "gain": 31.120289984714063,
    "per": "season",
@@ -109,12 +156,12 @@
     ],
     [
      "bid",
-     18652148.0,
+     18185815.0,
      "money"
     ],
     [
      "chance to win",
-     1.0,
+     0.4590394103889878,
      "chance"
     ],
     [
@@ -123,9 +170,9 @@
      "points"
     ]
    ],
-   "bids": 0,
+   "bids": 1,
    "auction": {
-    "yours": false,
+    "yours": true,
     "listings": 53,
     "thin": false,
     "cell": "0/2/0"
@@ -135,9 +182,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 32492073.60000001,
-    "lock_margin": 11214733.923000008,
-    "lock_margin_low": 7280647.108389005,
+    "margin": 33058406.60000001,
+    "lock_margin": 11781066.923000008,
+    "lock_margin_low": 7846980.108389005,
     "if_won": [
      "Dani Martinez",
      "Augusto Batalla",
@@ -178,11 +225,11 @@
      "Antony",
      "Martin Satriano"
     ],
-    "cash_if_lost": 10774635.923,
+    "cash_if_lost": 10874635.923,
     "gain": 31.120289984713963,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 31.120289984713963
+    "net": 14.28543956571742
    },
    "accepts": [],
    "act": []
@@ -244,9 +291,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 27210516.480000008,
-    "lock_margin": 5933176.803000003,
-    "lock_margin_low": 1999089.9883890003,
+    "margin": 9124701.480000008,
+    "lock_margin": 6033176.803000003,
+    "lock_margin_low": 2099089.9883890003,
     "if_won": [
      "Dani Martinez",
      "Augusto Batalla",
@@ -287,7 +334,7 @@
      "Antony",
      "Martin Satriano"
     ],
-    "cash_if_lost": 10774635.923,
+    "cash_if_lost": 10874635.923,
     "gain": 23.08698823619102,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
@@ -303,11 +350,11 @@
    "pos": "DEL",
    "status": "rival",
    "gain": 153.51850149575884,
-   "asking": 183291143.0,
+   "asking": 180613716.0,
    "bid": null,
    "win": null,
    "replaces": "Antony",
-   "per_million": 0.8375663929148984,
+   "per_million": 0.8499825201301923,
    "price_next": -0.00575678400608437,
    "price_lock": -0.04923532216934701,
    "available": false
@@ -331,11 +378,11 @@
    "pos": "DEL",
    "status": "rival",
    "gain": 107.3166679577385,
-   "asking": 174410170.0,
+   "asking": 171563423.0,
    "bid": null,
    "win": null,
    "replaces": "Antony",
-   "per_million": 0.6153119852915602,
+   "per_million": 0.62552183956914,
    "price_next": -0.00572441184057082,
    "price_lock": -0.048958456822879914,
    "available": false
@@ -429,11 +476,11 @@
    "pos": "DEF",
    "status": "rival",
    "gain": 37.18718845849334,
-   "asking": 61188470.0,
+   "asking": 58564537.0,
    "bid": null,
    "win": null,
    "replaces": "Fran Garcia",
-   "per_million": 0.6077482973261684,
+   "per_million": 0.6349779297067325,
    "price_next": -0.013681967889166091,
    "price_lock": -0.11701604510813335,
    "available": false
