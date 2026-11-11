@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-11T06:45Z",
- "market_at": "2026-11-11T06:44Z",
+ "generated_at": "2026-11-11T06:48Z",
+ "market_at": "2026-11-11T06:48Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-11T06:44Z",
+   "at": "2026-11-11T06:48Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,46 +56,7 @@
  "cash_locked": 0,
  "can_bid": 51144221.60000001,
  "ping": "",
- "do": [
-  {
-   "name": "Dani Martinez, Ferran Jutgla",
-   "pos": "",
-   "what": "list",
-   "label": "list Dani Martinez, Ferran Jutgla",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "109094611",
-     "player": "2881",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 620858.0
-    },
-    {
-     "player_team": "113276670",
-     "player": "2603",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 12837239.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
