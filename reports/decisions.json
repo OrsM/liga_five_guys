@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-11T12:33Z",
- "market_at": "2026-11-11T12:32Z",
+ "generated_at": "2026-11-11T13:55Z",
+ "market_at": "2026-11-11T13:54Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-11T12:32Z",
+   "at": "2026-11-11T13:54Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,54 +56,7 @@
  "cash_locked": 18185815.0,
  "can_bid": 33058406.60000001,
  "ping": "",
- "do": [
-  {
-   "name": "Aitor Paredes, Augusto Batalla, Thomas Lemar",
-   "pos": "",
-   "what": "list",
-   "label": "list Aitor Paredes, Augusto Batalla, Thomas Lemar",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "113276669",
-     "player": "2315",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 27202706.0
-    },
-    {
-     "player_team": "109094612",
-     "player": "2519",
-     "market": null,
-     "bid": null,
-     "pos": "POR",
-     "value": 3819983.0
-    },
-    {
-     "player_team": "109094606",
-     "player": "3182",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 6775821.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
@@ -120,8 +73,8 @@
   ],
   "message": "",
   "unmapped": [],
-  "points": 58.01366428721065,
-  "best": 58.01366428721065,
+  "points": 58.24133608917674,
+  "best": 58.24133608917674,
   "advice": []
  },
  "buys": [
@@ -226,10 +179,10 @@
      "Martin Satriano"
     ],
     "cash_if_lost": 10874635.923,
-    "gain": 31.120289984713963,
+    "gain": 31.12028998471419,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 14.28543956571742
+    "net": 14.285439565717525
    },
    "accepts": [],
    "act": []
@@ -335,10 +288,10 @@
      "Martin Satriano"
     ],
     "cash_if_lost": 10874635.923,
-    "gain": 23.08698823619102,
+    "gain": 23.086988236191246,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 20.86708552117265
+    "net": 20.867085521172857
    },
    "accepts": [],
    "act": []
@@ -391,12 +344,12 @@
    "name": "Arda Guler",
    "pos": "MED",
    "status": "unlisted",
-   "gain": 80.89800684445828,
+   "gain": 78.66233596624113,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.5895979864059134,
+   "per_million": 0.5733040491449182,
    "price_next": 0.014704471008946118,
    "price_lock": 0.12576107887495858,
    "available": false
@@ -405,12 +358,12 @@
    "name": "Jude Bellingham",
    "pos": "MED",
    "status": "rival",
-   "gain": 76.56916713781314,
+   "gain": 74.33349625959599,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.5265228952504013,
+   "per_million": 0.511149449937783,
    "price_next": 0.008722587642787882,
    "price_lock": 0.0746005777338743,
    "available": false
@@ -419,12 +372,12 @@
    "name": "Fermin Lopez",
    "pos": "MED",
    "status": "rival",
-   "gain": 71.56119897491041,
+   "gain": 69.32552809669326,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.5937234557225035,
+   "per_million": 0.5751747134056143,
    "price_next": 0.0209446342544386,
    "price_lock": 0.17913053783961996,
    "available": false
@@ -458,20 +411,6 @@
    "available": false
   },
   {
-   "name": "Federico Valverde",
-   "pos": "MED",
-   "status": "unlisted",
-   "gain": 37.98763550376586,
-   "asking": null,
-   "bid": null,
-   "win": null,
-   "replaces": "Guido Rodriguez",
-   "per_million": 0.5163895020841108,
-   "price_next": 0.03397684823278668,
-   "price_lock": 0.290589514435871,
-   "available": false
-  },
-  {
    "name": "Marcos Llorente",
    "pos": "DEF",
    "status": "rival",
@@ -483,6 +422,20 @@
    "per_million": 0.6349779297067325,
    "price_next": -0.013681967889166091,
    "price_lock": -0.11701604510813335,
+   "available": false
+  },
+  {
+   "name": "David Hancko",
+   "pos": "DEF",
+   "status": "rival",
+   "gain": 35.92850787635824,
+   "asking": 61130097.0,
+   "bid": null,
+   "win": null,
+   "replaces": "Fran Garcia",
+   "per_million": 0.5877384404667023,
+   "price_next": 0.0006847269446172977,
+   "price_lock": 0.005856177977257904,
    "available": false
   }
  ],
@@ -1049,7 +1002,7 @@
    "amount": 38738955.0,
    "done": false,
    "key": "8405",
-   "gain": -1.4146922952854766,
+   "gain": -1.4146922952852492,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1059,7 +1012,7 @@
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
-    "season": 1.4146922952854766
+    "season": 1.4146922952852492
    },
    "per_million": 0.0,
    "facts": [
@@ -1090,7 +1043,7 @@
     ],
     [
      "season",
-     1.4146922952854766,
+     1.4146922952852492,
      "points"
     ]
    ],
@@ -1111,7 +1064,7 @@
    "amount": 48046533.0,
    "done": false,
    "key": "2675",
-   "gain": -15.654616951296703,
+   "gain": -15.654616951296475,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1121,7 +1074,7 @@
    "lost": {
     "next4": 5.25212575231194,
     "next8": 7.023995038503529,
-    "season": 15.654616951296703
+    "season": 15.654616951296475
    },
    "per_million": 0.1461915064402988,
    "facts": [
@@ -1152,7 +1105,7 @@
     ],
     [
      "season",
-     15.654616951296703,
+     15.654616951296475,
      "points"
     ]
    ],
@@ -1235,7 +1188,7 @@
    "amount": 21096527.0,
    "done": false,
    "key": "8496",
-   "gain": -13.128507726926273,
+   "gain": -13.128507726926046,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1245,7 +1198,7 @@
    "lost": {
     "next4": 2.101827349921109,
     "next8": 5.0427750178023985,
-    "season": 13.128507726926273
+    "season": 13.128507726926046
    },
    "per_million": 0.2390334208944628,
    "facts": [
@@ -1276,7 +1229,7 @@
     ],
     [
      "season",
-     13.128507726926273,
+     13.128507726926046,
      "points"
     ]
    ],
@@ -1306,10 +1259,10 @@
    "ratio": 0.940133857484682,
    "lost": {
     "next4": 4.357572641070277,
-    "next8": 11.280055611529235,
+    "next8": 11.280055611529292,
     "season": 12.07444796127811
    },
-   "per_million": 0.2607475028066449,
+   "per_million": 0.2607475028066462,
    "facts": [
     [
      "value",
@@ -1333,7 +1286,7 @@
     ],
     [
      "next 8",
-     11.280055611529235,
+     11.280055611529292,
      "points"
     ],
     [
@@ -1421,7 +1374,7 @@
    "amount": 46748179.0,
    "done": false,
    "key": "2632",
-   "gain": -37.415434760703874,
+   "gain": -37.41543476070365,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1431,7 +1384,7 @@
    "lost": {
     "next4": 11.118295592320493,
     "next8": 18.209183214680536,
-    "season": 37.415434760703874
+    "season": 37.41543476070365
    },
    "per_million": 0.38951641762731626,
    "facts": [
@@ -1462,7 +1415,7 @@
     ],
     [
      "season",
-     37.415434760703874,
+     37.41543476070365,
      "points"
     ]
    ],
@@ -1483,7 +1436,7 @@
    "amount": 51117803.0,
    "done": false,
    "key": "11813",
-   "gain": -41.296053148062356,
+   "gain": -41.29605314806213,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1493,7 +1446,7 @@
    "lost": {
     "next4": 10.999424058060441,
     "next8": 22.10355908014418,
-    "season": 41.296053148062356
+    "season": 41.29605314806213
    },
    "per_million": 0.4324043245783505,
    "facts": [
@@ -1524,7 +1477,7 @@
     ],
     [
      "season",
-     41.296053148062356,
+     41.29605314806213,
      "points"
     ]
    ],
@@ -1545,7 +1498,7 @@
    "amount": 19092246.0,
    "done": false,
    "key": "6392",
-   "gain": -3.469463054822654,
+   "gain": -3.469463054822427,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1555,7 +1508,7 @@
    "lost": {
     "next4": 5.059458601325474,
     "next8": 9.892115234696575,
-    "season": 3.469463054822654
+    "season": 3.469463054822427
    },
    "per_million": 0.5181221337026862,
    "facts": [
@@ -1586,7 +1539,7 @@
     ],
     [
      "season",
-     3.469463054822654,
+     3.469463054822427,
      "points"
     ]
    ],
@@ -1607,7 +1560,7 @@
    "amount": 20907329.0,
    "done": false,
    "key": "7658",
-   "gain": -15.286821513435598,
+   "gain": -15.28682151343537,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1616,10 +1569,10 @@
    "ratio": 1.027788390711342,
    "lost": {
     "next4": 6.941740482316277,
-    "next8": 11.808287781280853,
-    "season": 15.286821513435598
+    "next8": 11.80828778128091,
+    "season": 15.28682151343537
    },
-   "per_million": 0.5647917905381817,
+   "per_million": 0.5647917905381845,
    "facts": [
     [
      "value",
@@ -1643,12 +1596,12 @@
     ],
     [
      "next 8",
-     11.808287781280853,
+     11.80828778128091,
      "points"
     ],
     [
      "season",
-     15.286821513435598,
+     15.28682151343537,
      "points"
     ]
    ],
@@ -1669,7 +1622,7 @@
    "amount": 11100755.0,
    "done": false,
    "key": "7676",
-   "gain": -3.7466380621185635,
+   "gain": -5.9823089403355425,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1677,11 +1630,11 @@
    "flip": null,
    "ratio": 0.9545376061377925,
    "lost": {
-    "next4": 2.839659159863203,
-    "next8": 8.167226333892756,
-    "season": 3.7466380621185635
+    "next4": 3.603255080221402,
+    "next8": 9.530770508574165,
+    "season": 5.9823089403355425
    },
-   "per_million": 0.7357361128943714,
+   "per_million": 0.8585695755445611,
    "facts": [
     [
      "value",
@@ -1700,17 +1653,17 @@
     ],
     [
      "points lost, next 4",
-     2.839659159863203,
+     3.603255080221402,
      "points"
     ],
     [
      "next 8",
-     8.167226333892756,
+     9.530770508574165,
      "points"
     ],
     [
      "season",
-     3.7466380621185635,
+     5.9823089403355425,
      "points"
     ]
    ],
@@ -1731,7 +1684,7 @@
    "amount": 16700635.0,
    "done": false,
    "key": "1743",
-   "gain": -97.84118703747913,
+   "gain": -97.8411870374789,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1741,7 +1694,7 @@
    "lost": {
     "next4": 29.86317968183684,
     "next8": 55.304874894411,
-    "season": 97.84118703747913
+    "season": 97.8411870374789
    },
    "per_million": 3.3115432373925304,
    "facts": [
@@ -1772,7 +1725,7 @@
     ],
     [
      "season",
-     97.84118703747913,
+     97.8411870374789,
      "points"
     ]
    ],
@@ -1841,7 +1794,7 @@
   {
    "name": "Guido Rodriguez",
    "pos": "MED",
-   "next": 3.932113965478249,
+   "next": 4.1597857674443395,
    "xi": true,
    "best": true,
    "sold": false
