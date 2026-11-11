@@ -2,13 +2,13 @@
 bid, your squad with its eleven, the players on the market who would add points to it (buys, most first, each with
 the bid to make and, for the first few, the sales that fund it: approach.approach), and each standing offer on your
 players ranked by what taking it costs your eleven (eleven.remove). The one line act.py takes is do: list your unlisted players at
-their value. finish and band are placeholders: the page reads them."""
+their value."""
 from __future__ import annotations
 
 import json
 import sys
 from contextlib import closing
-from typing import Any
+from typing import Any, NamedTuple
 
 import decision
 import eleven
@@ -38,10 +38,22 @@ def next_value(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, float]:
     return cells.get(min((j for j, _ in inp["dec_lock"]), default=min(cells, default=0)), {})
 
 
-def squad_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[Doc], dict[str, str]]:
+class Fact(NamedTuple):
+    name: str
+    pos: str | None
+    trend: float | None
+
+
+UNKNOWN = Fact("", None, None)
+
+
+def facts() -> dict[str, Fact]:
+    return {k: Fact(name, pos, trend) for k, name, pos, trend in rows("SELECT player, name_shown(name), pos, trend FROM player_facts")}
+
+
+def squad_rows(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> list[Doc]:
     pos, _ = decision.cells_of(inp)
     mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
-    names = {k: n for k, n in rows("SELECT player, name_shown(name) FROM player_facts")}
     e = next_value(inp)
     fielded = decision.lineup_of(inp, pos).eleven
     settled = eleven.best_eleven(mine, pos, e, fielded)
@@ -49,7 +61,7 @@ def squad_rows(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[list[Doc], dict[s
     xi = fielded if fielded is not None else best
     order = sorted(mine, key=lambda k: (k not in xi, POSITIONS.index(pos[k]) if k in pos else len(POSITIONS), -e.get(k, 0.0), k))
     return [{"name": names.get(k, k), "pos": pos.get(k, ""), "next": e.get(k, 0.0), "xi": k in xi, "best": k in best,
-             "sold": False, "key": k} for k in order], names
+             "sold": False, "key": k} for k in order]
 
 
 def advice(swaps: tuple[tuple[str, str, float], ...], names: dict[str, str]) -> list[Doc]:
@@ -79,11 +91,11 @@ def lineup_doc(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> 
             "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
-def standing(mine: set[str]) -> list[tuple[Any, ...]]:
-    return rows("SELECT t.player, t.market_value, o.money, f.pos, f.trend FROM offers o"
-                " JOIN squads t ON t.player_team_id = o.player_team_id LEFT JOIN player_facts f ON f.player = t.player"
-                " WHERE o.status = 'pending' AND o.money <> 0 AND t.player IN (%s)" % ",".join("?" * len(mine)),
-                sorted(mine))
+def standing(mine: set[str], known: dict[str, Fact]) -> list[tuple[Any, ...]]:
+    return [(k, value, money, known.get(k, UNKNOWN).pos, known.get(k, UNKNOWN).trend) for k, value, money in rows(
+        "SELECT t.player, t.market_value, o.money FROM offers o"
+        " JOIN squads t ON t.player_team_id = o.player_team_id"
+        " WHERE o.status = 'pending' AND o.money <> 0 AND t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))]
 
 
 def offer_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], got: list[tuple[Any, ...]]) -> list[Doc]:
@@ -169,12 +181,12 @@ def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
             for r in [r for r in got if r["gain"] > 0][:TOP_TARGETS]]
 
 
-def list_line(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> list[Doc]:
+def list_line(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], known: dict[str, Fact]) -> list[Doc]:
     mine = {k for k, _, m, *_ in inp["dec_player"] if m}
     listed = {k for (k,) in rows("SELECT player FROM listings WHERE player IS NOT NULL")}
-    got = {k: (ptid, pid, value, p) for k, ptid, pid, value, p in rows(
-        "SELECT t.player, t.player_team_id, t.player_id, t.market_value, f.pos FROM squads t"
-        " LEFT JOIN player_facts f ON f.player = t.player WHERE t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))}
+    got = {k: (ptid, pid, value, known.get(k, UNKNOWN).pos) for k, ptid, pid, value in rows(
+        "SELECT t.player, t.player_team_id, t.player_id, t.market_value FROM squads t"
+        " WHERE t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))}
     todo = sorted(mine - listed, key=lambda k: (names.get(k, k), k))
     if not todo:
         return []
@@ -216,9 +228,11 @@ def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arri
     (cash, team_value, debt, _squad_max, _xi), = inp["dec_money"]
     locks = [lock for _, lock in inp["dec_lock"]]
     bids = sum(amount for _, amount in inp["dec_bid"])
-    squad, names = squad_rows(inp)
+    known = facts()
+    names = {k: fact.name for k, fact in known.items()}
+    squad = squad_rows(inp, names)
     mine = {k for k, _, m, *_ in inp["dec_player"] if m}
-    offered = standing(mine)
+    offered = standing(mine, known)
     pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
     club = Club(frozenset(mine), pos, {k: value for k, value, *_ in rows("SELECT player, market_value FROM squads") if k in mine},
                 {k: money for k, _, money, *_ in offered}, cash, team_value, (len(inp["dec_bid"]), bids), debt=debt)
@@ -233,11 +247,10 @@ def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arri
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
-        "do": list_line(inp, names), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
+        "do": list_line(inp, names, known), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
         "alerts": alerts, "auction": auction_card(),
         "sells": sells,
-        "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad],
-        "finish": 0.0, "band": [0.0, 0.0]}
+        "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
 
 
 def main() -> None:

@@ -33,10 +33,14 @@ def text() -> str:
     for name, club, value, no_app in rows("SELECT name, club, value, no_app FROM unmatched WHERE value >= ? ORDER BY value DESC",
                                           (UNMATCHED_FROM,)):
         lines.append("unmatched: %s (%s, %.1fM) has no %s" % (name, club, value / 1e6, "app id" if no_app else "probable-XI slug"))
-    for scope, bin_, n, stated, observed in rows(
+    drift = list(rows(
             "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE drift = 1"
-            " AND run_id = (SELECT max(run_id) FROM auction_calibration) ORDER BY scope, bin"):
-        lines.append("auction forecast drifting: %s, chance %s stated %.2f, observed %.2f over %d" % (scope, bin_, stated, observed, n))
+            " AND run_id = (SELECT max(run_id) FROM auction_calibration) ORDER BY abs(stated - observed) DESC, scope, bin"))
+    if drift:
+        scope, bin_, n, stated, observed = drift[0]
+        scopes = ", ".join(sorted({scope for scope, _, _, _, _ in drift}))
+        lines.append("auction forecast drifting in %d bins (%s); worst %s, chance %s: stated %.2f, observed %.2f over %d"
+                     % (len(drift), scopes, scope, bin_, stated, observed, n))
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
 
 
@@ -107,6 +111,21 @@ def _selftest() -> None:
             out = text()
             assert "unmatched: Star Man (x, 6.0M) has no app id" in out and "Cheap Man" not in out and "Matched" not in out, \
                 "a player of UNMATCHED_FROM or more the app does not reach is told; a cheap one or a matched one is not"
+        finally:
+            set_now(None)
+
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(now)
+            with closing(connect()) as db, db:
+                db.executemany("INSERT INTO auction_calibration (run_id, scope, bin, n, stated, observed, drift) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                               [(1, "rookies", "high", 52, 0.93, 0.77, 1), (1, "veterans", "mid", 42, 0.97, 0.85, 1),
+                                (1, "keepers", "low", 30, 0.50, 0.49, 0)])
+            out = text()
+            drifting = [line for line in out.splitlines() if "drifting" in line]
+            assert len(drifting) == 1, out
+            assert "rookies" in drifting[0] and "veterans" in drifting[0] and "0.93" in drifting[0] and "0.77" in drifting[0], out
+            assert "keepers" not in out, out
         finally:
             set_now(None)
     print("health self-test OK")
