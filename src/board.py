@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import sys
 from contextlib import closing
-from typing import Any
+from typing import Any, NamedTuple
 
 import decision
 import eleven
@@ -38,8 +38,17 @@ def next_value(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, float]:
     return cells.get(min((j for j, _ in inp["dec_lock"]), default=min(cells, default=0)), {})
 
 
-def facts() -> dict[str, tuple[str, str | None, float | None]]:
-    return {k: (name, pos, trend) for k, name, pos, trend in rows("SELECT player, name_shown(name), pos, trend FROM player_facts")}
+class Fact(NamedTuple):
+    name: str
+    pos: str | None
+    trend: float | None
+
+
+UNKNOWN = Fact("", None, None)
+
+
+def facts() -> dict[str, Fact]:
+    return {k: Fact(name, pos, trend) for k, name, pos, trend in rows("SELECT player, name_shown(name), pos, trend FROM player_facts")}
 
 
 def squad_rows(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> list[Doc]:
@@ -82,8 +91,8 @@ def lineup_doc(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> 
             "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
-def standing(mine: set[str], known: dict[str, tuple[str, str | None, float | None]]) -> list[tuple[Any, ...]]:
-    return [(k, value, money, known.get(k, ("", None, None))[1], known.get(k, ("", None, None))[2]) for k, value, money in rows(
+def standing(mine: set[str], known: dict[str, Fact]) -> list[tuple[Any, ...]]:
+    return [(k, value, money, known.get(k, UNKNOWN).pos, known.get(k, UNKNOWN).trend) for k, value, money in rows(
         "SELECT t.player, t.market_value, o.money FROM offers o"
         " JOIN squads t ON t.player_team_id = o.player_team_id"
         " WHERE o.status = 'pending' AND o.money <> 0 AND t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))]
@@ -172,10 +181,10 @@ def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
             for r in [r for r in got if r["gain"] > 0][:TOP_TARGETS]]
 
 
-def list_line(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], known: dict[str, tuple[str, str | None, float | None]]) -> list[Doc]:
+def list_line(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], known: dict[str, Fact]) -> list[Doc]:
     mine = {k for k, _, m, *_ in inp["dec_player"] if m}
     listed = {k for (k,) in rows("SELECT player FROM listings WHERE player IS NOT NULL")}
-    got = {k: (ptid, pid, value, known.get(k, ("", None, None))[1]) for k, ptid, pid, value in rows(
+    got = {k: (ptid, pid, value, known.get(k, UNKNOWN).pos) for k, ptid, pid, value in rows(
         "SELECT t.player, t.player_team_id, t.player_id, t.market_value FROM squads t"
         " WHERE t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))}
     todo = sorted(mine - listed, key=lambda k: (names.get(k, k), k))
@@ -220,7 +229,7 @@ def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arri
     locks = [lock for _, lock in inp["dec_lock"]]
     bids = sum(amount for _, amount in inp["dec_bid"])
     known = facts()
-    names = {k: v[0] for k, v in known.items()}
+    names = {k: fact.name for k, fact in known.items()}
     squad = squad_rows(inp, names)
     mine = {k for k, _, m, *_ in inp["dec_player"] if m}
     offered = standing(mine, known)
