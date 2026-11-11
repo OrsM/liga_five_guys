@@ -6,7 +6,7 @@ State as of 2026-11-11, afternoon. Repo: github.com/OrsM/liga_five_guys. Main's 
 
 Miguel is 1st: 639 points against 613, 538, 486, 485. The runner-up has a far larger team value (699M against 451M) and Miguel's cash is -39M, so the lead is held with less capital.
 
-Main is at 8be8c209 and is 8 commits ahead of origin: **not pushed**. The first live run on it is tonight's 21:45; it re-applies the schema and drops the `dec_offer` table.
+Main is pushed to origin. The first live run on the merged code is the 21:45 run of 2026-11-11; it re-applies the schema and drops the `dec_offer` table. Principles and the way issues are worked are in `CLAUDE.md`; the order of work is in the four GitHub milestones.
 
 ## What changed on 2026-11-11
 
@@ -81,11 +81,11 @@ Miguel's guidance: the code complies with the Structure and Interpretation of Co
 
 ## Waiting on Miguel
 
-1. Push main to origin.
-2. Keep or drop two pieces of unmerged work: the play-chance decay commit (`P_DECAY`, `P_LIFT`) on `worktree-agent-afc738a04a6949481`, and the `docs/plan-act.md` draft on branch `act`. Nothing has been removed.
-3. Clear `/tmp` (96% full): the 1.6 GB scratchpad of an earlier session and the 364 leaked `tmp*` dirs holding only `f.db`. An automated deletion was blocked.
-4. Whether the SICP reading above is the intended one, or the stricter "each layer reads only the layer directly below".
-5. Who lowered the Javi Rodriguez bid on 2026-11-01 (#53): by hand from the board, or code.
+1. Whether the SICP reading above is the intended one, or the stricter "each layer reads only the layer directly below".
+2. The word to start #39 (approved, deferred).
+3. `./deploy.sh` for the site (#34).
+
+Settled on 2026-11-11: main pushed; `/tmp` cleared; the `P_DECAY` commit and the `docs/plan-act.md` draft are dropped (the draft is kept as the local tag `archive/plan-act-draft`); nobody knows who lowered the Javi Rodriguez bid, so #53 starts by finding whether any code path can change a bid.
 
 ## How to hand work to small models
 
