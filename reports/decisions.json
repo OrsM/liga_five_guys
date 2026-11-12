@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-11T21:40Z",
- "market_at": "2026-11-11T21:40Z",
+ "generated_at": "2026-11-12T07:17Z",
+ "market_at": "2026-11-12T07:16Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-11T21:40Z",
+   "at": "2026-11-12T07:16Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -54,64 +54,9 @@
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -38952185.0,
  "cash_locked": 0,
- "can_bid": 51344221.60000001,
+ "can_bid": 51146610.0,
  "ping": "",
- "do": [
-  {
-   "name": "Adria Pedrosa, Gerard Martin, Martin Satriano, Robin Le Normand",
-   "pos": "",
-   "what": "list",
-   "label": "list Adria Pedrosa, Gerard Martin, Martin Satriano, Robin Le Normand",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "109094607",
-     "player": "1056",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 3115900.0
-    },
-    {
-     "player_team": "107331405",
-     "player": "2757",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 35599331.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 20545017.0
-    },
-    {
-     "player_team": "109094609",
-     "player": "255",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 5361535.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
@@ -128,8 +73,8 @@
   ],
   "message": "",
   "unmapped": [],
-  "points": 58.24133608917674,
-  "best": 58.24133608917674,
+  "points": 58.23618110245466,
+  "best": 58.23618110245466,
   "advice": []
  },
  "buys": [
@@ -146,16 +91,16 @@
    "plan": false,
    "done": false,
    "key": "6310",
-   "gain": 21.733810442686988,
+   "gain": 21.50836715194758,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
    "replaces": "Fran Garcia",
-   "per_million": 0.4612278704918182,
-   "price_next": -0.020490580167084937,
-   "price_lock": -0.17524720658217874,
+   "per_million": 0.456443586153892,
+   "price_next": -0.020054938971644454,
+   "price_lock": -0.15730231230135405,
    "facts": [
     [
      "asking",
@@ -174,14 +119,14 @@
     ],
     [
      "points added",
-     21.733810442686988,
+     21.50836715194758,
      "points"
     ]
    ],
    "bids": 0,
    "auction": {
     "yours": false,
-    "listings": 34,
+    "listings": 32,
     "thin": false,
     "cell": "0/3/0"
    },
@@ -190,7 +135,7 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 4222588.600000009,
+    "margin": 4024977.0,
     "lock_margin": 26001160.0,
     "lock_margin_low": 19612886.253999993,
     "if_won": [
@@ -237,10 +182,10 @@
      "Martin Satriano"
     ],
     "cash_if_lost": 11751602.0,
-    "gain": 21.733810442686945,
+    "gain": 21.508367151947596,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 21.733810442686945
+    "net": 21.508367151947596
    },
    "accepts": [],
    "act": []
@@ -251,140 +196,140 @@
    "name": "Lamine Yamal",
    "pos": "DEL",
    "status": "rival",
-   "gain": 153.51850149575884,
+   "gain": 153.53172654393933,
    "asking": 180613716.0,
    "bid": null,
    "win": null,
    "replaces": "Antony",
-   "per_million": 0.8499825201301923,
-   "price_next": -0.00575678400608437,
-   "price_lock": -0.04923532216934701,
+   "per_million": 0.8500557429643899,
+   "price_next": -0.006839223618398282,
+   "price_lock": -0.05364392736578161,
    "available": false
   },
   {
    "name": "Kylian Mbappe",
    "pos": "DEL",
    "status": "unlisted",
-   "gain": 131.3490346554452,
+   "gain": 131.4043942060215,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Antony",
-   "per_million": 0.7218508703145136,
-   "price_next": 0.002217523511899966,
-   "price_lock": 0.018965534300244835,
+   "per_million": 0.720398926073646,
+   "price_next": 0.0023730281823926003,
+   "price_lock": 0.01861301202533805,
    "available": false
   },
   {
    "name": "Raphinha",
    "pos": "DEL",
    "status": "rival",
-   "gain": 107.3166679577385,
+   "gain": 107.32132461560617,
    "asking": 171563423.0,
    "bid": null,
    "win": null,
    "replaces": "Antony",
-   "per_million": 0.62552183956914,
-   "price_next": -0.00572441184057082,
-   "price_lock": -0.048958456822879914,
+   "per_million": 0.6255489820554943,
+   "price_next": -0.00783450973149058,
+   "price_lock": -0.061450523397423185,
    "available": false
   },
   {
    "name": "Arda Guler",
    "pos": "MED",
    "status": "unlisted",
-   "gain": 78.66233596624113,
+   "gain": 78.74152375550638,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.5733040491449182,
-   "price_next": 0.014704471008946118,
-   "price_lock": 0.12576107887495858,
+   "per_million": 0.5639661035822126,
+   "price_next": 0.015283529453669509,
+   "price_lock": 0.11987742902570075,
    "available": false
   },
   {
    "name": "Jude Bellingham",
    "pos": "MED",
    "status": "rival",
-   "gain": 74.33349625959599,
+   "gain": 74.40381240220829,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.511149449937783,
-   "price_next": 0.008722587642787882,
-   "price_lock": 0.0746005777338743,
+   "per_million": 0.5049537661296181,
+   "price_next": 0.01015247886584092,
+   "price_lock": 0.07963167594004728,
    "available": false
   },
   {
    "name": "Fermin Lopez",
    "pos": "MED",
    "status": "rival",
-   "gain": 69.32552809669326,
+   "gain": 69.43504823101576,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.5751747134056143,
-   "price_next": 0.0209446342544386,
-   "price_lock": 0.17913053783961996,
+   "per_million": 0.5604470994282972,
+   "price_next": 0.02377168724959744,
+   "price_lock": 0.18645488659692844,
    "available": false
   },
   {
    "name": "Alex Grimaldo",
    "pos": "DEF",
    "status": "unlisted",
-   "gain": 68.46278124571889,
+   "gain": 68.28446107329545,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Fran Garcia",
-   "per_million": 0.706682759500367,
-   "price_next": -0.004834169617484396,
-   "price_lock": -0.04134459418427949,
+   "per_million": 0.7152930652017369,
+   "price_next": -0.009665713344701898,
+   "price_lock": -0.0758136966317069,
    "available": false
   },
   {
    "name": "Dean Huijsen",
    "pos": "DEF",
    "status": "unlisted",
-   "gain": 40.11383023272769,
+   "gain": 40.19949470015443,
    "asking": null,
    "bid": null,
    "win": null,
    "replaces": "Fran Garcia",
-   "per_million": 0.883988097484852,
-   "price_next": 0.032674389431186945,
-   "price_lock": 0.2794501389371056,
+   "per_million": 0.8534528642387701,
+   "price_next": 0.0323837204669053,
+   "price_lock": 0.25400396967386896,
    "available": false
   },
   {
    "name": "Marcos Llorente",
    "pos": "DEF",
    "status": "rival",
-   "gain": 37.18718845849334,
+   "gain": 37.11472090553998,
    "asking": 58564537.0,
    "bid": null,
    "win": null,
    "replaces": "Fran Garcia",
-   "per_million": 0.6349779297067325,
-   "price_next": -0.013681967889166091,
-   "price_lock": -0.11701604510813335,
+   "per_million": 0.6337405332093717,
+   "price_next": -0.014864369603398209,
+   "price_lock": -0.11658971951111186,
    "available": false
   },
   {
-   "name": "David Hancko",
-   "pos": "DEF",
-   "status": "rival",
-   "gain": 35.92850787635824,
-   "asking": 61130097.0,
+   "name": "Federico Valverde",
+   "pos": "MED",
+   "status": "unlisted",
+   "gain": 35.886349665732396,
+   "asking": null,
    "bid": null,
    "win": null,
-   "replaces": "Fran Garcia",
-   "per_million": 0.5877384404667023,
-   "price_next": 0.0006847269446172977,
-   "price_lock": 0.005856177977257904,
+   "replaces": "Guido Rodriguez",
+   "per_million": 0.4699776777280081,
+   "price_next": 0.033470006931921814,
+   "price_lock": 0.26252433331149416,
    "available": false
   }
  ],
@@ -393,57 +338,57 @@
   "brier": [
    {
     "scope": "backtest:all",
-    "n": 3033,
-    "model": 0.034498803995096514,
-    "pooled": 0.04405049138123615
+    "n": 3085,
+    "model": 0.03466805870659858,
+    "pooled": 0.04442559451926397
    },
    {
     "scope": "backtest:big",
-    "n": 280,
-    "model": 0.10416786634776914,
-    "pooled": 0.11993895655323296
+    "n": 276,
+    "model": 0.10571347992021639,
+    "pooled": 0.12176634332678009
    },
    {
     "scope": "backtest:norival",
-    "n": 2817,
-    "model": 0.02213566669240733,
-    "pooled": 0.025577882026280595
+    "n": 2869,
+    "model": 0.02255461006083466,
+    "pooled": 0.02630852206773959
    },
    {
     "scope": "backtest:ours",
-    "n": 284,
-    "model": 0.19062445404419043,
-    "pooled": 0.25861417528318253
+    "n": 289,
+    "model": 0.1869281140264689,
+    "pooled": 0.25472689748322047
    },
    {
     "scope": "backtest:rival",
     "n": 216,
-    "model": 0.19573471965100134,
-    "pooled": 0.2849641050521148
+    "model": 0.19556381872834247,
+    "pooled": 0.2850639318499282
    },
    {
     "scope": "backtest:small",
-    "n": 2753,
-    "model": 0.027412956752543544,
-    "pooled": 0.036332085915141296
+    "n": 2809,
+    "model": 0.027687447722277284,
+    "pooled": 0.03682643230108154
    },
    {
     "scope": "live:all",
-    "n": 102,
-    "model": 0.02571579192957096,
-    "pooled": 0.02571579192957096
+    "n": 154,
+    "model": 0.03255921230283502,
+    "pooled": 0.03255921230283502
    },
    {
     "scope": "live:norival",
-    "n": 84,
-    "model": 0.005402093658096997,
-    "pooled": 0.005402093658096997
+    "n": 136,
+    "model": 0.020918263125738988,
+    "pooled": 0.020918263125738988
    },
    {
     "scope": "live:ours",
-    "n": 26,
-    "model": 0.04116281349580298,
-    "pooled": 0.04116281349580298
+    "n": 30,
+    "model": 0.035674438363029255,
+    "pooled": 0.035674438363029255
    },
    {
     "scope": "live:rival",
@@ -453,53 +398,53 @@
    },
    {
     "scope": "live:small",
-    "n": 102,
-    "model": 0.02571579192957096,
-    "pooled": 0.02571579192957096
+    "n": 154,
+    "model": 0.03255921230283502,
+    "pooled": 0.03255921230283502
    }
   ],
   "drift": [
    {
     "scope": "backtest:big",
     "bin": "0.99-1.00",
-    "n": 37,
+    "n": 58,
     "stated": 1.0,
-    "observed": 0.918918918918919
+    "observed": 0.9482758620689655
+   },
+   {
+    "scope": "backtest:ours",
+    "bin": "0.00-0.50",
+    "n": 20,
+    "stated": 0.36708737097315275,
+    "observed": 0.1
    },
    {
     "scope": "backtest:ours",
     "bin": "0.50-0.80",
-    "n": 50,
-    "stated": 0.6935378921351786,
-    "observed": 0.52
+    "n": 46,
+    "stated": 0.6872273794130019,
+    "observed": 0.4782608695652174
    },
    {
     "scope": "backtest:ours",
     "bin": "0.80-0.90",
-    "n": 65,
-    "stated": 0.8433681480330717,
-    "observed": 0.6923076923076923
+    "n": 64,
+    "stated": 0.8417996233688861,
+    "observed": 0.6875
    },
    {
     "scope": "backtest:ours",
     "bin": "0.90-0.95",
-    "n": 52,
-    "stated": 0.931068658296027,
-    "observed": 0.7692307692307693
+    "n": 46,
+    "stated": 0.9323604195245039,
+    "observed": 0.7391304347826086
    },
    {
     "scope": "backtest:ours",
     "bin": "0.95-0.99",
     "n": 42,
-    "stated": 0.9743942315968666,
-    "observed": 0.8095238095238095
-   },
-   {
-    "scope": "backtest:ours",
-    "bin": "0.99-1.00",
-    "n": 56,
-    "stated": 0.999491633730789,
-    "observed": 0.9285714285714286
+    "stated": 0.9734328323896109,
+    "observed": 0.7857142857142857
    }
   ]
  },
@@ -512,7 +457,7 @@
    "step": "take offer",
    "offer": 677173.0,
    "waiting": null,
-   "trend": 4.897533055548878,
+   "trend": 4.464348449734415,
    "plan": false,
    "amount": 677173.0,
    "done": false,
@@ -523,7 +468,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0907051209777436,
+   "ratio": 1.0868137529470485,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -533,7 +478,7 @@
    "facts": [
     [
      "value",
-     620858.0,
+     623081.0,
      "money"
     ],
     [
@@ -543,7 +488,7 @@
     ],
     [
      "offer over value",
-     1.0907051209777436,
+     1.0868137529470485,
      "ratio"
     ],
     [
@@ -574,7 +519,7 @@
    "step": "take offer",
    "offer": 3623812.0,
    "waiting": null,
-   "trend": -34.48747593888065,
+   "trend": -35.426462539881314,
    "plan": false,
    "amount": 3623812.0,
    "done": false,
@@ -585,7 +530,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9486461065402647,
+   "ratio": 0.9736208673036906,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -595,7 +540,7 @@
    "facts": [
     [
      "value",
-     3819983.0,
+     3721995.0,
      "money"
     ],
     [
@@ -605,7 +550,7 @@
     ],
     [
      "offer over value",
-     0.9486461065402647,
+     0.9736208673036906,
      "ratio"
     ],
     [
@@ -636,7 +581,7 @@
    "step": "take offer",
    "offer": 8150755.0,
    "waiting": null,
-   "trend": -27.89522101586301,
+   "trend": -28.792460488651006,
    "plan": false,
    "amount": 8150755.0,
    "done": false,
@@ -647,7 +592,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9829235564933935,
+   "ratio": 1.0038006653781442,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -657,7 +602,7 @@
    "facts": [
     [
      "value",
-     8292359.0,
+     8119894.0,
      "money"
     ],
     [
@@ -667,7 +612,7 @@
     ],
     [
      "offer over value",
-     0.9829235564933935,
+     1.0038006653781442,
      "ratio"
     ],
     [
@@ -698,7 +643,7 @@
    "step": "take offer",
    "offer": 6107502.0,
    "waiting": null,
-   "trend": -30.229291426633292,
+   "trend": -30.889958357201973,
    "plan": false,
    "amount": 6107502.0,
    "done": false,
@@ -709,7 +654,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.901367081568418,
+   "ratio": 0.9219192397500955,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -719,7 +664,7 @@
    "facts": [
     [
      "value",
-     6775821.0,
+     6624769.0,
      "money"
     ],
     [
@@ -729,7 +674,7 @@
     ],
     [
      "offer over value",
-     0.901367081568418,
+     0.9219192397500955,
      "ratio"
     ],
     [
@@ -760,7 +705,7 @@
    "step": "take offer",
    "offer": 3425240.0,
    "waiting": null,
-   "trend": -12.367448257513573,
+   "trend": -13.67984793420335,
    "plan": false,
    "amount": 3425240.0,
    "done": false,
@@ -771,7 +716,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0992778972367534,
+   "ratio": 1.110723060853955,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -781,7 +726,7 @@
    "facts": [
     [
      "value",
-     3115900.0,
+     3083793.0,
      "money"
     ],
     [
@@ -791,7 +736,7 @@
     ],
     [
      "offer over value",
-     1.0992778972367534,
+     1.110723060853955,
      "ratio"
     ],
     [
@@ -822,7 +767,7 @@
    "step": "take offer",
    "offer": 5361795.0,
    "waiting": null,
-   "trend": -27.19725839437571,
+   "trend": -29.35415188725203,
    "plan": false,
    "amount": 5361795.0,
    "done": false,
@@ -833,7 +778,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0000484935750675,
+   "ratio": 1.0225244312967754,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -843,7 +788,7 @@
    "facts": [
     [
      "value",
-     5361535.0,
+     5243684.0,
      "money"
     ],
     [
@@ -853,7 +798,7 @@
     ],
     [
      "offer over value",
-     1.0000484935750675,
+     1.0225244312967754,
      "ratio"
     ],
     [
@@ -884,7 +829,7 @@
    "step": "take offer",
    "offer": 13881648.0,
    "waiting": null,
-   "trend": -26.28597377495444,
+   "trend": -27.538585575491457,
    "plan": false,
    "amount": 13881648.0,
    "done": false,
@@ -895,7 +840,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0813577592502561,
+   "ratio": 1.1030821526206336,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -905,7 +850,7 @@
    "facts": [
     [
      "value",
-     12837239.0,
+     12584419.0,
      "money"
     ],
     [
@@ -915,7 +860,7 @@
     ],
     [
      "offer over value",
-     1.0813577592502561,
+     1.1030821526206336,
      "ratio"
     ],
     [
@@ -946,7 +891,7 @@
    "step": "take offer",
    "offer": 29185404.0,
    "waiting": null,
-   "trend": -32.74319882112242,
+   "trend": -33.45350048051118,
    "plan": false,
    "amount": 29185404.0,
    "done": false,
@@ -957,7 +902,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.072886057732639,
+   "ratio": 1.0994697641712383,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -967,7 +912,7 @@
    "facts": [
     [
      "value",
-     27202706.0,
+     26544981.0,
      "money"
     ],
     [
@@ -977,7 +922,7 @@
     ],
     [
      "offer over value",
-     1.072886057732639,
+     1.0994697641712383,
      "ratio"
     ],
     [
@@ -1008,28 +953,28 @@
    "step": "take offer",
    "offer": 37238996.0,
    "waiting": null,
-   "trend": -20.840189861401736,
+   "trend": -20.970860808716097,
    "plan": false,
    "amount": 37238996.0,
    "done": false,
    "key": "8405",
-   "gain": -1.4146922952852492,
+   "gain": -1.4985333481974976,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9680918815716142,
+   "ratio": 0.9835901623223728,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
-    "season": 1.4146922952852492
+    "season": 1.4985333481974976
    },
    "per_million": 0.0,
    "facts": [
     [
      "value",
-     38466386.0,
+     37860277.0,
      "money"
     ],
     [
@@ -1039,7 +984,7 @@
     ],
     [
      "offer over value",
-     0.9680918815716142,
+     0.9835901623223728,
      "ratio"
     ],
     [
@@ -1054,7 +999,7 @@
     ],
     [
      "season",
-     1.4146922952852492,
+     1.4985333481974976,
      "points"
     ]
    ],
@@ -1070,7 +1015,7 @@
    "step": "take offer",
    "offer": 23357510.0,
    "waiting": null,
-   "trend": -20.55120970931033,
+   "trend": -21.560163703951762,
    "plan": false,
    "amount": 23357510.0,
    "done": false,
@@ -1081,17 +1026,17 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.047517330052915,
+   "ratio": 1.0642336190789314,
    "lost": {
-    "next4": 1.8717240142276523,
-    "next8": 3.0925710634306256,
+    "next4": 1.8575830803648898,
+    "next8": 3.0655125415041766,
     "season": 0.0
    },
-   "per_million": 0.13240157291725982,
+   "per_million": 0.13124312229788948,
    "facts": [
     [
      "value",
-     22297970.0,
+     21947728.0,
      "money"
     ],
     [
@@ -1101,17 +1046,17 @@
     ],
     [
      "offer over value",
-     1.047517330052915,
+     1.0642336190789314,
      "ratio"
     ],
     [
      "points lost, next 4",
-     1.8717240142276523,
+     1.8575830803648898,
      "points"
     ],
     [
      "next 8",
-     3.0925710634306256,
+     3.0655125415041766,
      "points"
     ],
     [
@@ -1132,28 +1077,28 @@
    "step": "take offer",
    "offer": 51967714.0,
    "waiting": null,
-   "trend": -24.4219819084114,
+   "trend": -25.701822297959247,
    "plan": false,
    "amount": 51967714.0,
    "done": false,
    "key": "2675",
-   "gain": -15.654616951296475,
+   "gain": -15.722808360338604,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0564950457920383,
+   "ratio": 1.0769778998226816,
    "lost": {
-    "next4": 5.25212575231194,
-    "next8": 7.023995038503529,
-    "season": 15.654616951296475
+    "next4": 5.248527070601568,
+    "next8": 7.018333409390948,
+    "season": 15.722808360338604
    },
-   "per_million": 0.13516074689187846,
+   "per_million": 0.135051801766592,
    "facts": [
     [
      "value",
-     49188791.0,
+     48253278.0,
      "money"
     ],
     [
@@ -1163,22 +1108,22 @@
     ],
     [
      "offer over value",
-     1.0564950457920383,
+     1.0769778998226816,
      "ratio"
     ],
     [
      "points lost, next 4",
-     5.25212575231194,
+     5.248527070601568,
      "points"
     ],
     [
      "next 8",
-     7.023995038503529,
+     7.018333409390948,
      "points"
     ],
     [
      "season",
-     15.654616951296475,
+     15.722808360338604,
      "points"
     ]
    ],
@@ -1194,28 +1139,28 @@
    "step": "take offer",
    "offer": 47685378.0,
    "waiting": null,
-   "trend": 17.820957773235474,
+   "trend": 20.281067832203398,
    "plan": false,
    "amount": 47685378.0,
    "done": false,
    "key": "2715",
-   "gain": -12.07444796127811,
+   "gain": -12.186988938566856,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.036296043690599,
+   "ratio": 1.018944460114362,
    "lost": {
-    "next4": 4.357572641070277,
-    "next8": 11.280055611529292,
-    "season": 12.07444796127811
+    "next4": 4.3649134089992,
+    "next8": 11.309860089570975,
+    "season": 12.186988938566856
    },
-   "per_million": 0.23655166603752814,
+   "per_million": 0.23717668945753087,
    "facts": [
     [
      "value",
-     46015208.0,
+     46798800.0,
      "money"
     ],
     [
@@ -1225,22 +1170,22 @@
     ],
     [
      "offer over value",
-     1.036296043690599,
+     1.018944460114362,
      "ratio"
     ],
     [
      "points lost, next 4",
-     4.357572641070277,
+     4.3649134089992,
      "points"
     ],
     [
      "next 8",
-     11.280055611529292,
+     11.309860089570975,
      "points"
     ],
     [
      "season",
-     12.07444796127811,
+     12.186988938566856,
      "points"
     ]
    ],
@@ -1256,28 +1201,28 @@
    "step": "take offer",
    "offer": 20340422.0,
    "waiting": null,
-   "trend": 13.723017650008952,
+   "trend": 8.862096769898308,
    "plan": false,
    "amount": 20340422.0,
    "done": false,
    "key": "8496",
-   "gain": -13.128507726926046,
+   "gain": -13.293356896944715,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9900416242050323,
+   "ratio": 0.9859919816374679,
    "lost": {
-    "next4": 2.101827349921109,
-    "next8": 5.0427750178023985,
-    "season": 13.128507726926046
+    "next4": 2.1135225587997866,
+    "next8": 5.065915819488794,
+    "season": 13.293356896944715
    },
-   "per_million": 0.247918898526412,
+   "per_million": 0.24905657412067428,
    "facts": [
     [
      "value",
-     20545017.0,
+     20629399.0,
      "money"
     ],
     [
@@ -1287,22 +1232,22 @@
     ],
     [
      "offer over value",
-     0.9900416242050323,
+     0.9859919816374679,
      "ratio"
     ],
     [
      "points lost, next 4",
-     2.101827349921109,
+     2.1135225587997866,
      "points"
     ],
     [
      "next 8",
-     5.0427750178023985,
+     5.065915819488794,
      "points"
     ],
     [
      "season",
-     13.128507726926046,
+     13.293356896944715,
      "points"
     ]
    ],
@@ -1318,28 +1263,28 @@
    "step": "take offer",
    "offer": 51073832.0,
    "waiting": null,
-   "trend": 32.364289436784865,
+   "trend": 33.637631101454105,
    "plan": false,
    "amount": 51073832.0,
    "done": false,
    "key": "2632",
-   "gain": -37.41543476070365,
+   "gain": -37.539800451718975,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0071149392585872,
+   "ratio": 0.9828390170245851,
    "lost": {
-    "next4": 11.118295592320493,
-    "next8": 18.209183214680536,
-    "season": 37.41543476070365
+    "next4": 11.12837214277394,
+    "next8": 18.242346048258696,
+    "season": 37.539800451718975
    },
-   "per_million": 0.3565266693652541,
+   "per_million": 0.35717598100449355,
    "facts": [
     [
      "value",
-     50713012.0,
+     51965613.0,
      "money"
     ],
     [
@@ -1349,22 +1294,22 @@
     ],
     [
      "offer over value",
-     1.0071149392585872,
+     0.9828390170245851,
      "ratio"
     ],
     [
      "points lost, next 4",
-     11.118295592320493,
+     11.12837214277394,
      "points"
     ],
     [
      "next 8",
-     18.209183214680536,
+     18.242346048258696,
      "points"
     ],
     [
      "season",
-     37.41543476070365,
+     37.539800451718975,
      "points"
     ]
    ],
@@ -1380,28 +1325,28 @@
    "step": "take offer",
    "offer": 32993622.0,
    "waiting": null,
-   "trend": -17.781094414097527,
+   "trend": -17.74964402625575,
    "plan": false,
    "amount": 32993622.0,
    "done": false,
    "key": "12641",
-   "gain": -21.984174081286028,
+   "gain": -22.01994392892493,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9268045514675542,
+   "ratio": 0.9387909216620164,
    "lost": {
-    "next4": 6.205693434111879,
-    "next8": 12.880717317358801,
-    "season": 21.984174081286028
+    "next4": 6.202147322001025,
+    "next8": 12.887074316551605,
+    "season": 22.01994392892493
    },
-   "per_million": 0.3904002209081137,
+   "per_million": 0.3905928944858374,
    "facts": [
     [
      "value",
-     35599331.0,
+     35144803.0,
      "money"
     ],
     [
@@ -1411,22 +1356,22 @@
     ],
     [
      "offer over value",
-     0.9268045514675542,
+     0.9387909216620164,
      "ratio"
     ],
     [
      "points lost, next 4",
-     6.205693434111879,
+     6.202147322001025,
      "points"
     ],
     [
      "next 8",
-     12.880717317358801,
+     12.887074316551605,
      "points"
     ],
     [
      "season",
-     21.984174081286028,
+     22.01994392892493,
      "points"
     ]
    ],
@@ -1442,28 +1387,28 @@
    "step": "take offer",
    "offer": 50089130.0,
    "waiting": null,
-   "trend": 1.9294409716950875,
+   "trend": 8.847052650424168,
    "plan": false,
    "amount": 50089130.0,
    "done": false,
    "key": "11813",
-   "gain": -41.29605314806213,
+   "gain": -41.38834875396287,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9829351333571199,
+   "ratio": 0.9729024197468786,
    "lost": {
-    "next4": 10.999424058060441,
-    "next8": 22.10355908014418,
-    "season": 41.29605314806213
+    "next4": 11.004219721677828,
+    "next8": 22.12725706391467,
+    "season": 41.38834875396287
    },
-   "per_million": 0.44128454776803233,
+   "per_million": 0.44175766406632877,
    "facts": [
     [
      "value",
-     50958734.0,
+     51484228.0,
      "money"
     ],
     [
@@ -1473,22 +1418,22 @@
     ],
     [
      "offer over value",
-     0.9829351333571199,
+     0.9729024197468786,
      "ratio"
     ],
     [
      "points lost, next 4",
-     10.999424058060441,
+     11.004219721677828,
      "points"
     ],
     [
      "next 8",
-     22.10355908014418,
+     22.12725706391467,
      "points"
     ],
     [
      "season",
-     41.29605314806213,
+     41.38834875396287,
      "points"
     ]
    ],
@@ -1504,28 +1449,28 @@
    "step": "take offer",
    "offer": 18304139.0,
    "waiting": null,
-   "trend": -1.2961879547454456,
+   "trend": 3.6220510632835285,
    "plan": false,
    "amount": 18304139.0,
    "done": false,
    "key": "6392",
-   "gain": -3.469463054822427,
+   "gain": -3.5603039963473293,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9352292257322402,
+   "ratio": 0.9313833084393047,
    "lost": {
-    "next4": 5.059458601325474,
-    "next8": 9.892115234696575,
-    "season": 3.469463054822427
+    "next4": 5.064025836841807,
+    "next8": 9.915343613559571,
+    "season": 3.5603039963473293
    },
-   "per_million": 0.5404305132678776,
+   "per_million": 0.5416995365670886,
    "facts": [
     [
      "value",
-     19571821.0,
+     19652638.0,
      "money"
     ],
     [
@@ -1535,22 +1480,22 @@
     ],
     [
      "offer over value",
-     0.9352292257322402,
+     0.9313833084393047,
      "ratio"
     ],
     [
      "points lost, next 4",
-     5.059458601325474,
+     5.064025836841807,
      "points"
     ],
     [
      "next 8",
-     9.892115234696575,
+     9.915343613559571,
      "points"
     ],
     [
      "season",
-     3.469463054822427,
+     3.5603039963473293,
      "points"
     ]
    ],
@@ -1566,28 +1511,28 @@
    "step": "take offer",
    "offer": 19098066.0,
    "waiting": null,
-   "trend": 13.634290378913706,
+   "trend": 18.036148773426444,
    "plan": false,
    "amount": 19098066.0,
    "done": false,
    "key": "7658",
-   "gain": -15.28682151343537,
+   "gain": -15.398250651650642,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9388463978272402,
+   "ratio": 0.924763545247815,
    "lost": {
-    "next4": 6.941740482316277,
-    "next8": 11.80828778128091,
-    "season": 15.28682151343537
+    "next4": 6.949548470522501,
+    "next8": 11.837608497641895,
+    "season": 15.398250651650642
    },
-   "per_million": 0.6182975690460443,
+   "per_million": 0.619832840542173,
    "facts": [
     [
      "value",
-     20342056.0,
+     20651837.0,
      "money"
     ],
     [
@@ -1597,22 +1542,22 @@
     ],
     [
      "offer over value",
-     0.9388463978272402,
+     0.924763545247815,
      "ratio"
     ],
     [
      "points lost, next 4",
-     6.941740482316277,
+     6.949548470522501,
      "points"
     ],
     [
      "next 8",
-     11.80828778128091,
+     11.837608497641895,
      "points"
     ],
     [
      "season",
-     15.28682151343537,
+     15.398250651650642,
      "points"
     ]
    ],
@@ -1628,28 +1573,28 @@
    "step": "take offer",
    "offer": 11645797.0,
    "waiting": null,
-   "trend": -16.40319212700327,
+   "trend": -19.03010666281325,
    "plan": false,
    "amount": 11645797.0,
    "done": false,
    "key": "7676",
-   "gain": -5.9823089403355425,
+   "gain": -6.005755133579896,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0014049665943159,
+   "ratio": 1.0158670274397916,
    "lost": {
-    "next4": 3.603255080221402,
-    "next8": 9.530770508574165,
-    "season": 5.9823089403355425
+    "next4": 3.5980790033838446,
+    "next8": 9.532774083300524,
+    "season": 6.005755133579896
    },
-   "per_million": 0.8183871407490758,
+   "per_million": 0.8185591834805744,
    "facts": [
     [
      "value",
-     11629458.0,
+     11463899.0,
      "money"
     ],
     [
@@ -1659,22 +1604,22 @@
     ],
     [
      "offer over value",
-     1.0014049665943159,
+     1.0158670274397916,
      "ratio"
     ],
     [
      "points lost, next 4",
-     3.603255080221402,
+     3.5980790033838446,
      "points"
     ],
     [
      "next 8",
-     9.530770508574165,
+     9.532774083300524,
      "points"
     ],
     [
      "season",
-     5.9823089403355425,
+     6.005755133579896,
      "points"
     ]
    ],
@@ -1690,28 +1635,28 @@
    "step": "take offer",
    "offer": 19591205.0,
    "waiting": null,
-   "trend": -5.519299372640766,
+   "trend": -2.454864423923364,
    "plan": false,
    "amount": 19591205.0,
    "done": false,
    "key": "1743",
-   "gain": -97.8411870374789,
+   "gain": -97.84260280536546,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0807242536455512,
+   "ratio": 1.082694537713723,
    "lost": {
-    "next4": 29.86317968183684,
-    "next8": 55.304874894411,
-    "season": 97.8411870374789
+    "next4": 29.865288326295598,
+    "next8": 55.30853352207447,
+    "season": 97.84260280536546
    },
-   "per_million": 2.822944014643867,
+   "per_million": 2.823130763119189,
    "facts": [
     [
      "value",
-     18127848.0,
+     18094859.0,
      "money"
     ],
     [
@@ -1721,22 +1666,22 @@
     ],
     [
      "offer over value",
-     1.0807242536455512,
+     1.082694537713723,
      "ratio"
     ],
     [
      "points lost, next 4",
-     29.86317968183684,
+     29.865288326295598,
      "points"
     ],
     [
      "next 8",
-     55.304874894411,
+     55.30853352207447,
      "points"
     ],
     [
      "season",
-     97.8411870374789,
+     97.84260280536546,
      "points"
     ]
    ],
@@ -1749,7 +1694,7 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "next": 6.930632675215552,
+   "next": 6.931122048428384,
    "xi": true,
    "best": true,
    "sold": false
@@ -1757,7 +1702,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "next": 6.313683833672293,
+   "next": 6.314399032119819,
    "xi": true,
    "best": true,
    "sold": false
@@ -1765,7 +1710,7 @@
   {
    "name": "Fran Garcia",
    "pos": "DEF",
-   "next": 4.718136871648473,
+   "next": 4.718790711529975,
    "xi": true,
    "best": true,
    "sold": false
@@ -1773,7 +1718,7 @@
   {
    "name": "Adria Pedrosa",
    "pos": "DEF",
-   "next": 3.7945311090033145,
+   "next": 3.793883861570617,
    "xi": true,
    "best": true,
    "sold": false
@@ -1781,7 +1726,7 @@
   {
    "name": "Pablo Fornals",
    "pos": "MED",
-   "next": 6.036300753862221,
+   "next": 6.038330456290959,
    "xi": true,
    "best": true,
    "sold": false
@@ -1789,7 +1734,7 @@
   {
    "name": "German Valera",
    "pos": "MED",
-   "next": 5.611112303428327,
+   "next": 5.612749688232636,
    "xi": true,
    "best": true,
    "sold": false
@@ -1797,7 +1742,7 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "next": 4.347756945931706,
+   "next": 4.349099632518806,
    "xi": true,
    "best": true,
    "sold": false
@@ -1805,7 +1750,7 @@
   {
    "name": "Guido Rodriguez",
    "pos": "MED",
-   "next": 4.1597857674443395,
+   "next": 4.157898299431055,
    "xi": true,
    "best": true,
    "sold": false
@@ -1813,7 +1758,7 @@
   {
    "name": "Mikel Oyarzabal",
    "pos": "DEL",
-   "next": 7.409126807371403,
+   "next": 7.405987792796666,
    "xi": true,
    "best": true,
    "sold": false
@@ -1821,7 +1766,7 @@
   {
    "name": "Iñigo Vicente",
    "pos": "DEL",
-   "next": 4.678597893062837,
+   "next": 4.673710977238835,
    "xi": true,
    "best": true,
    "sold": false
@@ -1829,7 +1774,7 @@
   {
    "name": "Antony",
    "pos": "DEL",
-   "next": 4.241671128536273,
+   "next": 4.240208602296906,
    "xi": true,
    "best": true,
    "sold": false
@@ -1845,7 +1790,7 @@
   {
    "name": "Gerard Martin",
    "pos": "DEF",
-   "next": 3.4098196942239305,
+   "next": 3.408784743380274,
    "xi": false,
    "best": false,
    "sold": false
@@ -1853,7 +1798,7 @@
   {
    "name": "Robin Le Normand",
    "pos": "DEF",
-   "next": 3.1573982085273578,
+   "next": 3.155691411228238,
    "xi": false,
    "best": false,
    "sold": false
@@ -1861,7 +1806,7 @@
   {
    "name": "Aitor Paredes",
    "pos": "DEF",
-   "next": 2.343313415286591,
+   "next": 2.3416845632060124,
    "xi": false,
    "best": false,
    "sold": false
@@ -1869,7 +1814,7 @@
   {
    "name": "Dani Martinez",
    "pos": "DEF",
-   "next": 0.9055448733551675,
+   "next": 0.9072971415403502,
    "xi": false,
    "best": false,
    "sold": false
@@ -1877,7 +1822,7 @@
   {
    "name": "Miguel Roman",
    "pos": "MED",
-   "next": 0.43022209719540216,
+   "next": 0.42996622241295884,
    "xi": false,
    "best": false,
    "sold": false
@@ -1893,7 +1838,7 @@
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "next": 3.937208407475301,
+   "next": 3.938356354639117,
    "xi": false,
    "best": false,
    "sold": false
@@ -1901,7 +1846,7 @@
   {
    "name": "Ferran Jutgla",
    "pos": "DEL",
-   "next": 2.032735131109024,
+   "next": 2.0316086557184603,
    "xi": false,
    "best": false,
    "sold": false
