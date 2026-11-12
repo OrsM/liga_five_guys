@@ -119,7 +119,6 @@ def _selftest() -> None:
     assert got[("rules", "DEBT_SHARE")]["kind"] == "constant"
     _selftest_market()
     _selftest_facts()
-    _selftest_sale()
     _selftest_prior()
     _selftest_points()
     print("assemble self-test OK")
@@ -270,78 +269,6 @@ def _selftest_points() -> None:
             set_now(None)
 
 
-def _selftest_sale() -> None:
-    """schema.sql's nights_left and sale_odds: what selling a player with an
-    offer standing on him gets, against the recursion they replace."""
-    import tempfile
-    from pathlib import Path
-
-    from ffcore.db import set_now
-    from ffcore.db import record
-    from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import store_sql, tables_in
-
-    def at(n: int) -> str:
-        return "2026-09-0%dT1000Z" % n
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), set_constants(
-            PRICE_WINDOW=3.0, CLIP=20.0, PRICE_W0=1.0, PRICE_W1=0.0, PRICE_W2=0.0):
-        try:
-            set_now(snapshot_stamp("2026-09-04T1200Z"))
-            record([{"me": "me", "budget": 100e6}], "league_config")
-            record([{"player_id": "p1", "app_id": "1"}, {"player_id": "p2", "app_id": "2"}],
-                   "crosswalk")
-            store_sql("market", [{"observed_at": at(1), "ff_id": k, "name": k, "value": "10000000"}
-                                 for k in ("p1", "p2", "p3")])
-            store_sql("api_standings", [{"observed_at": at(1), "user_id": "1", "manager": "me"}])
-            store_sql("matches", [{"observed_at": at(1), "match_id": "m", "jornada": "1",
-                                   "home": "a", "away": "b", "kickoff": "2026-09-05T19:00:00+00:00"}])
-            # past nightly offers, 0.8 / 0.9 / 1.0 / 1.1 of value: the last three count
-            for n, money in enumerate(("8000000", "9000000", "10000000", "11000000"), 1):
-                store_sql("api_teams", [{"observed_at": at(n), "player_id": "1", "manager": "me",
-                                         "market_value": "10000000", "player_team_id": "t1"}])
-                store_sql("api_offers", [{"observed_at": at(n), "player_team_id": "t1",
-                                          "offer_id": "o%d" % n, "from_market": "true",
-                                          "money": money, "status": "accepted",
-                                          "created_at": "2026-09-0%dT09:00:00+02:00" % n}])
-            store_sql("api_teams", [{"observed_at": at(3), "player_id": "2", "manager": "riv",
-                                     "market_value": "10000000", "player_team_id": "t2"}])
-            def sale(offer: str, expires: str = "2026-09-04T20:00:00+02:00"
-                     ) -> dict[str, tuple[Any, ...]]:
-                store_sql("api_offers", [{"observed_at": at(4), "player_team_id": "t1",
-                                          "offer_id": "now", "status": "pending", "money": offer,
-                                          "expires_at": expires}])
-                return {r[0]: r for r in rows("SELECT player, offer, waiting, fetches FROM sale_odds")}
-            assert rows("SELECT nights FROM nights_left") == [(0,)], "no offer standing: no nights"
-            got = sale("10500000")
-            assert rows("SELECT nights FROM nights_left") == [(2,)], \
-                "the offer ends 09-04 18:00 UTC, the match locks 09-05 19:00: a day and an hour, 2 nights"
-            assert set(got) == {"p1"}, "offers are only on your players"
-            last = sum((0.9, 1.0, 1.1)) / 3 * 10e6     # the last 3 offers: the last night's is taken
-            night_before = sum(max(x * 10e6, last) for x in (0.9, 1.0, 1.1)) / 3
-            assert abs(got["p1"][2] - night_before) < 1e-6, got
-            assert got["p1"][3] == max(10.5e6, night_before)
-
-            # a rising player, momentum fitted: the offers to come are on the value he will have
-            store_sql("market", [{"observed_at": at(n), "ff_id": k, "name": k, "value": v}
-                                 for n, v in ((2, "10500000"), (3, "11025000")) for k in ("p1", "p2", "p3")])
-            facts = dict(rows("SELECT ff_id, trend FROM price_trend"))
-            carry = [c for (c,) in rows("SELECT carry FROM price_carry ORDER BY h")]
-            assert facts["p1"] > 0 and carry == [1.0], (facts, carry)
-            value, trend, later = 11025000.0, facts["p1"], 0.0
-            for night in (2, 1):
-                then = value * (1 + trend / 100 * carry[min(night, len(carry)) - 1])
-                later = sum(max(x * then, later) for x in (0.9, 1.0, 1.1)) / 3
-            (waiting, fetches), = rows("SELECT waiting, fetches FROM sale_odds")
-            assert abs(waiting - later) < 1e-6 and fetches == max(10.5e6, later), (waiting, later)
-
-            assert [k for k, _kind in rows("SELECT player, kind FROM waiting")] == ["p1"], \
-                "waiting is a sale's: yours, with an offer standing"
-            assert [r[0] for r in rows("SELECT player FROM sale_odds")] == ["p1"]
-        finally:
-            set_now(None)
-
-
 def _selftest_facts() -> None:
     """schema.sql's player_facts, as seen at a cut (see)."""
     import tempfile
@@ -392,7 +319,7 @@ def _selftest_facts() -> None:
                                       ("t3", "pending", "4000000", "o4")]])
             c = see()
             cols, seen = query("SELECT player, name, pos, owner, value, trend, paid, offer, clause, price, route,"
-                               " my_bid, fetches FROM seen WHERE cut = ?", (c, ))
+                               " my_bid FROM seen WHERE cut = ?", (c, ))
             got = {r[0]: dict(zip(cols[1:], r[1:])) for r in seen}
             with closing(connect()) as db, db:
                 db.execute("UPDATE seen SET value = -1 WHERE player = 'p1'")
@@ -411,7 +338,7 @@ def _selftest_facts() -> None:
         "listed under his value: the game takes no bid under it (2026-10-29, D. Martinez), so that is what he costs"
     assert got["p1"] == {"name": "ana uno", "pos": "DEF", "value": 5e6, "owner": "me",
                          "clause": 9e6, "price": None, "route": None, "my_bid": None,
-                         "offer": 6e6, "paid": None, "trend": None, "fetches": 6e6}, got["p1"]
+                         "offer": 6e6, "paid": None, "trend": None}, got["p1"]
     assert (got["p2"]["value"], got["p2"]["price"], got["p2"]["route"], got["p2"]["my_bid"]) \
         == (None, 2e6, "listed", 2.5e6), "a value of 0 is none; a manager's listing; your bid"
     assert (got["p5"]["route"], got["p5"]["pos"]) == ("free", "MED"), \

@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS params (
 );
 
 -- The market and the league as a universe was built on them, a cut's and
--- a variant's: player_facts with what a sale of each gets (sale_odds), and
+-- a variant's: player_facts, and
 -- the clearing-price forecast of each listing (auction). Written by assemble.see,
 -- read by the decision (decide.sql) and a run's facts.
 CREATE TABLE IF NOT EXISTS seen (
@@ -148,7 +148,6 @@ CREATE TABLE IF NOT EXISTS seen (
     price   REAL,
     route   TEXT,
     my_bid  REAL,
-    fetches REAL,
     code    TEXT NOT NULL DEFAULT '',   -- what made it (assemble.see); '': by hand
     PRIMARY KEY (cut, variant, player)
 ) WITHOUT ROWID;
@@ -544,53 +543,9 @@ CREATE VIEW cell AS SELECT jornada, player, p, e, v FROM cell_pool WHERE player 
 DROP VIEW IF EXISTS cell_total;
 CREATE VIEW cell_total AS SELECT player, sum(e) AS e, sum(v) AS v, count(*) AS jornadas FROM cell GROUP BY player;
 
--- The game's nightly offers still to come before the lock (next_lock): one
--- as each standing offer expires, then one a day (0 with none standing),
--- and when the first of them comes (first, a julian day).
 DROP VIEW IF EXISTS nights_left;
-CREATE VIEW nights_left AS
-WITH e AS (SELECT max(julianday(expires_at)) AS ends FROM offers
-           WHERE status = 'pending' AND expires_at <> ''),
-l AS (SELECT t AS lock FROM next_lock)
-SELECT CASE WHEN ends IS NOT NULL AND lock > ends THEN CAST(lock - ends AS INTEGER) + 1 ELSE 0 END AS nights,
-       ends AS first
-FROM e, l;
-
--- What waiting to sell a player of yours with an offer standing is worth,
--- over the nights before the lock (next_lock, nights_left): each night's
--- offer to come taken only when it beats waiting on (the last before the
--- lock always). An offer to come is a past one's share of value
--- (recent_offers) of the value he will have that night: his value moved by
--- his trend, the share carry says is made by then (price_carry). NULL
--- without a value or past offers.
 DROP VIEW IF EXISTS waiting;
-CREATE VIEW waiting AS
-WITH RECURSIVE
-r AS MATERIALIZED (SELECT ratio FROM recent_offers),
-c AS MATERIALIZED (SELECT h, carry FROM price_carry),
-f AS MATERIALIZED (SELECT player, value, trend, offer FROM player_facts),
-s AS MATERIALIZED (
-    SELECT player, 'sale' AS kind, value, coalesce(trend, 0.0) AS trend,
-           (SELECT nights FROM nights_left) AS nights
-    FROM f WHERE offer IS NOT NULL),
-w(player, kind, night, later) AS (
-    SELECT player, kind, nights, 0.0 FROM s
-    WHERE value IS NOT NULL AND EXISTS (SELECT 1 FROM r)
-  UNION ALL
-    SELECT w.player, w.kind, w.night - 1,
-           (SELECT avg(max(r.ratio * s.value * (1 + s.trend / 100 * coalesce(
-                    (SELECT carry FROM c WHERE h = min(w.night, (SELECT max(h) FROM c))), 1.0)),
-                    w.later)) FROM r)
-    FROM w JOIN s USING (player, kind) WHERE w.night > 0)
-SELECT player, kind, later FROM w WHERE night = 0;
-
--- What selling a player with an offer standing on him gets: the offer, or
--- what turning it down is worth (waiting), whichever is more.
 DROP VIEW IF EXISTS sale_odds;
-CREATE VIEW sale_odds AS
-SELECT f.player, f.offer, w.later AS waiting, max(f.offer, coalesce(w.later, 0.0)) AS fetches
-FROM player_facts f LEFT JOIN waiting w ON w.player = f.player AND w.kind = 'sale'
-WHERE f.offer IS NOT NULL;
 
 -- Every player the market or a futbolfantasy line-up names, as of t,
 -- but coaches (no slot of the eleven, and the league has none: "Coach is not
@@ -1007,16 +962,7 @@ o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value 
         AND v.market_value <> 0 AND coalesce(o.offer_id, '') <> '')
 SELECT created_at, ratio FROM o WHERE first = 1 ORDER BY created_at, ratio;
 
--- The game's last PRICE_WINDOW offers as shares of value (every one with
--- no constants set), a night's batch (offers sharing a timestamp) whole: a cut
--- inside one would keep its highest or lowest by the order. What an offer to
--- come is drawn from.
 DROP VIEW IF EXISTS recent_offers;
-CREATE VIEW recent_offers AS
-SELECT ratio FROM offer_ratios
-WHERE created_at >= CASE WHEN (SELECT price_window FROM k) < 1 THEN ''
-    ELSE coalesce((SELECT created_at FROM offer_ratios ORDER BY created_at DESC
-                   LIMIT 1 OFFSET (SELECT CAST(price_window AS INTEGER) - 1 FROM k)), '') END;
 
 -- The jornada calendar, as of t. Each fixture's kickoff as last seen
 -- (a played match's page drops it) and its jornada, as a UTC stamp (as

@@ -8,7 +8,7 @@ from typing import Any
 __all__ = ["seed_league"]
 
 PLAYER_COLUMNS = ("name", "pos", "owner", "value", "trend", "paid", "offer", "clause", "price", "route",
-                  "my_bid", "fetches")
+                  "my_bid")
 
 
 def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
@@ -30,7 +30,7 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
     with closing(connect()) as db, db:
         for t in ("seen", "seen_cash", "seen_auction", "seen_curve"):
             db.execute("DELETE FROM %s WHERE cut = (SELECT cut()) AND variant = variant()" % t)
-        db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
+        db.executemany("INSERT INTO seen VALUES ((SELECT cut()), variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')",
                        [(k, p.get("name", k), *(p.get(c) for c in PLAYER_COLUMNS[1:])) for k, p in sorted(players.items())])
         db.execute("INSERT INTO seen_cash VALUES ((SELECT cut()), variant(), ?, ?)", (me, cash))
         db.executemany("INSERT INTO seen_curve VALUES ((SELECT cut()), variant(), ?, ?, ?)",

@@ -31,7 +31,6 @@ class Player(NamedTuple):
     pos: str
     mine: int
     asking: float | None
-    proceeds: float | None
 
 
 class CurvePoint(NamedTuple):
@@ -265,8 +264,8 @@ def _selftest_opportunities() -> None:
     kinds = {"star": "MED", "good": "MED", "keeper": "POR", "late": "MED", "rival": "MED", "free": "MED"}
     inp = Inputs(
         _NO_MONEY,
-        players=[Player(k, p, 1, None, 5e6) for k, p in squad.items()]
-        + [Player(k, kinds[k], 0, a, None) for k, a in (("star", 8e6), ("good", 5e6), ("keeper", 3e6), ("late", 6e6))],
+        players=[Player(k, p, 1, None) for k, p in squad.items()]
+        + [Player(k, kinds[k], 0, a) for k, a in (("star", 8e6), ("good", 5e6), ("keeper", 3e6), ("late", 6e6))],
         universe=[Candidate("star", "MED", "market", 8e6, 8e6), Candidate("good", "MED", "market", 5e6, 5e6),
                   Candidate("keeper", "POR", "market", 3e6, 3e6), Candidate("late", "MED", "market", 6e6, 6e6),
                   Candidate("rival", "MED", "rival", None, 9e6), Candidate("free", "MED", "unlisted", None, 1e6)],
@@ -300,7 +299,7 @@ def _selftest_lineup() -> None:
     slots = {k: squad[k] for k in squad}
 
     def lineup(names: list[str], extra: list[Slot] | None = None) -> Inputs:
-        return Inputs(_NO_MONEY, players=[Player(k, p, 1, None, 1e6) for k, p in squad.items()],
+        return Inputs(_NO_MONEY, players=[Player(k, p, 1, None) for k, p in squad.items()],
                       lineup=[Slot(str(i), k, slots[k], k) for i, k in enumerate(names)] + (extra or []))
     pos = dict(squad)
     got = lineup_of(lineup(fielded), pos)
@@ -311,7 +310,7 @@ def _selftest_lineup() -> None:
     assert unmatched.eleven is None and unmatched.unmapped == ("Ghost",), "an app id we cannot match is named, never dropped"
     short = lineup_of(lineup(fielded[:10]), pos)
     assert short.eleven is None and "not a legal eleven" in short.message
-    gone = lineup(fielded)._replace(players=[Player(k, p, int(k != "f3"), None, 1e6) for k, p in squad.items()])
+    gone = lineup(fielded)._replace(players=[Player(k, p, int(k != "f3"), None) for k, p in squad.items()])
     assert lineup_of(gone, pos).eleven is None and "no longer yours" in lineup_of(gone, pos).message
     flat = {k: 4.0 for k in squad}
     swapped = ["k", "d1", "d2", "d3", "bench", "m1", "m2", "m3", "f1", "f2", "f3"]
