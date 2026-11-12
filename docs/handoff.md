@@ -127,7 +127,7 @@ Board stage on a dry-run copy, idle machine: 15 s to 9.5 s. The 10:00 live run s
 
 Open and waiting:
 
-- **#53 page:** website branch `fantasy-standing-bid` (commit 8aaab1d, worktree `~/claude_projects/website-standing-bid`) shows "raise to X" and "the board would bid X: hold yours". Tests pass and it was rendered. Not merged, not deployed.
+- **#53 page:** merged into the website's main (8aaab1d: "raise to X" in red, "the board would bid X: hold yours"); #53 is closed. It goes live with `./deploy.sh` (#34), which now carries five commits.
 - **#49:** draft formulation on branch `issue-49-formulation` (`docs/notes/auction-demand.md`), five questions for Miguel. #48 should wait for its answer on backfill.
 - **#51:** evidence posted; the data cannot say what a later look buys (64 of 1099 auctions have a look inside 20 minutes). Decision: collect late looks as a measurement or not.
 - **#55:** table posted; Miguel says which remote branches to delete.
