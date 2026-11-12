@@ -227,8 +227,8 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
         steps = ahead.get(k, {})
         bid: float | None = None
         win: float | None = None
-        if status == "market" and asking is not None:
-            ratio, win = bid_for(curves[k], BID_TARGET) if k in curves else (1.0, 1.0)
+        if status == "market" and asking is not None and k in curves:
+            ratio, win = bid_for(curves[k], BID_TARGET)
             bid = asking * ratio
         out.append({
             "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": min(where),
@@ -282,6 +282,8 @@ def _selftest_opportunities() -> None:
     assert (got["star"]["bid"], got["star"]["win"]) == (10e6, 1.0), "the least bid that reaches the target chance"
     assert got["good"]["gain"] == 6.0 and got["good"]["placed"] == 5.5e6, "a bid placed is kept"
     assert (got["good"]["bid"], got["good"]["win"]) == (6e6, 0.7), "none reaches the target: the likeliest"
+    assert got["late"]["gain"] > 0 and (got["late"]["bid"], got["late"]["win"]) == (None, None), \
+        "on the market with no curve: his gain is said, no bid or chance is made up"
     assert got["keeper"]["gain"] == -2.0 and got["keeper"]["replaces"] == "k", "a worse keeper would replace the keeper, for less"
     assert got["late"]["gain"] == 7.0 and got["late"]["from_j"] == 2, "an auction closing after jornada 1's lock counts from jornada 2: your eleven is frozen at the lock"
     assert got["rival"]["status"] == "rival" and got["rival"]["bid"] is None and got["rival"]["gain"] == 10.0, "a target is judged without being on sale"

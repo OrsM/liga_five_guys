@@ -147,20 +147,22 @@ def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: 
 class Stance(NamedTuple):
     """Where a buy's bid stands: the bid the line is on (yours once one is placed, else the advised) and its chance,
     the bid advised and its chance, and the move: bid (none placed), raise (the advised is over yours) or hold. A bid
-    placed is never replaced by a lower one: lowering it is not advised."""
-    amount: float
-    win: float
-    advised: float
-    advised_win: float
+    placed is never replaced by a lower one: lowering it is not advised. With no curve for his auction nothing is
+    advised and no chance is known (None): the move is hold on a bid placed, else unknown."""
+    amount: float | None
+    win: float | None
+    advised: float | None
+    advised_win: float | None
     move: str
 
 
 def stance(r: dict[str, Any], curve: Curve | None) -> Stance:
     placed, advised, advised_win = r["placed"], r["bid"], r["win"]
+    if curve is None or advised is None:
+        return Stance(placed, None, None, None, "unknown" if placed is None else "hold")
     if placed is None:
         return Stance(advised, advised_win, advised, advised_win, "bid")
-    win = chance(curve, placed / r["asking"]) if curve else advised_win
-    return Stance(placed, win, advised, advised_win, "raise" if advised > placed else "hold")
+    return Stance(placed, chance(curve, placed / r["asking"]), advised, advised_win, "raise" if advised > placed else "hold")
 
 
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
@@ -177,7 +179,8 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         where = frozenset(j for j in cells if j >= r["from_j"])
         funding = funding_doc(club, names, approach(club._replace(pending=others), k, amount, win,
-                                                    decision.window_value(pos, cells, where)), amount) if i < TOP_FUNDED else None
+                                                    decision.window_value(pos, cells, where)), amount) \
+            if i < TOP_FUNDED and amount is not None and win is not None else None
         name = names.get(k, k)
         out.append({
             "name": name, "pos": r["pos"], "what": "buy", "label": "buy " + name, "step": "placed" if placed is not None else "bid",
@@ -316,6 +319,9 @@ def _selftest() -> None:
                 "win": chance(curve, advised / asking), "placed": placed, "replaces": "x", "per_million": None,
                 "price_next": None, "price_lock": None}
     for placed in (None, 10e6, 10.5e6, 11e6, 12e6, 13e6):
+        blind = stance({**row(placed), "bid": None, "win": None}, None)
+        assert (blind.amount, blind.win, blind.advised, blind.advised_win) == (placed, None, None, None), "no curve: no chance, nothing advised"
+        assert blind.move == ("unknown" if placed is None else "hold")
         at = stance(row(placed), curve)
         assert (at.advised, at.advised_win) == (advised, chance(curve, advised / asking)), "the advised bid is always said"
         if placed is None:
@@ -323,6 +329,7 @@ def _selftest() -> None:
             continue
         assert at.amount == placed and at.win == chance(curve, placed / asking), "a bid placed is the line's, at its own chance"
         assert at.move == ("raise" if advised > placed else "hold"), "the only move from a bid placed is up"
+        assert at.win is not None and at.advised_win is not None
         assert at.move == "hold" or at.advised_win >= at.win, "a raise never lowers the chance"
         (line,) = target_lines({}, [row(placed)])
         assert line["placed"] == placed, "a target with your bid on him says it beside the advised one"
