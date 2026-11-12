@@ -107,6 +107,36 @@ It worked on 2026-11-11 with six agents under these conditions.
 - Time the board on a dry-run copy before each commit; a slowdown is a regression.
 - Main is production: verify on a copy, delete scratch copies afterwards.
 
+## Update of 2026-11-12
+
+Merged to main and live since the 10:00 run (clean: 38 suites, six stages):
+
+| Issue | What is now true |
+|---|---|
+| #39, #40, #41 | `decision.Inputs`: your money and named rows per table; every reader reads by field; `squad_of` |
+| #42 | board.py runs no query; its reads are selectors in decision.py; `forecast_store.pin` |
+| #45 | `sale_odds`, `waiting`, `nights_left`, `recent_offers`, `seen.fetches`, `proceeds` removed |
+| #46 | grade stage 0.4 s when nothing is new (new code still regrades once, about 35 s) |
+| #53 (board side) | a buy with your bid on it stands on that bid and carries `advised`, `advised_win`, `move` (raise or hold) |
+| #54 | view `bid_changes` |
+| #58 | no curve: no advised bid and no chance, instead of the ask at 100% |
+
+Board stage on a dry-run copy, idle machine: 15 s to 9.5 s. The 10:00 live run showed 20.1 s, beside the self-tests and the one-off column drop; the 21:45 run is the one to read for #47.
+
+#53's cause: a phone tap on 2026-11-01 16:50Z that the `act.py` of that day carried out; no code path can change a bid since 2026-11-08.
+
+Open and waiting:
+
+- **#53 page:** website branch `fantasy-standing-bid` (commit 8aaab1d, worktree `~/claude_projects/website-standing-bid`) shows "raise to X" and "the board would bid X: hold yours". Tests pass and it was rendered. Not merged, not deployed.
+- **#49:** draft formulation on branch `issue-49-formulation` (`docs/notes/auction-demand.md`), five questions for Miguel. #48 should wait for its answer on backfill.
+- **#51:** evidence posted; the data cannot say what a later look buys (64 of 1099 auctions have a look inside 20 minutes). Decision: collect late looks as a measurement or not.
+- **#55:** table posted; Miguel says which remote branches to delete.
+- **#43:** not done (the small model's run was cut off). Brief: two AST checks in `tools/frontiers.py`, board runs no query, no tuple-unpacking of `inp.<field>` rows.
+- **#50:** not started. It needs the board's past rankings (`dec_opportunity`) joined to auctions; check how far back they go first.
+- Sections 5 and 6 of `docs/notes/lfg.md` still mention `proceeds` and `nights_left`. `frontiers.py` prints `unassigned: cell_total`.
+
+Working notes: agent worktrees start from `origin/main`, so push main before spawning. `tools/lfg-dry-run` takes `LFG_SCRATCH` (one scratch dir per agent) and `LFG_NOW` (pin the time; a fresh pin is needed for the board to rebuild `seen`). A scratch copy without `data/tidy` reparses every snapshot (about 9 minutes), so run `board grade health` on copies, not `parse`. #40 and #41 could not be done separately: typed rows force the container type through both files at once.
+
 ## First actions for whoever picks this up
 
 1. Check the 21:45 run's log and health line: it is the first live run on the merged code.
