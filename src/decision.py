@@ -269,7 +269,8 @@ UNKNOWN = Fact("", None, None)
 
 
 def player_facts() -> dict[str, Fact]:
-    return {k: Fact(name, pos, trend) for k, name, pos, trend in rows("SELECT player, name_shown(name), pos, trend FROM player_facts")}
+    return {k: Fact(name, pos, trend) for k, name, pos, trend in rows(
+        "SELECT s.player, name_shown(s.name), s.pos, s.trend FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant")}
 
 
 class Offer(NamedTuple):
@@ -352,7 +353,7 @@ def drifting_bins(run: int) -> list[Drift]:
 
 
 def manager_count() -> int:
-    (n,), = rows("SELECT count(*) FROM cash")
+    (n,), = rows("SELECT count(*) FROM seen_cash c JOIN look l ON c.cut = l.cut AND c.variant = l.variant")
     return int(n)
 
 
