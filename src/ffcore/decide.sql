@@ -38,8 +38,7 @@ CREATE TABLE IF NOT EXISTS dec_player (
     player   TEXT PRIMARY KEY,
     pos      TEXT NOT NULL,
     mine     INTEGER NOT NULL,
-    asking   REAL,
-    proceeds REAL
+    asking   REAL
 );
 CREATE TABLE IF NOT EXISTS dec_curve (
     player TEXT NOT NULL,
@@ -89,17 +88,14 @@ CREATE TABLE IF NOT EXISTS dec_money (
     xi_size    INTEGER NOT NULL
 );
 
--- The players the decision can move: yours (my_squad), at what a sale of
--- each gets as seen (seen.fetches: with an offer on him, the offer or what
--- waiting is worth; else his value), and the market's you could buy, at his
--- asking price (not yours, nor any manager's).
+-- The players the decision can move: yours (my_squad), and the market's you
+-- could buy, at his asking price (not yours, nor any manager's).
 DROP VIEW IF EXISTS dec_player_seen;
 CREATE VIEW dec_player_seen AS
-SELECT m.player, m.pos, 1 AS mine, NULL AS asking, coalesce(s.fetches, s.value, 0.0) AS proceeds
-FROM my_squad m CROSS JOIN look l
-LEFT JOIN seen s ON s.cut = l.cut AND s.variant = l.variant AND s.player = m.player
+SELECT m.player, m.pos, 1 AS mine, NULL AS asking
+FROM my_squad m
 UNION ALL
-SELECT s.player, s.pos, 0, s.price, NULL
+SELECT s.player, s.pos, 0, s.price
 FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant
 WHERE s.price IS NOT NULL AND s.owner IS NULL AND s.player NOT IN (SELECT player FROM my_squad);
 
