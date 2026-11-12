@@ -75,11 +75,13 @@ def _selftest() -> None:
             (line,) = doc["sells"]
             assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
             assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"
-            assert all(b["win"] > 0 and b["gain"] > 0 and b["accepts"] == [] for b in doc["buys"]), doc["buys"]
+            assert all(b["gain"] > 0 and b["accepts"] == [] for b in doc["buys"]), doc["buys"]
+            assert all((b["advised"] is None) == (b["advised_win"] is None) and (b["win"] is None or 0 < b["win"] <= 1)
+                       for b in doc["buys"]), ("a chance is one from a curve or none at all", doc["buys"])
             kinds = {r["player"]: r["status"] for r in got}
             assert {kinds[k] for k in rivals} == {"rival"} and {kinds[k] for k in listed} <= {"market"}, \
                 "the market's players are on sale, the rivals' are not: both are judged"
-            assert all(b["amount"] >= b["asking"] for b in doc["buys"]), "never a bid below the asking price"
+            assert all(b["advised"] is None or b["advised"] >= b["asking"] for b in doc["buys"]), "never a bid advised below the asking price"
             assert {t["status"] for t in doc["targets"]} >= {"rival"} or not doc["targets"], doc["targets"]
             assert rows("SELECT count(*) FROM dec_targets")[0][0] == sum(1 for r in got if r["gain"] > 0), "the targets view"
             assert rows("SELECT count(*) FROM dec_opportunities")[0][0] == sum(1 for r in got if r["gain"] > 0 and r["status"] == "market")
