@@ -5,7 +5,7 @@ import os
 import sys
 from contextlib import closing
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import decision
 from assemble import built, forecast
@@ -133,10 +133,16 @@ def graded(run: int, last: int, path: Path | None = None) -> bool:
                           " GROUP BY g.run_id HAVING max(g.jornada) >= ? LIMIT 1", (run, last)).fetchone() is not None
 
 
-def newest_result() -> float | None:
-    """When the newest auction with an outcome closed (a Julian day), as of t; None if there is none."""
-    (got,), = rows("SELECT max(julianday(close)) FROM auction_results")
-    return got
+class Results(NamedTuple):
+    """The auction outcomes seen as of t: how many, how many of them sold, and when the newest closed."""
+    n: int
+    sold: int
+    newest: str | None
+
+
+def results_seen() -> Results:
+    (row,) = rows("SELECT count(*) AS n, count(won) AS sold, max(close) AS newest FROM auction_results")
+    return Results(*row)
 
 
 def scored_at(run: int, path: Path | None = None) -> str | None:
@@ -148,15 +154,15 @@ def scored_at(run: int, path: Path | None = None) -> str | None:
                           (run,)).fetchone()[0]
 
 
-def auctions_scored(run: int, newest: float | None) -> bool:
-    """Whether an earlier run of this run's code scored the auctions with the newest outcome as it is now (newest):
-    its scores stand, and no auction closed since would change them."""
+def auctions_scored(run: int, now: Results) -> bool:
+    """Whether an earlier run of this run's code scored the auctions on the outcomes seen now: its scores stand, as
+    no outcome has come since."""
     then = scored_at(run)
-    if then is None or newest is None:
+    if then is None or not now.n:
         return False
     with replaying():
         set_now(snapshot_stamp(then))
-        return newest_result() == newest
+        return results_seen() == now
 
 
 def record_auction(run: int | None) -> dict[str, int]:
@@ -180,7 +186,7 @@ def record_grades() -> dict[str, int]:
     resolved = len(done)
     run = this_run()
     standing = run is not None and bool(done) and graded(run, max(done))
-    scored = {} if run is not None and auctions_scored(run, newest_result()) else record_auction(run)
+    scored = {} if run is not None and auctions_scored(run, results_seen()) else record_auction(run)
     if standing:
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, **scored}
@@ -249,6 +255,7 @@ def _selftest_stand() -> None:
     jornada or an auction new it enters that one."""
     entered: list[str] = []
     state = {"graded": True, "scored": True}
+
     def auction_scored(run: int | None) -> dict[str, int]:
         entered.append("auction")
         return {}
@@ -257,8 +264,8 @@ def _selftest_stand() -> None:
         entered.append("grades")
         return []
     stub: dict[str, Any] = {
-        "done_jornadas": lambda: {1, 2}, "this_run": lambda: 5, "newest_result": lambda: 1.0,
-        "graded": lambda run, last: state["graded"], "auctions_scored": lambda run, newest: state["scored"],
+        "done_jornadas": lambda: {1, 2}, "this_run": lambda: 5, "results_seen": lambda: Results(1, 1, "c"),
+        "graded": lambda run, last: state["graded"], "auctions_scored": lambda run, now: state["scored"],
         "record_auction": auction_scored, "backtest": regraded,
         "record": lambda *a, **k: None, "superseded": lambda run: None}
     kept = {k: globals()[k] for k in stub}
