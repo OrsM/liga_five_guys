@@ -7,6 +7,7 @@ production code of src/*.py (selftests excluded). No exemptions: grading is the 
 A Python file that implements several modules (assemble, sim, db, facts, fixtures) is no module's: whatever it reads
 of a module that is not exported is a crossing. Every crossing is printed, grouped by the reading module, with
 file:line. `--table` prints the exports as markdown."""
+import ast
 import re
 import shutil
 import sqlite3
@@ -28,7 +29,7 @@ NAMES = {
               "look auction_results auction_looks bid_changes player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
               "player_roster listings offers squads standings app_lineup price_history offer_ratios "
               "player_jornadas season_record last_season next_lock listing_ends listing_close price_paid market_read",
-    "forecast": "cell cell_pool standin_cell score_spread forecast_used "
+    "forecast": "cell cell_total cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior fitted horizons market_daily",
     "decision": "auction_calibration auction_brier player_facts my_squad my_cash",
     "board": "",
@@ -92,6 +93,35 @@ def lines(text: str, t: str) -> list[int]:
             if re.search(r"\b(?:from|join)\s+%s\b" % t, re.sub(r"--.*|#.*|'[^']*'", " ", line), re.I)]
 
 
+def board_queries(text: str) -> list[int]:
+    """The lines of a Python file that run a query: a call to rows, execute or executemany (the board has no SQL)."""
+    calls = [n for n in ast.walk(ast.parse(prod(text))) if isinstance(n, ast.Call)]
+    return sorted(c.lineno for c in calls
+                  if (isinstance(c.func, ast.Name) and c.func.id == "rows")
+                  or (isinstance(c.func, ast.Attribute) and c.func.attr in ("rows", "execute", "executemany")))
+
+
+def unpacks_inp(target: ast.expr, iterable: ast.expr) -> bool:
+    """A loop target that is a tuple or list, over an attribute of inp: the fields of an Inputs row read by position."""
+    return (isinstance(target, (ast.Tuple, ast.List)) and isinstance(iterable, ast.Attribute)
+            and isinstance(iterable.value, ast.Name) and iterable.value.id == "inp")
+
+
+def positional_reads(text: str) -> list[int]:
+    """The lines of a Python file with a for statement or comprehension that unpacks an Inputs row by position."""
+    hits = []
+    for n in ast.walk(ast.parse(prod(text))):
+        if isinstance(n, ast.For):
+            pairs = [(n.target, n.iter)]
+        elif isinstance(n, (ast.ListComp, ast.SetComp, ast.GeneratorExp, ast.DictComp)):
+            pairs = [(g.target, g.iter) for g in n.generators]
+        else:
+            continue
+        if any(unpacks_inp(t, i) for t, i in pairs):
+            hits.append(n.lineno)
+    return sorted(hits)
+
+
 def view_spans() -> dict[str, tuple[Path, int, str]]:
     """Where each view is written: its .sql file, first line and text (up to the next CREATE VIEW)."""
     spans = {}
@@ -131,6 +161,13 @@ def _selftest() -> None:
     assert crossing(None, "score_spread")  # a forecast internal, not exported
     assert crossing(None, "price_trend") is None  # exported: the trend the decision's odds read
     assert crossing(None, "cell") is None  # exported
+    assert board_queries("def f(db):\n    return db.execute('select 1')\n") == [2]  # a query in the board
+    assert board_queries("def f(db):\n    return squad_rows(inp)\n") == []  # a helper named *_rows is not a query
+    assert board_queries("def _selftest():\n    db.rows(1)\n\nX = 1\n") == []  # selftest code is ignored
+    assert positional_reads("for a, b in inp.bids:\n    pass\n") == [1]  # an Inputs row unpacked by position
+    assert positional_reads("ys = [a for a, b in inp.bids]\n") == [1]  # the same in a comprehension
+    assert positional_reads("for c in inp.universe:\n    pass\n") == []  # a named row is fine
+    assert positional_reads("def _selftest():\n    for a, b in inp.bids:\n        pass\n\nX = 1\n") == []
     assert lines("select 1\nfrom a join cell c -- from cell", "cell") == [2]
     assert prod("x\ndef _selftest():\n    from cell\n\ny from cell\n").count("\n") == 5
     assert main() == 0, "the tree has crossings (listed above)"  # the gate: red until they are fixed
@@ -164,6 +201,11 @@ def main() -> int:
             for ln in lines(text, t) if why else []:
                 found.setdefault(a or "no module: " + f.name, set()).add(
                     f"{f.relative_to(ROOT)}:{ln}  reads {t} ({why})")
+        for ln in positional_reads(text):
+            found.setdefault(a or "no module: " + f.name, set()).add(
+                f"{f.relative_to(ROOT)}:{ln}  unpacks an Inputs row by position")
+    for ln in board_queries((ROOT / "src/board.py").read_text()):
+        found.setdefault("board", set()).add(f"src/board.py:{ln}  runs a query (the board has no SQL)")
     stale = sorted(f"{m}.{t}" for m, e in EXPORT.items() for t in e if t not in names)
     total = 0
     for who in sorted(found, key=lambda w: (ORDER_ALL.index(w) if w in ORDER_ALL else 9, w)):
