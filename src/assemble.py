@@ -13,7 +13,7 @@ from typing import Any, NamedTuple
 
 from ffcore import forecast as model, pricing, rules
 from ffcore.db import connect, query, record, rows, set_constants, set_look
-from ffcore.forecast_store import Prices, forecast, price_change, price_momentum
+from ffcore.forecast_store import Prices, forecast, price_carry, price_change, price_momentum
 from ffcore.seen import see as see_at
 from ffcore.league import write_config
 from ffcore.tidy import age_hours
@@ -96,11 +96,10 @@ def built() -> Built:
         raise SystemExit("the app's squads are %s old; no board is built from "
                          "them" % ("unknown" if age is None else "%.0fh" % age))
     me = write_config()
-    prices = price_momentum()
     see()
     moment = forecast()
     set_look(me=me, moment=moment)
-    return Built(params(forecast_fits(), market_offer_ratios(), prices.carry), moment)
+    return Built(params(forecast_fits(), market_offer_ratios(), price_carry()), moment)
 
 
 def _selftest() -> None:

@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from ffcore.db import connect, named, rows
 
-__all__ = ["keep", "forecast", "pin", "price_momentum", "price_change", "seed_cells", "Prices"]
+__all__ = ["keep", "forecast", "pin", "price_momentum", "price_carry", "price_change", "seed_cells", "Prices"]
 
 # Each player's valued days (each day's last snapshot: market_daily), numbered (n); the
 # change in % on his previous valued day (NULL for the first, or after a
@@ -126,11 +126,16 @@ class Prices(NamedTuple):
     horizon: int
 
 
+def price_carry() -> tuple[float, ...]:
+    """The share of a trend made after each update, by horizon (view: price_carry)."""
+    return tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h"))
+
+
 def price_momentum() -> Prices:
     """Momentum and the price trend at t (views: momentum, price_carry,
     price_trend), read."""
     slope: dict[int, float] = dict(rows("SELECT h, slope FROM momentum ORDER BY h"))
-    return Prices(slope, tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h")),
+    return Prices(slope, price_carry(),
                   dict(rows("SELECT ff_id, trend FROM price_trend")), max(slope, default=1))
 
 
