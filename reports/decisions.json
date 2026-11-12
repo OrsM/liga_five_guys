@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-12T07:17Z",
- "market_at": "2026-11-12T07:16Z",
+ "generated_at": "2026-11-12T08:16Z",
+ "market_at": "2026-11-12T08:14Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-12T07:16Z",
+   "at": "2026-11-12T08:14Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -88,6 +88,9 @@
    "asking": 47121633.0,
    "amount": 47121633.0,
    "win": 1.0,
+   "advised": 47121633.0,
+   "advised_win": 1.0,
+   "move": "bid",
    "plan": false,
    "done": false,
    "key": "6310",
@@ -200,6 +203,7 @@
    "asking": 180613716.0,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Antony",
    "per_million": 0.8500557429643899,
    "price_next": -0.006839223618398282,
@@ -214,6 +218,7 @@
    "asking": null,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Antony",
    "per_million": 0.720398926073646,
    "price_next": 0.0023730281823926003,
@@ -228,6 +233,7 @@
    "asking": 171563423.0,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Antony",
    "per_million": 0.6255489820554943,
    "price_next": -0.00783450973149058,
@@ -242,6 +248,7 @@
    "asking": null,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Guido Rodriguez",
    "per_million": 0.5639661035822126,
    "price_next": 0.015283529453669509,
@@ -256,6 +263,7 @@
    "asking": null,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Guido Rodriguez",
    "per_million": 0.5049537661296181,
    "price_next": 0.01015247886584092,
@@ -270,6 +278,7 @@
    "asking": null,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Guido Rodriguez",
    "per_million": 0.5604470994282972,
    "price_next": 0.02377168724959744,
@@ -284,6 +293,7 @@
    "asking": null,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Fran Garcia",
    "per_million": 0.7152930652017369,
    "price_next": -0.009665713344701898,
@@ -298,6 +308,7 @@
    "asking": null,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Fran Garcia",
    "per_million": 0.8534528642387701,
    "price_next": 0.0323837204669053,
@@ -312,6 +323,7 @@
    "asking": 58564537.0,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Fran Garcia",
    "per_million": 0.6337405332093717,
    "price_next": -0.014864369603398209,
@@ -326,6 +338,7 @@
    "asking": null,
    "bid": null,
    "win": null,
+   "placed": null,
    "replaces": "Guido Rodriguez",
    "per_million": 0.4699776777280081,
    "price_next": 0.033470006931921814,
@@ -339,25 +352,25 @@
    {
     "scope": "backtest:all",
     "n": 3085,
-    "model": 0.03466805870659858,
+    "model": 0.03475343274451676,
     "pooled": 0.04442559451926397
    },
    {
     "scope": "backtest:big",
     "n": 276,
-    "model": 0.10571347992021639,
+    "model": 0.1064804858769449,
     "pooled": 0.12176634332678009
    },
    {
     "scope": "backtest:norival",
     "n": 2869,
-    "model": 0.02255461006083466,
+    "model": 0.02264641170146819,
     "pooled": 0.02630852206773959
    },
    {
     "scope": "backtest:ours",
     "n": 289,
-    "model": 0.1869281140264689,
+    "model": 0.187343506252752,
     "pooled": 0.25472689748322047
    },
    {
@@ -369,7 +382,7 @@
    {
     "scope": "backtest:small",
     "n": 2809,
-    "model": 0.027687447722277284,
+    "model": 0.027705847602277477,
     "pooled": 0.03682643230108154
    },
    {
@@ -407,9 +420,9 @@
    {
     "scope": "backtest:big",
     "bin": "0.99-1.00",
-    "n": 58,
+    "n": 30,
     "stated": 1.0,
-    "observed": 0.9482758620689655
+    "observed": 0.9
    },
    {
     "scope": "backtest:ours",
@@ -421,30 +434,30 @@
    {
     "scope": "backtest:ours",
     "bin": "0.50-0.80",
-    "n": 46,
-    "stated": 0.6872273794130019,
-    "observed": 0.4782608695652174
+    "n": 47,
+    "stated": 0.6901252009252831,
+    "observed": 0.48936170212765956
    },
    {
     "scope": "backtest:ours",
     "bin": "0.80-0.90",
-    "n": 64,
-    "stated": 0.8417996233688861,
-    "observed": 0.6875
+    "n": 68,
+    "stated": 0.8440991737683345,
+    "observed": 0.6764705882352942
    },
    {
     "scope": "backtest:ours",
     "bin": "0.90-0.95",
-    "n": 46,
-    "stated": 0.9323604195245039,
-    "observed": 0.7391304347826086
+    "n": 47,
+    "stated": 0.9335260011290474,
+    "observed": 0.7659574468085106
    },
    {
     "scope": "backtest:ours",
     "bin": "0.95-0.99",
-    "n": 42,
-    "stated": 0.9734328323896109,
-    "observed": 0.7857142857142857
+    "n": 48,
+    "stated": 0.974126377800372,
+    "observed": 0.8125
    }
   ]
  },
