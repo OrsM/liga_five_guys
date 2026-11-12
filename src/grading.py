@@ -71,7 +71,7 @@ def opportunity_grade(top: int = 5, span: int = 4) -> list[dict[str, Any]]:
             inp = decision.read_inputs()
             pos, cells = decision.cells_of(inp)
             got = decision.opportunity_rows(inp)
-            band = [(k, p, asking if asking is not None else value) for k, p, _, asking, value in inp["dec_universe"] if k in pos]
+            band = [(c.player, c.pos, c.asking if c.asking is not None else c.value) for c in inp.universe if c.player in pos]
             for rank, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:top], 1):
                 span_j = [j for j in range(r["from_j"], r["from_j"] + span) if j in done]
                 if not span_j or r["replaces"] is None:

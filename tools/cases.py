@@ -108,7 +108,7 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
         built()
         inp = decision.read_inputs()
         pos, cells = decision.cells_of(inp)
-        mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
+        mine = decision.squad_of(inp)
         first = rows("SELECT min(jornada) FROM jornada_calendar WHERE state = 'ahead'")[0][0]
         next_four = frozenset(range(first, first + AHEAD))
         windows = {"next4": next_four, "season": frozenset(cells)}
@@ -117,7 +117,7 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
         got = [] if degraded else decision.opportunity_rows(inp)
         opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
         doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [])
-        seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp["dec_money"][0],
+        seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp.money,
                       "squad": len(mine), "offers": rows("SELECT count(*) FROM offers WHERE status = 'pending'")[0][0],
                       "cases": {}}
         ids = tuple(CASES.values())
@@ -173,8 +173,8 @@ def checks() -> list[Check]:
         return got
 
     return [
-        ("context", "tables", "cash is the pre-sale debt (about -49.5M)", lambda s: -50e6 < s["money"][0] < -49e6, lambda s: s["money"][0]),
-        ("context", "tables", "team value about 464M", lambda s: 460e6 < s["money"][1] < 470e6, lambda s: s["money"][1]),
+        ("context", "tables", "cash is the pre-sale debt (about -49.5M)", lambda s: -50e6 < s["money"].cash < -49e6, lambda s: s["money"].cash),
+        ("context", "tables", "team value about 464M", lambda s: 460e6 < s["money"].team_value < 470e6, lambda s: s["money"].team_value),
         ("context", "tables", "22 players and 17 standing offers", lambda s: (s["squad"], s["offers"]) == (22, 17), lambda s: (s["squad"], s["offers"])),
         ("context", "board", "bid limit about 43.4M", lambda s: 43e6 < s["board"]["can_bid"] < 44e6, lambda s: s["board"]["can_bid"]),
         ("context", "lineup", "the app's eleven is read: 11 fielded players all matched, or the board says why there is none",

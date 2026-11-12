@@ -3,14 +3,14 @@ approach.approach read (decide.sql dec_*), and the players on the market who wou
 from __future__ import annotations
 
 from contextlib import closing
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Sequence
 
 import eleven
 from ffcore.db import connect, record
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
-__all__ = ["inputs", "Inputs", "read", "rows_of", "read_inputs", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
+__all__ = ["inputs", "Inputs", "read_inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
 
 INPUTS = ("dec_state", "dec_player", "dec_curve", "dec_auction", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_lineup")
 
@@ -105,37 +105,33 @@ class Price(NamedTuple):
 
 
 class Inputs(NamedTuple):
-    """The league at t as the decision reads it: a list of named rows a dec_* table, the cells (player, jornada, e),
-    every player who is not yours with his status (market, rival, unlisted), and each player's price forecast."""
-    players: list[Player]
-    curves: list[CurvePoint]
-    auctions: list[Auction]
-    money: list[Money]
-    bids: list[Bid]
-    closes: list[Close]
-    locks: list[Lock]
-    lineup: list[Slot]
-    cells: list[Cell]
-    universe: list[Candidate]
-    prices: list[Price]
+    """The league at t as the decision reads it: your money, a sequence of named rows a dec_* table, the cells
+    (player, jornada, e), every player who is not yours with his status (market, rival, unlisted), and each player's
+    price forecast."""
+    money: Money
+    players: Sequence[Player] = ()
+    curves: Sequence[CurvePoint] = ()
+    auctions: Sequence[Auction] = ()
+    bids: Sequence[Bid] = ()
+    closes: Sequence[Close] = ()
+    locks: Sequence[Lock] = ()
+    lineup: Sequence[Slot] = ()
+    cells: Sequence[Cell] = ()
+    universe: Sequence[Candidate] = ()
+    prices: Sequence[Price] = ()
 
 
-# The name each field of Inputs had as a key of the dict the readers still take (rows_of), until they read Inputs.
-ROWS = {"players": "dec_player", "curves": "dec_curve", "auctions": "dec_auction", "money": "dec_money", "bids": "dec_bid",
-        "closes": "dec_close", "locks": "dec_lock", "lineup": "dec_lineup", "cells": "cell", "universe": "dec_universe",
-        "prices": "price"}
-
-
-def read() -> Inputs:
+def read_inputs() -> Inputs:
     """inputs() made, and read back, each row under its columns' names."""
     inputs()
     with closing(connect()) as db:
         def table(kind: Any, name: str) -> list[Any]:
             return [kind(*r) for r in db.execute("SELECT %s FROM %s" % (", ".join(kind._fields), name))]
+        (money,) = table(Money, "dec_money")
         return Inputs(
-            players=table(Player, "dec_player"), curves=table(CurvePoint, "dec_curve"), auctions=table(Auction, "dec_auction"),
-            money=table(Money, "dec_money"), bids=table(Bid, "dec_bid"), closes=table(Close, "dec_close"),
-            locks=table(Lock, "dec_lock"), lineup=table(Slot, "dec_lineup"), cells=table(Cell, "cell"),
+            money, players=table(Player, "dec_player"), curves=table(CurvePoint, "dec_curve"), auctions=table(Auction, "dec_auction"),
+            bids=table(Bid, "dec_bid"), closes=table(Close, "dec_close"), locks=table(Lock, "dec_lock"),
+            lineup=table(Slot, "dec_lineup"), cells=table(Cell, "cell"),
             universe=[Candidate(*r) for r in db.execute(
                 "SELECT s.player, coalesce(nullif(c.pos, ''), s.pos, 'MED') AS pos,"
                 " CASE WHEN s.owner IS NULL AND s.price IS NOT NULL THEN 'market' WHEN s.owner IS NULL THEN 'unlisted'"
@@ -145,14 +141,8 @@ def read() -> Inputs:
             prices=[Price(*r) for r in db.execute("SELECT ff_id AS player, h, expected_value, value FROM price_forecast")])
 
 
-def rows_of(inp: Inputs) -> dict[str, list[tuple[Any, ...]]]:
-    """Inputs as the dict of rows its readers took before it had names: temporary, gone when they read Inputs (#40, #41)."""
-    return {ROWS[field]: list(rows) for field, rows in inp._asdict().items()}
-
-
-def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
-    """read(), as rows_of gives it: temporary, as rows_of is."""
-    return rows_of(read())
+def squad_of(inp: Inputs) -> frozenset[str]:
+    return frozenset(p.player for p in inp.players if p.mine)
 
 
 class Lineup(NamedTuple):
@@ -161,12 +151,11 @@ class Lineup(NamedTuple):
     unmapped: tuple[str, ...]
 
 
-def lineup_of(inp: dict[str, list[tuple[Any, ...]]], pos: dict[str, str]) -> Lineup:
-    rows_ = inp["dec_lineup"]
-    mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
-    unmapped = tuple(sorted(name for _, player, _, name in rows_ if player is None))
-    fielded = frozenset(player for _, player, _, _ in rows_ if player is not None)
-    if not rows_:
+def lineup_of(inp: Inputs, pos: dict[str, str]) -> Lineup:
+    mine = squad_of(inp)
+    unmapped = tuple(sorted(s.name for s in inp.lineup if s.player is None))
+    fielded = frozenset(s.player for s in inp.lineup if s.player is not None)
+    if not inp.lineup:
         return Lineup(None, "the app has no line-up for you: you don't have an eleven", unmapped)
     if unmapped:
         return Lineup(None, "the app's line-up has players we cannot match: " + ", ".join(unmapped), unmapped)
@@ -177,13 +166,13 @@ def lineup_of(inp: dict[str, list[tuple[Any, ...]]], pos: dict[str, str]) -> Lin
     return Lineup(fielded, "", unmapped)
 
 
-def cells_of(inp: dict[str, list[tuple[Any, ...]]]) -> tuple[dict[str, str], dict[int, dict[str, float]]]:
-    pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
-    pos |= {k: p for k, p, *_ in inp.get("dec_universe", []) if p in POSITIONS}
+def cells_of(inp: Inputs) -> tuple[dict[str, str], dict[int, dict[str, float]]]:
+    pos = {p.player: p.pos for p in inp.players if p.pos in POSITIONS}
+    pos |= {c.player: c.pos for c in inp.universe if c.pos in POSITIONS}
     cells: dict[int, dict[str, float]] = {}
-    for k, j, e in inp["cell"]:
-        if k in pos:
-            cells.setdefault(j, {})[k] = e
+    for c in inp.cells:
+        if c.player in pos:
+            cells.setdefault(c.jornada, {})[c.player] = c.e
     return pos, cells
 
 
@@ -191,28 +180,35 @@ def window_value(pos: dict[str, str], cells: dict[int, dict[str, float]], where:
     return {k: sum(cells[j].get(k, 0.0) for j in where) for k in pos}
 
 
-def curves_of(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, Curve]:
+def curves_of(inp: Inputs) -> dict[str, Curve]:
     out: dict[str, list[tuple[float, float]]] = {}
-    for k, r, p in sorted(inp["dec_curve"]):
-        out.setdefault(k, []).append((r, p))
+    for c in sorted(inp.curves):
+        out.setdefault(c.player, []).append((c.ratio, c.p))
     return {k: tuple(v) for k, v in out.items()}
 
 
-def opportunity_rows(inp: dict[str, list[tuple[Any, ...]]]) -> list[dict[str, Any]]:
+def rise(x: Price) -> float:
+    return x.expected_value / x.value - 1
+
+
+def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
     pos, cells = cells_of(inp)
-    mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
+    mine = squad_of(inp)
     curves = curves_of(inp)
-    locks, closes, placed = dict(inp["dec_lock"]), dict(inp["dec_close"]), dict(inp["dec_bid"])
+    locks = {x.jornada: x.lock for x in inp.locks}
+    closes = {x.player: x.close for x in inp.closes}
+    placed = {x.player: x.amount for x in inp.bids}
     soon = min(locks.values(), default=None)
-    ahead: dict[str, dict[int, tuple[float, float]]] = {}
-    for k, h, expected, value in inp["price"]:
-        if value:
-            ahead.setdefault(k, {})[h] = (expected, value)
+    ahead: dict[str, dict[int, Price]] = {}
+    for x in inp.prices:
+        if x.value:
+            ahead.setdefault(x.player, {})[x.h] = x
     fielded = lineup_of(inp, pos).eleven
     seen: dict[frozenset[int], tuple[dict[str, float], eleven.Settled | None]] = {}
     out = []
-    for k, _, status, asking, value in inp["dec_universe"]:
-        if k not in pos or not any(k in c for c in cells.values()):
+    for c in inp.universe:
+        k, status, asking, value = c.player, c.status, c.asking, c.value
+        if k not in pos or not any(k in at for at in cells.values()):
             continue
         close = closes.get(k) if status == "market" else None
         where = frozenset(j for j in cells if in_force(locks, j, close or soon))
@@ -237,8 +233,8 @@ def opportunity_rows(inp: dict[str, list[tuple[Any, ...]]]) -> list[dict[str, An
         out.append({
             "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": min(where),
             "replaces": got.replaces, "gain": got.gain, "per_million": got.gain / (price / 1e6) if price else None,
-            "price_next": steps[1][0] / steps[1][1] - 1 if 1 in steps else None,
-            "price_lock": steps[max(steps)][0] / steps[max(steps)][1] - 1 if steps else None,
+            "price_next": rise(steps[1]) if 1 in steps else None,
+            "price_lock": rise(steps[max(steps)]) if steps else None,
             "bid": bid, "win": win, "placed": placed.get(k)})
     return sorted(out, key=lambda o: (-o["gain"], o["player"]))
 
@@ -259,23 +255,28 @@ def read_arrivals() -> list[str]:
         return [k for (k,) in db.execute("SELECT player FROM dec_arrivals ORDER BY rank").fetchall()]
 
 
+_NO_MONEY = Money(0.0, 0.0, 0.0, SQUAD_MAX, XI_SIZE)
+
+
 def _selftest_opportunities() -> None:
     squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
              "m4": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL"}
     e = {**{k: 4.0 for k in squad}, "m4": 2.0, "star": 8.0, "good": 5.0, "keeper": 3.0, "late": 9.0, "rival": 7.0, "free": 1.0}
     kinds = {"star": "MED", "good": "MED", "keeper": "POR", "late": "MED", "rival": "MED", "free": "MED"}
-    inp: dict[str, list[tuple[Any, ...]]] = {
-        "dec_player": [(k, p, 1, None, 5e6) for k, p in squad.items()]
-                      + [(k, kinds[k], 0, a, None) for k, a in (("star", 8e6), ("good", 5e6), ("keeper", 3e6), ("late", 6e6))],
-        "dec_universe": [("star", "MED", "market", 8e6, 8e6), ("good", "MED", "market", 5e6, 5e6),
-                         ("keeper", "POR", "market", 3e6, 3e6), ("late", "MED", "market", 6e6, 6e6),
-                         ("rival", "MED", "rival", None, 9e6), ("free", "MED", "unlisted", None, 1e6)],
-        "dec_curve": [("star", 1.0, 0.25), ("star", 1.25, 1.0), ("star", 1.3, 1.0), ("good", 1.0, 0.5), ("good", 1.2, 0.7)],
-        "dec_bid": [("good", 5.5e6)],
-        "price": [("star", 1, 10.5e6, 10e6), ("star", 3, 11e6, 10e6)],
-        "cell": [(k, j, v) for k, v in e.items() for j in (1, 2)],
-        "dec_lock": [(1, "2026-11-06T20:00Z"), (2, "2026-11-13T20:00Z")],
-        "dec_close": [("late", "2026-11-06T21:24Z")], "dec_lineup": []}
+    inp = Inputs(
+        _NO_MONEY,
+        players=[Player(k, p, 1, None, 5e6) for k, p in squad.items()]
+        + [Player(k, kinds[k], 0, a, None) for k, a in (("star", 8e6), ("good", 5e6), ("keeper", 3e6), ("late", 6e6))],
+        universe=[Candidate("star", "MED", "market", 8e6, 8e6), Candidate("good", "MED", "market", 5e6, 5e6),
+                  Candidate("keeper", "POR", "market", 3e6, 3e6), Candidate("late", "MED", "market", 6e6, 6e6),
+                  Candidate("rival", "MED", "rival", None, 9e6), Candidate("free", "MED", "unlisted", None, 1e6)],
+        curves=[CurvePoint("star", 1.0, 0.25), CurvePoint("star", 1.25, 1.0), CurvePoint("star", 1.3, 1.0),
+                CurvePoint("good", 1.0, 0.5), CurvePoint("good", 1.2, 0.7)],
+        bids=[Bid("good", 5.5e6)],
+        prices=[Price("star", 1, 10.5e6, 10e6), Price("star", 3, 11e6, 10e6)],
+        cells=[Cell(k, j, v) for k, v in e.items() for j in (1, 2)],
+        locks=[Lock(1, "2026-11-06T20:00Z"), Lock(2, "2026-11-13T20:00Z")],
+        closes=[Close("late", "2026-11-06T21:24Z")])
     got = {r["player"]: r for r in opportunity_rows(inp)}
     assert got["star"]["gain"] == 12.0 and got["star"]["replaces"] == "m4", "star for m4 is 6 a jornada"
     assert (got["star"]["bid"], got["star"]["win"]) == (10e6, 1.0), "the least bid that reaches the target chance"
@@ -288,7 +289,7 @@ def _selftest_opportunities() -> None:
     assert abs(got["star"]["price_next"] - 0.05) < 1e-12 and abs(got["star"]["price_lock"] - 0.10) < 1e-12 and got["good"]["price_next"] is None
     assert got["star"]["per_million"] == 12.0 / 8.0, "points a million of his asking price"
     assert [r["player"] for r in opportunity_rows(inp)][0] == "star", "most points first"
-    short = dict(inp, dec_player=[row for row in inp["dec_player"] if row[0] != "k"])
+    short = inp._replace(players=[p for p in inp.players if p.player != "k"])
     assert opportunity_rows(short) == [], "no eleven: no opportunities"
 
 
@@ -298,19 +299,19 @@ def _selftest_lineup() -> None:
     fielded = ["k", "d1", "d2", "d3", "d4", "m1", "m2", "m3", "f1", "f2", "f3"]
     slots = {k: squad[k] for k in squad}
 
-    def lineup(names: list[str], extra: list[tuple[Any, ...]] | None = None) -> dict[str, list[tuple[Any, ...]]]:
-        return {"dec_player": [(k, p, 1, None, 1e6) for k, p in squad.items()],
-                "dec_lineup": [(str(i), k, slots[k], k) for i, k in enumerate(names)] + (extra or [])}
+    def lineup(names: list[str], extra: list[Slot] | None = None) -> Inputs:
+        return Inputs(_NO_MONEY, players=[Player(k, p, 1, None, 1e6) for k, p in squad.items()],
+                      lineup=[Slot(str(i), k, slots[k], k) for i, k in enumerate(names)] + (extra or []))
     pos = dict(squad)
     got = lineup_of(lineup(fielded), pos)
     assert got.eleven == frozenset(fielded) and got.message == "" and got.unmapped == ()
     none = lineup_of(lineup([]), pos)
     assert none.eleven is None and "don't have an eleven" in none.message, "no line-up in the app: you don't have an eleven"
-    unmatched = lineup_of(lineup(fielded[:10], [("99", None, "DEL", "Ghost")]), pos)
+    unmatched = lineup_of(lineup(fielded[:10], [Slot("99", None, "DEL", "Ghost")]), pos)
     assert unmatched.eleven is None and unmatched.unmapped == ("Ghost",), "an app id we cannot match is named, never dropped"
     short = lineup_of(lineup(fielded[:10]), pos)
     assert short.eleven is None and "not a legal eleven" in short.message
-    gone = dict(lineup(fielded), dec_player=[(k, p, int(k != "f3"), None, 1e6) for k, p in squad.items()])
+    gone = lineup(fielded)._replace(players=[Player(k, p, int(k != "f3"), None, 1e6) for k, p in squad.items()])
     assert lineup_of(gone, pos).eleven is None and "no longer yours" in lineup_of(gone, pos).message
     flat = {k: 4.0 for k in squad}
     swapped = ["k", "d1", "d2", "d3", "bench", "m1", "m2", "m3", "f1", "f2", "f3"]
