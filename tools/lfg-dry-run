@@ -10,7 +10,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
-SCRATCH="${HOME}/.cache/lfg-dry-run"     # not /tmp: a tmpfs too small for lfg.db
+SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-dry-run}"     # not /tmp: a tmpfs too small for lfg.db; LFG_SCRATCH: one each when several run at once
 mkdir -p "$SCRATCH/data" "$SCRATCH/reports"
 ln -sfn "$REPO/data/raw" "$SCRATCH/data/raw"
 
