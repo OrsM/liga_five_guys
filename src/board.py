@@ -33,9 +33,9 @@ def stamped(t: str) -> str:
     return t[:13] + ":" + t[13:]
 
 
-def next_value(inp: dict[str, list[tuple[Any, ...]]]) -> dict[str, float]:
+def next_value(inp: decision.Inputs) -> dict[str, float]:
     _, cells = decision.cells_of(inp)
-    return cells.get(min((j for j, _ in inp["dec_lock"]), default=min(cells, default=0)), {})
+    return cells.get(min((x.jornada for x in inp.locks), default=min(cells, default=0)), {})
 
 
 class Fact(NamedTuple):
@@ -51,9 +51,9 @@ def facts() -> dict[str, Fact]:
     return {k: Fact(name, pos, trend) for k, name, pos, trend in rows("SELECT player, name_shown(name), pos, trend FROM player_facts")}
 
 
-def squad_rows(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> list[Doc]:
+def squad_rows(inp: decision.Inputs, names: dict[str, str]) -> list[Doc]:
     pos, _ = decision.cells_of(inp)
-    mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
+    mine = decision.squad_of(inp)
     e = next_value(inp)
     fielded = decision.lineup_of(inp, pos).eleven
     settled = eleven.best_eleven(mine, pos, e, fielded)
@@ -76,31 +76,31 @@ def advice(swaps: tuple[tuple[str, str, float], ...], names: dict[str, str]) -> 
     return [{"in": names.get(i, i), "out": names.get(o, o), "gain": g} for i, o, g in steps if g > 0]
 
 
-def lineup_doc(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str]) -> Doc:
+def lineup_doc(inp: decision.Inputs, names: dict[str, str]) -> Doc:
     pos, _ = decision.cells_of(inp)
-    mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
+    mine = decision.squad_of(inp)
     e = next_value(inp)
     got = decision.lineup_of(inp, pos)
     settled = eleven.best_eleven(mine, pos, e, got.eleven)
     if got.eleven is None or settled is None:
         return {"eleven": None, "message": got.message or "the squad cannot field a legal eleven", "unmapped": list(got.unmapped),
                 "points": None, "best": eleven.total(settled.eleven, e) if settled else None, "advice": []}
-    slots = {player: slot for _, player, slot, _ in inp["dec_lineup"]}
+    slots = {s.player: s.slot for s in inp.lineup}
     order = sorted(got.eleven, key=lambda k: (POSITIONS.index(slots[k]) if slots[k] in POSITIONS else len(POSITIONS), -e.get(k, 0.0), k))
     return {"eleven": [names.get(k, k) for k in order], "message": "", "unmapped": list(got.unmapped),
             "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
-def standing(mine: set[str], known: dict[str, Fact]) -> list[tuple[Any, ...]]:
+def standing(mine: frozenset[str], known: dict[str, Fact]) -> list[tuple[Any, ...]]:
     return [(k, value, money, known.get(k, UNKNOWN).pos, known.get(k, UNKNOWN).trend) for k, value, money in rows(
         "SELECT t.player, t.market_value, o.money FROM offers o"
         " JOIN squads t ON t.player_team_id = o.player_team_id"
         " WHERE o.status = 'pending' AND o.money <> 0 AND t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))]
 
 
-def offer_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], got: list[tuple[Any, ...]]) -> list[Doc]:
+def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[tuple[Any, ...]]) -> list[Doc]:
     pos, cells = decision.cells_of(inp)
-    mine = frozenset(k for k, _, m, *_ in inp["dec_player"] if m)
+    mine = decision.squad_of(inp)
     js = sorted(cells)
     fielded = decision.lineup_of(inp, pos).eleven
     sides = {}
@@ -144,17 +144,17 @@ def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: 
             "gain": found.gain, "points_lost_if_won": found.cost_won, "points_lost_if_lost": found.cost_lost, "net": found.net}
 
 
-def buy_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
+def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
     pos, cells = decision.cells_of(inp)
     curves = decision.curves_of(inp)
-    seen = {k: (bids_seen, mine, n, thin, cell) for k, _, _, bids_seen, _, mine, _, cell, n, thin in inp["dec_auction"]}
-    bids = {k: amount for k, amount in inp["dec_bid"]}
+    seen = {a.player: a for a in inp.auctions}
+    bids = {b.player: b.amount for b in inp.bids}
     out = []
     for i, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:TOP_BUYS]):
         k, placed = r["player"], r["placed"]
         amount = placed if placed is not None else r["bid"]
         win = chance(curves[k], placed / r["asking"]) if placed is not None and k in curves else r["win"]
-        bids_seen, mine, n, thin, cell = seen.get(k, (None, None, 0, True, ""))
+        auction = seen.get(k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         where = frozenset(j for j in cells if j >= r["from_j"])
         funding = funding_doc(club, names, approach(club._replace(pending=others), k, amount, win,
@@ -168,7 +168,9 @@ def buy_lines(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], club
             "price_next": r["price_next"], "price_lock": r["price_lock"],
             "facts": [["asking", r["asking"], "money"], ["bid", amount, "money"], ["chance to win", win, "chance"],
                       ["points added", r["gain"], "points"]],
-            "bids": bids_seen, "auction": {"yours": bool(mine), "listings": n, "thin": bool(thin), "cell": cell},
+            "bids": auction.bids if auction else None,
+            "auction": {"yours": bool(auction.mine), "listings": auction.n, "thin": bool(auction.thin), "cell": auction.cell}
+            if auction else {"yours": False, "listings": 0, "thin": True, "cell": ""},
             "funding": funding, "accepts": [], "act": []})
     return out
 
@@ -181,8 +183,8 @@ def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
             for r in [r for r in got if r["gain"] > 0][:TOP_TARGETS]]
 
 
-def list_line(inp: dict[str, list[tuple[Any, ...]]], names: dict[str, str], known: dict[str, Fact]) -> list[Doc]:
-    mine = {k for k, _, m, *_ in inp["dec_player"] if m}
+def list_line(inp: decision.Inputs, names: dict[str, str], known: dict[str, Fact]) -> list[Doc]:
+    mine = decision.squad_of(inp)
     listed = {k for (k,) in rows("SELECT player FROM listings WHERE player IS NOT NULL")}
     got = {k: (ptid, pid, value, known.get(k, UNKNOWN).pos) for k, ptid, pid, value in rows(
         "SELECT t.player, t.player_team_id, t.player_id, t.market_value FROM squads t"
@@ -224,18 +226,18 @@ def auction_card() -> Doc:
                 "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE run_id = ? AND drift = 1 ORDER BY scope, bin", (run,))]}
 
 
-def board(inp: dict[str, list[tuple[Any, ...]]], got: list[dict[str, Any]], arrivals: list[str]) -> Doc:
-    (cash, team_value, debt, _squad_max, _xi), = inp["dec_money"]
-    locks = [lock for _, lock in inp["dec_lock"]]
-    bids = sum(amount for _, amount in inp["dec_bid"])
+def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str]) -> Doc:
+    cash, team_value, debt = inp.money.cash, inp.money.team_value, inp.money.debt
+    locks = [x.lock for x in inp.locks]
+    bids = sum(b.amount for b in inp.bids)
     known = facts()
     names = {k: fact.name for k, fact in known.items()}
     squad = squad_rows(inp, names)
-    mine = {k for k, _, m, *_ in inp["dec_player"] if m}
+    mine = decision.squad_of(inp)
     offered = standing(mine, known)
-    pos = {k: p for k, p, *_ in inp["dec_player"] if p in POSITIONS}
-    club = Club(frozenset(mine), pos, {k: value for k, value, *_ in rows("SELECT player, market_value FROM squads") if k in mine},
-                {k: money for k, _, money, *_ in offered}, cash, team_value, (len(inp["dec_bid"]), bids), debt=debt)
+    pos = {p.player: p.pos for p in inp.players if p.pos in POSITIONS}
+    club = Club(mine, pos, {k: value for k, value, *_ in rows("SELECT player, market_value FROM squads") if k in mine},
+                {k: money for k, _, money, *_ in offered}, cash, team_value, (len(inp.bids), bids), debt=debt)
     top = [r for r in got if r["gain"] > 0][:TOP_TARGETS]
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
                "win": r["win"]} for r in top if r["player"] in arrivals]
