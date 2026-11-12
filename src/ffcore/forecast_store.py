@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from ffcore.db import connect, named, rows
 
-__all__ = ["keep", "forecast", "price_momentum", "price_change", "seed_cells", "Prices"]
+__all__ = ["keep", "forecast", "pin", "price_momentum", "price_change", "seed_cells", "Prices"]
 
 # Each player's valued days (each day's last snapshot: market_daily), numbered (n); the
 # change in % on his previous valued day (NULL for the first, or after a
@@ -102,6 +102,12 @@ def forecast() -> int:
             db.executemany("INSERT INTO forecast_player VALUES (%d, ?, ?)" % moment,
                            [(k, flagged.get(k, 0)) for k in sorted({c[0] for c in cells})])
     return moment
+
+
+def pin(moment: int) -> None:
+    """The moment kept: a later forecast of the same cut and variant does not drop it (a run's board points to it)."""
+    with closing(connect()) as db, db:
+        db.execute("UPDATE forecast_moment SET pinned = 1 WHERE moment = ?", (moment, ))
 
 
 def seed_cells(db: sqlite3.Connection, moment: int, cells: Sequence[tuple[str, int, float, float]]) -> None:
@@ -318,8 +324,7 @@ def _selftest_forecast() -> None:
             assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (first, )) == [(len(cells), )]
             assert rows("SELECT player FROM forecast_player WHERE moment = ? AND flagged ORDER BY player",
                         (first, )) == [("dbt", ), ("gone", ), ("hurt", ), ("susp", )], "who was flagged then"
-            with closing(connect()) as db, db:
-                db.execute("UPDATE forecast_moment SET pinned = 1 WHERE moment = ?", (first, ))
+            pin(first)
             forecast()
             third = forecast()
             assert [m for m, in rows("SELECT moment FROM forecast_moment ORDER BY moment")] \

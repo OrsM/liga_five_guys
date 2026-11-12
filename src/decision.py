@@ -6,11 +6,13 @@ from contextlib import closing
 from typing import Any, NamedTuple, Sequence
 
 import eleven
-from ffcore.db import connect, record
+from ffcore.db import connect, record, rows
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
-__all__ = ["inputs", "Inputs", "read_inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
+__all__ = ["inputs", "Inputs", "read_inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals",
+           "Fact", "UNKNOWN", "player_facts", "Offer", "standing_offers", "Held", "held", "listed", "market_read_at",
+           "Source", "source_health", "Brier", "Drift", "latest_auction_run", "brier_by_scope", "drifting_bins", "manager_count"]
 
 INPUTS = ("dec_state", "dec_player", "dec_curve", "dec_auction", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_lineup")
 
@@ -253,6 +255,106 @@ def seen_cuts() -> list[str]:
 def read_arrivals() -> list[str]:
     with closing(connect()) as db:
         return [k for (k,) in db.execute("SELECT player FROM dec_arrivals ORDER BY rank").fetchall()]
+
+
+# What the board shows beside the decision: facts about players, the offers on your players, who is listed, how fresh
+# each source is, how the auction forecast has done. Each selector is named for what it returns.
+
+class Fact(NamedTuple):
+    name: str
+    pos: str | None
+    trend: float | None
+
+
+UNKNOWN = Fact("", None, None)
+
+
+def player_facts() -> dict[str, Fact]:
+    return {k: Fact(name, pos, trend) for k, name, pos, trend in rows("SELECT player, name_shown(name), pos, trend FROM player_facts")}
+
+
+class Offer(NamedTuple):
+    player: str
+    value: float
+    money: float
+
+
+def standing_offers(mine: frozenset[str]) -> list[Offer]:
+    """The pending offers, money not nil, on those of your players."""
+    return [Offer(*r) for r in rows(
+        "SELECT t.player, t.market_value, o.money FROM offers o"
+        " JOIN squads t ON t.player_team_id = o.player_team_id"
+        " WHERE o.status = 'pending' AND o.money <> 0 AND t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))]
+
+
+class Held(NamedTuple):
+    player: str
+    player_team: str
+    player_id: str | None
+    value: float
+
+
+def held(mine: frozenset[str]) -> list[Held]:
+    """Those of your players in the squads table, with the ids the app knows them by and their market value."""
+    return [Held(*r) for r in rows(
+        "SELECT t.player, t.player_team_id, t.player_id, t.market_value FROM squads t"
+        " WHERE t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))]
+
+
+def listed() -> frozenset[str]:
+    return frozenset(k for (k,) in rows("SELECT player FROM listings WHERE player IS NOT NULL"))
+
+
+def market_read_at() -> str | None:
+    """The stamp of the market read at t, if there is one."""
+    (at,), = rows("SELECT at FROM market_read")
+    return at or None
+
+
+class Source(NamedTuple):
+    src: str
+    last_at: str
+    hours: float
+    status: str
+
+
+def source_health() -> list[Source]:
+    return [Source(*r) for r in rows("SELECT src, last_at, hours_since, status FROM parser_health ORDER BY src")]
+
+
+class Brier(NamedTuple):
+    scope: str
+    n: int
+    model: float
+    pooled: float
+
+
+class Drift(NamedTuple):
+    scope: str
+    bin: str
+    n: int
+    stated: float
+    observed: float
+
+
+def latest_auction_run() -> int | None:
+    """The run that last measured the auction forecast (auction_brier), None if none has."""
+    (run,), = rows("SELECT max(run_id) FROM auction_brier")
+    return run
+
+
+def brier_by_scope(run: int) -> list[Brier]:
+    return [Brier(*r) for r in rows("SELECT scope, n, model, pooled FROM auction_brier WHERE run_id = ? ORDER BY scope", (run,))]
+
+
+def drifting_bins(run: int) -> list[Drift]:
+    return [Drift(*r) for r in rows(
+        "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE run_id = ? AND drift = 1 ORDER BY scope, bin", (run,))]
+
+
+def manager_count() -> int:
+    (n,), = rows("SELECT count(*) FROM cash")
+    return int(n)
 
 
 _NO_MONEY = Money(0.0, 0.0, 0.0, SQUAD_MAX, XI_SIZE)
