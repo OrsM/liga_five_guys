@@ -14,7 +14,7 @@ import decision
 import eleven
 from approach import Approach, Club, approach
 from assemble import built
-from ffcore.auction import chance
+from ffcore.auction import Curve, chance
 from ffcore.db import connect, cut, record, rows, this_run
 from ffcore.jornadas import rounds
 from ffcore.rules import POSITIONS, bid_limit
@@ -144,6 +144,25 @@ def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: 
             "gain": found.gain, "points_lost_if_won": found.cost_won, "points_lost_if_lost": found.cost_lost, "net": found.net}
 
 
+class Stance(NamedTuple):
+    """Where a buy's bid stands: the bid the line is on (yours once one is placed, else the advised) and its chance,
+    the bid advised and its chance, and the move: bid (none placed), raise (the advised is over yours) or hold. A bid
+    placed is never replaced by a lower one: lowering it is not advised."""
+    amount: float
+    win: float
+    advised: float
+    advised_win: float
+    move: str
+
+
+def stance(r: dict[str, Any], curve: Curve | None) -> Stance:
+    placed, advised, advised_win = r["placed"], r["bid"], r["win"]
+    if placed is None:
+        return Stance(advised, advised_win, advised, advised_win, "bid")
+    win = chance(curve, placed / r["asking"]) if curve else advised_win
+    return Stance(placed, win, advised, advised_win, "raise" if advised > placed else "hold")
+
+
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
     pos, cells = decision.cells_of(inp)
     curves = decision.curves_of(inp)
@@ -152,8 +171,8 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     out = []
     for i, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:TOP_BUYS]):
         k, placed = r["player"], r["placed"]
-        amount = placed if placed is not None else r["bid"]
-        win = chance(curves[k], placed / r["asking"]) if placed is not None and k in curves else r["win"]
+        at = stance(r, curves.get(k))
+        amount, win = at.amount, at.win
         auction = seen.get(k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         where = frozenset(j for j in cells if j >= r["from_j"])
@@ -162,12 +181,14 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         name = names.get(k, k)
         out.append({
             "name": name, "pos": r["pos"], "what": "buy", "label": "buy " + name, "step": "placed" if placed is not None else "bid",
-            "price": r["asking"], "asking": r["asking"], "amount": amount, "win": win, "plan": False, "done": placed is not None,
+            "price": r["asking"], "asking": r["asking"], "amount": amount, "win": win, "advised": at.advised, "advised_win": at.advised_win,
+            "move": at.move, "plan": False, "done": placed is not None,
             "key": k, "gain": r["gain"], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
             "replaces": names.get(r["replaces"], r["replaces"]), "per_million": r["per_million"],
             "price_next": r["price_next"], "price_lock": r["price_lock"],
-            "facts": [["asking", r["asking"], "money"], ["bid", amount, "money"], ["chance to win", win, "chance"],
-                      ["points added", r["gain"], "points"]],
+            "facts": [["asking", r["asking"], "money"], ["bid", amount, "money"], ["chance to win", win, "chance"]]
+            + ([["advised bid", at.advised, "money"], ["chance at the advised bid", at.advised_win, "chance"]] if placed is not None else [])
+            + [["points added", r["gain"], "points"]],
             "bids": auction.bids if auction else None,
             "auction": {"yours": bool(auction.mine), "listings": auction.n, "thin": bool(auction.thin), "cell": auction.cell}
             if auction else {"yours": False, "listings": 0, "thin": True, "cell": ""},
@@ -177,7 +198,8 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
 
 def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
     return [{"name": names.get(r["player"], r["player"]), "pos": r["pos"], "status": r["status"], "gain": r["gain"],
-             "asking": r["asking"], "bid": r["bid"], "win": r["win"], "replaces": names.get(r["replaces"], r["replaces"]),
+             "asking": r["asking"], "bid": r["bid"], "win": r["win"], "placed": r["placed"],
+             "replaces": names.get(r["replaces"], r["replaces"]),
              "per_million": r["per_million"], "price_next": r["price_next"], "price_lock": r["price_lock"],
              "available": r["status"] == "market"}
             for r in [r for r in got if r["gain"] > 0][:TOP_TARGETS]]
@@ -240,7 +262,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str]) 
                 {k: money for k, _, money, *_ in offered}, cash, team_value, (len(inp.bids), bids), debt=debt)
     top = [r for r in got if r["gain"] > 0][:TOP_TARGETS]
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
-               "win": r["win"]} for r in top if r["player"] in arrivals]
+               "win": r["win"], "placed": r["placed"]} for r in top if r["player"] in arrivals]
     buys = buy_lines(inp, names, club, got)
     sells = offer_lines(inp, names, offered)
     funds(buys, sells)
@@ -286,6 +308,24 @@ def _selftest() -> None:
     assert [s["for"] for s in sells] == [["Raphinha"], []], "an offer is taken tonight when a funded buy sells him tonight"
     assert advice((("c", "b", 2.0), ("d", "c", 1.0), ("e", "x", 0.5)), {"d": "D"}) == [
         {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"
+    curve: Curve = ((1.0, 0.2), (1.1, 0.6), (1.3, 1.0))
+    asking, advised = 10e6, 11e6
+
+    def row(placed: float | None) -> dict[str, Any]:
+        return {"player": "p", "pos": "MED", "status": "market", "gain": 1.0, "asking": asking, "bid": advised,
+                "win": chance(curve, advised / asking), "placed": placed, "replaces": "x", "per_million": None,
+                "price_next": None, "price_lock": None}
+    for placed in (None, 10e6, 10.5e6, 11e6, 12e6, 13e6):
+        at = stance(row(placed), curve)
+        assert (at.advised, at.advised_win) == (advised, chance(curve, advised / asking)), "the advised bid is always said"
+        if placed is None:
+            assert (at.amount, at.win, at.move) == (advised, at.advised_win, "bid"), "no bid placed: the advised one"
+            continue
+        assert at.amount == placed and at.win == chance(curve, placed / asking), "a bid placed is the line's, at its own chance"
+        assert at.move == ("raise" if advised > placed else "hold"), "the only move from a bid placed is up"
+        assert at.move == "hold" or at.advised_win >= at.win, "a raise never lowers the chance"
+        (line,) = target_lines({}, [row(placed)])
+        assert line["placed"] == placed, "a target with your bid on him says it beside the advised one"
     print("board self-test OK")
 
 
