@@ -10,7 +10,7 @@ from ffcore.db import connect, record
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
-__all__ = ["inputs", "read_inputs", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
+__all__ = ["inputs", "Inputs", "read", "rows_of", "read_inputs", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals"]
 
 INPUTS = ("dec_state", "dec_player", "dec_curve", "dec_auction", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_lineup")
 
@@ -26,21 +26,133 @@ def inputs() -> None:
             db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
 
 
-def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
-    """inputs() made, and read back: every table of it, the cells (player, jornada, e), every player who is not yours
-    with his status (market, rival, unlisted), and each player's price forecast."""
+class Player(NamedTuple):
+    player: str
+    pos: str
+    mine: int
+    asking: float | None
+    proceeds: float | None
+
+
+class CurvePoint(NamedTuple):
+    player: str
+    ratio: float
+    p: float
+
+
+class Auction(NamedTuple):
+    player: str
+    ask: float
+    mins: float
+    bids: int
+    rival: int
+    mine: int
+    trend: float | None
+    cell: str
+    n: int
+    thin: int
+
+
+class Money(NamedTuple):
+    cash: float
+    team_value: float
+    debt: float
+    squad_max: int
+    xi_size: int
+
+
+class Bid(NamedTuple):
+    player: str
+    amount: float
+
+
+class Close(NamedTuple):
+    player: str
+    close: str
+
+
+class Lock(NamedTuple):
+    jornada: int
+    lock: str
+
+
+class Slot(NamedTuple):
+    app_id: str
+    player: str | None
+    slot: str
+    name: str
+
+
+class Cell(NamedTuple):
+    player: str
+    jornada: int
+    e: float
+
+
+class Candidate(NamedTuple):
+    player: str
+    pos: str
+    status: str
+    asking: float | None
+    value: float | None
+
+
+class Price(NamedTuple):
+    player: str
+    h: int
+    expected_value: float
+    value: float
+
+
+class Inputs(NamedTuple):
+    """The league at t as the decision reads it: a list of named rows a dec_* table, the cells (player, jornada, e),
+    every player who is not yours with his status (market, rival, unlisted), and each player's price forecast."""
+    players: list[Player]
+    curves: list[CurvePoint]
+    auctions: list[Auction]
+    money: list[Money]
+    bids: list[Bid]
+    closes: list[Close]
+    locks: list[Lock]
+    lineup: list[Slot]
+    cells: list[Cell]
+    universe: list[Candidate]
+    prices: list[Price]
+
+
+# The name each field of Inputs had as a key of the dict the readers still take (rows_of), until they read Inputs.
+ROWS = {"players": "dec_player", "curves": "dec_curve", "auctions": "dec_auction", "money": "dec_money", "bids": "dec_bid",
+        "closes": "dec_close", "locks": "dec_lock", "lineup": "dec_lineup", "cells": "cell", "universe": "dec_universe",
+        "prices": "price"}
+
+
+def read() -> Inputs:
+    """inputs() made, and read back, each row under its columns' names."""
     inputs()
     with closing(connect()) as db:
-        inp = {t: db.execute("SELECT * FROM %s" % t).fetchall() for t in INPUTS[1:]}
-        inp["cell"] = db.execute("SELECT player, jornada, e FROM cell").fetchall()
-        inp["dec_universe"] = db.execute(
-            "SELECT s.player, coalesce(nullif(c.pos, ''), s.pos, 'MED'),"
-            " CASE WHEN s.owner IS NULL AND s.price IS NOT NULL THEN 'market' WHEN s.owner IS NULL THEN 'unlisted'"
-            " ELSE 'rival' END, s.price, s.value"
-            " FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant LEFT JOIN player_club c ON c.player = s.player"
-            " WHERE s.owner IS NULL OR s.owner <> l.me").fetchall()
-        inp["price"] = db.execute("SELECT ff_id, h, expected_value, value FROM price_forecast").fetchall()
-    return inp
+        def table(kind: Any, name: str) -> list[Any]:
+            return [kind(*r) for r in db.execute("SELECT %s FROM %s" % (", ".join(kind._fields), name))]
+        return Inputs(
+            players=table(Player, "dec_player"), curves=table(CurvePoint, "dec_curve"), auctions=table(Auction, "dec_auction"),
+            money=table(Money, "dec_money"), bids=table(Bid, "dec_bid"), closes=table(Close, "dec_close"),
+            locks=table(Lock, "dec_lock"), lineup=table(Slot, "dec_lineup"), cells=table(Cell, "cell"),
+            universe=[Candidate(*r) for r in db.execute(
+                "SELECT s.player, coalesce(nullif(c.pos, ''), s.pos, 'MED') AS pos,"
+                " CASE WHEN s.owner IS NULL AND s.price IS NOT NULL THEN 'market' WHEN s.owner IS NULL THEN 'unlisted'"
+                " ELSE 'rival' END AS status, s.price AS asking, s.value"
+                " FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant LEFT JOIN player_club c ON c.player = s.player"
+                " WHERE s.owner IS NULL OR s.owner <> l.me")],
+            prices=[Price(*r) for r in db.execute("SELECT ff_id AS player, h, expected_value, value FROM price_forecast")])
+
+
+def rows_of(inp: Inputs) -> dict[str, list[tuple[Any, ...]]]:
+    """Inputs as the dict of rows its readers took before it had names: temporary, gone when they read Inputs (#40, #41)."""
+    return {ROWS[field]: list(rows) for field, rows in inp._asdict().items()}
+
+
+def read_inputs() -> dict[str, list[tuple[Any, ...]]]:
+    """read(), as rows_of gives it: temporary, as rows_of is."""
+    return rows_of(read())
 
 
 class Lineup(NamedTuple):
