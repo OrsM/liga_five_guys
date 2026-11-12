@@ -133,6 +133,32 @@ def graded(run: int, last: int, path: Path | None = None) -> bool:
                           " GROUP BY g.run_id HAVING max(g.jornada) >= ? LIMIT 1", (run, last)).fetchone() is not None
 
 
+def newest_result() -> float | None:
+    """When the newest auction with an outcome closed (a Julian day), as of t; None if there is none."""
+    (got,), = rows("SELECT max(julianday(close)) FROM auction_results")
+    return got
+
+
+def scored_at(run: int, path: Path | None = None) -> str | None:
+    """When (runs.as_of) the latest earlier run of this run's code (runs.commit_sha) that recorded the auction scores
+    (auction_brier) was made; None if none was."""
+    with closing(connect(path)) as db:
+        return db.execute("SELECT max(e.as_of) FROM auction_brier b JOIN runs e ON e.run_id = b.run_id"
+                          " JOIN runs r ON r.run_id = ? AND e.commit_sha = r.commit_sha AND e.run_id < r.run_id",
+                          (run,)).fetchone()[0]
+
+
+def auctions_scored(run: int, newest: float | None) -> bool:
+    """Whether an earlier run of this run's code scored the auctions with the newest outcome as it is now (newest):
+    its scores stand, and no auction closed since would change them."""
+    then = scored_at(run)
+    if then is None or newest is None:
+        return False
+    with replaying():
+        set_now(snapshot_stamp(then))
+        return newest_result() == newest
+
+
 def record_auction(run: int | None) -> dict[str, int]:
     with closing(connect()) as db:
         ls = auction.looks(db)
@@ -148,12 +174,14 @@ def record_auction(run: int | None) -> dict[str, int]:
 
 def record_grades() -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code, and keep every player forecast against
-    what then happened (one set a code: superseded), unless this code has graded them on every jornada done (graded)."""
+    what then happened (one set a code: superseded), unless this code has graded them on every jornada done (graded);
+    and score the auction forecast (record_auction), unless this code has on every auction closed (auctions_scored)."""
     done = done_jornadas()
     resolved = len(done)
     run = this_run()
-    scored = record_auction(run)
-    if run is not None and done and graded(run, max(done)):
+    standing = run is not None and bool(done) and graded(run, max(done))
+    scored = {} if run is not None and auctions_scored(run, newest_result()) else record_auction(run)
+    if standing:
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, **scored}
     fc = backtest(GRADE_AHEAD)
@@ -216,6 +244,35 @@ def _selftest_measure_log() -> None:
         assert rows("SELECT key, value, previous, change FROM measure_latest") == [("share", 0.5, 0.25, 0.25)]
 
 
+def _selftest_stand() -> None:
+    """With nothing new (every jornada graded, every auction scored) the grade stage enters neither replay; with a
+    jornada or an auction new it enters that one."""
+    entered: list[str] = []
+    state = {"graded": True, "scored": True}
+    def auction_scored(run: int | None) -> dict[str, int]:
+        entered.append("auction")
+        return {}
+
+    def regraded(ahead: int = 0) -> list[dict[str, Any]]:
+        entered.append("grades")
+        return []
+    stub: dict[str, Any] = {
+        "done_jornadas": lambda: {1, 2}, "this_run": lambda: 5, "newest_result": lambda: 1.0,
+        "graded": lambda run, last: state["graded"], "auctions_scored": lambda run, newest: state["scored"],
+        "record_auction": auction_scored, "backtest": regraded,
+        "record": lambda *a, **k: None, "superseded": lambda run: None}
+    kept = {k: globals()[k] for k in stub}
+    try:
+        globals().update(stub)
+        for g, a, want in ((True, True, []), (False, True, ["grades"]), (True, False, ["auction"]), (False, False, ["auction", "grades"])):
+            state.update(graded=g, scored=a)
+            entered.clear()
+            record_grades()
+            assert entered == want, (g, a, entered)
+    finally:
+        globals().update(kept)
+
+
 def _selftest() -> None:
     _selftest_measure_log()
     import tempfile
@@ -257,6 +314,12 @@ def _selftest() -> None:
         later, elsewhere = run("a"), run("c")
         assert graded(later, 7, path) and not graded(later, 8, path) and not graded(elsewhere, 7, path), \
             "this code graded on every jornada done: nothing to grade again; a jornada more, or other code, is"
+        with db:
+            db.execute("UPDATE runs SET as_of = '2026-11-01T2210Z' WHERE run_id = ?", (old,))
+            db.execute("INSERT INTO auction_brier VALUES (?, 'live:', 1, 0.1, 0.2)", (old,))
+        assert scored_at(later, path) == "2026-11-01T2210Z" and scored_at(elsewhere, path) is None and scored_at(old, path) is None, \
+            "the run of this code that scored the auctions, not another's, nor one that came after"
+    _selftest_stand()
     print("grading self-test OK")
 
 
