@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import configparser
+import sqlite3
 import sys
 from contextlib import closing
 from dataclasses import dataclass
@@ -128,6 +129,27 @@ def _selftest() -> None:
                       "counterparty": "1", "amount": "12", "at": "2026-09-20"}],
                     users[:2], [{"observed_at": b, "manager": "riv", "player_id": "7"}], xw)
     assert bought.paid == {"p": 12.0}, ("what his owner paid, not the one before", bought.paid)
+
+    def changes(stamps: list[tuple[str, float | None]]) -> list[sqlite3.Row]:
+        """bid_changes over one bid seen at these (stamp, bid_money)."""
+        with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+            store_sql("api_market", [{"observed_at": at, "player_id": "7", "market_id": "m", "bid_id": "b1",
+                                      "expires_at": "2026-09-05T2000Z", "bid_money": m} for at, m in stamps]
+                      + [{"observed_at": at, "player_id": "7", "market_id": "m", "bid_id": "", "bid_money": None}
+                         for at, _ in stamps])
+            with closing(lfg.connect()) as db, db:
+                db.execute("INSERT INTO crosswalk (player_id, app_id) VALUES ('p', '7')")
+                db.row_factory = sqlite3.Row
+                return db.execute("SELECT * FROM bid_changes ORDER BY observed_at").fetchall()
+
+    placed = changes([(a, 10.0)])
+    assert [r["was"] for r in placed] == [None] and placed[0]["now"] == 10.0, "a bid placed is one row, was NULL"
+    assert (placed[0]["bid_id"], placed[0]["player"], placed[0]["close"]) == ("b1", "p", "2026-09-05T2000Z"), \
+        "the player as listings keys it, the listing's close; bids without a bid_id are no bid"
+    moved = changes([(a, 10.0), (b, 12.0)])
+    assert [(r["was"], r["now"]) for r in moved] == [(None, 10.0), (10.0, 12.0)], "a changed bid adds a row"
+    again = changes([(a, 10.0), (b, 10.0), ("2026-09-03T1000Z", 12.0), ("2026-09-04T1000Z", 12.0)])
+    assert [(r["was"], r["now"]) for r in again] == [(None, 10.0), (10.0, 12.0)], "an unchanged sighting adds none"
 
     print("ffcore.league self-test OK")
 

@@ -975,6 +975,20 @@ WHERE m.seller = 'marketPlayerLeague' AND coalesce(m.sale_price, 0) > 0 AND coal
   AND m.observed_at <= (SELECT cut())
   AND (r.player IS NOT NULL OR julianday(m.expires_at) > stamp_jd((SELECT cut())));
 
+-- Every change to one of your bids, up to t: the observations of a bid (bid_id) whose bid_money differs
+-- from the bid's previous observation, the first included (was NULL: the bid being placed). player and close
+-- as listings gives them; now is the new bid_money.
+DROP VIEW IF EXISTS bid_changes;
+CREATE VIEW bid_changes AS
+SELECT bid_id, player, close, observed_at, was, now FROM (
+    SELECT t.bid_id, a.player, t.expires_at AS close, t.observed_at,
+           lag(t.bid_money) OVER w AS was, t.bid_money AS now,
+           row_number() OVER w AS n, lag(t.bid_money) OVER w IS NOT t.bid_money AS changed
+    FROM src_api_market t LEFT JOIN app_player a ON a.app_id = t.player_id
+    WHERE t.bid_id <> '' AND t.observed_at <= (SELECT cut())
+    WINDOW w AS (PARTITION BY t.bid_id ORDER BY t.observed_at, t.rowid))
+WHERE n = 1 OR changed;
+
 -- The game's nightly offers for listed players, each once (its first
 -- sighting), over the player's value when it was made; by when made.
 DROP VIEW IF EXISTS offer_ratios;
