@@ -30,7 +30,7 @@ from ffcore.rules import position, slot
 from ffcore.text import stems_meet
 
 __all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "cut",
-           "functions", "query", "record", "replaying", "rows", "set_look", "set_now", "this_run", "LOOK"]
+           "schema_version", "functions", "query", "record", "replaying", "rows", "set_look", "set_now", "this_run", "LOOK"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
@@ -160,6 +160,12 @@ def cut() -> str:
     if LOOK["t"] is None:
         LOOK["t"] = run_now()
     return stamp(LOOK["t"])
+
+
+def schema_version() -> int:
+    """The version of the schema applied to the database (PRAGMA user_version)."""
+    with closing(connect()) as db:
+        return int(db.execute("PRAGMA user_version").fetchone()[0])
 
 
 def set_now(when: datetime | None) -> None:

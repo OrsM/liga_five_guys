@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 from ffcore import forecast as model, pricing, rules, tidy
-from ffcore.db import connect, query, record, rows, set_constants, set_look
+from ffcore.db import connect, query, record, rows, schema_version, set_constants, set_look
 from ffcore.forecast_store import Prices, club_ratings, forecast, market_offer_ratios, price_carry, price_change, price_momentum
 from ffcore.seen import see as see_at
 from ffcore.league import write_config
@@ -42,9 +42,7 @@ def see() -> str:
     snapshot, seen.see), made once a cut, variant and code: the key is the SQL's version and
     every constant, so another schema or a variant redefined makes them again, never reads a
     stale one."""
-    with closing(connect()) as db:
-        version, = db.execute("PRAGMA user_version").fetchone()
-    return see_at(hashlib.sha1(repr((version, sorted((m, sorted(c.items())) for m, c in constants().items())))
+    return see_at(hashlib.sha1(repr((schema_version(), sorted((m, sorted(c.items())) for m, c in constants().items())))
                                .encode()).hexdigest()[:12])
 
 
