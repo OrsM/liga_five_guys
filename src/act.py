@@ -1,5 +1,4 @@
-"""Act on the board: the one thing done from the phone, listing your players for sale at their value, done in the
-app when you accept it on the phone (lfg-watch hands the request here).
+"""Act on the board: the one thing done from the phone, listing your players for sale at their value.
 
 A request names the line (its label). It is acted on if that line is still on the board as it stands now, whatever board the
 phone saw it on, and is one the app can do. A line carries what it acts on as the app knows it (board.py's act: each
@@ -69,8 +68,7 @@ def home(call: Call, base: str) -> tuple[str, str] | str:
 
 def list_all(app: App, line: dict[str, Any]) -> tuple[bool, str]:
     """Each player of the line put on the market at his value, or at the
-    app's now if it has risen since the board (it refuses a price under it:
-    Lemar, 2026-10-30). Offers on them are yours to take; a listed player
+    app's now if it has risen since the board (it refuses a price under it). Offers on them are yours to take; a listed player
     still plays for you."""
     refused: list[str] = []
     for p in line["act"]:

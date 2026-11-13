@@ -48,7 +48,7 @@ def source_table(name: str) -> str:
 
 def migrate(db: sqlite3.Connection) -> None:
     """A database whose source tables have the names before their layer's prefix (src_): renamed, their
-    views and triggers dropped first (the schema texts make them again)."""
+    views and triggers dropped first."""
     old = [t for t in SOURCE if db.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (t,)).fetchone()]
     if not old:
         return
@@ -245,10 +245,7 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
 
 def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
     """The columns these schema texts give a table that db's copy of it lacks,
-    added, and those it has that they no longer give, dropped (CREATE TABLE
-    IF NOT EXISTS leaves a kept table as it was made; a table whose columns
-    change loses its triggers first, the texts make them again; a drop drops
-    every view first, a view the texts no longer make with it). A column a table
+    added, and those it has that they no longer give, dropped. A column a table
     cannot gain (NOT NULL without a default) raises."""
     with closing(sqlite3.connect(":memory:")) as want:
         functions(want)
@@ -301,9 +298,9 @@ def _put(sql: str) -> str:
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
     """The file at path (DB by default) in WAL mode, schema applied, and
-    cut() the process's t, which the as-of views read. The schema is applied when the file does not carry its version (it
-    recreates every view, 0.17s), one process at a time: a process that finds
-    it applied leaves the views other processes are using alone."""
+    cut() the process's t, which the as-of views read. The schema is applied when the file
+    does not carry its version, one process at a time: a process that finds it applied leaves
+    the views other processes are using alone."""
     path = path or DB
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path, timeout=120)     # a backtest builds its universes in several processes, each writing its fits

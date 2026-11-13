@@ -30,8 +30,7 @@ WHERE crosswalk.player_id = f.player
 
 def identity(db: sqlite3.Connection) -> None:
     """ff_identity_kept (identity.sql) up to the registry and the rows it is
-    read for: refilled from ff_identity_now when either changed (build calls
-    it too; so does connect, through facts.ensure)."""
+    read for: refilled from ff_identity_now when either changed."""
     if db.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('ff_identity_kept', 'facts_meta')"
                   ).fetchone()[0] < 2:
         return

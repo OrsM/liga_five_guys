@@ -1,5 +1,5 @@
-"""The report job's pull (tools/lfg-run) must keep a merge among the commits it replays: a plain
---rebase flattened one on 2026-11-05 and re-resolved four files. Read-only: scratch repos in a temp dir."""
+"""The report job's pull (tools/lfg-run) must keep a merge among the commits it replays.
+Read-only: scratch repos in a temp dir."""
 from __future__ import annotations
 
 import re

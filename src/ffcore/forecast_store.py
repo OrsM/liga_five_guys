@@ -69,9 +69,8 @@ def _make(db: sqlite3.Connection, name: str, sql: str, through: str, salt: str =
 
 
 def keep(db: sqlite3.Connection, now: Callable[[], str]) -> None:
-    """price_step and momentum_day up to the data: nothing when current. They are made with t put past
-    the last day (the kept days are the data's, whatever t the connection looks at), and now (the
-    connection's clock) is put back after."""
+    """price_step and momentum_day up to the data: nothing when current. The connection's clock
+    (now) is put back after."""
     ckey = db.execute("SELECT ckey FROM k").fetchone()[0]
     db.create_function("cut", 0, lambda: FAR)
     db.create_function("hpad", 0, lambda: PAD)      # a cut a day on can reach one horizon further

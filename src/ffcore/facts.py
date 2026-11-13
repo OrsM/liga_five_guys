@@ -1,7 +1,7 @@
 """Keeping what never changes once made, so a question is a lookup.
 
 ensure() is what keeps each module's kept facts current: connect() calls it, it costs a
-lookup when nothing is new, and a rebuild (~1s, about once a day) when a day has closed or
+lookup when nothing is new, and a rebuild when a day has closed or
 the SQL that makes them has changed. It reads nothing itself: each module keeps its own
 (ingest: ff_identity_kept, crosswalk.identity; forecast: price_step and momentum_day,
 forecast_store.keep), under the one record, facts_meta.

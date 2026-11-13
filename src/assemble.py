@@ -45,7 +45,7 @@ def see() -> str:
     """The market and the league as of t into seen, seen_cash and seen_odds (the decision's
     snapshot, seen.see), made once a cut, variant and code: the key is the SQL's version and
     every constant, so another schema or a variant redefined makes them again, never reads a
-    stale one. The cut."""
+    stale one."""
     with closing(connect()) as db:
         version, = db.execute("PRAGMA user_version").fetchone()
     return see_at(hashlib.sha1(repr((version, sorted((m, sorted(c.items())) for m, c in constants().items())))
@@ -438,7 +438,7 @@ def _selftest_market() -> None:
             "(a missing one counts as the oldest he has: 0 + .4 * 10 + .2 * 10); a rise is felt for three updates"
 
     def prices(series: dict[str, list[float]]) -> Prices:
-        """The momentum views over these values, one a day from 2026-08-10."""
+        """The momentum views over these values, one a day."""
         with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
             for n in range(max(len(v) for v in series.values())):
                 store_sql("market", [{"observed_at": "2026-08-%02dT2359Z" % (10 + n), "ff_id": k,

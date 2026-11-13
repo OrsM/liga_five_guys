@@ -14,7 +14,7 @@ __all__ = ["see"]
 def see(key: str) -> str:
     """The market and the league as of t into seen, seen_cash and seen_auction / seen_curve (views player_facts,
     cash, auction_looks): what a decision at t reads. Made once a cut, variant and key (the
-    caller's stamp of the SQL and constants it was made with). The cut."""
+    caller's stamp of the SQL and constants it was made with)."""
     with closing(connect()) as db, db:
         c = cut()
         if db.execute("SELECT 1 FROM seen WHERE cut = ? AND variant = variant() AND code = ? LIMIT 1",

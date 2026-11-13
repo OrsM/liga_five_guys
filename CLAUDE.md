@@ -16,6 +16,7 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
    - Data has constructors and selectors. No reading a row by position (`r[1]`, `k, _, m, *_`); use a named type.
    - Layers: ingest, forecast, decision, board, grading. A layer reads only what an earlier layer exports (`tools/frontiers.py` checks it; 0 crossings).
    - A procedure is a black box named for what it computes. Compose small general procedures.
+   - A docstring states the contract (what goes in, what comes out, what must hold), nothing else. No other comments.
 3. **One concept, one place.** Extend the canonical code; no second copy, no ad-hoc script with its own matching. Win chance is computed only in `ffcore/auction.py`; team quality is judged only by `eleven.py`; an optimisation has one objective in one place.
 4. **Simplest correct change.** Old code is not the spec; old numbers are a score to beat, not to match.
 5. **Tests assert general behaviour and invariants**, not one fixture's wording. Untested changes do not go live.
