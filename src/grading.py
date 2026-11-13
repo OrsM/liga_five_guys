@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from contextlib import closing
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -15,12 +15,14 @@ from ffcore import auction
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.forecast_store import forecast
 from ffcore.jornadas import round_locks
-from ffcore.parse import snapshot_stamp
+from ffcore.parse import snapshot_stamp, stamp
 from salegrade import HORIZONS
 
 __all__ = ["backtest", "superseded", "view_table", "record_grades"]
 
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
+RATE = 0.6
+SALES_FROM = "2026-08-25"
 
 
 def before_locks() -> dict[dt.datetime, int]:
@@ -191,6 +193,7 @@ def record_grades() -> dict[str, int]:
     run = this_run()
     standing = run is not None and bool(done) and graded(run, max(done))
     scored = {} if run is not None and auctions_scored(run, results_seen()) else record_auction(run)
+    record_sales()
     if standing:
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, **scored}
@@ -252,12 +255,18 @@ def sale_facts(sale: Trade, buys: Sequence[Trade], lock: dt.datetime | None) -> 
     return salegrade.Sale(sale.player, sale.amount, market, in_eleven, flagged, buys_between(buys, sale.at, lock))
 
 
-def sales_since(day: str) -> list[salegrade.Sale]:
-    """Each of my sales from the day on (a date, YYYY-MM-DD), as a salegrade.Sale read at the moment of the sale
-    (sale_facts); funded_buy is a buy of mine between the sale and the next lock."""
+class Sold(NamedTuple):
+    """A sale of mine with the moment it was made."""
+    at: dt.datetime
+    sale: salegrade.Sale
+
+
+def sales_since(day: str) -> list[Sold]:
+    """Each of my sales from the day on (a date, YYYY-MM-DD), with its moment and as a salegrade.Sale read at that
+    moment (sale_facts); funded_buy is a buy of mine between the sale and the next lock."""
     buys = my_trades("buy", day)
     locks = sorted(round_locks().values())
-    return [sale_facts(s, buys, lock_after(s.at, locks)) for s in my_trades("sell", day)]
+    return [Sold(s.at, sale_facts(s, buys, lock_after(s.at, locks))) for s in my_trades("sell", day)]
 
 
 def horizon_jornadas(at: dt.datetime, locks: dict[int, dt.datetime], done: set[int]) -> dict[str, frozenset[int]]:
@@ -270,6 +279,66 @@ def horizon_jornadas(at: dt.datetime, locks: dict[int, dt.datetime], done: set[i
     j0 = after[0]
     spans = {"lock": {j0}, "next4": set(range(j0, j0 + 4)), "season": {j for j in locks if j >= j0}}
     return {h: frozenset(spans[h] & done) for h in HORIZONS}
+
+
+def scored_points() -> dict[str, dict[int, float]]:
+    """Each player's points by jornada played (player_jornadas), read once."""
+    found: dict[str, dict[int, float]] = {}
+    for player, jornada, pts in rows("SELECT player, jornada, pts FROM player_jornadas"):
+        found.setdefault(player, {})[jornada] = pts
+    return found
+
+
+def points(scored: dict[str, dict[int, float]], player: str, jornadas: Iterable[int]) -> float:
+    """The points a player scored over the jornadas, from scored_points; a jornada he did not play adds 0."""
+    got = scored.get(player, {})
+    return sum(got.get(j, 0.0) for j in jornadas)
+
+
+def takers(at: dt.datetime, before: set[str]) -> set[str]:
+    """The players who took a sold player's place: in the first line-up seen after at, not in the eleven before it
+    (before), and on my squad when that line-up was seen. Empty if no line-up was seen after at."""
+    (first,), = rows("SELECT min(at) FROM app_lineup_seen WHERE at > ?", (stamp(at),))
+    moment = snapshot_stamp(first) if first else None
+    if moment is None:
+        return set()
+    with replaying():
+        set_now(moment)
+        mine = {p for (p,) in rows("SELECT player FROM squads WHERE manager = (SELECT me FROM league_config)")}
+    return (eleven_at(moment) & mine) - before
+
+
+def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]]) -> salegrade.Course | None:
+    """What followed the sale at each horizon of horizon_jornadas: what he scored (sold), what the takers scored
+    (cover, an eleven sale only; else 0) and his market value at the lock of the horizon's last jornada (value_after,
+    the amount if squads shows none). None if no jornada is done at the lock horizon (then none is at any)."""
+    spans = horizon_jornadas(sold.at, locks, done)
+    if not spans["lock"]:
+        return None
+    took = takers(sold.at, eleven_at(sold.at - dt.timedelta(minutes=1))) if sold.sale.in_eleven else set()
+    after = {}
+    for h in HORIZONS:
+        with replaying():
+            set_now(locks[max(spans[h])])
+            after[h] = market_value(sold.sale.player, sold.sale.amount)
+    return salegrade.Course(
+        sold={h: points(scored, sold.sale.player, spans[h]) for h in HORIZONS},
+        cover={h: sum(points(scored, p, spans[h]) for p in took) for h in HORIZONS},
+        value_after=after)
+
+
+def record_sales() -> None:
+    """Each sale from SALES_FROM with a done jornada at its lock, graded at RATE (salegrade.grade) and summarised
+    (salegrade.measure_values), is appended to measure_log as sale_grade with jornadas_done, unless the latest one
+    logged has the same all.lock.n and jornadas_done."""
+    done, locks, scored = done_jornadas(), round_locks(), scored_points()
+    courses = [(s.sale, course(s, locks, done, scored)) for s in sales_since(SALES_FROM)]
+    values = salegrade.measure_values(salegrade.summary(
+        [salegrade.grade(sale, got, RATE) for sale, got in courses if got is not None]))
+    values["jornadas_done"] = float(len(done))
+    latest = dict(rows("SELECT key, value FROM measure_latest WHERE measure = 'sale_grade'"))
+    if any(latest.get(k) != values.get(k) for k in ("all.lock.n", "jornadas_done")):
+        log_measure("sale_grade", values)
 
 
 def log_measure(measure: str, values: dict[str, float]) -> None:
@@ -339,7 +408,7 @@ def _selftest_stand() -> None:
     stub: dict[str, Any] = {
         "done_jornadas": lambda: {1, 2}, "this_run": lambda: 5, "results_seen": lambda: Results(1, 1, "c"),
         "graded": lambda run, last: state["graded"], "auctions_scored": lambda run, now: state["scored"],
-        "record_auction": auction_scored, "backtest": regraded,
+        "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda: None,
         "record": lambda *a, **k: None, "superseded": lambda run: None}
     kept = {k: globals()[k] for k in stub}
     try:
@@ -371,6 +440,79 @@ def _selftest_window() -> None:
         "the next lock is the first strictly after the sale; a sale after the last lock has none"
 
 
+def _selftest_takers() -> None:
+    """The takers of a sale are the entrants of the first line-up seen after it that were on my squad then: none of
+    them was in the eleven before, all are on the squad, the line-up of a later moment is not read, and with no
+    line-up seen after the sale there are none."""
+    import tempfile
+    from ffcore.tidy import store_sql, tables_in
+    first, second, third = "2026-09-01T1000Z", "2026-09-02T1000Z", "2026-09-03T1000Z"
+    ids = {"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "x": "6"}
+    fielded = {first: "abc", second: "abd", third: "abx"}
+    squad = {first: "abcde", second: "abcde", third: "abcde"}
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            store_sql("api_lineup", [{"observed_at": at, "player_id": ids[k], "slot": "1"}
+                                     for at, ks in fielded.items() for k in ks])
+            store_sql("api_teams", [{"observed_at": at, "player_id": ids[k], "player_name": k, "manager": "me"}
+                                    for at, ks in squad.items() for k in ks])
+            with closing(connect()) as db, db:
+                db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)", list(ids.items()))
+                db.execute("INSERT INTO league_config (me, budget) VALUES ('me', 0)")
+            set_now(snapshot_stamp("2026-09-10T0000Z"))
+            sale = snapshot_stamp("2026-09-01T1200Z")
+            assert sale is not None
+            got = takers(sale, set("abc"))
+            assert got == {"d"}, "the first line-up after the sale: d entered and is mine; the later x is not read"
+            assert got.isdisjoint("abc") and got <= set(squad[second])
+            assert takers(sale, set("abcd")) == set(), "an entrant already in the eleven before took nobody's place"
+            late = snapshot_stamp("2026-09-04T0000Z")
+            assert late is not None and takers(late, set()) == set(), "no line-up seen after the sale"
+        finally:
+            set_now(None)
+
+
+def _selftest_points() -> None:
+    """A player's points over jornadas add over disjoint sets, and a jornada or a player with none adds 0."""
+    scored = {"a": {1: 3.0, 2: -1.0, 4: 5.0}}
+    assert points(scored, "a", {1, 2}) + points(scored, "a", {3, 4}) == points(scored, "a", {1, 2, 3, 4}) == 7.0
+    assert points(scored, "a", set()) == points(scored, "nobody", {1, 2}) == 0.0
+
+
+def _selftest_record_sales() -> None:
+    """record_sales logs the sales' measure once for a given number of graded sales and jornadas done: a second call
+    with nothing new adds no rows, a jornada done adds a set; a sale with no course is not graded."""
+    import tempfile
+    from ffcore.tidy import tables_in
+    at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
+    state = {"done": {1}, "sold": [Sold(at, salegrade.Sale("p", 5e6, 5e6, True, False, False))] * 2}
+    flat = {h: 1.0 for h in HORIZONS}
+    ok = salegrade.Course(flat, flat, flat)
+    stub: dict[str, Any] = {
+        "done_jornadas": lambda: state["done"], "round_locks": lambda: {}, "sales_since": lambda day: state["sold"],
+        "course": lambda sold, locks, done, scored: ok if len(done) else None, "scored_points": lambda: {}}
+    kept = {k: globals()[k] for k in stub}
+
+    def logged() -> int:
+        return rows("SELECT count(*) FROM measure_log WHERE measure = 'sale_grade'")[0][0]
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            globals().update(stub)
+            record_sales()
+            first = logged()
+            assert first > 0 and dict(rows("SELECT key, value FROM measure_latest"))["all.lock.n"] == 2
+            record_sales()
+            assert logged() == first, "nothing new: no rows"
+            state["done"] = {1, 2}
+            record_sales()
+            assert logged() == 2 * first, "a jornada done: a new set"
+            state["done"] = set()
+            record_sales()
+            assert dict(rows("SELECT key, value FROM measure_latest"))["all.lock.n"] == 0, "no course: none graded"
+        finally:
+            globals().update(kept)
+
+
 def _selftest_horizons() -> None:
     """A sale's horizons are the done jornadas from its next lock on: the lock is inside next4, next4 inside season,
     each inside done; a sale with no jornada after it, or none done at its lock, has no lock jornada."""
@@ -393,6 +535,9 @@ def _selftest_horizons() -> None:
 def _selftest() -> None:
     _selftest_measure_log()
     _selftest_horizons()
+    _selftest_points()
+    _selftest_takers()
+    _selftest_record_sales()
     import tempfile
     from ffcore.tidy import tables_in
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
