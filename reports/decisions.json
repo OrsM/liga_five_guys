@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-13T17:03Z",
- "market_at": "2026-11-13T17:02Z",
+ "generated_at": "2026-11-13T20:46Z",
+ "market_at": "2026-11-13T20:45Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-13T17:02Z",
+   "at": "2026-11-13T20:45Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
- "cash": -38952185.0,
- "cash_locked": 0,
- "can_bid": 51032467.0,
+ "cash": -38752185.0,
+ "cash_locked": 13410012.0,
+ "can_bid": 37822455.0,
  "ping": "",
  "do": [],
  "lineup": {
@@ -83,16 +83,16 @@
    "pos": "DEL",
    "what": "buy",
    "label": "buy Felix Correia",
-   "step": "bid",
+   "step": "placed",
    "price": 11372671.0,
    "asking": 11372671.0,
-   "amount": 12282484.680000002,
-   "win": 0.9204545454545454,
+   "amount": 11372671.0,
+   "win": 0.6046511627906976,
    "advised": 12282484.680000002,
    "advised_win": 0.9204545454545454,
-   "move": "bid",
+   "move": "raise",
    "plan": false,
-   "done": false,
+   "done": true,
    "key": "8091",
    "gain": 8.937245334171138,
    "per": "season",
@@ -112,11 +112,21 @@
     ],
     [
      "bid",
-     12282484.680000002,
+     11372671.0,
      "money"
     ],
     [
      "chance to win",
+     0.6046511627906976,
+     "chance"
+    ],
+    [
+     "advised bid",
+     12282484.680000002,
+     "money"
+    ],
+    [
+     "chance at the advised bid",
      0.9204545454545454,
      "chance"
     ],
@@ -126,9 +136,9 @@
      "points"
     ]
    ],
-   "bids": 0,
+   "bids": 1,
    "auction": {
-    "yours": false,
+    "yours": true,
     "listings": 88,
     "thin": false,
     "cell": "0/2/2"
@@ -138,9 +148,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 38749982.32,
-    "lock_margin": 9752843.246,
-    "lock_margin_low": 6276555.009218,
+    "margin": 37822455.0,
+    "lock_margin": 10862656.925999999,
+    "lock_margin_low": 7386368.689218,
     "if_won": [
      "Dani Martinez",
      "Augusto Batalla",
@@ -178,11 +188,11 @@
      "Antony",
      "Martin Satriano"
     ],
-    "cash_if_lost": 8888372.925999999,
+    "cash_if_lost": 9088372.925999999,
     "gain": 8.937245334171166,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 8.226328091680278
+    "net": 5.403915783452333
    },
    "accepts": [],
    "act": []
