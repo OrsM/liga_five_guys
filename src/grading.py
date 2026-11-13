@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import decision
-from assemble import built, forecast
+from board import built
 from ffcore import auction
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
+from ffcore.forecast_store import forecast
 from ffcore.jornadas import round_locks
 from ffcore.parse import snapshot_stamp
 

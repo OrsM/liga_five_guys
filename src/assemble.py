@@ -10,10 +10,10 @@ from typing import Any
 
 from ffcore import forecast as model
 from ffcore.db import connect, query, record, rows, set_constants
-from ffcore.forecast_store import Prices, forecast, market_offer_ratios, price_change, price_momentum
+from ffcore.forecast_store import Prices, market_offer_ratios, price_change, price_momentum
 from board import built, constants, see
 
-__all__ = ["constants", "built", "forecast", "price_momentum",
+__all__ = ["constants", "built", "price_momentum",
            "price_change"]
 
 
