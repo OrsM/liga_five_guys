@@ -5,20 +5,25 @@ players ranked by what taking it costs your eleven (eleven.remove). The one line
 their value."""
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
+from collections.abc import Sequence
 from typing import Any, NamedTuple
 
 import decision
 import eleven
 from approach import Approach, Club, approach
-from assemble import built
+from ffcore import forecast as model, pricing, rules, tidy
 from ffcore.auction import Curve, chance
-from ffcore.db import cut, record, this_run
-from ffcore.forecast_store import pin
+from ffcore.db import cut, record, schema_version, set_look, this_run
+from ffcore.forecast_store import club_ratings, forecast, market_offer_ratios, pin, price_carry
 from ffcore.jornadas import rounds
+from ffcore.league import write_config
 from ffcore.rules import POSITIONS, bid_limit
-from ffcore.tidy import REPORTS
+from ffcore.seen import see as see_at
+from ffcore.tidy import REPORTS, app_stale
+from stats import percentile
 
 __all__ = ["board", "main"]
 
@@ -257,6 +262,75 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str]) 
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
 
 
+# The constants a run is built with, by module: what params records as such.
+NAMES: dict[str, tuple[str, ...]] = {
+    "tidy": ("APP_FRESH_HOURS", ),
+    "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_DECAY", "P_LIFT", "P_LISTING", "SHRINK_K"),
+    "pricing": ("AUCTION_MIN", "CLIP", "PRICE_FOCUS", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
+    "rules": ("DEBT_SHARE", "MATCH_LEN"),
+}
+MODULES: dict[str, Any] = {"tidy": tidy, "forecast": model, "pricing": pricing,
+                           "rules": rules}
+
+
+def constants() -> dict[str, dict[str, float]]:
+    """The constants in force now, by module (a variant applies its own)."""
+    return {m: {n: getattr(MODULES[m], n) for n in names} for m, names in NAMES.items()}
+
+
+def see() -> str:
+    """The market and the league as of t into seen, seen_cash and seen_odds (the decision's
+    snapshot, seen.see), made once a cut, variant and code: the key is the SQL's version and
+    every constant, so another schema or a variant redefined makes them again, never reads a
+    stale one."""
+    return see_at(hashlib.sha1(repr((schema_version(), sorted((m, sorted(c.items())) for m, c in constants().items())))
+                               .encode()).hexdigest()[:12])
+
+
+def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
+           carry: Sequence[float]) -> list[dict[str, Any]]:
+    """Every constant and fitted value a run is built with, one row each:
+    (component, term, value, kind, n); the forecast's fits (forecast_fits)."""
+    return ([_param(m, name, v, "constant") for m, names in constants().items()
+             for name, v in names.items()]
+            + list(fits)
+            + [_param("pricing.offer_ratios", t, percentile(ratios, p), n=len(ratios))
+               for t, p in (("p10", 10), ("median", 50), ("p90", 90)) if ratios]
+            + [_param("pricing.carry", str(h), v) for h, v in enumerate(carry, 1)])
+
+
+def forecast_fits() -> list[dict[str, Any]]:
+    """What the forecast fits at t, one params row each: each club's
+    attack and defence (club_rating)."""
+    return [_param("forecast.%s" % t, r.club, v) for r in club_ratings()
+            for t, v in (("attack", r.attack), ("defence", r.defence))]
+
+
+def _param(component: str, term: str, value: float, kind: str = "fitted",
+           n: int | None = None) -> dict[str, Any]:
+    return {"component": component, "term": term, "value": float(value), "kind": kind, "n": n}
+
+
+class Built(NamedTuple):
+    params: list[dict[str, Any]]
+    moment: int
+
+
+def built() -> Built:
+    """The league at t made for a decision (look): the market and the
+    league seen then (see), the forecast at t (forecast), its moment and you
+    in look; and the parameters it was made with. None made from squads
+    older than APP_FRESH_HOURS."""
+    stale = app_stale()
+    if stale:
+        raise SystemExit(stale)
+    me = write_config()
+    see()
+    moment = forecast()
+    set_look(me=me, moment=moment)
+    return Built(params(forecast_fits(), market_offer_ratios(), price_carry()), moment)
+
+
 def main() -> None:
     b = built()
     managers = decision.manager_count()
@@ -278,7 +352,24 @@ def main() -> None:
     print("wrote %s" % (REPORTS / "decisions.json"))
 
 
+def _selftest_params() -> None:
+    rows = params([_param("forecast.attack", "a", 1.2), _param("forecast.defence", "a", 0.8)],
+                  (0.9, 1.0, 1.1), (0.5, 1.0))
+    got = {(r["component"], r["term"]): r for r in rows}
+    assert len(got) == len(rows), "one row a parameter"
+    assert {r["kind"] for r in rows} == {"fitted", "constant"}
+    for key, value in [(("pricing.offer_ratios", "median"), 1.0),
+                       (("pricing.carry", "2"), 1.0),
+                       (("forecast.attack", "a"), 1.2),
+                       (("forecast.defence", "a"), 0.8),
+                       (("rules", "DEBT_SHARE"), rules.DEBT_SHARE)]:
+        assert got[key]["value"] == value, (key, got.get(key))
+    assert got[("pricing.offer_ratios", "median")]["n"] == 3
+    assert got[("rules", "DEBT_SHARE")]["kind"] == "constant"
+
+
 def _selftest() -> None:
+    _selftest_params()
     assert stamped("2026-10-30T1809Z") == "2026-10-30T18:09Z"
     buys: list[Doc] = [{"name": "Raphinha", "funding": {"tonight": [{"name": "Pepelu"}, {"name": "Alonso"}]}},
                        {"name": "Gueye", "funding": None}, {"name": "Nobody", "funding": {"feasible": False}}]

@@ -4,106 +4,21 @@ state and the forecast — so the model modules never read a table
 themselves."""
 from __future__ import annotations
 
-import hashlib
 from contextlib import closing
 from pathlib import Path
-from collections.abc import Sequence
-from typing import Any, NamedTuple
+from typing import Any
 
-from ffcore import forecast as model, pricing, rules, tidy
-from ffcore.db import connect, query, record, rows, schema_version, set_constants, set_look
-from ffcore.forecast_store import Prices, club_ratings, forecast, market_offer_ratios, price_carry, price_change, price_momentum
-from ffcore.seen import see as see_at
-from ffcore.league import write_config
-from ffcore.tidy import app_stale
-from stats import percentile
+from ffcore import forecast as model
+from ffcore.db import connect, query, record, rows, set_constants
+from ffcore.forecast_store import Prices, forecast, market_offer_ratios, price_change, price_momentum
+from board import built, constants, see
 
-__all__ = ["constants", "built", "forecast", "params", "price_momentum",
+__all__ = ["constants", "built", "forecast", "price_momentum",
            "price_change"]
 
-# The constants a run is built with, by module: what params records as such.
-NAMES: dict[str, tuple[str, ...]] = {
-    "tidy": ("APP_FRESH_HOURS", ),
-    "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_DECAY", "P_LIFT", "P_LISTING", "SHRINK_K"),
-    "pricing": ("AUCTION_MIN", "CLIP", "PRICE_FOCUS", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
-    "rules": ("DEBT_SHARE", "MATCH_LEN"),
-}
-MODULES: dict[str, Any] = {"tidy": tidy, "forecast": model, "pricing": pricing,
-                           "rules": rules}
-
-
-def constants() -> dict[str, dict[str, float]]:
-    """The constants in force now, by module (a variant applies its own)."""
-    return {m: {n: getattr(MODULES[m], n) for n in names} for m, names in NAMES.items()}
-
-
-def see() -> str:
-    """The market and the league as of t into seen, seen_cash and seen_odds (the decision's
-    snapshot, seen.see), made once a cut, variant and code: the key is the SQL's version and
-    every constant, so another schema or a variant redefined makes them again, never reads a
-    stale one."""
-    return see_at(hashlib.sha1(repr((schema_version(), sorted((m, sorted(c.items())) for m, c in constants().items())))
-                               .encode()).hexdigest()[:12])
-
-
-def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
-           carry: Sequence[float]) -> list[dict[str, Any]]:
-    """Every constant and fitted value a run is built with, one row each:
-    (component, term, value, kind, n); the forecast's fits (forecast_fits)."""
-    return ([_param(m, name, v, "constant") for m, names in constants().items()
-             for name, v in names.items()]
-            + list(fits)
-            + [_param("pricing.offer_ratios", t, percentile(ratios, p), n=len(ratios))
-               for t, p in (("p10", 10), ("median", 50), ("p90", 90)) if ratios]
-            + [_param("pricing.carry", str(h), v) for h, v in enumerate(carry, 1)])
-
-
-def forecast_fits() -> list[dict[str, Any]]:
-    """What the forecast fits at t, one params row each: each club's
-    attack and defence (club_rating)."""
-    return [_param("forecast.%s" % t, r.club, v) for r in club_ratings()
-            for t, v in (("attack", r.attack), ("defence", r.defence))]
-
-
-def _param(component: str, term: str, value: float, kind: str = "fitted",
-           n: int | None = None) -> dict[str, Any]:
-    return {"component": component, "term": term, "value": float(value), "kind": kind, "n": n}
-
-
-class Built(NamedTuple):
-    params: list[dict[str, Any]]
-    moment: int
-
-
-def built() -> Built:
-    """The league at t made for a decision (look): the market and the
-    league seen then (see), the forecast at t (forecast), its moment and you
-    in look; and the parameters it was made with. None made from squads
-    older than APP_FRESH_HOURS."""
-    stale = app_stale()
-    if stale:
-        raise SystemExit(stale)
-    me = write_config()
-    see()
-    moment = forecast()
-    set_look(me=me, moment=moment)
-    return Built(params(forecast_fits(), market_offer_ratios(), price_carry()), moment)
 
 
 def _selftest() -> None:
-    rows = params([_param("forecast.attack", "a", 1.2), _param("forecast.defence", "a", 0.8)],
-                  (0.9, 1.0, 1.1), (0.5, 1.0))
-    got = {(r["component"], r["term"]): r for r in rows}
-    assert len(got) == len(rows), "one row a parameter"
-    assert {r["kind"] for r in rows} == {"fitted", "constant"}
-    for key, value in [(("pricing.offer_ratios", "median"), 1.0),
-                       (("pricing.carry", "2"), 1.0),
-                       (("forecast.attack", "a"), 1.2),
-                       (("forecast.defence", "a"), 0.8),
-                       (("rules", "DEBT_SHARE"), rules.DEBT_SHARE)]:
-        assert got[key]["value"] == value, (key, got.get(key))
-    assert got[("pricing.offer_ratios", "median")]["n"] == 3
-    assert got[("rules", "DEBT_SHARE")]["kind"] == "constant"
     _selftest_market()
     _selftest_facts()
     _selftest_prior()
@@ -256,6 +171,8 @@ def _selftest_points() -> None:
             set_now(None)
 
 
+
+
 def _selftest_facts() -> None:
     """schema.sql's player_facts, as seen at a cut (see)."""
     import tempfile
@@ -314,7 +231,7 @@ def _selftest_facts() -> None:
             assert rows("SELECT value FROM seen WHERE player = 'p1'") == [(-1, )], \
                 "made once a cut and code: read, not made again"
             from unittest import mock
-            with mock.patch(__name__ + ".constants", lambda: {"x": {"Y": 1.0}}):
+            with mock.patch("board.constants", lambda: {"x": {"Y": 1.0}}):
                 see()
             assert rows("SELECT value FROM seen WHERE player = 'p1'") == [(5e6, )], "other constants make it again"
         finally:
