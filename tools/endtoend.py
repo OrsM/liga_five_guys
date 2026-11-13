@@ -13,7 +13,7 @@ def _selftest() -> None:
     import tempfile
     from pathlib import Path
 
-    from assemble import built
+    from board import built
     from ffcore.db import cut, record, rows, set_now
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import store_sql, tables_in

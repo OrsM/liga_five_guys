@@ -84,8 +84,7 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
     import crosswalk
     import decision
     import eleven
-    from assemble import built
-    from board import board
+    from board import board, built
     from ffcore.db import connect, record, rows, set_now, source_table
     from ffcore.league import write_config
     from ffcore.parse import snapshot_stamp
