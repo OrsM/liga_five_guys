@@ -16,6 +16,7 @@ from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_
 from ffcore.forecast_store import forecast
 from ffcore.jornadas import round_locks
 from ffcore.parse import snapshot_stamp
+from salegrade import HORIZONS
 
 __all__ = ["backtest", "superseded", "view_table", "record_grades"]
 
@@ -227,15 +228,26 @@ def buys_between(buys: Sequence[Trade], start: dt.datetime, end: dt.datetime | N
     return any(start <= b.at and (end is None or b.at < end) for b in buys)
 
 
+def market_value(player: str, default: float) -> float:
+    """His market value as squads shows it at t (whoever holds him): the first one shown, else default."""
+    return next((v for (v,) in rows("SELECT market_value FROM squads WHERE player = ?", (player,)) if v is not None), default)
+
+
+def eleven_at(moment: dt.datetime) -> set[str]:
+    """The players in the eleven the app had fielded at moment (its last line-up seen by then)."""
+    with replaying():
+        set_now(moment)
+        return {p for (p,) in rows("SELECT player FROM app_lineup WHERE player IS NOT NULL")}
+
+
 def sale_facts(sale: Trade, buys: Sequence[Trade], lock: dt.datetime | None) -> salegrade.Sale:
     """The sale as the facts stood a minute before it: his market value (the amount if squads shows none), whether he
     was in the latest line-up seen, whether he was flagged, and whether a buy of mine fell before the lock (lock None:
     no bound)."""
     with replaying():
         set_now(sale.at - dt.timedelta(minutes=1))
-        market = next((v for (v,) in rows("SELECT market_value FROM squads WHERE player = ?", (sale.player,))
-                       if v is not None), sale.amount)
-        in_eleven = bool(rows("SELECT 1 FROM app_lineup WHERE player = ?", (sale.player,)))
+        market = market_value(sale.player, sale.amount)
+        in_eleven = sale.player in eleven_at(sale.at - dt.timedelta(minutes=1))
         flagged = bool(rows("SELECT 1 FROM player_status WHERE player = ? AND status IS NOT NULL", (sale.player,)))
     return salegrade.Sale(sale.player, sale.amount, market, in_eleven, flagged, buys_between(buys, sale.at, lock))
 
@@ -246,6 +258,18 @@ def sales_since(day: str) -> list[salegrade.Sale]:
     buys = my_trades("buy", day)
     locks = sorted(round_locks().values())
     return [sale_facts(s, buys, lock_after(s.at, locks)) for s in my_trades("sell", day)]
+
+
+def horizon_jornadas(at: dt.datetime, locks: dict[int, dt.datetime], done: set[int]) -> dict[str, frozenset[int]]:
+    """Per horizon of salegrade.HORIZONS, the done jornadas a sale at at is graded on: lock is j0, the first jornada
+    whose lock is after at; next4 is j0 to j0+3; season is every jornada from j0 on. Each set is inside done, and a
+    set is empty when no jornada of its horizon is done (or none follows the sale)."""
+    after = sorted((j for j in locks if locks[j] > at), key=locks.__getitem__)
+    if not after:
+        return {h: frozenset() for h in HORIZONS}
+    j0 = after[0]
+    spans = {"lock": {j0}, "next4": set(range(j0, j0 + 4)), "season": {j for j in locks if j >= j0}}
+    return {h: frozenset(spans[h] & done) for h in HORIZONS}
 
 
 def log_measure(measure: str, values: dict[str, float]) -> None:
@@ -347,8 +371,28 @@ def _selftest_window() -> None:
         "the next lock is the first strictly after the sale; a sale after the last lock has none"
 
 
+def _selftest_horizons() -> None:
+    """A sale's horizons are the done jornadas from its next lock on: the lock is inside next4, next4 inside season,
+    each inside done; a sale with no jornada after it, or none done at its lock, has no lock jornada."""
+    day = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
+    locks = {j: day + dt.timedelta(days=7 * j) for j in range(1, 11)}
+    for done in ({1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, {2, 3, 4, 5, 6}, {3, 5, 9}, {1}, set()):
+        for at in (day, day + dt.timedelta(days=30), day + dt.timedelta(days=80)):
+            got = horizon_jornadas(at, locks, done)
+            assert frozenset(got) == frozenset(HORIZONS)
+            assert got["lock"] <= got["next4"] <= got["season"] <= frozenset(done), (done, at, got)
+    got = horizon_jornadas(day + dt.timedelta(days=7), locks, {1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+    assert got == {"lock": {2}, "next4": {2, 3, 4, 5}, "season": set(range(2, 11))}, got
+    got = horizon_jornadas(day + dt.timedelta(days=7), locks, {2, 3, 4, 9})
+    assert got == {"lock": {2}, "next4": {2, 3, 4}, "season": {2, 3, 4, 9}}, got
+    assert not horizon_jornadas(day + dt.timedelta(days=7), locks, {3, 4})["lock"], "a sale whose lock is not done has no lock jornada"
+    assert not any(horizon_jornadas(day + dt.timedelta(days=80), locks, set(locks)).values()), \
+        "a sale after the last lock has no jornada ahead"
+
+
 def _selftest() -> None:
     _selftest_measure_log()
+    _selftest_horizons()
     import tempfile
     from ffcore.tidy import tables_in
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
