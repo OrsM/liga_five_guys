@@ -232,9 +232,10 @@ def buys_between(buys: Sequence[Trade], start: dt.datetime, end: dt.datetime | N
     return any(start <= b.at and (end is None or b.at < end) for b in buys)
 
 
-def market_value(player: str, default: float) -> float:
-    """His market value as squads shows it at t (whoever holds him): the first one shown, else default."""
-    return next((v for (v,) in rows("SELECT market_value FROM squads WHERE player = ?", (player,)) if v is not None), default)
+def market_value(player: str) -> float | None:
+    """His latest market value at t (price_history, held or not), or None if none was seen by t."""
+    return next((v for (v,) in rows("SELECT value FROM price_history WHERE ff_id = ? AND value > 0"
+                                    " ORDER BY observed_at DESC, id DESC LIMIT 1", (player,))), None)
 
 
 def eleven_at(moment: dt.datetime) -> set[str]:
@@ -250,7 +251,7 @@ def sale_facts(sale: Trade, buys: Sequence[Trade], lock: dt.datetime | None) -> 
     no bound)."""
     with replaying():
         set_now(sale.at - dt.timedelta(minutes=1))
-        market = market_value(sale.player, sale.amount)
+        market = market_value(sale.player) or sale.amount
         in_eleven = sale.player in eleven_at(sale.at - dt.timedelta(minutes=1))
         flagged = bool(rows("SELECT 1 FROM player_status WHERE player = ? AND status IS NOT NULL", (sale.player,)))
     return salegrade.Sale(sale.player, sale.amount, market, in_eleven, flagged, buys_between(buys, sale.at, lock))
@@ -313,17 +314,21 @@ def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: di
            fielded: dict[int, set[str]]) -> salegrade.Course | None:
     """What followed the sale at each horizon of horizon_jornadas: what he scored (sold); what my players on the bench
     when he was sold (benched_at) scored in the jornadas they were fielded (fielded: the eleven at each lock), for an
-    eleven sale only, else 0 (cover); and his market value at the lock of the horizon's last jornada (value_after,
-    the amount if squads shows none). None if no jornada is done at the lock horizon (then none is at any)."""
+    eleven sale only, else 0 (cover); and his latest market value at the lock of the horizon's last jornada
+    (value_after; never the sale amount). None if no jornada is done at the lock horizon (then none is at any) or if
+    no market value of his was seen by then."""
     spans = horizon_jornadas(sold.at, locks, done)
     if not spans["lock"]:
         return None
     bench = benched_at(sold.at - dt.timedelta(minutes=1)) if sold.sale.in_eleven else set()
-    after = {}
+    after: dict[str, float] = {}
     for h in HORIZONS:
         with replaying():
             set_now(locks[max(spans[h])])
-            after[h] = market_value(sold.sale.player, sold.sale.amount)
+            value = market_value(sold.sale.player)
+        if value is None:
+            return None
+        after[h] = value
     return salegrade.Course(
         sold={h: points(scored, sold.sale.player, spans[h]) for h in HORIZONS},
         cover={h: sum(points(scored, p, [j]) for j in spans[h] for p in bench & fielded[j]) for h in HORIZONS},
@@ -568,8 +573,13 @@ def _selftest_cover() -> None:
             assert benched_at(day) == {"a", "b"}, "my squad less the eleven fielded then"
             done = {1, 2, 3}
             sale = salegrade.Sale("s", 5e6, 5e6, True, False, False)
+            assert course(Sold(day, sale), locks, done, scored, fielded) is None, "no value of his seen: not graded"
+            for at, v in {"2026-08-31T1000Z": 4e6, "2026-09-05T1000Z": 6e6, "2026-09-12T1000Z": 7e6, "2026-09-19T1000Z": 8e6}.items():
+                store_sql("market", [{"observed_at": at, "ff_id": "s", "name": "s", "club": "x", "value": v}])
             got = course(Sold(day, sale), locks, done, scored, fielded)
             assert got is not None
+            assert got.value_after == {"lock": 4e6, "next4": 7e6, "season": 7e6}, \
+                "his latest value by the lock of each horizon's last jornada, held or not, never the sale amount"
             assert got.cover == {"lock": 0.0, "next4": 6.0 + 1.0 + 2.0, "season": 6.0 + 1.0 + 2.0}, \
                 "a and b count only in the jornadas they were fielded (c was never on the bench)"
             assert got.sold["season"] == 9.0
