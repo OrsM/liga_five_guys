@@ -1,0 +1,9 @@
+[Unit]
+Description=liga_five_guys — store a look at the open auctions before they close
+
+[Service]
+Type=oneshot
+NoNewPrivileges=yes
+ExecStart=%h/.local/bin/lfg-run
+Environment=LFG_LOOK=1 LFG_LOCK_WAIT=120 LFG_PUSH=1
+TimeoutStartSec=5min

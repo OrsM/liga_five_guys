@@ -200,7 +200,16 @@ def carry_matches(rows: list[dict[str, str]], prev: dict[str, dict[str, str]]
                    if MATCH_KEY_RE.match(page) and page not in have]
 
 
-def fetch() -> Path:
+LOOK_KEYS = ("api_leagues", "api_market")
+
+
+def requested(src: Source, prev: dict[str, dict[str, str]], now: str,
+              only: tuple[str, ...] | None) -> bool:
+    """Whether fetch asks for this source now: it is in `only` (None means any) and due."""
+    return (only is None or src.key in only) and due(src, prev, now)
+
+
+def fetch(only: tuple[str, ...] | None = None) -> Path:
     import httpx
 
     now = datetime.now(timezone.utc)
@@ -239,7 +248,7 @@ def fetch() -> Path:
         context = {"me": load_config().me}
         while queue:
             src = queue.pop(0)
-            if not due(src, prev, stamp):
+            if not requested(src, prev, stamp, only):
                 if src.key in prev:
                     rows.append(dict(prev[src.key]))
                 skipped += 1
@@ -320,6 +329,11 @@ def fetch() -> Path:
                                             for kv in fails.items()))
                  if fails else ""))
     return dest
+
+
+def look() -> Path:
+    """Fetch only LOOK_KEYS into one raw snapshot; every other source carries forward unrequested."""
+    return fetch(only=LOOK_KEYS)
 
 
 def _version() -> str:
@@ -514,6 +528,67 @@ def route(tables: dict[str, list[Row]], rows: list[Row], default: str, stamp: st
         tables.setdefault(table, []).append(d)
 
 
+def _fetch_selftest() -> None:
+    """With stubs and no network, fetch(only=LOOK_KEYS) asks for exactly the look sources and writes one raw snapshot, nothing else."""
+    import re
+    import tempfile
+    from unittest import mock
+
+    import httpx
+    from ffcore.laliga_api import _API_LEAGUES_FIXTURE, league_sources
+
+    saw: list[str] = []
+    leagues = next(s.url for s in sources() if s.key == "api_leagues").format(
+        date="D", base=API_BASE)
+
+    class Client:
+        def __init__(self, **_kw: object) -> None:
+            pass
+
+        def __enter__(self) -> Client:
+            return self
+
+        def __exit__(self, *_exc: object) -> None:
+            pass
+
+        def get(self, url: str, headers: object = None) -> types.SimpleNamespace:
+            page = re.sub(r"\d{4}-\d{2}-\d{2}", "D", url)
+            saw.append(page)
+            if page == leagues:
+                return types.SimpleNamespace(status_code=200, text=_API_LEAGUES_FIXTURE)
+            return types.SimpleNamespace(status_code=500, text="")
+
+    class Tokens:
+        def bearer(self) -> str:
+            return "stub"
+
+        def expiry_days(self) -> None:
+            return None
+
+    me = types.SimpleNamespace(me="stub")
+    with tempfile.TemporaryDirectory() as tmp, \
+            mock.patch.object(sys.modules[__name__], "RAW", Path(tmp) / "raw"), \
+            mock.patch.object(sys.modules[__name__], "TokenStore", Tokens), \
+            mock.patch.object(sys.modules[__name__], "load_config", lambda: me), \
+            mock.patch.object(httpx, "Client", Client), \
+            mock.patch.object(time, "sleep", lambda _s: None):
+        import contextlib
+        prev = [{"page": s.key, "sig": "", "stored": "t", "seen": "t"}
+                for s in sources()]
+        _write(RAW / "dt=2026-11-12T2200Z.tar.xz",
+               {MANIFEST: csv_string(prev, MANIFEST_FIELDS)})
+        with contextlib.redirect_stdout(io.StringIO()):
+            fetch(only=LOOK_KEYS)
+        written = sorted(str(p.relative_to(tmp)) for p in Path(tmp).rglob("*")
+                         if p.is_file())
+        want = {re.sub(r"\d{4}-\d{2}-\d{2}", "D",
+                       s.url.format(date="D", base=API_BASE))
+                for s in [*sources(), *league_sources(_API_LEAGUES_FIXTURE)]
+                if s.key in LOOK_KEYS}
+    assert saw and set(saw) == want, (saw, want)
+    assert len(written) == 2 and all(f.startswith("raw/dt=") for f in written), written
+
+
 def _selftest() -> None:
     uses = compile("mod.thing", "<fp>", "eval")
     at = {}
@@ -654,6 +729,19 @@ def _selftest() -> None:
                           ("/jugadores/pedri", "/jugadores/pedri-gonzalez")]:
         assert page_sig(team, _FIXTURE.replace(before, after)) != base, after
 
+    import run
+    from ffcore.laliga_api import _API_LEAGUES_FIXTURE, league_sources
+    feeds = [*sources(), *league_sources(_API_LEAGUES_FIXTURE)]
+    assert set(LOOK_KEYS) <= {s.key for s in feeds}, {s.key for s in feeds}
+    for cadence in ("once", "every_run", "daily", "twice_daily"):
+        for s in feeds:
+            if s.key not in LOOK_KEYS:
+                assert not requested(s._replace(cadence=cadence), {},
+                                     "2026-08-15T2219Z", LOOK_KEYS), s.key
+    names = {n for n, _spec, _makes in run.STAGES}
+    assert "parse" in names and {"board", "publish"} <= names, names
+    _fetch_selftest()
+
     print("ingest.py selftest OK")
 
 
@@ -662,7 +750,7 @@ if __name__ == "__main__":
     cmd = argv[0] if argv else "fetch"
     if cmd in ("--selftest", "selftest"):
         _selftest()
-    elif cmd in ("fetch", "parse"):
-        {"fetch": fetch, "parse": parse}[cmd]()
+    elif cmd in ("fetch", "look", "parse"):
+        {"fetch": fetch, "look": look, "parse": parse}[cmd]()
     else:
-        sys.exit("usage: ingest.py fetch | parse | --selftest")
+        sys.exit("usage: ingest.py fetch | look | parse | --selftest")

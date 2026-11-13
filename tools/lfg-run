@@ -14,13 +14,16 @@ cd "$REPO"
 # One run at a time, whoever asks; a later one waits up to ten minutes.
 mkdir -p "$HOME/.local/state/lfg"
 exec 9>"$HOME/.local/state/lfg/run.lock"
-if ! flock -w 600 9; then
-    echo "another run held the lock for ten minutes — giving up" >&2
+if ! flock -w "${LFG_LOCK_WAIT:-600}" 9; then
+    echo "another run held the lock for ${LFG_LOCK_WAIT:-600} seconds — giving up" >&2
     exit 1
 fi
 
 export PYTHONPATH=src
 export FF_ROOT=./data
+if [ "${LFG_LOOK:-}" = 1 ]; then
+    export LFG_STAGES=parse LFG_TRIGGER=look
+fi
 
 log() { printf '%s  %s\n' "$(TZ=Europe/Madrid date +'%H:%M:%S %Z')" "$*"; }
 RUN_T0=$(date +%s)
@@ -39,7 +42,9 @@ if [ -z "$(git status --porcelain --untracked-files=no -- . ':!data' ':!reports'
     ST_KEY="$(git ls-tree HEAD | grep -vP '\t(data|reports|inputs)$' | git hash-object --stdin)"
 fi
 ST_PID=""
-if [ -n "$ST_KEY" ] && [ "$(cat "$ST_OK" 2>/dev/null)" = "$ST_KEY" ]; then
+if [ "${LFG_LOOK:-}" = 1 ]; then
+    :
+elif [ -n "$ST_KEY" ] && [ "$(cat "$ST_OK" 2>/dev/null)" = "$ST_KEY" ]; then
     log "self-tests: passed on this code"
 else
     log "self-tests"
@@ -51,7 +56,11 @@ fi
 
 # LFG_STAGES (lfg-watch, a hold tapped on the page): just those stages of src/run.py, on the data as it is.
 STAGES="${LFG_STAGES:-}"
-if [ -z "$STAGES" ]; then
+if [ "${LFG_LOOK:-}" = 1 ]; then
+    log "look"
+    "$UV" run --frozen python src/ingest.py look || { log "FAILED: look"; exit 1; }
+    mark look
+elif [ -z "$STAGES" ]; then
     log "fetch"
     "$UV" run --frozen python src/ingest.py fetch || { log "FAILED: fetch"; exit 1; }
     mark fetch

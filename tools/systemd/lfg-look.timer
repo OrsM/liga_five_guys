@@ -1,0 +1,11 @@
+[Unit]
+Description=Look at the open auctions 20, 10 and 5 minutes before the close
+
+[Timer]
+OnCalendar=*-*-* 22:04:00 Europe/Madrid
+OnCalendar=*-*-* 22:14:00 Europe/Madrid
+OnCalendar=*-*-* 22:19:00 Europe/Madrid
+Persistent=false
+
+[Install]
+WantedBy=timers.target
