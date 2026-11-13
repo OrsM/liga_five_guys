@@ -13,6 +13,7 @@ from typing import Any, NamedTuple
 
 import decision
 import eleven
+import worth
 from approach import Approach, Club, approach
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore.auction import Curve, chance
@@ -83,31 +84,41 @@ def lineup_doc(inp: decision.Inputs, names: dict[str, str]) -> Doc:
             "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
-def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.Offer], known: dict[str, decision.Fact]) -> list[Doc]:
+def context(inp: decision.Inputs) -> worth.Context:
     pos, cells = decision.cells_of(inp)
     mine = decision.squad_of(inp)
     js = sorted(cells)
     fielded = decision.lineup_of(inp, pos).eleven
-    sides = {}
+    horizons = {}
     for n in AHEAD:
         v = decision.window_value(pos, cells, frozenset(js[:n or len(js)]))
-        sides[n] = (v, eleven.best_eleven(mine, pos, v, fielded))
+        horizons[n] = worth.Horizon(v, eleven.best_eleven(mine, pos, v, fielded))
+    return worth.Context(pos, horizons, inp.money.cash)
+
+
+def later_sale(inp: decision.Inputs, player: str, value: float) -> float:
+    rows = [x for x in inp.prices if x.player == player]
+    if not rows:
+        return rules.SALE_ESTIMATE * value
+    return rules.SALE_ESTIMATE * value * (1 + decision.rise(max(rows, key=lambda x: x.h)))
+
+
+def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.Offer], known: dict[str, decision.Fact]) -> list[Doc]:
+    ctx = context(inp)
     out = []
     for offer in got:
         k, value, money = offer.player, offer.value, offer.money
         fact = known.get(k, decision.UNKNOWN)
-        lost = {}
-        for n, (v, settled) in sides.items():
-            gone = eleven.remove(k, settled.eleven, settled.bench, pos, v) if settled else None
-            lost[n] = gone.cost if gone else (eleven.total(settled.eleven, v) if settled else 0.0)
+        verdict = worth.LIVE(worth.Standing(k, value, money, later_sale(inp, k, value)), ctx)
+        lost = verdict.lost
         ratio = money / value if value else None
         name = names.get(k, k)
         out.append({
-            "name": name, "pos": fact.pos or pos.get(k, ""), "what": "sell", "label": "sell " + name, "step": "take offer",
+            "name": name, "pos": fact.pos or ctx.pos.get(k, ""), "what": "sell", "label": "sell " + name, "step": "take offer",
             "offer": money, "waiting": None, "trend": fact.trend, "plan": False, "amount": money, "done": False, "key": k,
             "gain": 0.0 - lost[0], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
             "ratio": ratio, "lost": {"next4": lost[4], "next8": lost[8], "season": lost[0]},
-            "per_million": lost[8] / (money / 1e6) if money else None,
+            "per_million": verdict.key,
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
                       ["points lost, next 4", lost[4], "points"], ["next 8", lost[8], "points"],
                       ["season", lost[0], "points"]],
@@ -376,6 +387,10 @@ def _selftest() -> None:
     sells: list[Doc] = [{"name": "Pepelu"}, {"name": "Ryan"}]
     funds(buys, sells)
     assert [s["for"] for s in sells] == [["Raphinha"], []], "an offer is taken tonight when a funded buy sells him tonight"
+    money = decision.Money(0.0, 0.0, 0.0, 0, 0)
+    assert later_sale(decision.Inputs(money), "p", 10.0) == rules.SALE_ESTIMATE * 10.0, "no price row: the estimate"
+    priced = decision.Inputs(money, prices=[decision.Price("p", 1, 10.5, 10.0), decision.Price("p", 3, 11.0, 10.0)])
+    assert abs(later_sale(priced, "p", 10.0) - rules.SALE_ESTIMATE * 10.0 * 1.1) < 1e-9, "the price row furthest ahead: 10% above"
     assert advice((("c", "b", 2.0), ("d", "c", 1.0), ("e", "x", 0.5)), {"d": "D"}) == [
         {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"
     curve: Curve = ((1.0, 0.2), (1.1, 0.6), (1.3, 1.0))
