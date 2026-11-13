@@ -3,14 +3,15 @@ from __future__ import annotations
 import datetime as dt
 import os
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import decision
 import salegrade
-from board import built
+import worth
+from board import built, context, later_sale
 from ffcore import auction
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.forecast_store import forecast
@@ -334,6 +335,13 @@ def graded_count(locks: dict[int, dt.datetime], done: set[int]) -> int:
     return sum(1 for t in my_trades("sell", SALES_FROM) if horizon_jornadas(t.at, locks, done)["lock"])
 
 
+def graded_sales(sold: Sequence[Sold], locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]],
+                 fielded: dict[int, set[str]]) -> list[salegrade.Graded]:
+    """The sales that have a course (course), each graded at RATE (salegrade.grade); a sale with no course is left out."""
+    courses = [(s.sale, course(s, locks, done, scored, fielded)) for s in sold]
+    return [salegrade.grade(sale, got, RATE) for sale, got in courses if got is not None]
+
+
 def record_sales() -> None:
     """Each sale from SALES_FROM with a done jornada at its lock, graded at RATE (salegrade.grade) and summarised
     (salegrade.measure_values), is appended to measure_log as sale_grade with jornadas_done, unless the latest one
@@ -344,10 +352,99 @@ def record_sales() -> None:
     if all(latest.get(k) == v for k, v in marks.items()):
         return
     scored, fielded = scored_points(), fielded_at_locks(locks, done)
-    courses = [(s.sale, course(s, locks, done, scored, fielded)) for s in sales_since(SALES_FROM)]
-    values = salegrade.measure_values(salegrade.summary(
-        [salegrade.grade(sale, got, RATE) for sale, got in courses if got is not None]))
+    values = salegrade.measure_values(salegrade.summary(graded_sales(sales_since(SALES_FROM), locks, done, scored, fielded)))
     log_measure("sale_grade", values | {"jornadas_done": marks["jornadas_done"]})
+
+
+class Cut(NamedTuple):
+    """A replayed cut: the moment a sale made at it is read from (a minute after its snapshot), the context the rules
+    read and the standing offers on my players."""
+    at: dt.datetime
+    ctx: worth.Context
+    standings: Sequence[worth.Standing]
+
+
+class Choice(NamedTuple):
+    """A sale a rule would make: the player, the moment and the offer it accepts."""
+    player: str
+    at: dt.datetime
+    amount: float
+
+
+class RuleScore(NamedTuple):
+    rule: str
+    horizon: str
+    n: int
+    total_net: float
+    per_million: float
+
+
+def first_sales(cuts: Sequence[Cut], rules: Mapping[str, worth.Rule]) -> dict[str, list[Choice]]:
+    """For each rule, in cut order, the sales it makes: an offer is accepted when the rule states a reserve and the offer
+    reaches it. A rule sells a player at most once, at the first cut where it accepts an offer on him; a rule with no
+    reserve sells nothing."""
+    out: dict[str, list[Choice]] = {name: [] for name in rules}
+    for cut in cuts:
+        for name, rule in rules.items():
+            gone = {c.player for c in out[name]}
+            for standing in cut.standings:
+                if standing.player in gone or standing.offer is None:
+                    continue
+                reserve = rule(standing, cut.ctx).reserve
+                if reserve is not None and standing.offer >= reserve:
+                    out[name].append(Choice(standing.player, cut.at, standing.offer))
+                    gone.add(standing.player)
+    return out
+
+
+def score_rows(name: str, graded: Sequence[salegrade.Graded]) -> list[RuleScore]:
+    """One RuleScore per horizon of salegrade.HORIZONS for the graded sales: their count, total net points and net
+    points per million raised; n is 0 and the totals 0 when there are none."""
+    return [RuleScore(name, r.horizon, r.n, r.mean_net * r.n, r.per_million)
+            for r in salegrade.summary(graded) if r.case == "all"]
+
+
+def replayed_cuts(since: str) -> list[Cut]:
+    """Each seen cut from since on (a date, YYYY-MM-DD) that has standing offers on my players, replayed (built) so the
+    context and the later sale prices are those of the cut; a cut that cannot be built is skipped."""
+    out = []
+    with replaying():
+        for c in decision.seen_cuts():
+            stamp = snapshot_stamp(c)
+            if c < since or stamp is None:
+                continue
+            set_now(stamp)
+            try:
+                built()
+            except SystemExit:
+                continue
+            inp = decision.read_inputs()
+            offers = decision.standing_offers(decision.squad_of(inp))
+            if offers:
+                standings = [worth.Standing(o.player, o.value, o.money, later_sale(inp, o.player, o.value)) for o in offers]
+                out.append(Cut(stamp + dt.timedelta(minutes=1), context(inp), standings))
+    return out
+
+
+def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> list[RuleScore]:
+    """On demand, never in the grade stage: "actual" (my real sales from since, sales_since) and each rule (first_sales
+    over replayed_cuts) as RuleScores, every sale graded by the same course at RATE (graded_sales)."""
+    done, locks = done_jornadas(), round_locks()
+    scored, fielded = scored_points(), fielded_at_locks(locks, done)
+    chosen = first_sales(replayed_cuts(since), rules)
+    sold = {"actual": sales_since(since)} | {
+        name: [Sold(c.at, sale_facts(Trade(c.player, c.at, c.amount), [], None)) for c in got] for name, got in chosen.items()}
+    return [row for name, found in sold.items() for row in score_rows(name, graded_sales(found, locks, done, scored, fielded))]
+
+
+def rule_report(scores: Sequence[RuleScore]) -> str:
+    """A table, a line for each score: rule, horizon, n, total net points and net points per million. Every line is
+    the same length."""
+    head = ("rule", "horizon", "n", "net", "net/M")
+    body = [(s.rule, s.horizon, str(s.n), "%.1f" % s.total_net, "%.2f" % s.per_million) for s in scores]
+    widths = [max(len(r[i]) for r in [head, *body]) for i in range(len(head))]
+    return "\n".join("  ".join(c.ljust(w) if i < 2 else c.rjust(w) for i, (c, w) in enumerate(zip(r, widths)))
+                     for r in [head, *body])
 
 
 def log_measure(measure: str, values: dict[str, float]) -> None:
@@ -548,7 +645,38 @@ def _selftest_horizons() -> None:
         "a sale after the last lock has no jornada ahead"
 
 
+def _selftest_rule_scores() -> None:
+    """A rule that states reserve 0 sells each offered player exactly once, one with no reserve sells nothing, a player
+    offered at many cuts is sold at the first only; the report's lines are all the same length."""
+    import itertools
+    at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
+    ctx = worth.Context({}, {}, 0.0)
+
+    def rule(reserve: float | None) -> worth.Rule:
+        return lambda standing, ctx: worth.Verdict(None, {}, reserve)
+    cases: list[list[list[str]]] = [[["a"], ["a", "b"], ["b", "a", "c"]], [["x"]], [[]]]
+    for offers in cases:
+        cuts = [Cut(at + dt.timedelta(days=i), ctx, [worth.Standing(p, 1e6, 1e6 * (1 + i), 1e6) for p in ps])
+                for i, ps in enumerate(offers)]
+        got = first_sales(cuts, {"all": rule(0.0), "none": rule(None), "high": rule(1e12)})
+        every = sorted(set(itertools.chain.from_iterable(offers)))
+        assert sorted(c.player for c in got["all"]) == every, "each offered player is sold exactly once"
+        assert not got["none"] and not got["high"], "no reserve, or none reached: nothing sold"
+        for c in got["all"]:
+            first = next(i for i, ps in enumerate(offers) if c.player in ps)
+            assert c.at == cuts[first].at and c.amount == 1e6 * (1 + first), "sold at the first cut that offers him"
+    flat = {h: 1.0 for h in HORIZONS}
+    sale = salegrade.Sale("p", 2e6, 2e6, True, False, False)
+    graded = [salegrade.grade(sale, salegrade.Course(flat, flat, flat), RATE)] * 3
+    for h, row in zip(HORIZONS, score_rows("r", graded)):
+        assert row.rule == "r" and row.horizon == h and row.n == 3 and abs(row.total_net - 3 * graded[0].net[h]) < 1e-9
+    assert [r.n for r in score_rows("r", [])] == [0] * len(HORIZONS), "no sales: n is 0"
+    table = rule_report(score_rows("a_long_rule_name", graded) + score_rows("r", []))
+    assert len({len(line) for line in table.splitlines()}) == 1, "every line is the same length"
+
+
 def _selftest() -> None:
+    _selftest_rule_scores()
     _selftest_measure_log()
     _selftest_horizons()
     _selftest_points()
