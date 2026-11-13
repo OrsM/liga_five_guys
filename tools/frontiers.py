@@ -4,7 +4,7 @@ skipped) and prints every read past the frontier: a read of a later module, or o
 table from outside ingest. Any module may read the facts and t (look) and an earlier module's contract. Exit 1 if there is one.
 Each module's EXPORTS is its contract: reading another module's name that is not exported fails, in views and in the
 production code of src/*.py (selftests excluded). No exemptions: grading is the last module and reads contracts only.
-A Python file that implements several modules (assemble, sim, db, facts, fixtures) is no module's: whatever it reads
+A Python file that implements several modules (sim, db, facts, fixtures) is no module's: whatever it reads
 of a module that is not exported is a crossing. Every crossing is printed, grouped by the reading module, with
 file:line. `--table` prints the exports as markdown."""
 import ast
@@ -46,8 +46,8 @@ EXPORTS = {
     "grading": "",  # a measure: nothing downstream reads it
 }
 EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
-# Python files that are wholly one module's: their reads are judged as that module's. A file not here (assemble,
-# sim, db, facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
+# Python files that are wholly one module's: their reads are judged as that module's. A file not here (sim, db,
+# facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
 OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest",
         "forecast": "forecast", "forecast_store": "forecast", "seen": "decision", "auction": "decision", "decision": "decision", "board": "board", "grading": "grading"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}

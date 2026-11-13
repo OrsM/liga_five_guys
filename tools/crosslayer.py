@@ -1,25 +1,20 @@
-"""Where the data meets the model: the one place that reads the tables and
-builds what the decision works on — the scorer, the market, the league
-state and the forecast — so the model modules never read a table
-themselves."""
+"""Self-tests that cross layers: tables seeded as ingest leaves them, read through the forecast's views and the board's see()."""
 from __future__ import annotations
 
+import sys
 from contextlib import closing
 from typing import Any
 
 from ffcore.db import connect, query, rows, set_constants
-from ffcore.forecast_store import Prices, market_offer_ratios, price_change, price_momentum
-from board import constants, see
-
-__all__ = ["constants", "price_momentum",
-           "price_change"]
+from ffcore.forecast_store import Prices, market_offer_ratios, price_momentum
+from board import see
 
 
 
 def _selftest() -> None:
     _selftest_market()
     _selftest_facts()
-    print("assemble self-test OK")
+    print("crosslayer self-test OK")
 
 
 
@@ -313,4 +308,5 @@ def _selftest_market() -> None:
         "none seen: half the listings sold late at 1.1 (the rival bid came after the look), half did not sell; nothing is known of a bid under the ask"
 
 if __name__ == "__main__":
-    _selftest()
+    if "--selftest" in sys.argv:
+        _selftest()
