@@ -5,34 +5,30 @@ themselves."""
 from __future__ import annotations
 
 import hashlib
-import sys
 from contextlib import closing
 from pathlib import Path
 from collections.abc import Sequence
 from typing import Any, NamedTuple
 
-from ffcore import forecast as model, pricing, rules
+from ffcore import forecast as model, pricing, rules, tidy
 from ffcore.db import connect, query, record, rows, set_constants, set_look
 from ffcore.forecast_store import Prices, club_ratings, forecast, market_offer_ratios, price_carry, price_change, price_momentum
 from ffcore.seen import see as see_at
 from ffcore.league import write_config
-from ffcore.tidy import age_hours
+from ffcore.tidy import app_stale
 from stats import percentile
 
 __all__ = ["constants", "built", "forecast", "params", "price_momentum",
-           "price_change",
-           "APP_FRESH_HOURS"]
-
-APP_FRESH_HOURS = 14.4
+           "price_change"]
 
 # The constants a run is built with, by module: what params records as such.
 NAMES: dict[str, tuple[str, ...]] = {
-    "assemble": ("APP_FRESH_HOURS", ),
+    "tidy": ("APP_FRESH_HOURS", ),
     "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_DECAY", "P_LIFT", "P_LISTING", "SHRINK_K"),
     "pricing": ("AUCTION_MIN", "CLIP", "PRICE_FOCUS", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "rules": ("DEBT_SHARE", "MATCH_LEN"),
 }
-MODULES: dict[str, Any] = {"assemble": sys.modules[__name__], "forecast": model, "pricing": pricing,
+MODULES: dict[str, Any] = {"tidy": tidy, "forecast": model, "pricing": pricing,
                            "rules": rules}
 
 
@@ -86,10 +82,9 @@ def built() -> Built:
     league seen then (see), the forecast at t (forecast), its moment and you
     in look; and the parameters it was made with. None made from squads
     older than APP_FRESH_HOURS."""
-    age = age_hours("api_teams")
-    if age is None or age > APP_FRESH_HOURS:
-        raise SystemExit("the app's squads are %s old; no board is built from "
-                         "them" % ("unknown" if age is None else "%.0fh" % age))
+    stale = app_stale()
+    if stale:
+        raise SystemExit(stale)
     me = write_config()
     see()
     moment = forecast()

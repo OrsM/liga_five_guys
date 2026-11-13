@@ -15,7 +15,7 @@ from ffcore.db import ROOT, source_table
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "REPORTS",
-           "current", "history", "typed", "age_hours", "tables_in",
+           "current", "history", "typed", "age_hours", "app_stale", "APP_FRESH_HOURS", "tables_in",
            "input_path", "csv_string", "store_sql", "stored",
            "clear_sql", "NUMBERS", "LINEUP_SOURCE"]
 
@@ -154,6 +154,18 @@ def age_hours(name: str) -> float | None:
     stamps = [r.get("observed_at", "") for r in current(name)]
     when, t = snapshot_stamp(max(stamps)) if stamps else None, snapshot_stamp(lfg.cut())
     return None if when is None or t is None else (t - when).total_seconds() / 3600
+
+
+APP_FRESH_HOURS = 14.4
+
+
+def app_stale() -> str | None:
+    """None when the app's squads (api_teams) are at most APP_FRESH_HOURS old at t;
+    otherwise the reason no board is built from them."""
+    age = age_hours("api_teams")
+    if age is not None and age <= APP_FRESH_HOURS:
+        return None
+    return "the app's squads are %s old; no board is built from them" % ("unknown" if age is None else "%.0fh" % age)
 
 
 LINEUP_SOURCE = "futbolfantasy"

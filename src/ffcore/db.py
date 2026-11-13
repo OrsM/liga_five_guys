@@ -186,7 +186,7 @@ def replaying() -> Iterator[None]:
 
 # The model's constants are module attributes (forecast, pricing, rules); the views read them through
 # const(NAME) as they stand when the query runs, so a variant (assemble.applied) or a test is just set_constants.
-CONSTANT_MODULES = ("ffcore.forecast", "ffcore.pricing", "ffcore.rules", "assemble")
+CONSTANT_MODULES = ("ffcore.forecast", "ffcore.pricing", "ffcore.rules", "ffcore.tidy")
 
 
 def _owner(name: str) -> Any:
