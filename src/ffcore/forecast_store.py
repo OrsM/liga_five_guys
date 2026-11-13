@@ -12,7 +12,8 @@ from typing import NamedTuple
 
 from ffcore.db import connect, named, rows
 
-__all__ = ["keep", "forecast", "pin", "price_momentum", "price_carry", "price_change", "seed_cells", "Prices"]
+__all__ = ["keep", "forecast", "pin", "price_momentum", "price_carry", "price_change", "seed_cells", "Prices",
+           "market_offer_ratios", "club_ratings", "ClubRating"]
 
 # Each player's valued days (each day's last snapshot: market_daily), numbered (n); the
 # change in % on his previous valued day (NULL for the first, or after a
@@ -128,6 +129,22 @@ class Prices(NamedTuple):
 def price_carry() -> tuple[float, ...]:
     """The share of a trend made after each update, by horizon (view: price_carry)."""
     return tuple(v for (v,) in rows("SELECT carry FROM price_carry ORDER BY h"))
+
+
+def market_offer_ratios() -> list[float]:
+    """The game's nightly offers over value, each once, by when made."""
+    return [r for (r,) in rows("SELECT ratio FROM offer_ratios")]
+
+
+class ClubRating(NamedTuple):
+    club: str
+    attack: float
+    defence: float
+
+
+def club_ratings() -> list[ClubRating]:
+    """Each club's attack and defence at t (view: club_rating)."""
+    return [ClubRating(*r) for r in rows("SELECT club, attack, defence FROM club_rating ORDER BY club")]
 
 
 def price_momentum() -> Prices:

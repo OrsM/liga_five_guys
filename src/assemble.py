@@ -13,14 +13,14 @@ from typing import Any, NamedTuple
 
 from ffcore import forecast as model, pricing, rules
 from ffcore.db import connect, query, record, rows, set_constants, set_look
-from ffcore.forecast_store import Prices, forecast, price_carry, price_change, price_momentum
+from ffcore.forecast_store import Prices, club_ratings, forecast, market_offer_ratios, price_carry, price_change, price_momentum
 from ffcore.seen import see as see_at
 from ffcore.league import write_config
 from ffcore.tidy import age_hours
 from stats import percentile
 
 __all__ = ["constants", "built", "forecast", "params", "price_momentum",
-           "price_change", "market_offer_ratios",
+           "price_change",
            "APP_FRESH_HOURS"]
 
 APP_FRESH_HOURS = 14.4
@@ -52,11 +52,6 @@ def see() -> str:
                                .encode()).hexdigest()[:12])
 
 
-def market_offer_ratios() -> list[float]:
-    """The game's nightly offers over value, each once, by when made."""
-    return [r for (r,) in rows("SELECT ratio FROM offer_ratios")]
-
-
 def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
            carry: Sequence[float]) -> list[dict[str, Any]]:
     """Every constant and fitted value a run is built with, one row each:
@@ -72,8 +67,8 @@ def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
 def forecast_fits() -> list[dict[str, Any]]:
     """What the forecast fits at t, one params row each: each club's
     attack and defence (club_rating)."""
-    return [_param("forecast.%s" % t, c, v) for c, a, d in rows("SELECT club, attack, defence FROM club_rating ORDER BY club")
-            for t, v in (("attack", a), ("defence", d))]
+    return [_param("forecast.%s" % t, r.club, v) for r in club_ratings()
+            for t, v in (("attack", r.attack), ("defence", r.defence))]
 
 
 def _param(component: str, term: str, value: float, kind: str = "fitted",
