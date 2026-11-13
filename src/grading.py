@@ -3,11 +3,13 @@ from __future__ import annotations
 import datetime as dt
 import os
 import sys
+from collections.abc import Sequence
 from contextlib import closing
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import decision
+import salegrade
 from board import built
 from ffcore import auction
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
@@ -200,6 +202,52 @@ def record_grades() -> dict[str, int]:
     return {"resolved": resolved, "forecasts": forecasts, **scored}
 
 
+class Trade(NamedTuple):
+    """A ledger row of mine: the player, when it happened (with its offset) and the amount."""
+    player: str
+    at: dt.datetime
+    amount: float
+
+
+def my_trades(kind: str, since: str) -> list[Trade]:
+    """My ledger rows of one kind (buy, sell) from since on, oldest first."""
+    found = [Trade(p, dt.datetime.fromisoformat(at), amount) for p, at, amount in rows(
+        "SELECT player, at, amount FROM ledger WHERE kind = ? AND who = (SELECT me FROM league_config) AND at >= ?",
+        (kind, since))]
+    return sorted(found, key=lambda t: t.at)
+
+
+def lock_after(at: dt.datetime, locks: Sequence[dt.datetime]) -> dt.datetime | None:
+    """The first of the locks strictly after at, or None if none is."""
+    return min((x for x in locks if x > at), default=None)
+
+
+def buys_between(buys: Sequence[Trade], start: dt.datetime, end: dt.datetime | None) -> bool:
+    """Whether a buy falls at or after start and before end (end None: no bound), so funds a sale made at start."""
+    return any(start <= b.at and (end is None or b.at < end) for b in buys)
+
+
+def sale_facts(sale: Trade, buys: Sequence[Trade], lock: dt.datetime | None) -> salegrade.Sale:
+    """The sale as the facts stood a minute before it: his market value (the amount if squads shows none), whether he
+    was in the latest line-up seen, whether he was flagged, and whether a buy of mine fell before the lock (lock None:
+    no bound)."""
+    with replaying():
+        set_now(sale.at - dt.timedelta(minutes=1))
+        market = next((v for (v,) in rows("SELECT market_value FROM squads WHERE player = ?", (sale.player,))
+                       if v is not None), sale.amount)
+        in_eleven = bool(rows("SELECT 1 FROM app_lineup WHERE player = ?", (sale.player,)))
+        flagged = bool(rows("SELECT 1 FROM player_status WHERE player = ? AND status IS NOT NULL", (sale.player,)))
+    return salegrade.Sale(sale.player, sale.amount, market, in_eleven, flagged, buys_between(buys, sale.at, lock))
+
+
+def sales_since(day: str) -> list[salegrade.Sale]:
+    """Each of my sales from the day on (a date, YYYY-MM-DD), as a salegrade.Sale read at the moment of the sale
+    (sale_facts); funded_buy is a buy of mine between the sale and the next lock."""
+    buys = my_trades("buy", day)
+    locks = sorted(round_locks().values())
+    return [sale_facts(s, buys, lock_after(s.at, locks)) for s in my_trades("sell", day)]
+
+
 def log_measure(measure: str, values: dict[str, float]) -> None:
     """The headline numbers of a measure appended to measure_log, beside
     the code's short commit (measure_latest shows each against the one
@@ -281,6 +329,24 @@ def _selftest_stand() -> None:
         globals().update(kept)
 
 
+def _selftest_window() -> None:
+    """A buy funds a sale when it falls from the sale up to the next lock: inside it does; before the sale, at the
+    lock or after it does not; with no lock after the sale, any later buy does."""
+    hour = dt.timedelta(hours=1)
+    lock = dt.datetime(2026, 9, 1, 12, tzinfo=dt.timezone.utc)
+    sale = lock - dt.timedelta(days=1)
+
+    def buy(at: dt.datetime) -> Trade:
+        return Trade("x", at, 1.0)
+    assert buys_between([buy(sale + hour)], sale, lock), "a buy inside the window funds the sale"
+    assert not buys_between([buy(sale - hour)], sale, lock), "a buy before the sale does not"
+    assert not buys_between([buy(lock)], sale, lock), "a buy exactly at the lock does not"
+    assert not buys_between([buy(lock + hour)], sale, lock), "a buy after the lock does not"
+    assert buys_between([buy(lock + hour)], sale, None), "with no lock after the sale, a later buy does"
+    assert lock_after(sale, [lock]) == lock and lock_after(lock, [lock]) is None, \
+        "the next lock is the first strictly after the sale; a sale after the last lock has none"
+
+
 def _selftest() -> None:
     _selftest_measure_log()
     import tempfile
@@ -328,6 +394,7 @@ def _selftest() -> None:
         assert scored_at(later, path) == "2026-11-01T2210Z" and scored_at(elsewhere, path) is None and scored_at(old, path) is None, \
             "the run of this code that scored the auctions, not another's, nor one that came after"
     _selftest_stand()
+    _selftest_window()
     print("grading self-test OK")
 
 
