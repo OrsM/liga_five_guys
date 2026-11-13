@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-13T12:07Z",
- "market_at": "2026-11-13T12:06Z",
+ "generated_at": "2026-11-13T17:03Z",
+ "market_at": "2026-11-13T17:02Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-13T12:06Z",
+   "at": "2026-11-13T17:02Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -1159,11 +1159,11 @@
    "flip": null,
    "ratio": 0.9038939504036805,
    "lost": {
-    "next4": 4.373573106154794,
-    "next8": 11.342902433096071,
+    "next4": 4.292085934021088,
+    "next8": 10.761152502457492,
     "season": 12.310276547542799
    },
-   "per_million": 0.2626473724372951,
+   "per_million": 0.24917682628748605,
    "facts": [
     [
      "value",
@@ -1182,17 +1182,79 @@
     ],
     [
      "points lost, next 4",
-     4.373573106154794,
+     4.292085934021088,
      "points"
     ],
     [
      "next 8",
-     11.342902433096071,
+     10.761152502457492,
      "points"
     ],
     [
      "season",
      12.310276547542799,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "what": "sell",
+   "label": "sell Pablo Fornals",
+   "step": "take offer",
+   "offer": 51661721.0,
+   "waiting": null,
+   "trend": 32.472028342925846,
+   "plan": false,
+   "amount": 51661721.0,
+   "done": false,
+   "key": "2632",
+   "gain": -37.6603154968393,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 0.9721588146726583,
+   "lost": {
+    "next4": 11.056118031829868,
+    "next8": 17.69248837613827,
+    "season": 37.6603154968393
+   },
+   "per_million": 0.34246804081765436,
+   "facts": [
+    [
+     "value",
+     53141236.0,
+     "money"
+    ],
+    [
+     "offer",
+     51661721.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9721588146726583,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     11.056118031829868,
+     "points"
+    ],
+    [
+     "next 8",
+     17.69248837613827,
+     "points"
+    ],
+    [
+     "season",
+     37.6603154968393,
      "points"
     ]
    ],
@@ -1255,68 +1317,6 @@
     [
      "season",
      22.060985287172798,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
-   "name": "Pablo Fornals",
-   "pos": "MED",
-   "what": "sell",
-   "label": "sell Pablo Fornals",
-   "step": "take offer",
-   "offer": 51661721.0,
-   "waiting": null,
-   "trend": 32.472028342925846,
-   "plan": false,
-   "amount": 51661721.0,
-   "done": false,
-   "key": "2632",
-   "gain": -37.6603154968393,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 0.9721588146726583,
-   "lost": {
-    "next4": 11.137605203963545,
-    "next8": 18.274238306776795,
-    "season": 37.6603154968393
-   },
-   "per_million": 0.3537287948029605,
-   "facts": [
-    [
-     "value",
-     53141236.0,
-     "money"
-    ],
-    [
-     "offer",
-     51661721.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9721588146726583,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     11.137605203963545,
-     "points"
-    ],
-    [
-     "next 8",
-     18.274238306776795,
-     "points"
-    ],
-    [
-     "season",
-     37.6603154968393,
      "points"
     ]
    ],
@@ -1407,11 +1407,11 @@
    "flip": null,
    "ratio": 0.9235715637960685,
    "lost": {
-    "next4": 3.5935904285634876,
-    "next8": 9.536608497576594,
+    "next4": 3.5121032564298105,
+    "next8": 8.954858566938071,
     "season": 6.035408692163401
    },
-   "per_million": 0.912615423515783,
+   "per_million": 0.8569442738125245,
    "facts": [
     [
      "value",
@@ -1430,12 +1430,12 @@
     ],
     [
      "points lost, next 4",
-     3.5935904285634876,
+     3.5121032564298105,
      "points"
     ],
     [
      "next 8",
-     9.536608497576594,
+     8.954858566938071,
      "points"
     ],
     [
@@ -1579,17 +1579,17 @@
    "sold": false
   },
   {
-   "name": "Miguel Roman",
+   "name": "Thomas Lemar",
    "pos": "MED",
-   "next": 0.42969957760507493,
+   "next": 2.7691682084508704,
    "xi": false,
    "best": false,
    "sold": false
   },
   {
-   "name": "Thomas Lemar",
+   "name": "Miguel Roman",
    "pos": "MED",
-   "next": 0.0,
+   "next": 0.42969957760507493,
    "xi": false,
    "best": false,
    "sold": false
