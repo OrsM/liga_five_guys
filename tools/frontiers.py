@@ -27,7 +27,7 @@ NAMES = {
     "ingest": "unmatched crosswalk app_player slug_player id_clashes "
               "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
               "look auction_results auction_looks bid_changes player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
-              "player_roster listings offers squads standings app_lineup app_lineup_seen price_history offer_ratios "
+              "player_roster listings offers squads standings app_lineup price_history offer_ratios "
               "player_jornadas season_record last_season next_lock listing_ends listing_close price_paid market_read",
     "forecast": "cell cell_total cell_pool standin_cell score_spread forecast_used "
                 "late_arrivals ppm_prior fitted horizons market_daily",
@@ -39,7 +39,7 @@ EXPORTS = {
     "ingest": """player_club player_value player_status player_roster appearances scored season_record last_season
         club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look unmatched
         listings listing_close offers offer_ratios price_history price_paid auction_results auction_looks bid_changes market_read
-        squads owners cash standings league_config app_lineup app_lineup_seen ledger player_jornadas""",
+        squads owners cash standings league_config app_lineup ledger player_jornadas""",
     "forecast": "cell market_daily forecast_e price_carry price_trend price_trend_daily price_forecast price_grade",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read; price_forecast: each player's expected value night by night to the next lock; price_grade: its error against what happened
     "decision": "player_facts auction_calibration auction_brier",  # the facts of each player the board shows; the decision's inputs are dec_* tables, read by decision.py only
     "board": "",

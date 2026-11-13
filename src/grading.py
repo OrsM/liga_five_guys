@@ -15,7 +15,7 @@ from ffcore import auction
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.forecast_store import forecast
 from ffcore.jornadas import round_locks
-from ffcore.parse import snapshot_stamp, stamp
+from ffcore.parse import snapshot_stamp
 from salegrade import HORIZONS
 
 __all__ = ["backtest", "superseded", "view_table", "record_grades"]
@@ -295,27 +295,29 @@ def points(scored: dict[str, dict[int, float]], player: str, jornadas: Iterable[
     return sum(got.get(j, 0.0) for j in jornadas)
 
 
-def takers(at: dt.datetime, before: set[str]) -> set[str]:
-    """The players who took a sold player's place: in the first line-up seen after at, not in the eleven before it
-    (before), and on my squad when that line-up was seen. Empty if no line-up was seen after at."""
-    (first,), = rows("SELECT min(at) FROM app_lineup_seen WHERE at > ?", (stamp(at),))
-    moment = snapshot_stamp(first) if first else None
-    if moment is None:
-        return set()
+def benched_at(moment: dt.datetime) -> set[str]:
+    """The players on my squad at moment who were not in the eleven the app had fielded then."""
     with replaying():
         set_now(moment)
         mine = {p for (p,) in rows("SELECT player FROM squads WHERE manager = (SELECT me FROM league_config)")}
-    return (eleven_at(moment) & mine) - before
+    return mine - eleven_at(moment)
 
 
-def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]]) -> salegrade.Course | None:
-    """What followed the sale at each horizon of horizon_jornadas: what he scored (sold), what the takers scored
-    (cover, an eleven sale only; else 0) and his market value at the lock of the horizon's last jornada (value_after,
+def fielded_at_locks(locks: dict[int, dt.datetime], done: set[int]) -> dict[int, set[str]]:
+    """The eleven the app had fielded a minute before each done jornada's lock (eleven_at)."""
+    return {j: eleven_at(locks[j] - dt.timedelta(minutes=1)) for j in done & set(locks)}
+
+
+def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]],
+           fielded: dict[int, set[str]]) -> salegrade.Course | None:
+    """What followed the sale at each horizon of horizon_jornadas: what he scored (sold); what my players on the bench
+    when he was sold (benched_at) scored in the jornadas they were fielded (fielded: the eleven at each lock), for an
+    eleven sale only, else 0 (cover); and his market value at the lock of the horizon's last jornada (value_after,
     the amount if squads shows none). None if no jornada is done at the lock horizon (then none is at any)."""
     spans = horizon_jornadas(sold.at, locks, done)
     if not spans["lock"]:
         return None
-    took = takers(sold.at, eleven_at(sold.at - dt.timedelta(minutes=1))) if sold.sale.in_eleven else set()
+    bench = benched_at(sold.at - dt.timedelta(minutes=1)) if sold.sale.in_eleven else set()
     after = {}
     for h in HORIZONS:
         with replaying():
@@ -323,22 +325,29 @@ def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: di
             after[h] = market_value(sold.sale.player, sold.sale.amount)
     return salegrade.Course(
         sold={h: points(scored, sold.sale.player, spans[h]) for h in HORIZONS},
-        cover={h: sum(points(scored, p, spans[h]) for p in took) for h in HORIZONS},
+        cover={h: sum(points(scored, p, [j]) for j in spans[h] for p in bench & fielded[j]) for h in HORIZONS},
         value_after=after)
+
+
+def graded_count(locks: dict[int, dt.datetime], done: set[int]) -> int:
+    """How many of my sales from SALES_FROM have a done jornada at their lock horizon, from the ledger alone."""
+    return sum(1 for t in my_trades("sell", SALES_FROM) if horizon_jornadas(t.at, locks, done)["lock"])
 
 
 def record_sales() -> None:
     """Each sale from SALES_FROM with a done jornada at its lock, graded at RATE (salegrade.grade) and summarised
     (salegrade.measure_values), is appended to measure_log as sale_grade with jornadas_done, unless the latest one
-    logged has the same all.lock.n and jornadas_done."""
-    done, locks, scored = done_jornadas(), round_locks(), scored_points()
-    courses = [(s.sale, course(s, locks, done, scored)) for s in sales_since(SALES_FROM)]
+    logged has the same all.lock.n (graded_count) and jornadas_done; then no sale is read."""
+    done, locks = done_jornadas(), round_locks()
+    marks = {"all.lock.n": float(graded_count(locks, done)), "jornadas_done": float(len(done))}
+    latest = dict(rows("SELECT key, value FROM measure_latest WHERE measure = 'sale_grade'"))
+    if all(latest.get(k) == v for k, v in marks.items()):
+        return
+    scored, fielded = scored_points(), fielded_at_locks(locks, done)
+    courses = [(s.sale, course(s, locks, done, scored, fielded)) for s in sales_since(SALES_FROM)]
     values = salegrade.measure_values(salegrade.summary(
         [salegrade.grade(sale, got, RATE) for sale, got in courses if got is not None]))
-    values["jornadas_done"] = float(len(done))
-    latest = dict(rows("SELECT key, value FROM measure_latest WHERE measure = 'sale_grade'"))
-    if any(latest.get(k) != values.get(k) for k in ("all.lock.n", "jornadas_done")):
-        log_measure("sale_grade", values)
+    log_measure("sale_grade", values | {"jornadas_done": marks["jornadas_done"]})
 
 
 def log_measure(measure: str, values: dict[str, float]) -> None:
@@ -440,34 +449,36 @@ def _selftest_window() -> None:
         "the next lock is the first strictly after the sale; a sale after the last lock has none"
 
 
-def _selftest_takers() -> None:
-    """The takers of a sale are the entrants of the first line-up seen after it that were on my squad then: none of
-    them was in the eleven before, all are on the squad, the line-up of a later moment is not read, and with no
-    line-up seen after the sale there are none."""
+def _selftest_cover() -> None:
+    """The cover of a sale counts a bench player only in the jornadas he was fielded: it is zero for a sale not from
+    the eleven, never more than the bench's points in the horizon, and adds over disjoint horizons."""
     import tempfile
     from ffcore.tidy import store_sql, tables_in
-    first, second, third = "2026-09-01T1000Z", "2026-09-02T1000Z", "2026-09-03T1000Z"
-    ids = {"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "x": "6"}
-    fielded = {first: "abc", second: "abd", third: "abx"}
-    squad = {first: "abcde", second: "abcde", third: "abcde"}
+    ids = {"s": "1", "a": "2", "b": "3", "c": "4"}
+    day = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
+    locks = {1: day + dt.timedelta(days=2), 2: day + dt.timedelta(days=9), 3: day + dt.timedelta(days=16)}
+    scored = {"a": {1: 4.0, 2: 6.0, 3: 1.0}, "b": {1: 2.0, 2: 2.0, 3: 2.0}, "s": {1: 3.0, 2: 3.0, 3: 3.0}}
+    fielded = {1: set("sc"), 2: set("ac"), 3: set("ab")}
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
-            store_sql("api_lineup", [{"observed_at": at, "player_id": ids[k], "slot": "1"}
-                                     for at, ks in fielded.items() for k in ks])
-            store_sql("api_teams", [{"observed_at": at, "player_id": ids[k], "player_name": k, "manager": "me"}
-                                    for at, ks in squad.items() for k in ks])
+            store_sql("api_lineup", [{"observed_at": "2026-08-31T1000Z", "player_id": ids[k], "slot": "1"} for k in "sc"])
+            store_sql("api_teams", [{"observed_at": "2026-08-31T1000Z", "player_id": ids[k], "player_name": k, "manager": "me"}
+                                    for k in "sabc"])
             with closing(connect()) as db, db:
                 db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)", list(ids.items()))
                 db.execute("INSERT INTO league_config (me, budget) VALUES ('me', 0)")
-            set_now(snapshot_stamp("2026-09-10T0000Z"))
-            sale = snapshot_stamp("2026-09-01T1200Z")
-            assert sale is not None
-            got = takers(sale, set("abc"))
-            assert got == {"d"}, "the first line-up after the sale: d entered and is mine; the later x is not read"
-            assert got.isdisjoint("abc") and got <= set(squad[second])
-            assert takers(sale, set("abcd")) == set(), "an entrant already in the eleven before took nobody's place"
-            late = snapshot_stamp("2026-09-04T0000Z")
-            assert late is not None and takers(late, set()) == set(), "no line-up seen after the sale"
+            set_now(snapshot_stamp("2026-09-30T0000Z"))
+            assert benched_at(day) == {"a", "b"}, "my squad less the eleven fielded then"
+            done = {1, 2, 3}
+            sale = salegrade.Sale("s", 5e6, 5e6, True, False, False)
+            got = course(Sold(day, sale), locks, done, scored, fielded)
+            assert got is not None
+            assert got.cover == {"lock": 0.0, "next4": 6.0 + 1.0 + 2.0, "season": 6.0 + 1.0 + 2.0}, \
+                "a and b count only in the jornadas they were fielded (c was never on the bench)"
+            assert got.sold["season"] == 9.0
+            other = course(Sold(day, sale._replace(in_eleven=False)), locks, done, scored, fielded)
+            assert other is not None and not any(other.cover.values()), "a bench sale has no cover"
+            assert course(Sold(locks[3], sale), locks, done, scored, fielded) is None, "no jornada after the sale"
         finally:
             set_now(None)
 
@@ -481,16 +492,24 @@ def _selftest_points() -> None:
 
 def _selftest_record_sales() -> None:
     """record_sales logs the sales' measure once for a given number of graded sales and jornadas done: a second call
-    with nothing new adds no rows, a jornada done adds a set; a sale with no course is not graded."""
+    with nothing new adds no rows and reads no sale, a jornada done adds a set; a sale with no course is not graded."""
     import tempfile
     from ffcore.tidy import tables_in
     at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
-    state = {"done": {1}, "sold": [Sold(at, salegrade.Sale("p", 5e6, 5e6, True, False, False))] * 2}
+    locks = {1: at + dt.timedelta(days=2), 2: at + dt.timedelta(days=9)}
+    state: dict[str, Any] = {"done": {1}, "read": 0}
+    sold = [Sold(at, salegrade.Sale("p", 5e6, 5e6, True, False, False))] * 2
     flat = {h: 1.0 for h in HORIZONS}
     ok = salegrade.Course(flat, flat, flat)
+
+    def read(day: str) -> list[Sold]:
+        state["read"] += 1
+        return sold
     stub: dict[str, Any] = {
-        "done_jornadas": lambda: state["done"], "round_locks": lambda: {}, "sales_since": lambda day: state["sold"],
-        "course": lambda sold, locks, done, scored: ok if len(done) else None, "scored_points": lambda: {}}
+        "done_jornadas": lambda: state["done"], "round_locks": lambda: locks, "sales_since": read,
+        "my_trades": lambda kind, since: [Trade("p", s.at, 5e6) for s in sold],
+        "course": lambda s, locks, done, scored, fielded: ok if len(done) else None,
+        "scored_points": lambda: {}, "fielded_at_locks": lambda locks, done: {}}
     kept = {k: globals()[k] for k in stub}
 
     def logged() -> int:
@@ -502,13 +521,10 @@ def _selftest_record_sales() -> None:
             first = logged()
             assert first > 0 and dict(rows("SELECT key, value FROM measure_latest"))["all.lock.n"] == 2
             record_sales()
-            assert logged() == first, "nothing new: no rows"
+            assert logged() == first and state["read"] == 1, "nothing new: no rows, no sale read"
             state["done"] = {1, 2}
             record_sales()
             assert logged() == 2 * first, "a jornada done: a new set"
-            state["done"] = set()
-            record_sales()
-            assert dict(rows("SELECT key, value FROM measure_latest"))["all.lock.n"] == 0, "no course: none graded"
         finally:
             globals().update(kept)
 
@@ -536,7 +552,7 @@ def _selftest() -> None:
     _selftest_measure_log()
     _selftest_horizons()
     _selftest_points()
-    _selftest_takers()
+    _selftest_cover()
     _selftest_record_sales()
     import tempfile
     from ffcore.tidy import tables_in

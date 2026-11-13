@@ -378,11 +378,6 @@ DROP VIEW IF EXISTS app_lineup;
 CREATE VIEW app_lineup AS
 SELECT player_id AS app_id, player, slot, player_name AS name FROM current_api_lineup;
 
--- When the app's line-up was seen: each moment a line-up was fetched, up to t.
-DROP VIEW IF EXISTS app_lineup_seen;
-CREATE VIEW app_lineup_seen AS
-SELECT DISTINCT observed_at AS at FROM src_api_lineup WHERE observed_at <= (SELECT cut());
-
 -- The activity feed, each event once, with who paid (buyer: a buy's or a
 -- clause's manager) and who was paid (seller: a sale's manager, a clause's
 -- other); then the exits the squads show beyond those the feed records (a

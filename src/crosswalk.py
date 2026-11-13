@@ -104,27 +104,6 @@ def main() -> None:
               % (idx, ", ".join(ids)))
 
 
-def _selftest_lineup_seen() -> None:
-    """app_lineup_seen lists each moment a line-up was fetched up to t, once, whatever its size; none after t."""
-    import tempfile
-    from pathlib import Path
-    from ffcore.db import set_now
-    from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import store_sql, tables_in
-
-    moments = ["2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"]
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            store_sql("api_lineup", [{"observed_at": at, "player_id": p, "slot": "1"}
-                                     for at, n in zip(moments, (2, 1, 3)) for p in map(str, range(n))])
-            for k, now in enumerate(moments, 1):
-                set_now(snapshot_stamp(now))
-                assert [at for (at,) in rows("SELECT at FROM app_lineup_seen ORDER BY at")] == moments[:k], \
-                    "every moment up to t, each once, none after"
-        finally:
-            set_now(None)
-
-
 def _selftest() -> None:
     import tempfile
     from pathlib import Path
@@ -227,7 +206,6 @@ def _selftest() -> None:
         assert "same players" not in stage() and rows("SELECT count(*) FROM crosswalk") == [(3,)], \
             "a player the sources have not named before is made at once"
 
-    _selftest_lineup_seen()
     print("crosswalk self-test OK")
 
 
