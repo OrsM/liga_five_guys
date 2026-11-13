@@ -356,6 +356,116 @@ def _selftest_forecast() -> None:
             set_now(None)
 
 
+def _selftest_prior() -> None:
+    """schema.sql's last_season and ppm_prior on points, player_club
+    and player_value as tables: in his position, the least-squares line of
+    last season's points per match (10+ matches) on log value, at his value;
+    a position with fewer than three, its mean; no position, everyone's
+    median."""
+    import math
+    import sqlite3
+    from ffcore.db import SCHEMA, functions
+
+    db = sqlite3.connect(":memory:")
+    functions(db)
+    db.execute("CREATE TABLE src_points (observed_at, season, ff_id, points, games)")
+    db.execute("CREATE TABLE player_club (player, pos)")
+    db.execute("CREATE TABLE player_value (player, value)")
+    db.executemany("INSERT INTO src_points VALUES ('2026-01-01T0000Z', ?, ?, ?, ?)", [
+        ("2024-25", "a", 999.0, 30.0),                        # an older season: not read
+        ("2025-26", "a", 60.0, 30.0), ("2025-26", "b", 90.0, 30.0),
+        ("2025-26", "c", 150.0, 30.0), ("2025-26", "d", 210.0, 30.0),
+        ("2025-26", "e", 300.0, 9.0), ("2025-26", "f", 40.0, 10.0),
+        ("2026-27", "a", 5.0, 1.0)])                          # the season under way: not last season
+    market = [("a", "DEF", 1e6), ("b", "DEF", 2e6), ("c", "DEF", 50e6), ("d", "DEF", 60e6),
+              ("e", "DEF", 70e6), ("f", "POR", 3e6), ("x", "", 5e6), ("z", "DEF", None)]
+    db.executemany("INSERT INTO player_club VALUES (?, ?)", [(k, p) for k, p, _v in market])
+    db.executemany("INSERT INTO player_value VALUES (?, ?)", [(k, v) for k, _p, v in market if v])
+    sql = SCHEMA.read_text()
+    for view in ("last_season", "ppm_prior"):
+        i = sql.index("CREATE VIEW %s AS" % view)
+        db.execute(sql[i:sql.index(";\n", i)])
+    got = dict(db.execute("SELECT player, prior FROM ppm_prior"))
+    xs, ys = [math.log(v) for v in (1e6, 2e6, 50e6, 60e6)], [2.0, 3.0, 5.0, 7.0]
+    mx, my = sum(xs) / 4, sum(ys) / 4
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+    line = {k: my + slope * (math.log(v) - mx) for k, v in (("a", 1e6), ("d", 60e6), ("e", 70e6))}
+    assert all(abs(got[k] - line[k]) < 1e-9 for k in line), \
+        ("DEF: the line on log value through a-d (e's 9 matches are too few), at each one's value", got, line)
+    assert got["f"] == 4.0, "POR: one player, his mean"
+    assert got["x"] == 4.0, "no position: the median of everyone's (2, 3, 4, 5, 7)"
+    assert got["z"] == my, "no value: his position's mean"
+
+
+def _selftest_points() -> None:
+    """schema.sql's scored and season_record: each change in a player's
+    season total by the jornada of his club's last match by then, and his
+    season so far (points, appearances, squads, pick)."""
+    import tempfile
+    from ffcore import forecast as model
+    from ffcore.db import record
+
+    from ffcore.db import set_now
+    from ffcore.parse import snapshot_stamp
+    from ffcore.tidy import store_sql, tables_in
+
+    a, b, later = "2026-08-01T0900Z", "2026-08-02T0900Z", "2026-08-03T0900Z"
+    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        try:
+            set_now(snapshot_stamp("2026-08-04T0000Z"))
+            store_sql("market", [
+                {"observed_at": a, "ff_id": "1", "club": "x"},
+                {"observed_at": a, "ff_id": "2", "club": "y"},
+                {"observed_at": a, "ff_id": "3", "club": "w"}, {"observed_at": a, "ff_id": "4", "club": "w"}])
+            store_sql("matches", [
+                {"observed_at": a, "match_id": "m1", "jornada": "1", "home": "x",
+                 "away": "y", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"},
+                {"observed_at": later, "match_id": "m2", "jornada": "2",
+                 "home": "x", "away": "z", "score": "1-0", "kickoff": ""},
+                {"observed_at": a, "match_id": "m3", "jornada": "1", "home": "w",
+                 "away": "v", "score": "", "kickoff": "2026-08-01T10:00:00+00:00"}])
+            store_sql("points", [
+                {"observed_at": a, "season": "2025-26", "ff_id": "1",
+                 "points": "90", "games": "30"},
+                *({"observed_at": a, "season": "2026-27", "ff_id": k,
+                   "points": "0", "games": "0"} for k in "12"),
+                # the first fetch of the season is the season so far: one game is that game's (3 played jornada 1),
+                # more is no one jornada's (4 started the tool mid-season)
+                {"observed_at": a, "season": "2026-27", "ff_id": "3", "points": "4", "games": "1"},
+                {"observed_at": a, "season": "2026-27", "ff_id": "4", "points": "60", "games": "20"},
+                {"observed_at": b, "season": "2026-27", "ff_id": "1",
+                 "points": "5", "games": "1"},
+                {"observed_at": later, "season": "2026-27", "ff_id": "1",
+                 "points": "12", "games": "2"},
+                {"observed_at": later, "season": "2026-27", "ff_id": "2",
+                 "points": "3", "games": "1"}])
+            assert set(rows("SELECT player, jornada, pts, at FROM scored")) == {
+                ("1", 1, 5.0, b), ("1", 2, 7.0, later), ("2", 1, 3.0, later), ("3", 1, 4.0, a)}
+            record([{"player_id": k, "ff_slug": slug} for k, slug in
+                    [("1", "uno"), ("2", "dos"), ("3", "tres")]], "crosswalk")
+            store_sql("starters", [
+                {"observed_at": a, "match_id": "m1", "team_slug": "x", "player_slug": p,
+                 "player_name": n, "role": r, "minute": m}
+                for p, n, r, m in [("uno", "1", "starter", ""), ("dos", "2", "sub", "70"),
+                                   ("tres", "3", "sub", ""), ("uno-coach", "1", "coach", "")]] + [
+                {"observed_at": later, "match_id": "m2", "team_slug": "x", "player_slug": "uno",
+                 "player_name": "1", "role": "starter", "minute": "45"}])
+            assert set(rows("SELECT player, jornada FROM appearances")) == {("1", 1), ("1", 2), ("2", 1)}, \
+                "started or came on, not an unused sub"
+            got = {k: r for k, *r in rows("SELECT player, pts, apps, squads, pick FROM season_record")}
+            assert {k: tuple(r[:3]) for k, r in got.items()} == {"1": (12.0, 2.0, 2.0), "2": (3.0, 1.0, 1.0), "3": (4.0, 0.0, 1.0)}, \
+                "a starter the match unless he came off, a sub from when he came on"
+            assert abs(got["1"][3] - (model.PICK_K * model.NEUTRAL_START / 100 + 2) / (model.PICK_K + 2)) < 1e-12, \
+                "his record pulled toward NEUTRAL_START, worth PICK_K matches"
+            # a listed start %, unflagged, is the chance he is picked as it says, whatever his record (he has started both)
+            store_sql("lineups", [{"observed_at": later, "source": "futbolfantasy", "team_slug": "x", "player_slug": "uno",
+                                   "player_name": "1", "start_pct": "10", "status": "ok", "note": ""}])
+            assert dict(rows("SELECT player, picked FROM forecast_rate")).get("1") == 0.10, \
+                "the listing's start %, not pulled toward his record of selection"
+        finally:
+            set_now(None)
+
+
 def _selftest_cells() -> None:
     """seed_cells puts the cells of a moment where the forecast keeps them (what a test of the decision seeds)."""
     import tempfile
@@ -374,6 +484,8 @@ def _selftest() -> None:
     _selftest_keep()
     _selftest_forecast()
     _selftest_cells()
+    _selftest_prior()
+    _selftest_points()
     print("ffcore.forecast_store self-test OK")
 
 
