@@ -44,7 +44,7 @@ def lock_cells(i: int, ahead: int, done: set[int]) -> list[dict[str, Any]]:
 
 
 def backtest(ahead: int = 0) -> list[dict[str, Any]]:
-    """The forecast at each past lock (assemble.forecast makes it, the cell
+    """The forecast at each past lock (forecast_store.forecast makes it, the cell
     contract is read): a row (lock, jornada, player) for the jornada it locks
     and, with ahead, the next ones too, each one done. Graded in SQL
     (grade_forecast)."""

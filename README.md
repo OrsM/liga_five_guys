@@ -106,7 +106,7 @@ Every forecast is the same product, for every player and jornada
   (`Market.fetches`; schema.sql's `waiting`: each later night's offer, at
   his value then (`price_carry`), taken when it beats waiting on, the last
   before the lock always); with no offer yet, his value.
-- **Assembly** (`assemble.py`): the one place that reads the tables and
+- **Assembly** (`board.built`): the one place that reads the tables and
   builds the scorer, market, league state and forecast; model modules never
   read a table themselves.
 
@@ -169,7 +169,7 @@ rather than reaching through them; ruff flags reads of private members.
 
 ## Layout
 
-    src/            run, ingest, sources, crosswalk, assemble, decision (the
+    src/            run, ingest, sources, crosswalk, decision (the
                     inputs and fund), board, publish, grading, act, health, stats
     src/ffcore/     schema.sql (the views), decide.sql (the decision's inputs),
                     tables.sql and identity.sql (what parse fills), db, kept,

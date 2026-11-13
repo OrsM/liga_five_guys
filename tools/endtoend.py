@@ -7,7 +7,7 @@ import sys
 
 
 def _selftest() -> None:
-    """The view build (connect), assemble.built (seen, the forecast moment, look) and board.board (the decision's
+    """The view build (connect), board.built (seen, the forecast moment, look) and board.board (the decision's
     inputs, your squad and its eleven, the standing offers ranked): a forecast and a board come out."""
     import contextlib
     import tempfile

@@ -1,4 +1,4 @@
-"""Rows seeded by hand for the self-tests: a league at t as assemble writes it
+"""Rows seeded by hand for the self-tests: a league at t as board.built writes it
 (seed_league)."""
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ PLAYER_COLUMNS = ("name", "pos", "owner", "value", "trend", "paid", "offer", "cl
 def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
                 cells: Mapping[int, Mapping[str, tuple[float, float]]],
                 odds: Mapping[str, Any] | None = None) -> None:
-    """Into the current tables (tidy.tables_in), a league at t as assemble
+    """Into the current tables (tidy.tables_in), a league at t as board.built
     writes it: seen (a row a player, PLAYER_COLUMNS; name defaults to his
     key, your squad is those he owns by `me`), your cash (seen_cash),
     forecast_cell at moment 0 (cells: jornada -> player -> (points if he
