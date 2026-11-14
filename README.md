@@ -8,10 +8,10 @@ redistribute the scraped data.
 
 On the Asus box under systemd. `tools/lfg-run` (linked from
 `~/.local/bin/lfg-run`) runs the self-tests and the fetch, then `src/run.py`,
-then commits. Every run, whoever asks for it (timer, phone button),
+then commits. Every run, whoever asks for it (timer, report button),
 runs every stage of `src/run.py` in one process; the report is
-published to the phone (notes.lemonworlds.com/fantasy) as soon as it is made. The phone's "Run again" button leaves
-a request that `lfg-watch.timer` picks up within a minute.
+published to the site (notes.lemonworlds.com/fantasy) as soon as it is made. The page's "Run again" button leaves
+a request (`rerun.json` in `$LIST_DATA_DIR/fantasy`) that `lfg-watch.timer` picks up within a minute.
 
     systemctl --user list-timers | grep lfg     # lfg, lfg-flip, lfg-watch, lfg-gc
     systemctl --user start lfg.service          # run now
@@ -43,7 +43,7 @@ Everything else comes from the app's API and public pages.
 3. **board** (`board.py`, `decision.py`, `approach.py`, `eleven.py`, `ffcore/decide.sql`): `reports/decisions.json`: your cash and what you
    can bid, your squad and its eleven, the line that lists your players for sale, and each standing offer on them
    ranked by what taking it costs the eleven. `approach.approach` says how to get a buy: the bid, the sales that pay for it, and what they cost the eleven.
-4. **publish** (`publish.py`): the report to the phone, and its ping.
+4. **publish** (`publish.py`): the report to the site, and its ping.
 5. **grade** (`grading.py`: each past lock's forecast, kept as `grade_cell`, read through `grade_forecast` and
    `grade_accuracy`, star group first), **health** (`health.py`). A failure from here on is noted and the run goes
    on; before it, the run stops.
@@ -187,4 +187,4 @@ rather than reaching through them; ruff flags reads of private members.
     data/tidy/      parse caches (what parse fills is rebuilt from raw: the
                     registry each run; runs, their decisions,
                     forecasts and grades are records, kept)
-    reports/        decisions.json, what the phone draws
+    reports/        decisions.json, what the report page draws

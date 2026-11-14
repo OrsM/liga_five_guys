@@ -1,34 +1,30 @@
 #!/usr/bin/env bash
-# Do the lines accepted on the phone, and send the results back.
+# Do the lines accepted on the report page, and write the results back beside it.
 #
 # Its own unit on a short timer (lfg-accept.timer), so a press is not held
 # behind the minute lfg-watch waits, nor behind a run it has in flight.
 
 set -uo pipefail
 
-PHONE="${LFG_PHONE:-$("$HOME/.local/bin/phone-addr" || true)}"
-PORT="${LFG_PHONE_PORT:-8022}"
-DEST="${LFG_PHONE_DEST:-/data/data/com.termux/files/home/list-data/fantasy}"
+DEST="${LIST_DATA_DIR:-$HOME/list-data}/fantasy"
 STATE="$HOME/.local/state/lfg"
 mkdir -p "$STATE"
 
-ssh_phone() { ssh -p "$PORT" -o BatchMode=yes -o ConnectTimeout=5 "$PHONE" "$@"; }
-
-if ! ssh_phone true 2>/dev/null; then
-    echo "phone unreachable — nothing to check"; exit 0
+# Lines accepted on the report page, a file a press in accept/ (the server
+# renames each in whole): each taken by renaming it into taken/, so a press
+# landing meanwhile stays for the next round, then read and removed there,
+# where nothing but this writes. Placed by act.py (each checked against the
+# board as it stands now), and the results written back beside the report as
+# act.json. Not held behind a run in flight: a bid waits for nothing the run
+# makes. accept.json is the server's older single-file queue, taken the same way.
+ACC=
+if [ -d "$DEST" ]; then
+    mkdir -p "$DEST/taken"
+    for f in "$DEST"/accept/*.json "$DEST/accept.json"; do
+        [ -e "$f" ] && mv "$f" "$DEST/taken/"
+    done
+    ACC=$(cat "$DEST"/taken/* 2>/dev/null; rm -f "$DEST"/taken/*)
 fi
-
-# Lines accepted on the phone, a file a press in accept/ (the server renames
-# each in whole): each taken by renaming it into taken/, so a press landing
-# meanwhile stays for the next round, then read and removed there, where
-# nothing but this writes. Placed by act.py (each checked against the board
-# as it stands now), and the results put
-# back beside the report as act.json. Not held behind a run in flight: a bid
-# waits for nothing the run makes. accept.json is the server's queue before
-# accept/ (2026-10-31), taken the same way until the phone runs the new one.
-ACC=$(ssh_phone "cd '$DEST' 2>/dev/null && mkdir -p taken && \
-    for f in accept/*.json accept.json; do [ -e \"\$f\" ] && mv \"\$f\" taken/; done; \
-    cat taken/* 2>/dev/null && rm -f taken/*" || true)
 if [ -n "$ACC" ]; then
     echo "accepted: $ACC"
     # One request a line, or (accept.json) a list of them: act.py takes a list.
@@ -53,5 +49,5 @@ json.dump([{**r, "state": "failed", "message": "the box could not act: " + err[0
 PYEOF
     fi
     cat "$STATE/act.json"; echo
-    scp -q -P "$PORT" -o BatchMode=yes "$STATE/act.json" "$PHONE:$DEST/act.json" || true
+    cp "$STATE/act.json" "$DEST/.act.json.$$" && mv "$DEST/.act.json.$$" "$DEST/act.json"
 fi

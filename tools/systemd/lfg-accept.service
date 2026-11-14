@@ -1,5 +1,5 @@
 [Unit]
-Description=liga_five_guys — do the lines accepted on the phone
+Description=liga_five_guys — do the lines accepted on the report page
 After=network-online.target
 
 [Service]
