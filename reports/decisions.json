@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-14T09:03Z",
- "market_at": "2026-11-14T09:02Z",
+ "generated_at": "2026-11-14T16:00Z",
+ "market_at": "2026-11-14T15:59Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-14T09:02Z",
+   "at": "2026-11-14T15:59Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -58,10 +58,10 @@
  "ping": "",
  "do": [
   {
-   "name": "Dani Martinez, Ferran Jutgla, Miguel Roman, Raul Asencio",
+   "name": "Aitor Paredes, Augusto Batalla, Thomas Lemar",
    "pos": "",
    "what": "list",
-   "label": "list Dani Martinez, Ferran Jutgla, Miguel Roman, Raul Asencio",
+   "label": "list Aitor Paredes, Augusto Batalla, Thomas Lemar",
    "step": "list",
    "amount": null,
    "done": false,
@@ -78,36 +78,28 @@
    "plan": false,
    "act": [
     {
-     "player_team": "109094611",
-     "player": "2881",
+     "player_team": "113276669",
+     "player": "2315",
      "market": null,
      "bid": null,
      "pos": "DEF",
-     "value": 629127.0
+     "value": 25271694.0
     },
     {
-     "player_team": "113276670",
-     "player": "2603",
+     "player_team": "109094612",
+     "player": "2519",
      "market": null,
      "bid": null,
-     "pos": "DEL",
-     "value": 12087243.0
+     "pos": "POR",
+     "value": 3536350.0
     },
     {
-     "player_team": "114630995",
-     "player": "2639",
+     "player_team": "109094606",
+     "player": "3182",
      "market": null,
      "bid": null,
      "pos": "MED",
-     "value": 7777667.0
-    },
-    {
-     "player_team": "115749175",
-     "player": "2146",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 785564.0
+     "value": 6335280.0
     }
    ]
   }
@@ -255,12 +247,12 @@
    "pos": "DEL",
    "status": "rival",
    "gain": 153.5628625141859,
-   "asking": 180613716.0,
+   "asking": 176940925.0,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Antony",
-   "per_million": 0.8502281328079528,
+   "per_million": 0.8678764537609708,
    "price_next": -0.005699126353211459,
    "price_lock": -0.03602003399538467,
    "available": false
@@ -285,12 +277,12 @@
    "pos": "DEL",
    "status": "rival",
    "gain": 107.34294448003413,
-   "asking": 171563423.0,
+   "asking": 167767644.0,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Antony",
-   "per_million": 0.6256749988022455,
+   "per_million": 0.639831030112303,
    "price_next": -0.0061495764224036575,
    "price_lock": -0.03886700137247645,
    "available": false
@@ -375,12 +367,12 @@
    "pos": "DEF",
    "status": "rival",
    "gain": 36.97751184176063,
-   "asking": 58564537.0,
+   "asking": 55948235.0,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Fran Garcia",
-   "per_million": 0.6313976637732256,
+   "per_million": 0.6609236527615328,
    "price_next": -0.013079415537467831,
    "price_lock": -0.08266547591700035,
    "available": false
