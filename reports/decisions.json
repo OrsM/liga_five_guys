@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-15T09:03Z",
- "market_at": "2026-11-15T09:02Z",
+ "generated_at": "2026-11-15T09:05Z",
+ "market_at": "2026-11-15T09:05Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-15T09:02Z",
+   "at": "2026-11-15T09:05Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,62 +56,7 @@
  "cash_locked": 0,
  "can_bid": 50703872.80000001,
  "ping": "",
- "do": [
-  {
-   "name": "Adria Pedrosa, Gerard Martin, Martin Satriano, Robin Le Normand",
-   "pos": "",
-   "what": "list",
-   "label": "list Adria Pedrosa, Gerard Martin, Martin Satriano, Robin Le Normand",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "109094607",
-     "player": "1056",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 2981821.0
-    },
-    {
-     "player_team": "107331405",
-     "player": "2757",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 33889113.0
-    },
-    {
-     "player_team": "109094608",
-     "player": "3137",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 20693953.0
-    },
-    {
-     "player_team": "109094609",
-     "player": "255",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 4923839.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
