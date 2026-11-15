@@ -287,17 +287,12 @@ DROP TABLE IF EXISTS forecast_variant;
 DROP VIEW IF EXISTS market_read;
 CREATE VIEW market_read AS SELECT max(observed_at) AS at FROM src_api_market WHERE observed_at <= (SELECT cut());
 
+-- parser_health reads a source's newest snapshots by time alone.
+CREATE INDEX IF NOT EXISTS lineups_observed ON src_lineups (observed_at);
+
 DROP VIEW IF EXISTS parser_health;
 CREATE VIEW parser_health AS
-WITH snaps AS (
-  SELECT 'market' AS src, observed_at AS at, count(*) AS n FROM src_market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'lineups' AS src, observed_at AS at, count(*) AS n FROM src_lineups WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_standings' AS src, observed_at AS at, count(*) AS n FROM src_api_standings WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_lineup' AS src, observed_at AS at, count(*) AS n FROM src_api_lineup WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_teams' AS src, observed_at AS at, count(*) AS n FROM src_api_teams WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_leagues' AS src, observed_at AS at, count(*) AS n FROM src_api_leagues WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_market' AS src, observed_at AS at, count(*) AS n FROM src_api_market WHERE observed_at <= (SELECT cut()) GROUP BY observed_at
-  UNION ALL SELECT 'api_offers' AS src, observed_at AS at, count(*) AS n FROM src_api_offers WHERE observed_at <= (SELECT cut()) GROUP BY observed_at),
+WITH snaps AS (/* health.RECENT */),
 r AS (SELECT *, row_number() OVER (PARTITION BY src ORDER BY at DESC) AS k, stamp_jd(at) AS jd FROM snaps),
 usual AS (SELECT src, avg(n) AS usual_rows, (max(jd) - min(jd)) * 24 / (count(*) - 1) AS gap_h
           FROM r WHERE k BETWEEN 2 AND 21 GROUP BY src HAVING count(*) >= 5),
@@ -306,7 +301,7 @@ SELECT l.src, l.at AS last_at, l.n AS rows, round(u.usual_rows, 1) AS usual_rows
        round((now.jd - l.jd) * 24, 1) AS hours_since, round(u.gap_h, 1) AS usual_gap_h,
        CASE WHEN (now.jd - l.jd) * 24 > max(6.0, 3 * u.gap_h) THEN 'stale'
             WHEN l.n < 0.5 * u.usual_rows THEN 'thin' ELSE 'ok' END AS status,
-       (SELECT max(g.at) FROM r g WHERE g.src = l.src AND g.n >= 0.5 * u.usual_rows) AS last_good
+       (SELECT max(g.at) FROM (/* health.SNAPSHOTS */) g WHERE g.src = l.src AND g.n >= 0.5 * u.usual_rows) AS last_good
 FROM r l JOIN usual u USING (src), now WHERE l.k = 1;
 
 -- Views are recreated on every connect: a changed one replaces the old.

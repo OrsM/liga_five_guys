@@ -283,7 +283,24 @@ def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
 
 
 # The Python constants the SQL names, put in where it names them.
-PUT = {"/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x in SEED_POOL)}
+HEALTH_SOURCES = ("market", "lineups", "api_standings", "api_lineup", "api_teams", "api_leagues", "api_market", "api_offers")
+HEALTH_USUAL = 21
+
+
+def _snapshots(recent: bool) -> str:
+    """The rows each snapshot of each source parser_health watches holds, as of t: all of them, or only the
+    HEALTH_USUAL newest of each (all that its status reads)."""
+    def arm(src: str) -> str:
+        table = source_table(src)
+        newest = ("AND observed_at >= (SELECT min(at) FROM (SELECT DISTINCT observed_at AS at FROM %s"
+                  " WHERE observed_at <= (SELECT cut()) ORDER BY at DESC LIMIT %d))" % (table, HEALTH_USUAL)) if recent else ""
+        return ("SELECT '%s' AS src, observed_at AS at, count(*) AS n FROM %s WHERE observed_at <= (SELECT cut()) %s"
+                " GROUP BY observed_at" % (src, table, newest))
+    return " UNION ALL ".join(arm(src) for src in HEALTH_SOURCES)
+
+
+PUT = {"/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x in SEED_POOL),
+       "/* health.SNAPSHOTS */": _snapshots(False), "/* health.RECENT */": _snapshots(True)}
 
 
 # "Each source's last snapshot as of t", said once: `WHERE /* latest TABLE */`
