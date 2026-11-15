@@ -378,18 +378,23 @@ SELECT player_id AS app_id, player, slot, player_name AS name FROM current_api_l
 -- other); then the exits the squads show beyond those the feed records (a
 -- sale by him, a clause paid to him), as sales at the player's last value.
 -- Counted, not matched by time: squads and feed are stamped minutes apart.
-DROP VIEW IF EXISTS ledger;
-CREATE VIEW ledger AS
+-- The feed's events alone, with who bought and who sold: what the ledger starts from.
+DROP VIEW IF EXISTS feed_ledger;
+CREATE VIEW feed_ledger AS
 WITH feed AS (
     SELECT coalesce(a.at, '') AS at, coalesce(a.kind, '') AS kind,
            u.manager AS who, c.manager AS other, a.player, coalesce(a.amount, 0.0) AS amount
     FROM current_api_activity a
     LEFT JOIN users u ON u.user_id = a.user_id
-    LEFT JOIN users c ON c.user_id = a.counterparty),
-roles AS (
-    SELECT *, CASE WHEN kind IN ('buy', 'transfer') THEN who END AS buyer,
-              CASE kind WHEN 'sell' THEN who WHEN 'transfer' THEN other END AS seller
-    FROM feed),
+    LEFT JOIN users c ON c.user_id = a.counterparty)
+SELECT at, kind, who, other, player, amount,
+       CASE WHEN kind IN ('buy', 'transfer') THEN who END AS buyer,
+       CASE kind WHEN 'sell' THEN who WHEN 'transfer' THEN other END AS seller
+FROM feed;
+
+DROP VIEW IF EXISTS ledger;
+CREATE VIEW ledger AS
+WITH roles AS MATERIALIZED (SELECT * FROM feed_ledger),
 t AS MATERIALIZED (
     SELECT h.observed_at, h.player, h.manager AS manager,
            coalesce(h.market_value, 0.0) AS value
@@ -444,7 +449,7 @@ CREATE VIEW price_paid AS
 SELECT player, amount AS paid FROM (
     SELECT l.player, l.amount,
            row_number() OVER (PARTITION BY l.player ORDER BY l.at DESC) AS last
-    FROM ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
+    FROM feed_ledger l JOIN owners o ON o.player = l.player AND o.manager = l.buyer)
 WHERE last = 1;
 
 -- The lock: the next jornada to lock after t, at its first kickoff
