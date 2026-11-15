@@ -1344,15 +1344,16 @@ LEFT JOIN r USING (player) LEFT JOIN s USING (player);
 -- 0, a doubt 0.5, back 1.
 DROP VIEW IF EXISTS forecast_fit;
 CREATE VIEW forecast_fit AS
-WITH g AS MATERIALIZED (SELECT player, prognosis(status, note, at) AS g FROM player_status WHERE status IS NOT NULL),
+WITH g AS MATERIALIZED (SELECT player, json_extract(g, '$.kind') AS kind, json_extract(g, '$.until') AS until,
+                               json_extract(g, '$.j') AS j
+                        FROM (SELECT player, prognosis(status, note, at) AS g FROM player_status WHERE status IS NOT NULL)),
 f AS MATERIALIZED (SELECT * FROM club_fixture),
 nx AS MATERIALIZED (SELECT club, jornada AS nx FROM (SELECT club, jornada, row_number() OVER
            (PARTITION BY club ORDER BY kick IS NULL, kick, jornada) AS n FROM f) WHERE n = 1),
-c AS MATERIALIZED (SELECT player, club FROM player_club WHERE club IS NOT NULL),
-x AS (SELECT c.player, f.jornada, f.kick, json_extract(g.g, '$.kind') AS kind, json_extract(g.g, '$.until') AS until,
-             coalesce(json_extract(g.g, '$.j'), nx.nx) AS j
-      FROM c JOIN f ON f.club = c.club JOIN nx ON nx.club = c.club
-      LEFT JOIN g ON g.player = c.player)
+c AS MATERIALIZED (SELECT p.player, p.club, g.kind, g.until, g.j
+                   FROM player_club p LEFT JOIN g ON g.player = p.player WHERE p.club IS NOT NULL),
+x AS (SELECT c.player, f.jornada, f.kick, c.kind, c.until, coalesce(c.j, nx.nx) AS j
+      FROM c JOIN f ON f.club = c.club JOIN nx ON nx.club = c.club)
 SELECT player, jornada, CASE kind
     WHEN 'never' THEN 0.0
     WHEN 'until' THEN CASE WHEN kick IS NULL OR substr(kick, 1, 10) >= until THEN 1.0 ELSE 0.0 END
