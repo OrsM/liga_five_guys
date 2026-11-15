@@ -297,9 +297,16 @@ def _put(sql: str) -> str:
     for name, text in PUT.items():
         sql = sql.replace(name, text)
     sql = _NEWEST.sub(lambda m: "row_number() OVER (PARTITION BY %s ORDER BY observed_at DESC, rowid DESC)" % m[1], sql)
-    return _LATEST.sub(lambda m: "(t.source, t.observed_at) IN (SELECT source, max(observed_at) FROM %s "
-                                 "WHERE observed_at <= (SELECT cut()) GROUP BY source)"
-                       % (source_table(m[1]) if m[1] in SOURCE else m[1]), sql)
+    return _LATEST.sub(lambda m: _latest_of(source_table(m[1]) if m[1] in SOURCE else m[1]), sql)
+
+
+def _latest_of(table: str) -> str:
+    """The predicate on t: its (source, observed_at) is its source's newest at or before cut(). One
+    seek per source on the (source, observed_at) index, not a walk of it."""
+    return ("(t.source, t.observed_at) IN (WITH RECURSIVE s(source) AS (SELECT min(source) FROM {0} UNION ALL "
+            "SELECT (SELECT min(source) FROM {0} WHERE source > s.source) FROM s WHERE source IS NOT NULL) "
+            "SELECT source, (SELECT max(observed_at) FROM {0} WHERE source = s.source "
+            "AND observed_at <= (SELECT cut())) FROM s WHERE source IS NOT NULL)").format(table)
 
 
 def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connection:
@@ -565,6 +572,19 @@ def _selftest() -> None:
         with closing(connect(Path(tmp) / "x.db", once)) as db:
             assert db.execute("SELECT count(*) FROM n").fetchone()[0] == 1, \
                 "the schema is applied once a file and process, not every connect"
+    import random
+    rng = random.Random(7)
+    with closing(sqlite3.connect(":memory:")) as db:
+        cutoff = [0]
+        db.create_function("cut", 0, lambda: cutoff[0])
+        db.execute("CREATE TABLE x (source TEXT NOT NULL, observed_at INTEGER NOT NULL, v INTEGER)")
+        db.execute("CREATE INDEX x_at ON x (source, observed_at)")
+        db.executemany("INSERT INTO x VALUES (?, ?, ?)", [(rng.choice("abcde"), rng.randrange(50), i) for i in range(300)])
+        for cutoff[0] in (-1, 0, 7, 25, 49, 99):
+            plain = db.execute("SELECT v FROM x t WHERE (t.source, t.observed_at) IN (SELECT source, max(observed_at) "
+                               "FROM x WHERE observed_at <= (SELECT cut()) GROUP BY source) ORDER BY v").fetchall()
+            loose = db.execute("SELECT v FROM x t WHERE %s ORDER BY v" % _latest_of("x")).fetchall()
+            assert loose == plain, "each source's newest rows at or before cut(): the same as the grouped maximum"
     print("ffcore.db self-test OK")
 
 
