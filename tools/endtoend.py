@@ -7,13 +7,13 @@ import sys
 
 
 def _selftest() -> None:
-    """The view build (connect), board.built (seen, the forecast moment, look) and board.board (the decision's
+    """The view build (connect), board.replayed (seen, the forecast moment, look, the inputs) and board.board (the decision's
     inputs, your squad and its eleven, the standing offers ranked): a forecast and a board come out."""
     import contextlib
     import tempfile
     from pathlib import Path
 
-    from board import built
+    from board import replayed
     from ffcore.db import cut, record, rows, set_now
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import store_sql, tables_in
@@ -63,10 +63,11 @@ def _selftest() -> None:
                                       "status": "pending", "expires_at": "2026-09-21T22:00:00+02:00"}])
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
 
-            b = built()
-            assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (b.moment,))[0][0] > 0, "a forecast"
+            at = replayed()
+            assert at is not None
+            assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (at.moment,))[0][0] > 0, "a forecast"
             assert len(rows("SELECT player FROM my_squad")) == len(mine), "your squad as the app showed it"
-            inp = decision.read_inputs()
+            inp = at.inputs
             got = decision.opportunity_rows(inp)
             decision.keep_opportunities(cut(), got)
             doc = board(inp, got, decision.read_arrivals())

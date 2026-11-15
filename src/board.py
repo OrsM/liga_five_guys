@@ -327,11 +327,15 @@ class Built(NamedTuple):
     moment: int
 
 
-def built() -> Built:
-    """The league at t made for a decision (look): the market and the
-    league seen then (see), the forecast at t (forecast), its moment and you
-    in look; and the parameters it was made with. None made from squads
-    older than APP_FRESH_HOURS."""
+class Replay(NamedTuple):
+    moment: int
+    inputs: decision.Inputs
+
+
+def at_cut() -> int:
+    """The league at t made for a decision (look): the market and the league seen then (see), the forecast at t,
+    its moment returned, and you and that moment in look. SystemExit when the app's squads are older than
+    APP_FRESH_HOURS."""
     stale = app_stale()
     if stale:
         raise SystemExit(stale)
@@ -339,6 +343,22 @@ def built() -> Built:
     see()
     moment = forecast()
     set_look(me=me, moment=moment)
+    return moment
+
+
+def replayed() -> Replay | None:
+    """The cut at t made (at_cut) and the decision's inputs read from it, with no parameters made; None when
+    the app's squads are too old to make it."""
+    try:
+        moment = at_cut()
+    except SystemExit:
+        return None
+    return Replay(moment, decision.read_inputs())
+
+
+def built() -> Built:
+    """at_cut and the parameters it was made with (params): what a run records."""
+    moment = at_cut()
     return Built(params(forecast_fits(), market_offer_ratios(), price_carry()), moment)
 
 

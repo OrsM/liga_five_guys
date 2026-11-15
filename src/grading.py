@@ -11,7 +11,7 @@ from typing import Any, NamedTuple
 import decision
 import salegrade
 import worth
-from board import built, context, later_sale
+from board import Replay, context, later_sale, replayed
 from ffcore import auction
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.forecast_store import forecast
@@ -71,11 +71,10 @@ def opportunity_grade(top: int = 5, span: int = 4) -> list[dict[str, Any]]:
     with replaying():
         for c in decision.seen_cuts():
             set_now(snapshot_stamp(c))
-            try:
-                built()
-            except SystemExit:
+            at = replayed()
+            if at is None:
                 continue
-            inp = decision.read_inputs()
+            inp = at.inputs
             pos, cells = decision.cells_of(inp)
             got = decision.opportunity_rows(inp)
             band = [(c.player, c.pos, c.asking if c.asking is not None else c.value) for c in inp.universe if c.player in pos]
@@ -422,11 +421,10 @@ def replayed_cuts(since: str) -> list[Cut]:
             offers = decision.standing_offers(decision.squad_held())
             if not offers:
                 continue
-            try:
-                built()
-            except SystemExit:
+            at = replayed()
+            if at is None:
                 continue
-            inp = decision.read_inputs()
+            inp = at.inputs
             standings = [worth.Standing(o.player, o.value, o.money, later_sale(inp, o.player, o.value)) for o in offers]
             out.append(Cut(stamp + dt.timedelta(minutes=1), context(inp), standings))
     return out
@@ -697,26 +695,24 @@ def _selftest_replayed_cuts() -> None:
     def set_at(t: Any) -> None:
         state["at"] = t
 
-    def make() -> None:
+    def make() -> Replay | None:
         c = next(c for c in cuts if snapshot_stamp(c) == state["at"])
         state["built"].append(c)
-        if c in unbuildable:
-            raise SystemExit("stale")
+        return None if c in unbuildable else Replay(0, decision.Inputs(decision.Money(0.0, 0.0, 0.0, 0, 0)))
     stub: dict[str, Any] = {
-        "set_now": set_at, "built": make, "context": lambda inp: worth.Context({}, {}, 0.0), "later_sale": lambda inp, p, v: v}
+        "set_now": set_at, "replayed": make, "context": lambda inp: worth.Context({}, {}, 0.0), "later_sale": lambda inp, p, v: v}
     kept = {k: globals()[k] for k in stub}
-    held, offers, read, seen = decision.squad_held, decision.standing_offers, decision.read_inputs, decision.seen_cuts
+    held, offers, seen = decision.squad_held, decision.standing_offers, decision.seen_cuts
     try:
         globals().update(stub)
         decision.seen_cuts = lambda: cuts
         decision.squad_held = lambda: frozenset()
-        decision.read_inputs = lambda: None  # type: ignore[assignment,return-value]
         decision.standing_offers = lambda mine: [decision.Offer(p, 1e6, 2e6) for p in offered.get(
             next(c for c in cuts if snapshot_stamp(c) == state["at"]), [])]
         got = replayed_cuts("2026-10-01")
     finally:
         globals().update(kept)
-        decision.squad_held, decision.standing_offers, decision.read_inputs, decision.seen_cuts = held, offers, read, seen
+        decision.squad_held, decision.standing_offers, decision.seen_cuts = held, offers, seen
     assert state["built"] == [cuts[1], cuts[2], cuts[3]], "only cuts with offers are built"
     assert [[s.player for s in c.standings] for c in got] == [["a", "b"], ["c"]], "a Cut for each built cut with offers"
 

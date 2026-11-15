@@ -84,7 +84,7 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
     import crosswalk
     import decision
     import eleven
-    from board import board, built
+    from board import board, replayed
     from ffcore.db import connect, record, rows, set_now, source_table
     from ffcore.league import write_config
     from ffcore.parse import snapshot_stamp
@@ -104,8 +104,9 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
         with closing(connect()) as db, db:
             crosswalk.build(db)
         record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-        built()
-        inp = decision.read_inputs()
+        at = replayed()
+        assert at is not None
+        inp = at.inputs
         pos, cells = decision.cells_of(inp)
         mine = decision.squad_of(inp)
         first = rows("SELECT min(jornada) FROM jornada_calendar WHERE state = 'ahead'")[0][0]
