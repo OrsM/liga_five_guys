@@ -676,7 +676,7 @@ DROP VIEW IF EXISTS price_live;
 CREATE VIEW price_live AS
 WITH cutday AS (SELECT d FROM price_day_now),
 latest AS (SELECT ff_id, max(n) AS n, max(CASE WHEN step IS NOT NULL THEN n END) AS ln
-           FROM price_step WHERE day < (SELECT d FROM cutday) GROUP BY ff_id),
+           FROM price_step WHERE +day < (SELECT d FROM cutday) GROUP BY ff_id),
 seed AS (SELECT a.ff_id, a.n, a.value, l.i AS i0, l.step AS last_step, l.s1 AS last_s1
          FROM latest z JOIN price_step a ON a.ff_id = z.ff_id AND a.n = z.n
          LEFT JOIN price_step l ON l.ff_id = z.ff_id AND l.n = z.ln),
@@ -693,7 +693,7 @@ FROM live;
 
 DROP VIEW IF EXISTS price_rows;
 CREATE VIEW price_rows AS
-SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE day < (SELECT d FROM price_day_now)
+SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE +day < (SELECT d FROM price_day_now)
 UNION ALL
 SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_live;
 
@@ -714,7 +714,7 @@ FROM (SELECT ff_id, observed_at, day, step, i, value, k.price_w0, k.price_w1, k.
 DROP VIEW IF EXISTS price_hmax;
 CREATE VIEW price_hmax AS
 WITH lens AS (SELECT ff_id, sum(n) AS n FROM (
-                  SELECT ff_id, count(step) AS n FROM price_step WHERE day < (SELECT d FROM price_day_now) GROUP BY ff_id
+                  SELECT ff_id, count(step) AS n FROM price_step WHERE +day < (SELECT d FROM price_day_now) GROUP BY ff_id
                   UNION ALL SELECT ff_id, step IS NOT NULL FROM price_live) GROUP BY ff_id),
 ranked AS (SELECT n, row_number() OVER (ORDER BY n) AS r, count(*) OVER () AS m FROM lens)
 SELECT coalesce((SELECT max(1, CAST(avg(n) AS INTEGER) / 4) FROM ranked
