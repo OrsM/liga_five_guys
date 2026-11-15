@@ -291,13 +291,25 @@ PUT = {"/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x
 # its row_number() (n = 1 is the newest), where rows are ordered as they came.
 _LATEST = re.compile(r"/\* latest (\w+) \*/")
 _NEWEST = re.compile(r"/\* newest ([^*]+) \*/")
+_SIGNAL = re.compile(r"/\* signal (\w+) \*/")
 
 
 def _put(sql: str) -> str:
     for name, text in PUT.items():
         sql = sql.replace(name, text)
     sql = _NEWEST.sub(lambda m: "row_number() OVER (PARTITION BY %s ORDER BY observed_at DESC, rowid DESC)" % m[1], sql)
+    sql = _SIGNAL.sub(lambda m: _signal_of(m[1]), sql)
     return _LATEST.sub(lambda m: _latest_of(source_table(m[1]) if m[1] in SOURCE else m[1]), sql)
+
+
+def _signal_of(rows: str) -> str:
+    """The price series of the price rows in the view `rows` (price_step's columns), said once: each change
+    that has a step, its clip (k.clip) and x, the signal momentum fits on (k.price_w0..2)."""
+    return ("SELECT ff_id, observed_at, day, step, price_w0 * c + price_w1 * coalesce(c1, c)"
+            " + price_w2 * coalesce(c2, coalesce(c1, c)) AS x, i, value"
+            " FROM (SELECT ff_id, observed_at, day, step, i, value, k.price_w0, k.price_w1, k.price_w2,"
+            " max(-k.clip, min(k.clip, step)) AS c, max(-k.clip, min(k.clip, s1)) AS c1,"
+            " max(-k.clip, min(k.clip, s2)) AS c2 FROM %s, k WHERE step IS NOT NULL)" % rows)
 
 
 def _latest_of(table: str) -> str:

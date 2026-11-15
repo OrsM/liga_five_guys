@@ -624,6 +624,8 @@ CREATE TABLE IF NOT EXISTS price_step (
     PRIMARY KEY (ff_id, n)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS price_step_day ON price_step (day, ff_id);
+-- A player's i-th change by seek, covering what price_before reads.
+CREATE INDEX IF NOT EXISTS price_step_i ON price_step (ff_id, i, step, s1, s2, value, day);
 
 -- Every valued day of each player's market value, all time, with the
 -- change since his previous one in % (NULL for his first, or after a value
@@ -691,30 +693,33 @@ SELECT ff_id, coalesce(n0 + 1, 0) AS n, substr(observed_at, 1, 10) AS day, obser
        CASE WHEN pv > 0 THEN last_step END AS s1, CASE WHEN pv > 0 THEN last_s1 END AS s2
 FROM live;
 
-DROP VIEW IF EXISTS price_rows;
-CREATE VIEW price_rows AS
-SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE +day < (SELECT d FROM price_day_now)
-UNION ALL
-SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_live;
+DROP VIEW IF EXISTS price_past;
+CREATE VIEW price_past AS
+SELECT ff_id, n, day, observed_at, value, step, i, s1, s2 FROM price_step WHERE +day < (SELECT d FROM price_day_now);
 
 -- Each player's changes, all time, numbered (i), each clipped at CLIP; x is
 -- the signal momentum fits on: his last three clipped changes weighted
 -- PRICE_W0..2 (a missing one counts as the oldest he has), with the value each ends at.
+-- price_before is that of the closed days alone, price_open that of the day of the cut: a change's signal is
+-- made of the changes before it, so the closed days are all that a change looks back on.
+DROP VIEW IF EXISTS price_before;
+CREATE VIEW price_before AS /* signal price_past */;
+
+DROP VIEW IF EXISTS price_open;
+CREATE VIEW price_open AS /* signal price_live */;
+
 DROP VIEW IF EXISTS price_series;
 CREATE VIEW price_series AS
-SELECT ff_id, observed_at, day, step,
-       price_w0 * c + price_w1 * coalesce(c1, c) + price_w2 * coalesce(c2, coalesce(c1, c)) AS x, i, value
-FROM (SELECT ff_id, observed_at, day, step, i, value, k.price_w0, k.price_w1, k.price_w2,
-             max(-k.clip, min(k.clip, step)) AS c, max(-k.clip, min(k.clip, s1)) AS c1,
-             max(-k.clip, min(k.clip, s2)) AS c2
-      FROM price_rows, k WHERE step IS NOT NULL);
+SELECT ff_id, observed_at, day, step, x, i, value FROM price_before
+UNION ALL
+SELECT ff_id, observed_at, day, step, x, i, value FROM price_open;
 
 -- The longest horizon momentum fits, as of t: a quarter of the median
 -- player's number of changes (players with none count), at least 1.
 DROP VIEW IF EXISTS price_hmax;
 CREATE VIEW price_hmax AS
 WITH lens AS (SELECT ff_id, sum(n) AS n FROM (
-                  SELECT ff_id, count(step) AS n FROM price_step WHERE +day < (SELECT d FROM price_day_now) GROUP BY ff_id
+                  SELECT ff_id, count(step) AS n FROM price_past GROUP BY ff_id
                   UNION ALL SELECT ff_id, step IS NOT NULL FROM price_live) GROUP BY ff_id),
 ranked AS (SELECT n, row_number() OVER (ORDER BY n) AS r, count(*) OVER () AS m FROM lens)
 SELECT coalesce((SELECT max(1, CAST(avg(n) AS INTEGER) / 4) FROM ranked
@@ -734,7 +739,7 @@ CREATE VIEW price_ahead AS
 SELECT a.ff_id, a.i, a.day, a.x, a.value, hs.h, b.observed_at AS end_at,
        b.day AS end_day, 100 * (b.value / a.value - 1) AS change
 FROM price_series b JOIN horizons hs ON hs.h <= (SELECT hmax FROM price_hmax) + hpad()
-JOIN price_series a ON a.ff_id = b.ff_id AND a.i = b.i - hs.h;
+JOIN price_before a ON a.ff_id = b.ff_id AND a.i = b.i - hs.h;
 
 -- Momentum, as of t: how much of a price change carries into the next
 -- h (up to price_hmax), the move over h clipped at CLIP an update.
