@@ -955,18 +955,18 @@ WHERE n = 1 OR changed;
 -- sighting), over the player's value when it was made; by when made.
 DROP VIEW IF EXISTS offer_ratios;
 CREATE VIEW offer_ratios AS
-WITH v AS (SELECT observed_at, player_team_id, market_value FROM (
-               SELECT observed_at, player_team_id, coalesce(market_value, 0.0) AS market_value,
-                      row_number() OVER (PARTITION BY observed_at, player_team_id
-                                         ORDER BY rowid DESC) AS last
-               FROM src_api_teams WHERE observed_at <= (SELECT cut()))
-           WHERE last = 1),
-o AS (SELECT coalesce(o.created_at, '') AS created_at, o.money / v.market_value AS ratio,
-             row_number() OVER (PARTITION BY o.offer_id ORDER BY o.rowid) AS first
-      FROM src_api_offers o JOIN v ON v.observed_at = o.observed_at
-       AND v.player_team_id IS o.player_team_id
-      WHERE o.observed_at <= (SELECT cut()) AND o.from_market = 'true' AND o.money <> 0
-        AND v.market_value <> 0 AND coalesce(o.offer_id, '') <> '')
+WITH made AS (SELECT offer_id, observed_at, player_team_id, money, created_at, rowid AS id FROM src_api_offers
+              WHERE observed_at <= (SELECT cut()) AND from_market = 'true' AND money <> 0 AND coalesce(offer_id, '') <> ''),
+v AS (SELECT observed_at, player_team_id, market_value FROM (
+          SELECT observed_at, player_team_id, coalesce(market_value, 0.0) AS market_value,
+                 row_number() OVER (PARTITION BY observed_at, player_team_id ORDER BY rowid DESC) AS last
+          FROM src_api_teams WHERE observed_at <= (SELECT cut())
+            AND (observed_at, player_team_id) IN (SELECT observed_at, player_team_id FROM made))
+      WHERE last = 1),
+o AS (SELECT coalesce(m.created_at, '') AS created_at, m.money / v.market_value AS ratio,
+             row_number() OVER (PARTITION BY m.offer_id ORDER BY m.id) AS first
+      FROM made m JOIN v ON v.observed_at = m.observed_at AND v.player_team_id IS m.player_team_id
+      WHERE v.market_value <> 0)
 SELECT created_at, ratio FROM o WHERE first = 1 ORDER BY created_at, ratio;
 
 DROP VIEW IF EXISTS recent_offers;
