@@ -1066,17 +1066,20 @@ p AS (SELECT ff_id, observed_at AS at, points, games, src_points.rowid AS id,
       WHERE observed_at <= (SELECT cut()) AND src_points.season = s.season AND ff_id <> ''
       WINDOW w AS (PARTITION BY ff_id ORDER BY observed_at, src_points.rowid)),
 c AS (SELECT player AS ff_id, club FROM player_club),
-g AS MATERIALIZED (SELECT club, jornada, at FROM club_games
-                   UNION ALL SELECT '*', jornada, at FROM club_games),
-credited AS (
-    SELECT p.ff_id AS player, p.at, p.id, p.points - p.points0 AS pts, p.games - p.games0 AS games,
-           CASE WHEN p.at = s.first     -- a single game seen at the first fetch: his club's first jornada
-                THEN (SELECT min(g.jornada) FROM g WHERE g.club = coalesce(c.club, '*'))
-                ELSE (SELECT g.jornada FROM g WHERE g.club = coalesce(c.club, '*') AND g.at <= p.at
-                      ORDER BY g.at DESC, g.jornada DESC LIMIT 1) END AS jornada
+games AS MATERIALIZED (SELECT club, jornada, at FROM club_games),
+g AS MATERIALIZED (SELECT club, jornada, at FROM games UNION ALL SELECT '*', jornada, at FROM games),
+changed AS (
+    SELECT p.ff_id AS player, p.at, p.id, p.points - p.points0 AS pts, coalesce(c.club, '*') AS club
     FROM p, s LEFT JOIN c ON c.ff_id = p.ff_id
-    WHERE (p.at > s.first OR p.games <= 1) AND NOT (p.points IS p.points0 AND p.games IS p.games0))
-SELECT player, jornada, pts, at, id FROM credited WHERE jornada IS NOT NULL;
+    WHERE (p.at > s.first OR p.games <= 1) AND NOT (p.points IS p.points0 AND p.games IS p.games0)),
+credit AS MATERIALIZED (     -- once for each club and time a change was seen
+    SELECT club, at, CASE WHEN at = (SELECT first FROM s)     -- a single game seen at the first fetch: his club's first jornada
+                          THEN (SELECT min(g.jornada) FROM g WHERE g.club = d.club)
+                          ELSE (SELECT g.jornada FROM g WHERE g.club = d.club AND g.at <= d.at
+                                ORDER BY g.at DESC, g.jornada DESC LIMIT 1) END AS jornada
+    FROM (SELECT DISTINCT club, at FROM changed) d)
+SELECT ch.player, cr.jornada, ch.pts, ch.at, ch.id FROM changed ch JOIN credit cr ON cr.club = ch.club AND cr.at = ch.at
+WHERE cr.jornada IS NOT NULL;
 
 -- Who was in each matchday squad (starters and subs) and his minutes: a
 -- starter the whole match unless he came off, a sub none unless he came
