@@ -402,11 +402,12 @@ t AS MATERIALIZED (
     WHERE h.manager <> '' AND h.player IS NOT NULL),
 s AS (SELECT observed_at AS a, lead(observed_at) OVER (ORDER BY observed_at) AS b
       FROM (SELECT DISTINCT observed_at FROM t)),
+present AS MATERIALIZED (SELECT DISTINCT observed_at, manager FROM t),
 shown AS (
     SELECT ta.manager AS who, ta.player, s.b AS at, ta.value,
            row_number() OVER (PARTITION BY ta.manager, ta.player ORDER BY s.b) AS n
-    FROM t ta JOIN s ON s.a = ta.observed_at AND s.b IS NOT NULL
-    WHERE EXISTS (SELECT 1 FROM t m WHERE m.observed_at = s.b AND m.manager = ta.manager)
+    FROM t ta CROSS JOIN s ON s.a = ta.observed_at AND s.b IS NOT NULL
+    WHERE EXISTS (SELECT 1 FROM present m WHERE m.observed_at = s.b AND m.manager = ta.manager)
       AND NOT EXISTS (SELECT 1 FROM t tb WHERE tb.observed_at = s.b
                       AND tb.player = ta.player AND tb.manager = ta.manager)),
 recorded AS (SELECT seller, player, count(*) AS n FROM roles
