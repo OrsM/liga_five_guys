@@ -504,7 +504,8 @@ DROP VIEW IF EXISTS score_spread;
 CREATE VIEW score_spread AS
 WITH c AS (SELECT const('MIN_POOL') AS min_pool,
                   const('PERSISTENT_SHARE') AS share),
-played AS MATERIALIZED (SELECT sum(s.pts) AS x FROM scored s JOIN appearances a ON a.player = s.player AND a.jornada = s.jornada
+sc AS MATERIALIZED (SELECT player, jornada, pts FROM scored),
+played AS MATERIALIZED (SELECT sum(s.pts) AS x FROM sc s JOIN appearances a ON a.player = s.player AND a.jornada = s.jornada
                         GROUP BY s.player, s.jornada),
 pool AS (SELECT x FROM played WHERE (SELECT count(*) FROM played) >= (SELECT min_pool FROM c)
          UNION ALL
