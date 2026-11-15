@@ -11,7 +11,7 @@ from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
 __all__ = ["inputs", "Inputs", "read_inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals",
-           "Fact", "UNKNOWN", "player_facts", "Offer", "standing_offers", "Held", "held", "listed", "market_read_at",
+           "Fact", "UNKNOWN", "player_facts", "squad_held", "Offer", "standing_offers", "Held", "held", "listed", "market_read_at",
            "Source", "source_health", "Brier", "Drift", "latest_auction_run", "brier_by_scope", "drifting_bins", "manager_count"]
 
 INPUTS = ("dec_state", "dec_player", "dec_curve", "dec_auction", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_lineup")
@@ -271,6 +271,11 @@ UNKNOWN = Fact("", None, None)
 def player_facts() -> dict[str, Fact]:
     return {k: Fact(name, pos, trend) for k, name, pos, trend in rows(
         "SELECT s.player, name_shown(s.name), s.pos, s.trend FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant")}
+
+
+def squad_held() -> frozenset[str]:
+    """Your players in the squads table at t (league_config's me); readable with no look made."""
+    return frozenset(p for (p,) in rows("SELECT player FROM squads WHERE manager = (SELECT me FROM league_config)"))
 
 
 class Offer(NamedTuple):

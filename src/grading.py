@@ -301,8 +301,8 @@ def benched_at(moment: dt.datetime) -> set[str]:
     """The players on my squad at moment who were not in the eleven the app had fielded then."""
     with replaying():
         set_now(moment)
-        mine = {p for (p,) in rows("SELECT player FROM squads WHERE manager = (SELECT me FROM league_config)")}
-    return mine - eleven_at(moment)
+        mine = decision.squad_held()
+    return set(mine - eleven_at(moment))
 
 
 def fielded_at_locks(locks: dict[int, dt.datetime], done: set[int]) -> dict[int, set[str]]:
@@ -410,8 +410,8 @@ def score_rows(name: str, graded: Sequence[salegrade.Graded]) -> list[RuleScore]
 
 
 def replayed_cuts(since: str) -> list[Cut]:
-    """Each seen cut from since on (a date, YYYY-MM-DD) that has standing offers on my players, replayed (built) so the
-    context and the later sale prices are those of the cut; a cut that cannot be built is skipped."""
+    """Each seen cut from since on (a date, YYYY-MM-DD) that has standing offers on my players, replayed (built, and
+    only then) so the context and the later sale prices are those of the cut; a cut that cannot be built is skipped."""
     out = []
     with replaying():
         for c in decision.seen_cuts():
@@ -419,15 +419,16 @@ def replayed_cuts(since: str) -> list[Cut]:
             if c < since or stamp is None:
                 continue
             set_now(stamp)
+            offers = decision.standing_offers(decision.squad_held())
+            if not offers:
+                continue
             try:
                 built()
             except SystemExit:
                 continue
             inp = decision.read_inputs()
-            offers = decision.standing_offers(decision.squad_of(inp))
-            if offers:
-                standings = [worth.Standing(o.player, o.value, o.money, later_sale(inp, o.player, o.value)) for o in offers]
-                out.append(Cut(stamp + dt.timedelta(minutes=1), context(inp), standings))
+            standings = [worth.Standing(o.player, o.value, o.money, later_sale(inp, o.player, o.value)) for o in offers]
+            out.append(Cut(stamp + dt.timedelta(minutes=1), context(inp), standings))
     return out
 
 
@@ -685,7 +686,43 @@ def _selftest_rule_scores() -> None:
     assert len({len(line) for line in table.splitlines()}) == 1, "every line is the same length"
 
 
+def _selftest_replayed_cuts() -> None:
+    """A cut is built only if it has standing offers, each cut with offers gives one Cut whose standings are those
+    offers, and a cut that cannot be built is skipped."""
+    cuts = ["2026-10-01T0800Z", "2026-10-02T0800Z", "2026-10-03T0800Z", "2026-10-04T0800Z"]
+    offered = {cuts[1]: ["a", "b"], cuts[2]: ["c"], cuts[3]: ["d"]}
+    unbuildable = {cuts[3]}
+    state: dict[str, Any] = {"at": None, "built": []}
+
+    def set_at(t: Any) -> None:
+        state["at"] = t
+
+    def make() -> None:
+        c = next(c for c in cuts if snapshot_stamp(c) == state["at"])
+        state["built"].append(c)
+        if c in unbuildable:
+            raise SystemExit("stale")
+    stub: dict[str, Any] = {
+        "set_now": set_at, "built": make, "context": lambda inp: worth.Context({}, {}, 0.0), "later_sale": lambda inp, p, v: v}
+    kept = {k: globals()[k] for k in stub}
+    held, offers, read, seen = decision.squad_held, decision.standing_offers, decision.read_inputs, decision.seen_cuts
+    try:
+        globals().update(stub)
+        decision.seen_cuts = lambda: cuts
+        decision.squad_held = lambda: frozenset()
+        decision.read_inputs = lambda: None  # type: ignore[assignment,return-value]
+        decision.standing_offers = lambda mine: [decision.Offer(p, 1e6, 2e6) for p in offered.get(
+            next(c for c in cuts if snapshot_stamp(c) == state["at"]), [])]
+        got = replayed_cuts("2026-10-01")
+    finally:
+        globals().update(kept)
+        decision.squad_held, decision.standing_offers, decision.read_inputs, decision.seen_cuts = held, offers, read, seen
+    assert state["built"] == [cuts[1], cuts[2], cuts[3]], "only cuts with offers are built"
+    assert [[s.player for s in c.standings] for c in got] == [["a", "b"], ["c"]], "a Cut for each built cut with offers"
+
+
 def _selftest() -> None:
+    _selftest_replayed_cuts()
     _selftest_rule_scores()
     _selftest_measure_log()
     _selftest_horizons()
