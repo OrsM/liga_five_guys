@@ -22,6 +22,7 @@ class Market(NamedTuple):
     ff_id: str
     position: str
     club: str
+    name: str = ""
 
 
 class Lineups(NamedTuple):

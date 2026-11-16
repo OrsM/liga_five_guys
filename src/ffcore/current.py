@@ -1,6 +1,7 @@
 """What the latest rows say (ingest): the facts the SQL views player_status, player_club, player_value, club_rating,
-listings, offers, squads, standings, owners, users, app_lineup, feed_ledger, price_paid and offer_ratios hold, as
-selectors over a World (state.py) and, for offer_ratios, two folds of their own (offers_made, team_values).
+listings, offers, squads, standings, owners, users, app_lineup, feed_ledger, price_paid, offer_ratios and
+player_roster hold, as selectors over a World (state.py) and, for offer_ratios, two folds of their own (offers_made,
+team_values).
 
 A selector takes the World at a cut (and an Identity where the SQL joined ff_identity or app_player) and returns
 tuples of named rows, in no particular order. Identity is the one identity type, used by season_facts too: its ff
@@ -19,9 +20,15 @@ none has no player. Named rules, each tested:
     in feed order) event whose buyer owns him now.
   offer_first_sighting: offer_ratios holds each offer once, at its first sighting that has a team value other than 0
     at that stamp; only market offers with money other than 0 and an offer id count.
+  roster_market_rows: player_roster has one row per latest market row with a ff_id that is not a coach; no
+    de-duplication.
+  roster_lineup_only: player_roster adds one row, at MED with no value, per latest futbolfantasy line-up row whose
+    player the identity names and no latest market row holds (a coach's ff_id counts).
+  trim_spaces_only: a roster name loses its leading and trailing spaces, and nothing else.
+  unknown_position_is_med: a roster position that is none of the four is MED.
 FACT_NAMES are the folds the selectors read (pass {n: state.FOLDS[n] for n in FACT_NAMES} to sweep to run only
 those). Selectors: player_status, player_club, player_value, club_rating, listings, offers, squads, standings, owners,
-users, app_lineup, feed_ledger, price_paid, offer_ratios."""
+users, app_lineup, feed_ledger, price_paid, offer_ratios, player_roster."""
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
@@ -29,7 +36,7 @@ from typing import Any, NamedTuple
 
 from ffcore import observations as ob
 from ffcore import state
-from ffcore.rules import slot
+from ffcore.rules import position, slot
 
 OFFERS_MADE = "offers_made"
 TEAM_VALUES = "team_values"
@@ -62,6 +69,13 @@ class PlayerClub(NamedTuple):
 class PlayerValue(NamedTuple):
     player: str
     value: float
+
+
+class RosterRow(NamedTuple):
+    player: str
+    name: str
+    pos: str
+    value: float | None
 
 
 class ClubRating(NamedTuple):
@@ -193,6 +207,20 @@ def player_value(world: state.World) -> tuple[PlayerValue, ...]:
     return tuple(PlayerValue(r.ff_id, r.value) for r in _first_per(
         (r for r in state.latest(world, "market") if r.ff_id != "" and r.value is not None and r.value > 0),
         lambda r: r.ff_id))
+
+
+def player_roster(world: state.World, identity: Identity) -> tuple[RosterRow, ...]:
+    """The roster at the cut: the market rows, then the line-up-only players (roster_market_rows, roster_lineup_only,
+    trim_spaces_only, unknown_position_is_med)."""
+    market = state.latest(world, "market")
+    listed = {r.ff_id for r in market}
+    out = [RosterRow(r.ff_id, r.name.strip(" "), position(r.position.upper()), r.value)
+           for r in market if r.ff_id != "" and r.position.lower() != "entrenador"]
+    for r in state.latest(world, "lineups"):
+        p = identity.ff.get((r.player_slug, r.player_name, r.team_slug))
+        if r.source == LIST_SOURCE and p is not None and p not in listed:
+            out.append(RosterRow(p, r.player_name.strip(" "), position(""), None))
+    return tuple(out)
 
 
 def club_rating(world: state.World, fixture_k: float) -> tuple[ClubRating, ...]:
@@ -327,14 +355,15 @@ def facts(world: state.World, identity: Identity, fixture_k: float) -> dict[str,
             "listings": listings(world, identity), "offers": offers(world), "squads": squads(world, identity),
             "standings": standings(world), "owners": owners(world, identity), "users": users(world),
             "app_lineup": app_lineup(world, identity), "feed_ledger": feed_ledger(world, identity),
-            "price_paid": price_paid(world, identity), "offer_ratios": offer_ratios(world)}
+            "price_paid": price_paid(world, identity), "offer_ratios": offer_ratios(world),
+            "player_roster": player_roster(world, identity)}
 
 
 def _selftest() -> None:
     """Each named rule holds on a small league; later rows leave a cut unchanged, any subset or order of cuts
     gives each cut the same facts, and a cut alone equals the cut inside a sweep."""
     ident = Identity({("s1", "n1", "t"): "p1", ("s2", "n2", "t"): "p2", ("s3", "n3", "t"): "p3",
-                      ("s4", "n4", "t"): "p4"},
+                      ("s4", "n4", "t"): "p4", ("s5", "n5", "t"): "p5"},
                      {"a1": "p1", "a2": "p2", "a3": "p3", "a9": "p9"})
 
     def ln(at: str, slug: str, pct: float | None, status: str = "", note: str = "",
@@ -360,16 +389,18 @@ def _selftest() -> None:
     def res(at: str, home: str, away: str, hg: float | None, ag: float | None, day: str) -> ob.ResultsHistory:
         return ob.ResultsHistory(at, "fd", hg, ag, "s", day, "h" + home, "h" + away, home, away)
 
-    def mk(at: str, ff: str, value: float | None, position: str, club: str, source: str = "") -> ob.Market:
-        return ob.Market(at, source, value, ff, position, club)
+    def mk(at: str, ff: str, value: float | None, position: str, club: str, source: str = "",
+           name: str = "") -> ob.Market:
+        return ob.Market(at, source, value, ff, position, club, name)
 
     tables: dict[str, list[Any]] = {
         "lineups": [ln("01", "s1", 50.0), ln("01", "s2", 60.0), ln("01", "s2", 60.0, "doubt", "knock"),
                     ln("01", "s3", None), ln("01", "s3", 10.0), ln("01", "s4", 70.0, "", "", "other"),
-                    ln("01", "x9", 90.0)],
+                    ln("01", "x9", 90.0), ln("01", "s5", 40.0)],
         "api_players_all": [pa("01", "a1", "ok"), pa("01", "a9", OUT_OF_LEAGUE), pa("02", "a1", OUT_OF_LEAGUE)],
         "market": [mk("01", "p1", 0.0, "Portero", "RMA"), mk("01", "p2", None, "DEL", ""),
-                   mk("01", "p3", 4.0, "Entrenador", "BAR"), mk("01", "p1", 9.0, "DEL", "ATM", "b"), mk("01", "", 1.0, "", "")],
+                   mk("01", "p3", 4.0, "Entrenador", "BAR"), mk("01", "p1", 9.0, "DEL", "ATM", "b"), mk("01", "", 1.0, "", ""),
+                   mk("01", "p6", 3.0, "DEL", "RMA", "c", "  Ana\t"), mk("01", "p7", 2.0, "Tercero", "VAL", "c", "Bo")],
         "api_standings": [standing("01", "u1", "ann"), standing("01", "u1", "zed"), standing("01", "u2", "bob"),
                           standing("01", "u3", ""), standing("01", "", "nobody")],
         "api_teams": [team("01", "a1", "ann", "t1", None), team("01", "a2", "bob", "t2"),
@@ -401,7 +432,7 @@ def _selftest() -> None:
     assert st["p2"] == PlayerStatus("p2", True, 60.0, "01", "doubt", "knock"), "flagged beats unflagged"
     assert st["p3"].pct == 10.0, "a start_pct beats none"
     assert "p4" not in st and "p9" in st and st["p9"] == PlayerStatus("p9", False, None, None, "gone", "")
-    assert {s.player for s in two["player_status"]} == {"p1", "p2", "p3", "p9"}
+    assert {s.player for s in two["player_status"]} == {"p1", "p2", "p3", "p5", "p9"}
     assert {s.player: s.status for s in two["player_status"]}["p1"] == "gone"
     only = {n: state.FOLDS[n] for n in FACT_NAMES}
     tied = state.world_at(ob.of({"lineups": [ln("01", "s1", 50.0, "", "first"), ln("01", "s1", 50.0, "", "second")]}),
@@ -410,10 +441,24 @@ def _selftest() -> None:
 
     assert {c.player: c for c in one["player_club"]} == {"p1": PlayerClub("p1", "RMA", "POR"),
                                                          "p2": PlayerClub("p2", None, "DEL"),
-                                                         "p3": PlayerClub("p3", "BAR", "")}
-    assert {v.player: v.value for v in one["player_value"]} == {"p1": 9.0, "p3": 4.0}, "a zero or none value has no row"
+                                                         "p3": PlayerClub("p3", "BAR", ""),
+                                                         "p6": PlayerClub("p6", "RMA", "DEL"),
+                                                         "p7": PlayerClub("p7", "VAL", "")}
+    assert {v.player: v.value for v in one["player_value"]} == {"p1": 9.0, "p3": 4.0, "p6": 3.0, "p7": 2.0}, (
+        "a zero or none value has no row")
     assert {(u.user_id, u.manager) for u in one["users"]} == {("u1", "ann"), ("u2", "bob")}
     assert {(o.player, o.manager) for o in one["owners"]} == {("p1", "ann"), ("p2", "bob")}
+
+    roster = one["player_roster"]
+    assert roster == sorted([RosterRow("p1", "", "POR", 0.0), RosterRow("p1", "", "DEL", 9.0),
+                             RosterRow("p2", "", "DEL", None), RosterRow("p6", "Ana\t", "DEL", 3.0),
+                             RosterRow("p7", "Bo", "MED", 2.0), RosterRow("p5", "n5", "MED", None)], key=repr), (
+        "market rows keep zero, none and repeated values; a line-up player listed in the market is not repeated")
+    assert "p3" not in {r.player for r in roster}, "a coach is not on the roster, and his line-up row adds nothing"
+    assert [r.name for r in roster if r.player == "p6"] == ["Ana\t"], "trim_spaces_only: spaces go, a tab stays"
+    assert [r.pos for r in roster if r.player == "p7"] == ["MED"], "unknown_position_is_med"
+    assert [r.value for r in roster if r.player == "p5"] == [None], "a line-up-only player has no value"
+    assert two["player_roster"] == roster, "a later cut with no new rows has the same roster"
 
     fl = {e.at + e.kind: e for e in one["feed_ledger"]}
     assert fl["2026-01-02transfer"].buyer == "bob" and fl["2026-01-02transfer"].seller == "ann"
