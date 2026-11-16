@@ -3,10 +3,17 @@ approach.approach read (decide.sql dec_*), and the players on the market who wou
 from __future__ import annotations
 
 from contextlib import closing
-from typing import Any, NamedTuple, Sequence
+from datetime import datetime, timezone
+from typing import Any, Iterable, NamedTuple, Sequence
 
 import eleven
+from ffcore import current, forecast_facts, price_fold, season_facts, state
+from ffcore.current import AppLineup, Identity, PlayerClub
 from ffcore.db import connect, record, rows
+from ffcore.decision_facts import DEFAULT_POS, PlayerFact, Seen, SeenAuction, my_cash, my_squad
+from ffcore.ledger import Cash, League
+from ffcore.price_fold import Expected
+from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
@@ -140,6 +147,91 @@ def read_inputs() -> Inputs:
                 " FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant LEFT JOIN player_club c ON c.player = s.player"
                 " WHERE s.owner IS NULL OR s.owner <> l.me")],
             prices=[Price(*r) for r in db.execute("SELECT ff_id AS player, h, expected_value, value FROM price_forecast")])
+
+
+def julian_stamp(t: float) -> str:
+    """SQLite's strftime('%Y-%m-%dT%H:%MZ', t) of a julian day: UTC, rounded to the millisecond, minutes truncated."""
+    unix_ms = int(t * 86400000.0 + 0.5) - 210866760000000
+    return datetime.fromtimestamp(unix_ms // 60000 * 60, timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+
+
+def colon_stamp(stamp: str) -> str:
+    """'2026-08-30T1700Z' as '2026-08-30T17:00Z'."""
+    return stamp[:13] + ":" + stamp[13:]
+
+
+def players_of(seen: Seen, league: League) -> list[Player]:
+    """The players the decision can move (rule market_player_needs_price_and_no_owner): each of mine once, with mine 1
+    and no asking price, then every other player with a price and no owner at his price."""
+    squad = my_squad(seen, league)
+    held = {m.player for m in squad}
+    return [Player(m.player, m.pos, 1, None) for m in squad] + [
+        Player(f.player, f.pos or DEFAULT_POS, 0, f.price) for f in seen.facts
+        if f.price is not None and f.owner is None and f.player not in held]
+
+
+def curve_points_of(seen: Seen) -> list[CurvePoint]:
+    """The bid-ratio win-chance points of the seen curves."""
+    return [CurvePoint(c.player, c.ratio, c.p) for c in seen.curves]
+
+
+def auctions_of(seen: Seen) -> list[Auction]:
+    """The seen auctions without their close (rule auction_drops_close); mine and thin stay ints."""
+    return [Auction(a.player, a.ask, a.mins, a.bids, a.rival, a.mine, a.trend, a.cell, a.n, a.thin) for a in seen.auctions]
+
+
+def closes_of(listing_close: Iterable[ListingClose]) -> list[Close]:
+    """When each listed player's auction closes, as julian_stamp reads it (rule close_stamp_has_a_colon)."""
+    return [Close(c.player, julian_stamp(c.t)) for c in listing_close if c.t is not None]
+
+
+def locks_of(rounds: Iterable[RoundLock], cut: str) -> list[Lock]:
+    """The locks strictly after the cut, in colon_stamp form (rule lock_after_cut_only)."""
+    return [Lock(r.jornada, colon_stamp(r.lock)) for r in rounds if r.lock > cut]
+
+
+def bids_of(seen: Seen) -> list[Bid]:
+    """My standing bids (rule bid_positive_only)."""
+    return [Bid(f.player, f.my_bid) for f in seen.facts if f.my_bid is not None and f.my_bid > 0]
+
+
+def slots_of(rows: Iterable[AppLineup]) -> list[Slot]:
+    """The app's fielded eleven as Slots."""
+    return [Slot(r.app_id, r.player, r.slot, r.name) for r in rows]
+
+
+def money_of(seen: Seen, league: League) -> Money:
+    """My cash, the total value of my squad's seen rows (rule team_value_is_total), and the rules' debt share, squad cap
+    and eleven size."""
+    mine = {m.player for m in my_squad(seen, league)}
+    value = sum((f.value for f in seen.facts if f.player in mine and f.value is not None), 0.0)
+    return Money(my_cash(seen, league), value, DEBT_SHARE, SQUAD_MAX, XI_SIZE)
+
+
+def universe_of(seen: Seen, clubs: Iterable[PlayerClub], league: League) -> list[Candidate]:
+    """Every seen player who is not mine, with his status market (no owner, a price), unlisted (no owner) or rival, and
+    his club's position, else the fact's, else 'MED' (rule universe_excludes_mine)."""
+    club_pos = {c.player: c.pos for c in clubs}
+    return [Candidate(f.player, club_pos.get(f.player) or f.pos or DEFAULT_POS,
+                      ("market" if f.price is not None else "unlisted") if f.owner is None else "rival", f.price, f.value)
+            for f in seen.facts if f.owner is None or f.owner != league.me]
+
+
+def prices_of(expected: Iterable[Expected]) -> list[Price]:
+    """Each expected price row under the decision's names (rule price_forecast_rows_by_name)."""
+    return [Price(e.ff_id, e.h, e.expected_value, e.value) for e in expected]
+
+
+def inputs_at(world: state.World, identity: Identity, league: League, seen: Seen, fc: forecast_facts.Inputs) -> Inputs:
+    """The decision's inputs at the world's cut: a pure function of the world, the seen facts and the forecast inputs,
+    each fact computed once."""
+    cells = [Cell(c.player, c.jornada, c.e) for c in forecast_facts.cell(fc)]
+    return Inputs(
+        money_of(seen, league), players=players_of(seen, league), curves=curve_points_of(seen), auctions=auctions_of(seen),
+        bids=bids_of(seen), closes=closes_of(season_facts.listing_close(world, identity)),
+        locks=locks_of(season_facts.round_locks(world), world.cut), lineup=slots_of(current.app_lineup(world, identity)),
+        cells=cells, universe=universe_of(seen, fc.clubs, league),
+        prices=prices_of(price_fold.price_forecast(price_fold.price_state(world), season_facts.next_lock(world).t)))
 
 
 def squad_of(inp: Inputs) -> frozenset[str]:
@@ -461,7 +553,73 @@ def _selftest_arrivals() -> None:
             set_now(None)
 
 
+def _fact(player: str, pos: str | None = "MED", value: float | None = None, owner: str | None = None,
+          price: float | None = None, my_bid: float | None = None) -> PlayerFact:
+    return PlayerFact(player, player, pos, value, owner, None, price, None, my_bid, None, None, None)
+
+
+def _selftest_builders() -> None:
+    """One assertion per named rule of the builders, on hand-built Seen rows."""
+    me = League("me", 100.0)
+    facts = (_fact("mine1", "DEL", 5.0, "me"), _fact("mine2", None, None, "me", 3.0), _fact("mkt", "POR", 2.0, None, 4.0),
+             _fact("free", "DEF", 1.0), _fact("rival", "MED", 6.0, "other", 9.0, 2.0), _fact("bid0", "MED", 1.0, None, 1.0, 0.0),
+             _fact("nopos", None, 1.0, None, 2.0))
+    seen = Seen("2026-08-18T1800Z", facts, (Cash("me", 7.5),), (), ())
+    got = players_of(seen, me)
+    assert got == [Player("mine1", "DEL", 1, None), Player("mine2", "MED", 1, None), Player("mkt", "POR", 0, 4.0),
+                   Player("bid0", "MED", 0, 1.0), Player("nopos", "MED", 0, 2.0)], "market_player_needs_price_and_no_owner"
+    assert len({p.player for p in got}) == len(got)
+    assert julian_stamp(2460000.5) == "2023-02-25T00:00Z" and julian_stamp(2460000.5 + 59.9 / 86400) == "2023-02-25T00:00Z", (
+        "close_stamp_has_a_colon: seconds truncate, never round")
+    assert julian_stamp(2460000.5 + 3 * 3600 / 86400 + 125 / 86400) == "2023-02-25T03:02Z"
+    assert colon_stamp("2026-08-30T1700Z") == "2026-08-30T17:00Z"
+    cut = "2026-08-30T1700Z"
+    assert locks_of([RoundLock(1, "2026-08-30T1659Z"), RoundLock(2, cut), RoundLock(3, "2026-08-30T1701Z")], cut) == [
+        Lock(3, "2026-08-30T17:01Z")], "lock_after_cut_only"
+    assert bids_of(Seen(cut, (_fact("a", my_bid=0.0), _fact("b", my_bid=None), _fact("c", my_bid=2.5)), (), (), ())) == [
+        Bid("c", 2.5)], "bid_positive_only"
+    assert money_of(seen, me) == Money(7.5, 5.0, DEBT_SHARE, SQUAD_MAX, XI_SIZE), "team_value_is_total: None ignored"
+    assert money_of(Seen(cut, (), (), (), ()), me).team_value == 0.0 and isinstance(money_of(seen, me).team_value, float)
+    clubs = [PlayerClub("mkt", "BAR", "DEL"), PlayerClub("free", None, ""), PlayerClub("nopos", None, "")]
+    assert universe_of(seen, clubs, me) == [
+        Candidate("mkt", "DEL", "market", 4.0, 2.0), Candidate("free", "DEF", "unlisted", None, 1.0),
+        Candidate("rival", "MED", "rival", 9.0, 6.0), Candidate("bid0", "MED", "market", 1.0, 1.0),
+        Candidate("nopos", "MED", "market", 2.0, 1.0)], "universe_excludes_mine: club pos, else the fact's, else MED"
+    auction = SeenAuction("mkt", 4.0, "2026-08-18T20:00Z", 30.0, 2, 1, 1, None, "c", 5, 0)
+    (a,) = auctions_of(Seen(cut, (), (), (auction,), ()))
+    assert "close" not in Auction._fields and a == Auction("mkt", 4.0, 30.0, 2, 1, 1, None, "c", 5, 0) and (
+        type(a.mine), type(a.thin)) == (int, int), "auction_drops_close"
+    assert prices_of([Expected("p", 3, "2026-08-19", 5.0, 5.5, None)]) == [Price("p", 3, 5.5, 5.0)], (
+        "price_forecast_rows_by_name")
+
+
+def _selftest_inputs_at() -> None:
+    """Appended later rows leave a cut's inputs unchanged, any subset or order of cuts gives each cut the same inputs,
+    and a cut alone equals the cut inside a sweep."""
+    from ffcore.decision_facts import _CUTS, _scratch, _tables, _listing, _offer, _standing, _LATER, seen_at
+    from ffcore import observations as ob
+    obs, ident, league = _scratch()
+    knobs = forecast_facts.knobs()
+
+    def read(w: state.World) -> Inputs:
+        seen = seen_at(w, ident, league)
+        return inputs_at(w, ident, league, seen, forecast_facts.inputs(w, ident, knobs))
+    alone = {c: read(state.world_at(obs, c)) for c in _CUTS}
+    assert state.sweep(obs, _CUTS, read) == [alone[c] for c in _CUTS]
+    for order in (_CUTS[::-1], [_CUTS[1], _CUTS[0], _CUTS[1]], [_CUTS[-1]]):
+        assert state.sweep(obs, order, read) == [alone[c] for c in order]
+    later = _tables()
+    later["api_market"].append(_listing("a1", "m8", "marketPlayerTeam", 13.0, 9.0, 50.0, "pending", "b8", _LATER))
+    later["api_offers"].append(_offer("t3", "o9", 30.0, "pending", _LATER))
+    later["api_standings"].append(_standing("t-ann", "u1", "ann", 99.0, _LATER))
+    later_obs = ob.of(later)
+    assert all(read(state.world_at(later_obs, c)) == alone[c] for c in _CUTS)
+    assert any(alone[c].players for c in _CUTS)
+
+
 def _selftest() -> None:
+    _selftest_builders()
+    _selftest_inputs_at()
     _selftest_opportunities()
     _selftest_lineup()
     _selftest_arrivals()
