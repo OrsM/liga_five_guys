@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-16T20:45Z",
- "market_at": "2026-11-16T20:45Z",
+ "generated_at": "2026-11-16T20:46Z",
+ "market_at": "2026-11-16T20:46Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-16T20:45Z",
+   "at": "2026-11-16T20:46Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,78 +56,7 @@
  "cash_locked": 0,
  "can_bid": 50704824.400000006,
  "ping": "",
- "do": [
-  {
-   "name": "Antony, Fran Garcia, Guido Rodriguez, Mikel Oyarzabal, Pablo Fornals, Pepelu",
-   "pos": "",
-   "what": "list",
-   "label": "list Antony, Fran Garcia, Guido Rodriguez, Mikel Oyarzabal, Pablo Fornals, Pepelu",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "114200862",
-     "player": "2770",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 35825090.0
-    },
-    {
-     "player_team": "114200865",
-     "player": "2429",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 20077066.0
-    },
-    {
-     "player_team": "112907378",
-     "player": "3128",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 10874251.0
-    },
-    {
-     "player_team": "114200866",
-     "player": "3091",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 45346320.0
-    },
-    {
-     "player_team": "111434450",
-     "player": "3099",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 56403449.0
-    },
-    {
-     "player_team": "114200863",
-     "player": "2464",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 51773917.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
