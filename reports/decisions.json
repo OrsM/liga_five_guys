@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-16T20:46Z",
- "market_at": "2026-11-16T20:46Z",
+ "generated_at": "2026-11-16T21:37Z",
+ "market_at": "2026-11-16T21:37Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-16T20:46Z",
+   "at": "2026-11-16T21:37Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -85,68 +85,68 @@
  },
  "buys": [
   {
-   "name": "Ibrahima Konate",
+   "name": "Jon Martin",
    "pos": "DEF",
    "what": "buy",
-   "label": "buy Ibrahima Konate",
+   "label": "buy Jon Martin",
    "step": "bid",
-   "price": 46592434.0,
-   "asking": 46592434.0,
-   "amount": 50319828.720000006,
-   "win": 0.9,
-   "advised": 50319828.720000006,
-   "advised_win": 0.9,
+   "price": 22569306.0,
+   "asking": 22569306.0,
+   "amount": 24374850.48,
+   "win": 0.9130434782608695,
+   "advised": 24374850.48,
+   "advised_win": 0.9130434782608695,
    "move": "bid",
    "plan": false,
    "done": false,
-   "key": "4884",
-   "gain": 14.266611679744798,
+   "key": "11792",
+   "gain": 3.1912752045696067,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.3062001800495076,
-   "price_next": 0.01956763677709361,
-   "price_lock": 0.0917881058825647,
+   "per_million": 0.14139890719588838,
+   "price_next": 0.004781398217727606,
+   "price_lock": 0.022428640253034704,
    "facts": [
     [
      "asking",
-     46592434.0,
+     22569306.0,
      "money"
     ],
     [
      "bid",
-     50319828.720000006,
+     24374850.48,
      "money"
     ],
     [
      "chance to win",
-     0.9,
+     0.9130434782608695,
      "chance"
     ],
     [
      "points added",
-     14.266611679744798,
+     3.1912752045696067,
      "points"
     ]
    ],
    "bids": 0,
    "auction": {
     "yours": false,
-    "listings": 61,
+    "listings": 92,
     "thin": false,
-    "cell": "0/3/2"
+    "cell": "0/2/2"
    },
    "funding": {
     "feasible": true,
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 384995.6799999997,
-    "lock_margin": 2164613.280000001,
-    "lock_margin_low": -3080826.825000003,
+    "margin": 26329973.920000006,
+    "lock_margin": 4698444.519999996,
+    "lock_margin_low": 787439.7939999923,
     "if_won": [
      "Dani Martinez",
      "Raul Asencio",
@@ -156,9 +156,7 @@
      "Adria Pedrosa",
      "Robin Le Normand",
      "Fran Garcia",
-     "Iñigo Vicente",
-     "Guido Rodriguez",
-     "Ferran Jutgla"
+     "Iñigo Vicente"
     ],
     "if_lost": [
      "Dani Martinez",
@@ -193,11 +191,11 @@
      "Antony",
      "Martin Satriano"
     ],
-    "cash_if_lost": 8570872.0,
-    "gain": 14.266611679744756,
+    "cash_if_lost": 6451240.0,
+    "gain": 3.1912752045695925,
     "points_lost_if_won": 0.0,
     "points_lost_if_lost": 0.0,
-    "net": 12.839950511770281
+    "net": 2.9137730128678885
    },
    "accepts": [],
    "act": []
@@ -477,11 +475,11 @@
    "what": "sell",
    "label": "sell Dani Martinez",
    "step": "take offer",
-   "offer": 608499.0,
+   "offer": 639890.0,
    "waiting": null,
    "trend": 12.541281081728231,
    "plan": false,
-   "amount": 608499.0,
+   "amount": 639890.0,
    "done": false,
    "key": "11861",
    "gain": 0.0,
@@ -490,7 +488,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9484530137007653,
+   "ratio": 0.9973814236949982,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -505,12 +503,12 @@
     ],
     [
      "offer",
-     608499.0,
+     639890.0,
      "money"
     ],
     [
      "offer over value",
-     0.9484530137007653,
+     0.9973814236949982,
      "ratio"
     ],
     [
@@ -539,11 +537,11 @@
    "what": "sell",
    "label": "sell Raul Asencio",
    "step": "take offer",
-   "offer": 762685.0,
+   "offer": 752402.0,
    "waiting": null,
    "trend": -0.9601666270713708,
    "plan": false,
-   "amount": 762685.0,
+   "amount": 752402.0,
    "done": false,
    "key": "12639",
    "gain": 0.0,
@@ -552,7 +550,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9706545269891046,
+   "ratio": 0.9575675507131467,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -567,12 +565,12 @@
     ],
     [
      "offer",
-     762685.0,
+     752402.0,
      "money"
     ],
     [
      "offer over value",
-     0.9706545269891046,
+     0.9575675507131467,
      "ratio"
     ],
     [
@@ -601,11 +599,11 @@
    "what": "sell",
    "label": "sell Augusto Batalla",
    "step": "take offer",
-   "offer": 3738037.0,
+   "offer": 3693107.0,
    "waiting": null,
    "trend": -33.40692960029531,
    "plan": false,
-   "amount": 3738037.0,
+   "amount": 3693107.0,
    "done": false,
    "key": "12651",
    "gain": 0.0,
@@ -614,7 +612,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.1087978590743142,
+   "ratio": 1.0954704661650925,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -629,12 +627,12 @@
     ],
     [
      "offer",
-     3738037.0,
+     3693107.0,
      "money"
     ],
     [
      "offer over value",
-     1.1087978590743142,
+     1.0954704661650925,
      "ratio"
     ],
     [
@@ -663,11 +661,11 @@
    "what": "sell",
    "label": "sell Miguel Roman",
    "step": "take offer",
-   "offer": 7628911.0,
+   "offer": 7924619.0,
    "waiting": null,
    "trend": -27.528910963378035,
    "plan": false,
-   "amount": 7628911.0,
+   "amount": 7924619.0,
    "done": false,
    "key": "13808",
    "gain": 0.0,
@@ -676,7 +674,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0199419766703433,
+   "ratio": 1.0594764530900096,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -691,12 +689,12 @@
     ],
     [
      "offer",
-     7628911.0,
+     7924619.0,
      "money"
     ],
     [
      "offer over value",
-     1.0199419766703433,
+     1.0594764530900096,
      "ratio"
     ],
     [
@@ -725,11 +723,11 @@
    "what": "sell",
    "label": "sell Thomas Lemar",
    "step": "take offer",
-   "offer": 6227601.0,
+   "offer": 6452373.0,
    "waiting": null,
    "trend": -27.827444605416463,
    "plan": false,
-   "amount": 6227601.0,
+   "amount": 6452373.0,
    "done": false,
    "key": "3427",
    "gain": 0.0,
@@ -738,7 +736,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0225027407226313,
+   "ratio": 1.0594078003174427,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -753,12 +751,12 @@
     ],
     [
      "offer",
-     6227601.0,
+     6452373.0,
      "money"
     ],
     [
      "offer over value",
-     1.0225027407226313,
+     1.0594078003174427,
      "ratio"
     ],
     [
@@ -787,11 +785,11 @@
    "what": "sell",
    "label": "sell Adria Pedrosa",
    "step": "take offer",
-   "offer": 2803636.0,
+   "offer": 2693298.0,
    "waiting": null,
    "trend": -16.758716279526748,
    "plan": false,
-   "amount": 2803636.0,
+   "amount": 2693298.0,
    "done": false,
    "key": "5587",
    "gain": 0.0,
@@ -800,7 +798,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9519637310414423,
+   "ratio": 0.9144988910423658,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -815,12 +813,12 @@
     ],
     [
      "offer",
-     2803636.0,
+     2693298.0,
      "money"
     ],
     [
      "offer over value",
-     0.9519637310414423,
+     0.9144988910423658,
      "ratio"
     ],
     [
@@ -849,11 +847,11 @@
    "what": "sell",
    "label": "sell Robin Le Normand",
    "step": "take offer",
-   "offer": 5247289.0,
+   "offer": 4930925.0,
    "waiting": null,
    "trend": -27.755031676513156,
    "plan": false,
-   "amount": 5247289.0,
+   "amount": 4930925.0,
    "done": false,
    "key": "6002",
    "gain": 0.0,
@@ -862,7 +860,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0859599547676129,
+   "ratio": 1.0204864054490788,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -877,12 +875,12 @@
     ],
     [
      "offer",
-     5247289.0,
+     4930925.0,
      "money"
     ],
     [
      "offer over value",
-     1.0859599547676129,
+     1.0204864054490788,
      "ratio"
     ],
     [
@@ -911,11 +909,11 @@
    "what": "sell",
    "label": "sell Ferran Jutgla",
    "step": "take offer",
-   "offer": 10739314.0,
+   "offer": 11162246.0,
    "waiting": null,
    "trend": -26.4781421681608,
    "plan": false,
-   "amount": 10739314.0,
+   "amount": 11162246.0,
    "done": false,
    "key": "7842",
    "gain": 0.0,
@@ -924,7 +922,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9226023756724625,
+   "ratio": 0.9589359876655474,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -939,12 +937,12 @@
     ],
     [
      "offer",
-     10739314.0,
+     11162246.0,
      "money"
     ],
     [
      "offer over value",
-     0.9226023756724625,
+     0.9589359876655474,
      "ratio"
     ],
     [
@@ -973,11 +971,11 @@
    "what": "sell",
    "label": "sell Aitor Paredes",
    "step": "take offer",
-   "offer": 22752622.0,
+   "offer": 23058835.0,
    "waiting": null,
    "trend": -31.853366761128047,
    "plan": false,
-   "amount": 22752622.0,
+   "amount": 23058835.0,
    "done": false,
    "key": "7916",
    "gain": -9.771427785978858,
@@ -986,7 +984,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9422236250648817,
+   "ratio": 0.9549044107300236,
    "lost": {
     "next4": 0.9837704459975214,
     "next8": 0.0,
@@ -1001,12 +999,12 @@
     ],
     [
      "offer",
-     22752622.0,
+     23058835.0,
      "money"
     ],
     [
      "offer over value",
-     0.9422236250648817,
+     0.9549044107300236,
      "ratio"
     ],
     [
@@ -1035,11 +1033,11 @@
    "what": "sell",
    "label": "sell Antony",
    "step": "take offer",
-   "offer": 39219567.0,
+   "offer": 39289803.0,
    "waiting": null,
    "trend": -18.733768493914816,
    "plan": false,
-   "amount": 39219567.0,
+   "amount": 39289803.0,
    "done": false,
    "key": "8405",
    "gain": -1.8777036413207497,
@@ -1048,7 +1046,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0947513879239381,
+   "ratio": 1.096711913354579,
    "lost": {
     "next4": 0.0,
     "next8": 0.0,
@@ -1063,12 +1061,12 @@
     ],
     [
      "offer",
-     39219567.0,
+     39289803.0,
      "money"
     ],
     [
      "offer over value",
-     1.0947513879239381,
+     1.096711913354579,
      "ratio"
     ],
     [
@@ -1092,78 +1090,16 @@
    "for": []
   },
   {
-   "name": "Guido Rodriguez",
-   "pos": "MED",
-   "what": "sell",
-   "label": "sell Guido Rodriguez",
-   "step": "take offer",
-   "offer": 11660959.0,
-   "waiting": null,
-   "trend": -18.467118592574273,
-   "plan": false,
-   "amount": 11660959.0,
-   "done": false,
-   "key": "7676",
-   "gain": -2.158124690089835,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.0723459482404811,
-   "lost": {
-    "next4": 0.0,
-    "next8": 0.5647634664476868,
-    "season": 2.158124690089835
-   },
-   "per_million": 0.04843199143807013,
-   "facts": [
-    [
-     "value",
-     10874251.0,
-     "money"
-    ],
-    [
-     "offer",
-     11660959.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0723459482404811,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     0.0,
-     "points"
-    ],
-    [
-     "next 8",
-     0.5647634664476868,
-     "points"
-    ],
-    [
-     "season",
-     2.158124690089835,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
    "name": "Pepelu",
    "pos": "MED",
    "what": "sell",
    "label": "sell Pepelu",
    "step": "take offer",
-   "offer": 50719029.0,
+   "offer": 51287015.0,
    "waiting": null,
    "trend": 37.22341396596131,
    "plan": false,
-   "amount": 50719029.0,
+   "amount": 51287015.0,
    "done": false,
    "key": "2715",
    "gain": -8.768434562425455,
@@ -1172,13 +1108,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9796251073682526,
+   "ratio": 0.9905956120723878,
    "lost": {
     "next4": 0.8270611743965617,
     "next8": 2.4756569877273478,
     "season": 8.768434562425455
    },
-   "per_million": 0.048811206297489404,
+   "per_million": 0.04827063902485547,
    "facts": [
     [
      "value",
@@ -1187,12 +1123,12 @@
     ],
     [
      "offer",
-     50719029.0,
+     51287015.0,
      "money"
     ],
     [
      "offer over value",
-     0.9796251073682526,
+     0.9905956120723878,
      "ratio"
     ],
     [
@@ -1216,16 +1152,78 @@
    "for": []
   },
   {
+   "name": "Guido Rodriguez",
+   "pos": "MED",
+   "what": "sell",
+   "label": "sell Guido Rodriguez",
+   "step": "take offer",
+   "offer": 11406817.0,
+   "waiting": null,
+   "trend": -18.467118592574273,
+   "plan": false,
+   "amount": 11406817.0,
+   "done": false,
+   "key": "7676",
+   "gain": -2.158124690089835,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 1.0489749592868511,
+   "lost": {
+    "next4": 0.0,
+    "next8": 0.5647634664476868,
+    "season": 2.158124690089835
+   },
+   "per_million": 0.04951104821333478,
+   "facts": [
+    [
+     "value",
+     10874251.0,
+     "money"
+    ],
+    [
+     "offer",
+     11406817.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     1.0489749592868511,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     0.0,
+     "points"
+    ],
+    [
+     "next 8",
+     0.5647634664476868,
+     "points"
+    ],
+    [
+     "season",
+     2.158124690089835,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
    "name": "Fran Garcia",
    "pos": "DEF",
    "what": "sell",
    "label": "sell Fran Garcia",
    "step": "take offer",
-   "offer": 21095037.0,
+   "offer": 18905449.0,
    "waiting": null,
    "trend": 8.164922528913381,
    "plan": false,
-   "amount": 21095037.0,
+   "amount": 18905449.0,
    "done": false,
    "key": "6392",
    "gain": 0.0,
@@ -1234,13 +1232,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.050703175454023,
+   "ratio": 0.9416440131242284,
    "lost": {
     "next4": 1.5080314003544686,
     "next8": 1.038167096645509,
     "season": 0.0
    },
-   "per_million": 0.04921380780917848,
+   "per_million": 0.05491364403170266,
    "facts": [
     [
      "value",
@@ -1249,12 +1247,12 @@
     ],
     [
      "offer",
-     21095037.0,
+     18905449.0,
      "money"
     ],
     [
      "offer over value",
-     1.050703175454023,
+     0.9416440131242284,
      "ratio"
     ],
     [
@@ -1283,11 +1281,11 @@
    "what": "sell",
    "label": "sell Iñigo Vicente",
    "step": "take offer",
-   "offer": 21513297.0,
+   "offer": 22622055.0,
    "waiting": null,
    "trend": -21.128440154690338,
    "plan": false,
-   "amount": 21513297.0,
+   "amount": 22622055.0,
    "done": false,
    "key": "6442",
    "gain": 0.0,
@@ -1296,13 +1294,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0435109893582557,
+   "ratio": 1.0972917351704332,
    "lost": {
     "next4": 1.7943523119215854,
     "next8": 1.8358071453847629,
     "season": 0.0
    },
-   "per_million": 0.08533360299840433,
+   "per_million": 0.08115121041765494,
    "facts": [
     [
      "value",
@@ -1311,12 +1309,12 @@
     ],
     [
      "offer",
-     21513297.0,
+     22622055.0,
      "money"
     ],
     [
      "offer over value",
-     1.0435109893582557,
+     1.0972917351704332,
      "ratio"
     ],
     [
@@ -1340,78 +1338,16 @@
    "for": []
   },
   {
-   "name": "Mikel Oyarzabal",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Mikel Oyarzabal",
-   "step": "take offer",
-   "offer": 50120958.0,
-   "waiting": null,
-   "trend": -20.64128733923845,
-   "plan": false,
-   "amount": 50120958.0,
-   "done": false,
-   "key": "2675",
-   "gain": -16.064757817237478,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.1052927337874385,
-   "lost": {
-    "next4": 5.238828513323284,
-    "next8": 5.895242163323417,
-    "season": 16.064757817237478
-   },
-   "per_million": 0.11762030093924813,
-   "facts": [
-    [
-     "value",
-     45346320.0,
-     "money"
-    ],
-    [
-     "offer",
-     50120958.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.1052927337874385,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     5.238828513323284,
-     "points"
-    ],
-    [
-     "next 8",
-     5.895242163323417,
-     "points"
-    ],
-    [
-     "season",
-     16.064757817237478,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
    "name": "Gerard Martin",
    "pos": "DEF",
    "what": "sell",
    "label": "sell Gerard Martin",
    "step": "take offer",
-   "offer": 31116283.0,
+   "offer": 35001492.0,
    "waiting": null,
    "trend": -17.11919712314649,
    "plan": false,
-   "amount": 31116283.0,
+   "amount": 35001492.0,
    "done": false,
    "key": "12641",
    "gain": -18.22783240393892,
@@ -1420,13 +1356,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9289000026568758,
+   "ratio": 1.044883349717401,
    "lost": {
     "next4": 2.611535107669539,
     "next8": 3.938090096726569,
     "season": 18.22783240393892
    },
-   "per_million": 0.12656042807961893,
+   "per_million": 0.11251206367793033,
    "facts": [
     [
      "value",
@@ -1435,12 +1371,12 @@
     ],
     [
      "offer",
-     31116283.0,
+     35001492.0,
      "money"
     ],
     [
      "offer over value",
-     0.9289000026568758,
+     1.044883349717401,
      "ratio"
     ],
     [
@@ -1464,16 +1400,78 @@
    "for": []
   },
   {
+   "name": "Mikel Oyarzabal",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Mikel Oyarzabal",
+   "step": "take offer",
+   "offer": 41490615.0,
+   "waiting": null,
+   "trend": -20.64128733923845,
+   "plan": false,
+   "amount": 41490615.0,
+   "done": false,
+   "key": "2675",
+   "gain": -16.064757817237478,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 0.9149720418327221,
+   "lost": {
+    "next4": 5.238828513323284,
+    "next8": 5.895242163323417,
+    "season": 16.064757817237478
+   },
+   "per_million": 0.14208616004663746,
+   "facts": [
+    [
+     "value",
+     45346320.0,
+     "money"
+    ],
+    [
+     "offer",
+     41490615.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9149720418327221,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     5.238828513323284,
+     "points"
+    ],
+    [
+     "next 8",
+     5.895242163323417,
+     "points"
+    ],
+    [
+     "season",
+     16.064757817237478,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
    "name": "German Valera",
    "pos": "MED",
    "what": "sell",
    "label": "sell German Valera",
    "step": "take offer",
-   "offer": 22232494.0,
+   "offer": 19509842.0,
    "waiting": null,
    "trend": 12.61816858295214,
    "plan": false,
-   "amount": 22232494.0,
+   "amount": 19509842.0,
    "done": false,
    "key": "7658",
    "gain": -11.836825013287125,
@@ -1482,13 +1480,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0336590536120611,
+   "ratio": 0.9070743398307379,
    "lost": {
     "next4": 3.3933991122331975,
     "next8": 2.9585548783328477,
     "season": 11.836825013287125
    },
-   "per_million": 0.1330734589800338,
+   "per_million": 0.15164422542903463,
    "facts": [
     [
      "value",
@@ -1497,12 +1495,12 @@
     ],
     [
      "offer",
-     22232494.0,
+     19509842.0,
      "money"
     ],
     [
      "offer over value",
-     1.0336590536120611,
+     0.9070743398307379,
      "ratio"
     ],
     [
@@ -1531,11 +1529,11 @@
    "what": "sell",
    "label": "sell Pablo Fornals",
    "step": "take offer",
-   "offer": 55884996.0,
+   "offer": 55576405.0,
    "waiting": null,
    "trend": 27.77422576345193,
    "plan": false,
-   "amount": 55884996.0,
+   "amount": 55576405.0,
    "done": false,
    "key": "2632",
    "gain": -34.045762372892796,
@@ -1544,13 +1542,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9908081330274678,
+   "ratio": 0.9853369959698741,
    "lost": {
     "next4": 7.583612997629757,
     "next8": 9.38355324421508,
     "season": 34.045762372892796
    },
-   "per_million": 0.16790827441796863,
+   "per_million": 0.16884059420927064,
    "facts": [
     [
      "value",
@@ -1559,12 +1557,12 @@
     ],
     [
      "offer",
-     55884996.0,
+     55576405.0,
      "money"
     ],
     [
      "offer over value",
-     0.9908081330274678,
+     0.9853369959698741,
      "ratio"
     ],
     [
@@ -1593,11 +1591,11 @@
    "what": "sell",
    "label": "sell Martin Satriano",
    "step": "take offer",
-   "offer": 21574355.0,
+   "offer": 19553672.0,
    "waiting": null,
    "trend": -3.712722277057057,
    "plan": false,
-   "amount": 21574355.0,
+   "amount": 19553672.0,
    "done": false,
    "key": "8496",
    "gain": -13.861898006376805,
@@ -1606,13 +1604,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0491774251701371,
+   "ratio": 0.9509100615791947,
    "lost": {
     "next4": 2.140702002099914,
     "next8": 4.010802978901438,
     "season": 13.861898006376805
    },
-   "per_million": 0.18590604349012696,
+   "per_million": 0.2051176361606883,
    "facts": [
     [
      "value",
@@ -1621,12 +1619,12 @@
     ],
     [
      "offer",
-     21574355.0,
+     19553672.0,
      "money"
     ],
     [
      "offer over value",
-     1.0491774251701371,
+     0.9509100615791947,
      "ratio"
     ],
     [
@@ -1655,11 +1653,11 @@
    "what": "sell",
    "label": "sell Natan",
    "step": "take offer",
-   "offer": 57646716.0,
+   "offer": 55282379.0,
    "waiting": null,
    "trend": 23.794092460192644,
    "plan": false,
-   "amount": 57646716.0,
+   "amount": 55282379.0,
    "done": false,
    "key": "11813",
    "gain": -37.872360564327664,
@@ -1668,13 +1666,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0509586464777525,
+   "ratio": 1.0078543625609155,
    "lost": {
     "next4": 7.455184261942236,
     "next8": 13.26438688504993,
     "season": 37.872360564327664
    },
-   "per_million": 0.23009787556762004,
+   "per_million": 0.23993878564903892,
    "facts": [
     [
      "value",
@@ -1683,12 +1681,12 @@
     ],
     [
      "offer",
-     57646716.0,
+     55282379.0,
      "money"
     ],
     [
      "offer over value",
-     1.0509586464777525,
+     1.0078543625609155,
      "ratio"
     ],
     [
@@ -1717,11 +1715,11 @@
    "what": "sell",
    "label": "sell Mathew Ryan",
    "step": "take offer",
-   "offer": 19740221.0,
+   "offer": 18731401.0,
    "waiting": null,
    "trend": -3.0407648472184725,
    "plan": false,
-   "amount": 19740221.0,
+   "amount": 18731401.0,
    "done": false,
    "key": "1743",
    "gain": -97.87170068100158,
@@ -1730,13 +1728,13 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0993207343157534,
+   "ratio": 1.0431401706233603,
    "lost": {
     "next4": 29.87217444373951,
     "next8": 55.321579513499046,
     "season": 97.87170068100158
    },
-   "per_million": 2.802480251538169,
+   "per_million": 2.953413869763348,
    "facts": [
     [
      "value",
@@ -1745,12 +1743,12 @@
     ],
     [
      "offer",
-     19740221.0,
+     18731401.0,
      "money"
     ],
     [
      "offer over value",
-     1.0993207343157534,
+     1.0431401706233603,
      "ratio"
     ],
     [
