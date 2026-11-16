@@ -3,7 +3,7 @@ price_history .. price_grade and the kept price_step / momentum_day say, from th
 
 One fold, "price", registered with ffcore.state: its state holds each day's closing snapshot of the market, each
 player's closed days (price_step), his changes with the signal x each carries (price_series), and per horizon
-h <= HORIZONS the sums momentum fits on, per closing day and cumulative (momentum_day). Everything else is a
+h <= level the sums momentum fits on, per closing day and cumulative (momentum_day). Everything else is a
 selector over that state at the cut, a function of the rows with observed_at <= cut and nothing else: the day of
 the cut is the day of the last snapshot, its rows are live (not closed) and only worked out against the closed
 days. Momentum has no window: all-time sums over the closed days, with the live day's pairs added. The constants
@@ -29,7 +29,7 @@ import math
 import random
 from collections import defaultdict
 from datetime import date, timedelta
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, NamedTuple, TypeVar, cast
 
 from ffcore import observations as ob
@@ -38,7 +38,6 @@ from ffcore import state as st
 from ffcore.forecast_store import Prices
 
 T = TypeVar("T")
-HORIZONS = 200
 GRADE_HORIZONS = (1, 2, 3, 5, 7, 10)
 
 
@@ -189,6 +188,8 @@ class PriceState:
         self.daily: list[ob.Market] = []
         self.steps: dict[str, list[Step]] = defaultdict(list)
         self.changes: dict[str, list[Change]] = defaultdict(list)
+        self.level = 0
+        self.closed_changes: list[list[tuple[str, int]]] = []
         self.days: dict[int, list[DayFit]] = defaultdict(list)
         self.cum: dict[int, list[Sums]] = defaultdict(list)
         self.memo: dict[str, Any] = {}
@@ -206,15 +207,15 @@ def _signal(k: Constants, step: float, s1: float | None, s2: float | None) -> fl
     return k.w0 * c + k.w1 * older + k.w2 * (older if c2 is None else c2)
 
 
-def _add_pairs(acc: list[list[float]], k: Constants, ch: list[Change], value: float, top: int) -> None:
-    """The pairs ending in value at a player's change number len(ch), h <= top, added to acc: row h - 1 holds
-    sxy, sxx, fxy, fxx, fyy, fn of horizon h; acc grows to the longest h reached (each h up to it has a row)."""
-    j = len(ch)
+def _add_pairs(acc: list[list[float]], k: Constants, ch: list[Change], j: int, value: float, lo: int, top: int) -> None:
+    """The pairs ending in value at a player's change number j (ch[:j] are the starts), lo <= h <= top, added to
+    acc: row h - 1 holds sxy, sxx, fxy, fxx, fyy, fn of horizon h; acc grows to the longest h reached (each h up
+    to it has a row)."""
     m = min(j, top)
     while len(acc) < m:
         acc.append([0.0, 0.0, 0.0, 0.0, 0.0, 0])
     clip, focus = k.clip, k.focus
-    for h in range(1, m + 1):
+    for h in range(lo, m + 1):
         a = ch[j - h]
         s = acc[h - 1]
         x = a.x
@@ -237,9 +238,43 @@ def _plus(a: Sums, v: list[float]) -> Sums:
     return Sums(a.sxy + v[0], a.sxx + v[1], a.fxy + v[2], a.fxx + v[3], a.fyy + v[4], a.fn + int(v[5]))
 
 
+def _quarter_median(counts: Iterable[int]) -> int:
+    """A quarter of the median of counts (the mean of the two middle ones, truncated, when even), at least 1."""
+    ns = sorted(counts)
+    m = len(ns)
+    if not m:
+        return 1
+    return max(1, int((ns[(m + 1) // 2 - 1] + ns[(m + 2) // 2 - 1]) / 2) // 4)
+
+
+def _fit_days(s: PriceState, acc: list[list[float]], day: str, lo: int) -> None:
+    for h in range(lo, len(acc) + 1):
+        v = acc[h - 1]
+        s.days[h].append(DayFit(h, day, v[0], v[1], v[2], v[3], v[4], int(v[5])))
+        before = s.cum[h][-1] if s.cum[h] else Sums(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+        s.cum[h].append(_plus(before, v))
+
+
+def _widen(s: PriceState, top: int) -> None:
+    """Hold the per-day and cumulative sums of every horizon up to top, worked out from the closed days (a no-op
+    when s.level >= top)."""
+    lo = s.level + 1
+    if top < lo:
+        return
+    for made in s.closed_changes:
+        acc: list[list[float]] = []
+        for ff, j in made:
+            ch = s.changes[ff]
+            _add_pairs(acc, s.k, ch, j, ch[j].value, lo, top)
+        if made:
+            _fit_days(s, acc, s.changes[made[0][0]][made[0][1]].day, lo)
+    s.level = top
+
+
 def _close(s: PriceState, rows: list[ob.Market]) -> None:
     s.daily.extend(rows)
     acc: list[list[float]] = []
+    made: list[tuple[str, int]] = []
     day = rows[0].observed_at[:10]
     for r in _valued(rows):
         closed = s.steps[r.ff_id]
@@ -251,13 +286,13 @@ def _close(s: PriceState, rows: list[ob.Market]) -> None:
         ch = s.changes[r.ff_id]
         s1 = ch[-1].step if ch else None
         s2 = ch[-2].step if len(ch) > 1 else None
-        _add_pairs(acc, s.k, ch, r.value, HORIZONS)
+        _add_pairs(acc, s.k, ch, len(ch), r.value, 1, s.level)
+        made.append((r.ff_id, len(ch)))
         closed.append(Step(r.ff_id, len(closed), day, r.observed_at, r.value, step, len(ch), s1, s2))
         ch.append(Change(r.ff_id, r.observed_at, day, step, _signal(s.k, step, s1, s2), len(ch), r.value))
-    for h, v in enumerate(acc, 1):
-        s.days[h].append(DayFit(h, day, v[0], v[1], v[2], v[3], v[4], int(v[5])))
-        before = s.cum[h][-1] if s.cum[h] else Sums(0.0, 0.0, 0.0, 0.0, 0.0, 0)
-        s.cum[h].append(_plus(before, v))
+    _fit_days(s, acc, day, 1)
+    s.closed_changes.append(made)
+    _widen(s, _quarter_median(len(s.changes.get(ff, ())) for ff in s.steps))
 
 
 def _step(s: PriceState, row: ob.Market) -> PriceState:
@@ -342,8 +377,10 @@ def price_past(s: PriceState) -> list[Step]:
 
 
 def momentum_day(s: PriceState) -> list[DayFit]:
-    """What each closed day added to the fit, per horizon, for the days with pairs."""
-    return [d for ds in s.days.values() for d in ds]
+    """What each closed day added to the fit, per horizon h <= hmax, for the days with pairs (horizons beyond hmax
+    are held only as far as earlier cuts needed them, so they are not part of the result)."""
+    top = price_hmax(s)
+    return [d for h, ds in s.days.items() if h <= top for d in ds]
 
 
 @_held
@@ -379,11 +416,9 @@ def price_hmax(s: PriceState) -> int:
     lens: dict[str, int] = {ff: len(s.changes.get(ff, ())) for ff in s.steps}
     for x in price_live(s):
         lens[x.ff_id] = lens.get(x.ff_id, 0) + (x.step is not None)
-    ns = sorted(lens.values())
-    m = len(ns)
-    if not m:
-        return 1
-    return max(1, int((ns[(m + 1) // 2 - 1] + ns[(m + 2) // 2 - 1]) / 2) // 4)
+    top = _quarter_median(lens.values())
+    _widen(s, top)
+    return top
 
 
 def _ends(s: PriceState) -> list[tuple[list[Change], Change]]:
@@ -415,7 +450,7 @@ def momentum_sums(s: PriceState) -> list[HorizonSums]:
     top = price_hmax(s)
     live: list[list[float]] = []
     for c in _live_changes(s):
-        _add_pairs(live, s.k, s.changes.get(c.ff_id, []), c.value, top)
+        _add_pairs(live, s.k, s.changes.get(c.ff_id, []), c.i, c.value, 1, top)
     out = []
     for h in range(1, top + 1):
         if not s.cum.get(h) and h > len(live):
@@ -632,6 +667,57 @@ def _selftest() -> None:
         + mk("2026-08-13T0800Z", {"a": 10.0})
     zw = price_state(st.world_at(ob.of({"market": zero}), "2026-08-13T0900Z", only))
     assert momentum_pairs(zw)[0].y is None and momentum_sums(zw)[0].sums.sxy == 0.0 and momentum_sums(zw)[0].sums.sxx > 0, "zero_start_no_y"
+
+    def after(rows_: list[ob.Market], cut: str) -> PriceState:
+        return price_state(st.world_at(ob.of({"market": rows_}), cut, only))
+
+    def daily(values: list[float], ff: str = "a") -> list[ob.Market]:
+        return [r for i, v in enumerate(values) for r in mk("2026-09-%02dT0800Z" % (i + 1), {ff: v})]
+    d = ["2026-09-%02d" % n for n in range(1, 7)]
+    z = after(daily([100.0, 100.0, 100.0, 110.0, 121.0, 133.0]), "2026-09-06T0900Z")
+    assert price_hmax(z) == 1
+    got_slope = price_slope(z)
+    assert [(x.day, x.slope) for x in got_slope[:2]] == [(d[2], None), (d[3], None)], "slope_none_on_zero_sxx"
+    assert got_slope[2].day == d[4] and math.isclose(got_slope[2].slope or 0.0, (4 * 10) / (4 * 4)) \
+        and (got_slope[3].day, got_slope[3].slope) == (d[5], momentum(z)[-1].slope), "slope_none_on_zero_sxx"
+    t4 = after(daily([100.0, 110.0, 121.0, 133.0]), "2026-09-04T0900Z")
+    trend = {x.day: x.trend for x in price_trend_daily(t4)}
+    x1 = 0.4 * 10 + 0.4 * 10 + 0.2 * 10
+    assert trend[d[1]] == 0.0 and math.isclose(trend[d[2]], 1.0 * x1), "slope_none_on_zero_sxx"
+    flat = after(daily([100.0, 100.0, 100.0, 100.0]), "2026-09-04T0900Z")
+    assert momentum(flat) == [] and price_series(flat) and all(x.trend == 0.0 for x in price_trend_daily(flat)), \
+        "slope_none_on_zero_sxx"
+
+    def counted(counts: list[int]) -> PriceState:
+        rows_: list[ob.Market] = []
+        for n in range(max(counts, default=0) + 1):
+            day = "2026-09-%02d" % (21 + n)
+            rows_ += mk(day + "T0800Z", {"q%d" % i: 100.0 * 1.07 ** (n - (max(counts) - c))
+                                         for i, c in enumerate(counts) if max(counts) - n <= c})
+        return after(rows_, "2026-09-%02dT0900Z" % (21 + max(counts, default=0)))
+    assert price_hmax(price_state(st.world_at(ob.of({"market": []}), "2026-09-21T0900Z", only))) == 1, "hmax_median"
+    for counts, want in (([3], 1), ([8, 8, 8, 8], 2), ([7, 8], 1), ([16, 4], 2), ([7, 7], 1), ([8, 8], 2)):
+        assert price_hmax(counted(counts)) == want, "hmax_median"
+    c8 = counted([8, 8])
+    assert [len(c8.changes[ff]) for ff in ("q0", "q1")] == [7, 7], "hmax_median"
+
+    g = after(daily([1.1 ** n * 100 for n in range(12)]), "2026-09-12T0900Z")
+    ch = price_series(g)
+    gdays = sorted({c.day for c in ch})
+
+    def graded(index: int) -> int:
+        return sum(1 for b in range(1, len(ch)) if ch[b - 1].day >= gdays[index])
+    n_all = [r.n for r in price_grade(g) if r.scope == "all" and r.h == 1]
+    assert len(gdays) == 11 and n_all == [graded(11 // 4)] == [8] and graded(len(gdays) // 3) == 7, "grade_days"
+
+    cuts_ = ["2026-%s-%02dT1200Z" % (("09", n) if n <= 30 else ("10", n - 30)) for n in range(2, 41)]
+    swept = st.sweep(obs, cuts_, lambda w_: (price_hmax(price_state(w_)), price_state(w_).level,
+                                             max(price_state(w_).days, default=0), read(w_)), only)
+    seen = [x[0] for x in swept]
+    assert seen[-1] > seen[0] and len(set(seen)) >= 3
+    for i, (hm, level, widest, facts) in enumerate(swept):
+        assert widest <= level <= max(seen[:i + 1]), "level bounded by the horizons in use"
+        assert facts == read(st.world_at(obs, cuts_[i], only)), "a cut alone equals the cut inside a sweep"
     print("ffcore.price_fold self-test OK")
 
 
