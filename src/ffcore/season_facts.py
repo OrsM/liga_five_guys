@@ -4,8 +4,8 @@ market's club of a player; every selector is a pure function of the World (and, 
 
 Folds (registered): kickoffs, first_results, points_changes, season_last. Selectors: kickoffs, blind_results,
 jornada_calendar, round_locks, next_lock, clubs_played, club_fixture, jornadas_done, club_games, scored,
-squad_minutes, appearances, player_jornadas, season_record, pick, last_season. An identity maps a starter's
-(player_slug, player_name, team_slug) to his player id.
+squad_minutes, appearances, player_jornadas, season_record, pick, last_season. An Identity (current.py) maps a starter's
+(player_slug, player_name, team_slug), through its ff map, to his player id.
 
 Named rules, each tested:
   utc_stamp       a kickoff text is read in UTC (a text without a zone is UTC) and stamped YYYY-MM-DDTHHMMZ;
@@ -33,6 +33,7 @@ from typing import Any, NamedTuple
 
 from ffcore import observations as ob
 from ffcore import state as st
+from ffcore.current import Identity, player_club
 from ffcore.db import stamp_jd
 from ffcore.rules import MATCH_LEN
 from stats import shrink
@@ -41,8 +42,6 @@ STAMP = "%Y-%m-%dT%H%MZ"
 JULIAN_EPOCH_MS = 210866760000000
 UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 ANY_CLUB = "*"
-
-Identity = Mapping[tuple[str, str, str], str]
 
 
 class Kickoff(NamedTuple):
@@ -329,10 +328,6 @@ def club_games(world: st.World) -> tuple[ClubGame, ...]:
     return tuple(out + [ClubGame(away, j, at) for _, away, j, at in rows if away != ""])
 
 
-def _clubs(world: st.World) -> dict[str, str | None]:
-    return {r.ff_id: r.club or None for r in st.latest(world, "market") if r.ff_id != ""}
-
-
 def _credit(games: list[tuple[str, int]], at: str, first: str) -> int | None:
     if not games:
         return None
@@ -355,7 +350,7 @@ def scored(world: st.World) -> tuple[Scored, ...]:
         games[ANY_CLUB].append((g.at, g.jornada))
     for held in games.values():
         held.sort()
-    clubs = _clubs(world)
+    clubs = {r.player: r.club for r in player_club(world)}
     credited: dict[tuple[str, str], int | None] = {}
     out = []
     for c in seen.changes.get(season, ()):
@@ -369,6 +364,7 @@ def scored(world: st.World) -> tuple[Scored, ...]:
 
 
 def _squads(world: st.World, identity: Identity) -> list[tuple[str, str, str, str | None, int, float]]:
+    ff = identity.ff
     jornada = {m.match_id: m.jornada for m in _matches(world)}
     out = []
     for s in st.latest(world, "starters"):
@@ -379,7 +375,7 @@ def _squads(world: st.World, identity: Identity) -> list[tuple[str, str, str, st
             mins = MATCH_LEN if minute is None else minute
         else:
             mins = 0.0 if minute is None else MATCH_LEN - minute
-        out.append((s.match_id, s.team_slug, s.player_slug, identity.get((s.player_slug, s.player_name, s.team_slug)),
+        out.append((s.match_id, s.team_slug, s.player_slug, ff.get((s.player_slug, s.player_name, s.team_slug)),
                     jornada[s.match_id], mins if mins > 0.0 else 0.0))
     return out
 
@@ -465,7 +461,7 @@ def _st(at: str, mid: str, team: str, slug: str, role: str, minute: float | None
     return ob.Starters(at, "s", minute, slug, slug.upper(), team, mid, role)
 
 
-SCRATCH_IDENTITY = {("pa", "PA", "A"): "ida", ("pb", "PB", "B"): "idb", ("pc", "PC", "C"): "idc"}
+SCRATCH_IDENTITY_FF = {("pa", "PA", "A"): "ida", ("pb", "PB", "B"): "idb", ("pc", "PC", "C"): "idc"}
 
 
 def _scratch() -> ob.Observations:
@@ -487,7 +483,7 @@ def _scratch() -> ob.Observations:
               _p(d2, "ida", 5.0, 2.0), _p(d2, "idb", 2.0, 1.0), _p(d2, "idc", 3.0, 1.0), _p(d3, "ida", 9.0, 3.0), _p(d3, "idb", 2.0, 1.0),
               _p(d4, "ida", 9.0, 3.0), _p(d4, "idc", 6.0, 2.0), _p(d4, "idb", 4.0, 2.0)]
     market = [_mk(d1, "ida", "A"), _mk(d1, "idb", "B"), _mk(d1, "idc", "C"), _mk(d3, "ida", "A"), _mk(d3, "idb", "B"),
-              _mk(d3, "idc", "")]
+              _mk(d3, "idc", ""), ob.Market(d3, "t", 1.0, "ida", "DEL", "Z")]
     starters = [_st(d2, "m1", "A", "pa", "starter", None), _st(d2, "m1", "B", "pb", "sub", 60.0),
                 _st(d2, "m1", "B", "pz", "starter", 80.0), _st(d3, "m3", "C", "pc", "sub", None),
                 _st(d3, "m3", "A", "pa", "starter", 70.0), _st(d4, "m5", "A", "pa", "starter", None),
@@ -496,7 +492,7 @@ def _scratch() -> ob.Observations:
 
 
 def _view(world: st.World) -> Any:
-    ids = SCRATCH_IDENTITY
+    ids = Identity(ff=SCRATCH_IDENTITY_FF, app={})
     return (world.cut, kickoffs(world), blind_results(world), jornada_calendar(world), round_locks(world),
             next_lock(world), clubs_played(world), club_fixture(world), jornadas_done(world), sorted(club_games(world)),
             scored(world), sorted(squad_minutes(world, ids), key=repr), appearances(world, ids), player_jornadas(world, ids),
@@ -544,6 +540,10 @@ def _selftest() -> None:
         ("ida", 1, 4.0), ("idc", 2, 3.0), ("idb", 2, 2.0)]
     assert [(r.player, r.pts, r.apps, r.squads) for r in end[14]] == [
         ("ida", 4.0, 2.0, 2.0), ("idb", 4.0, 1.0, 2.0), ("idc", 6.0, 0.0, 2.0)]
+    ida_club = next(c.club for c in player_club(worlds[cuts[-1]]) if c.player == "ida")
+    ida_credit = [s.jornada for s in end[10] if s.player == "ida"]
+    assert ida_credit and all(j in {g.jornada for g in club_games(worlds[cuts[-1]]) if g.club == ida_club}
+                              for j in ida_credit), "scored_club_is_player_club"
     assert {(m.player_slug, m.mins) for m in end[11] if m.player is None} == {("pz", 80.0)}
     assert max(m.mins for m in end[11]) == 200.0 and min(m.mins for m in end[11]) == 0.0
     assert end[12] == (Appearance("ida", 1), Appearance("ida", 2), Appearance("idb", 1))

@@ -3,8 +3,9 @@ listings, offers, squads, standings, owners, users, app_lineup, feed_ledger, pri
 selectors over a World (state.py) and, for offer_ratios, two folds of their own (offers_made, team_values).
 
 A selector takes the World at a cut (and an Identity where the SQL joined ff_identity or app_player) and returns
-tuples of named rows, in no particular order. Identity maps a futbolfantasy row (slug, name, team) and an app id
-to the player they are; a row with none has no player. Named rules, each tested:
+tuples of named rows, in no particular order. Identity is the one identity type, used by season_facts too: its ff
+maps a futbolfantasy row (slug, name, team) to a player id, its app maps an app player_id to a player id; a row with
+none has no player. Named rules, each tested:
   one_status_per_player: of a player's futbolfantasy rows, the flagged one, then the highest start_pct (none is
     lowest), a tie to the first in observation order; the app's out_of_league word makes his status gone.
   one_row_per_key: users, owners, player_club and player_value keep one row per user_id / player, the first in
