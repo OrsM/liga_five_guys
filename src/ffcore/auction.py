@@ -5,10 +5,13 @@ from collections import defaultdict
 from math import sqrt
 from typing import Any, NamedTuple, Sequence
 
-from ffcore import pricing
+from ffcore import auction_facts as af
+from ffcore import current, ledger, price_fold, pricing
+from ffcore import observations as ob
+from ffcore import state as st
 
 __all__ = ["Look", "Sample", "Model", "Forecast", "RATIOS", "sample", "curve", "fit", "predict", "forecast", "chance", "bid_for",
-           "looks", "write", "Record", "backtest_records", "points", "backtest", "stored_points", "calibration", "briers"]
+           "looks", "looks_of", "write", "Record", "backtest_records", "points", "backtest", "stored_points", "calibration", "briers"]
 
 RATIOS = (0.5, 0.6, 0.7, 0.8, 0.9) + tuple(round(0.95 + 0.01 * i, 2) for i in range(51))
 ASK_LEVELS = (0.5, 0.75, 0.9)
@@ -171,6 +174,24 @@ def looks(db: Any) -> list[Look]:
     return [Look(p, c, lk, m, a, b, bool(mi), rv, trend_at(p, lk), mb, w, bool(bm), bool(o)) for p, c, lk, m, a, b, mi, rv, mb, w, bm, o in db.execute(
         "SELECT player, close, look, mins, ask, bids, mine, rival, my_bid, won, by_me, is_open"
         " FROM auction_looks ORDER BY look")]
+
+
+def looks_of(world: st.World, identity: current.Identity, league: ledger.League) -> list[Look]:
+    """The looks of auction_facts.auction_looks sorted by look, each with the price trend of its day or the day before
+    (trend_is_last_day_on_or_before_look; None before the player's first day), bools as bool."""
+    series: dict[str, tuple[list[str], list[float]]] = defaultdict(lambda: ([], []))
+    for t in sorted(price_fold.price_trend_daily(price_fold.price_state(world)), key=lambda t: (t.ff_id, t.day)):
+        series[t.ff_id][0].append(t.day)
+        series[t.ff_id][1].append(t.trend)
+
+    def trend_at(player: str, look: str) -> float | None:
+        days, values = series.get(player, ([], []))
+        i = bisect_right(days, look[:10]) - 1
+        return values[i] if i >= 0 else None
+
+    rows = [Look(r.player, r.close, r.look, r.mins, r.ask, r.bids, r.mine, r.rival, trend_at(r.player, r.look), r.my_bid,
+                 r.won, bool(r.by_me), r.is_open) for r in af.auction_looks(world, identity, league)]
+    return sorted(rows, key=lambda x: x.look)
 
 
 def write(db: Any, cut: str) -> None:
@@ -347,6 +368,21 @@ def _selftest() -> None:
     cal = calibration([Point(("all",), 0.97, 0.9, i < 5) for i in range(40)], "t:")
     assert cal and cal[0]["drift"] == 1, "stated 0.97, observed 0.125 over 40: drift"
     assert calibration([Point(("all",), 0.97, 0.9, True)] * 10, "t:")[0]["drift"] == 0, "too few to call it drift"
+
+    mkt = [ob.Market(at, "", x, "a", "DEL", "RMA") for at, x in (
+        ("2026-08-10T0800Z", 100.0), ("2026-08-11T0800Z", 105.0), ("2026-08-11T2000Z", 110.0),
+        ("2026-08-12T2000Z", 0.0), ("2026-08-13T2000Z", 50.0), ("2026-08-14T0800Z", 60.0))]
+    listed = [ob.ApiMarket(at, "laliga", None, 20.0, None, None, "a1", "m", "", "", "marketPlayerLeague", "", "",
+                           "2026-08-20T20:00:00+00:00", "", "") for at in ("2026-08-09T1200Z", "2026-08-11T1200Z")]
+    priced = st.world_at(ob.of({"market": mkt, "api_market": listed, "api_activity": [], "api_standings": []}),
+                         "2026-08-14T0900Z", {n: st.FOLDS[n] for n in ("price", *af.AUCTION_FACTS)})
+    daily = sorted((t.day, t.trend) for t in price_fold.price_trend_daily(price_fold.price_state(priced)))
+
+    def last_on_or_before(day: str) -> float | None:
+        return max(((d, v) for d, v in daily if d <= day), default=(None, None))[1]
+    got = {x.look: x.trend for x in looks_of(priced, current.Identity({}, {"a1": "a"}), ledger.League("ann", 100.0))}
+    assert got == {"2026-08-09T1200Z": last_on_or_before("2026-08-09"), "2026-08-11T1200Z": last_on_or_before("2026-08-11")}
+    assert last_on_or_before("2026-08-11") is not None, "trend_is_last_day_on_or_before_look: the look's own day counts"
     print("ffcore.auction self-test OK")
 
 

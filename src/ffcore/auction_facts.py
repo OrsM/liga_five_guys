@@ -22,9 +22,18 @@ Named rules, each tested:
     (the SQL reads the standings of all time; the two agree whenever your user_id never changes).
   bid_first_row_is_a_change: the first observation of a bid_id is a change (was None); a row with an unchanged
     bid_money is not; a change to or from None is; rows with an empty bid_id are no bid.
+  look_needs_game_listing: a look is a listing of the league seller with a sale_price above 0 and a non-empty
+    expires_at; a manager's listing is no look.
+  look_joins_result_by_raw_close: a look's outcome is matched on the raw expires_at text, not the instant: another
+    spelling of the same instant does not match.
+  closed_look_needs_its_outcome: a look whose close is at or before the cut and has no outcome is absent; a look
+    closing after the cut is open (is_open True, won None); a look with an unparseable close is never kept.
+  rival_excludes_own_bid: rival = bids - mine, with bids 0 when None.
+  mins_before_close: minutes from the look's stamp to its close, times 1440.0.
 Contract: auction_results(world, identity, league) gives one AuctionResult per listing whose outcome is seen at the cut;
-bid_changes(world, identity) one BidChange per change of one of your bids; each cut's result is the same alone, in any
-subset or order of cuts, and unchanged by rows stamped after it."""
+bid_changes(world, identity) one BidChange per change of one of your bids; auction_looks(world, identity, league) one
+LookRow per look observed by the cut; each cut's result is the same alone, in any subset or order of cuts, and
+unchanged by rows stamped after it."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -99,12 +108,28 @@ class BidChange(NamedTuple):
     now: float | None
 
 
+class LookRow(NamedTuple):
+    player: str
+    close: str
+    look: str
+    mins: float
+    ask: float
+    bids: int
+    mine: bool
+    rival: int
+    my_bid: float | None
+    won: float | None
+    by_me: bool | None
+    is_open: bool
+
+
 MARKET_ENDS = "market_ends"
 BUYS = "buys"
 FEED_SEEN = "feed_seen"
 USER_IDS = "user_ids"
 BID_CHANGES = "bid_changes"
-AUCTION_FACTS = (MARKET_ENDS, BUYS, FEED_SEEN, USER_IDS, BID_CHANGES)
+LOOKS = "looks"
+AUCTION_FACTS = (MARKET_ENDS, BUYS, FEED_SEEN, USER_IDS, BID_CHANGES, LOOKS)
 
 
 def _end_step(ends: dict[tuple[str, float], End], row: ob.ApiMarket) -> dict[tuple[str, float], End]:
@@ -147,7 +172,14 @@ state.register(state.Fold(MARKET_ENDS, "api_market", dict, _end_step))
 state.register(state.Fold(BUYS, "api_activity", dict, _buy_step))
 state.register(state.Fold(FEED_SEEN, "api_activity", FeedSeen, _feed_step))
 state.register(state.Fold(USER_IDS, "api_standings", dict, _user_step))
+def _look_step(looks: list[ob.ApiMarket], row: ob.ApiMarket) -> list[ob.ApiMarket]:
+    if row.seller == LEAGUE_SELLER and row.sale_price is not None and row.sale_price > 0 and row.expires_at != "":
+        looks.append(row)
+    return looks
+
+
 state.register(state.Fold(BID_CHANGES, "api_market", BidState, _bid_step))
+state.register(state.Fold(LOOKS, "api_market", list, _look_step))
 
 
 def _buys_by_player(world: state.World) -> dict[str, list[Buy]]:
@@ -200,6 +232,34 @@ def bid_changes(world: state.World, identity: current.Identity) -> tuple[BidChan
     unmapped_player_dropped)."""
     return tuple(BidChange(c.bid_id, identity.app.get(c.player_id), c.close, c.observed_at, c.was, c.now)
                  for c in state.fact(world, BID_CHANGES).changes)
+
+
+def auction_looks(world: state.World, identity: current.Identity, league: League) -> tuple[LookRow, ...]:
+    """One row per league listing observed by the cut, with its outcome if the cut has one (the rules
+    look_needs_game_listing to mins_before_close and unmapped_player_dropped)."""
+    outcomes: dict[tuple[str, str], list[AuctionResult]] = defaultdict(list)
+    for r in auction_results(world, identity, league):
+        if r.seller == LEAGUE_SELLER:
+            outcomes[(r.player, r.close)].append(r)
+    cut = stamp_jd(world.cut)
+    out = []
+    for row in state.fact(world, LOOKS):
+        player = identity.app.get(row.player_id)
+        close = julian_day(row.expires_at)
+        seen = stamp_jd(row.observed_at)
+        if player is None or close is None or seen is None:
+            continue
+        held = outcomes.get((player, row.expires_at), [])
+        if not held and not (cut is not None and close > cut):
+            continue
+        mine = row.bid_id != ""
+        bids = row.bids or 0
+        outcome: list[AuctionResult | None] = [*held] if held else [None]
+        for res in outcome:
+            out.append(LookRow(player, row.expires_at, row.observed_at, (close - seen) * 1440.0, row.sale_price or 0.0,
+                               bids, mine, bids - mine, row.bid_money,
+                               None if res is None else res.won, None if res is None else res.by_me, res is None))
+    return tuple(out)
 
 
 _APP = {"a1": "p1", "a2": "p2", "a3": "p3"}
@@ -265,8 +325,9 @@ def _scratch() -> tuple[ob.Observations, current.Identity, League]:
     return ob.of(_tables()), current.Identity({}, _APP), _ME
 
 
-def _view(world: state.World, identity: current.Identity, league: League) -> tuple[str, Any, Any]:
-    return world.cut, auction_results(world, identity, league), bid_changes(world, identity)
+def _view(world: state.World, identity: current.Identity, league: League) -> tuple[str, Any, Any, Any]:
+    return world.cut, auction_results(world, identity, league), bid_changes(world, identity), auction_looks(
+        world, identity, league)
 
 
 _CUTS = ["2026-08-17T0000Z"] + [_stamp(h) for h in ("1800", "1900", "1930", "2000", "2030", "2035", "2040", "2043",
@@ -276,6 +337,31 @@ _CUTS = ["2026-08-17T0000Z"] + [_stamp(h) for h in ("1800", "1900", "1930", "200
 def _results_at(tables: dict[str, list[Any]], cut: str, league: League = _ME) -> tuple[AuctionResult, ...]:
     world = state.world_at(ob.of(tables), cut, {n: state.FOLDS[n] for n in AUCTION_FACTS})
     return auction_results(world, current.Identity({}, _APP), league)
+
+
+def _look_tables() -> dict[str, list[Any]]:
+    lg = LEAGUE_SELLER
+    close = "2026-08-18T10:00:00+00:00"
+    return {
+        "api_market": [
+            _listing("0900", "a1", lg, close, 10.0)._replace(bids=2),
+            _listing("0930", "a1", lg, close, 10.0)._replace(bids=3),
+            _listing("0900", "a2", "marketPlayerTeam", close, 5.0),
+            _listing("0905", "a1", lg, close, 0.0),
+            _listing("0906", "a1", lg, close, None),
+            _listing("0907", "a1", lg, "", 4.0),
+            _listing("0908", "a1", lg, "not a time", 6.0),
+            _listing("0909", "a9", lg, close, 7.0),
+            _listing("0910", "a1", lg, "2026-08-18T11:00:00+00:00", 9.0, "b7", 9.0)._replace(bids=3),
+            _listing("0912", "a1", lg, "2026-08-18T12:00:00+02:00", 8.0)],
+        "api_activity": [_buy("1015", "e1", "u2", "a1", 12.0, "2026-08-18T10:02:00+00:00")],
+        "api_standings": [],
+    }
+
+
+def _looks_at(tables: dict[str, list[Any]], cut: str) -> tuple[LookRow, ...]:
+    world = state.world_at(ob.of(tables), cut, {n: state.FOLDS[n] for n in AUCTION_FACTS})
+    return auction_looks(world, current.Identity({}, _APP), _ME)
 
 
 def _selftest() -> None:
@@ -299,7 +385,7 @@ def _selftest() -> None:
     assert all(_view(state.world_at(later_obs, c, only), ident, league) == alone[c] for c in _CUTS)
 
     for c in _CUTS:
-        _, results, _ = alone[c]
+        _, results, _, _ = alone[c]
         assert all(r.closed <= c for r in results)
         assert all((r.bar is None) == (r.seller != LEAGUE_SELLER) for r in results)
 
@@ -353,6 +439,28 @@ def _selftest() -> None:
         ("b9", None, None, 3.0), ("b1", "p1", None, 12.0), ("b1", "p1", 12.0, 15.0), ("b1", "p1", 15.0, None),
         ("b1", "p3", None, 20.0)], "bid_first_row_is_a_change"
     assert not any(c.bid_id == "" for c in changes) and len(changes) == 5
+
+    lt = _look_tables()
+    mid = {(r.player, r.look): r for r in _looks_at(lt, "2026-08-18T0945Z")}
+    assert mid.keys() == {("p1", _stamp("0900")), ("p1", _stamp("0910")), ("p1", _stamp("0912")), ("p1", _stamp("0930"))}, (
+        "look_needs_game_listing: the manager's, zero, empty, unparseable and unmapped listings are no look")
+    assert all(r.is_open and r.won is None and r.by_me is None for r in mid.values())
+    assert mid[("p1", _stamp("0900"))].rival == 2 and mid[("p1", _stamp("0930"))].rival == 3, (
+        "rival_excludes_own_bid: no bid of ours, the rivals are the bids")
+    own = mid[("p1", _stamp("0910"))]
+    assert own.mine and own.rival == 2 and own.my_bid == 9.0, "rival_excludes_own_bid: our bid is not a rival"
+    assert abs(mid[("p1", _stamp("0900"))].mins - 60.0) < 1e-6 and abs(mid[("p1", _stamp("0930"))].mins - 30.0) < 1e-6, (
+        "mins_before_close: from the look's stamp to the close")
+
+    assert {(r.player, r.look) for r in _looks_at(lt, "2026-08-18T1005Z")} == {("p1", _stamp("0910"))}, (
+        "closed_look_needs_its_outcome: closed at 10:00 with no outcome yet, so absent; open looks stay")
+    late = {(r.player, r.look): r for r in _looks_at(lt, "2026-08-18T1015Z")}
+    assert late.keys() == {("p1", _stamp("0900")), ("p1", _stamp("0910")), ("p1", _stamp("0930"))}, (
+        "look_joins_result_by_raw_close: the look with the other spelling of 10:00Z has no outcome, so it is absent")
+    for key in (("p1", _stamp("0900")), ("p1", _stamp("0930"))):
+        assert late[key].won == 12.0 and late[key].by_me is False and late[key].is_open is False, (
+            "closed_look_needs_its_outcome: a closed look takes its outcome, non-prefix with the cut at 10:05")
+    assert late[("p1", _stamp("0910"))].is_open is True and late[("p1", _stamp("0910"))].won is None
     print("ffcore.auction_facts self-test OK")
 
 
