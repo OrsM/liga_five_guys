@@ -4,7 +4,7 @@ market's club of a player; every selector is a pure function of the World (and, 
 
 Folds (registered): kickoffs, first_results, points_changes, season_last. Selectors: kickoffs, blind_results,
 jornada_calendar, round_locks, next_lock, clubs_played, club_fixture, jornadas_done, club_games, scored,
-squad_minutes, appearances, player_jornadas, season_record, pick, last_season. An Identity (current.py) maps a starter's
+squad_minutes, appearances, player_jornadas, season_record, pick, last_season, listing_close. An Identity (current.py) maps a starter's
 (player_slug, player_name, team_slug), through its ff map, to his player id.
 
 Named rules, each tested:
@@ -20,7 +20,12 @@ Named rules, each tested:
   last_game       a change is credited to the jornada of the club's latest game at or before the stamp it was seen
                   (the latest kickoff, ties to the higher jornada); a player with no club in the market is credited
                   against all clubs' games.
-  one_per_fixture two fixtures of a club in one jornada are two rows."""
+  one_per_fixture two fixtures of a club in one jornada are two rows.
+  league_listings_only            a listing counts for listing_close only with seller marketPlayerLeague, a known player,
+                                  a sale_price present and not 0, and a non-empty expires_at; a player's close is the latest
+                                  of his counted listings' julian days.
+  close_group_keeps_unparseable   a player whose counted listings all expire at a text that is not an instant has a
+                                  ListingClose with t None."""
 from __future__ import annotations
 
 import bisect
@@ -33,7 +38,7 @@ from typing import Any, NamedTuple
 
 from ffcore import observations as ob
 from ffcore import state as st
-from ffcore.current import Identity, player_club
+from ffcore.current import Identity, listings, player_club
 from ffcore.db import stamp_jd
 from ffcore.rules import MATCH_LEN
 from stats import shrink
@@ -147,6 +152,11 @@ class PointsChanges(NamedTuple):
     prev: dict[tuple[str, str], tuple[float | None, float | None]]
     changes: dict[str, list[Change]]
     rows: int
+
+
+class ListingClose(NamedTuple):
+    player: str
+    t: float | None
 
 
 def _utc(text: str | None) -> datetime | None:
@@ -445,6 +455,23 @@ def last_season(world: st.World) -> tuple[LastSeason, ...]:
     return tuple(LastSeason(r.ff_id, r.points, r.games) for r in seasons[max(older)].values())
 
 
+def _latest_close(held: float | None, t: float | None) -> float | None:
+    if held is None:
+        return t
+    return held if t is None else max(held, t)
+
+
+def listing_close(world: st.World, identity: Identity) -> tuple[ListingClose, ...]:
+    """Each player on the game's market with a counted listing: the latest julian day of his counted listings'
+    expires_at (rules league_listings_only, close_group_keeps_unparseable), no particular order."""
+    close: dict[str, float | None] = {}
+    for r in listings(world, identity):
+        if r.seller == "marketPlayerLeague" and r.player is not None and r.sale_price is not None and r.sale_price != 0.0 \
+                and r.expires_at:
+            close[r.player] = _latest_close(close.get(r.player), julian_day(r.expires_at))
+    return tuple(ListingClose(p, t) for p, t in close.items())
+
+
 def _m(at: str, mid: str, j: int | None, home: str, away: str, score: str, kickoff: str) -> ob.Matches:
     return ob.Matches(at, "s", j, mid, "", home, away, score, kickoff)
 
@@ -553,6 +580,24 @@ def _selftest() -> None:
     twice = {(f.jornada, f.club) for f in views[cuts[1]][7]}
     assert len(views[cuts[1]][7]) == len(set(views[cuts[1]][7])) and ("A", 2) not in twice
     assert sum(f.club == "A" and f.jornada == 2 for f in views[cuts[1]][7]) == 2
+
+    def listing(mid: str, app_id: str, price: float | None, seller: str, expires: str) -> ob.ApiMarket:
+        return ob.ApiMarket("2026-08-20T1000Z", "s", 1.0, price, None, 0, app_id, mid, app_id, app_id, seller, "", "",
+                            expires, "", "")
+
+    league, team = "marketPlayerLeague", "marketPlayerTeam"
+    close_rows = [listing("m1", "api-x", 5.0, league, "2026-08-22T10:00:00+00:00"),
+                  listing("m2", "api-x", 7.0, league, "2026-08-21T10:00:00+02:00"),
+                  listing("m3", "api-z", 0.0, league, "2026-08-22T10:00:00+00:00"),
+                  listing("m4", "api-n", None, league, "2026-08-22T10:00:00+00:00"),
+                  listing("m5", "api-s", 3.0, league, "soon"),
+                  listing("m6", "api-t", 3.0, team, "2026-08-22T10:00:00+00:00"),
+                  listing("m7", "api-u", 3.0, league, ""),
+                  listing("m8", "api-q", 3.0, league, "2026-08-22T10:00:00+00:00")]
+    close_ids = Identity(ff={}, app={"api-x": "px", "api-z": "pz", "api-n": "pn", "api-s": "ps", "api-t": "pt", "api-u": "pu"})
+    closes = listing_close(st.world_at(ob.of({"api_market": close_rows}), "2026-08-23T1000Z"), close_ids)
+    assert {c.player: c.t for c in closes} == {"px": julian_day("2026-08-22T10:00:00+00:00"), "ps": None}, \
+        "league_listings_only and close_group_keeps_unparseable"
     print("ffcore.season_facts self-test OK")
 
 

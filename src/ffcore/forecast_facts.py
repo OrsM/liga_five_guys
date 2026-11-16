@@ -12,7 +12,10 @@ chance from his record alone) and listed_pct (whether his listing gives a start 
 fit_of: the chance a player is fit for one fixture, from his Prognosis (None: fit).
 forecast_fit: one FitRow per (player with a club, fixture of his club).
 forecast_now: one NowRow per (player with a position and a club, fixture of his club still to play): his points if he plays
-  and the chance he plays.
+  and the chance he plays. It returns Inputs.now, built in inputs() by _now_rows.
+late_arrivals: one Late per (player, jornada) in Inputs.late, built in inputs() by _late from listing_close.
+forecast_used: the Used rows of Inputs.used, forecast_now with the late pairs zeroed (built by _used).
+forecast_now, late_arrivals and forecast_used read Inputs.now, Inputs.late and Inputs.used; no selector calls another.
 
 Named rules, each tested:
   fit_needs_value_and_ten_matches     a last-season row joins the fit only if its player has a value above 0, a position
@@ -39,7 +42,13 @@ Named rules, each tested:
   fixture_by_position                 a goalkeeper or defender faces 1 / attack of the opponent, anyone else its defence; an
                                       opponent with no rating gives 1.0.
   pts_floor                           pts = max(0.0, ppm * fixture); p = min(1.0, q + p_lift * q * (1 - q)), so p is in [0, 1].
-  coach_has_no_now                    a player with an empty position (a coach) has no NowRow."""
+  coach_has_no_now                    a player with an empty position (a coach) has no NowRow.
+  late_means_after_kickoff            a (player, jornada) is late when his listing close (listing_close) is strictly after
+                                      the kickoff of a fixture of his club in a jornada whose calendar state is "under way"
+                                      or "ahead"; a player with no club is never late; one Late per pair, so a club with
+                                      two fixtures in one jornada gives one.
+  late_zeroes_p_and_e_not_pts         every Used row of a late pair (all its fixtures) has p 0.0 and e 0.0, pts unchanged;
+                                      every other row has p as in NowRow and e = pts * p."""
 from __future__ import annotations
 
 import json
@@ -55,7 +64,8 @@ from ffcore import forecast
 from ffcore import observations as ob
 from ffcore import state
 from ffcore.current import LIST_SOURCE, ClubRating, Identity, PlayerClub, PlayerStatus, club_rating, player_club, player_status, player_value
-from ffcore.season_facts import Fixture, LastSeason, SeasonRecord, club_fixture, last_season, pick, season_record
+from ffcore.season_facts import (Calendar, Fixture, Kickoff, LastSeason, ListingClose, SeasonRecord, club_fixture, jornada_calendar,
+                                 kickoffs, last_season, listing_close, pick, season_record)
 from stats import shrink
 
 MIN_MATCHES = 10
@@ -80,6 +90,9 @@ class Inputs(NamedTuple):
     rating: Mapping[str, ClubRating]
     fixtures: Mapping[str, tuple[Fixture, ...]]
     rate: Mapping[str, Rate]
+    now: tuple[NowRow, ...]
+    late: frozenset[Late]
+    used: tuple[Used, ...]
 
 
 class _Point(NamedTuple):
@@ -276,30 +289,90 @@ def _fixture_factor(pos: str, opp: ClubRating | None) -> float:
     return 1.0 / opp.attack if pos in ("POR", "DEF") else opp.defence
 
 
-def forecast_now(inp: Inputs) -> tuple[NowRow, ...]:
-    """One NowRow per (player with a position and a club, fixture of his club still to play): points if he plays,
-    the chance he plays (rules: fixture_by_position, pts_floor, one_row_per_fixture, coach_has_no_now)."""
-    k = inp.knobs
+def _now_rows(clubs: tuple[PlayerClub, ...], rate: Mapping[str, Rate], fixtures: Mapping[str, tuple[Fixture, ...]],
+              prog: Mapping[str, Prognosis], nxt: Mapping[str, int], rating: Mapping[str, ClubRating], knobs: Knobs
+              ) -> tuple[NowRow, ...]:
+    """The rows of forecast_now, built once in inputs() (rules: fixture_by_position, pts_floor, one_row_per_fixture,
+    coach_has_no_now)."""
     out = []
-    for c in inp.clubs:
+    for c in clubs:
         if c.pos == "" or c.club is None:
             continue
-        r = inp.rate[c.player]
-        games = inp.fixtures.get(c.club, ())
+        r = rate[c.player]
+        games = fixtures.get(c.club, ())
         first = min((f.jornada for f in games), default=0)
         for f in games:
-            fit = fit_of(inp.prog.get(c.player), inp.nxt[c.club], f)
-            fixture = _fixture_factor(c.pos, inp.rating.get(f.opp))
-            w = k.p_listing * math.pow(k.p_decay, f.jornada - first)
+            fit = fit_of(prog.get(c.player), nxt[c.club], f)
+            fixture = _fixture_factor(c.pos, rating.get(f.opp))
+            w = knobs.p_listing * math.pow(knobs.p_decay, f.jornada - first)
             q = w * r.picked * (1.0 if r.listed_pct else fit) + (1.0 - w) * r.record * fit
-            p = min(1.0, q + k.p_lift * q * (1.0 - q))
+            p = min(1.0, q + knobs.p_lift * q * (1.0 - q))
             out.append(NowRow(c.player, f.jornada, max(0.0, r.ppm * fixture), p, r.ppm, fixture, r.picked, fit))
     return tuple(out)
 
 
+def forecast_now(inp: Inputs) -> tuple[NowRow, ...]:
+    """One NowRow per (player with a position and a club, fixture of his club still to play): points if he plays,
+    the chance he plays (rules: fixture_by_position, pts_floor, one_row_per_fixture, coach_has_no_now)."""
+    return inp.now
+
+
+class Late(NamedTuple):
+    player: str
+    jornada: int
+
+
+class Used(NamedTuple):
+    player: str
+    jornada: int
+    pts: float
+    p: float
+    e: float
+
+
+def _late(clubs: tuple[PlayerClub, ...], close: tuple[ListingClose, ...], kicks: tuple[Kickoff, ...],
+          calendar: tuple[Calendar, ...]) -> frozenset[Late]:
+    """The Late pairs: a player whose listing close is after a kickoff of his club in an open jornada (rule
+    late_means_after_kickoff)."""
+    open_jornadas = {c.jornada for c in calendar if c.state in ("under way", "ahead")}
+    by_club: dict[str, list[Kickoff]] = defaultdict(list)
+    for k in kicks:
+        if k.jornada in open_jornadas:
+            by_club[k.home].append(k)
+            by_club[k.away].append(k)
+    closes = {c.player: c.t for c in close}
+    out: set[Late] = set()
+    for c in clubs:
+        t = closes.get(c.player)
+        if c.club is None or t is None:
+            continue
+        out.update(Late(c.player, k.jornada) for k in by_club.get(c.club, ()) if k.t < t)
+    return frozenset(out)
+
+
+def _used(now: tuple[NowRow, ...], late: frozenset[Late]) -> tuple[Used, ...]:
+    """forecast_now with the late pairs zeroed in p and e (rule late_zeroes_p_and_e_not_pts)."""
+    out = []
+    for n in now:
+        p = 0.0 if Late(n.player, n.jornada) in late else n.p
+        out.append(Used(n.player, n.jornada, n.pts, p, n.pts * p))
+    return tuple(out)
+
+
+def late_arrivals(inp: Inputs) -> tuple[Late, ...]:
+    """One Late per pair of inp.late, no particular order (rule late_means_after_kickoff)."""
+    return tuple(inp.late)
+
+
+def forecast_used(inp: Inputs) -> tuple[Used, ...]:
+    """inp.used: the forecast_now rows with the late pairs zeroed (rule late_zeroes_p_and_e_not_pts)."""
+    return inp.used
+
+
 def inputs(world: state.World, identity: Identity, knobs: Knobs) -> Inputs:
     """The shared pieces of one cut, each built once: the one place the ingest selectors are called for this group.
-    rate is the Rate of every player_club row, prior his Prior, prog and nxt as in fit_of."""
+    rate is the Rate of every player_club row, prior his Prior, prog and nxt as in fit_of, now the forecast_now rows,
+    late the late pairs of listing_close against the kickoffs and calendar, used the forecast_used rows."""
     clubs = player_club(world)
     status_rows = player_status(world, identity)
     status = {s.player: s for s in status_rows}
@@ -311,9 +384,15 @@ def inputs(world: state.World, identity: Identity, knobs: Knobs) -> Inputs:
     for f in fixture_rows:
         fixtures[f.club].append(f)
     prior = _priors(clubs, value, last)
-    return Inputs(knobs, clubs, status, record, last, value, prior, _prognoses(status_rows), _next_jornadas(fixture_rows),
-                  {r.club: r for r in club_rating(world, knobs.fixture_k)}, {c: tuple(fs) for c, fs in fixtures.items()},
-                  _rate_map(clubs, status, record, last, prior, knobs))
+    prog = _prognoses(status_rows)
+    nxt = _next_jornadas(fixture_rows)
+    rating = {r.club: r for r in club_rating(world, knobs.fixture_k)}
+    by_club = {c: tuple(fs) for c, fs in fixtures.items()}
+    rate = _rate_map(clubs, status, record, last, prior, knobs)
+    now = _now_rows(clubs, rate, by_club, prog, nxt, rating, knobs)
+    late = _late(clubs, listing_close(world, identity), kickoffs(world), jornada_calendar(world))
+    return Inputs(knobs, clubs, status, record, last, value, prior, prog, nxt, rating, by_club, rate, now, late,
+                  _used(now, late))
 
 
 D0, D1, D2, D3, D4, D5 =("2026-08-13T0000Z", "2026-08-14T1000Z", "2026-08-16T1000Z", "2026-08-20T1000Z",
@@ -324,7 +403,9 @@ FIT_Y = {"q1": 4.0, "q2": 3.0, "q3": 2.5, "qn": 1.0, "r1": 2.0, "r2": 4.0,
 LINE_VALUES = {"f1": 10.0, "f2": 100.0, "f3": 1000.0}
 CLUBS = {"q1": "A", "q2": "B", "q3": "C", "qn": "D", "r1": "E", "r2": "F", "m1": "G", "m2": "H", "m3": "I",
          "m4": "J", "f1": "K", "f2": "L", "f3": "M", "c1": "N"}
-IDENTITY = Identity(ff={(p, p.upper(), c): p for p, c in CLUBS.items()}, app={"api-m4": "m4"})
+IDENTITY = Identity(ff={(p, p.upper(), c): p for p, c in CLUBS.items()},
+                    app={"api-m4": "m4", "api-q1": "q1", "api-q2": "q2", "api-z1": "z1"})
+LEAGUE, TEAM = "marketPlayerLeague", "marketPlayerTeam"
 MATCHES_1 = (("AB", "A", "B", "2026-08-15T20:00:00+02:00"), ("CD", "C", "D", ""), ("EF", "E", "F", ""),
              ("GH", "G", "H", ""), ("IJ", "I", "J", ""), ("KL", "K", "L", ""), ("MN", "M", "N", ""))
 MATCHES_2 = (("AC", "A", "C", "2026-08-22T19:00:00+00:00"), ("AD", "A", "D", "2026-08-23T12:00:00"),
@@ -345,7 +426,22 @@ def _league(at: str, por: tuple[float, float], q2: float) -> list[ob.Market]:
             _mk(at, "qn", None, "DEL", "D"), _mk(at, "r1", por[0], "POR", "E"), _mk(at, "r2", por[1], "POR", "F"),
             _mk(at, "m1", 10.0, "MED", "G"), _mk(at, "m2", 100.0, "MED", "H"), _mk(at, "m3", 1000.0, "MED", "I"),
             _mk(at, "m4", 1e12, "MED", "J"), _mk(at, "f1", 10.0, "DEF", "K"), _mk(at, "f2", 100.0, "DEF", "L"),
-            _mk(at, "f3", 1000.0, "DEF", "M"), _mk(at, "c1", 3.0, "Entrenador", "N")]
+            _mk(at, "f3", 1000.0, "DEF", "M"), _mk(at, "c1", 3.0, "Entrenador", "N"),
+            _mk(at, "z1", 5.0, "DEL", "")]
+
+
+def _listing(at: str, app_id: str, price: float | None, seller: str, expires: str) -> ob.ApiMarket:
+    return ob.ApiMarket(at, "s", 1.0, price, None, 0, app_id, app_id, app_id.upper(), app_id.upper(), seller, "", "",
+                        expires, "", "")
+
+
+def _listings(at: str, q1_expires: str) -> list[ob.ApiMarket]:
+    """q1's close is q1_expires; m4's does not parse and his zero-priced row is not counted; z1 has no club; q2 is a
+    manager's listing (not counted)."""
+    return [_listing(at, "api-q1", 5.0, LEAGUE, q1_expires), _listing(at, "api-m4", 5.0, LEAGUE, "soon"),
+            _listing(at, "api-m4", 0.0, LEAGUE, "2026-08-16T10:00:00+00:00"),
+            _listing(at, "api-z1", 5.0, LEAGUE, "2026-08-23T18:00:00+00:00"),
+            _listing(at, "api-q2", 5.0, TEAM, "2026-08-23T18:00:00+00:00")]
 
 
 def _lu(at: str, p: str, pct: float | None, status: str, note: str) -> ob.Lineups:
@@ -360,7 +456,7 @@ def _st(at: str, mid: str, team: str, slug: str, role: str, minute: float | None
     return ob.Starters(at, "s", minute, slug, slug.upper(), team, mid, role)
 
 
-def _tables(por: tuple[float, float] = (5.0, 20.0)) -> dict[str, list[Any]]:
+def _tables(por: tuple[float, float] = (5.0, 20.0), q1_expires: str = "2026-08-23T18:00:00+00:00") -> dict[str, list[Any]]:
     y = dict(FIT_Y)
     y.update({ff: 1.0 + 0.5 * math.log(v) for ff, v in LINE_VALUES.items()})
     points = [_p(D1, ff, 10.0 * v, 10.0, "25") for ff, v in y.items()] + [_p(D1, "q1", 3.0, 3.0, "26")]
@@ -370,7 +466,7 @@ def _tables(por: tuple[float, float] = (5.0, 20.0)) -> dict[str, list[Any]]:
                 _st(D3, "EF", "E", "r1", "starter", 70.0)]
     api = [ob.ApiPlayersAll(D1, "s", None, "api-m4", "T", "J", "J", "out_of_league")]
     return {"market": _league(D1, por, 100.0) + _league(D3, por, 120.0), "points": points, "lineups": lineups,
-            "matches": matches, "starters": starters, "api_players_all": api,
+            "matches": matches, "starters": starters, "api_players_all": api, "api_market": _listings(D1, q1_expires),
             "results_history": [ob.ResultsHistory(D1, "fd", hg, ag, "s", day, "h" + h, "h" + a, h, a)
                                 for h, a, hg, ag, day in (("A", "B", 2.0, 0.0, "d1"), ("B", "A", 1.0, 1.0, "d2"),
                                                           ("E", "F", 0.0, 3.0, "d3"), ("C", "D", 1.0, 1.0, "d4"),
@@ -383,7 +479,8 @@ def _scratch() -> ob.Observations:
 
 def _view(world: state.World) -> Any:
     inp = inputs(world, IDENTITY, knobs())
-    return world.cut, ppm_prior(inp), forecast_rate(inp), forecast_fit(inp), forecast_now(inp)
+    return (world.cut, ppm_prior(inp), forecast_rate(inp), forecast_fit(inp), forecast_now(inp), late_arrivals(inp),
+            forecast_used(inp))
 
 
 def _inp(world: state.World) -> Inputs:
@@ -415,6 +512,7 @@ def _selftest() -> None:
     later = _tables()
     later["points"].append(_p(D5, "q2", 1.0, 10.0, "25"))
     later["lineups"].append(_lu(D5, "m4", 5.0, "doubt", "Duda para la jornada 9"))
+    later["api_market"].append(_listing(D5, "api-q1", 5.0, LEAGUE, "2026-08-14T12:00:00+00:00"))
     assert all(_view(state.world_at(ob.of(later), c)) == views[c] for c in CUTS)
 
     assert ppm_prior(_inp(state.world_at(obs, D0))) == () and len(views[D1][1]) == len(set(p.player for p in views[D1][1]))
@@ -535,6 +633,29 @@ def _selftest() -> None:
     moved = forecast_now(_inp(state.world_at(ob.of(t4), D1)))
     assert [n for n in now if n.player != "q2"] == [n for n in moved if n.player != "q2"], (
         "a player's rows do not change when another player's line-up row changes")
+
+    late1 = {(x.player, x.jornada) for x in late_arrivals(inp1)}
+    assert len(late_arrivals(inp1)) == len(late1), "one_per_pair: a club with two fixtures in a jornada gives one Late"
+    assert late1 == {("q1", 1), ("q1", 2)}, "late_means_after_kickoff: q1 closes after A's kickoffs in jornadas 1 and 2"
+    used1 = forecast_used(inp1)
+    assert len(used1) == len(now) and sorted((u.player, u.jornada, u.pts) for u in used1) == sorted(
+        (n.player, n.jornada, n.pts) for n in now), "forecast_used has one row per now row"
+    for u, n in zip(used1, now):
+        assert 0.0 <= u.p <= 1.0 and u.pts >= 0.0, "forecast_used: p in [0, 1], pts >= 0"
+        if (u.player, u.jornada) in late1:
+            assert u.p == 0.0 and u.e == 0.0 and u.pts == n.pts, "late_zeroes_p_and_e_not_pts"
+        else:
+            assert u.p == n.p and u.e == u.pts * u.p and u.pts == n.pts, "late_zeroes_p_and_e_not_pts: others as now"
+    assert [u.p for u in used1 if (u.player, u.jornada) == ("q1", 2)] == [0.0, 0.0], "all fixtures of a late pair are zeroed"
+    with db.set_constants(P_LIFT=0.5):
+        lifted1 = forecast_used(_inp(w1))
+    assert len(lifted1) == len(used1) and all(b.p >= a.p - 1e-12 for a, b in zip(used1, lifted1)), \
+        "raising P_LIFT never lowers a used.p"
+    t5 = _tables(q1_expires="2026-08-14T12:00:00+00:00")
+    w5 = state.world_at(ob.of(t5), D1)
+    assert late_arrivals(_inp(w5)) == (), "a close before the kickoff is not late"
+    assert [u for u in used1 if u.player != "q1"] == [u for u in forecast_used(_inp(w5)) if u.player != "q1"], \
+        "a player's used rows do not change when another player's listing row changes"
     print("ffcore.forecast_facts self-test OK")
 
 
