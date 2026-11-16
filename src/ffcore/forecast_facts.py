@@ -16,6 +16,11 @@ forecast_now: one NowRow per (player with a position and a club, fixture of his 
 late_arrivals: one Late per (player, jornada) in Inputs.late, built in inputs() by _late from listing_close.
 forecast_used: the Used rows of Inputs.used, forecast_now with the late pairs zeroed (built by _used).
 forecast_now, late_arrivals and forecast_used read Inputs.now, Inputs.late and Inputs.used; no selector calls another.
+spread: the Spread of one cut, from season_facts.played_points and forecast.SEED_POOL, in Inputs.spread (by _spread).
+held: the players in the latest squads or listings, in Inputs.held (by _held).
+pool: the PoolCell rows (player rows and each position's stand-in) of one cut, in Inputs.pool (by _pool).
+score_spread, held, cell_pool, cell and cell_total read Inputs.spread, Inputs.held and Inputs.pool; cell and cell_total are
+  views over Inputs.pool (both through _player_cells).
 
 Named rules, each tested:
   fit_needs_value_and_ten_matches     a last-season row joins the fit only if its player has a value above 0, a position
@@ -48,7 +53,19 @@ Named rules, each tested:
                                       or "ahead"; a player with no club is never late; one Late per pair, so a club with
                                       two fixtures in one jornada gives one.
   late_zeroes_p_and_e_not_pts         every Used row of a late pair (all its fixtures) has p 0.0 and e 0.0, pts unchanged;
-                                      every other row has p as in NowRow and e = pts * p."""
+                                      every other row has p as in NowRow and e = pts * p.
+  pool_is_seed_until_enough           fewer than knobs.min_pool played rows (a row whose sum is None counts toward the size)
+                                      -> the pool is forecast.SEED_POOL; otherwise the played sums; a None sum is not averaged.
+  m2_zero_mean_guard                  m2 = mean(x*x) / (mean(x)*mean(x) if abs(mean(x)) > 1e-9 else 1.0), means over non-null
+                                      x; m2 None when the pool has no non-null x.
+  standin_is_average_of_held          per (jornada, position) one stand-in row (player None, pos set): pts and p are the means
+                                      over the used rows of held players whose position is not ""; e = pts_mean * p_mean (the
+                                      product of the means); a position with no held player in a jornada has no stand-in.
+  variance_formula                    v = p * pts * pts * m2 - e * e (in that order) for player and stand-in rows alike; v None
+                                      when m2 is None. m2 >= 1 (Jensen) and p in [0, 1] make a player's v >= 0.
+  held_drops_unknown                  held is the players of the latest squads and listings rows; a row with no player adds none.
+  cell_total_sums                     per player with a cell: e summed, v summed over its non-None values (None if all are None),
+                                      jornadas the number of his cell rows."""
 from __future__ import annotations
 
 import json
@@ -63,9 +80,10 @@ from ffcore import db
 from ffcore import forecast
 from ffcore import observations as ob
 from ffcore import state
-from ffcore.current import LIST_SOURCE, ClubRating, Identity, PlayerClub, PlayerStatus, club_rating, player_club, player_status, player_value
-from ffcore.season_facts import (Calendar, Fixture, Kickoff, LastSeason, ListingClose, SeasonRecord, club_fixture, jornada_calendar,
-                                 kickoffs, last_season, listing_close, pick, season_record)
+from ffcore.current import (LIST_SOURCE, ClubRating, Identity, Listing, PlayerClub, PlayerStatus, Squad, club_rating, listings,
+                            player_club, player_status, player_value, squads)
+from ffcore.season_facts import (Calendar, Fixture, Kickoff, LastSeason, ListingClose, PlayedPoints, SeasonRecord, club_fixture,
+                                 jornada_calendar, kickoffs, last_season, listing_close, pick, played_points, season_record)
 from stats import shrink
 
 MIN_MATCHES = 10
@@ -75,6 +93,35 @@ MIN_FIT = 3
 class Prior(NamedTuple):
     player: str
     prior: float | None
+
+
+class Spread(NamedTuple):
+    m2: float | None
+    share: float
+
+
+class PoolCell(NamedTuple):
+    jornada: int
+    player: str | None
+    pos: str | None
+    p: float
+    e: float
+    v: float | None
+
+
+class Cell(NamedTuple):
+    jornada: int
+    player: str
+    p: float
+    e: float
+    v: float | None
+
+
+class Total(NamedTuple):
+    player: str
+    e: float
+    v: float | None
+    jornadas: int
 
 
 class Inputs(NamedTuple):
@@ -93,6 +140,9 @@ class Inputs(NamedTuple):
     now: tuple[NowRow, ...]
     late: frozenset[Late]
     used: tuple[Used, ...]
+    spread: Spread
+    held: frozenset[str]
+    pool: tuple[PoolCell, ...]
 
 
 class _Point(NamedTuple):
@@ -369,10 +419,91 @@ def forecast_used(inp: Inputs) -> tuple[Used, ...]:
     return inp.used
 
 
+def _spread(played: Iterable[PlayedPoints], knobs: Knobs) -> Spread:
+    """m2 of the pool of played sums (or the seed pool) and the persistent share (rules pool_is_seed_until_enough,
+    m2_zero_mean_guard)."""
+    rows = tuple(played)
+    xs: list[float | None] = [r.pts for r in rows] if len(rows) >= knobs.min_pool else list(forecast.SEED_POOL)
+    vals = [x for x in xs if x is not None]
+    if not vals:
+        return Spread(None, knobs.persistent_share)
+    mean = sum(vals) / len(vals)
+    sq = sum(x * x for x in vals) / len(vals)
+    return Spread(sq / (mean * mean if abs(mean) > 1e-9 else 1.0), knobs.persistent_share)
+
+
+def _held(squad_rows: Iterable[Squad], listing_rows: Iterable[Listing]) -> frozenset[str]:
+    """The players of the latest squads and listings (rule held_drops_unknown)."""
+    rows: list[Squad | Listing] = [*squad_rows, *listing_rows]
+    return frozenset(r.player for r in rows if r.player is not None)
+
+
+def _pool(used: tuple[Used, ...], held: frozenset[str], clubs: tuple[PlayerClub, ...], spread: Spread) -> tuple[PoolCell, ...]:
+    """Each used row as a player's PoolCell, then each (jornada, position) of held players as a stand-in (rules
+    standin_is_average_of_held, variance_formula)."""
+    m2 = spread.m2
+    pos = {c.player: c.pos for c in clubs}
+
+    def variance(p: float, pts: float, e: float) -> float | None:
+        return None if m2 is None else p * pts * pts * m2 - e * e
+
+    out = [PoolCell(u.jornada, u.player, None, u.p, u.e, variance(u.p, u.pts, u.e)) for u in used]
+    by_position: dict[tuple[int, str], list[Used]] = defaultdict(list)
+    for u in used:
+        if u.player in held and pos.get(u.player, "") != "":
+            by_position[(u.jornada, pos[u.player])].append(u)
+    for (jornada, position), rows in by_position.items():
+        pts = sum(u.pts for u in rows) / len(rows)
+        p = sum(u.p for u in rows) / len(rows)
+        e = pts * p
+        out.append(PoolCell(jornada, None, position, p, e, variance(p, pts, e)))
+    return tuple(out)
+
+
+def _player_cells(pool: tuple[PoolCell, ...]) -> tuple[Cell, ...]:
+    """The player rows of a pool as Cells (rule cell_pool reads player rows only)."""
+    return tuple(Cell(r.jornada, r.player, r.p, r.e, r.v) for r in pool if r.player is not None)
+
+
+def score_spread(inp: Inputs) -> Spread:
+    """The spread of a jornada's points about a cell's expectation: m2 and the persistent share (rules
+    pool_is_seed_until_enough, m2_zero_mean_guard)."""
+    return inp.spread
+
+
+def held(inp: Inputs) -> frozenset[str]:
+    """The players in the latest squads or listings (rule held_drops_unknown)."""
+    return inp.held
+
+
+def cell_pool(inp: Inputs) -> tuple[PoolCell, ...]:
+    """The player rows and the stand-in rows of one cut (rules standin_is_average_of_held, variance_formula)."""
+    return inp.pool
+
+
+def cell(inp: Inputs) -> tuple[Cell, ...]:
+    """The player rows of cell_pool: each player's p, e and v for each jornada left."""
+    return _player_cells(inp.pool)
+
+
+def cell_total(inp: Inputs) -> tuple[Total, ...]:
+    """One Total per player with a cell: his e summed, v summed over its non-None values, and his cell rows counted
+    (rule cell_total_sums)."""
+    by_player: dict[str, list[Cell]] = defaultdict(list)
+    for c in _player_cells(inp.pool):
+        by_player[c.player].append(c)
+    out = []
+    for player, rows in by_player.items():
+        known = [c.v for c in rows if c.v is not None]
+        out.append(Total(player, sum(c.e for c in rows), sum(known) if known else None, len(rows)))
+    return tuple(out)
+
+
 def inputs(world: state.World, identity: Identity, knobs: Knobs) -> Inputs:
     """The shared pieces of one cut, each built once: the one place the ingest selectors are called for this group.
     rate is the Rate of every player_club row, prior his Prior, prog and nxt as in fit_of, now the forecast_now rows,
-    late the late pairs of listing_close against the kickoffs and calendar, used the forecast_used rows."""
+    late the late pairs of listing_close against the kickoffs and calendar, used the forecast_used rows, spread the
+    Spread of the played points, held the players of the latest squads and listings, pool the PoolCell rows."""
     clubs = player_club(world)
     status_rows = player_status(world, identity)
     status = {s.player: s for s in status_rows}
@@ -391,8 +522,11 @@ def inputs(world: state.World, identity: Identity, knobs: Knobs) -> Inputs:
     rate = _rate_map(clubs, status, record, last, prior, knobs)
     now = _now_rows(clubs, rate, by_club, prog, nxt, rating, knobs)
     late = _late(clubs, listing_close(world, identity), kickoffs(world), jornada_calendar(world))
-    return Inputs(knobs, clubs, status, record, last, value, prior, prog, nxt, rating, by_club, rate, now, late,
-                  _used(now, late))
+    used = _used(now, late)
+    spread = _spread(played_points(world, identity), knobs)
+    held_players = _held(squads(world, identity), listings(world, identity))
+    return Inputs(knobs, clubs, status, record, last, value, prior, prog, nxt, rating, by_club, rate, now, late, used,
+                  spread, held_players, _pool(used, held_players, clubs, spread))
 
 
 D0, D1, D2, D3, D4, D5 =("2026-08-13T0000Z", "2026-08-14T1000Z", "2026-08-16T1000Z", "2026-08-20T1000Z",
@@ -404,7 +538,7 @@ LINE_VALUES = {"f1": 10.0, "f2": 100.0, "f3": 1000.0}
 CLUBS = {"q1": "A", "q2": "B", "q3": "C", "qn": "D", "r1": "E", "r2": "F", "m1": "G", "m2": "H", "m3": "I",
          "m4": "J", "f1": "K", "f2": "L", "f3": "M", "c1": "N"}
 IDENTITY = Identity(ff={(p, p.upper(), c): p for p, c in CLUBS.items()},
-                    app={"api-m4": "m4", "api-q1": "q1", "api-q2": "q2", "api-z1": "z1"})
+                    app={"api-m4": "m4", "api-q1": "q1", "api-q2": "q2", "api-z1": "z1", "api-r1": "r1"})
 LEAGUE, TEAM = "marketPlayerLeague", "marketPlayerTeam"
 MATCHES_1 = (("AB", "A", "B", "2026-08-15T20:00:00+02:00"), ("CD", "C", "D", ""), ("EF", "E", "F", ""),
              ("GH", "G", "H", ""), ("IJ", "I", "J", ""), ("KL", "K", "L", ""), ("MN", "M", "N", ""))
@@ -465,8 +599,11 @@ def _tables(por: tuple[float, float] = (5.0, 20.0), q1_expires: str = "2026-08-2
     starters = [_st(D3, "AB", "A", "q1", "starter", None), _st(D3, "AB", "B", "q2", "sub", 60.0),
                 _st(D3, "EF", "E", "r1", "starter", 70.0)]
     api = [ob.ApiPlayersAll(D1, "s", None, "api-m4", "T", "J", "J", "out_of_league")]
+    teams = [ob.ApiTeams(D1, "s", 1.0, 1.0, 1.0, "api-r1", "t", "mgr", "R1", "R1", "", "pr1"),
+             ob.ApiTeams(D1, "s", 1.0, 1.0, 1.0, "api-nobody", "t", "mgr", "N", "N", "", "pn")]
     return {"market": _league(D1, por, 100.0) + _league(D3, por, 120.0), "points": points, "lineups": lineups,
-            "matches": matches, "starters": starters, "api_players_all": api, "api_market": _listings(D1, q1_expires),
+            "matches": matches, "starters": starters, "api_players_all": api, "api_teams": teams,
+            "api_market": _listings(D1, q1_expires),
             "results_history": [ob.ResultsHistory(D1, "fd", hg, ag, "s", day, "h" + h, "h" + a, h, a)
                                 for h, a, hg, ag, day in (("A", "B", 2.0, 0.0, "d1"), ("B", "A", 1.0, 1.0, "d2"),
                                                           ("E", "F", 0.0, 3.0, "d3"), ("C", "D", 1.0, 1.0, "d4"),
@@ -480,7 +617,7 @@ def _scratch() -> ob.Observations:
 def _view(world: state.World) -> Any:
     inp = inputs(world, IDENTITY, knobs())
     return (world.cut, ppm_prior(inp), forecast_rate(inp), forecast_fit(inp), forecast_now(inp), late_arrivals(inp),
-            forecast_used(inp))
+            forecast_used(inp), score_spread(inp), held(inp), cell_pool(inp), cell(inp), cell_total(inp))
 
 
 def _inp(world: state.World) -> Inputs:
@@ -656,6 +793,74 @@ def _selftest() -> None:
     assert late_arrivals(_inp(w5)) == (), "a close before the kickoff is not late"
     assert [u for u in used1 if u.player != "q1"] == [u for u in forecast_used(_inp(w5)) if u.player != "q1"], \
         "a player's used rows do not change when another player's listing row changes"
+
+    assert held(inp1) == {"q1", "q2", "m4", "z1", "r1"}, "held: squads and listings; the row with no known player adds none"
+    seed = [float(x) for x in forecast.SEED_POOL]
+    seed_m2 = (sum(x * x for x in seed) / len(seed)) / (sum(seed) / len(seed)) ** 2
+    assert score_spread(inp1).share == k.persistent_share
+
+    def near(a: float | None, b: float, tol: float = 1e-12) -> bool:
+        return a is not None and abs(a - b) <= tol
+
+    assert len(played_points(w1, IDENTITY)) < k.min_pool and near(score_spread(inp1).m2, seed_m2), \
+        "pool_is_seed_until_enough: fewer played rows than MIN_POOL, the seed pool"
+    scored_t = _tables()
+    scored_t["points"] += [_p(D2, "q1", 5.0, 4.0, "26"), _p(D2, "q2", 1.0, 1.0, "26")]
+    w_scored = state.world_at(ob.of(scored_t), D3)
+    rows1 = played_points(w_scored, IDENTITY)
+    assert _spread([PlayedPoints("a", 1, 0.0)], k._replace(min_pool=0.0)).m2 == 0.0, \
+        "m2_zero_mean_guard: a zero mean divides by 1.0"
+    assert _spread([PlayedPoints("a", 1, None)], k._replace(min_pool=0.0)).m2 is None, "m2 None with no non-null x"
+    assert _spread([PlayedPoints("a", 1, None), PlayedPoints("b", 1, 2.0)], k._replace(min_pool=0.0)).m2 == 1.0, \
+        "a None sum counts in the pool's size, not in its averages"
+    assert near(_spread([PlayedPoints("a", 1, None)], k._replace(min_pool=2.0)).m2, seed_m2), \
+        "a None row counts toward min_pool: one row of two needed is the seed pool"
+    xs = [r.pts for r in rows1 if r.pts is not None]
+    assert xs, "the fixture has played points"
+    with db.set_constants(MIN_POOL=1):
+        played_spread = score_spread(_inp(w_scored))
+    assert near(played_spread.m2, (sum(x * x for x in xs) / len(xs)) / (sum(xs) / len(xs)) ** 2), \
+        "pool_is_seed_until_enough: from MIN_POOL played rows, the played sums"
+
+    pos = {c.player: c.pos for c in inp1.clubs}
+    m2 = inp1.spread.m2
+    assert m2 is not None and m2 >= 1.0 - 1e-12, "m2 >= 1 (Jensen)"
+    pool1 = cell_pool(inp1)
+    player_rows = [r for r in pool1 if r.player is not None]
+    assert [(r.jornada, r.player) for r in player_rows] == [(u.jornada, u.player) for u in inp1.used], \
+        "player rows are the used rows, in order"
+    for r, u in zip(player_rows, inp1.used):
+        assert r.p == u.p and r.e == u.e and r.pos is None and r.v == u.p * u.pts * u.pts * m2 - u.e * u.e, \
+            "variance_formula: player rows"
+        assert r.v is not None and r.v >= -1e-9, "v = p pts^2 (m2 - p) >= 0 for p in [0, 1] and m2 >= 1"
+    standins = {(r.jornada, r.pos): r for r in pool1 if r.player is None}
+    assert len(standins) == sum(1 for r in pool1 if r.player is None), "one stand-in per (jornada, position)"
+    keys = {(u.jornada, pos[u.player]) for u in inp1.used if u.player in inp1.held and pos.get(u.player, "") != ""}
+    assert set(standins) == keys, "standin_is_average_of_held: a stand-in per position a held player has in the jornada"
+    for (j, ps), r in standins.items():
+        held_rows = [u for u in inp1.used if u.jornada == j and u.player in inp1.held and pos.get(u.player, "") == ps]
+        pts_m = sum(u.pts for u in held_rows) / len(held_rows)
+        p_m = sum(u.p for u in held_rows) / len(held_rows)
+        assert abs(r.p - p_m) < 1e-12 and abs(r.e - pts_m * p_m) < 1e-12, "standin: means of pts and p; e the product"
+        assert near(r.v, p_m * pts_m * pts_m * m2 - (pts_m * p_m) ** 2, 1e-9), "variance_formula: stand-in rows"
+
+    cells1 = cell(inp1)
+    assert sorted((c.player, c.jornada) for c in cells1) == sorted((u.player, u.jornada) for u in inp1.used), \
+        "cell: used's (player, jornada) keys with multiplicity"
+    totals1 = cell_total(inp1)
+    assert {t.player for t in totals1} == {c.player for c in cells1}, "cell_total: one row per player with a cell"
+    for t in totals1:
+        rows = [c for c in cells1 if c.player == t.player]
+        known = [c.v for c in rows if c.v is not None]
+        assert abs(t.e - sum(c.e for c in rows)) < 1e-12 and t.jornadas == len(rows), "cell_total_sums: e and the row count"
+        assert (t.v is None) == (not known) and (t.v is None or abs(t.v - sum(known)) < 1e-9), "cell_total_sums: v"
+    t6 = _tables()
+    t6["api_teams"] = []
+    no_squads = _inp(state.world_at(ob.of(t6), D1))
+    assert held(no_squads) == held(inp1) - {"r1"}, "held: the squads row is the only source of r1"
+    assert cell(no_squads) == cell(inp1), "a player's cell rows do not depend on who is held"
+    no_squads_keys = {(r.jornada, r.pos) for r in cell_pool(no_squads) if r.player is None}
+    assert no_squads_keys < set(standins), "a stand-in for each position with a held player, and only those"
     print("ffcore.forecast_facts self-test OK")
 
 

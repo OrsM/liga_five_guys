@@ -4,7 +4,7 @@ market's club of a player; every selector is a pure function of the World (and, 
 
 Folds (registered): kickoffs, first_results, points_changes, season_last. Selectors: kickoffs, blind_results,
 jornada_calendar, round_locks, next_lock, clubs_played, club_fixture, jornadas_done, club_games, scored,
-squad_minutes, appearances, player_jornadas, season_record, pick, last_season, listing_close. An Identity (current.py) maps a starter's
+squad_minutes, appearances, player_jornadas, played_points, season_record, pick, last_season, listing_close. An Identity (current.py) maps a starter's
 (player_slug, player_name, team_slug), through its ff map, to his player id.
 
 Named rules, each tested:
@@ -25,7 +25,9 @@ Named rules, each tested:
                                   a sale_price present and not 0, and a non-empty expires_at; a player's close is the latest
                                   of his counted listings' julian days.
   close_group_keeps_unparseable   a player whose counted listings all expire at a text that is not an instant has a
-                                  ListingClose with t None."""
+                                  ListingClose with t None.
+  played_is_scored_and_appeared   played_points has a row only for a (player, jornada) with BOTH a scored row and an
+                                  appearance; its pts is the sum of his scored rows only (None if all are None)."""
 from __future__ import annotations
 
 import bisect
@@ -129,6 +131,12 @@ class Appearance(NamedTuple):
 
 
 class PlayerJornada(NamedTuple):
+    player: str
+    jornada: int
+    pts: float | None
+
+
+class PlayedPoints(NamedTuple):
     player: str
     jornada: int
     pts: float | None
@@ -428,6 +436,16 @@ def player_jornadas(world: st.World, identity: Identity) -> tuple[PlayerJornada,
     return tuple(PlayerJornada(p, j, _total(v)) for (p, j), v in sorted(points.items()))
 
 
+def played_points(world: st.World, identity: Identity) -> tuple[PlayedPoints, ...]:
+    """Each (player, jornada) with a scored row and an appearance: his scored rows' points summed, by player and
+    jornada (rule played_is_scored_and_appeared)."""
+    played = _played(_squads(world, identity))
+    points: dict[tuple[str, int], list[float | None]] = defaultdict(list)
+    for s in scored(world):
+        points[(s.player, s.jornada)].append(s.pts)
+    return tuple(PlayedPoints(p, j, _total(v)) for (p, j), v in sorted(points.items()) if (p, j) in played)
+
+
 def season_record(world: st.World, identity: Identity) -> tuple[SeasonRecord, ...]:
     """Each scoring player's season so far: points, appearances and matchday squads (jornadas scored in or
     squadded), by player."""
@@ -476,7 +494,7 @@ def _m(at: str, mid: str, j: int | None, home: str, away: str, score: str, kicko
     return ob.Matches(at, "s", j, mid, "", home, away, score, kickoff)
 
 
-def _p(at: str, ff: str, points: float, games: float, season: str = "26") -> ob.Points:
+def _p(at: str, ff: str, points: float | None, games: float, season: str = "26") -> ob.Points:
     return ob.Points(at, "s", points, games, 0.0, ff, "", "", "", season)
 
 
@@ -598,6 +616,22 @@ def _selftest() -> None:
     closes = listing_close(st.world_at(ob.of({"api_market": close_rows}), "2026-08-23T1000Z"), close_ids)
     assert {c.player: c.t for c in closes} == {"px": julian_day("2026-08-22T10:00:00+00:00"), "ps": None}, \
         "league_listings_only and close_group_keeps_unparseable"
+
+    ids_end = Identity(ff=SCRATCH_IDENTITY_FF, app={})
+    played = played_points(worlds[cuts[-1]], ids_end)
+    scored_keys = {(s.player, s.jornada) for s in end[10]}
+    apps_keys = {(a.player, a.jornada) for a in end[12]}
+    assert {(r.player, r.jornada) for r in played} == scored_keys & apps_keys, "played_is_scored_and_appeared"
+    assert len({(r.player, r.jornada) for r in played}) == len(played), "one row per (player, jornada)"
+    for r in played:
+        held = [s.pts for s in end[10] if (s.player, s.jornada) == (r.player, r.jornada)]
+        assert r.pts == (sum(v for v in held if v is not None) if any(v is not None for v in held) else None), \
+            "the sum of his scored rows"
+    d1, d2, d3 = "2026-08-14T1000Z", "2026-08-16T1000Z", "2026-08-20T1000Z"
+    none_obs = ob.of({"matches": [_m(d2, "m1", 1, "A", "B", "1-0", "")], "points": [_p(d2, "ida", None, 1.0)],
+                      "market": [_mk(d1, "ida", "A")], "starters": [_st(d2, "m1", "A", "pa", "starter", None)]})
+    none_played = played_points(st.world_at(none_obs, d3), ids_end)
+    assert [(r.player, r.jornada, r.pts) for r in none_played] == [("ida", 1, None)], "an all-None scored row gives pts None"
     print("ffcore.season_facts self-test OK")
 
 
