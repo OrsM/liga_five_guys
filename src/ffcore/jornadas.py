@@ -5,11 +5,12 @@ from __future__ import annotations
 
 
 from datetime import datetime
+from ffcore import season_facts, state
 from ffcore.db import rows
 from ffcore.parse import snapshot_stamp
 from typing import NamedTuple
 
-__all__ = ["Rounds", "round_locks", "rounds", "rounds_ahead"]
+__all__ = ["Rounds", "round_locks", "rounds", "rounds_ahead", "rounds_at"]
 
 
 class Rounds(NamedTuple):
@@ -47,6 +48,54 @@ def rounds() -> Rounds:
         played.setdefault(j, set()).add(club)
     return Rounds(rem, {j: nxt[j] for j in rem if j in nxt}, played,
                   {j for j, state in left.items() if state == "behind"})
+
+
+def rounds_at(world: state.World) -> Rounds:
+    """rounds() over the World (rule rounds_left_order): rem is the jornadas not done, those with a next kickoff by
+    when it is (ties by jornada), those with none last by jornada; next, played (the clubs with a scored match in each
+    jornada left) and behind as rounds() has them."""
+    calendar = season_facts.jornada_calendar(world)
+    nxt = {c.jornada: when for c in sorted(calendar, key=lambda c: (c.next or "", c.jornada))
+           if c.next is not None and (when := snapshot_stamp(c.next)) is not None}
+    left = {c.jornada: c.state for c in calendar if c.state != "done"}
+    rem = [j for j in nxt if j in left] + sorted(set(left) - set(nxt))
+    played: dict[int, set[str]] = {}
+    for p in season_facts.clubs_played(world):
+        played.setdefault(p.jornada, set()).add(p.club)
+    return Rounds(rem, {j: nxt[j] for j in rem if j in nxt}, played, {j for j, s in left.items() if s == "behind"})
+
+
+def _selftest_rounds_at() -> None:
+    """rounds_left_order, and the same facts alone, in a sweep and unchanged by rows after the cut."""
+    from datetime import timezone
+
+    from ffcore import observations as ob
+
+    def m(at: str, j: int, mid: str, home: str, away: str, score: str, kick: str) -> ob.Matches:
+        return ob.Matches(at, "s", j, mid, "", home, away, score, kick)
+    t0 = "2026-08-10T0900Z"
+    rows_ = [m(t0, 1, "m1", "a", "b", "1-0", "2026-08-10T17:00:00+00:00"),
+             m(t0, 2, "m2", "c", "d", "", "2026-08-16T17:00:00+00:00"),
+             m(t0, 2, "m3", "e", "f", "", "2026-08-26T17:00:00+00:00"),
+             m(t0, 3, "m4", "g", "h", "", "2026-08-22T17:00:00+00:00"),
+             m(t0, 4, "m5", "i", "j", "", "2026-08-30T17:00:00+00:00"),
+             m(t0, 5, "m6", "k", "l", "", ""),
+             m("2026-08-17T0900Z", 2, "m2", "c", "d", "1-0", "")]
+    obs = ob.of({"matches": rows_})
+    cut = "2026-08-24T0000Z"
+    got = rounds_at(state.world_at(obs, cut))
+    utc = timezone.utc
+    assert got.rem == [3, 2, 4, 5], "by when each next plays, the unknown last, a done jornada not at all"
+    assert got.next == {3: datetime(2026, 8, 22, 17, tzinfo=utc), 2: datetime(2026, 8, 26, 17, tzinfo=utc),
+                        4: datetime(2026, 8, 30, 17, tzinfo=utc)}
+    assert got.played == {2: {"c", "d"}} and got.behind == {2}, "jornada 2 started before jornada 3 did"
+    cuts = ["2026-08-09T0000Z", "2026-08-18T0000Z", cut]
+    alone = {c: rounds_at(state.world_at(obs, c)) for c in cuts}
+    assert state.sweep(obs, cuts, rounds_at) == [alone[c] for c in cuts]
+    assert state.sweep(obs, cuts[::-1], rounds_at) == [alone[c] for c in cuts[::-1]]
+    later = ob.of({"matches": rows_ + [m("2026-08-25T0900Z", 3, "m4", "g", "h", "2-0", "")]})
+    assert all(rounds_at(state.world_at(later, c)) == alone[c] for c in cuts)
+    assert alone[cuts[0]] == Rounds([], {}, {}, set())
 
 
 def _selftest() -> None:
@@ -145,6 +194,7 @@ def _selftest() -> None:
                 "done: every match has a score (jornada 1 still has one to play, 3 and 4 theirs)"
         finally:
             set_now(None)
+    _selftest_rounds_at()
     print("ffcore.jornadas self-test OK")
 
 

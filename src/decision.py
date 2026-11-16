@@ -1,17 +1,33 @@
 """The decision's inputs: the league at t (schema.sql look, my_squad, my_cash) made into the rows the board and
-approach.approach read (decide.sql dec_*), and the players on the market who would improve your eleven."""
+approach.approach read (decide.sql dec_*), and the players on the market who would improve your eleven.
+decision_at(loaded, world) is the decision at a cut as one value computed from the World, live and replay alike; the
+board's extras (Extras) are selectors over the same World.
+Named rules, each tested:
+  stale_app_makes_no_decision: fresh is None only when the newest api_teams snapshot is at most APP_FRESH_HOURS before
+    the cut; no api_teams at all is stale ("unknown"); decision_at gives Stale(reason) for a stale cut.
+  known_name_is_shown_name: Fact.name is Name's shown form of the stored name, not the raw text.
+  offer_needs_pending_money: Extras.offers: status 'pending', money not 0, on a player of held_names, value the
+    squad row's market_value (0.0 when the squad row has none, as Held's).
+  market_read_is_newest_api_market_stamp: market_read is None when there is no market row at the cut.
+  arrivals_need_a_previous_run: arrivals computes from the fresh opportunities and the records of earlier cuts, at every
+    cut (the SQL dec_arrivals read only the cut's own kept run); with no earlier record there is none, and a player
+    who was 'market' at the newest earlier cut is not an arrival."""
 from __future__ import annotations
 
 from contextlib import closing
 from datetime import datetime, timezone
-from typing import Any, Iterable, NamedTuple, Sequence
+from typing import Any, Iterable, Mapping, NamedTuple, Sequence
 
 import eleven
-from ffcore import current, forecast_facts, price_fold, season_facts, state
+from ffcore import current, forecast_facts, jornadas, price_fold, season_facts, state
 from ffcore.current import AppLineup, Identity, PlayerClub
 from ffcore.db import connect, record, rows
-from ffcore.decision_facts import DEFAULT_POS, PlayerFact, Seen, SeenAuction, my_cash, my_squad
+from ffcore.decision_facts import DEFAULT_POS, PlayerFact, Seen, SeenAuction, my_cash, my_squad, seen_at
 from ffcore.ledger import Cash, League
+from ffcore.loader import Loaded, Opportunity
+from ffcore.names import Name
+from ffcore.parse import snapshot_stamp
+from ffcore.tidy import APP_FRESH_HOURS
 from ffcore.price_fold import Expected
 from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve, bid_for
@@ -19,6 +35,7 @@ from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, 
 
 __all__ = ["inputs", "Inputs", "read_inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals",
            "Fact", "UNKNOWN", "player_facts", "squad_held", "Offer", "standing_offers", "Held", "held", "listed", "market_read_at",
+           "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions",
            "Source", "source_health", "Brier", "Drift", "latest_auction_run", "brier_by_scope", "drifting_bins", "manager_count"]
 
 INPUTS = ("dec_state", "dec_player", "dec_curve", "dec_auction", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_lineup")
@@ -454,6 +471,90 @@ def manager_count() -> int:
     return int(n)
 
 
+class Extras(NamedTuple):
+    """What the board reads beside the inputs, at the cut: the facts about players, your players' names in the squads,
+    the offers on them, who is held and who is listed, and the stamp of the market read."""
+    known: dict[str, Fact]
+    held_names: frozenset[str]
+    offers: list[Offer]
+    held: list[Held]
+    listed: frozenset[str]
+    market_read: str | None
+
+
+class Stale(NamedTuple):
+    reason: str
+
+
+class Decided(NamedTuple):
+    """The decision at a cut: the seen facts, the forecast's inputs, the decision's inputs, the extras and the jornadas
+    left (jornadas.rounds_at's rem)."""
+    cut: str
+    seen: Seen
+    fc: forecast_facts.Inputs
+    inputs: Inputs
+    extras: Extras
+    rounds_left: list[int]
+
+
+def fresh(world: state.World) -> str | None:
+    """None when the newest api_teams snapshot at the cut is at most APP_FRESH_HOURS old (rule
+    stale_app_makes_no_decision), else the reason no decision is made."""
+    stamps = [r.observed_at for r in state.latest(world, "api_teams")]
+    when, at = (snapshot_stamp(max(stamps)) if stamps else None), snapshot_stamp(world.cut)
+    age = None if when is None or at is None else (at - when).total_seconds() / 3600
+    if age is not None and age <= APP_FRESH_HOURS:
+        return None
+    return "the app's squads are %s old; no board is built from them" % ("unknown" if age is None else "%.0fh" % age)
+
+
+def extras_at(world: state.World, identity: Identity, league: League, seen: Seen) -> Extras:
+    """The extras of the cut, over the World and its seen facts (rules known_name_is_shown_name,
+    offer_needs_pending_money, market_read_is_newest_api_market_stamp)."""
+    squads = current.squads(world, identity)
+    names = frozenset(s.player for s in squads if s.manager == league.me and s.player is not None)
+    pending = [o for o in current.offers(world) if o.status == "pending" and o.money is not None and o.money != 0]
+    stamps = [r.observed_at for r in state.latest(world, "api_market")]
+    return Extras(
+        {f.player: Fact(Name(f.name).shown, f.pos, f.trend) for f in seen.facts}, names,
+        sorted((Offer(s.player, s.market_value or 0.0, o.money) for o in pending for s in squads
+                if s.player_team_id == o.player_team_id and s.player in names and o.money is not None),
+               key=lambda x: (x.player, x.money)),
+        sorted((Held(s.player, s.player_team_id, s.player_id, s.market_value or 0.0) for s in squads if s.player in names),
+               key=lambda x: (x.player, x.player_team)),
+        frozenset(x.player for x in current.listings(world, identity) if x.player is not None),
+        max(stamps) if stamps else None)
+
+
+def arrivals(got: Sequence[Mapping[str, Any]], previous: Sequence[Opportunity]) -> list[str]:
+    """The players on the market with a gain, best first (gain, then name), who were not on the market at the newest
+    cut of previous (the records of the cuts before this one); none when there is no record (rule
+    arrivals_need_a_previous_run)."""
+    if not previous:
+        return []
+    last = max(o.cut for o in previous)
+    on_market = {o.player for o in previous if o.cut == last and o.status == "market"}
+    ranked = sorted((r for r in got if r["gain"] > 0), key=lambda r: (-r["gain"], r["player"]))
+    return [r["player"] for r in ranked if r["status"] == "market" and r["player"] not in on_market]
+
+
+def decision_at(loaded: Loaded, world: state.World) -> Decided | Stale:
+    """The decision at the world's cut: Stale(reason) when fresh gives one, else the seen facts, the forecast inputs,
+    the inputs, the extras and the jornadas left, each built once."""
+    reason = fresh(world)
+    if reason is not None:
+        return Stale(reason)
+    seen = seen_at(world, loaded.identity, loaded.league)
+    fc = forecast_facts.inputs(world, loaded.identity, loaded.knobs)
+    return Decided(world.cut, seen, fc, inputs_at(world, loaded.identity, loaded.league, seen, fc),
+                   extras_at(world, loaded.identity, loaded.league, seen), jornadas.rounds_at(world).rem)
+
+
+def decisions(loaded: Loaded, cuts: Sequence[str]) -> list[Decided | Stale]:
+    """decision_at for each cut, in the order given, in one sweep of the loaded observations."""
+    return state.sweep(loaded.obs, cuts, lambda world: decision_at(loaded, world))
+
+
 _NO_MONEY = Money(0.0, 0.0, 0.0, SQUAD_MAX, XI_SIZE)
 
 
@@ -617,12 +718,84 @@ def _selftest_inputs_at() -> None:
     assert any(alone[c].players for c in _CUTS)
 
 
+def _selftest_decision_at() -> None:
+    """The three invariants of decision_at on the scratch league, and one assertion per named rule."""
+    from ffcore import observations as ob
+    from ffcore.decision_facts import _CUTS, _LATER, _ST, _listing, _offer, _scratch, _standing, _tables, TEAM_SELLER
+    obs, ident, league = _scratch()
+    loaded = Loaded(obs, ident, league, forecast_facts.knobs(), ())
+    alone = {c: decision_at(loaded, state.world_at(obs, c)) for c in _CUTS}
+    assert decisions(loaded, _CUTS) == [alone[c] for c in _CUTS], "decisions is decision_at cut by cut"
+    for order in (_CUTS[::-1], [_CUTS[1], _CUTS[0], _CUTS[1]], [_CUTS[-1]]):
+        assert decisions(loaded, order) == [alone[c] for c in order]
+    later = _tables()
+    later["api_market"].append(_listing("a1", "m8", TEAM_SELLER, 13.0, 9.0, 50.0, "pending", "b8", _LATER))
+    later["api_offers"].append(_offer("t3", "o9", 30.0, "pending", _LATER))
+    later["api_standings"].append(_standing("t-ann", "u1", "ann", 99.0, _LATER))
+    later_loaded = loaded._replace(obs=ob.of(later))
+    assert all(decision_at(later_loaded, state.world_at(later_loaded.obs, c)) == alone[c] for c in _CUTS)
+
+    first = alone[_CUTS[0]]
+    assert isinstance(first, Stale) and "unknown" in first.reason, "no api_teams: stale"
+    decided = alone[_ST]
+    assert isinstance(decided, Decided) and decided.cut == _ST and decided.inputs.players and decided.rounds_left == []
+    assert decided.inputs == inputs_at(state.world_at(obs, _ST), ident, league, decided.seen, decided.fc)
+    edge = {"2026-08-19T0824Z": True, "2026-08-19T0825Z": False}
+    for c, ok in edge.items():
+        w = state.world_at(obs, c)
+        assert (fresh(w) is None) == ok == isinstance(decision_at(loaded, w), Decided), "stale_app_makes_no_decision"
+    assert "14h old" in (fresh(state.world_at(obs, "2026-08-19T0825Z")) or "")
+
+    w = state.world_at(obs, _ST)
+    ex = decided.extras
+    squads = current.squads(w, ident)
+    assert ex.held_names == frozenset({"p1", "p3"}) == squad_names(squads, league.me)
+    value = {s.player: s.market_value or 0.0 for s in squads}
+    assert ex.offers == [Offer("p3", value["p3"], 2.0), Offer("p3", value["p3"], 6.0)], (
+        "offer_needs_pending_money: pending, not 0, on mine; not declined, not bob's, not the unmatched")
+    assert [h.player for h in ex.held] == ["p1", "p3"] and all(h.value == value[h.player] for h in ex.held)
+    assert ex.listed == frozenset({"p1", "p2", "p4"}) and ex.market_read == _ST, "market_read_is_newest_api_market_stamp"
+    assert alone[_CUTS[2]].extras.market_read == _ST  # type: ignore[union-attr]
+    assert extras_at(state.world_at(obs, _CUTS[0]), ident, league, decided.seen).market_read is None
+    assert ex.known["p1"] == Fact("Ana", "DEL", decided.seen.facts[0].trend)
+
+    tables = _tables()
+    tables["market"][2] = ob.Market(_ST, "laliga", 15.0, "p3", "MED", "ATM", "nico van gaal")
+    named = ob.of(tables)
+    w3 = state.world_at(named, _ST)
+    seen3 = seen_at(w3, ident, league)
+    shown = extras_at(w3, ident, league, seen3).known["p3"].name
+    assert shown == Name("nico van gaal").shown != "nico van gaal", "known_name_is_shown_name"
+
+
+def squad_names(squads: Iterable[current.Squad], me: str) -> frozenset[str]:
+    return frozenset(s.player for s in squads if s.manager == me and s.player is not None)
+
+
+def _selftest_arrivals_at() -> None:
+    def rec(cut: str, player: str, status: str, gain: float = 1.0) -> Opportunity:
+        return Opportunity(cut, player, "MED", status, None, None, 1, None, gain, None, None, None, None, None, None)
+
+    def row(player: str, status: str, gain: float) -> dict[str, Any]:
+        return {"player": player, "status": status, "gain": gain}
+    got = [row("c", "market", 3.0), row("a", "market", 5.0), row("b", "market", 5.0), row("z", "market", 0.0),
+           row("r", "rival", 9.0), row("old", "market", 2.0)]
+    assert arrivals(got, []) == [], "arrivals_need_a_previous_run: no record"
+    assert arrivals(got, [rec("1", "old", "market")]) == ["a", "b", "c"], "best first, ties by name, gain above 0"
+    assert arrivals(got, [rec("1", "a", "market"), rec("2", "x", "market")]) == ["a", "b", "c", "old"], (
+        "only the newest earlier cut counts")
+    assert arrivals(got, [rec("2", "a", "market"), rec("2", "r", "market"), rec("2", "b", "rival"), rec("1", "c", "market")]) == [
+        "b", "c", "old"], "market then, not an arrival; rival or older then, an arrival"
+
+
 def _selftest() -> None:
     _selftest_builders()
     _selftest_inputs_at()
     _selftest_opportunities()
     _selftest_lineup()
     _selftest_arrivals()
+    _selftest_decision_at()
+    _selftest_arrivals_at()
     print("decision self-test OK")
 
 
