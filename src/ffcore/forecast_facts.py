@@ -12,6 +12,8 @@ prognoses: player -> Prognosis, for each flagged player (a status and a prognosi
 next_jornadas: club -> the jornada of its first fixture.
 fit_of: the chance a player is fit for one fixture, from his Prognosis (None: fit).
 forecast_fit: one FitRow per (player with a club, fixture of his club).
+forecast_now: one NowRow per (player with a position and a club, fixture of his club still to play): his points if he plays
+  and the chance he plays, from forecast_rate, prognoses, next_jornadas and club_rating.
 
 Named rules, each tested:
   fit_needs_value_and_ten_matches     a last-season row joins the fit only if its player has a value above 0, a position
@@ -34,7 +36,11 @@ Named rules, each tested:
   next_fixture_order                  the club's next fixture is the first by kick (a missing kick sorts after any kick), ties by
                                       the lower jornada.
   one_row_per_fixture                 a club with two fixtures in one jornada gives each of its players two FitRows; never a product.
-  knobs_read_at_call                  knobs() sees db.set_constants(SHRINK_K=...) inside the context and the constant after it."""
+  knobs_read_at_call                  knobs() sees db.set_constants(SHRINK_K=...) inside the context and the constant after it.
+  fixture_by_position                 a goalkeeper or defender faces 1 / attack of the opponent, anyone else its defence; an
+                                      opponent with no rating gives 1.0.
+  pts_floor                           pts = max(0.0, ppm * fixture); p = min(1.0, q + p_lift * q * (1 - q)), so p is in [0, 1].
+  coach_has_no_now                    a player with an empty position (a coach) has no NowRow."""
 from __future__ import annotations
 
 import json
@@ -49,7 +55,7 @@ from ffcore import db
 from ffcore import forecast
 from ffcore import observations as ob
 from ffcore import state
-from ffcore.current import LIST_SOURCE, Identity, PlayerStatus, player_club, player_status, player_value
+from ffcore.current import LIST_SOURCE, ClubRating, Identity, PlayerStatus, club_rating, player_club, player_status, player_value
 from ffcore.season_facts import Fixture, LastSeason, SeasonRecord, club_fixture, last_season, pick, season_record
 from stats import shrink
 
@@ -243,7 +249,51 @@ def forecast_fit(world: state.World, identity: Identity) -> tuple[FitRow, ...]:
                  for f in fixtures.get(c.club, ()))
 
 
-D0, D1, D2, D3, D4, D5 = ("2026-08-13T0000Z", "2026-08-14T1000Z", "2026-08-16T1000Z", "2026-08-20T1000Z",
+class NowRow(NamedTuple):
+    player: str
+    jornada: int
+    pts: float
+    p: float
+    ppm: float
+    fixture: float
+    picked: float
+    fit: float
+
+
+def _fixture_factor(pos: str, opp: ClubRating | None) -> float:
+    if opp is None:
+        return 1.0
+    return 1.0 / opp.attack if pos in ("POR", "DEF") else opp.defence
+
+
+def forecast_now(world: state.World, identity: Identity, knobs: Knobs) -> tuple[NowRow, ...]:
+    """One NowRow per (player with a position and a club, fixture of his club still to play): points if he plays,
+    the chance he plays (rules: fixture_by_position, pts_floor, one_row_per_fixture, coach_has_no_now)."""
+    rate = {r.player: r for r in forecast_rate(world, identity, knobs)}
+    prog = prognoses(world, identity)
+    nxt = next_jornadas(world)
+    ratings = {r.club: r for r in club_rating(world, knobs.fixture_k)}
+    fixtures: dict[str, list[Fixture]] = defaultdict(list)
+    for f in club_fixture(world):
+        fixtures[f.club].append(f)
+    out = []
+    for c in player_club(world):
+        if c.pos == "" or c.club is None:
+            continue
+        r = rate[c.player]
+        games = fixtures.get(c.club, [])
+        first = min((f.jornada for f in games), default=0)
+        for f in games:
+            fit = fit_of(prog.get(c.player), nxt[c.club], f)
+            fixture = _fixture_factor(c.pos, ratings.get(f.opp))
+            w = knobs.p_listing * math.pow(knobs.p_decay, f.jornada - first)
+            q = w * r.picked * (1.0 if r.listed_pct else fit) + (1.0 - w) * r.record * fit
+            p = min(1.0, q + knobs.p_lift * q * (1.0 - q))
+            out.append(NowRow(c.player, f.jornada, max(0.0, r.ppm * fixture), p, r.ppm, fixture, r.picked, fit))
+    return tuple(out)
+
+
+D0, D1, D2, D3, D4, D5 =("2026-08-13T0000Z", "2026-08-14T1000Z", "2026-08-16T1000Z", "2026-08-20T1000Z",
                           "2026-08-23T1000Z", "2026-08-30T1000Z")
 CUTS = (D0, D1, D2, D3, D4)
 FIT_Y = {"q1": 4.0, "q2": 3.0, "q3": 2.5, "qn": 1.0, "r1": 2.0, "r2": 4.0,
@@ -297,7 +347,11 @@ def _tables(por: tuple[float, float] = (5.0, 20.0)) -> dict[str, list[Any]]:
                 _st(D3, "EF", "E", "r1", "starter", 70.0)]
     api = [ob.ApiPlayersAll(D1, "s", None, "api-m4", "T", "J", "J", "out_of_league")]
     return {"market": _league(D1, por, 100.0) + _league(D3, por, 120.0), "points": points, "lineups": lineups,
-            "matches": matches, "starters": starters, "api_players_all": api}
+            "matches": matches, "starters": starters, "api_players_all": api,
+            "results_history": [ob.ResultsHistory(D1, "fd", hg, ag, "s", day, "h" + h, "h" + a, h, a)
+                                for h, a, hg, ag, day in (("A", "B", 2.0, 0.0, "d1"), ("B", "A", 1.0, 1.0, "d2"),
+                                                          ("E", "F", 0.0, 3.0, "d3"), ("C", "D", 1.0, 1.0, "d4"),
+                                                          ("G", "H", 2.0, 2.0, "d5"))]}
 
 
 def _scratch() -> ob.Observations:
@@ -305,7 +359,8 @@ def _scratch() -> ob.Observations:
 
 
 def _view(world: state.World) -> Any:
-    return (world.cut, ppm_prior(world), forecast_rate(world, IDENTITY, knobs()), forecast_fit(world, IDENTITY))
+    return (world.cut, ppm_prior(world), forecast_rate(world, IDENTITY, knobs()), forecast_fit(world, IDENTITY),
+            forecast_now(world, IDENTITY, knobs()))
 
 
 def _priors(world: state.World) -> dict[str, float]:
@@ -429,6 +484,29 @@ def _selftest() -> None:
     with db.set_constants(SHRINK_K=1.0):
         assert knobs().shrink_k == 1.0
     assert knobs().shrink_k == forecast.SHRINK_K
+
+    now = forecast_now(w1, IDENTITY, k)
+    ratings = {r.club: r for r in club_rating(w1, k.fixture_k)}
+    assert "c1" not in {n.player for n in now}, "coach_has_no_now"
+    for n in now:
+        assert 0.0 <= n.p <= 1.0 and n.pts >= 0.0, "pts_floor"
+        assert n.pts == max(0.0, n.ppm * n.fixture)
+    assert {n.player for n in now} == {c.player for c in player_club(w1) if c.pos != "" and c.club is not None}
+    at_j1 = {(n.player, n.jornada): n.fixture for n in now if n.player in ("q1", "r1", "m3")}
+    assert at_j1[("q1", 1)] == ratings["B"].defence, "fixture_by_position: a defender (DEL) faces the defence of B"
+    assert at_j1[("r1", 1)] == 1.0 / ratings["F"].attack, "fixture_by_position: a goalkeeper faces 1 / attack of F"
+    assert at_j1[("m3", 1)] == 1.0, "fixture_by_position: an opponent with no rating gives 1.0 (J is unrated)"
+    q1_two = sorted(n.fixture for n in now if n.player == "q1" and n.jornada == 2)
+    assert q1_two == sorted([ratings["C"].defence, ratings["D"].defence]), "one_row_per_fixture: two rows in jornada 2"
+    with db.set_constants(P_LIFT=0.5):
+        lifted = forecast_now(w1, IDENTITY, knobs())
+    base_by = {(n.player, n.jornada, n.fixture): n for n in now}
+    assert all(n.p >= base_by[(n.player, n.jornada, n.fixture)].p - 1e-12 for n in lifted), "raising P_LIFT never lowers p"
+    t4 = _tables()
+    t4["lineups"] = [x._replace(start_pct=None) if x.player_slug == "q2" else x for x in t4["lineups"]]
+    moved = forecast_now(state.world_at(ob.of(t4), D1), IDENTITY, k)
+    assert [n for n in now if n.player != "q2"] == [n for n in moved if n.player != "q2"], (
+        "a player's rows do not change when another player's line-up row changes")
     print("ffcore.forecast_facts self-test OK")
 
 
