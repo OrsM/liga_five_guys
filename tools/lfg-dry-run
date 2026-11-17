@@ -20,4 +20,4 @@ fi
 
 export PYTHONPATH=src FF_ROOT="$SCRATCH/data" LFG_REPORTS="$SCRATCH/reports" LFG_NO_PUBLISH=1
 echo "lfg-dry-run: scratch=$SCRATCH"
-"$HOME/.local/bin/uv" run --frozen python src/run.py "$@"
+"$REPO/tools/capped" "$HOME/.local/bin/uv" run --frozen python src/run.py "$@"

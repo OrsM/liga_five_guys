@@ -41,6 +41,7 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 - `tools/lfg-dry-run` does not copy the database: seed `$LFG_SCRATCH/data/lfg.db` first with a read-only backup of the live one (`sqlite3` `backup()` from a `mode=ro` connection), and delete it afterwards.
 - On a copy run `tools/lfg-dry-run board grade health`, not `parse`: a copy reparses every snapshot (9 minutes).
 - Read-only agents open the live database as above (`mode=ro`).
+- Every heavy or long job that is not `lfg.service` runs through `tools/capped` (`LFG_CAP`, default 1500M; `tools/lfg-dry-run` already does). The box has 3.8 GB: on 2026-11-17 an uncapped sweep run made the OOM killer take down the Remote Control server and archive the phone session. Run at most two such jobs at once.
 - Three levels. Small models do the issues, in swarms. A mid-size pickup agent reads their reports and diffs against the brief and the principles and sorts each issue: good, another small-model turn (it writes the corrected brief), or blocked. The main session writes the briefs, merges what is good, and takes what is blocked to Miguel.
 - Before a brief is posted, the main session runs its verify command on main and checks every fact it names (a name exists, a file is where it says). A wrong brief costs a whole turn.
 - At most two small-model turns on an issue; then it is blocked.

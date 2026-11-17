@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Run a command in its own memory-capped systemd scope: if it outgrows the cap,
+# only it is killed (exit 137). Anything heavy or long that is not lfg.service
+# (which has its own MemoryMax) goes through this.
+#
+#     tools/capped python tools/analyses/hurdle.py ...
+#     LFG_CAP=2G tools/capped tools/lfg-dry-run board
+#
+# Why: the box has 3.8 GB. An uncapped sweep run filled it on 2026-11-17, the
+# kernel OOM killer took down the Remote Control server, and every phone
+# session under it was archived. Swap is disabled for the scope: a job that
+# swaps for minutes slows the whole desktop before it ever dies.
+
+set -euo pipefail
+
+exec systemd-run --user --scope --quiet --collect \
+    -p MemoryMax="${LFG_CAP:-1500M}" -p MemorySwapMax=0 \
+    -- "$@"
