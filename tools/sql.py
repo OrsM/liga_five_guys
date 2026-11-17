@@ -1,7 +1,7 @@
 """Ask the database anything, read-only, with the views as of any moment.
 
     python tools/sql.py "SELECT * FROM parser_health"
-    python tools/sql.py --at 2026-09-27T0934Z "SELECT count(*) FROM player_facts"
+    python tools/sql.py --at 2026-09-27T0934Z "SELECT count(*) FROM current_market"
     python tools/sql.py --variant shrink-8 "SELECT const('SHRINK_K')"
 
 The same functions as Datasette (variant(), name_key(), claim(),
@@ -16,7 +16,7 @@ from contextlib import closing
 from typing import Any
 
 from ffcore.clock import set_variant
-from ffcore.db import connect, replaying, set_now
+from ffcore.db import connect, set_now
 from ffcore.parse import snapshot_stamp
 from q import table
 
@@ -28,7 +28,7 @@ def ask(sql: str, at: str = "", variant: str = "live") -> tuple[list[str], list[
         raise SystemExit("--at %r is not a stamp (2026-09-27T0934Z)" % at)
     set_variant(variant)
     try:
-        with replaying(), closing(connect()) as db:
+        with closing(connect()) as db:
             if when is not None:
                 set_now(when)
             db.execute("PRAGMA query_only = 1")
@@ -36,6 +36,7 @@ def ask(sql: str, at: str = "", variant: str = "live") -> tuple[list[str], list[
             return [d[0] for d in cur.description or ()], [tuple(r) for r in cur.fetchall()]
     finally:
         set_variant("live")
+        set_now(None)
 
 
 def main(argv: list[str]) -> int:

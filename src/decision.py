@@ -33,23 +33,10 @@ from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
-__all__ = ["inputs", "Inputs", "read_inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities", "seen_cuts", "read_arrivals",
-           "Fact", "UNKNOWN", "player_facts", "squad_held", "Offer", "standing_offers", "Held", "held", "listed", "market_read_at",
+__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities",
+           "Fact", "UNKNOWN", "Offer", "Held",
            "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions",
-           "Source", "source_health", "Brier", "Drift", "latest_auction_run", "brier_by_scope", "drifting_bins", "manager_count"]
-
-INPUTS = ("dec_state", "dec_player", "dec_curve", "dec_auction", "dec_money", "dec_bid", "dec_close", "dec_lock", "dec_lineup")
-
-
-def inputs() -> None:
-    """What the decision looks at, the league at t (look: the market seen, the forecast, your squad and cash then),
-    made once a decision (decide.sql dec_player_seen, dec_curve_seen, dec_money_seen, dec_bid_seen)."""
-    with closing(connect()) as db, db:
-        for t in INPUTS:
-            db.execute("DELETE FROM %s" % t)
-        db.execute("INSERT INTO dec_state VALUES (?, ?, ?)", (DEBT_SHARE, SQUAD_MAX, XI_SIZE))
-        for t in INPUTS[1:]:
-            db.execute("INSERT INTO %s SELECT * FROM %s_seen" % (t, t))
+           "Source", "source_health", "Brier", "Drift", "latest_auction_run", "brier_by_scope", "drifting_bins"]
 
 
 class Player(NamedTuple):
@@ -144,26 +131,6 @@ class Inputs(NamedTuple):
     cells: Sequence[Cell] = ()
     universe: Sequence[Candidate] = ()
     prices: Sequence[Price] = ()
-
-
-def read_inputs() -> Inputs:
-    """inputs() made, and read back, each row under its columns' names."""
-    inputs()
-    with closing(connect()) as db:
-        def table(kind: Any, name: str) -> list[Any]:
-            return [kind(*r) for r in db.execute("SELECT %s FROM %s" % (", ".join(kind._fields), name))]
-        (money,) = table(Money, "dec_money")
-        return Inputs(
-            money, players=table(Player, "dec_player"), curves=table(CurvePoint, "dec_curve"), auctions=table(Auction, "dec_auction"),
-            bids=table(Bid, "dec_bid"), closes=table(Close, "dec_close"), locks=table(Lock, "dec_lock"),
-            lineup=table(Slot, "dec_lineup"), cells=table(Cell, "cell"),
-            universe=[Candidate(*r) for r in db.execute(
-                "SELECT s.player, coalesce(nullif(c.pos, ''), s.pos, 'MED') AS pos,"
-                " CASE WHEN s.owner IS NULL AND s.price IS NOT NULL THEN 'market' WHEN s.owner IS NULL THEN 'unlisted'"
-                " ELSE 'rival' END AS status, s.price AS asking, s.value"
-                " FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant LEFT JOIN player_club c ON c.player = s.player"
-                " WHERE s.owner IS NULL OR s.owner <> l.me")],
-            prices=[Price(*r) for r in db.execute("SELECT ff_id AS player, h, expected_value, value FROM price_forecast")])
 
 
 def julian_stamp(t: float) -> str:
@@ -355,16 +322,6 @@ def keep_opportunities(cut: str, got: list[dict[str, Any]]) -> None:
     record([{"cut": cut, **r} for r in got], "dec_opportunity")
 
 
-def seen_cuts() -> list[str]:
-    with closing(connect()) as db:
-        return [c for (c,) in db.execute("SELECT DISTINCT cut FROM seen ORDER BY cut")]
-
-
-def read_arrivals() -> list[str]:
-    with closing(connect()) as db:
-        return [k for (k,) in db.execute("SELECT player FROM dec_arrivals ORDER BY rank").fetchall()]
-
-
 # What the board shows beside the decision: facts about players, the offers on your players, who is listed, how fresh
 # each source is, how the auction forecast has done. Each selector is named for what it returns.
 
@@ -377,28 +334,10 @@ class Fact(NamedTuple):
 UNKNOWN = Fact("", None, None)
 
 
-def player_facts() -> dict[str, Fact]:
-    return {k: Fact(name, pos, trend) for k, name, pos, trend in rows(
-        "SELECT s.player, name_shown(s.name), s.pos, s.trend FROM seen s JOIN look l ON s.cut = l.cut AND s.variant = l.variant")}
-
-
-def squad_held() -> frozenset[str]:
-    """Your players in the squads table at t (league_config's me); readable with no look made."""
-    return frozenset(p for (p,) in rows("SELECT player FROM squads WHERE manager = (SELECT me FROM league_config)"))
-
-
 class Offer(NamedTuple):
     player: str
     value: float
     money: float
-
-
-def standing_offers(mine: frozenset[str]) -> list[Offer]:
-    """The pending offers, money not nil, on those of your players."""
-    return [Offer(*r) for r in rows(
-        "SELECT t.player, t.market_value, o.money FROM offers o"
-        " JOIN squads t ON t.player_team_id = o.player_team_id"
-        " WHERE o.status = 'pending' AND o.money <> 0 AND t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))]
 
 
 class Held(NamedTuple):
@@ -406,23 +345,6 @@ class Held(NamedTuple):
     player_team: str
     player_id: str | None
     value: float
-
-
-def held(mine: frozenset[str]) -> list[Held]:
-    """Those of your players in the squads table, with the ids the app knows them by and their market value."""
-    return [Held(*r) for r in rows(
-        "SELECT t.player, t.player_team_id, t.player_id, t.market_value FROM squads t"
-        " WHERE t.player IN (%s)" % ",".join("?" * len(mine)), sorted(mine))]
-
-
-def listed() -> frozenset[str]:
-    return frozenset(k for (k,) in rows("SELECT player FROM listings WHERE player IS NOT NULL"))
-
-
-def market_read_at() -> str | None:
-    """The stamp of the market read at t, if there is one."""
-    (at,), = rows("SELECT at FROM market_read")
-    return at or None
 
 
 class Source(NamedTuple):
@@ -464,11 +386,6 @@ def brier_by_scope(run: int) -> list[Brier]:
 def drifting_bins(run: int) -> list[Drift]:
     return [Drift(*r) for r in rows(
         "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE run_id = ? AND drift = 1 ORDER BY scope, bin", (run,))]
-
-
-def manager_count() -> int:
-    (n,), = rows("SELECT count(*) FROM seen_cash c JOIN look l ON c.cut = l.cut AND c.variant = l.variant")
-    return int(n)
 
 
 class Extras(NamedTuple):
@@ -632,36 +549,6 @@ def _selftest_lineup() -> None:
     assert top is not None and eleven.total(top.eleven, value) == eleven.total(best.eleven, value), "settling from the app's eleven reaches the best"
 
 
-def _selftest_arrivals() -> None:
-    import tempfile
-    from pathlib import Path
-
-    from ffcore.db import cut, set_now
-    from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import tables_in
-
-    def row(k: str, status: str, gain: float) -> dict[str, Any]:
-        return {"player": k, "pos": "MED", "status": status, "asking": 1e6 if status == "market" else None, "close_at": None,
-                "from_j": 1, "replaces": "x", "gain": gain, "per_million": None, "price_next": None, "price_lock": None,
-                "bid": None, "win": None, "placed": None}
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(snapshot_stamp("2026-09-03T0000Z"))
-            keep_opportunities(cut(), [row("a", "market", 5.0), row("b", "rival", 4.0)])
-            assert read_arrivals() == [], "the first night has no night before it"
-            set_now(snapshot_stamp("2026-09-04T0000Z"))
-            keep_opportunities(cut(), [row("a", "market", 5.0), row("b", "market", 4.0), row("c", "unlisted", 3.0)])
-            assert read_arrivals() == ["b"], "b is on the market now and was not last night; a was"
-            keep_opportunities(cut(), [row("b", "market", 4.0)])
-            assert read_arrivals() == ["b"], "the same night kept again replaces it"
-            set_now(snapshot_stamp("2026-09-05T0000Z"))
-            keep_opportunities(cut(), [row("b", "market", 4.0), row("a", "market", 0.0)])
-            assert read_arrivals() == [], "b stayed on the market; a no longer adds points"
-        finally:
-            set_now(None)
-
-
 def _fact(player: str, pos: str | None = "MED", value: float | None = None, owner: str | None = None,
           price: float | None = None, my_bid: float | None = None) -> PlayerFact:
     return PlayerFact(player, player, pos, value, owner, None, price, None, my_bid, None, None, None)
@@ -807,7 +694,6 @@ def _selftest() -> None:
     _selftest_inputs_at()
     _selftest_opportunities()
     _selftest_lineup()
-    _selftest_arrivals()
     _selftest_decision_at()
     _selftest_arrivals_at()
     print("decision self-test OK")

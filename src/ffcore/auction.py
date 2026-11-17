@@ -13,7 +13,7 @@ from ffcore.db import stamp_jd
 from ffcore.season_facts import julian_day
 
 __all__ = ["Look", "Sample", "Model", "Forecast", "RATIOS", "sample", "curve", "fit", "predict", "forecast", "chance", "bid_for",
-           "looks", "looks_of", "open_looks_of", "FIXED_CUTS", "write", "Record", "backtest_records", "points", "backtest", "stored_points", "live_points", "calibration", "briers"]
+           "looks_of", "open_looks_of", "FIXED_CUTS", "Record", "backtest_records", "points", "backtest", "live_points", "calibration", "briers"]
 
 RATIOS = (0.5, 0.6, 0.7, 0.8, 0.9) + tuple(round(0.95 + 0.01 * i, 2) for i in range(51))
 ASK_LEVELS = (0.5, 0.75, 0.9)
@@ -168,22 +168,6 @@ def bid_for(cv: Curve, target: float) -> tuple[float, float]:
     return next(((r, p) for r, p in cv if r >= 1.0 - EPS and p >= target - EPS), cv[-1])
 
 
-def looks(db: Any) -> list[Look]:
-    series: dict[str, tuple[list[str], list[float]]] = defaultdict(lambda: ([], []))
-    for player, day, trend in db.execute("SELECT ff_id, day, trend FROM price_trend_daily ORDER BY ff_id, day"):
-        series[player][0].append(day)
-        series[player][1].append(trend)
-
-    def trend_at(player: str, look: str) -> float | None:
-        days, values = series.get(player, ([], []))
-        i = bisect_right(days, look[:10]) - 1
-        return values[i] if i >= 0 else None
-
-    return [Look(p, c, lk, m, a, b, bool(mi), rv, trend_at(p, lk), mb, w, bool(bm), bool(o)) for p, c, lk, m, a, b, mi, rv, mb, w, bm, o in db.execute(
-        "SELECT player, close, look, mins, ask, bids, mine, rival, my_bid, won, by_me, is_open"
-        " FROM auction_looks ORDER BY look")]
-
-
 def looks_of(world: st.World, identity: current.Identity, league: ledger.League) -> list[Look]:
     """The looks of auction_facts.auction_looks sorted by look, each with the price trend of its day or the day before
     (trend_is_last_day_on_or_before_look; None before the player's first day), bools as bool."""
@@ -213,14 +197,6 @@ def open_looks_of(world: st.World, identity: current.Identity, league: ledger.Le
         out.append(Look(player, close, row.observed_at, mins, row.sale_price or 0.0, bids, mine, bids - mine,
                         trend_at(player, row.observed_at), row.bid_money, None, False, True))
     return sorted(out, key=lambda x: x.look)
-
-
-def write(db: Any, cut: str) -> None:
-    ls = looks(db)
-    for f in forecast(fit(ls), ls):
-        db.execute("INSERT INTO seen_auction VALUES (?, variant(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                   (cut, f.player, f.ask, f.close, f.mins, f.bids, f.rival, f.mine, f.trend, f.cell, f.n, f.thin))
-        db.executemany("INSERT INTO seen_curve VALUES (?, variant(), ?, ?, ?)", [(cut, f.player, r, p) for r, p in f.curve])
 
 
 class Point(NamedTuple):
@@ -300,28 +276,6 @@ def points(records: Sequence[Record]) -> list[Point]:
 
 def backtest(ls: Sequence[Look], blocks: int = 8) -> list[Point]:
     return points(backtest_records(ls, blocks))
-
-
-def stored_points(db: Any) -> list[Point]:
-    cuts: dict[tuple[str, str], tuple[str, float, int, bool]] = {}
-    for cut, player, close, ask, rival, mine, mins in db.execute(
-            "SELECT a.cut, a.player, a.close, a.ask, a.rival, a.mine, a.mins FROM seen_auction a"
-            " JOIN auction_results r ON r.player = a.player AND r.close = a.close AND r.seller = 'marketPlayerLeague'"
-            " WHERE a.variant = variant() AND a.mins >= ? ORDER BY a.cut", (DECISION_MINS,)):
-        cuts[(player, close)] = (cut, ask, rival, bool(mine))
-    out: list[Point] = []
-    for (player, close), (cut, ask, rival, mine) in cuts.items():
-        cv = tuple((r, p) for r, p in db.execute(
-            "SELECT ratio, p FROM seen_curve WHERE cut = ? AND variant = variant() AND player = ? ORDER BY ratio", (cut, player)))
-        row = db.execute("SELECT won, by_me FROM auction_results WHERE player = ? AND close = ?", (player, close)).fetchone()
-        if not cv or row is None:
-            continue
-        s = sample(Look(player, close, cut, 0.0, ask, 0, mine, rival, None, None, row[0], bool(row[1]), False))
-        for r in SCORE_RATIOS:
-            w = observed(s, r)
-            if w is not None:
-                out.append(Point(scopes(False, rival, mine), chance(cv, r), chance(cv, r), w))
-    return out
 
 
 def live_points(forecasts: Mapping[str, Sequence[Forecast]], results: Sequence[af.AuctionResult]) -> list[Point]:

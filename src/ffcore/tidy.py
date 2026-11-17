@@ -15,7 +15,7 @@ from ffcore.db import ROOT, source_table
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "REPORTS",
-           "current", "history", "typed", "age_hours", "app_stale", "APP_FRESH_HOURS", "tables_in",
+           "current", "history", "typed", "APP_FRESH_HOURS", "tables_in",
            "input_path", "csv_string", "store_sql", "stored",
            "clear_sql", "NUMBERS", "LINEUP_SOURCE"]
 
@@ -149,23 +149,7 @@ def current(name: str, source: str = "") -> list[dict[str, Any]]:
             if not source or r.get("source") == source]
 
 
-def age_hours(name: str) -> float | None:
-    """How old a table's last row is at t, in hours."""
-    stamps = [r.get("observed_at", "") for r in current(name)]
-    when, t = snapshot_stamp(max(stamps)) if stamps else None, snapshot_stamp(lfg.cut())
-    return None if when is None or t is None else (t - when).total_seconds() / 3600
-
-
 APP_FRESH_HOURS = 14.4
-
-
-def app_stale() -> str | None:
-    """None when the app's squads (api_teams) are at most APP_FRESH_HOURS old at t;
-    otherwise the reason no board is built from them."""
-    age = age_hours("api_teams")
-    if age is not None and age <= APP_FRESH_HOURS:
-        return None
-    return "the app's squads are %s old; no board is built from them" % ("unknown" if age is None else "%.0fh" % age)
 
 
 LINEUP_SOURCE = "futbolfantasy"
@@ -216,9 +200,6 @@ def _selftest_tables() -> None:
             mk = current("api_market")[0]
             assert (mk["sale_price"], mk["bids"], mk["bid_money"], mk["player_id"]) \
                 == (5e6, 2, None, "7"), mk
-            assert age_hours("market") is None
-            age = age_hours("lineups")
-            assert age is not None and abs(age - 3.0) < 1e-9
             set_now(snapshot_stamp("2026-08-01T1000Z"))
             assert stats != {(r["activity_id"], r["kind"])
                              for r in current("api_activity")}

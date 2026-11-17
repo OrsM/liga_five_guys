@@ -5,7 +5,6 @@ players ranked by what taking it costs your eleven (eleven.remove). The one line
 their value."""
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
 from collections.abc import Iterable, Sequence
@@ -19,12 +18,9 @@ from approach import Approach, Club, approach
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore.auction import Curve, chance
-from ffcore.db import connect, cut, record, schema_version, set_look, this_run
-from ffcore.forecast_store import club_ratings, forecast, market_offer_ratios, price_carry
-from ffcore.league import write_config
+from ffcore.db import connect, cut, record, this_run
 from ffcore.rules import POSITIONS, bid_limit
-from ffcore.seen import see as see_at
-from ffcore.tidy import REPORTS, app_stale
+from ffcore.tidy import REPORTS
 from stats import percentile
 
 __all__ = ["board", "main"]
@@ -245,18 +241,9 @@ def auction_card() -> Doc:
                       for d in decision.drifting_bins(run)]}
 
 
-def sql_extras(inp: decision.Inputs) -> decision.Extras:
-    """The extras of the cut read by the SQL readers, for callers that have no World; removed at step 10 of #80."""
-    mine = decision.squad_of(inp)
-    return decision.Extras(decision.player_facts(), mine, decision.standing_offers(mine), decision.held(mine),
-                           decision.listed(), decision.market_read_at())
-
-
 def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
-          extras: decision.Extras | None = None) -> Doc:
-    """The decisions document of the cut; extras are what the World gives beside the inputs, or, when None, what
-    sql_extras reads."""
-    extras = extras or sql_extras(inp)
+          extras: decision.Extras) -> Doc:
+    """The decisions document of the cut; extras are what the World gives beside the inputs."""
     cash, team_value, debt = inp.money.cash, inp.money.team_value, inp.money.debt
     locks = [x.lock for x in inp.locks]
     bids = sum(b.amount for b in inp.bids)
@@ -301,19 +288,10 @@ def constants() -> dict[str, dict[str, float]]:
     return {m: {n: getattr(MODULES[m], n) for n in names} for m, names in NAMES.items()}
 
 
-def see() -> str:
-    """The market and the league as of t into seen, seen_cash and seen_odds (the decision's
-    snapshot, seen.see), made once a cut, variant and code: the key is the SQL's version and
-    every constant, so another schema or a variant redefined makes them again, never reads a
-    stale one."""
-    return see_at(hashlib.sha1(repr((schema_version(), sorted((m, sorted(c.items())) for m, c in constants().items())))
-                               .encode()).hexdigest()[:12])
-
-
 def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
            carry: Sequence[float]) -> list[dict[str, Any]]:
     """Every constant and fitted value a run is built with, one row each:
-    (component, term, value, kind, n); the forecast's fits (forecast_fits)."""
+    (component, term, value, kind, n); fits are the forecast's, as fit_rows gives them."""
     return ([_param(m, name, v, "constant") for m, names in constants().items()
              for name, v in names.items()]
             + list(fits)
@@ -326,12 +304,6 @@ def fit_rows(ratings: Iterable[Any]) -> list[dict[str, Any]]:
     """One params row for each club's attack and defence, clubs in club order; ratings have club, attack, defence."""
     return [_param("forecast.%s" % t, r.club, v) for r in sorted(ratings, key=lambda r: r.club)
             for t, v in (("attack", r.attack), ("defence", r.defence))]
-
-
-def forecast_fits() -> list[dict[str, Any]]:
-    """What the forecast fits at t, one params row each: each club's
-    attack and defence (club_rating)."""
-    return fit_rows(club_ratings())
 
 
 def world_params(world: state.World, fc: Any) -> list[dict[str, Any]]:
@@ -356,46 +328,6 @@ def moment_at(loaded: loader.Loaded, world: state.World) -> Moment:
 def _param(component: str, term: str, value: float, kind: str = "fitted",
            n: int | None = None) -> dict[str, Any]:
     return {"component": component, "term": term, "value": float(value), "kind": kind, "n": n}
-
-
-class Built(NamedTuple):
-    params: list[dict[str, Any]]
-    moment: int
-
-
-class Replay(NamedTuple):
-    moment: int
-    inputs: decision.Inputs
-
-
-def at_cut() -> int:
-    """The league at t made for a decision (look): the market and the league seen then (see), the forecast at t,
-    its moment returned, and you and that moment in look. SystemExit when the app's squads are older than
-    APP_FRESH_HOURS."""
-    stale = app_stale()
-    if stale:
-        raise SystemExit(stale)
-    me = write_config()
-    see()
-    moment = forecast()
-    set_look(me=me, moment=moment)
-    return moment
-
-
-def replayed() -> Replay | None:
-    """The cut at t made (at_cut) and the decision's inputs read from it, with no parameters made; None when
-    the app's squads are too old to make it."""
-    try:
-        moment = at_cut()
-    except SystemExit:
-        return None
-    return Replay(moment, decision.read_inputs())
-
-
-def built() -> Built:
-    """at_cut and the parameters it was made with (params): what a run records."""
-    moment = at_cut()
-    return Built(params(forecast_fits(), market_offer_ratios(), price_carry()), moment)
 
 
 def main() -> None:

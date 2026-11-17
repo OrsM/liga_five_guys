@@ -29,7 +29,7 @@ Rules copied from the SQL, each tested:
     only for a player worth PRICE_FOCUS.
   grade_days: price_grade fits from the day a quarter through the distinct change days.
 Selectors: price_state; the views by their names (price_history .. price_grade) over a PriceState;
-price_momentum_of is forecast_store.price_momentum() from the state."""
+price_momentum_of is the Prices of the state."""
 from __future__ import annotations
 
 import bisect
@@ -43,10 +43,18 @@ from typing import Any, NamedTuple, TypeVar, cast
 from ffcore import observations as ob
 from ffcore import pricing
 from ffcore import state as st
-from ffcore.forecast_store import Prices
 
 T = TypeVar("T")
 GRADE_HORIZONS = (1, 2, 3, 5, 7, 10)
+
+
+class Prices(NamedTuple):
+    """Momentum as the price fold fits it: a slope per horizon, the share of a trend made after each update, each
+    player's trend in %, and the horizon."""
+    slope: dict[int, float]
+    carry: tuple[float, ...]
+    trend: dict[str, float]
+    horizon: int
 
 
 class Constants(NamedTuple):
@@ -642,7 +650,7 @@ def price_grade(s: PriceState) -> list[Grade]:
 
 
 def price_momentum_of(s: PriceState) -> Prices:
-    """forecast_store.price_momentum() as of the state's cut: slope per horizon, carry, each live player's trend
+    """The Prices as of the state's cut: slope per horizon, carry, each live player's trend
     and the horizon."""
     slope = {f.h: f.slope for f in momentum(s)}
     return Prices(slope, tuple(c.carry for c in price_carry(s)), {t.ff_id: t.trend for t in price_trend(s)},

@@ -6,15 +6,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from ffcore import season_facts, state
-from ffcore.db import rows
 from ffcore.parse import snapshot_stamp
 from typing import NamedTuple
 
-__all__ = ["Rounds", "round_locks", "rounds", "rounds_ahead", "rounds_at"]
+__all__ = ["Rounds", "rounds_at"]
 
 
 class Rounds(NamedTuple):
-    """The jornadas left as rounds reads them (jornada_calendar): those not
+    """The jornadas left (jornada_calendar): those not
     done, by when each next plays (none known last); when each next plays;
     the clubs that have played in each; and those behind (a match put back:
     no line-up is picked for them)."""
@@ -24,36 +23,10 @@ class Rounds(NamedTuple):
     behind: set[int]
 
 
-def round_locks() -> dict[int, datetime]:
-    """Each jornada's lock (round_locks), in lock order."""
-    return {j: when for j, at in rows("SELECT jornada, lock FROM round_locks ORDER BY lock, jornada")
-            if (when := snapshot_stamp(at)) is not None}
-
-
-def rounds_ahead() -> dict[int, datetime]:
-    """Each jornada with a match still to play: when the next one kicks off (rounds_ahead)."""
-    return {j: when for j, at in rows("SELECT jornada, next FROM rounds_ahead ORDER BY next, jornada")
-            if (when := snapshot_stamp(at)) is not None}
-
-
-def rounds() -> Rounds:
-    """The jornadas left (jornada_calendar's not done), by when each next
-    plays (rounds_ahead; none known last), the clubs that have played in each
-    (clubs_played), and those behind."""
-    nxt = rounds_ahead()
-    left = {j: state for j, state in rows("SELECT jornada, state FROM jornada_calendar WHERE state <> 'done'")}
-    rem = [j for j in nxt if j in left] + sorted(set(left) - set(nxt))
-    played: dict[int, set[str]] = {}
-    for j, club in rows("SELECT jornada, club FROM clubs_played"):
-        played.setdefault(j, set()).add(club)
-    return Rounds(rem, {j: nxt[j] for j in rem if j in nxt}, played,
-                  {j for j, state in left.items() if state == "behind"})
-
-
 def rounds_at(world: state.World) -> Rounds:
-    """rounds() over the World (rule rounds_left_order): rem is the jornadas not done, those with a next kickoff by
-    when it is (ties by jornada), those with none last by jornada; next, played (the clubs with a scored match in each
-    jornada left) and behind as rounds() has them."""
+    """The Rounds of the World (rule rounds_left_order): rem is the jornadas not done, those with a next kickoff by
+    when it is (ties by jornada), those with none last by jornada; next is when each next plays, played the clubs with a
+    scored match in each jornada left, behind the jornadas with a match put back (no line-up is picked for them)."""
     calendar = season_facts.jornada_calendar(world)
     nxt = {c.jornada: when for c in sorted(calendar, key=lambda c: (c.next or "", c.jornada))
            if c.next is not None and (when := snapshot_stamp(c.next)) is not None}

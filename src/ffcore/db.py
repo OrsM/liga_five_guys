@@ -12,7 +12,6 @@ import re
 import sqlite3
 import time
 import zlib
-from statistics import NormalDist
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import closing, contextmanager
 from pathlib import Path
@@ -21,7 +20,6 @@ from typing import Any
 from datetime import datetime
 
 from ffcore.clock import run_now, variant
-from ffcore.facts import ensure
 from ffcore.names import Name
 from ffcore.parse import snapshot_stamp, stamp, year_for
 from stats import shrink
@@ -30,7 +28,7 @@ from ffcore.rules import position, slot
 from ffcore.text import stems_meet
 
 __all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "cut",
-           "schema_version", "functions", "query", "record", "replaying", "rows", "set_look", "set_now", "this_run", "LOOK"]
+           "functions", "query", "record", "rows", "set_now", "this_run", "LOOK"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
@@ -162,32 +160,9 @@ def cut() -> str:
     return stamp(LOOK["t"])
 
 
-def schema_version() -> int:
-    """The version of the schema applied to the database (PRAGMA user_version)."""
-    with closing(connect()) as db:
-        return int(db.execute("PRAGMA user_version").fetchone()[0])
-
-
 def set_now(when: datetime | None) -> None:
     """Set t: a replay's past time, or None for the wall clock now."""
     LOOK["t"] = when or run_now()
-
-
-def set_look(**what: Any) -> None:
-    """The forecast moment and you, as the views read them."""
-    assert set(what) <= set(LOOK) - {"t"}, what
-    LOOK.update(what)
-
-
-@contextmanager
-def replaying() -> Iterator[None]:
-    """What the views look at put back as it was once a replay that moves t
-    or the path is done."""
-    was = dict(LOOK)
-    try:
-        yield
-    finally:
-        LOOK.update(was)
 
 
 # The model's constants are module attributes (forecast, pricing, rules); the views read them through
@@ -224,7 +199,7 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (t as a stamp: the process's,
     unless told otherwise), moment() and me() (LOOK's),
     stamp_jd() (a stamp as a Julian day), variant() (the variant in force), const() (a model constant as it stands), name_key() and name_shown() (Name's),
-    prognosis() (a flagged player's listing read), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'), ncdf() and ninv() (the standard normal's cdf and its inverse),
+    prognosis() (a flagged player's listing read), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'),
     lo95(), hi95() and claim() (an estimate and its standard error) and
     the aggregate median()."""
     db.create_function("cut", 0, now)
@@ -241,8 +216,6 @@ def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
         db.create_function(fn.__name__, 2, fn, deterministic=True)
     db.create_function("shrink", 4, lambda prior, k, total, n: None if None in (prior, k, total, n) or k + n == 0
                        else shrink(prior, k, total, n), deterministic=True)
-    db.create_function("ncdf", 1, NormalDist().cdf, deterministic=True)
-    db.create_function("ninv", 1, NormalDist().inv_cdf, deterministic=True)
     db.create_function("position", 1, position, deterministic=True)
     db.create_function("slot", 1, slot, deterministic=True)
     db.create_function("stems_meet", 3, stems_meet, deterministic=True)
@@ -366,7 +339,8 @@ def connect(path: Path | None = None, schema: Path = SCHEMA) -> sqlite3.Connecti
                     db.executescript(sql)
                 db.execute("PRAGMA user_version = %d" % version)
         _APPLIED.add(key)
-    ensure(db, cut)
+    import crosswalk                            # not at the top: it imports this module
+    crosswalk.identity(db)
     return db
 
 
@@ -456,6 +430,9 @@ def _selftest() -> None:
         schema, path = Path(tmp) / "s.sql", Path(tmp) / "x.db"
         schema.write_text("CREATE VIEW IF NOT EXISTS one AS SELECT 1 AS n;")
         connect(path, schema).close()
+        with closing(connect(Path(tmp) / "empty.db")) as fresh:
+            assert fresh.execute("SELECT count(*) FROM facts_meta WHERE name <> 'ff_identity'").fetchone()[0] == 0, \
+                "connect_runs_without_the_stores: an empty root opens with the schema applied and nothing kept but the identity"
         with closing(sqlite3.connect(path)) as raw:
             raw.execute("CREATE VIEW marker AS SELECT 1")     # a view another process is using
         _APPLIED.clear()
