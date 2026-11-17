@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from contextlib import closing
 from datetime import datetime, timezone
-from typing import Any, Iterable, Mapping, NamedTuple, Sequence
+from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence
 
 import eleven
 from ffcore import current, forecast_facts, jornadas, price_fold, season_facts, state
@@ -550,9 +550,17 @@ def decision_at(loaded: Loaded, world: state.World) -> Decided | Stale:
                    extras_at(world, loaded.identity, loaded.league, seen), jornadas.rounds_at(world).rem)
 
 
+def replay(loaded: Loaded, cuts: Iterable[str], consume: Callable[[str, Decided | Stale], None]) -> None:
+    """consume(cut, decision_at that cut) once for each distinct cut of cuts, ascending, in one sweep of the loaded
+    observations; nothing is kept, so memory does not grow with the cuts. Returns None."""
+    state.sweep(loaded.obs, cuts, lambda world: consume(world.cut, decision_at(loaded, world)))
+
+
 def decisions(loaded: Loaded, cuts: Sequence[str]) -> list[Decided | Stale]:
-    """decision_at for each cut, in the order given, in one sweep of the loaded observations."""
-    return state.sweep(loaded.obs, cuts, lambda world: decision_at(loaded, world))
+    """decision_at for each cut, in the order given: replay collected."""
+    got: dict[str, Decided | Stale] = {}
+    replay(loaded, cuts, got.__setitem__)
+    return [got[c] for c in cuts]
 
 
 _NO_MONEY = Money(0.0, 0.0, 0.0, SQUAD_MAX, XI_SIZE)
@@ -728,12 +736,18 @@ def _selftest_decision_at() -> None:
     assert decisions(loaded, _CUTS) == [alone[c] for c in _CUTS], "decisions is decision_at cut by cut"
     for order in (_CUTS[::-1], [_CUTS[1], _CUTS[0], _CUTS[1]], [_CUTS[-1]]):
         assert decisions(loaded, order) == [alone[c] for c in order]
+    seen_by_replay: dict[str, Decided | Stale] = {}
+    replay(loaded, _CUTS[::-1], seen_by_replay.__setitem__)
+    assert seen_by_replay == alone, "replay shows consume each cut's decision, whatever the order"
     later = _tables()
     later["api_market"].append(_listing("a1", "m8", TEAM_SELLER, 13.0, 9.0, 50.0, "pending", "b8", _LATER))
     later["api_offers"].append(_offer("t3", "o9", 30.0, "pending", _LATER))
     later["api_standings"].append(_standing("t-ann", "u1", "ann", 99.0, _LATER))
     later_loaded = loaded._replace(obs=ob.of(later))
     assert all(decision_at(later_loaded, state.world_at(later_loaded.obs, c)) == alone[c] for c in _CUTS)
+    after: dict[str, Decided | Stale] = {}
+    replay(later_loaded, _CUTS, after.__setitem__)
+    assert after == alone, "rows appended after a cut do not change what consume saw at it"
 
     first = alone[_CUTS[0]]
     assert isinstance(first, Stale) and "unknown" in first.reason, "no api_teams: stale"
