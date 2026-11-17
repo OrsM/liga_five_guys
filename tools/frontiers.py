@@ -36,12 +36,9 @@ NAMES = {
     "grading": "measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
 EXPORTS = {
-    "ingest": """player_club player_value player_status player_roster appearances scored season_record last_season
-        club_fixture club_rating jornada_calendar kickoffs next_lock round_locks look unmatched
-        listings listing_close offers offer_ratios price_history price_paid auction_results auction_looks bid_changes market_read
-        squads owners cash standings league_config app_lineup ledger player_jornadas app_player ff_identity_kept""",
-    "forecast": "cell market_daily forecast_e price_carry price_trend price_trend_daily price_forecast price_grade",  # cell(player, jornada, pts, p), a stand-in for one not yet known; forecast_e: the cells of a stored moment; the price trend and carry the decision's odds read; price_forecast: each player's expected value night by night to the next lock; price_grade: its error against what happened
-    "decision": "player_facts auction_calibration auction_brier",  # the facts of each player the board shows; the decision's inputs are dec_* tables, read by decision.py only
+    "ingest": "unmatched app_player ff_identity_kept",
+    "forecast": "",
+    "decision": "auction_calibration auction_brier",
     "board": "",
     "grading": "",  # a measure: nothing downstream reads it
 }
@@ -159,8 +156,8 @@ def _selftest() -> None:
     assert crossing("decision", "src_market")  # a scraped table
     assert crossing("ingest", "src_market") is None  # ingest reads its own
     assert crossing(None, "score_spread")  # a forecast internal, not exported
-    assert crossing(None, "price_trend") is None  # exported: the trend the decision's odds read
-    assert crossing(None, "cell") is None  # exported
+    assert crossing(None, "auction_brier") is None  # exported
+    assert crossing(None, "app_player") is None  # exported
     assert board_queries("def f(db):\n    return db.execute('select 1')\n") == [2]  # a query in the board
     assert board_queries("def f(db):\n    return squad_rows(inp)\n") == []  # a helper named *_rows is not a query
     assert board_queries("def _selftest():\n    db.rows(1)\n\nX = 1\n") == []  # selftest code is ignored

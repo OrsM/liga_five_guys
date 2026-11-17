@@ -20,7 +20,7 @@ from ffcore.db import connect, record, rows, this_run
 from ffcore.parse import snapshot_stamp, stamp
 from salegrade import HORIZONS
 
-__all__ = ["backtest", "superseded", "view_table", "record_grades"]
+__all__ = ["backtest", "superseded", "record_grades"]
 
 T = TypeVar("T")
 
@@ -704,16 +704,6 @@ def price_grades(loaded: loader.Loaded) -> list[price_fold.Grade]:
     scope descending and h."""
     got = state.sweep(loaded.obs, [stamp(run_now())], lambda world: price_fold.price_grade(price_fold.price_state(world)), PRICE_FOLDS)[0]
     return sorted(sorted(got, key=lambda g: g.h), key=lambda g: g.scope, reverse=True)
-
-
-def view_table(view: str, path: Path | None = None) -> str:
-    """A view (grade_forecast) made a table of its columns in the
-    current tables (tidy.tables_in), for its readers' tests to fill."""
-    with closing(connect(path)) as db, db:
-        cols = ['"%s" %s' % (r[1], r[2]) for r in db.execute('PRAGMA table_info("%s")' % view)]
-        db.execute('DROP VIEW "%s"' % view)
-        db.execute('CREATE TABLE "%s" (%s)' % (view, ", ".join(cols)))
-    return view
 
 
 def _selftest_measure_log() -> None:

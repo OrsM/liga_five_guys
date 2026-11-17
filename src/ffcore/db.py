@@ -22,9 +22,6 @@ from datetime import datetime
 from ffcore.clock import run_now, variant
 from ffcore.names import Name
 from ffcore.parse import snapshot_stamp, stamp, year_for
-from stats import shrink
-from ffcore.forecast import SEED_POOL
-from ffcore.rules import position, slot
 from ffcore.text import stems_meet
 
 __all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "cut",
@@ -58,47 +55,6 @@ def migrate(db: sqlite3.Connection) -> None:
         db.execute('ALTER TABLE "%s" RENAME TO "%s"' % (t, source_table(t)))
 RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
-
-
-Z95 = 1.96   # standard errors either side of an estimate: the 95% interval
-
-
-def lo95(gain: float | None, se: float | None) -> float | None:
-    return None if gain is None or se is None else gain - Z95 * se
-
-
-def hi95(gain: float | None, se: float | None) -> float | None:
-    return None if gain is None or se is None else gain + Z95 * se
-
-
-def claim(gain: float | None, se: float | None) -> str:
-    """What an estimate with its standard error establishes: positive or
-    negative when the 95% interval excludes zero, else not established; too
-    few when there is no spread to judge it by."""
-    lo, hi = lo95(gain, se), hi95(gain, se)
-    if lo is None or hi is None:
-        return "too few"
-    return "positive" if lo > 0 else "negative" if hi < 0 else "not established"
-
-
-def _quantile(sorted_values: list[float], p: float) -> float:
-    """Linear between ranks (numpy's default)."""
-    pos = (len(sorted_values) - 1) * p
-    lo = int(pos)
-    hi = min(lo + 1, len(sorted_values) - 1)
-    return sorted_values[lo] + (sorted_values[hi] - sorted_values[lo]) * (pos - lo)
-
-
-class _Median:
-    def __init__(self) -> None:
-        self.values: list[float] = []
-
-    def step(self, x: Any) -> None:
-        if x is not None:
-            self.values.append(float(x))
-
-    def finalize(self) -> float | None:
-        return _quantile(sorted(self.values), 0.5) if self.values else None
 
 
 def stamp_jd(s: str | None) -> float | None:
@@ -147,9 +103,8 @@ def prognosis(status: str | None, note: str | None, seen_at: str | None) -> str 
 # What the model looks at, this process's (never the file's: every process
 # on it, a run, a replay, the watcher, Datasette, has its own): t, the one
 # moment every view is read as of (a run's start, or a replay's past time:
-# set_now), the forecast moment and who you are. The views read them as
-# cut(), moment(), me() and the view look.
-LOOK: dict[str, Any] = {"t": None, "moment": 0, "me": ""}
+# set_now). The views read it as cut().
+LOOK: dict[str, Any] = {"t": None}
 
 
 def cut() -> str:
@@ -165,8 +120,7 @@ def set_now(when: datetime | None) -> None:
     LOOK["t"] = when or run_now()
 
 
-# The model's constants are module attributes (forecast, pricing, rules); the views read them through
-# const(NAME) as they stand when the query runs, so a variant (assemble.applied) or a test is just set_constants.
+# The model's constants are module attributes (forecast, pricing, rules); a variant (assemble.applied) or a test is just set_constants.
 CONSTANT_MODULES = ("ffcore.forecast", "ffcore.pricing", "ffcore.rules", "ffcore.tidy")
 
 
@@ -176,10 +130,6 @@ def _owner(name: str) -> Any:
         if hasattr(owner, name):
             return owner
     raise KeyError("no module has the constant %s" % name)
-
-
-def const(name: str) -> float:
-    return float(getattr(_owner(name), name))  # type: ignore[no-any-return]
 
 
 @contextmanager
@@ -197,29 +147,14 @@ def set_constants(**values: float) -> Iterator[None]:
 
 def functions(db: sqlite3.Connection, now: Callable[[], str] = cut) -> None:
     """The functions the views call: cut() (t as a stamp: the process's,
-    unless told otherwise), moment() and me() (LOOK's),
-    stamp_jd() (a stamp as a Julian day), variant() (the variant in force), const() (a model constant as it stands), name_key() and name_shown() (Name's),
-    prognosis() (a flagged player's listing read), shrink() (stats', NULL as SQL arithmetic gives it), position() (rules'),
-    lo95(), hi95() and claim() (an estimate and its standard error) and
-    the aggregate median()."""
+    unless told otherwise), stamp_jd() (a stamp as a Julian day), variant() (the variant in force), name_key() and
+    name_shown() (Name's) and stems_meet() (text's)."""
     db.create_function("cut", 0, now)
-    for k in ("moment", "me"):
-        db.create_function(k, 0, lambda k=k: LOOK[k])
     db.create_function("stamp_jd", 1, stamp_jd, deterministic=True)
     db.create_function("variant", 0, variant)
-    db.create_function("const", 1, const)
-    db.create_function("hpad", 0, lambda: 0)
     db.create_function("name_key", 1, lambda s: Name(s).key, deterministic=True)
     db.create_function("name_shown", 1, lambda s: Name(s).shown, deterministic=True)
-    db.create_aggregate("median", 1, _Median)  # type: ignore[arg-type]  # the stubs only allow int results
-    for fn in (lo95, hi95, claim):
-        db.create_function(fn.__name__, 2, fn, deterministic=True)
-    db.create_function("shrink", 4, lambda prior, k, total, n: None if None in (prior, k, total, n) or k + n == 0
-                       else shrink(prior, k, total, n), deterministic=True)
-    db.create_function("position", 1, position, deterministic=True)
-    db.create_function("slot", 1, slot, deterministic=True)
     db.create_function("stems_meet", 3, stems_meet, deterministic=True)
-    db.create_function("prognosis", 3, prognosis, deterministic=True)
 
 
 def fit_columns(db: sqlite3.Connection, texts: Sequence[str]) -> None:
@@ -272,8 +207,7 @@ def _snapshots(recent: bool) -> str:
     return " UNION ALL ".join(arm(src) for src in HEALTH_SOURCES)
 
 
-PUT = {"/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x in SEED_POOL),
-       "/* health.SNAPSHOTS */": _snapshots(False), "/* health.RECENT */": _snapshots(True)}
+PUT = {"/* health.SNAPSHOTS */": _snapshots(False), "/* health.RECENT */": _snapshots(True)}
 
 
 # "Each source's last snapshot as of t", said once: `WHERE /* latest TABLE */`
@@ -281,25 +215,13 @@ PUT = {"/* forecast.SEED_POOL */": " UNION ALL ".join("SELECT %d AS x" % x for x
 # its row_number() (n = 1 is the newest), where rows are ordered as they came.
 _LATEST = re.compile(r"/\* latest (\w+) \*/")
 _NEWEST = re.compile(r"/\* newest ([^*]+) \*/")
-_SIGNAL = re.compile(r"/\* signal (\w+) \*/")
 
 
 def _put(sql: str) -> str:
     for name, text in PUT.items():
         sql = sql.replace(name, text)
     sql = _NEWEST.sub(lambda m: "row_number() OVER (PARTITION BY %s ORDER BY observed_at DESC, rowid DESC)" % m[1], sql)
-    sql = _SIGNAL.sub(lambda m: _signal_of(m[1]), sql)
     return _LATEST.sub(lambda m: _latest_of(source_table(m[1]) if m[1] in SOURCE else m[1]), sql)
-
-
-def _signal_of(rows: str) -> str:
-    """The price series of the price rows in the view `rows` (price_step's columns), said once: each change
-    that has a step, its clip (k.clip) and x, the signal momentum fits on (k.price_w0..2)."""
-    return ("SELECT ff_id, observed_at, day, step, price_w0 * c + price_w1 * coalesce(c1, c)"
-            " + price_w2 * coalesce(c2, coalesce(c1, c)) AS x, i, value"
-            " FROM (SELECT ff_id, observed_at, day, step, i, value, k.price_w0, k.price_w1, k.price_w2,"
-            " max(-k.clip, min(k.clip, step)) AS c, max(-k.clip, min(k.clip, s1)) AS c1,"
-            " max(-k.clip, min(k.clip, s2)) AS c2 FROM %s, k WHERE step IS NOT NULL)" % rows)
 
 
 def _latest_of(table: str) -> str:
@@ -497,13 +419,6 @@ def _selftest() -> None:
     assert says("ok", "Duda para la jornada 9") is None and says("", "") is None, "fit: nothing"
     assert says("other") is None, "a status that says nothing of playing"
 
-    mem = sqlite3.connect(":memory:")
-    functions(mem)
-    assert mem.execute("SELECT lo95(1.0, 0.5), hi95(1.0, 0.5), claim(1.0, 0.5), claim(1.0, 0.6),"
-                       " claim(-1.0, 0.5), claim(0.0, 1.0), claim(1.0, NULL), lo95(NULL, 1)").fetchone() \
-        == (1.0 - 0.98, 1.0 + 0.98, "positive", "not established", "negative",
-            "not established", "too few", None), \
-        "1.96 standard errors: 1.0 +- 0.98 excludes 0; +- 1.176 does not; no spread, no claim"
     with tempfile.TemporaryDirectory() as tmp:
         meta, path = Path(tmp) / "datasette.json", Path(tmp) / "lfg.db"
         meta.write_text(json.dumps({"databases": {"lfg": {"queries": {

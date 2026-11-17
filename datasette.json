@@ -3,49 +3,9 @@
   "databases": {
     "lfg": {
       "queries": {
-        "error_by_value": {
-          "title": "Where the forecast misses, by value (:run, default the latest graded with plays; :ahead, the fewest jornadas past the lock, default 1): players in quarters of value at the lock forecast from, cheapest first; the chance he plays against how often he did, and the points when he played, forecast against scored. bias = forecast minus scored per player-jornada",
-          "sql": "WITH r AS (SELECT coalesce(nullif(:run, ''), (SELECT max(run_id) FROM grade_forecast WHERE plays IS NOT NULL)) AS run_id),\nl AS (SELECT jornada AS from_j, (SELECT max(observed_at) FROM src_market WHERE observed_at <= rl.lock) AS at FROM round_locks rl),\nv AS (SELECT l.from_j, m.ff_id AS player, ntile(4) OVER (PARTITION BY l.from_j ORDER BY m.value, m.ff_id) AS q\n      FROM l JOIN src_market m ON m.observed_at = l.at WHERE m.ff_id <> ''),\nplayed AS (SELECT DISTINCT player, jornada FROM squad_minutes WHERE mins > 0 AND player IS NOT NULL),\ng AS (SELECT g.*, v.q, p.player IS NOT NULL AS went FROM grade_forecast g JOIN r USING (run_id)\n      JOIN v USING (from_j, player) LEFT JOIN played p ON p.player = g.player AND p.jornada = g.jornada\n      WHERE g.jornada - g.from_j >= cast(coalesce(nullif(:ahead, ''), 1) AS INTEGER)\n        AND g.jornada IN (SELECT jornada FROM jornadas_done))\nSELECT q AS value_quarter, count(*) AS n, round(avg(plays), 3) AS plays_forecast, round(avg(went), 3) AS played,\n       round(sum(CASE WHEN went THEN predicted / plays END) / sum(went), 2) AS points_forecast_when_played,\n       round(sum(CASE WHEN went THEN actual END) / sum(went), 2) AS points_when_played,\n       round(avg(predicted - actual), 2) AS bias\nFROM g GROUP BY q ORDER BY q"
-        },
-        "compare_grades": {
-          "title": "Two graded runs' next-jornada forecasts, on the players both forecast",
-          "sql": "WITH p AS (SELECT a.from_j, a.jornada, a.player, a.predicted AS pa, b.predicted AS pb, a.actual\n           FROM grade_forecast a JOIN grade_forecast b USING (from_j, jornada, player)\n           WHERE a.run_id = :a AND b.run_id = :b AND a.from_j = a.jornada),\n     r AS (SELECT *, row_number() OVER (PARTITION BY jornada ORDER BY pa DESC, player) AS ra,\n                     row_number() OVER (PARTITION BY jornada ORDER BY pb DESC, player) AS rb FROM p)\nSELECT jornada, count(*) AS n,\n       round(sqrt(avg((pa - actual) * (pa - actual))), 3) AS rmse_a,\n       round(sqrt(avg((pb - actual) * (pb - actual))), 3) AS rmse_b,\n       round(avg(CASE WHEN ra <= 50 THEN actual END), 2) AS top50_a,\n       round(avg(CASE WHEN rb <= 50 THEN actual END), 2) AS top50_b\nFROM r GROUP BY jornada ORDER BY jornada"
-        },
         "timings": {
           "title": "Runs: seconds by stage, rows parsed, memory",
           "sql": "SELECT r.run_id, r.started, r.trigger, r.commit_sha, r.ok, round(r.peak_mb) AS peak_mb,\n       round(max(CASE WHEN m.stage = 'parse' AND m.measure = 'seconds' THEN m.value END), 1) AS parse_s,\n       max(CASE WHEN m.stage = 'parse' AND m.measure = 'snapshots' THEN m.value END) AS snapshots,\n       round(max(CASE WHEN m.stage = 'crosswalk' AND m.measure = 'seconds' THEN m.value END), 1) AS crosswalk_s,\n       round(max(CASE WHEN m.stage = 'sim' AND m.measure = 'seconds' THEN m.value END), 1) AS sim_s,\n       round(max(CASE WHEN m.stage = 'grade' AND m.measure = 'seconds' THEN m.value END), 1) AS grade_s\nFROM runs r LEFT JOIN run_measures m USING (run_id)\nGROUP BY r.run_id ORDER BY r.run_id DESC LIMIT 100"
-        },
-        "cash": {
-          "title": "Each manager's cash: yours from the app, rivals' from the ledger (as of now)",
-          "sql": "SELECT manager, round(cash / 1e6, 2) AS cash_m FROM cash ORDER BY cash DESC"
-        },
-        "ledger": {
-          "title": "The league's money moves, oldest first; inferred = an exit the feed never recorded",
-          "sql": "SELECT l.at, l.kind, l.who, l.other, coalesce(p.name, l.player) AS player,\n       round(l.amount / 1e6, 2) AS amount_m, l.buyer, l.seller, l.inferred\nFROM ledger l LEFT JOIN names p ON p.player = l.player\nWHERE nullif(:manager, '') IS NULL OR :manager IN (l.who, l.other)\nORDER BY l.at"
-        },
-        "price_paid": {
-          "title": "What each owner paid for his players (last buy or clause to him)",
-          "sql": "SELECT o.manager, coalesce(p.name, o.player) AS player, round(pp.paid / 1e6, 2) AS paid_m\nFROM owners o LEFT JOIN price_paid pp USING (player)\nLEFT JOIN names p ON p.player = o.player\nORDER BY o.manager, pp.paid DESC"
-        },
-        "momentum": {
-          "title": "Price momentum: the slope per horizon and the share of a trend made after each update",
-          "sql": "SELECT m.h, round(m.slope, 4) AS slope, round(c.carry, 3) AS carry FROM momentum m LEFT JOIN price_carry c USING (h) ORDER BY m.h"
-        },
-        "price_trend": {
-          "title": "Each player's expected value change over the horizon, in %",
-          "sql": "SELECT coalesce(p.name, t.ff_id) AS player, round(t.trend, 1) AS trend_pct FROM price_trend t\nLEFT JOIN names p ON p.player = t.ff_id\nORDER BY t.trend DESC"
-        },
-        "price_change": {
-          "title": "Each player's value change in % over :h updates after his last one on or before :day (all time: what happened; empty where there are not :h more yet)",
-          "sql": "SELECT a.ff_id, x.change\nFROM (SELECT ff_id, max(i) AS i FROM price_series WHERE day <= :day GROUP BY ff_id) a\nLEFT JOIN price_ahead x ON x.ff_id = a.ff_id AND x.i = a.i AND x.h = CAST(:h AS INTEGER)"
-        },
-        "bench_points": {
-          "title": "Each finished jornada (every match scored): the points your fielded eleven scored (the app's line-up at the lock), what sat on your bench, and the best benched player",
-          "sql": "WITH l AS (SELECT jornada, lock FROM round_locks WHERE jornada IN (SELECT jornada FROM jornadas_done)),\nfs AS (SELECT DISTINCT observed_at FROM src_api_lineup),\nfa AS (SELECT l.jornada, (SELECT max(observed_at) FROM fs WHERE observed_at <= l.lock) AS at FROM l),\nts AS (SELECT DISTINCT observed_at FROM src_api_teams),\nta AS (SELECT l.jornada, (SELECT max(observed_at) FROM ts WHERE observed_at <= l.lock) AS at FROM l),\nfielded AS (SELECT DISTINCT fa.jornada, a.player FROM fa\n            JOIN src_api_lineup t ON t.observed_at = fa.at JOIN app_player a ON a.app_id = t.player_id),\nsquad AS (SELECT DISTINCT ta.jornada, a.player FROM ta\n          JOIN src_api_teams t ON t.observed_at = ta.at AND t.manager = (SELECT me FROM league_config)\n          JOIN app_player a ON a.app_id = t.player_id),\npts AS (SELECT player, jornada, sum(pts) AS pts FROM scored GROUP BY player, jornada),\nrows AS (SELECT s.jornada, s.player, f.player IS NOT NULL AS in_xi, coalesce(p.pts, 0.0) AS pts\n         FROM squad s LEFT JOIN fielded f ON f.jornada = s.jornada AND f.player = s.player\n         LEFT JOIN pts p ON p.jornada = s.jornada AND p.player = s.player\n         WHERE s.jornada IN (SELECT jornada FROM pts)),\nbest AS (SELECT jornada, player, pts, row_number() OVER (PARTITION BY jornada ORDER BY pts DESC, player) AS n\n         FROM rows WHERE NOT in_xi)\nSELECT r.jornada, round(sum(CASE WHEN r.in_xi THEN r.pts END), 0) AS fielded_pts,\n       round(coalesce(sum(CASE WHEN NOT r.in_xi THEN r.pts END), 0), 0) AS bench_pts,\n       sum(r.in_xi) AS fielded, n.name AS best_benched, b.pts AS best_benched_pts\nFROM rows r LEFT JOIN best b ON b.jornada = r.jornada AND b.n = 1 LEFT JOIN names n ON n.player = b.player\nGROUP BY r.jornada ORDER BY r.jornada"
-        },
-        "paired_gain": {
-          "title": "Is one run's forecast better than another's? The same player-jornadas forecast by both (:old, :new, default the first and latest graded run; :ahead jornadas past the lock it was forecast from, default 0: the next jornada), the mean squared-error gain of the new over the old with its standard error and a 95% interval, for all, flagged and not flagged players. A gain is only established when the interval excludes zero (outcomes treated as independent, which flatters the interval a little)",
-          "sql": "WITH ids AS (SELECT coalesce(nullif(:new, ''), (SELECT max(run_id) FROM grade_forecast)) AS new,\n                    coalesce(nullif(:old, ''), (SELECT min(run_id) FROM grade_forecast)) AS old,\n                    cast(coalesce(nullif(:ahead, ''), 0) AS INTEGER) AS ahead),\nd AS (SELECT n.flagged,\n             (o.predicted - o.actual) * (o.predicted - o.actual)\n           - (n.predicted - n.actual) * (n.predicted - n.actual) AS d\n      FROM grade_forecast n JOIN grade_forecast o USING (from_j, jornada, player), ids\n      WHERE n.run_id = ids.new AND o.run_id = ids.old AND n.jornada - n.from_j = ids.ahead),\ns AS (SELECT 'all' AS scope, count(*) AS n, avg(d) AS gain,\n             (sum(d * d) - count(*) * avg(d) * avg(d)) / (count(*) - 1) AS var FROM d\n      UNION ALL\n      SELECT 'flagged', count(*), avg(d), (sum(d * d) - count(*) * avg(d) * avg(d)) / (count(*) - 1) FROM d WHERE flagged = 1\n      UNION ALL\n      SELECT 'not flagged', count(*), avg(d), (sum(d * d) - count(*) * avg(d) * avg(d)) / (count(*) - 1) FROM d WHERE flagged = 0),\nt AS (SELECT scope, n, gain, sqrt(max(var, 0) / n) AS se FROM s WHERE n > 0)\nSELECT scope, n, round(gain, 4) AS gain, round(se, 4) AS se,\n       round(lo95(gain, se), 4) AS lo, round(hi95(gain, se), 4) AS hi,\n       CASE claim(gain, se) WHEN 'positive' THEN 'new better' WHEN 'negative' THEN 'old better'\n            ELSE claim(gain, se) END AS verdict\nFROM t ORDER BY CASE scope WHEN 'all' THEN 0 WHEN 'flagged' THEN 1 ELSE 2 END"
         }
       }
     }
