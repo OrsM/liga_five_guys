@@ -70,13 +70,23 @@ class Cash(NamedTuple):
     cash: float
 
 
-def _squad_step(held: dict[str, list[ob.ApiTeams]], row: ob.ApiTeams) -> dict[str, list[ob.ApiTeams]]:
+class SquadHistory:
+    """The squad rows of every stamp (manager != "") and, per stamp, the Held list converted from them under the app
+    identity `names`: a stamp is converted once and again only when it gains rows or `names` is another mapping."""
+
+    def __init__(self) -> None:
+        self.rows: dict[str, list[ob.ApiTeams]] = {}
+        self.names: Mapping[str, str] | None = None
+        self.known: dict[str, tuple[int, list[Held]]] = {}
+
+
+def _squad_step(history: SquadHistory, row: ob.ApiTeams) -> SquadHistory:
     if row.manager != "":
-        held.setdefault(row.observed_at, []).append(row)
-    return held
+        history.rows.setdefault(row.observed_at, []).append(row)
+    return history
 
 
-state.register(state.Fold(SQUAD_HISTORY, "api_teams", dict, _squad_step))
+state.register(state.Fold(SQUAD_HISTORY, "api_teams", SquadHistory, _squad_step))
 
 
 def _known(rows: Iterable[ob.ApiTeams], identity: current.Identity) -> list[Held]:
@@ -89,12 +99,18 @@ def _known(rows: Iterable[ob.ApiTeams], identity: current.Identity) -> list[Held
 
 
 def squad_snapshots(world: state.World, identity: current.Identity) -> dict[str, list[Held]]:
-    """Per stamp, the squad rows with a known player (snapshot_stamps_from_known_players); a stamp with none is absent."""
+    """Per stamp, the squad rows with a known player (snapshot_stamps_from_known_players); a stamp with none is absent.
+    A stamp's rows are converted once per identity, so a cut converts only the stamps it adds."""
+    history: SquadHistory = state.fact(world, SQUAD_HISTORY)
+    if history.names is not identity.app:
+        history.names, history.known = identity.app, {}
     out: dict[str, list[Held]] = {}
-    for stamp, rows in state.fact(world, SQUAD_HISTORY).items():
-        held = _known(rows, identity)
-        if held:
-            out[stamp] = held
+    for stamp, rows in history.rows.items():
+        converted = history.known.get(stamp)
+        if converted is None or converted[0] != len(rows):
+            converted = history.known[stamp] = (len(rows), _known(rows, identity))
+        if converted[1]:
+            out[stamp] = converted[1]
     return out
 
 
@@ -211,6 +227,12 @@ def _selftest() -> None:
     assert state.sweep(obs, cuts, read, only) == [alone[c] for c in cuts]
     for order in (cuts[::-1], ["04", "02", "04"], ["05"], ["01", "05"]):
         assert state.sweep(obs, order, read, only) == [alone[c] for c in order]
+    other = current.Identity({}, {**_APP, "a2": "p6"})
+    fresh = {c: _view(state.world_at(obs, c, only), other, league) for c in cuts}
+    assert fresh["05"] != alone["05"]
+    shared = state.world_at(obs, "05", only)
+    assert [_view(shared, i, league) for i in (ident, other, ident)] == [alone["05"], fresh["05"], alone["05"]], (
+        "a stamp's conversion is cached per identity and never leaks into another's")
     later_tables = _tables()
     later_tables["api_teams"] += [_team("06", "a1", "ann"), _team("06", "a4", "cat", 7.0)]
     later_tables["api_activity"].append(_act("06", "e9", "sell", "u3", "a4", 7.0))
