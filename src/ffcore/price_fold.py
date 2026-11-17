@@ -193,6 +193,7 @@ class ClosedTrends:
         self.fitted = 0
         self.closed = 0
         self.rows: list[Trend] = []
+        self.by_player: dict[str, tuple[list[str], list[float]]] = {}
 
 
 class PriceState:
@@ -516,10 +517,7 @@ def price_slope(s: PriceState) -> list[DaySlope]:
     return out + [DaySlope(s.day, top.slope)]
 
 
-def price_trend_daily(s: PriceState) -> list[Trend]:
-    """Each change's value change in % over the horizon: the slope of its day (0 with none) times its signal x.
-    The closed days' entries are kept in the state and extended by the days closed since the last read; only the
-    live day's are worked out. Closed days come in closing order, then the live day's."""
+def _closed_trends(s: PriceState) -> tuple[ClosedTrends, float]:
     fits = momentum(s)
     h = fits[-1].h if fits else 0
     if s.trends.h != h:
@@ -532,10 +530,41 @@ def price_trend_daily(s: PriceState) -> list[Trend]:
     for made in s.closed_changes[kept.closed:]:
         for ff, j in made:
             c = s.changes[ff][j]
-            kept.rows.append(Trend(c.ff_id, c.day, (kept.slope.get(c.day) or 0.0) * c.x))
+            t = Trend(c.ff_id, c.day, (kept.slope.get(c.day) or 0.0) * c.x)
+            kept.rows.append(t)
+            series_days, series_values = kept.by_player.setdefault(t.ff_id, ([], []))
+            series_days.append(t.day)
+            series_values.append(t.trend)
     kept.closed = len(s.closed_changes)
-    live = fits[-1].slope if fits else 0.0
-    return kept.rows + [Trend(c.ff_id, c.day, (live or 0.0) * c.x) for c in _live_changes(s)]
+    return kept, (fits[-1].slope if fits else 0.0) or 0.0
+
+
+def price_trend_daily(s: PriceState) -> list[Trend]:
+    """Each change's value change in % over the horizon: the slope of its day (0 with none) times its signal x.
+    The closed days' entries are kept in the state and extended by the days closed since the last read; only the
+    live day's are worked out. Closed days come in closing order, then the live day's."""
+    kept, live = _closed_trends(s)
+    return kept.rows + [Trend(c.ff_id, c.day, live * c.x) for c in _live_changes(s)]
+
+
+def price_trend_at(s: PriceState) -> Callable[[str, str], float | None]:
+    """The lookup (player, day) -> the trend of the player's last entry of price_trend_daily, in (day, order) order,
+    on or before that day, None before the player's first; it reads the kept per-player series and works out only
+    the live day's entries."""
+    kept, live = _closed_trends(s)
+    fresh: dict[str, list[Trend]] = defaultdict(list)
+    for c in _live_changes(s):
+        fresh[c.ff_id].append(Trend(c.ff_id, c.day, live * c.x))
+
+    def trend_at(player: str, day: str) -> float | None:
+        days, values = kept.by_player.get(player, ([], []))
+        i = bisect.bisect_right(days, day) - 1
+        closed = (days[i], values[i]) if i >= 0 else None
+        newest = max((t for t in reversed(fresh.get(player, ())) if t.day <= day), key=lambda t: t.day, default=None)
+        if newest is not None and (closed is None or newest.day >= closed[0]):
+            return newest.trend
+        return closed[1] if closed else None
+    return trend_at
 
 
 def price_trend(s: PriceState) -> list[PlayerTrend]:
@@ -697,6 +726,22 @@ def _selftest() -> None:
     at_once = trends_of(rows, [])[0]
     assert trends_of(rows, [len(rows) // 3, len(rows) // 2])[-1] == at_once, "chunked fold equals one fold"
     assert trends_of(rows, [len(rows) // 3])[-1] == at_once
+    def rebuilt(state: PriceState, player: str, day: str) -> float | None:
+        mine = sorted(price_trend_daily(state), key=lambda t: (t.ff_id, t.day))
+        return next((t.trend for t in reversed(mine) if t.ff_id == player and t.day <= day), None)
+    players = sorted({r.ff_id for r in rows})
+    days = sorted({r.observed_at[:10] for r in rows}) + ["0000-00-00", "9999-99-99"]
+    for chunks in ([len(rows) // 3, len(rows) // 2], [1, 2, 3, len(rows) // 2], [len(rows) - 1]):
+        walked = FOLD.start()
+        for lo, hi in zip([0, *chunks], [*chunks, len(rows)]):
+            for r in rows[lo:hi]:
+                walked = FOLD.step(walked, r)
+            scratch = FOLD.start()
+            for r in rows[:hi]:
+                scratch = FOLD.step(scratch, r)
+            lookup = price_trend_at(walked)
+            assert all(lookup(p, d) == rebuilt(scratch, p, d) for p in [*players, "nobody"] for d in days), \
+                "price_trend_at equals the last entry on or before the day of a from-scratch rebuild, at any cut"
     steady = [ob.Market("2026-09-%02dT0800Z" % (n + 1), "", v, "a", "DEL", "RMA")
               for n, v in enumerate([100.0, 100.0, 101.0, 103.0, 104.0, 108.0, 109.0])]
     early, final = trends_of(steady, [5])

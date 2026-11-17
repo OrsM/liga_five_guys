@@ -3,7 +3,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from collections import defaultdict
 from math import sqrt
-from typing import Any, Callable, Mapping, NamedTuple, Sequence
+from typing import Any, Mapping, NamedTuple, Sequence
 
 from ffcore import auction_facts as af
 from ffcore import current, ledger, price_fold, pricing
@@ -184,23 +184,10 @@ def looks(db: Any) -> list[Look]:
         " FROM auction_looks ORDER BY look")]
 
 
-def _trend_at(world: st.World) -> Callable[[str, str], float | None]:
-    series: dict[str, tuple[list[str], list[float]]] = defaultdict(lambda: ([], []))
-    for t in sorted(price_fold.price_trend_daily(price_fold.price_state(world)), key=lambda t: (t.ff_id, t.day)):
-        series[t.ff_id][0].append(t.day)
-        series[t.ff_id][1].append(t.trend)
-
-    def trend_at(player: str, look: str) -> float | None:
-        days, values = series.get(player, ([], []))
-        i = bisect_right(days, look[:10]) - 1
-        return values[i] if i >= 0 else None
-    return trend_at
-
-
 def looks_of(world: st.World, identity: current.Identity, league: ledger.League) -> list[Look]:
     """The looks of auction_facts.auction_looks sorted by look, each with the price trend of its day or the day before
     (trend_is_last_day_on_or_before_look; None before the player's first day), bools as bool."""
-    trend_at = _trend_at(world)
+    trend_at = price_fold.price_trend_at(price_fold.price_state(world))
     rows = [Look(r.player, r.close, r.look, r.mins, r.ask, r.bids, r.mine, r.rival, trend_at(r.player, r.look), r.my_bid,
                  r.won, bool(r.by_me), r.is_open) for r in af.auction_looks(world, identity, league)]
     return sorted(rows, key=lambda x: x.look)
@@ -219,7 +206,7 @@ def open_looks_of(world: st.World, identity: current.Identity, league: ledger.Le
         key = (player, row.expires_at)
         if key not in newest or newest[key][0].observed_at <= row.observed_at:
             newest[key] = (row, (ends - seen) * 1440.0)
-    trend_at = _trend_at(world)
+    trend_at = price_fold.price_trend_at(price_fold.price_state(world))
     out = []
     for (player, close), (row, mins) in newest.items():
         mine, bids = row.bid_id != "", row.bids or 0
