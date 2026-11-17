@@ -175,6 +175,18 @@ class Grade(NamedTuple):
     actual: float | None
 
 
+class ClosedTrends:
+    """The trends of every closed change at horizon h (0: none fitted), appended as days close and never
+    rewritten: rows is in closing order, and a closed day's slope at h is fixed once it has closed."""
+
+    def __init__(self, h: int) -> None:
+        self.h = h
+        self.slope: dict[str, float | None] = {}
+        self.fitted = 0
+        self.closed = 0
+        self.rows: list[Trend] = []
+
+
 class PriceState:
     """The state of the "price" fold; read only through the selectors of this module."""
 
@@ -193,6 +205,7 @@ class PriceState:
         self.days: dict[int, list[DayFit]] = defaultdict(list)
         self.cum: dict[int, list[Sums]] = defaultdict(list)
         self.memo: dict[str, Any] = {}
+        self.trends = ClosedTrends(0)
 
 
 def _clip(v: float, lim: float) -> float:
@@ -496,9 +509,25 @@ def price_slope(s: PriceState) -> list[DaySlope]:
 
 
 def price_trend_daily(s: PriceState) -> list[Trend]:
-    """Each change's value change in % over the horizon: the slope of its day (0 with none) times its signal x."""
-    slope = {d.day: d.slope for d in price_slope(s)}
-    return [Trend(c.ff_id, c.day, (slope.get(c.day) or 0.0) * c.x) for c in price_series(s)]
+    """Each change's value change in % over the horizon: the slope of its day (0 with none) times its signal x.
+    The closed days' entries are kept in the state and extended by the days closed since the last read; only the
+    live day's are worked out. Closed days come in closing order, then the live day's."""
+    fits = momentum(s)
+    h = fits[-1].h if fits else 0
+    if s.trends.h != h:
+        s.trends = ClosedTrends(h)
+    kept = s.trends
+    days, cums = s.days.get(h, ()), s.cum.get(h, ())
+    for d, cum in zip(days[kept.fitted:], cums[kept.fitted:]):
+        kept.slope[d.end_day] = cum.sxy / cum.sxx if cum.sxx != 0 else None
+    kept.fitted = len(days)
+    for made in s.closed_changes[kept.closed:]:
+        for ff, j in made:
+            c = s.changes[ff][j]
+            kept.rows.append(Trend(c.ff_id, c.day, (kept.slope.get(c.day) or 0.0) * c.x))
+    kept.closed = len(s.closed_changes)
+    live = fits[-1].slope if fits else 0.0
+    return kept.rows + [Trend(c.ff_id, c.day, (live or 0.0) * c.x) for c in _live_changes(s)]
 
 
 def price_trend(s: PriceState) -> list[PlayerTrend]:
@@ -648,6 +677,24 @@ def _selftest() -> None:
     assert [f.h for f in momentum(s)] == sorted(f.h for f in momentum(s))
     assert {t.ff_id for t in price_trend(s)} <= {t.ff_id for t in price_trend_daily(s) if t.day == "2026-10-09"}
     assert price_momentum_of(s).horizon == max(f.h for f in momentum(s))
+
+    def trends_of(rows_: list[ob.Market], chunks: list[int]) -> list[list[Trend]]:
+        state = FOLD.start()
+        out = []
+        for lo, hi in zip([0, *chunks], [*chunks, len(rows_)]):
+            for r in rows_[lo:hi]:
+                state = FOLD.step(state, r)
+            out.append(sorted(price_trend_daily(state), key=repr))
+        return out
+    at_once = trends_of(rows, [])[0]
+    assert trends_of(rows, [len(rows) // 3, len(rows) // 2])[-1] == at_once, "chunked fold equals one fold"
+    assert trends_of(rows, [len(rows) // 3])[-1] == at_once
+    steady = [ob.Market("2026-09-%02dT0800Z" % (n + 1), "", v, "a", "DEL", "RMA")
+              for n, v in enumerate([100.0, 100.0, 101.0, 103.0, 104.0, 108.0, 109.0])]
+    early, final = trends_of(steady, [5])
+    shut = {(t.ff_id, t.day) for t in early if t.day < "2026-09-05"}
+    assert shut and {t for t in final if (t.ff_id, t.day) in shut} == {t for t in early if (t.ff_id, t.day) in shut}, \
+        "rows after a day closes leave its entries unchanged"
 
     def mk(at: str, v: dict[str, float | None]) -> list[ob.Market]:
         return [ob.Market(at, "", x, ff, "DEL", "RMA") for ff, x in v.items()]
