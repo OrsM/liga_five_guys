@@ -223,6 +223,9 @@ def arranged(rows: Iterable[Any]) -> Table:
     """rows (in storage order) as a Table: stably sorted by observed_at; refolds counts the rows whose stamp
     is before an earlier row's of the same source."""
     held = list(rows)
+    stamps = tuple(map(operator.attrgetter("observed_at"), held))
+    if all(map(operator.le, stamps, stamps[1:])):
+        return Table(tuple(held), stamps, 0)
     last: dict[str, str] = {}
     refolds = 0
     for r in held:
