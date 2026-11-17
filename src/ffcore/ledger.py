@@ -257,6 +257,13 @@ def _selftest() -> None:
     assert not any(e.inferred and e.at == "02" for e in late), "exits_counted_not_matched: a later feed row drops it"
 
     tabs = _tables()
+    tabs["api_activity"] = [a for a in tabs["api_activity"] if a.activity_id != "e1"] + [
+        _act("02", "e1", "transfer", "u2", "a2", 6.0, "u1")]
+    by_transfer = ledger(state.world_at(ob.of(tabs), "05", only), ident)
+    assert not any(e.inferred and e.at == "02" for e in by_transfer), \
+        "exits_counted_not_matched: a transfer names its seller, so it records his exit as a sale does"
+
+    tabs = _tables()
     tabs["api_activity"] += [_act("04", "e6", "sell", "u1", "a2", 8.0), _act("05", "e7", "sell", "u3", "a4", 7.0)]
     recorded = ledger(state.world_at(ob.of(tabs), "05", only), ident)
     assert not any(e.inferred for e in recorded), "with every exit recorded in the feed there are no inferred rows"

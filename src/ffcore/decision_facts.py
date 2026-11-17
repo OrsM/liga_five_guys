@@ -13,6 +13,9 @@ Named rules, each tested:
   owner_is_current_manager: owner is the manager of the player's squad row.
   paid_is_last_buy_to_owner: paid is what the owner last paid for the player (current.price_paid).
   trend_is_the_days_trend: trend is the player's price trend (price_fold.price_trend), None when he has none.
+  clause_is_squad_buyout: clause is the buyout of the player's squad row, None with no row or a buyout of 0.
+  open_listing_rival_excludes_own_bid: an open listing gives one SeenAuction; its rival is the bids seen less my own
+    (mine 1 when I have a bid on it).
   my_squad_pos_default: a squad member with no position is 'MED'.
   my_cash_zero_without_row: my_cash is 0.0 when league.me has no cash row.
 Contract: seen_at(world, identity, league) gives the Seen of the cut; it is the same alone or inside a sweep, unchanged by
@@ -258,6 +261,8 @@ def _selftest() -> None:
         "bid_is_pending_max: the largest pending bid; the sale listing with no sale and the won bid are not")
     assert facts["p3"].offer == 6.0, "offer_is_pending_on_mine: the largest pending offer of my squad"
     assert facts["p2"].offer is None, "offer_is_pending_on_mine: shown only on my players"
+    assert (facts["p2"].clause, facts["p3"].clause, facts["p4"].clause) == (5.0, 15.0, None), \
+        "clause_is_squad_buyout: the buyout of his squad row, none without one"
     assert facts["p3"].owner == "ann" and facts["p4"].owner is None and facts["p5"].owner == "cat", (
         "owner_is_current_manager")
     assert facts["p3"].paid == 12.0 and facts["p2"].paid == 2.0 and facts["p1"].paid is None, (
@@ -272,6 +277,15 @@ def _selftest() -> None:
     assert {c.manager for c in seen.cash} == {u.manager for u in current.users(w)}, "cash covers exactly the users"
     assert {c.player for c in seen.curves} <= {a.player for a in seen.auctions} and seen.auctions, (
         "every curve point has its auction")
+    listed = [ob.ApiMarket(_ST, "laliga", 1.0, 100.0, 100.0, 1, "a8", "m8", "", "", "marketPlayerLeague", "", "", _END, "b8", "pending"),
+              ob.ApiMarket(_ST, "laliga", 1.0, 100.0, None, 1, "a9", "m9", "", "", "marketPlayerLeague", "", "", _END, "", ""),
+              ob.ApiMarket(_ST, "laliga", 1.0, 100.0, None, 1, "a4", "m4", "", "", "marketPlayerLeague", "", "",
+                           "2026-08-18T17:30:00+00:00", "", "")]
+    forecast = {a.player: a for a in seen_at(state.world_at(ob.of({"api_market": listed}), _ST),
+                                              current.Identity({}, {"a8": "p8", "a9": "p9", "a4": "p4"}), league).auctions}
+    assert forecast.keys() == {"p8", "p9"}, "open_listing_rival_excludes_own_bid: a forecast for each open listing only"
+    assert [(forecast[p].bids, forecast[p].rival, forecast[p].mine) for p in ("p8", "p9")] == [(1, 0, 1), (1, 1, 0)], \
+        "open_listing_rival_excludes_own_bid: a bid seen is a rival's unless it is mine"
     print("ffcore.decision_facts self-test OK")
 
 

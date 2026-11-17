@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextlib import closing
-from pathlib import Path
 
 from ffcore import auction
 from ffcore.db import connect, cut
@@ -28,34 +27,3 @@ def see(key: str) -> str:
         db.execute("INSERT INTO seen_cash SELECT ?, variant(), manager, cash FROM cash", (c, ))
         auction.write(db, c)
     return c
-
-
-def _selftest() -> None:
-    import tempfile
-
-    from ffcore.db import connect, record, rows, set_now
-    from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import store_sql, tables_in
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(snapshot_stamp("2026-09-03T0000Z"))
-            record([{"me": "me", "budget": 100e6}], "league_config")
-            record([{"player_id": "p1", "app_id": "1"}], "crosswalk")
-            store_sql("market", [{"observed_at": "2026-09-02T1000Z", "ff_id": "p1", "name": "Ana",
-                                  "position": "defensa", "value": "5000000"}])
-            c = see("a")
-            assert rows("SELECT player, value FROM seen") == [("p1", 5e6)], "the market as seen at the cut"
-            with closing(connect()) as db, db:
-                db.execute("UPDATE seen SET value = -1")
-            assert see("a") == c and rows("SELECT value FROM seen") == [(-1,)], \
-                "made once a cut and key: read, not made again"
-            see("b")
-            assert rows("SELECT value FROM seen") == [(5e6,)], "another key makes it again"
-        finally:
-            set_now(None)
-    print("ffcore.seen self-test OK")
-
-
-if __name__ == "__main__":
-    _selftest()

@@ -19,6 +19,14 @@ Rules copied from the SQL, each tested:
   slope_none_on_zero_sxx: a cumulative slope with sum x*x 0 is None, and a trend with no slope is 0.
   hmax_median: the longest horizon is a quarter of the median count of changes over players (closed or live; the
     live rows of one player add), at least 1.
+  price_obs_counts_single_sightings: a player seen once has an Obs with no change, a flat one changes of 0.
+  signal_spans_three_updates: a change is in the signal x of its own update and the next two (weights w0, w1, w2), then no more.
+  slope_fits_h_update_change: on a constant rise slope * x is the change over h updates, however large the rise.
+  carry_reaches_one: carry is a horizon's slope over the longest's, so the last is 1.0 and it grows with h on a rise.
+  trend_follows_the_signal: a rising player's trend is above 0, a falling one's below, a flat one's 0; a single day gives none.
+  grade_beats_no_change: on steady rises and falls momentum's rmse is below that of no change.
+  forecast_follows_slope: expected_value is value * (1 + slope * x / 100) for h up to the longest horizon, with a spread
+    only for a player worth PRICE_FOCUS.
   grade_days: price_grade fits from the day a quarter through the distinct change days.
 Selectors: price_state; the views by their names (price_history .. price_grade) over a PriceState;
 price_momentum_of is forecast_store.price_momentum() from the state."""
@@ -756,6 +764,47 @@ def _selftest() -> None:
         return sum(1 for b in range(1, len(ch)) if ch[b - 1].day >= gdays[index])
     n_all = [r.n for r in price_grade(g) if r.scope == "all" and r.h == 1]
     assert len(gdays) == 11 and n_all == [graded(11 // 4)] == [8] and graded(len(gdays) // 3) == 7, "grade_days"
+
+    once = [r for n in range(3) for r in mk("2026-08-%02dT0800Z" % (10 + n), {"up": 100.0 * 1.05 ** n, "flat": 100.0, **(
+        {"once": 50.0} if n == 0 else {})})]
+    seen_obs = price_obs(after(once, "2026-08-12T0900Z"))
+
+    def steps_of(ff: str) -> list[float | None]:
+        return [None if o.step is None else round(o.step, 9) for o in sorted(seen_obs, key=lambda o: o.observed_at) if o.ff_id == ff]
+    assert (steps_of("once"), steps_of("flat"), steps_of("up")) == ([None], [None, 0.0, 0.0], [None, 5.0, 5.0]), \
+        "price_obs_counts_single_sightings"
+    spans = price_series(after(daily([100.0, 110.0, 110.0, 110.0, 110.0, 110.0]), "2026-09-06T0900Z"))
+    assert [round(c.x, 9) for c in spans] == [10.0, 6.0, 2.0, 0.0, 0.0], "signal_spans_three_updates"
+
+    def run(series: dict[str, list[float]]) -> PriceState:
+        return after([r for n in range(max(len(v) for v in series.values()))
+                      for r in mk("2026-08-%02dT2359Z" % (10 + n), {k: v[n] for k, v in series.items() if n < len(v)})],
+                     "2026-08-30T0000Z")
+    by = {k + str(i): [100 * g ** n for n in range(20)] for k, g in (("up", 1.05), ("down", 0.98), ("flat", 1.0)) for i in range(12)}
+    mixed = run(by)
+    rising = {f.h: f.slope for f in momentum(run({k: v for k, v in by.items() if k.startswith("up")}))}
+    assert abs(rising[3] * 5.0 - (1.05 ** 3 - 1) * 100) < 1e-6, "slope_fits_h_update_change"
+    fast = {f.h: f.slope for f in momentum(run({"r%d" % i: [100 * 1.15 ** n for n in range(13)] for i in range(3)}))}
+    assert abs(fast[2] * 15.0 - (1.15 ** 2 - 1) * 100) < 1e-6, "slope_fits_h_update_change: a rise over several updates is not clipped as one"
+    carry = [c.carry for c in price_carry(mixed)]
+    assert carry[-1] == 1.0 and 0 < carry[0] < carry[1], "carry_reaches_one"
+    trend = {t.ff_id: t.trend for t in price_trend(mixed)}
+    assert trend["up0"] > 0 > trend["down0"] and trend["flat0"] == 0.0, "trend_follows_the_signal"
+    assert price_trend(after(daily([100.0]), "2026-09-01T0900Z")) == [], "trend_follows_the_signal: one day gives none"
+    graded_all = {x.h: x for x in price_grade(mixed) if x.scope == "all"}
+    assert graded_all[1].rmse is not None and graded_all[1].rmse_none is not None and graded_all[1].rmse < graded_all[1].rmse_none \
+        and graded_all[3].n > 0, "grade_beats_no_change"
+    from ffcore.db import set_constants
+    with set_constants(PRICE_FOCUS=0.0):
+        focused = run(by)
+    live_x = {c.ff_id: c.x for c in price_series(focused) if c.day == price_day_now(focused)}
+    slope_of = {f.h: f.slope for f in momentum(focused)}
+    ahead = price_forecast(focused, None)
+    assert ahead and all(abs(e.expected_value - e.value * (1 + slope_of[e.h] * live_x[e.ff_id] / 100)) < 1e-6 for e in ahead), \
+        "forecast_follows_slope: the value times one plus slope times signal"
+    assert max(e.h for e in ahead) <= max(slope_of) and all(e.spread is not None and e.spread >= 0 for e in ahead), \
+        "forecast_follows_slope: nights up to the horizon, each with a spread for a player worth the focus"
+    assert all(e.spread is None for e in price_forecast(mixed, None)), "forecast_follows_slope: no spread under the focus"
 
     cuts_ = ["2026-%s-%02dT1200Z" % (("09", n) if n <= 30 else ("10", n - 30)) for n in range(2, 41)]
     swept = st.sweep(obs, cuts_, lambda w_: (price_hmax(price_state(w_)), price_state(w_).level,

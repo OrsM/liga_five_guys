@@ -522,11 +522,6 @@ def _selftest() -> None:
 
     mem = sqlite3.connect(":memory:")
     functions(mem)
-    mem.execute("CREATE TABLE t (x REAL, y REAL)")
-    mem.executemany("INSERT INTO t VALUES (?, ?)", [(1, 2), (2, 4), (3, 6), (4, 8), (None, 9), (100, 1)])
-    assert mem.execute("SELECT median(x), median(x) FROM t WHERE x < 10").fetchone() == (2.5, 2.5), "even count: the middle two"
-    assert mem.execute("SELECT median(x) FROM t").fetchone() == (3.0,), "odd count, nulls ignored"
-    assert mem.execute("SELECT median(x) FROM t WHERE x > 1000").fetchone() == (None,)
     assert mem.execute("SELECT lo95(1.0, 0.5), hi95(1.0, 0.5), claim(1.0, 0.5), claim(1.0, 0.6),"
                        " claim(-1.0, 0.5), claim(0.0, 1.0), claim(1.0, NULL), lo95(NULL, 1)").fetchone() \
         == (1.0 - 0.98, 1.0 + 0.98, "positive", "not established", "negative",

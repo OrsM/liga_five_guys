@@ -22,6 +22,7 @@ Named rules, each tested:
     (the SQL reads the standings of all time; the two agree whenever your user_id never changes).
   bid_first_row_is_a_change: the first observation of a bid_id is a change (was None); a row with an unchanged
     bid_money is not; a change to or from None is; rows with an empty bid_id are no bid.
+  bid_change_carries_close: a BidChange's close is the raw expires_at of the listing it was seen on.
   look_needs_game_listing: a look is a listing of the league seller with a sale_price above 0 and a non-empty
     expires_at; a manager's listing is no look.
   look_joins_result_by_raw_close: a look's outcome is matched on the raw expires_at text, not the instant: another
@@ -439,6 +440,8 @@ def _selftest() -> None:
         ("b9", None, None, 3.0), ("b1", "p1", None, 12.0), ("b1", "p1", 12.0, 15.0), ("b1", "p1", 15.0, None),
         ("b1", "p3", None, 20.0)], "bid_first_row_is_a_change"
     assert not any(c.bid_id == "" for c in changes) and len(changes) == 5
+    assert {(c.player, c.close) for c in changes if c.bid_id == "b1"} == {("p1", _C1), ("p3", "2026-08-19T20:00:00+00:00")}, \
+        "bid_change_carries_close: a change has the listing's raw expires_at"
 
     lt = _look_tables()
     mid = {(r.player, r.look): r for r in _looks_at(lt, "2026-08-18T0945Z")}

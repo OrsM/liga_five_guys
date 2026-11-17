@@ -47,6 +47,8 @@ Named rules, each tested:
   fixture_by_position                 a goalkeeper or defender faces 1 / attack of the opponent, anyone else its defence; an
                                       opponent with no rating gives 1.0.
   pts_floor                           pts = max(0.0, ppm * fixture); p = min(1.0, q + p_lift * q * (1 - q)), so p is in [0, 1].
+  p_blends_listing_and_record         q = w * picked * (1 if his listing gives a start %, else fit) + (1 - w) * record * fit, with
+                                      w = P_LISTING * P_DECAY ** (jornada - his club's first jornada left); p = min(1, q + P_LIFT * q * (1 - q)).
   coach_has_no_now                    a player with an empty position (a coach) has no NowRow.
   late_means_after_kickoff            a (player, jornada) is late when his listing close (listing_close) is strictly after
                                       the kickoff of a fixture of his club in a jornada whose calendar state is "under way"
@@ -715,6 +717,9 @@ def _selftest() -> None:
         if rp.pts is not None and rp.apps > 0:
             hull.append(rp.pts / rp.apps)
         assert min(hull) - 1e-9 <= x.ppm <= max(hull) + 1e-9, "ppm is a convex combination of its prior and its records"
+        past = shrink(priors[p], k.shrink_k, (lp.pts or 0.0) if lp else 0.0, (lp.pj or 0.0) if lp else 0.0)
+        assert abs(x.ppm - shrink(past, k.shrink_k, rp.pts or 0.0, rp.apps)) < 1e-12, \
+            "no_record_means_prior: last season's points and matches first, then this season's, each worth SHRINK_K matches"
 
     t2 = _tables()
     t2["points"].append(_p(D3, "m2", 4.0, 2.0, "26"))
@@ -739,6 +744,8 @@ def _selftest() -> None:
     assert [fit_of(Prognosis("out", None, 3), 1, Fixture(j, "A", "C", None)) for j in (2, 3, 4)] == [0.0, 0.0, 1.0]
     assert [fit_of(Prognosis("back", None, 3), 1, Fixture(j, "A", "C", None)) for j in (2, 3, 4)] == [0.0, 1.0, 1.0]
     assert fit_of(Prognosis("doubt", None, None), 4, Fixture(4, "A", "C", None)) == 0.5, "no jornada: the club's next"
+    assert [fit_of(Prognosis("out", None, None), 4, Fixture(j, "A", "C", None)) for j in (4, 5)] == [0.0, 1.0], \
+        "fit_kinds: an out with no jornada is the club's next match"
     until = Prognosis("until", "2026-09-01", None)
     assert fit_of(until, 1, Fixture(1, "A", "C", "2026-08-30T1800Z")) == 0.0
     assert fit_of(until, 1, Fixture(1, "A", "C", "2026-09-02T1800Z")) == 1.0
@@ -761,6 +768,17 @@ def _selftest() -> None:
     assert at_j1[("m3", 1)] == 1.0, "fixture_by_position: an opponent with no rating gives 1.0 (J is unrated)"
     q1_two = sorted(n.fixture for n in now if n.player == "q1" and n.jornada == 2)
     assert q1_two == sorted([ratings["C"].defence, ratings["D"].defence]), "one_row_per_fixture: two rows in jornada 2"
+    club_of = {c.player: c.club for c in inp1.clubs if c.club is not None}
+    for n in now:
+        pr = rate[n.player]
+        w = k.p_listing * k.p_decay ** (n.jornada - min(f.jornada for f in inp1.fixtures[club_of[n.player]]))
+        q = w * pr.picked * (1.0 if pr.listed_pct else n.fit) + (1.0 - w) * pr.record * n.fit
+        assert abs(n.p - min(1.0, q + k.p_lift * q * (1.0 - q))) < 1e-12, \
+            "p_blends_listing_and_record: the listing's share P_LISTING falling by P_DECAY a jornada, lifted by P_LIFT"
+    with db.set_constants(P_LISTING=0.0, P_LIFT=0.0):
+        record_only = forecast_now(_inp(w1))
+    assert all(abs(n.p - rate[n.player].record * n.fit) < 1e-12 for n in record_only), \
+        "p_blends_listing_and_record: with no listing share the chance is his record times his fit"
     with db.set_constants(P_LIFT=0.5):
         lifted = forecast_now(_inp(w1))
     base_by = {(n.player, n.jornada, n.fixture): n for n in now}

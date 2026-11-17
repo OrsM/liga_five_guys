@@ -26,6 +26,8 @@ Named rules, each tested:
                                   of his counted listings' julian days.
   close_group_keeps_unparseable   a player whose counted listings all expire at a text that is not an instant has a
                                   ListingClose with t None.
+  pick_pulls_toward_neutral       pick is (pick_k * neutral_start / 100 + apps) / (pick_k + squads): his appearances over matchday
+                                  squads pulled toward neutral_start percent, worth pick_k matches; no squads: neutral_start / 100.
   played_is_scored_and_appeared   played_points has a row only for a (player, jornada) with BOTH a scored row and an
                                   appearance; its pts is the sum of his scored rows only (None if all are None)."""
 from __future__ import annotations
@@ -595,6 +597,8 @@ def _selftest() -> None:
     assert last_season(worlds[cuts[0]]) == () and end[15] == [
         LastSeason("", 1.0, 1.0), LastSeason("ida", 12.0, 5.0), LastSeason("idb", 7.0, 3.0)]
     assert all(0.0 < pick(r, 60.0, 4.0) < 1.0 for r in end[14])
+    assert pick(SeasonRecord("x", 5.0, 2.0, 2.0), 60.0, 4.0) == (4.0 * 0.6 + 2.0) / 6.0 and pick(
+        SeasonRecord("x", None, 0.0, 0.0), 60.0, 4.0) == 0.6, "pick_pulls_toward_neutral"
     twice = {(f.jornada, f.club) for f in views[cuts[1]][7]}
     assert len(views[cuts[1]][7]) == len(set(views[cuts[1]][7])) and ("A", 2) not in twice
     assert sum(f.club == "A" and f.jornada == 2 for f in views[cuts[1]][7]) == 2

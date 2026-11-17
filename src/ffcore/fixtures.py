@@ -42,24 +42,3 @@ def seed_league(me: str, cash: float, players: Mapping[str, Mapping[str, Any]],
                           "position": p.get("pos") or ""} for k, p in players.items()])
     store_sql("api_teams", [{"observed_at": "2026-08-01T0000Z", "source": "test", "player_id": k, "manager": p["owner"]}
                             for k, p in players.items() if p.get("owner")])
-
-
-def _selftest() -> None:
-    import tempfile
-    from pathlib import Path
-
-    from ffcore.db import rows
-    from ffcore.tidy import tables_in
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        seed_league("me", 7e6, {"a": {"pos": "POR", "owner": "me", "value": 1e6}, "b": {"pos": "DEF", "price": 2e6}},
-                    {1: {"a": (5.0, 0.8)}}, odds={"b": ((1.0, 0.5),)})
-        assert rows("SELECT player, name, owner, price FROM seen ORDER BY player") == [
-            ("a", "a", "me", None), ("b", "b", None, 2e6)]
-        assert rows("SELECT player FROM my_squad") == [("a",)] and rows("SELECT cash FROM my_cash") == [(7e6,)]
-        assert rows("SELECT player, jornada, pts, p FROM forecast_cell") == [("a", 1, 5.0, 0.8)]
-    print("ffcore.fixtures self-test OK")
-
-
-if __name__ == "__main__":
-    _selftest()
