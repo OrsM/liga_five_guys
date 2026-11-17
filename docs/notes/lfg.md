@@ -43,7 +43,7 @@ after the lock is possible, what the 100k cash bumps are, bonus income.
 ## 2. What the machine models, and the measured facts [model, plan-datasette]
 
 **State, derived and never stored twice:** the squad (owner = me), cash (the ledger's fold), the eleven (the best legal
-eleven of the fieldable squad), a manager's standing (points of his squad). "Now" is an argument (`look.cut`), a
+eleven of the fieldable squad), a manager's standing (points of his squad). "Now" is an argument (the cut), a
 backtest is the same expression at an earlier t, "what if I had moved otherwise" is a different input, not a changed
 world (after SICP). [simplify]
 
@@ -72,32 +72,53 @@ jornadas, +~700 a week), not the number of snapshots replayed. A 0.01 rmse diffe
 interval about ±0.18 in squared error). Only the flagged-player gain is established (+0.289, n=601). Every claim is
 made with a paired interval or not made. [plan-datasette 5.1a]
 
-## 3. Architecture: five modules, one decision [simplify]
+## 3. Architecture: five layers, one sweep [simplify]
 
-Each module reads the facts and earlier modules' contracts only, owns its tables and views, and is judged by its own
-test and measure. Every contract is a SQL table or view; the decision's search is one pure Python function that reads
-rows and writes plan rows.
+Each layer reads the facts and earlier layers' exports only, and is judged by its own test and measure.
 
-| # | Module | Contract | Measure |
+| # | Layer | Contract | Measure |
 |---|---|---|---|
-| 1 | Ingest | facts: player_club/value/status/points, club_fixture, owners, cash, listings, offers, auction closes (timestamped) | parser health |
-| 2 | Forecast | `cell(player, jornada, pts, p)` from facts at t | RMSE and r, next jornada and five ahead |
-| 3 | Decision | the plan, kept per run: order, cash after, `due`/`why`, blockers on two futures, what skipping each step leaves | checks: cash ≥ 0 at the lock, squad ≤ cap, legal eleven |
-| 4 | Board | `board_json` (the phone's JSON) | correctness only |
-| 5 | Grading | replays the same views at a past t | its own |
+| 1 | Ingest | observations: every `src_*` row typed and read once; the facts of a cut (squads, cash, ledger, listings, offers, auction outcomes, prices, calendar) | parser health |
+| 2 | Forecast | `forecast_facts.cell(player, jornada, pts, p)` and the price fold, from the facts at a cut | RMSE and r, next jornada and five ahead |
+| 3 | Decision | the opportunities, the sales and the funding of a buy at a cut; the win chance is the fixed table `ffcore/auction_table.py` | checks: cash >= 0 at the lock, squad <= cap, legal eleven |
+| 4 | Board | `decisions.json` (the phone's JSON) | correctness only |
+| 5 | Grading | replays the same sweep at past cuts | its own |
 
-**Rules.** A module reads ingest's facts, t and earlier contracts; never a later module, never a scraped table. A test
-seeds its module's inputs as rows (no Python mirror of a table). A change is judged by its module's measure; old
-output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/selftests.sh`) enforces the exports;
-`python tools/frontiers.py --table` regenerates them.
+**The sweep.** `loader.load` reads storage once (observations, identity, league, knobs, earlier opportunity records)
+into a `Loaded`. `state.world_at` (or `state.sweep` over many cuts) folds the observations as of a cut into a `World`: each fact group registers its own fold
+(`state.register`) in its module, and a fact is a selector over the World. `decision.decisions(loaded, cuts)` (also
+`replay`, `decision_at`) decides at each cut; a live run is one cut. Where the facts live, one module per group:
+`current`, `season_facts`, `ledger`, `auction_facts` (ingest), `price_fold`, `forecast_facts` (forecast),
+`decision_facts`, `decision`, `auction` (decision), `board`, `grading`/`salegrade`. Replay cuts are the app's snapshot
+stamps (`loader.replay_cuts(obs, since)`). The sweep is the one place a derived fact is computed: no SQL view
+computes one, and a fact is never stored twice.
+
+**What stays SQL:** the raw `src_*` tables and their `current_*`/`history_*` views, the crosswalk and its identity views,
+`parser_health`, and the records (`runs`, `run_measures`, `params`, `measure_log` with `measure_latest`, `grade_cell`,
+`auction_calibration`, `auction_brier`, `dec_opportunity`), until the storage swap (#80, storage section, not started).
+The live database is read through a `mode=ro` connection.
+
+**Rules.** A layer reads ingest's facts, the cut and earlier layers' exports; never a later layer, never a raw table.
+A test seeds its module's inputs as rows (no Python mirror of a table). A change is judged by its layer's measure; old
+output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/selftests.sh`) enforces the exports
+over the SQL names and the Python reads of them; `python tools/frontiers.py --table` prints them.
+
+**The auction table.** The win chance of a bid is a fixed `Model` in `ffcore/auction_table.py`, fitted once over every
+closed auction with the fixed cuts `auction.FIXED_CUTS`. It is regenerated only by `tools/auction_table.py`, and the
+goldens are blessed in the same commit (it is an input of every golden decision).
+
+**Checks.** `tools/selftests.sh` (suites, mypy, ruff); `tools/frontiers.py`; `tools/golden.py` (`--selftest` on the fixture
+cuts, `--live` on the 5 live cuts of a database read `mode=ro`; a change to a golden file is `golden.py bless`, with the
+reason in the commit); `tools/lfg-rules` (the sale-rule table over every cut, on a scratch copy of the live database,
+about 3 min); `tools/lfg-dry-run` (the stages on a copy). Every heavy job goes through `tools/capped` (a memory-capped
+systemd scope, `LFG_CAP` to change the 1500M default). The git tag `oracle-sql` is the last SQL-view implementation,
+kept as the historic proof; it is not run any more.
 
 **The dictionary:** each concept has one home; a concept with two homes, a layer reaching past the one below, or a
-concept held as mutable state is a fault. Layers: facts → league at t → forecast → decision → grade/board.
-
-**Storage.** SQL owns the facts and every calculation across many rows; Python owns only parsing HTML, the season
-simulation and the plan search. One SQLite file `data/lfg.db`, rebuilt from `data/raw`; Datasette on it; saved queries
-in `datasette.json`, `tools/q.py` runs them in a terminal. Money is whole euros as INTEGER; SQLite SUM is compensated;
-golden compares decisions exactly and floats with `isclose`. Pages stay one renderer (`Fantasy.jsx`).
+concept held as mutable state is a fault. Layers: facts -> forecast -> decision -> board/grading. One SQLite file
+`data/lfg.db`, rebuilt from `data/raw`; Datasette on it; saved queries in `datasette.json`, `tools/q.py` runs them in a
+terminal, `tools/sql.py` asks it anything, read-only. Money is whole euros as INTEGER. Pages stay one renderer
+(`Fantasy.jsx`).
 
 ## 4. The board: cash, offers, funding a buy (2026-11-08)
 
@@ -108,8 +129,8 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada, `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
   offer on your players ranked by the points the best eleven loses per million it raises: next 4, next 8, season), and
-  `buys` (`decision.opportunities`: the players on the market who add points to your best eleven, most first; the bid is
-  `decision.recommended`, the least bid as likely to win as any; the first three carry `funding` from `approach.approach`:
+  `buys` (`decision.opportunity_rows`: the players on the market who add points to your best eleven, most first; the bid is
+  `auction.bid_for`, the least bid as likely to win as any; the first three carry `funding` from `approach.approach`:
   the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.
 - **`eleven.py`** (pure, no database): the eleven is fixed, never searched by formation. `best_eleven` builds the best eleven of
@@ -123,8 +144,8 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   the offers to hold, the cash left if the bid is lost, and the net gain: the win-weighted points the buy adds less the points
   the sales cost (by `eleven.remove_all`). No cap on the sales; squad max counts pending bids; a legal eleven always remains;
   checked against brute force on small leagues.
-- **`decision.read_inputs`**: the league at t as `dec_*` rows and the cells; `cells_of`, `window_value` and `opportunities`
-  (each market player by `eleven.swap`). Nothing else of the old decision survives.
+- **`decision.inputs_at`**: the league at a cut as the typed `Inputs` and the cells; `cells_of`, `window_value` and `opportunity_rows`
+  (each market player by `eleven.swap`); `decision_at`, `replay` and `decisions` run it at one cut or over many. Nothing else of the old decision survives.
 - **Taps:** only `list` is done from the phone (`act.py`; an already-listed player, error 030.01.52, counts as listed).
 - **Not true any more:** the recommender, `plan_rows`, `worth_on`, the ledger and sale due times, `sim_*` and
   `decision_*` tables, the hold, the line-up reminder (`remind.py`, `lock_due`, `lineup_alert`).

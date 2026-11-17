@@ -19,19 +19,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 ORDER = ["ingest", "forecast", "decision", "board"]
 ORDER_ALL = ORDER + ["grading"]  # grading, the measure, is last: it reads contracts like the rest
-PREFIX = {"src_": "ingest", "current_": "ingest", "history_": "ingest", "ff_identity": "ingest",
-          "name_": "ingest", "forecast_": "forecast", "price_": "forecast", "momentum": "forecast",
-          "dec_": "decision", "seen": "decision", "my_": "decision", "league_": "decision",
-          "board_": "board", "lineup_": "board", "grade_": "grading", "replay": "grading", "sim_": "grading"}
+PREFIX = {"src_": "ingest", "current_": "ingest", "history_": "ingest", "ff_identity": "ingest", "name_": "ingest",
+          "dec_": "decision", "grade_": "grading"}
 NAMES = {
-    "ingest": "unmatched crosswalk app_player slug_player id_clashes "
-              "names registry app_links owners users ledger cash league_config kickoffs blind_results jornada_calendar "
-              "look auction_results auction_looks bid_changes player_club player_value player_status club_fixture club_rating clubs_played round_locks rounds_ahead match_jornada club_games jornadas_done scored squad_minutes appearances "
-              "player_roster listings offers squads standings app_lineup price_history offer_ratios "
-              "player_jornadas season_record last_season next_lock listing_ends listing_close price_paid market_read",
-    "forecast": "cell cell_total cell_pool standin_cell score_spread forecast_used "
-                "late_arrivals ppm_prior fitted horizons market_daily",
-    "decision": "auction_calibration auction_brier player_facts my_squad my_cash",
+    "ingest": "unmatched crosswalk app_player slug_player id_clashes names registry app_links",
+    "forecast": "",
+    "decision": "auction_calibration auction_brier",
     "board": "",
     "grading": "measure_log measure_latest"}
 # Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
@@ -46,7 +39,7 @@ EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
 # Python files that are wholly one module's: their reads are judged as that module's. A file not here (sim, db,
 # facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
 OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest", "observations": "ingest", "state": "ingest", "current": "ingest", "season_facts": "ingest", "ledger": "ingest",
-        "forecast": "forecast", "forecast_facts": "forecast", "forecast_store": "forecast", "price_fold": "forecast", "seen": "decision", "auction": "decision", "decision": "decision", "board": "board", "grading": "grading", "salegrade": "grading", "auction_facts": "ingest", "decision_facts": "decision", "loader": "decision"}
+        "forecast": "forecast", "forecast_facts": "forecast", "price_fold": "forecast", "auction": "decision", "decision": "decision", "board": "board", "grading": "grading", "salegrade": "grading", "auction_facts": "ingest", "decision_facts": "decision", "loader": "decision"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
 SKIP = {"k", "model_constants", "params", "runs", "run_measures", "facts_meta", "parser_health"}  # no module: config, bookkeeping
 
@@ -155,7 +148,7 @@ def _selftest() -> None:
     assert crossing("forecast", "dec_player")  # a later module
     assert crossing("decision", "src_market")  # a scraped table
     assert crossing("ingest", "src_market") is None  # ingest reads its own
-    assert crossing(None, "score_spread")  # a forecast internal, not exported
+    assert crossing(None, "measure_log")  # a grading internal, not exported
     assert crossing(None, "auction_brier") is None  # exported
     assert crossing(None, "app_player") is None  # exported
     assert board_queries("def f(db):\n    return db.execute('select 1')\n") == [2]  # a query in the board

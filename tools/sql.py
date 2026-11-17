@@ -1,13 +1,12 @@
-"""Ask the database anything, read-only, with the views as of any moment.
+"""Ask the database anything, read-only: raw src_* storage, its current_* views, the records and the crosswalk, as of any
+moment. Derived facts are not here: the sweep computes them (ffcore/state.py).
 
     python tools/sql.py "SELECT * FROM parser_health"
     python tools/sql.py --at 2026-09-27T0934Z "SELECT count(*) FROM current_market"
-    python tools/sql.py --variant shrink-8 "SELECT const('SHRINK_K')"
+    python tools/sql.py "SELECT player_id, name_key(name) FROM crosswalk LIMIT 5"
 
-The same functions as Datasette (variant(), name_key(), claim(),
-median(), ...); --at sets t (cut(), this process's) to a past stamp, so
-every view reads as it did then. Nothing can be written.
-"""
+The same functions as Datasette (cut(), variant(), name_key(), name_shown(), stems_meet()); --at sets t (cut(),
+this process's) to a past stamp, so every current_* view reads as it did then. Nothing can be written."""
 from __future__ import annotations
 
 import sqlite3
