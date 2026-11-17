@@ -49,7 +49,7 @@ def digest(model: Model, text: str) -> Digest:
 def table_at(db: sqlite3.Connection, cut: str | None = None) -> Model:
     """auction.fit of the looks of the World at cut, with the fixed cuts."""
     loaded = loader.load(db, league.load_config())
-    at = cut if cut is not None else loader.replay_cuts(db)[-1]
+    at = cut if cut is not None else loader.replay_cuts(loaded.obs, "")[-1]
     world = state.world_at(loaded.obs, at)
     return auction.fit(auction.looks_of(world, loaded.identity, loaded.league), auction.FIXED_CUTS)
 

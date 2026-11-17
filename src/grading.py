@@ -410,9 +410,10 @@ def graded_sales(sold: Sequence[Sold], locks: dict[int, dt.datetime], done: set[
 
 
 def read_storage() -> tuple[loader.Loaded, list[str]]:
-    """The storage read once: the Loaded the sweeps run over and the cuts a replay runs at (loader.replay_cuts)."""
+    """The storage read once: the Loaded the sweeps run over and the cuts a replay runs at (loader.replay_cuts from SALES_FROM)."""
     with closing(connect()) as db:
-        return loader.load(db, league.load_config()), loader.replay_cuts(db)
+        loaded = loader.load(db, league.load_config())
+    return loaded, loader.replay_cuts(loaded.obs, SALES_FROM)
 
 
 def season(loaded: loader.Loaded) -> Season:
