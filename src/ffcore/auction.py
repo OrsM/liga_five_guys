@@ -3,7 +3,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from collections import defaultdict
 from math import sqrt
-from typing import Any, Callable, NamedTuple, Sequence
+from typing import Any, Callable, Mapping, NamedTuple, Sequence
 
 from ffcore import auction_facts as af
 from ffcore import current, ledger, price_fold, pricing
@@ -13,7 +13,7 @@ from ffcore.db import stamp_jd
 from ffcore.season_facts import julian_day
 
 __all__ = ["Look", "Sample", "Model", "Forecast", "RATIOS", "sample", "curve", "fit", "predict", "forecast", "chance", "bid_for",
-           "looks", "looks_of", "open_looks_of", "FIXED_CUTS", "write", "Record", "backtest_records", "points", "backtest", "stored_points", "calibration", "briers"]
+           "looks", "looks_of", "open_looks_of", "FIXED_CUTS", "write", "Record", "backtest_records", "points", "backtest", "stored_points", "live_points", "calibration", "briers"]
 
 RATIOS = (0.5, 0.6, 0.7, 0.8, 0.9) + tuple(round(0.95 + 0.01 * i, 2) for i in range(51))
 ASK_LEVELS = (0.5, 0.75, 0.9)
@@ -337,6 +337,28 @@ def stored_points(db: Any) -> list[Point]:
     return out
 
 
+def live_points(forecasts: Mapping[str, Sequence[Forecast]], results: Sequence[af.AuctionResult]) -> list[Point]:
+    """The Points of the stated chance of each decision against what happened. forecasts are each cut's Forecasts; of
+    a listing (player, close) with a result of the league's own sale, the last cut (ascending) whose forecast has mins at
+    least DECISION_MINS gives the stated curve (rule live_point_is_last_look_before_decision_mins), scored at the
+    SCORE_RATIOS against that result's sample; a listing with no such result or no such cut gives none."""
+    sold = {(r.player, r.close): r for r in results if r.seller == af.LEAGUE_SELLER}
+    last: dict[tuple[str, str], tuple[str, Forecast]] = {}
+    for cut in sorted(forecasts):
+        for f in forecasts[cut]:
+            if f.mins >= DECISION_MINS and (f.player, f.close) in sold:
+                last[(f.player, f.close)] = (cut, f)
+    out: list[Point] = []
+    for key, (cut, f) in last.items():
+        r = sold[key]
+        s = sample(Look(f.player, f.close, cut, 0.0, f.ask, 0, f.mine, f.rival, None, None, r.won, bool(r.by_me), False))
+        for ratio in SCORE_RATIOS:
+            w = observed(s, ratio)
+            if w is not None:
+                out.append(Point(scopes(False, f.rival, f.mine), chance(f.curve, ratio), chance(f.curve, ratio), w))
+    return out
+
+
 def calibration(points: Sequence[Point], prefix: str) -> list[dict[str, Any]]:
     out = []
     for scope in sorted({s for p in points for s in p.scope}):
@@ -423,6 +445,22 @@ def _selftest() -> None:
     assert open_looks_of(st.world_at(ob.of({"market": mkt, "api_market": listed, "api_activity": [], "api_standings": []}),
                                       "2026-08-25T0900Z", {n: st.FOLDS[n] for n in ("price", *af.AUCTION_FACTS)}), ident, lg) == [], \
         "a close at or before the cut is no open auction"
+    def forecast_at(mins: float, chance_at_ask: float, player: str = "a") -> Forecast:
+        cv = tuple((r, chance_at_ask if r < 1.1 else 1.0) for r in RATIOS)
+        return Forecast(player, "c1", 10.0, mins, 1, 1, False, None, "all", 50, False, cv)
+
+    def result(player: str, won: float | None, seller: str = af.LEAGUE_SELLER, by_me: bool | None = False) -> af.AuctionResult:
+        return af.AuctionResult(player, "c1", "c1", 10.0, seller, won, by_me, None)
+    staged = {"c1": [forecast_at(600.0, 0.9), forecast_at(50.0, 0.8, "z")], "c2": [forecast_at(39.0, 0.2)], "c3": [forecast_at(38.0, 0.7)],
+              "c0": [forecast_at(120.0, 0.6)]}
+    paid = live_points(staged, [result("a", 11.0), result("z", None, af.LISTING_SELLERS[1]), result("n", 11.0)])
+    assert [(p.scope, p.stated, p.won) for p in paid] == [(scopes(False, 1, False), 0.2, False)] * 2 + [(scopes(False, 1, False), 1.0, True)] * 2, \
+        "live_point_is_last_look_before_decision_mins: the cut with 39 minutes, not 38 or the earlier ones; no league result, no point"
+    assert [p.stated for p in live_points({"c1": [forecast_at(600.0, 0.9)]}, [result("a", 11.0)])] == [0.9] * 2 + [1.0] * 2
+    assert live_points({}, [result("a", 11.0)]) == [] and live_points(staged, []) == [] and live_points({"c3": staged["c3"]}, [result("a", 11.0)]) == []
+    assert live_points(dict(reversed(staged.items())), [result("a", 11.0)]) == live_points(staged, [result("a", 11.0)]), "cuts are taken in ascending order"
+    unsold = live_points({"c1": [forecast_at(600.0, 0.9)]}, [result("a", None)])
+    assert unsold and all(p.won == (r >= 1.0 - EPS) for p, r in zip(unsold, SCORE_RATIOS)), "an unsold listing is won at the ask and above"
     fixed = fit(ls, FIXED_CUTS)
     assert (fixed.ask_cuts, fixed.trend_cuts) == FIXED_CUTS and all(k[1] <= len(ASK_CUTS) and k[2] <= len(TREND_CUTS) for k in fixed.cells if len(k) == 3), \
         "fit with cuts bands the looks by those cuts, whatever their quantiles are"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
 import os
 import sys
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
@@ -11,13 +12,11 @@ from typing import Any, NamedTuple, TypeVar
 import decision
 import salegrade
 import worth
-from board import context, later_sale, replayed
-from ffcore import auction, current, league, ledger, loader, price_fold, season_facts, state
+from board import context, later_sale
+from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state
 from ffcore import observations as ob
 from ffcore.clock import run_now
-from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
-from ffcore.forecast_store import forecast
-from ffcore.jornadas import round_locks
+from ffcore.db import connect, record, rows, this_run
 from ffcore.parse import snapshot_stamp, stamp
 from salegrade import HORIZONS
 
@@ -25,80 +24,110 @@ __all__ = ["backtest", "superseded", "view_table", "record_grades"]
 
 T = TypeVar("T")
 
+RESULT_FOLDS = {name: state.FOLDS[name] for name in auction_facts.AUCTION_FACTS}
+AUCTION_FOLDS = {name: state.FOLDS[name] for name in ("price", *auction_facts.AUCTION_FACTS)}
+PRICE_FOLDS = {"price": state.FOLDS["price"]}
+
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 RATE = 0.6
 SALES_FROM = "2026-08-25"
 
 
-def before_locks() -> dict[dt.datetime, int]:
-    """A minute before each finished jornada's lock, oldest first, and the
-    jornada: where every replay of a lock stands."""
-    locks = round_locks()
-    return {locks[j] - dt.timedelta(minutes=1): j for j in sorted(done_jornadas() & set(locks), key=locks.__getitem__)}
+class GradeCell(NamedTuple):
+    """The forecast graded at the lock of from_j: what was expected of a player in a jornada (predicted), his chance of
+    playing and whether he was flagged (status not None); a grade_cell record without its run."""
+    from_j: int
+    jornada: int
+    player: str
+    predicted: float
+    plays: float | None
+    flagged: int
 
 
-def done_jornadas() -> set[int]:
-    """The jornadas every match of which has a score (jornada_calendar's done):
-    the ones a forecast can be graded on."""
-    return {j for (j,) in rows("SELECT jornada FROM jornada_calendar WHERE state = 'done'")}
+class LockForecast(NamedTuple):
+    """The forecast at a moment as grading reads it: the cell of every player and jornada left, and the players flagged
+    (a PlayerStatus with a status)."""
+    cells: tuple[forecast_facts.Cell, ...]
+    flagged: frozenset[str]
 
 
-def lock_cells(i: int, ahead: int, done: set[int]) -> list[dict[str, Any]]:
-    """The forecast at t (the cell contract) for the lock of jornada i and, with ahead, the next ones, each one
-    done: a row a player and jornada, his expected points, the chance he plays and whether he is flagged
-    (player_status: injured, doubtful, suspended)."""
-    flagged = {k for (k,) in rows("SELECT player FROM player_status WHERE status IS NOT NULL")}
-    return [{"jornada": j, "player": k, "predicted": e, "plays": p, "flagged": int(k in flagged)}
-            for j, k, e, p in rows("SELECT jornada, player, e, p FROM cell WHERE jornada BETWEEN ? AND ?",
-                                   (i, i + ahead)) if j in done]
+def lock_forecast(loaded: loader.Loaded, world: state.World) -> LockForecast:
+    """The LockForecast of the world: forecast_facts.cell of its inputs, and who has a status (rule flagged_is_status_not_null)."""
+    inp = forecast_facts.inputs(world, loaded.identity, loaded.knobs)
+    return LockForecast(forecast_facts.cell(inp), frozenset(k for k, s in inp.status.items() if s.status is not None))
 
 
-def backtest(ahead: int = 0) -> list[dict[str, Any]]:
-    """The forecast at each past lock (forecast_store.forecast makes it, the cell
-    contract is read): a row (lock, jornada, player) for the jornada it locks
-    and, with ahead, the next ones too, each one done. Graded in SQL
-    (grade_forecast)."""
-    done = done_jornadas()
+def lock_moments(now: Season) -> dict[int, dt.datetime]:
+    """Where the forecast of each done jornada's lock is read, by jornada in lock order: a minute before the lock (rule
+    lock_forecast_is_a_minute_before)."""
+    return {j: when - MINUTE for j, when in now.locks.items() if j in now.done}
+
+
+def lock_cells(i: int, ahead: int, done: set[int], fc: LockForecast) -> list[GradeCell]:
+    """The GradeCells of the forecast at the lock of jornada i: a row for each player and jornada from i to i + ahead
+    that is done; flagged is 1 for a player in fc.flagged."""
+    return [GradeCell(i, c.jornada, c.player, c.e, c.p, int(c.player in fc.flagged))
+            for c in fc.cells if i <= c.jornada <= i + ahead and c.jornada in done]
+
+
+def backtest(loaded: loader.Loaded, now: Season, ahead: int = 0) -> list[GradeCell]:
+    """The forecast at each past lock (lock_moments, read in one sweep) as GradeCells (lock_cells) for the jornada it
+    locks and, with ahead, the next ones, each one done; in lock order."""
+    moments = lock_moments(now)
+    got = moments_facts(loaded, moments.values(), lambda world: lock_forecast(loaded, world))
+    return [c for j, moment in moments.items() for c in lock_cells(j, ahead, now.done, got[moment])]
+
+
+class OpportunityGrade(NamedTuple):
+    """An opportunity of a cut graded: the market player, his rank among the cut's gains, the peers (same position, ask
+    within 30%) and jornadas compared, the forecast gain over the player he replaces, what was realised and the mean of
+    the peers' realised (None with no peer)."""
+    cut: str
+    player: str
+    rank: int
+    n_peers: int
+    jornadas: int
+    forecast: float
+    realised: float
+    control: float | None
+
+
+def graded_opportunities(cut: str, inp: decision.Inputs, now: Season, top: int, span: int) -> list[OpportunityGrade]:
+    """The first top market opportunities with a gain of the decision's inputs, each over the span jornadas from its
+    from_j that are done (none if no one is, or it replaces no one), against the points scored (Season.scored)."""
+    pos, cells = decision.cells_of(inp)
+    got = decision.opportunity_rows(inp)
+    band = [(c.player, c.pos, c.asking if c.asking is not None else c.value) for c in inp.universe if c.player in pos]
     out = []
-    with replaying():
-        for t, i in before_locks().items():
-            set_now(t)
-            set_look(moment=forecast())
-            out += [{"from_j": i, **c} for c in lock_cells(i, ahead, done)]
+    for rank, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:top], 1):
+        span_j = [j for j in range(r["from_j"], r["from_j"] + span) if j in now.done]
+        if not span_j or r["replaces"] is None:
+            continue
+        gone, k = r["replaces"], r["player"]
+        lost = points(now.scored, gone, span_j)
+        peers = [b for b, p, pr in band if p == r["pos"] and b != k and pr and abs(pr / r["asking"] - 1) <= 0.3]
+        out.append(OpportunityGrade(
+            cut, k, rank, len(peers), len(span_j),
+            sum(cells.get(j, {}).get(k, 0.0) - cells.get(j, {}).get(gone, 0.0) for j in span_j),
+            points(now.scored, k, span_j) - lost,
+            sum(points(now.scored, b, span_j) for b in peers) / len(peers) - lost if peers else None))
     return out
 
 
-def opportunity_grade(top: int = 5, span: int = 4) -> list[dict[str, Any]]:
-    done = done_jornadas()
-    actual = {(k, j): x for k, j, x in rows("SELECT player, jornada, sum(pts) FROM scored GROUP BY player, jornada")}
-    out = []
-    with replaying():
-        for c in decision.seen_cuts():
-            set_now(snapshot_stamp(c))
-            at = replayed()
-            if at is None:
-                continue
-            inp = at.inputs
-            pos, cells = decision.cells_of(inp)
-            got = decision.opportunity_rows(inp)
-            band = [(c.player, c.pos, c.asking if c.asking is not None else c.value) for c in inp.universe if c.player in pos]
-            for rank, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:top], 1):
-                span_j = [j for j in range(r["from_j"], r["from_j"] + span) if j in done]
-                if not span_j or r["replaces"] is None:
-                    continue
-                gone, k = r["replaces"], r["player"]
-                lost = sum(actual.get((gone, j), 0.0) for j in span_j)
-                price = r["asking"]
-                peers = [b for b, p, pr in band if p == r["pos"] and b != k and pr and abs(pr / price - 1) <= 0.3]
-                out.append({
-                    "cut": c, "player": k, "rank": rank, "n_peers": len(peers), "jornadas": len(span_j),
-                    "forecast": sum(cells.get(j, {}).get(k, 0.0) - cells.get(j, {}).get(gone, 0.0) for j in span_j),
-                    "realised": sum(actual.get((k, j), 0.0) for j in span_j) - lost,
-                    "control": (sum(actual.get((b, j), 0.0) for b in peers for j in span_j) / len(peers) - lost) if peers else None})
+def opportunity_grade(loaded: loader.Loaded, now: Season, cuts: Sequence[str], top: int = 5, span: int = 4) -> list[OpportunityGrade]:
+    """graded_opportunities of the decision at each cut that has one (not Stale), ascending, from one streamed replay."""
+    out: list[OpportunityGrade] = []
+
+    def keep(cut: str, decided: decision.Decided | decision.Stale) -> None:
+        if isinstance(decided, decision.Decided):
+            out.extend(graded_opportunities(cut, decided.inputs, now, top, span))
+    decision.replay(loaded, cuts, keep)
     return out
 
 
-def opportunity_report(got: list[dict[str, Any]]) -> str:
+def opportunity_report(got: Sequence[OpportunityGrade]) -> str:
+    """A table, a line for each OpportunityGrade, and a summary line: cases, the means of forecast, realised and control,
+    realised less control with its standard error, and the shares beating control and above 0."""
     import statistics as st
 
     def mean(xs: list[float]) -> float:
@@ -107,15 +136,15 @@ def opportunity_report(got: list[dict[str, Any]]) -> str:
     def sem(xs: list[float]) -> float:
         return st.stdev(xs) / len(xs) ** 0.5 if len(xs) > 1 else float("nan")
     lines = ["%-15s %-4s %3s %5s %9s %9s %9s" % ("cut", "rank", "n", "jorn", "forecast", "realised", "control")]
-    lines += ["%-15s %-4d %3d %5d %9.1f %9.1f %9s" % (g["cut"], g["rank"], g["n_peers"], g["jornadas"], g["forecast"], g["realised"],
-                                                    "-" if g["control"] is None else "%.1f" % g["control"]) for g in got]
-    both = [g for g in got if g["control"] is not None]
-    diff = [g["realised"] - g["control"] for g in both]
+    lines += ["%-15s %-4d %3d %5d %9.1f %9.1f %9s" % (g.cut, g.rank, g.n_peers, g.jornadas, g.forecast, g.realised,
+                                                    "-" if g.control is None else "%.1f" % g.control) for g in got]
+    both = [(g.realised, g.control) for g in got if g.control is not None]
+    diff = [realised - control for realised, control in both]
     lines.append("cases %d (with a control %d), cuts %d: mean forecast %.1f, realised %.1f, control %.1f; realised less control %+.1f (se %.1f), "
                  "share beating control %.0f%%, realised above 0 in %.0f%%" % (
-                     len(got), len(both), len({g["cut"] for g in got}), mean([g["forecast"] for g in got]),
-                     mean([g["realised"] for g in got]), mean([g["control"] for g in both]), mean(diff), sem(diff),
-                     100 * mean([float(d > 0) for d in diff]), 100 * mean([float(g["realised"] > 0) for g in got])))
+                     len(got), len(both), len({g.cut for g in got}), mean([g.forecast for g in got]),
+                     mean([g.realised for g in got]), mean([control for _, control in both]), mean(diff), sem(diff),
+                     100 * mean([float(d > 0) for d in diff]), 100 * mean([float(g.realised > 0) for g in got])))
     return "\n".join(lines)
 
 
@@ -150,9 +179,18 @@ class Results(NamedTuple):
     newest: str | None
 
 
-def results_seen() -> Results:
-    (row,) = rows("SELECT count(*) AS n, count(won) AS sold, max(close) AS newest FROM auction_results")
-    return Results(*row)
+def summarised(results: Iterable[auction_facts.AuctionResult]) -> Results:
+    """The Results of auction results: n all of them, sold those with a won, newest the largest raw close text (None with
+    none; rule results_count_sold_newest)."""
+    held = list(results)
+    return Results(len(held), sum(r.won is not None for r in held), max((r.close for r in held), default=None))
+
+
+def results_seen(loaded: loader.Loaded, moment: dt.datetime) -> Results:
+    """The Results (summarised) of auction_facts.auction_results in the world of the moment's minute, folding only the
+    auction facts (RESULT_FOLDS)."""
+    return state.sweep(loaded.obs, [stamp(moment)], lambda world: summarised(
+        auction_facts.auction_results(world, loaded.identity, loaded.league)), RESULT_FOLDS)[0]
 
 
 def scored_at(run: int, path: Path | None = None) -> str | None:
@@ -164,22 +202,55 @@ def scored_at(run: int, path: Path | None = None) -> str | None:
                           (run,)).fetchone()[0]
 
 
-def auctions_scored(run: int, now: Results) -> bool:
+def auctions_scored(run: int, loaded: loader.Loaded, now: Results) -> bool:
     """Whether an earlier run of this run's code scored the auctions on the outcomes seen now: its scores stand, as
-    no outcome has come since."""
+    no outcome has come since (the results as they stood at that run's cut equal now)."""
     then = scored_at(run)
     if then is None or not now.n:
         return False
-    with replaying():
-        set_now(snapshot_stamp(then))
-        return results_seen() == now
+    when = snapshot_stamp(then)
+    return when is not None and results_seen(loaded, when) == now
 
 
-def record_auction(run: int | None) -> dict[str, int]:
-    with closing(connect()) as db:
-        ls = auction.looks(db)
-        live = auction.stored_points(db)
-    back = auction.backtest(ls)
+class CutRead(NamedTuple):
+    """What the auction scoring reads at one cut: the forecast of the open auctions and, at the last cut only, the looks
+    and the results."""
+    forecast: list[auction.Forecast]
+    looks: list[auction.Look]
+    results: tuple[auction_facts.AuctionResult, ...]
+
+
+class AuctionReads(NamedTuple):
+    """What the auction scoring reads of the sweep: each cut's forecast and the looks and results at the last cut."""
+    forecasts: dict[str, list[auction.Forecast]]
+    looks: list[auction.Look]
+    results: tuple[auction_facts.AuctionResult, ...]
+
+
+def auction_reads(loaded: loader.Loaded, cuts: Sequence[str], moment: dt.datetime) -> AuctionReads:
+    """In one sweep over the cuts not after the moment's minute and that minute, auction.forecast of the fixed table
+    over each cut's open looks, and at the moment's minute its looks (auction.looks_of) and results; only the folds
+    the auction facts need are run (AUCTION_FOLDS)."""
+    last = stamp(moment)
+    asked = sorted({*(c for c in cuts if c <= last), last})
+
+    def read(world: state.World) -> CutRead:
+        forecast = auction.forecast(auction_table.TABLE, auction.open_looks_of(world, loaded.identity, loaded.league))
+        if world.cut != last:
+            return CutRead(forecast, [], ())
+        return CutRead(forecast, auction.looks_of(world, loaded.identity, loaded.league),
+                       auction_facts.auction_results(world, loaded.identity, loaded.league))
+    got = state.sweep(loaded.obs, asked, read, AUCTION_FOLDS)
+    return AuctionReads({c: r.forecast for c, r in zip(asked, got)}, got[-1].looks, got[-1].results)
+
+
+def record_auction(run: int | None, loaded: loader.Loaded, cuts: Sequence[str]) -> dict[str, int]:
+    """Scores the auction forecast: backtest (an expanding fit over the closed looks) and live (the stated chance of
+    each decision, auction_reads' forecasts of the fixed table at the cuts, against the results); calibration and Brier
+    scores of both are recorded for the run, and their sizes and drifts returned."""
+    reads = auction_reads(loaded, cuts, run_now())
+    live = auction.live_points(reads.forecasts, reads.results)
+    back = auction.backtest(reads.looks)
     cal = auction.calibration(back, "backtest:") + auction.calibration(live, "live:")
     brier = auction.briers(back, "backtest:") + auction.briers(live, "live:")
     if run is not None:
@@ -192,20 +263,22 @@ def record_grades() -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code, and keep every player forecast against
     what then happened (one set a code: superseded), unless this code has graded them on every jornada done (graded);
     and score the auction forecast (record_auction), unless this code has on every auction closed (auctions_scored)."""
-    done = done_jornadas()
-    resolved = len(done)
+    loaded, cuts = read_storage()
+    moment = run_now()
+    now = season(loaded)
+    resolved = len(now.done)
     run = this_run()
-    standing = run is not None and bool(done) and graded(run, max(done))
-    scored = {} if run is not None and auctions_scored(run, results_seen()) else record_auction(run)
+    standing = run is not None and bool(now.done) and graded(run, max(now.done))
+    scored = {} if run is not None and auctions_scored(run, loaded, results_seen(loaded, moment)) else record_auction(run, loaded, cuts)
     record_sales()
     if standing:
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, **scored}
-    fc = backtest(GRADE_AHEAD)
+    fc = backtest(loaded, now, GRADE_AHEAD)
     if run is not None:
-        record([{"run_id": run, **r} for r in fc], "grade_cell")
+        record([{"run_id": run, **c._asdict()} for c in fc], "grade_cell")
         superseded(run)
-    forecasts = len({(r["from_j"], r["jornada"]) for r in fc})     # lock moments a jornada
+    forecasts = len({(c.from_j, c.jornada) for c in fc})
     print("  grade: %d forecasts over %d jornadas" % (forecasts, resolved))
     return {"resolved": resolved, "forecasts": forecasts, **scored}
 
@@ -547,20 +620,90 @@ def log_measure(measure: str, values: dict[str, float]) -> None:
              "key": k, "value": v} for k, v in values.items()], "measure_log")
 
 
-def accuracy(ahead: int = 5) -> list[tuple[Any, ...]]:
-    """The forecast at each lock (backtest) graded as a run of its own
-    (trigger 'accuracy'): at the next jornada and at ahead, the rows
-    (grp, ahead, n, rmse, mae, bias, r, slope) of grade_accuracy, the star group first."""
+class GradeRow(NamedTuple):
+    """A graded forecast, a player a row: a GradeCell with the points he scored in the jornada (0.0 with none; rule
+    actual_is_zero_without_points)."""
+    from_j: int
+    jornada: int
+    player: str
+    predicted: float
+    plays: float | None
+    actual: float
+    flagged: int
+
+
+class Accuracy(NamedTuple):
+    """The forecast's accuracy for a group (grp: all, or star: predicted at 4 or more; rule star_is_predicted_four_or_more)
+    at a distance (ahead: jornadas past the lock): n, RMSE, MAE, bias (predicted less actual), the correlation r and the
+    slope of actual on predicted; r and slope are None where the variance makes them undefined."""
+    grp: str
+    ahead: int
+    n: int
+    rmse: float
+    mae: float
+    bias: float
+    r: float | None
+    slope: float | None
+
+
+STAR = 4.0
+
+
+def grade_rows(cells: Iterable[GradeCell], scored: Mapping[str, Mapping[int, float]]) -> list[GradeRow]:
+    """Each GradeCell against what its player scored in its jornada (points of a Season's scored)."""
+    return [GradeRow(c.from_j, c.jornada, c.player, c.predicted, c.plays, scored.get(c.player, {}).get(c.jornada, 0.0), c.flagged)
+            for c in cells]
+
+
+def accuracy_of(grp: str, ahead: int, graded_rows: Sequence[GradeRow]) -> Accuracy:
+    """The Accuracy of rows, predicted against actual, as the sums of their squares and products say it."""
+    xs, ys = [r.predicted for r in graded_rows], [r.actual for r in graded_rows]
+    n = len(xs)
+
+    def mean(vs: Iterable[float]) -> float:
+        return math.fsum(vs) / n
+    mx, my = mean(xs), mean(ys)
+    cov = mean(x * y for x, y in zip(xs, ys)) - mx * my
+    vx, vy = mean(x * x for x in xs) - mx * mx, mean(y * y for y in ys) - my * my
+    spread = vx * vy
+    return Accuracy(grp, ahead, n, math.sqrt(mean((x - y) * (x - y) for x, y in zip(xs, ys))), mean(abs(x - y) for x, y in zip(xs, ys)),
+                    mean(x - y for x, y in zip(xs, ys)), cov / math.sqrt(spread) if spread > 0 else None, cov / vx if vx != 0 else None)
+
+
+def accuracy_rows(graded_rows: Iterable[GradeRow]) -> list[Accuracy]:
+    """The Accuracy of the all group and of the star group (predicted at least STAR) at each ahead (jornada less from_j)
+    that has a row, ordered star first, then by ahead."""
+    groups: dict[tuple[str, int], list[GradeRow]] = {}
+    for r in graded_rows:
+        groups.setdefault(("all", r.jornada - r.from_j), []).append(r)
+        if r.predicted >= STAR:
+            groups.setdefault(("star", r.jornada - r.from_j), []).append(r)
+    return sorted((accuracy_of(grp, ahead, got) for (grp, ahead), got in groups.items()), key=lambda a: (a.grp != "star", a.ahead))
+
+
+def accuracy(ahead: int = 5) -> list[Accuracy]:
+    """The forecast at each lock (backtest) graded as a run of its own (trigger 'accuracy'; its cells are kept as
+    grade_cell records): the Accuracy at the next jornada and at ahead, the star group first."""
+    loaded, _ = read_storage()
+    now = season(loaded)
+    cells = backtest(loaded, now, ahead)
     with closing(connect()) as db, db:
         run = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
                          " VALUES ('', '', 'accuracy', '', 1)").lastrowid
     assert run is not None
-    record([{"run_id": run, **r} for r in backtest(ahead)], "grade_cell")
-    got = [tuple(r) for r in rows("SELECT grp, ahead, n, rmse, mae, bias, r, slope FROM grade_accuracy"
-                                  " WHERE run_id = ? AND ahead IN (0, ?) ORDER BY grp DESC, ahead", (run, ahead))]
-    log_measure("accuracy", {"%s%s@%d" % ("" if g == "all" else "star_", k, a): v for g, a, n, rmse, mae, bias, r, slope in got
-                             for k, v in (("n", n), ("rmse", rmse), ("mae", mae), ("bias", bias), ("r", r), ("slope", slope))})
+    record([{"run_id": run, **c._asdict()} for c in cells], "grade_cell")
+    got = [a for a in accuracy_rows(grade_rows(cells, now.scored)) if a.ahead in (0, ahead)]
+    log_measure("accuracy", {"%s%s@%d" % ("" if a.grp == "all" else "star_", k, a.ahead): v for a in got
+                             for k, v in (("n", a.n), ("rmse", a.rmse), ("mae", a.mae), ("bias", a.bias), ("r", a.r), ("slope", a.slope))
+                             if v is not None})
     return got
+
+
+def price_grades(loaded: loader.Loaded) -> list[price_fold.Grade]:
+    """price_fold.price_grade of the price state at the run's moment (folding only the price fold, PRICE_FOLDS), ordered by
+    scope descending and h."""
+    got = state.sweep(loaded.obs, [stamp(run_now())], lambda world: price_fold.price_grade(price_fold.price_state(world)), PRICE_FOLDS)[0]
+    return sorted(sorted(got, key=lambda g: g.h), key=lambda g: g.scope, reverse=True)
 
 
 def view_table(view: str, path: Path | None = None) -> str:
@@ -590,25 +733,26 @@ def _selftest_stand() -> None:
     """With nothing new (every jornada graded, every auction scored) the grade stage enters neither replay; with a
     jornada or an auction new it enters that one."""
     entered: list[str] = []
-    state = {"graded": True, "scored": True}
+    held = {"graded": True, "scored": True}
 
-    def auction_scored(run: int | None) -> dict[str, int]:
+    def auction_scored(run: int | None, loaded: Any, cuts: Sequence[str]) -> dict[str, int]:
         entered.append("auction")
         return {}
 
-    def regraded(ahead: int = 0) -> list[dict[str, Any]]:
+    def regraded(loaded: Any, now: Season, ahead: int = 0) -> list[GradeCell]:
         entered.append("grades")
         return []
     stub: dict[str, Any] = {
-        "done_jornadas": lambda: {1, 2}, "this_run": lambda: 5, "results_seen": lambda: Results(1, 1, "c"),
-        "graded": lambda run, last: state["graded"], "auctions_scored": lambda run, now: state["scored"],
+        "read_storage": lambda: (None, []), "season": lambda loaded: Season((), {}, {1, 2}, {}),
+        "this_run": lambda: 5, "results_seen": lambda loaded, moment: Results(1, 1, "c"),
+        "graded": lambda run, last: held["graded"], "auctions_scored": lambda run, loaded, now: held["scored"],
         "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda: None,
         "record": lambda *a, **k: None, "superseded": lambda run: None}
     kept = {k: globals()[k] for k in stub}
     try:
         globals().update(stub)
         for g, a, want in ((True, True, []), (False, True, ["grades"]), (True, False, ["auction"]), (False, False, ["auction", "grades"])):
-            state.update(graded=g, scored=a)
+            held.update(graded=g, scored=a)
             entered.clear()
             record_grades()
             assert entered == want, (g, a, entered)
@@ -825,6 +969,152 @@ def _selftest_replayed_cuts() -> None:
     assert replayed_cut(decision.Stale("old")) is None, "a Stale cut is skipped"
 
 
+def _selftest_lock_forecast() -> None:
+    """Rules lock_forecast_is_a_minute_before and flagged_is_status_not_null: the forecast graded for a lock is that of
+    the world a minute before it, for the done jornadas from the lock's on up to ahead, and rows stamped at the lock are
+    not seen; flagged players are those whose PlayerStatus has a status."""
+    from ffcore.forecast_facts import _p, _tables
+    tables = _tables()
+    obs = ob.of(tables)
+    loaded = loader.Loaded(obs, forecast_facts.IDENTITY, ledger.League("me", 0.0), forecast_facts.knobs(), ())
+    lock = snapshot_stamp(forecast_facts.D3)
+    assert lock is not None
+    lock += MINUTE
+    now = Season((), {1: lock, 2: lock + dt.timedelta(days=7), 3: lock + dt.timedelta(days=14)}, {1, 2}, {})
+    assert lock_moments(now) == {1: lock - MINUTE, 2: lock + dt.timedelta(days=7) - MINUTE}, \
+        "a minute before the lock of each done jornada, and none for a jornada not done"
+    got = backtest(loaded, now, 1)
+    world = state.world_at(obs, stamp(lock - MINUTE))
+    fc = lock_forecast(loaded, world)
+    assert [c.from_j for c in got] == sorted(c.from_j for c in got) and got, "in lock order"
+    assert [c for c in got if c.from_j == 1] == lock_cells(1, 1, now.done, fc), "the forecast of the world a minute before the lock"
+    assert {c.jornada for c in got} <= {1, 2} and all(c.from_j <= c.jornada <= c.from_j + 1 for c in got)
+    assert {c.jornada for c in backtest(loaded, now, 0)} <= {1, 2} and all(c.jornada == c.from_j for c in backtest(loaded, now, 0)), \
+        "ahead 0 grades the jornada the lock is for"
+    later = {**tables, "points": [*tables["points"], _p(stamp(lock), "q2", 50.0, 10.0, "26"),
+                                  _p(stamp(lock), "q1", 50.0, 10.0, "26")]}
+    after = state.world_at(ob.of(later), stamp(lock))
+    assert lock_forecast(loaded, after) != lock_forecast(loaded, state.world_at(obs, stamp(lock))), "rows at the lock do change its forecast"
+    assert [c for c in backtest(loaded._replace(obs=ob.of(later)), now, 1) if c.from_j == 1] == [c for c in got if c.from_j == 1], \
+        "rows stamped at the lock are not seen"
+    inp = forecast_facts.inputs(world, loaded.identity, loaded.knobs)
+    assert fc.flagged == {k for k, x in inp.status.items() if x.status is not None} and fc.flagged, "flagged is status not None"
+    assert any(x.status is None for x in inp.status.values()), "a player with no status is in the status rows and not flagged"
+    assert all(c.flagged == int(c.player in fc.flagged) for c in got if c.from_j == 1)
+    assert {c.jornada for c in lock_cells(1, 1, {2}, fc)} <= {2}, "a jornada not done is not graded"
+
+
+def _selftest_grades() -> None:
+    """Rules actual_is_zero_without_points and star_is_predicted_four_or_more, and accuracy_rows against statistics:
+    a player with no scored row has actual 0.0; star rows are those predicted at 4 or more; the figures are those of
+    the definitions, a perfect forecast has rmse 0, r 1 and slope 1, and a constant forecast has no r or slope."""
+    import random
+    import statistics as stats
+    cells = [GradeCell(7, 7 + i % 3, "p%d" % (i % 5), 0.5 * i, 0.5 if i % 2 else None, i % 2) for i in range(14)]
+    scored = {"p1": {8: 3.0}, "p2": {9: 5.0, 7: 1.0}}
+    got = grade_rows(cells, scored)
+    assert [(g.from_j, g.jornada, g.player, g.predicted, g.plays, g.flagged) for g in got] == [
+        (c.from_j, c.jornada, c.player, c.predicted, c.plays, c.flagged) for c in cells]
+    assert all(g.actual == scored.get(g.player, {}).get(g.jornada, 0.0) for g in got) and any(g.actual == 0.0 for g in got) \
+        and any(g.actual > 0 for g in got), "no scored row: actual 0.0"
+    rng = random.Random(3)
+    rows_ = [GradeRow(5, 5 + rng.randrange(4), "p%d" % i, rng.uniform(0, 8), None, rng.uniform(-2, 12), 0) for i in range(80)]
+    by = {(a.grp, a.ahead): a for a in accuracy_rows(rows_)}
+    assert [(a.grp, a.ahead) for a in accuracy_rows(rows_)] == sorted(by, key=lambda k: (k[0] != "star", k[1])), "star first, by ahead"
+    for (grp, ahead), a in by.items():
+        mine = [r for r in rows_ if r.jornada - r.from_j == ahead and (grp == "all" or r.predicted >= 4)]
+        xs, ys = [r.predicted for r in mine], [r.actual for r in mine]
+        assert a.n == len(mine) and abs(a.rmse - math.sqrt(stats.fmean((x - y) ** 2 for x, y in zip(xs, ys)))) < 1e-9
+        assert abs(a.mae - stats.fmean(abs(x - y) for x, y in zip(xs, ys))) < 1e-9 and abs(a.bias - stats.fmean(x - y for x, y in zip(xs, ys))) < 1e-9
+        assert a.r is not None and abs(a.r - stats.correlation(xs, ys)) < 1e-9 and a.slope is not None
+        assert abs(a.slope - stats.linear_regression(xs, ys).slope) < 1e-9
+        assert (grp == "star") <= all(x >= 4 for x in xs), "star_is_predicted_four_or_more"
+    assert {a.n for a in by.values() if a.grp == "all"} == {sum(r.jornada - r.from_j == k for r in rows_) for k in range(4)}
+    perfect = accuracy_rows([GradeRow(1, 1 + i % 2, "p", float(i), None, float(i), 0) for i in range(6)])
+    assert all(a.rmse == 0.0 and a.bias == 0.0 for a in perfect)
+    exact = accuracy_of("all", 0, [GradeRow(1, 1, "p", float(i), None, float(i), 0) for i in range(6)])
+    assert exact.rmse == 0.0 and abs((exact.r or 0) - 1.0) < 1e-9 and abs((exact.slope or 0) - 1.0) < 1e-9
+    flat = accuracy_of("all", 0, [GradeRow(1, 1, "p", 2.0, None, float(i), 0) for i in range(6)])
+    assert flat.r is None and flat.slope is None, "no variance in the forecast: no correlation or slope"
+    assert accuracy_rows([]) == [] and not [a for a in accuracy_rows([GradeRow(1, 1, "p", 3.9, None, 1.0, 0)]) if a.grp == "star"]
+
+
+def _selftest_results() -> None:
+    """Rule results_count_sold_newest: n counts all results, sold those with a won, newest is the largest raw close text
+    (None for none); results_seen is that of the world a minute floor of the moment."""
+    def result(close: str, won: float | None) -> auction_facts.AuctionResult:
+        return auction_facts.AuctionResult("p", close, close, 1.0, auction_facts.LEAGUE_SELLER, won, None, None)
+    assert summarised([]) == Results(0, 0, None)
+    got = summarised([result("2026-08-18T10:00:00+00:00", None), result("2026-08-18T09:00:00+02:00", 5.0),
+                      result("2026-08-17T23:00:00+00:00", 0.0)])
+    assert got == Results(3, 2, "2026-08-18T10:00:00+00:00"), "newest is the largest close text, not the latest time"
+    from ffcore.auction_facts import _CUTS, _scratch
+    obs, ident, lg = _scratch()
+    loaded = loader.Loaded(obs, ident, lg, forecast_facts.knobs(), ())
+    for cut in _CUTS:
+        moment = snapshot_stamp(cut)
+        assert moment is not None
+        world = state.sweep(obs, [cut], lambda w: w)[0]
+        assert results_seen(loaded, moment + dt.timedelta(seconds=30)) == summarised(auction_facts.auction_results(world, ident, lg))
+    assert results_seen(loaded, dt.datetime(2026, 8, 17, tzinfo=dt.timezone.utc)) == Results(0, 0, None)
+
+
+def _selftest_opportunities() -> None:
+    """The opportunities graded are the first top market ones with a gain: forecast is the gain over the player replaced
+    on the span jornadas done, realised the points scored there, the control the peers' (same position, asking within
+    30%) mean realised, None with no peer; a span with no jornada done grades nothing; a Stale cut grades nothing."""
+    squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED",
+             "f1": "DEL", "f2": "DEL", "f3": "DEL"}
+    e = {**{k: 4.0 for k in squad}, "m4": 2.0, "star": 8.0, "near": 3.0, "far": 9.0}
+    market = {"star": 8e6, "near": 8.4e6, "far": 20e6}
+    inp = decision.Inputs(
+        decision.Money(0.0, 0.0, 0.0, decision.SQUAD_MAX, decision.XI_SIZE), players=[decision.Player(k, p, 1, None) for k, p in squad.items()]
+        + [decision.Player(k, "MED", 0, a) for k, a in market.items()],
+        universe=[decision.Candidate(k, "MED", "market", a, a) for k, a in market.items()],
+        cells=[decision.Cell(k, j, v) for k, v in e.items() for j in (1, 2)],
+        locks=[decision.Lock(1, "2026-11-06T20:00Z"), decision.Lock(2, "2026-11-13T20:00Z")])
+    now = Season((), {}, {1, 2}, {"star": {1: 10.0, 2: 6.0}, "near": {1: 4.0, 2: 2.0}, "m4": {1: 1.0, 2: 1.0}, "far": {1: 20.0}})
+    got = {g.player: g for g in graded_opportunities("c", inp, now, 5, 4)}
+    assert sorted(g.rank for g in got.values()) == [1, 2, 3], "ranked among the cut's gains"
+    star = got["star"]
+    assert (star.jornadas, star.n_peers, star.forecast, star.realised, star.control) == (2, 1, 12.0, 14.0, 6.0 - 2.0), star
+    assert got["far"].rank == 1 and got["far"].control is None, "most points first; no peer within 30% of his asking: no control"
+    assert got["near"].control == 16.0 - 2.0 and got["near"].realised == 6.0 - 2.0
+    assert {g.player for g in graded_opportunities("c", inp, now, 1, 4)} == {min(got.values(), key=lambda g: g.rank).player}, "only the top ones"
+    assert [g.jornadas for g in graded_opportunities("c", inp, now._replace(done={2}), 5, 4)] == [1] * 3, "only jornadas done"
+    assert graded_opportunities("c", inp, now._replace(done={9}), 5, 4) == [], "no jornada done in the span: nothing graded"
+    assert [g.jornadas for g in graded_opportunities("c", inp, now, 5, 1)] == [1] * 3, "span limits the jornadas"
+    alone = inp._replace(universe=[decision.Candidate("star", "MED", "market", 8e6, 8e6)])
+    assert graded_opportunities("c", alone, now, 5, 4)[0].control is None, "no peer: no control"
+    from ffcore.decision_facts import _CUTS, _scratch
+    obs, ident, lg = _scratch()
+    loaded = loader.Loaded(obs, ident, lg, forecast_facts.knobs(), ())
+    decided = decision.decisions(loaded, _CUTS)
+    assert any(isinstance(d, decision.Stale) for d in decided)
+    want = [g for d in decided if isinstance(d, decision.Decided) for g in graded_opportunities(d.cut, d.inputs, now, 5, 4)]
+    assert opportunity_grade(loaded, now, _CUTS) == want, "the streamed replay grades each cut that has a decision"
+
+
+def _selftest_auction_reads() -> None:
+    """auction_reads gives the forecast of the fixed table at each cut not after the moment and, at the moment's
+    minute, the looks and the results; live scores are the live_points of those; a cut after the moment is not read."""
+    from ffcore.decision_facts import _CUTS, _scratch
+    obs, ident, lg = _scratch()
+    loaded = loader.Loaded(obs, ident, lg, forecast_facts.knobs(), ())
+    cuts = _CUTS
+    moment = snapshot_stamp(cuts[1])
+    assert moment is not None
+    got = auction_reads(loaded, cuts, moment + dt.timedelta(seconds=40))
+    assert sorted(got.forecasts) == [c for c in cuts if c <= cuts[1]], "the cuts not after the moment, and the moment"
+    world = state.world_at(obs, cuts[1])
+    assert got.looks == auction.looks_of(world, ident, lg) and got.results == auction_facts.auction_results(world, ident, lg)
+    for cut in got.forecasts:
+        assert got.forecasts[cut] == auction.forecast(auction_table.TABLE, auction.open_looks_of(state.world_at(obs, cut), ident, lg)), \
+            "a cut alone gives the same forecast as inside the sweep"
+    live = auction.live_points(got.forecasts, got.results)
+    assert all(0.0 <= p.stated <= 1.0 and p.stated == p.pooled for p in live)
+
+
 def _selftest() -> None:
     _selftest_replayed_cuts()
     _selftest_rule_scores()
@@ -834,25 +1124,12 @@ def _selftest() -> None:
     _selftest_cover()
     _selftest_moment_facts()
     _selftest_record_sales()
+    _selftest_lock_forecast()
+    _selftest_grades()
+    _selftest_results()
+    _selftest_opportunities()
+    _selftest_auction_reads()
     import tempfile
-    from ffcore.tidy import tables_in
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        record([{"run_id": 1, "from_j": 7, "jornada": 8, "player": k, "predicted": e, "plays": 0.5, "flagged": fl}
-                for k, e, fl in (("a", 3.0, 0), ("b", 1.0, 1))], "grade_cell")
-        assert rows("SELECT from_j, jornada, player, predicted, plays, actual, flagged FROM grade_forecast"
-                    " ORDER BY player") == [(7, 8, "a", 3.0, 0.5, 0.0, 0), (7, 8, "b", 1.0, 0.5, 0.0, 1)], \
-            "a grade's cells, a row a player of the jornadas graded; no points scored is 0"
-
-    from ffcore.fixtures import seed_league
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        seed_league("me", 1e6, {"a": {"pos": "MED", "owner": "me"}, "b": {"pos": "DEF"}},
-                    {1: {"a": (5.0, 0.8), "b": (2.0, 0.5)}, 2: {"a": (5.0, 0.8)}, 3: {"a": (5.0, 0.8)}})
-        got = sorted((r["jornada"], r["player"], r["predicted"], r["plays"], r["flagged"])
-                     for r in lock_cells(1, 1, {1, 2, 3}))
-        assert got == [(1, "a", 4.0, 0.8, 0), (1, "b", 1.0, 0.5, 0), (2, "a", 4.0, 0.8, 0)], \
-            "the cells at t (cell) of the lock's jornada and ahead more, each a jornada done"
-        assert {r["jornada"] for r in lock_cells(1, 2, {1, 3})} == {1, 3}, "a jornada not done is not graded"
-
     with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
         path = Path(tmp) / "lfg.db"
 
@@ -890,12 +1167,13 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["accuracy"]:
         # accuracy: predicted e against actual points, next jornada and five ahead, at every past lock
         # (records a run of trigger 'accuracy' in the database it reads)
-        for g, a, n, rmse, mae, bias, r, slope in accuracy():
-            print("%-4s ahead %d  n=%d  rmse=%.4f  mae=%.4f  bias=%+.4f  r=%.4f  slope=%.3f" % (g, a, n, rmse, mae, bias, r, slope), flush=True)
+        for a in accuracy():
+            print("%-4s ahead %d  n=%d  rmse=%.4f  mae=%.4f  bias=%+.4f  r=%.4f  slope=%.3f" % (a.grp, a.ahead, a.n, a.rmse, a.mae, a.bias, a.r or 0, a.slope or 0), flush=True)
         os._exit(0)
     if sys.argv[1:2] == ["auction"]:
-        with closing(connect()) as db:
-            recs = auction.backtest_records(auction.looks(db))
+        loaded, _ = read_storage()
+        recs = auction.backtest_records(state.sweep(loaded.obs, [stamp(run_now())], lambda world: auction.looks_of(
+            world, loaded.identity, loaded.league), AUCTION_FOLDS)[0])
         pts = auction.points(recs)
         print("Brier, expanding time-split over %d closed auctions (model vs the pooled distribution):" % len(recs))
         for b in auction.briers(pts, ""):
@@ -911,13 +1189,15 @@ if __name__ == "__main__":
         raise SystemExit(0)
     if sys.argv[1:2] == ["price"]:
         # price: momentum's price forecasts against what happened, by horizon (rmse in %, with 'no change' and 'the last change again')
-        for scope, h, n, rmse, none, again, predicted, actual in rows(
-                "SELECT scope, h, n, rmse, rmse_none, rmse_again, predicted, actual FROM price_grade ORDER BY scope DESC, h"):
-            print("%-5s h=%2d  n=%d  rmse=%.2f  none=%.2f  again=%.2f  predicted=%+.2f  actual=%+.2f" % (
-                scope, h, n, rmse, none, again, predicted, actual), flush=True)
+        loaded, _ = read_storage()
+        for g in price_grades(loaded):
+            fig = ["-" if v is None else "%.2f" % v for v in (g.rmse, g.rmse_none, g.rmse_again)]
+            fig += ["-" if v is None else "%+.2f" % v for v in (g.predicted, g.actual)]
+            print("%-5s h=%2d  n=%d  rmse=%s  none=%s  again=%s  predicted=%s  actual=%s" % (g.scope, g.h, g.n, fig[0], fig[1], fig[2], fig[3], fig[4]), flush=True)
         os._exit(0)
     if sys.argv[1:2] == ["opportunities"]:
-        print(opportunity_report(opportunity_grade()), flush=True)
+        loaded, cuts = read_storage()
+        print(opportunity_report(opportunity_grade(loaded, season(loaded), [c for c in cuts if snapshot_stamp(c) is not None])), flush=True)
         os._exit(0)
     if sys.argv[1:2] == ["rules"]:
         print(rule_report(rule_scores(worth.CHALLENGERS)), flush=True)
