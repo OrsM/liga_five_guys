@@ -3,23 +3,27 @@ from __future__ import annotations
 import datetime as dt
 import os
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from contextlib import closing
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, TypeVar
 
 import decision
 import salegrade
 import worth
-from board import Replay, context, later_sale, replayed
-from ffcore import auction
+from board import context, later_sale, replayed
+from ffcore import auction, current, league, ledger, loader, price_fold, season_facts, state
+from ffcore import observations as ob
+from ffcore.clock import run_now
 from ffcore.db import connect, record, replaying, rows, set_look, set_now, this_run
 from ffcore.forecast_store import forecast
 from ffcore.jornadas import round_locks
-from ffcore.parse import snapshot_stamp
+from ffcore.parse import snapshot_stamp, stamp
 from salegrade import HORIZONS
 
 __all__ = ["backtest", "superseded", "view_table", "record_grades"]
+
+T = TypeVar("T")
 
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 RATE = 0.6
@@ -213,11 +217,96 @@ class Trade(NamedTuple):
     amount: float
 
 
-def my_trades(kind: str, since: str) -> list[Trade]:
-    """My ledger rows of one kind (buy, sell) from since on, oldest first."""
-    found = [Trade(p, dt.datetime.fromisoformat(at), amount) for p, at, amount in rows(
-        "SELECT player, at, amount FROM ledger WHERE kind = ? AND who = (SELECT me FROM league_config) AND at >= ?",
-        (kind, since))]
+class Season(NamedTuple):
+    """What the grading reads of the world at the run's moment: my ledger rows (a row of mine is one whose who is me
+    and that names a player), each jornada's lock in lock order, the jornadas done and each player's points by jornada
+    played."""
+    entries: tuple[ledger.LedgerEntry, ...]
+    locks: dict[int, dt.datetime]
+    done: set[int]
+    scored: dict[str, dict[int, float]]
+
+
+class MomentFacts(NamedTuple):
+    """What the sale grading reads at one moment: each asked player's newest market value above 0, the players in the
+    eleven the app had fielded, the players flagged (player_status with a status) and my players."""
+    market: Mapping[str, float]
+    eleven: frozenset[str]
+    flagged: frozenset[str]
+    squad: frozenset[str]
+
+
+def season_at(loaded: loader.Loaded, world: state.World) -> Season:
+    """The Season of the world (rules my_rows_name_a_player, locks_in_lock_order, scored_is_points_played)."""
+    mine = tuple(e for e in ledger.ledger(world, loaded.identity) if e.who == loaded.league.me and e.player is not None)
+    locks = {r.jornada: when for r in sorted(season_facts.round_locks(world), key=lambda r: (r.lock, r.jornada))
+             if (when := snapshot_stamp(r.lock)) is not None}
+    scored: dict[str, dict[int, float]] = {}
+    for p in season_facts.player_jornadas(world, loaded.identity):
+        if p.pts is not None:
+            scored.setdefault(p.player, {})[p.jornada] = p.pts
+    return Season(mine, locks, set(season_facts.jornadas_done(world)), scored)
+
+
+def moments_facts(loaded: loader.Loaded, moments: Iterable[dt.datetime], read: Callable[[state.World], T]) -> dict[dt.datetime, T]:
+    """read(world) for each moment, in one sweep over their minute-floored stamps; a moment's result is that of its
+    stamp, the same alone, in any subset or order of moments, and unchanged by rows appended after it."""
+    asked = list(moments)
+    return dict(zip(asked, state.sweep(loaded.obs, [stamp(m) for m in asked], read)))
+
+
+def market_values(history: Sequence[ob.Market], players: Iterable[str]) -> dict[str, float]:
+    """Each asked player's newest value above 0 in the market rows (rule value_is_last_positive: a later 0 or an empty
+    value does not hide it; a player with none is absent)."""
+    want, out = set(players), {}
+    for m in reversed(history):
+        if not want:
+            break
+        if m.ff_id in want and m.value is not None and m.value > 0:
+            out[m.ff_id] = m.value
+            want.discard(m.ff_id)
+    return out
+
+
+def facts_at(loaded: loader.Loaded, world: state.World, players: Iterable[str]) -> MomentFacts:
+    """The MomentFacts of the world, with the market values of the players."""
+    return MomentFacts(
+        market_values(price_fold.price_history(price_fold.price_state(world)), players),
+        frozenset(a.player for a in current.app_lineup(world, loaded.identity) if a.player is not None),
+        frozenset(s.player for s in current.player_status(world, loaded.identity) if s.status is not None),
+        frozenset(s.player for s in current.squads(world, loaded.identity)
+                  if s.manager == loaded.league.me and s.player is not None))
+
+
+def facts_for(loaded: loader.Loaded, wanted: Mapping[dt.datetime, Collection[str]]) -> dict[dt.datetime, MomentFacts]:
+    """The MomentFacts at each moment of wanted, with the market values of the players it names, in one sweep."""
+    asked: dict[str, set[str]] = {}
+    for moment, players in wanted.items():
+        asked.setdefault(stamp(moment), set()).update(players)
+    return moments_facts(loaded, wanted, lambda world: facts_at(loaded, world, asked[world.cut]))
+
+
+MINUTE = dt.timedelta(minutes=1)
+
+
+def wanted_moments(trades: Iterable[Trade], locks: Mapping[int, dt.datetime], done: set[int]) -> dict[dt.datetime, set[str]]:
+    """The moments whose facts grading the sales needs, with the players whose value is asked there: a minute before
+    each sale (his), the last lock of each horizon of a sale with a done jornada at its lock (his value), and a minute
+    before the lock of every done jornada (no player)."""
+    out: dict[dt.datetime, set[str]] = {locks[j] - MINUTE: set() for j in done & set(locks)}
+    for t in trades:
+        out.setdefault(t.at - MINUTE, set()).add(t.player)
+        spans = horizon_jornadas(t.at, dict(locks), done)
+        if spans["lock"]:
+            for h in HORIZONS:
+                out.setdefault(locks[max(spans[h])], set()).add(t.player)
+    return out
+
+
+def my_trades(season: Season, kind: str, since: str) -> list[Trade]:
+    """My ledger rows of one kind (buy, sell) from since on (a text comparison of the row's at), oldest first."""
+    found = [Trade(str(e.player), dt.datetime.fromisoformat(e.at), e.amount) for e in season.entries
+             if e.kind == kind and e.at >= since]
     return sorted(found, key=lambda t: t.at)
 
 
@@ -231,29 +320,14 @@ def buys_between(buys: Sequence[Trade], start: dt.datetime, end: dt.datetime | N
     return any(start <= b.at and (end is None or b.at < end) for b in buys)
 
 
-def market_value(player: str) -> float | None:
-    """His latest market value at t (price_history, held or not), or None if none was seen by t."""
-    return next((v for (v,) in rows("SELECT value FROM price_history WHERE ff_id = ? AND value > 0"
-                                    " ORDER BY observed_at DESC, id DESC LIMIT 1", (player,))), None)
-
-
-def eleven_at(moment: dt.datetime) -> set[str]:
-    """The players in the eleven the app had fielded at moment (its last line-up seen by then)."""
-    with replaying():
-        set_now(moment)
-        return {p for (p,) in rows("SELECT player FROM app_lineup WHERE player IS NOT NULL")}
-
-
-def sale_facts(sale: Trade, buys: Sequence[Trade], lock: dt.datetime | None) -> salegrade.Sale:
-    """The sale as the facts stood a minute before it: his market value (the amount if squads shows none), whether he
-    was in the latest line-up seen, whether he was flagged, and whether a buy of mine fell before the lock (lock None:
-    no bound)."""
-    with replaying():
-        set_now(sale.at - dt.timedelta(minutes=1))
-        market = market_value(sale.player) or sale.amount
-        in_eleven = sale.player in eleven_at(sale.at - dt.timedelta(minutes=1))
-        flagged = bool(rows("SELECT 1 FROM player_status WHERE player = ? AND status IS NOT NULL", (sale.player,)))
-    return salegrade.Sale(sale.player, sale.amount, market, in_eleven, flagged, buys_between(buys, sale.at, lock))
+def sale_facts(sale: Trade, buys: Sequence[Trade], lock: dt.datetime | None,
+               facts: Mapping[dt.datetime, MomentFacts]) -> salegrade.Sale:
+    """The sale as the facts stood a minute before it (facts at that moment): his market value (the amount if none was
+    seen), whether he was in the latest line-up seen, whether he was flagged, and whether a buy of mine fell before the
+    lock (lock None: no bound)."""
+    then = facts[sale.at - MINUTE]
+    return salegrade.Sale(sale.player, sale.amount, then.market.get(sale.player) or sale.amount, sale.player in then.eleven,
+                          sale.player in then.flagged, buys_between(buys, sale.at, lock))
 
 
 class Sold(NamedTuple):
@@ -262,12 +336,12 @@ class Sold(NamedTuple):
     sale: salegrade.Sale
 
 
-def sales_since(day: str) -> list[Sold]:
+def sales_since(season: Season, day: str, facts: Mapping[dt.datetime, MomentFacts]) -> list[Sold]:
     """Each of my sales from the day on (a date, YYYY-MM-DD), with its moment and as a salegrade.Sale read at that
     moment (sale_facts); funded_buy is a buy of mine between the sale and the next lock."""
-    buys = my_trades("buy", day)
-    locks = sorted(round_locks().values())
-    return [Sold(s.at, sale_facts(s, buys, lock_after(s.at, locks))) for s in my_trades("sell", day)]
+    buys = my_trades(season, "buy", day)
+    locks = sorted(season.locks.values())
+    return [Sold(s.at, sale_facts(s, buys, lock_after(s.at, locks), facts)) for s in my_trades(season, "sell", day)]
 
 
 def horizon_jornadas(at: dt.datetime, locks: dict[int, dt.datetime], done: set[int]) -> dict[str, frozenset[int]]:
@@ -282,49 +356,38 @@ def horizon_jornadas(at: dt.datetime, locks: dict[int, dt.datetime], done: set[i
     return {h: frozenset(spans[h] & done) for h in HORIZONS}
 
 
-def scored_points() -> dict[str, dict[int, float]]:
-    """Each player's points by jornada played (player_jornadas), read once."""
-    found: dict[str, dict[int, float]] = {}
-    for player, jornada, pts in rows("SELECT player, jornada, pts FROM player_jornadas"):
-        found.setdefault(player, {})[jornada] = pts
-    return found
-
-
 def points(scored: dict[str, dict[int, float]], player: str, jornadas: Iterable[int]) -> float:
-    """The points a player scored over the jornadas, from scored_points; a jornada he did not play adds 0."""
+    """The points a player scored over the jornadas, from a Season's scored; a jornada he did not play adds 0."""
     got = scored.get(player, {})
     return sum(got.get(j, 0.0) for j in jornadas)
 
 
-def benched_at(moment: dt.datetime) -> set[str]:
-    """The players on my squad at moment who were not in the eleven the app had fielded then."""
-    with replaying():
-        set_now(moment)
-        mine = decision.squad_held()
-    return set(mine - eleven_at(moment))
+def benched_at(moment: dt.datetime, facts: Mapping[dt.datetime, MomentFacts]) -> set[str]:
+    """The players on my squad at moment who were not in the eleven the app had fielded then (rule
+    bench_is_squad_less_eleven)."""
+    return set(facts[moment].squad - facts[moment].eleven)
 
 
-def fielded_at_locks(locks: dict[int, dt.datetime], done: set[int]) -> dict[int, set[str]]:
-    """The eleven the app had fielded a minute before each done jornada's lock (eleven_at)."""
-    return {j: eleven_at(locks[j] - dt.timedelta(minutes=1)) for j in done & set(locks)}
+def fielded_at_locks(locks: dict[int, dt.datetime], done: set[int],
+                     facts: Mapping[dt.datetime, MomentFacts]) -> dict[int, set[str]]:
+    """The eleven the app had fielded a minute before each done jornada's lock."""
+    return {j: set(facts[locks[j] - MINUTE].eleven) for j in done & set(locks)}
 
 
 def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]],
-           fielded: dict[int, set[str]]) -> salegrade.Course | None:
+           fielded: dict[int, set[str]], facts: Mapping[dt.datetime, MomentFacts]) -> salegrade.Course | None:
     """What followed the sale at each horizon of horizon_jornadas: what he scored (sold); what my players on the bench
     when he was sold (benched_at) scored in the jornadas they were fielded (fielded: the eleven at each lock), for an
     eleven sale only, else 0 (cover); and his latest market value at the lock of the horizon's last jornada
-    (value_after; never the sale amount). None if no jornada is done at the lock horizon (then none is at any) or if
-    no market value of his was seen by then."""
+    (value_after, from facts; never the sale amount). None if no jornada is done at the lock horizon (then none is at
+    any) or if no market value of his was seen by then."""
     spans = horizon_jornadas(sold.at, locks, done)
     if not spans["lock"]:
         return None
-    bench = benched_at(sold.at - dt.timedelta(minutes=1)) if sold.sale.in_eleven else set()
+    bench = benched_at(sold.at - MINUTE, facts) if sold.sale.in_eleven else set()
     after: dict[str, float] = {}
     for h in HORIZONS:
-        with replaying():
-            set_now(locks[max(spans[h])])
-            value = market_value(sold.sale.player)
+        value = facts[locks[max(spans[h])]].market.get(sold.sale.player)
         if value is None:
             return None
         after[h] = value
@@ -334,29 +397,43 @@ def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: di
         value_after=after)
 
 
-def graded_count(locks: dict[int, dt.datetime], done: set[int]) -> int:
+def graded_count(season: Season) -> int:
     """How many of my sales from SALES_FROM have a done jornada at their lock horizon, from the ledger alone."""
-    return sum(1 for t in my_trades("sell", SALES_FROM) if horizon_jornadas(t.at, locks, done)["lock"])
+    return sum(1 for t in my_trades(season, "sell", SALES_FROM) if horizon_jornadas(t.at, season.locks, season.done)["lock"])
 
 
 def graded_sales(sold: Sequence[Sold], locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]],
-                 fielded: dict[int, set[str]]) -> list[salegrade.Graded]:
+                 fielded: dict[int, set[str]], facts: Mapping[dt.datetime, MomentFacts]) -> list[salegrade.Graded]:
     """The sales that have a course (course), each graded at RATE (salegrade.grade); a sale with no course is left out."""
-    courses = [(s.sale, course(s, locks, done, scored, fielded)) for s in sold]
+    courses = [(s.sale, course(s, locks, done, scored, fielded, facts)) for s in sold]
     return [salegrade.grade(sale, got, RATE) for sale, got in courses if got is not None]
+
+
+def read_storage() -> tuple[loader.Loaded, list[str]]:
+    """The storage read once: the Loaded the sweeps run over and the cuts a replay runs at (loader.replay_cuts)."""
+    with closing(connect()) as db:
+        return loader.load(db, league.load_config()), loader.replay_cuts(db)
+
+
+def season(loaded: loader.Loaded) -> Season:
+    """The Season at the run's moment (clock.run_now, LFG_NOW when pinned)."""
+    return state.sweep(loaded.obs, [stamp(run_now())], lambda world: season_at(loaded, world))[0]
 
 
 def record_sales() -> None:
     """Each sale from SALES_FROM with a done jornada at its lock, graded at RATE (salegrade.grade) and summarised
     (salegrade.measure_values), is appended to measure_log as sale_grade with jornadas_done, unless the latest one
     logged has the same all.lock.n (graded_count) and jornadas_done; then no sale is read."""
-    done, locks = done_jornadas(), round_locks()
-    marks = {"all.lock.n": float(graded_count(locks, done)), "jornadas_done": float(len(done))}
+    loaded, _ = read_storage()
+    now = season(loaded)
+    marks = {"all.lock.n": float(graded_count(now)), "jornadas_done": float(len(now.done))}
     latest = dict(rows("SELECT key, value FROM measure_latest WHERE measure = 'sale_grade'"))
     if all(latest.get(k) == v for k, v in marks.items()):
         return
-    scored, fielded = scored_points(), fielded_at_locks(locks, done)
-    values = salegrade.measure_values(salegrade.summary(graded_sales(sales_since(SALES_FROM), locks, done, scored, fielded)))
+    facts = facts_for(loaded, wanted_moments(my_trades(now, "sell", SALES_FROM), now.locks, now.done))
+    fielded = fielded_at_locks(now.locks, now.done, facts)
+    sold = sales_since(now, SALES_FROM, facts)
+    values = salegrade.measure_values(salegrade.summary(graded_sales(sold, now.locks, now.done, now.scored, fielded, facts)))
     log_measure("sale_grade", values | {"jornadas_done": marks["jornadas_done"]})
 
 
@@ -408,37 +485,43 @@ def score_rows(name: str, graded: Sequence[salegrade.Graded]) -> list[RuleScore]
             for r in salegrade.summary(graded) if r.case == "all"]
 
 
-def replayed_cuts(since: str) -> list[Cut]:
-    """Each seen cut from since on (a date, YYYY-MM-DD) that has standing offers on my players, replayed (built, and
-    only then) so the context and the later sale prices are those of the cut; a cut that cannot be built is skipped."""
-    out = []
-    with replaying():
-        for c in decision.seen_cuts():
-            stamp = snapshot_stamp(c)
-            if c < since or stamp is None:
-                continue
-            set_now(stamp)
-            offers = decision.standing_offers(decision.squad_held())
-            if not offers:
-                continue
-            at = replayed()
-            if at is None:
-                continue
-            inp = at.inputs
-            standings = [worth.Standing(o.player, o.value, o.money, later_sale(inp, o.player, o.value)) for o in offers]
-            out.append(Cut(stamp + dt.timedelta(minutes=1), context(inp), standings))
+def replayed_cut(decided: decision.Decided | decision.Stale) -> Cut | None:
+    """The Cut of a decision that has standing offers on my players (rule replayed_cut_needs_offers: its extras'
+    offers), so the context and the later sale prices are those of the cut; None for a Stale cut or one with no offer."""
+    at = None if isinstance(decided, decision.Stale) else snapshot_stamp(decided.cut)
+    if isinstance(decided, decision.Stale) or at is None or not decided.extras.offers:
+        return None
+    standings = [worth.Standing(o.player, o.value, o.money, later_sale(decided.inputs, o.player, o.value))
+                 for o in decided.extras.offers]
+    return Cut(at + MINUTE, context(decided.inputs), standings)
+
+
+def replayed_cuts(loaded: loader.Loaded, cuts: Sequence[str]) -> list[Cut]:
+    """The Cut (replayed_cut) of each cut that has one, ascending, from one streamed replay: only the Cuts are kept."""
+    out: list[Cut] = []
+
+    def keep(_: str, decided: decision.Decided | decision.Stale) -> None:
+        cut = replayed_cut(decided)
+        if cut is not None:
+            out.append(cut)
+    decision.replay(loaded, cuts, keep)
     return out
 
 
 def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> list[RuleScore]:
     """On demand, never in the grade stage: "actual" (my real sales from since, sales_since) and each rule (first_sales
-    over replayed_cuts) as RuleScores, every sale graded by the same course at RATE (graded_sales)."""
-    done, locks = done_jornadas(), round_locks()
-    scored, fielded = scored_points(), fielded_at_locks(locks, done)
-    chosen = first_sales(replayed_cuts(since), rules)
-    sold = {"actual": sales_since(since)} | {
-        name: [Sold(c.at, sale_facts(Trade(c.player, c.at, c.amount), [], None)) for c in got] for name, got in chosen.items()}
-    return [row for name, found in sold.items() for row in score_rows(name, graded_sales(found, locks, done, scored, fielded))]
+    over replayed_cuts at the replay cuts from since) as RuleScores, every sale graded by the same
+    course at RATE (graded_sales)."""
+    loaded, cuts = read_storage()
+    now = season(loaded)
+    chosen = first_sales(replayed_cuts(loaded, [c for c in cuts if c >= since and snapshot_stamp(c) is not None]), rules)
+    made = {name: [Trade(c.player, c.at, c.amount) for c in got] for name, got in chosen.items()}
+    facts = facts_for(loaded, wanted_moments([*my_trades(now, "sell", since), *(t for ts in made.values() for t in ts)], now.locks, now.done))
+    fielded = fielded_at_locks(now.locks, now.done, facts)
+    sold = {"actual": sales_since(now, since, facts)} | {
+        name: [Sold(t.at, sale_facts(t, [], None, facts)) for t in ts] for name, ts in made.items()}
+    return [row for name, found in sold.items()
+            for row in score_rows(name, graded_sales(found, now.locks, now.done, now.scored, fielded, facts))]
 
 
 def rule_report(scores: Sequence[RuleScore]) -> str:
@@ -552,41 +635,78 @@ def _selftest_window() -> None:
 
 def _selftest_cover() -> None:
     """The cover of a sale counts a bench player only in the jornadas he was fielded: it is zero for a sale not from
-    the eleven, never more than the bench's points in the horizon, and adds over disjoint horizons."""
-    import tempfile
-    from ffcore.tidy import store_sql, tables_in
-    ids = {"s": "1", "a": "2", "b": "3", "c": "4"}
+    the eleven, never more than the bench's points in the horizon, and adds over disjoint horizons; his value after is
+    that of the lock of each horizon's last jornada, never the sale amount, and a sale with none seen is not graded
+    (rule bench_is_squad_less_eleven for who is on the bench)."""
     day = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
     locks = {1: day + dt.timedelta(days=2), 2: day + dt.timedelta(days=9), 3: day + dt.timedelta(days=16)}
     scored = {"a": {1: 4.0, 2: 6.0, 3: 1.0}, "b": {1: 2.0, 2: 2.0, 3: 2.0}, "s": {1: 3.0, 2: 3.0, 3: 3.0}}
     fielded = {1: set("sc"), 2: set("ac"), 3: set("ab")}
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            store_sql("api_lineup", [{"observed_at": "2026-08-31T1000Z", "player_id": ids[k], "slot": "1"} for k in "sc"])
-            store_sql("api_teams", [{"observed_at": "2026-08-31T1000Z", "player_id": ids[k], "player_name": k, "manager": "me"}
-                                    for k in "sabc"])
-            with closing(connect()) as db, db:
-                db.executemany("INSERT INTO crosswalk (player_id, app_id) VALUES (?, ?)", list(ids.items()))
-                db.execute("INSERT INTO league_config (me, budget) VALUES ('me', 0)")
-            set_now(snapshot_stamp("2026-09-30T0000Z"))
-            assert benched_at(day) == {"a", "b"}, "my squad less the eleven fielded then"
-            done = {1, 2, 3}
-            sale = salegrade.Sale("s", 5e6, 5e6, True, False, False)
-            assert course(Sold(day, sale), locks, done, scored, fielded) is None, "no value of his seen: not graded"
-            for at, v in {"2026-08-31T1000Z": 4e6, "2026-09-05T1000Z": 6e6, "2026-09-12T1000Z": 7e6, "2026-09-19T1000Z": 8e6}.items():
-                store_sql("market", [{"observed_at": at, "ff_id": "s", "name": "s", "club": "x", "value": v}])
-            got = course(Sold(day, sale), locks, done, scored, fielded)
-            assert got is not None
-            assert got.value_after == {"lock": 4e6, "next4": 7e6, "season": 7e6}, \
-                "his latest value by the lock of each horizon's last jornada, held or not, never the sale amount"
-            assert got.cover == {"lock": 0.0, "next4": 6.0 + 1.0 + 2.0, "season": 6.0 + 1.0 + 2.0}, \
-                "a and b count only in the jornadas they were fielded (c was never on the bench)"
-            assert got.sold["season"] == 9.0
-            other = course(Sold(day, sale._replace(in_eleven=False)), locks, done, scored, fielded)
-            assert other is not None and not any(other.cover.values()), "a bench sale has no cover"
-            assert course(Sold(locks[3], sale), locks, done, scored, fielded) is None, "no jornada after the sale"
-        finally:
-            set_now(None)
+    done = {1, 2, 3}
+    sale = salegrade.Sale("s", 5e6, 5e6, True, False, False)
+
+    def facts_with(values: dict[int, float]) -> dict[dt.datetime, MomentFacts]:
+        out = {locks[j]: MomentFacts({"s": values[j]} if j in values else {}, frozenset(), frozenset(), frozenset()) for j in locks}
+        out[day - MINUTE] = MomentFacts({}, frozenset("sc"), frozenset(), frozenset("sabc"))
+        return out
+    assert benched_at(day - MINUTE, facts_with({})) == {"a", "b"}, "my squad less the eleven fielded then"
+    assert course(Sold(day, sale), locks, done, scored, fielded, facts_with({})) is None, "no value of his seen: not graded"
+    facts = facts_with({1: 4e6, 2: 6e6, 3: 7e6})
+    got = course(Sold(day, sale), locks, done, scored, fielded, facts)
+    assert got is not None
+    assert got.value_after == {"lock": 4e6, "next4": 7e6, "season": 7e6}, \
+        "his value at the lock of each horizon's last jornada, never the sale amount"
+    assert got.cover == {"lock": 0.0, "next4": 6.0 + 1.0 + 2.0, "season": 6.0 + 1.0 + 2.0}, \
+        "a and b count only in the jornadas they were fielded (c was never on the bench)"
+    assert got.sold["season"] == 9.0
+    other = course(Sold(day, sale._replace(in_eleven=False)), locks, done, scored, fielded, facts)
+    assert other is not None and not any(other.cover.values()), "a bench sale has no cover"
+    assert course(Sold(locks[3], sale), locks, done, scored, fielded, facts) is None, "no jornada after the sale"
+
+
+def _selftest_moment_facts() -> None:
+    """Rules value_is_last_positive and moment_facts_are_as_of on a small league, and the invariants: the facts at a
+    moment are those of any sweep over moments containing it and do not change when rows are appended after it."""
+    from ffcore import forecast_facts
+    t0, t1, t2, t3 = ("2026-09-0%dT1000Z" % d for d in (1, 2, 3, 4))
+    ident = current.Identity({("s", "P2", "c"): "p2"}, {"a1": "p1", "a2": "p2", "a3": "p3"})
+
+    def team(at: str, who: dict[str, str]) -> list[ob.ApiTeams]:
+        return [ob.ApiTeams(at, "app", 1.0, 1.0, 0.0, a, "t", m, "", "", "", "pt" + a) for a, m in who.items()]
+
+    def lineup(at: str, ids: str) -> list[ob.ApiLineup]:
+        return [ob.ApiLineup(at, "app", None, None, a, "1", "", "", "") for a in ids.split()]
+    tables: dict[str, list[Any]] = {
+        "market": [ob.Market(t0, "laliga", 5.0, "p1", "MED", "c"), ob.Market(t1, "laliga", 7.0, "p1", "MED", "c"),
+                   ob.Market(t1, "laliga", 3.0, "p2", "MED", "c"), ob.Market(t2, "laliga", 0.0, "p1", "MED", "c")],
+        "api_teams": team(t0, {"a1": "me", "a2": "me", "a3": "me"}) + team(t2, {"a1": "me", "a2": "bob", "a3": "me"}),
+        "api_lineup": lineup(t0, "a1 a2") + lineup(t2, "a1 a3"),
+        "lineups": [ob.Lineups(t1, "futbolfantasy", 50.0, "s", "P2", "c", "injured", "")]}
+    loaded = loader.Loaded(ob.of(tables), ident, ledger.League("me", 0.0), forecast_facts.knobs(), ())
+    everyone = ["p1", "p2", "p3"]
+    when = {name: snapshot_stamp(t) for name, t in (("t0", t0), ("t1", t1), ("t2", t2), ("t3", t3))}
+    assert all(w is not None for w in when.values())
+    moments = {k: v + dt.timedelta(seconds=30) for k, v in when.items() if v is not None}
+    wanted = {m: everyone for m in moments.values()}
+    got = facts_for(loaded, wanted)
+    at = {k: got[m] for k, m in moments.items()}
+    assert at["t0"] == MomentFacts({"p1": 5.0}, frozenset({"p1", "p2"}), frozenset(), frozenset({"p1", "p2", "p3"})), \
+        "moment_facts_are_as_of: a minute floor, and no value, flag or line-up observed after it is seen"
+    assert at["t1"].market == {"p1": 7.0, "p2": 3.0} and at["t1"].flagged == {"p2"}
+    assert at["t3"].market == {"p1": 7.0, "p2": 3.0}, "value_is_last_positive: a later 0 does not hide the 7; p3 has none"
+    assert at["t3"].eleven == {"p1", "p3"} and at["t3"].squad == {"p1", "p3"}
+    assert benched_at(moments["t0"], got) == {"p3"} and benched_at(moments["t3"], got) == set(), "bench_is_squad_less_eleven"
+    only = facts_for(loaded, {moments["t3"]: ["p2"]})[moments["t3"]]
+    assert only.market == {"p2": 3.0}, "only the players asked"
+    for order in (list(moments.values())[::-1], [moments["t2"], moments["t0"], moments["t2"]], [moments["t3"]]):
+        again = facts_for(loaded, {m: everyone for m in order})
+        assert all(again[m] == got[m] for m in order), "any subset or order of moments gives each the same facts"
+    tables["market"].append(ob.Market("2026-09-09T1000Z", "laliga", 99.0, "p1", "MED", "c"))
+    tables["api_lineup"] += lineup("2026-09-09T1000Z", "a2")
+    tables["lineups"].append(ob.Lineups("2026-09-09T1000Z", "futbolfantasy", 50.0, "s", "P2", "c", "", ""))
+    later = facts_for(loaded._replace(obs=ob.of(tables)), wanted)
+    assert later == got, "rows appended after the moments leave their facts unchanged"
+    assert market_values([ob.Market(t0, "laliga", 0.0, "p1", "MED", "c")], ["p1"]) == {}, "a value of 0 is none"
 
 
 def _selftest_points() -> None:
@@ -603,19 +723,20 @@ def _selftest_record_sales() -> None:
     from ffcore.tidy import tables_in
     at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
     locks = {1: at + dt.timedelta(days=2), 2: at + dt.timedelta(days=9)}
-    state: dict[str, Any] = {"done": {1}, "read": 0}
+    held: dict[str, Any] = {"done": {1}, "read": 0}
+    entries = tuple(ledger.LedgerEntry(at.isoformat(), "sell", "me", None, "p", 5e6, None, "me", 0) for _ in range(2))
     sold = [Sold(at, salegrade.Sale("p", 5e6, 5e6, True, False, False))] * 2
     flat = {h: 1.0 for h in HORIZONS}
     ok = salegrade.Course(flat, flat, flat)
 
-    def read(day: str) -> list[Sold]:
-        state["read"] += 1
+    def read(now: Season, day: str, facts: Mapping[dt.datetime, MomentFacts]) -> list[Sold]:
+        held["read"] += 1
         return sold
     stub: dict[str, Any] = {
-        "done_jornadas": lambda: state["done"], "round_locks": lambda: locks, "sales_since": read,
-        "my_trades": lambda kind, since: [Trade("p", s.at, 5e6) for s in sold],
-        "course": lambda s, locks, done, scored, fielded: ok if len(done) else None,
-        "scored_points": lambda: {}, "fielded_at_locks": lambda locks, done: {}}
+        "read_storage": lambda: (None, []), "season": lambda loaded: Season(entries, locks, held["done"], {}),
+        "facts_for": lambda loaded, wanted: {}, "sales_since": read,
+        "course": lambda s, locks, done, scored, fielded, facts: ok if len(done) else None,
+        "fielded_at_locks": lambda locks, done, facts: {}}
     kept = {k: globals()[k] for k in stub}
 
     def logged() -> int:
@@ -627,8 +748,8 @@ def _selftest_record_sales() -> None:
             first = logged()
             assert first > 0 and dict(rows("SELECT key, value FROM measure_latest"))["all.lock.n"] == 2
             record_sales()
-            assert logged() == first and state["read"] == 1, "nothing new: no rows, no sale read"
-            state["done"] = {1, 2}
+            assert logged() == first and held["read"] == 1, "nothing new: no rows, no sale read"
+            held["done"] = {1, 2}
             record_sales()
             assert logged() == 2 * first, "a jornada done: a new set"
         finally:
@@ -685,36 +806,22 @@ def _selftest_rule_scores() -> None:
 
 
 def _selftest_replayed_cuts() -> None:
-    """A cut is built only if it has standing offers, each cut with offers gives one Cut whose standings are those
-    offers, and a cut that cannot be built is skipped."""
-    cuts = ["2026-10-01T0800Z", "2026-10-02T0800Z", "2026-10-03T0800Z", "2026-10-04T0800Z"]
-    offered = {cuts[1]: ["a", "b"], cuts[2]: ["c"], cuts[3]: ["d"]}
-    unbuildable = {cuts[3]}
-    state: dict[str, Any] = {"at": None, "built": []}
-
-    def set_at(t: Any) -> None:
-        state["at"] = t
-
-    def make() -> Replay | None:
-        c = next(c for c in cuts if snapshot_stamp(c) == state["at"])
-        state["built"].append(c)
-        return None if c in unbuildable else Replay(0, decision.Inputs(decision.Money(0.0, 0.0, 0.0, 0, 0)))
-    stub: dict[str, Any] = {
-        "set_now": set_at, "replayed": make, "context": lambda inp: worth.Context({}, {}, 0.0), "later_sale": lambda inp, p, v: v}
-    kept = {k: globals()[k] for k in stub}
-    held, offers, seen = decision.squad_held, decision.standing_offers, decision.seen_cuts
-    try:
-        globals().update(stub)
-        decision.seen_cuts = lambda: cuts
-        decision.squad_held = lambda: frozenset()
-        decision.standing_offers = lambda mine: [decision.Offer(p, 1e6, 2e6) for p in offered.get(
-            next(c for c in cuts if snapshot_stamp(c) == state["at"]), [])]
-        got = replayed_cuts("2026-10-01")
-    finally:
-        globals().update(kept)
-        decision.squad_held, decision.standing_offers, decision.seen_cuts = held, offers, seen
-    assert state["built"] == [cuts[1], cuts[2], cuts[3]], "only cuts with offers are built"
-    assert [[s.player for s in c.standings] for c in got] == [["a", "b"], ["c"]], "a Cut for each built cut with offers"
+    """A Cut for each decision with standing offers on my players, its standings those offers; a decision with none, or
+    a Stale one, makes no Cut (rule replayed_cut_needs_offers), and the streamed replay gives the same Cuts."""
+    from ffcore import forecast_facts
+    from ffcore.decision_facts import _CUTS, _scratch
+    obs, ident, lg = _scratch()
+    loaded = loader.Loaded(obs, ident, lg, forecast_facts.knobs(), ())
+    decided = decision.decisions(loaded, _CUTS)
+    offered = [d for d in decided if isinstance(d, decision.Decided) and d.extras.offers]
+    assert offered and any(isinstance(d, decision.Stale) for d in decided)
+    got = [c for c in map(replayed_cut, decided) if c is not None]
+    assert [stamp(c.at - MINUTE) for c in got] == [d.cut for d in offered], "a Cut a decision with offers, a minute on"
+    assert [[s.player for s in c.standings] for c in got] == [[o.player for o in d.extras.offers] for d in offered]
+    assert replayed_cuts(loaded, _CUTS) == got, "the streamed replay keeps the same Cuts"
+    emptied = [d._replace(extras=d.extras._replace(offers=[])) if isinstance(d, decision.Decided) else d for d in decided]
+    assert all(replayed_cut(d) is None for d in emptied), "no standing offer on my players: no Cut"
+    assert replayed_cut(decision.Stale("old")) is None, "a Stale cut is skipped"
 
 
 def _selftest() -> None:
@@ -724,6 +831,7 @@ def _selftest() -> None:
     _selftest_horizons()
     _selftest_points()
     _selftest_cover()
+    _selftest_moment_facts()
     _selftest_record_sales()
     import tempfile
     from ffcore.tidy import tables_in
