@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Iterable, NamedTuple
 
-from ffcore import auction, current, ledger, price_fold, state
+from ffcore import auction, auction_table, current, ledger, price_fold, state
 from ffcore import observations as ob
 
 TEAM_SELLER = "marketPlayerTeam"
@@ -136,9 +136,8 @@ def player_facts(world: state.World, identity: current.Identity, league: ledger.
 
 def seen_at(world: state.World, identity: current.Identity, league: ledger.League) -> Seen:
     """The Seen of the cut: the player facts, each manager's cash, and the clearing-price forecast with its curves
-    (auction.forecast over auction.fit of auction.looks_of)."""
-    ls = auction.looks_of(world, identity, league)
-    forecasts = auction.forecast(auction.fit(ls), ls)
+    (auction.forecast of auction_table.TABLE over auction.open_looks_of)."""
+    forecasts = auction.forecast(auction_table.TABLE, auction.open_looks_of(world, identity, league))
     auctions = tuple(SeenAuction(f.player, f.ask, f.close, f.mins, f.bids, f.rival, int(f.mine), f.trend, f.cell, f.n,
                                  int(f.thin)) for f in forecasts)
     curves = tuple(SeenCurve(f.player, ratio, p) for f in forecasts for ratio, p in f.curve)

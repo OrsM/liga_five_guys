@@ -3,15 +3,17 @@ from __future__ import annotations
 from bisect import bisect_right
 from collections import defaultdict
 from math import sqrt
-from typing import Any, NamedTuple, Sequence
+from typing import Any, Callable, NamedTuple, Sequence
 
 from ffcore import auction_facts as af
 from ffcore import current, ledger, price_fold, pricing
 from ffcore import observations as ob
 from ffcore import state as st
+from ffcore.db import stamp_jd
+from ffcore.season_facts import julian_day
 
 __all__ = ["Look", "Sample", "Model", "Forecast", "RATIOS", "sample", "curve", "fit", "predict", "forecast", "chance", "bid_for",
-           "looks", "looks_of", "write", "Record", "backtest_records", "points", "backtest", "stored_points", "calibration", "briers"]
+           "looks", "looks_of", "open_looks_of", "FIXED_CUTS", "write", "Record", "backtest_records", "points", "backtest", "stored_points", "calibration", "briers"]
 
 RATIOS = (0.5, 0.6, 0.7, 0.8, 0.9) + tuple(round(0.95 + 0.01 * i, 2) for i in range(51))
 ASK_LEVELS = (0.5, 0.75, 0.9)
@@ -22,9 +24,13 @@ BINS = ((0.0, 0.5), (0.5, 0.8), (0.8, 0.9), (0.9, 0.95), (0.95, 0.99), (0.99, 1.
 DRIFT_MIN = 20
 DRIFT_SLACK = 0.02
 EPS = 1e-9
+ASK_CUTS = (2e6, 10e6, 30e6)
+TREND_CUTS = (-10.0, 0.0)
 
 Curve = tuple[tuple[float, float], ...]
 Key = tuple[int, ...]
+Cuts = tuple[tuple[float, ...], tuple[float, ...]]
+FIXED_CUTS: Cuts = (ASK_CUTS, TREND_CUTS)
 
 
 class Look(NamedTuple):
@@ -114,14 +120,16 @@ def keys(cuts: tuple[Sequence[float], Sequence[float]], x: Look) -> list[Key]:
     return [(r, a, t), (r, a), (r,), ()]
 
 
-def fit(ls: Sequence[Look]) -> Model:
+def fit(ls: Sequence[Look], cuts: Cuts | None = None) -> Model:
+    """The Model of the closed looks of ls: the cells of keys over the ask and trend cuts, each the curve of the samples
+    held there. cuts are the quantiles of the closed looks unless given, then used as they are."""
     closed = sorted((x for x in ls if not x.is_open), key=lambda x: x.look)
     last: dict[tuple[str, str], float] = {}
     for x in closed:
         last[(x.player, x.close)] = x.ask
-    ask_cuts = quantiles(list(last.values()), ASK_LEVELS)
+    ask_cuts = quantiles(list(last.values()), ASK_LEVELS) if cuts is None else cuts[0]
     floor = min([1.0] + [s.ratio for s in map(sample, closed) if s.ratio is not None])
-    trend_cuts = quantiles([x.trend for x in closed if x.trend is not None], TREND_LEVELS)
+    trend_cuts = quantiles([x.trend for x in closed if x.trend is not None], TREND_LEVELS) if cuts is None else cuts[1]
     held: dict[Key, dict[tuple[str, str], Sample]] = defaultdict(dict)
     for x in closed:
         s = sample(x)
@@ -176,9 +184,7 @@ def looks(db: Any) -> list[Look]:
         " FROM auction_looks ORDER BY look")]
 
 
-def looks_of(world: st.World, identity: current.Identity, league: ledger.League) -> list[Look]:
-    """The looks of auction_facts.auction_looks sorted by look, each with the price trend of its day or the day before
-    (trend_is_last_day_on_or_before_look; None before the player's first day), bools as bool."""
+def _trend_at(world: st.World) -> Callable[[str, str], float | None]:
     series: dict[str, tuple[list[str], list[float]]] = defaultdict(lambda: ([], []))
     for t in sorted(price_fold.price_trend_daily(price_fold.price_state(world)), key=lambda t: (t.ff_id, t.day)):
         series[t.ff_id][0].append(t.day)
@@ -188,10 +194,38 @@ def looks_of(world: st.World, identity: current.Identity, league: ledger.League)
         days, values = series.get(player, ([], []))
         i = bisect_right(days, look[:10]) - 1
         return values[i] if i >= 0 else None
+    return trend_at
 
+
+def looks_of(world: st.World, identity: current.Identity, league: ledger.League) -> list[Look]:
+    """The looks of auction_facts.auction_looks sorted by look, each with the price trend of its day or the day before
+    (trend_is_last_day_on_or_before_look; None before the player's first day), bools as bool."""
+    trend_at = _trend_at(world)
     rows = [Look(r.player, r.close, r.look, r.mins, r.ask, r.bids, r.mine, r.rival, trend_at(r.player, r.look), r.my_bid,
                  r.won, bool(r.by_me), r.is_open) for r in af.auction_looks(world, identity, league)]
     return sorted(rows, key=lambda x: x.look)
+
+
+def open_looks_of(world: st.World, identity: current.Identity, league: ledger.League) -> list[Look]:
+    """The newest look of each auction still open at the cut, as looks_of gives it (same fields, trend included), sorted
+    by look; no look is built for a closed auction. Open means the close is after the cut (and so has no outcome)."""
+    cut = stamp_jd(world.cut)
+    newest: dict[tuple[str, str], tuple[ob.ApiMarket, float]] = {}
+    for row in st.fact(world, af.LOOKS):
+        ends, seen = julian_day(row.expires_at), stamp_jd(row.observed_at)
+        player = identity.app.get(row.player_id)
+        if player is None or ends is None or seen is None or cut is None or ends <= cut:
+            continue
+        key = (player, row.expires_at)
+        if key not in newest or newest[key][0].observed_at <= row.observed_at:
+            newest[key] = (row, (ends - seen) * 1440.0)
+    trend_at = _trend_at(world)
+    out = []
+    for (player, close), (row, mins) in newest.items():
+        mine, bids = row.bid_id != "", row.bids or 0
+        out.append(Look(player, close, row.observed_at, mins, row.sale_price or 0.0, bids, mine, bids - mine,
+                        trend_at(player, row.observed_at), row.bid_money, None, False, True))
+    return sorted(out, key=lambda x: x.look)
 
 
 def write(db: Any, cut: str) -> None:
@@ -382,6 +416,16 @@ def _selftest() -> None:
         return max(((d, v) for d, v in daily if d <= day), default=(None, None))[1]
     got = {x.look: x.trend for x in looks_of(priced, current.Identity({}, {"a1": "a"}), ledger.League("ann", 100.0))}
     assert got == {"2026-08-09T1200Z": last_on_or_before("2026-08-09"), "2026-08-11T1200Z": last_on_or_before("2026-08-11")}
+    ident, lg = current.Identity({}, {"a1": "a"}), ledger.League("ann", 100.0)
+    newest = {(x.player, x.close): x for x in looks_of(priced, ident, lg) if x.is_open}
+    assert open_looks_of(priced, ident, lg) == sorted(newest.values(), key=lambda x: x.look) and newest, \
+        "open_looks_of: the newest look of each open auction, as looks_of gives it"
+    assert open_looks_of(st.world_at(ob.of({"market": mkt, "api_market": listed, "api_activity": [], "api_standings": []}),
+                                      "2026-08-25T0900Z", {n: st.FOLDS[n] for n in ("price", *af.AUCTION_FACTS)}), ident, lg) == [], \
+        "a close at or before the cut is no open auction"
+    fixed = fit(ls, FIXED_CUTS)
+    assert (fixed.ask_cuts, fixed.trend_cuts) == FIXED_CUTS and all(k[1] <= len(ASK_CUTS) and k[2] <= len(TREND_CUTS) for k in fixed.cells if len(k) == 3), \
+        "fit with cuts bands the looks by those cuts, whatever their quantiles are"
     assert last_on_or_before("2026-08-11") is not None, "trend_is_last_day_on_or_before_look: the look's own day counts"
     print("ffcore.auction self-test OK")
 
