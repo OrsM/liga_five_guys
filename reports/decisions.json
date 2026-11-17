@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-17T20:46Z",
- "market_at": "2026-11-17T20:45Z",
+ "generated_at": "2026-11-17T21:16Z",
+ "market_at": "2026-11-17T21:16Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-17T20:45Z",
+   "at": "2026-11-17T21:16Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,62 +56,7 @@
  "cash_locked": 0,
  "can_bid": 50779872.400000006,
  "ping": "",
- "do": [
-  {
-   "name": "Dani Martinez, Ferran Jutgla, Miguel Roman, Raul Asencio",
-   "pos": "",
-   "what": "list",
-   "label": "list Dani Martinez, Ferran Jutgla, Miguel Roman, Raul Asencio",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "109094611",
-     "player": "2881",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 647175.0
-    },
-    {
-     "player_team": "113276670",
-     "player": "2603",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 11417668.0
-    },
-    {
-     "player_team": "114630995",
-     "player": "2639",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 7329364.0
-    },
-    {
-     "player_team": "115749175",
-     "player": "2146",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 785581.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
