@@ -919,5 +919,8 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["opportunities"]:
         print(opportunity_report(opportunity_grade()), flush=True)
         os._exit(0)
-    print("grading.py --selftest | accuracy | price | opportunities")
+    if sys.argv[1:2] == ["rules"]:
+        print(rule_report(rule_scores(worth.CHALLENGERS)), flush=True)
+        os._exit(0)
+    print("grading.py --selftest | accuracy | price | opportunities | rules")
     raise SystemExit(2)
