@@ -1,99 +1,68 @@
 {
- "generated_at": "2026-11-18T21:25Z",
- "market_at": "2026-11-18T21:25Z",
+ "generated_at": "2026-11-18T21:30Z",
+ "market_at": "2026-11-18T21:30Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-18T21:25Z",
+   "at": "2026-11-18T21:30Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
- "cash": -70279223.0,
+ "cash": -22852707.0,
  "cash_locked": 0,
- "can_bid": 26521898.200000003,
- "ping": "on the market: Dean Huijsen (+38 points)",
- "do": [
-  {
-   "name": "Vinicius Junior",
-   "pos": "",
-   "what": "list",
-   "label": "list Vinicius Junior",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "117252189",
-     "player": "3102",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 72231169.0
-    }
-   ]
-  }
- ],
+ "can_bid": 64690206.0,
+ "ping": "",
+ "do": [],
  "lineup": {
   "eleven": null,
-  "message": "the app's line-up is not a legal eleven (10 players)",
+  "message": "the app's line-up is not a legal eleven (9 players)",
   "unmapped": [],
   "points": null,
-  "best": 58.91728003595338,
+  "best": 57.786150104372226,
   "advice": []
  },
  "buys": [
@@ -155,19 +124,8 @@
    "funding": {
     "feasible": true,
     "short": 0.0,
-    "tonight": [
-     {
-      "name": "Antony",
-      "offer": 35367571.0,
-      "ratio": 1.008995396645158
-     },
-     {
-      "name": "Ferran Jutgla",
-      "offer": 12058945.0,
-      "ratio": 1.0729764327601778
-     }
-    ],
-    "raises": 47426516.0,
+    "tonight": [],
+    "raises": 0,
     "margin": 3470027.9099999964,
     "lock_margin": 376052.9099999964,
     "lock_margin_low": -4437536.556000009,
@@ -371,16 +329,7 @@
    "available": false
   }
  ],
- "alerts": [
-  {
-   "name": "Dean Huijsen",
-   "gain": 38.497662425711965,
-   "asking": 56165301.0,
-   "bid": 61220178.09,
-   "win": 0.9491525423728814,
-   "placed": null
-  }
- ],
+ "alerts": [],
  "auction": {
   "brier": [
    {
@@ -987,270 +936,6 @@
    "for": []
   },
   {
-   "name": "Ferran Jutgla",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Ferran Jutgla",
-   "step": "take offer",
-   "offer": 12058945.0,
-   "waiting": null,
-   "trend": -24.52918201875695,
-   "plan": false,
-   "amount": 12058945.0,
-   "done": false,
-   "key": "7842",
-   "gain": 0.0,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.0729764327601778,
-   "lost": {
-    "next4": 0.0,
-    "next8": 0.0,
-    "season": 0.0
-   },
-   "offer_percentile": 0.8832684824902723,
-   "offers_seen": 771,
-   "note": "offer 1.07 x value; at or above 88% of the 771 nightly offers seen; the eleven loses 0 points (bench)",
-   "per_million": 0.0,
-   "facts": [
-    [
-     "value",
-     11238779.0,
-     "money"
-    ],
-    [
-     "offer",
-     12058945.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0729764327601778,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     0.0,
-     "points"
-    ],
-    [
-     "next 8",
-     0.0,
-     "points"
-    ],
-    [
-     "season",
-     0.0,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": [
-    "Dean Huijsen"
-   ]
-  },
-  {
-   "name": "Antony",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Antony",
-   "step": "take offer",
-   "offer": 35367571.0,
-   "waiting": null,
-   "trend": -15.816702485636897,
-   "plan": false,
-   "amount": 35367571.0,
-   "done": false,
-   "key": "8405",
-   "gain": 0.0,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.008995396645158,
-   "lost": {
-    "next4": 1.0764910256110056,
-    "next8": 0.0,
-    "season": 0.0
-   },
-   "offer_percentile": 0.5642023346303502,
-   "offers_seen": 771,
-   "note": "offer 1.01 x value; at or above 56% of the 771 nightly offers seen; the eleven loses 1.1 points over the next 4 jornadas, 0.0 over the next 8, 0.0 over the season",
-   "per_million": 0.0,
-   "facts": [
-    [
-     "value",
-     35052262.0,
-     "money"
-    ],
-    [
-     "offer",
-     35367571.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.008995396645158,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     1.0764910256110056,
-     "points"
-    ],
-    [
-     "next 8",
-     0.0,
-     "points"
-    ],
-    [
-     "season",
-     0.0,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": [
-    "Dean Huijsen"
-   ]
-  },
-  {
-   "name": "Martin Satriano",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Martin Satriano",
-   "step": "take offer",
-   "offer": 21504881.0,
-   "waiting": null,
-   "trend": -8.697108662662155,
-   "plan": false,
-   "amount": 21504881.0,
-   "done": false,
-   "key": "8496",
-   "gain": -5.515527516789916,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.0588781875647277,
-   "lost": {
-    "next4": 0.5293111242854138,
-    "next8": 0.9872902747752619,
-    "season": 5.515527516789916
-   },
-   "offer_percentile": 0.8197146562905318,
-   "offers_seen": 771,
-   "note": "offer 1.06 x value; at or above 82% of the 771 nightly offers seen; the eleven loses 0.5 points over the next 4 jornadas, 1.0 over the next 8, 5.5 over the season",
-   "per_million": 0.04591005524630719,
-   "facts": [
-    [
-     "value",
-     20309117.0,
-     "money"
-    ],
-    [
-     "offer",
-     21504881.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0588781875647277,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     0.5293111242854138,
-     "points"
-    ],
-    [
-     "next 8",
-     0.9872902747752619,
-     "points"
-    ],
-    [
-     "season",
-     5.515527516789916,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
-   "name": "Mikel Oyarzabal",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Mikel Oyarzabal",
-   "step": "take offer",
-   "offer": 40323076.0,
-   "waiting": null,
-   "trend": -16.573522915643125,
-   "plan": false,
-   "amount": 40323076.0,
-   "done": false,
-   "key": "2675",
-   "gain": -7.691718956653858,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 0.9094329784138913,
-   "lost": {
-    "next4": 3.622202606705514,
-    "next8": 2.863329235261972,
-    "season": 7.691718956653858
-   },
-   "offer_percentile": 0.04669260700389105,
-   "offers_seen": 771,
-   "note": "offer 0.91 x value; at or above 5% of the 771 nightly offers seen; the eleven loses 3.6 points over the next 4 jornadas, 2.9 over the next 8, 7.7 over the season",
-   "per_million": 0.0710096926946241,
-   "facts": [
-    [
-     "value",
-     44338700.0,
-     "money"
-    ],
-    [
-     "offer",
-     40323076.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9094329784138913,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     3.622202606705514,
-     "points"
-    ],
-    [
-     "next 8",
-     2.863329235261972,
-     "points"
-    ],
-    [
-     "season",
-     7.691718956653858,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
    "name": "Pepelu",
    "pos": "MED",
    "what": "sell",
@@ -1336,7 +1021,7 @@
    "flip": null,
    "ratio": 1.029357434204765,
    "lost": {
-    "next4": 2.907025730423186,
+    "next4": 2.9070257304231575,
     "next8": 7.202697372375269,
     "season": 30.22910997964027
    },
@@ -1362,7 +1047,7 @@
     ],
     [
      "points lost, next 4",
-     2.907025730423186,
+     2.9070257304231575,
      "points"
     ],
     [
@@ -1401,7 +1086,7 @@
    "flip": null,
    "ratio": 0.9095969291405372,
    "lost": {
-    "next4": 9.539247835421008,
+    "next4": 9.53924783542098,
     "next8": 16.65092510881925,
     "season": 47.611177225017855
    },
@@ -1427,7 +1112,7 @@
     ],
     [
      "points lost, next 4",
-     9.539247835421008,
+     9.53924783542098,
      "points"
     ],
     [
@@ -1503,6 +1188,71 @@
     [
      "season",
      38.80250652396626,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
+   "name": "Mikel Oyarzabal",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Mikel Oyarzabal",
+   "step": "take offer",
+   "offer": 40323076.0,
+   "waiting": null,
+   "trend": -16.573522915643125,
+   "plan": false,
+   "amount": 40323076.0,
+   "done": false,
+   "key": "2675",
+   "gain": -37.388807256627615,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 0.9094329784138913,
+   "lost": {
+    "next4": 8.485542764394523,
+    "next8": 13.12197906626227,
+    "season": 37.388807256627615
+   },
+   "offer_percentile": 0.04669260700389105,
+   "offers_seen": 771,
+   "note": "offer 0.91 x value; at or above 5% of the 771 nightly offers seen; the eleven loses 8.5 points over the next 4 jornadas, 13.1 over the next 8, 37.4 over the season",
+   "per_million": 0.3254210831103825,
+   "facts": [
+    [
+     "value",
+     44338700.0,
+     "money"
+    ],
+    [
+     "offer",
+     40323076.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9094329784138913,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     8.485542764394523,
+     "points"
+    ],
+    [
+     "next 8",
+     13.12197906626227,
+     "points"
+    ],
+    [
+     "season",
+     37.388807256627615,
      "points"
     ]
    ],
@@ -1596,7 +1346,7 @@
    "flip": null,
    "ratio": 0.9496199277628328,
    "lost": {
-    "next4": 9.410077424474082,
+    "next4": 9.410077424474053,
     "next8": 20.53217520383589,
     "season": 58.547886520668044
    },
@@ -1622,7 +1372,7 @@
     ],
     [
      "points lost, next 4",
-     9.410077424474082,
+     9.410077424474053,
      "points"
     ],
     [
@@ -1633,6 +1383,71 @@
     [
      "season",
      58.547886520668044,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
+   "name": "Martin Satriano",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Martin Satriano",
+   "step": "take offer",
+   "offer": 21504881.0,
+   "waiting": null,
+   "trend": -8.697108662662155,
+   "plan": false,
+   "amount": 21504881.0,
+   "done": false,
+   "key": "8496",
+   "gain": -35.2126158167639,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 1.0588781875647277,
+   "lost": {
+    "next4": 5.392651281974395,
+    "next8": 11.24594010577556,
+    "season": 35.2126158167639
+   },
+   "offer_percentile": 0.8197146562905318,
+   "offers_seen": 771,
+   "note": "offer 1.06 x value; at or above 82% of the 771 nightly offers seen; the eleven loses 5.4 points over the next 4 jornadas, 11.2 over the next 8, 35.2 over the season",
+   "per_million": 0.5229482602473159,
+   "facts": [
+    [
+     "value",
+     20309117.0,
+     "money"
+    ],
+    [
+     "offer",
+     21504881.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     1.0588781875647277,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     5.392651281974395,
+     "points"
+    ],
+    [
+     "next 8",
+     11.24594010577556,
+     "points"
+    ],
+    [
+     "season",
+     35.2126158167639,
      "points"
     ]
    ],
@@ -1845,17 +1660,17 @@
    "sold": false
   },
   {
-   "name": "Antony",
+   "name": "Vinicius Junior",
    "pos": "DEL",
-   "next": 5.069551228777386,
+   "next": 4.7146916949114726,
    "xi": true,
    "best": true,
    "sold": false
   },
   {
-   "name": "Vinicius Junior",
+   "name": "Martin Satriano",
    "pos": "DEL",
-   "next": 4.7146916949114726,
+   "next": 3.938421297196236,
    "xi": true,
    "best": true,
    "sold": false
@@ -1912,22 +1727,6 @@
    "name": "Miguel Roman",
    "pos": "MED",
    "next": 0.0,
-   "xi": false,
-   "best": false,
-   "sold": false
-  },
-  {
-   "name": "Martin Satriano",
-   "pos": "DEL",
-   "next": 3.938421297196236,
-   "xi": false,
-   "best": false,
-   "sold": false
-  },
-  {
-   "name": "Ferran Jutgla",
-   "pos": "DEL",
-   "next": 2.0247875952143692,
    "xi": false,
    "best": false,
    "sold": false
