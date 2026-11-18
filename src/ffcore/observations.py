@@ -3,7 +3,7 @@ rowid). The only place that reads storage for the sweep.
 
 TABLES names the sources (the src_<name> tables of the database); each has a NamedTuple (its needed columns) and a
 grain: () for a snapshot table (every fetch repeats the whole table) or the key columns of a table that keeps a
-row per key. read(db, until) and of(rows) give an Observations: for each table its rows in (observed_at, rowid)
+row per key. read(db, names, until, latest) and of(rows) give an Observations: for each table its rows in (observed_at, rowid)
 order, their stamps, and refolds, the number of rows that arrived with a stamp before an earlier row of their
 source (storage order is not time order there, so a fold that already passed them must start again). Selectors:
 rows_of, stamps_of, refolds_of, key_of."""
@@ -250,13 +250,18 @@ def of(tables: Mapping[str, Iterable[Any]]) -> Observations:
     return Observations({name: arranged(rows) for name, rows in tables.items()})
 
 
-def read(db: sqlite3.Connection, names: Iterable[str] = tuple(TABLES), until: str | None = None) -> Observations:
+def read(db: sqlite3.Connection, names: Iterable[str] = tuple(TABLES), until: str | None = None,
+         latest: bool = False) -> Observations:
     """The named tables of db, rows with observed_at <= until (all when None), in one range scan each; every str
-    field of every row is the pooled object (pooled), so a second read adds no second copy of a string."""
+    field of every row is the pooled object (pooled), so a second read adds no second copy of a string. With latest,
+    a table keeps only each source's newest snapshot in that range (the rows whose observed_at is the greatest of
+    their source), as the whole range would leave in a fold that keeps the newest snapshot."""
     def scan(name: str) -> Iterable[Any]:
         row = TABLES[name].row
-        sql = "SELECT %s FROM src_%s%s ORDER BY rowid" % (
-            ", ".join(row._fields), name, "" if until is None else " WHERE observed_at <= ?")
+        bound = "" if until is None else " WHERE observed_at <= ?"
+        keep = " WHERE (source, observed_at) IN (SELECT source, MAX(observed_at) FROM src_%s%s GROUP BY source)" % (
+            name, bound) if latest else bound
+        sql = "SELECT %s FROM src_%s%s ORDER BY rowid" % (", ".join(row._fields), name, keep)
         return map(row._make, map(pooled, db.execute(sql, () if until is None else (until,))))
     return of({name: scan(name) for name in names})
 
@@ -299,6 +304,13 @@ def _selftest() -> None:
     assert refolds_of(of({"market": sorted(stored, key=lambda r: r.observed_at)})) == 0
     assert refolds_of(of({"market": stored[::-1]})) >= 1
     assert [r.ff_id for r in rows_of(read(_database({"market": stored}), ["market"], "2026-11-01"), "market")] == ["b", "d"]
+    snaps = [Market(at, source, 1.0, ff, "DEL", "RMA") for at, source, ff in
+             [("01", "ff", "a"), ("02", "ff", "b"), ("02", "ff", "c"), ("03", "ff", "d"), ("01", "other", "e"),
+              ("02", "other", "f")]]
+
+    def newest(until: str | None) -> list[str]:
+        return sorted(r.ff_id for r in rows_of(read(_database({"market": snaps}), ["market"], until, True), "market"))
+    assert newest(None) == ["d", "f"] and newest("02") == ["b", "c", "f"] and newest("00") == []
     assert key_of("matches", Matches("t", "s", 1, "m1", "", "", "", "", "")) == ("m1",)
     assert key_of("market", stored[0]) == ()
     again = rows_of(read(_database({"market": stored}), ["market"]), "market")
