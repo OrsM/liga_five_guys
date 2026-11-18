@@ -15,7 +15,7 @@ from typing import Any, NamedTuple
 import numpy as np
 import numpy.typing as npt
 
-__all__ = ["AuctionBrier", "AuctionCalibration", "DecOpportunity", "GRADE_CELL_DTYPE", "GradeCell", "KINDS", "KindSpec",
+__all__ = ["AuctionBrier", "AuctionCalibration", "DecOffer", "DecOpportunity", "GRADE_CELL_DTYPE", "GradeCell", "KINDS", "KindSpec",
            "LATEST", "Latest", "MeasureLog", "PLAYER_BYTES", "Param", "READERS", "Run", "RunMeasure", "SaleScore", "StoreError",
            "change", "decode", "encode", "grade_cell_array", "grade_cell_rows", "header", "latest", "parse_header"]
 
@@ -105,6 +105,26 @@ class DecOpportunity(NamedTuple):
     placed: float | None
 
 
+class DecOffer(NamedTuple):
+    """One standing offer on one of my players at a run's cut, as the board stated it: bench is lost 0 at the three windows,
+    funds the names of the buys it funds tonight joined by ';' (empty: none)."""
+    cut: str
+    player: str
+    offer_id: str
+    created_at: str
+    offer: float
+    value: float
+    ratio: float | None
+    percentile: float | None
+    offers_seen: int
+    lost4: float
+    lost8: float
+    lost_season: float
+    funds: str
+    bench: bool
+    trend: float | None
+
+
 class SaleScore(NamedTuple):
     run_id: int
     group: str
@@ -135,6 +155,7 @@ KINDS: Mapping[str, KindSpec] = {s.name: s for s in (
     KindSpec("auction_brier", AuctionBrier, "brier.jsonl"),
     KindSpec("grade_cell", GradeCell, "grade_cell.npy"),
     KindSpec("dec_opportunity", DecOpportunity, "opportunity.jsonl"),
+    KindSpec("dec_offer", DecOffer, "offer.jsonl"),
     KindSpec("sale_score", SaleScore, "sale_score.jsonl"))}
 
 LATEST: Mapping[str, int] = {name: 1 for name in KINDS}
@@ -249,6 +270,8 @@ def _selftest() -> None:
         "grade_cell": GradeCell(7, 3, 4, "Pedri ñ", 2.5, None, 1),
         "dec_opportunity": DecOpportunity("2026-11-01T1000Z", "Pedri", "MED", "open", None, None, 4, None, 1.5,
                                           None, None, None, 4.2, 0.3, None),
+        "dec_offer": DecOffer("2026-11-01T1000Z", "Pedri", "49892747", "2026-11-01T09:00:00Z", 6795815.0, 1 / 3, None, 0.1 + 0.2,
+                              752, 0.0, 0.0, -0.0, "Gavi;Raphinha", True, None),
         "sale_score": SaleScore(7, "m1", "eleven-proxy bound", "season", 12, -3.5, -0.25, -9.0, 2.0, -11.5, 4.5)}
     assert set(sample) == set(KINDS) == set(LATEST), "every kind has a sample, a spec and a version"
     for kind, row in sample.items():
