@@ -4,13 +4,13 @@ the key per-cut features the sweep makes at pinned cuts, stored under tools/gold
     python tools/golden.py --selftest              # replay the fixture cuts, compare with tools/golden/ (seconds)
     python tools/golden.py check                   # the same, printing every difference
     python tools/golden.py bless                   # regenerate the fixture goldens: the only way a golden file changes
-    python tools/golden.py --live [check|bless] [DB]   # the 5 live cuts on a database (default FF_ROOT/lfg.db, opened mode=ro)
+    python tools/golden.py --live [check|bless] [TIDY]   # the 5 live cuts from the parse cache in TIDY (default FF_ROOT/tidy), no database
 
 Fixture goldens (decisions-<stamp>.json, features-<stamp>.json): the two latest api_teams snapshots of the real-data
 fixture tools/cases/league.json.xz, each decided CUT_AFTER_MINUTES later, through loader.load, state.sweep,
 decision.decision_at, decision.opportunity_rows and board.board. Live goldens (live-<stamp>.json): the features only
 (the board document of a live cut holds the live account's sources and auction scoring), at LIVE_CUTS, read through
-loader.load on a mode=ro connection; they need the production database and are not part of selftests.sh.
+loader.load over the parse cache; they need the production files and are not part of selftests.sh.
 
 Features (one document per cut): money, my squad, the 20 best opportunities, cash of every manager, the auction
 rows, the cells of the cases.CASES players, price momentum (slope per horizon, carry), club ratings, offer ratio
@@ -29,28 +29,23 @@ bless_is_explicit: check never writes; only bless changes a golden file."""
 from __future__ import annotations
 
 import argparse
-import contextlib
 import json
 import math
 import os
-import sqlite3
 import sys
 import tempfile
 import time
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import closing
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import cases
-import crosswalk
 import decision
 from board import board, stamped
-from ffcore import current, db as store, ledger, loader, price_fold, state
+from ffcore import current, db as store, ledger, loader, parsed, price_fold, state
 from ffcore.league import Config, load_config
 from ffcore.parse import snapshot_stamp, stamp
-from ffcore.tidy import tables_in
 from stats import percentile
 
 GOLDEN = Path(__file__).with_name("golden")
@@ -204,19 +199,9 @@ def fixture_cuts(doc: dict[str, Any]) -> list[Cut]:
     return [Cut(s, after(s, timedelta(minutes=cases.CUT_AFTER_MINUTES))) for s in stamps]
 
 
-@contextlib.contextmanager
-def fixture_loaded(doc: dict[str, Any]) -> Iterator[loader.Loaded]:
-    """The fixture's tables in a scratch database, loaded, for the length of the block."""
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), contextlib.chdir(tmp):
-        with closing(store.connect()) as db, db:
-            for name, t in doc["tables"].items():
-                cols = t["columns"]
-                db.executemany("INSERT INTO %s (%s) VALUES (%s)" % (store.source_table(name), ", ".join(cols), ", ".join("?" * len(cols))),
-                               t["rows"])
-        with closing(store.connect()) as db, db:
-            crosswalk.build(db)
-        with closing(store.connect()) as db:
-            yield loader.load(db, Config())
+def fixture_loaded(doc: dict[str, Any]) -> loader.Loaded:
+    """The fixture's tables as Observations (cases.observations), loaded; render inside cases.scratch_sources."""
+    return loader.loaded(cases.observations(doc), Config())
 
 
 def rendered(loaded: loader.Loaded, cuts: Sequence[Cut]) -> Rendered:
@@ -229,14 +214,13 @@ def rendered(loaded: loader.Loaded, cuts: Sequence[Cut]) -> Rendered:
 
 
 def render_fixture(doc: dict[str, Any]) -> Rendered:
-    with fixture_loaded(doc) as loaded:
-        return rendered(loaded, fixture_cuts(doc))
+    with cases.scratch_sources(doc):
+        return rendered(fixture_loaded(doc), fixture_cuts(doc))
 
 
-def render_live(path: Path) -> Rendered:
-    """The live goldens' texts: live-<stamp>.json of each LIVE_CUTS, from the database at path opened mode=ro."""
-    with closing(sqlite3.connect("file:%s?mode=ro" % path, uri=True)) as db:
-        loaded = loader.load(db, load_config())
+def render_live(paths: parsed.Paths) -> Rendered:
+    """The live goldens' texts: live-<stamp>.json of each LIVE_CUTS, from the parse cache at paths."""
+    loaded = loader.load(load_config(), paths=paths)
     return {"live-%s.json" % r.cut.name: text_of(r.features)
             for r in replayed(loaded, [Cut(c, c) for c in LIVE_CUTS], with_document=False)}
 
@@ -254,7 +238,8 @@ def _selftest() -> None:
     doc = cases.load()
     cuts = fixture_cuts(doc)
     t0 = time.monotonic()
-    with fixture_loaded(doc) as loaded:
+    loaded = fixture_loaded(doc)
+    with cases.scratch_sources(doc):
         made = rendered(loaded, cuts)
         last = cuts[-1]
         os.environ["LFG_NOW"] = "2031-01-01T0000Z"
@@ -300,12 +285,12 @@ def main() -> int:
     p.add_argument("--selftest", action="store_true")
     p.add_argument("--live", action="store_true")
     p.add_argument("command", nargs="?", choices=("check", "bless"), default="check")
-    p.add_argument("db", nargs="?", type=Path, default=store.DB)
+    p.add_argument("tidy", nargs="?", type=Path)
     args = p.parse_args()
     if args.selftest:
         _selftest()
         return 0
-    made = render_live(args.db) if args.live else render_fixture(cases.load())
+    made = render_live(loader.paths_in(args.tidy)) if args.live else render_fixture(cases.load())
     kinds = LIVE_KINDS if args.live else FIXTURE_KINDS
     if args.command == "bless":
         bless(GOLDEN, made, kinds)

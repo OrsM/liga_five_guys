@@ -134,6 +134,18 @@ class ApiLineup(NamedTuple):
     player_name_full: str
 
 
+class ApiLeagues(NamedTuple):
+    observed_at: str
+    source: str
+    managers: int | None
+    money: float | None
+    team_value: float | None
+    team_points: float | None
+    league_id: str
+    league_name: str
+    team_id: str
+
+
 class ApiPlayersAll(NamedTuple):
     observed_at: str
     source: str
@@ -197,6 +209,7 @@ TABLES: dict[str, Source] = {
     "api_market": Source(ApiMarket, (), ("source", "market_id", "bid_id")),
     "api_offers": Source(ApiOffers, (), ("source", "player_team_id", "offer_id")),
     "api_lineup": Source(ApiLineup, (), ("source", "player_id")),
+    "api_leagues": Source(ApiLeagues, (), ("source", "league_id")),
     "api_players_all": Source(ApiPlayersAll, ("player_id",), ("player_id",)),
     "results_history": Source(ResultsHistory, ("season", "date", "home_name", "away_name"),
                               ("season", "date", "home_name", "away_name")),

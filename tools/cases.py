@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import lzma
 import sys
-from collections.abc import Callable
+import tempfile
+from collections.abc import Callable, Iterator
+from contextlib import closing
 from pathlib import Path
 from typing import Any, NamedTuple
+
+from ffcore import observations as ob
 
 FIXTURE = Path(__file__).with_name("cases") / "league.json.xz"
 
@@ -96,22 +101,23 @@ def load() -> dict[str, Any]:
     return doc
 
 
-def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
-    import contextlib
-    import tempfile
-    from contextlib import closing
-    from datetime import timedelta
+def observations(doc: dict[str, Any]) -> ob.Observations:
+    """The fixture's tables as Observations: every table of ob.TABLES, its rows in the order stored, each column read by
+    name into the table's row type (none for a table the fixture lacks)."""
+    out: dict[str, list[Any]] = {}
+    for name, source in ob.TABLES.items():
+        t = doc["tables"].get(name, {"columns": [], "rows": []})
+        at = [t["columns"].index(f) for f in source.row._fields] if t["rows"] else []
+        out[name] = [source.row._make(ob.pooled(r[i] for i in at)) for r in t["rows"]]
+    return ob.of(out)
 
-    import crosswalk
-    import decision
-    import eleven
-    from board import board
-    from ffcore import current, forecast_facts, loader, season_facts, state
-    from ffcore.db import connect, cut, record, rows, set_now, source_table
-    from ffcore.league import Config
-    from ffcore.parse import snapshot_stamp
+
+@contextlib.contextmanager
+def scratch_sources(doc: dict[str, Any], degraded: bool = False) -> Iterator[None]:
+    """Inside the block the working directory is a scratch root whose database holds the fixture's tables (the degraded
+    club's line-ups at as_of left out when degraded): board.sources reads the parser health there, nothing else does."""
+    from ffcore.db import connect, source_table
     from ffcore.tidy import tables_in
-
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), contextlib.chdir(tmp):
         with closing(connect()) as db, db:
             for name, t in doc["tables"].items():
@@ -119,61 +125,71 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
                 db.executemany("INSERT INTO %s (%s) VALUES (%s)" % (source_table(name), ", ".join(cols), ", ".join("?" * len(cols))), t["rows"])
             if degraded:
                 db.execute("DELETE FROM src_lineups WHERE team_slug = ? AND observed_at = ?", (DEGRADED_CLUB, doc["as_of"]))
-        stamp = snapshot_stamp(doc["as_of"])
-        assert stamp is not None
-        set_now(stamp + timedelta(minutes=CUT_AFTER_MINUTES))
-        with closing(connect()) as db, db:
-            crosswalk.build(db)
-        record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-        with closing(connect()) as db:
-            loaded = loader.load(db, Config())
-        world = state.world_at(loaded.obs, cut())
-        d = decision.decision_at(loaded, world)
-        assert not isinstance(d, decision.Stale), d
-        inp = d.inputs
-        pos, cells = decision.cells_of(inp)
-        mine = decision.squad_of(inp)
-        first = min(c.jornada for c in season_facts.jornada_calendar(world) if c.state == "ahead")
-        next_four = frozenset(range(first, first + AHEAD))
-        windows = {"next4": next_four, "season": frozenset(cells)}
-        values = {w: decision.window_value(pos, cells, js) for w, js in windows.items()}
-        settled = {w: eleven.best_eleven(mine, pos, v) for w, v in values.items()}
-        got = [] if degraded else decision.opportunity_rows(inp)
-        opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
-        doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [], d.extras)
-        seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp.money,
-                      "squad": len(mine), "offers": sum(1 for o in current.offers(world) if o.status == "pending"),
-                      "cases": {}}
-        ids = tuple(CASES.values())
-        marks = ",".join("?" * len(ids))
+        yield
 
-        def each(sql: str, kind: type[Any]) -> dict[str, list[Any]]:
-            out: dict[str, list[Any]] = {k: [] for k in ids}
-            for r in rows(sql % marks, ids):
-                x = kind._make(r)
-                out[x.player].append(x)
-            return out
 
-        market = each("SELECT ff_id, value FROM src_market WHERE ff_id IN (%s) ORDER BY observed_at", Market)
-        points = each("SELECT ff_id, games, points FROM src_points WHERE ff_id IN (%s) AND season = (SELECT max(season) FROM src_points)"
-                      " ORDER BY observed_at", Played)
-        known = each("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk WHERE player_id IN (%s)", Known)
-        cell = {k: {c.jornada: (c.p, c.e) for c in forecast_facts.cell(d.fc) if c.player == k} for k in ids}
-        total = {t.player: t for t in forecast_facts.cell_total(d.fc)}
-        for name, k in CASES.items():
-            swaps = {w: eleven.swap(k, s.eleven, pos, values[w]) if s else None for w, s in settled.items()}
-            seen["cases"][name] = {
-                "id": k,
-                "value": market[k][-1].value if market[k] else None,
-                "points": points[k][-1] if points[k] else None,
-                "crosswalk": known[k][0] if known[k] else None,
-                "status": d.fc.status.get(k),
-                "rate": d.fc.rate.get(k),
-                "cells": cell[k],
-                "total": total.get(k),
-                "late": sorted(x.jornada for x in d.fc.late if x.player == k),
-                "swaps": swaps,
-                "buy": next((b for b in doc_board["buys"] if b["key"] == k), None)}
+def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
+    with scratch_sources(doc, degraded):
+        return observed(doc, degraded)
+
+
+def observed(doc: dict[str, Any], degraded: bool) -> Seen:
+    from datetime import timedelta
+
+    import decision
+    import eleven
+    from board import board
+    from ffcore import current, forecast_facts, identity, league, loader, season_facts, state
+    from ffcore.db import cut, set_now
+    from ffcore.parse import snapshot_stamp
+
+    obs = observations(doc)
+    if degraded:
+        lineups = [r for r in ob.rows_of(obs, "lineups") if (r.team_slug, r.observed_at) != (DEGRADED_CLUB, doc["as_of"])]
+        obs = ob.Observations({**obs.tables, **ob.of({"lineups": lineups}).tables})
+    stamp = snapshot_stamp(doc["as_of"])
+    assert stamp is not None
+    set_now(stamp + timedelta(minutes=CUT_AFTER_MINUTES))
+    loaded = loader.loaded(obs, league.Config())
+    world = state.world_at(loaded.obs, cut())
+    d = decision.decision_at(loaded, world)
+    assert not isinstance(d, decision.Stale), d
+    inp = d.inputs
+    pos, cells = decision.cells_of(inp)
+    mine = decision.squad_of(inp)
+    first = min(c.jornada for c in season_facts.jornada_calendar(world) if c.state == "ahead")
+    next_four = frozenset(range(first, first + AHEAD))
+    windows = {"next4": next_four, "season": frozenset(cells)}
+    values = {w: decision.window_value(pos, cells, js) for w, js in windows.items()}
+    settled = {w: eleven.best_eleven(mine, pos, v) for w, v in values.items()}
+    got = [] if degraded else decision.opportunity_rows(inp)
+    opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
+    doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [], d.extras)
+    seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp.money,
+                  "squad": len(mine), "offers": sum(1 for o in current.offers(world) if o.status == "pending"),
+                  "cases": {}}
+    ids = tuple(CASES.values())
+    people = {p.player_id: Known(*p) for p in identity.crosswalk(obs, identity.END_OF_TIME) if p.player_id in ids}
+    stored = [r for r in ob.rows_of(obs, "points") if r.ff_id in ids]
+    season = max((r.season for r in ob.rows_of(obs, "points")), default="")
+    market = {k: [Market(r.ff_id, r.value) for r in ob.rows_of(obs, "market") if r.ff_id == k] for k in ids}
+    points = {k: [Played(r.ff_id, r.games, r.points) for r in stored if r.ff_id == k and r.season == season] for k in ids}
+    cell = {k: {c.jornada: (c.p, c.e) for c in forecast_facts.cell(d.fc) if c.player == k} for k in ids}
+    total = {t.player: t for t in forecast_facts.cell_total(d.fc)}
+    for name, k in CASES.items():
+        swaps = {w: eleven.swap(k, s.eleven, pos, values[w]) if s else None for w, s in settled.items()}
+        seen["cases"][name] = {
+            "id": k,
+            "value": market[k][-1].value if market[k] else None,
+            "points": points[k][-1] if points[k] else None,
+            "crosswalk": people.get(k),
+            "status": d.fc.status.get(k),
+            "rate": d.fc.rate.get(k),
+            "cells": cell[k],
+            "total": total.get(k),
+            "late": sorted(x.jornada for x in d.fc.late if x.player == k),
+            "swaps": swaps,
+            "buy": next((b for b in doc_board["buys"] if b["key"] == k), None)}
     return seen
 
 

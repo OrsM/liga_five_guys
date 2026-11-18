@@ -332,7 +332,8 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
 
 def main() -> None:
     with closing(connect()) as db:
-        loaded = loader.load(db, league.load_config(), cut())
+        previous = loader.previous_opportunities(db)
+    loaded = loader.load(league.load_config(), cut(), previous=previous)
     [(d, rows)] = state.sweep(loaded.obs, [cut()], lambda world: moment_at(loaded, world))
     if isinstance(d, decision.Stale):
         raise SystemExit(d.reason)

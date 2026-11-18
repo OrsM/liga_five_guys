@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # src/run.py on a scratch copy: data/raw linked in read-only, the parse cache
-# (data/tidy/parsed.jsonl) copied so a copy does not reparse every snapshot,
+# (data/tidy/parsed.jsonl and snapindex.json) copied so a copy does not reparse every snapshot,
 # everything written (lfg.db, reports) under the scratch dir, nothing published or sent.
 # For checking and timing a change; the tracked repo is never touched.
 #
@@ -14,9 +14,11 @@ cd "$REPO"
 SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-dry-run}"     # not /tmp: a tmpfs too small for lfg.db; LFG_SCRATCH: one each when several run at once
 mkdir -p "$SCRATCH/data/tidy" "$SCRATCH/reports"
 ln -sfn "$REPO/data/raw" "$SCRATCH/data/raw"
-if [ ! -e "$SCRATCH/data/tidy/parsed.jsonl" ] && [ -e "$REPO/data/tidy/parsed.jsonl" ]; then
-    cp "$REPO/data/tidy/parsed.jsonl" "$SCRATCH/data/tidy/parsed.jsonl"
-fi
+for f in parsed.jsonl snapindex.json; do
+    if [ ! -e "$SCRATCH/data/tidy/$f" ] && [ -e "$REPO/data/tidy/$f" ]; then
+        cp "$REPO/data/tidy/$f" "$SCRATCH/data/tidy/$f"
+    fi
+done
 
 export PYTHONPATH=src FF_ROOT="$SCRATCH/data" LFG_REPORTS="$SCRATCH/reports" LFG_NO_PUBLISH=1
 echo "lfg-dry-run: scratch=$SCRATCH"
