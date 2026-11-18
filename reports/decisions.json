@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-18T17:50Z",
- "market_at": "2026-11-18T17:50Z",
+ "generated_at": "2026-11-18T18:52Z",
+ "market_at": "2026-11-18T18:51Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-18T17:50Z",
+   "at": "2026-11-18T18:51Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -534,6 +534,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.5252659574468085,
+   "offers_seen": 752,
+   "note": "offer 1.00 x value; at or above 53% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -596,6 +599,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.29654255319148937,
+   "offers_seen": 752,
+   "note": "offer 0.96 x value; at or above 30% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -658,6 +664,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 1.0,
+   "offers_seen": 752,
+   "note": "offer 1.12 x value; at or above 100% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -720,6 +729,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.8643617021276596,
+   "offers_seen": 752,
+   "note": "offer 1.07 x value; at or above 86% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -782,6 +794,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.7034574468085106,
+   "offers_seen": 752,
+   "note": "offer 1.04 x value; at or above 70% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -844,6 +859,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.8643617021276596,
+   "offers_seen": 752,
+   "note": "offer 1.07 x value; at or above 86% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -906,6 +924,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.6449468085106383,
+   "offers_seen": 752,
+   "note": "offer 1.03 x value; at or above 64% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -968,6 +989,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.9827127659574468,
+   "offers_seen": 752,
+   "note": "offer 1.10 x value; at or above 98% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -1032,6 +1056,9 @@
     "next8": 0.0,
     "season": 0.0
    },
+   "offer_percentile": 0.6675531914893617,
+   "offers_seen": 752,
+   "note": "offer 1.03 x value; at or above 67% of the 752 nightly offers seen; the eleven loses 0 points (bench)",
    "per_million": 0.0,
    "facts": [
     [
@@ -1094,6 +1121,9 @@
     "next8": 0.0,
     "season": 9.558370497437409
    },
+   "offer_percentile": 0.2925531914893617,
+   "offers_seen": 752,
+   "note": "offer 0.96 x value; at or above 29% of the 752 nightly offers seen; the eleven loses 1.0 points over the next 4 jornadas, 0.0 over the next 8, 9.6 over the season",
    "per_million": 0.0,
    "facts": [
     [
@@ -1156,6 +1186,9 @@
     "next8": 1.2396518124139106,
     "season": 8.512921712664593
    },
+   "offer_percentile": 0.5398936170212766,
+   "offers_seen": 752,
+   "note": "offer 1.00 x value; at or above 54% of the 752 nightly offers seen; the eleven loses 0.9 points over the next 4 jornadas, 1.2 over the next 8, 8.5 over the season",
    "per_million": 0.03521049998251508,
    "facts": [
     [
@@ -1218,6 +1251,9 @@
     "next8": 2.5524482248023332,
     "season": 8.813248200872295
    },
+   "offer_percentile": 0.8430851063829787,
+   "offers_seen": 752,
+   "note": "offer 1.06 x value; at or above 84% of the 752 nightly offers seen; the eleven loses 0.9 points over the next 4 jornadas, 2.6 over the next 8, 8.8 over the season",
    "per_million": 0.04436365918122566,
    "facts": [
     [
@@ -1280,6 +1316,9 @@
     "next8": 0.5870327940319839,
     "season": 2.0280741220403797
    },
+   "offer_percentile": 0.37898936170212766,
+   "offers_seen": 752,
+   "note": "offer 0.97 x value; at or above 38% of the 752 nightly offers seen; the eleven loses 0.0 points over the next 4 jornadas, 0.6 over the next 8, 2.0 over the season",
    "per_million": 0.05652178711636983,
    "facts": [
     [
@@ -1342,6 +1381,9 @@
     "next8": 1.101712840065204,
     "season": 0.0
    },
+   "offer_percentile": 0.23670212765957446,
+   "offers_seen": 752,
+   "note": "offer 0.95 x value; at or above 24% of the 752 nightly offers seen; the eleven loses 1.5 points over the next 4 jornadas, 1.1 over the next 8, 0.0 over the season",
    "per_million": 0.05721802921140349,
    "facts": [
     [
@@ -1406,6 +1448,9 @@
     "next8": 1.5516365534379588,
     "season": 9.453447498921605
    },
+   "offer_percentile": 0.39361702127659576,
+   "offers_seen": 752,
+   "note": "offer 0.98 x value; at or above 39% of the 752 nightly offers seen; the eleven loses 2.5 points over the next 4 jornadas, 1.6 over the next 8, 9.5 over the season",
    "per_million": 0.07291319232186905,
    "facts": [
     [
@@ -1468,6 +1513,9 @@
     "next8": 4.102981047675883,
     "season": 16.20464066931845
    },
+   "offer_percentile": 0.13962765957446807,
+   "offers_seen": 752,
+   "note": "offer 0.93 x value; at or above 14% of the 752 nightly offers seen; the eleven loses 3.5 points over the next 4 jornadas, 4.1 over the next 8, 16.2 over the season",
    "per_million": 0.09968973213796498,
    "facts": [
     [
@@ -1530,6 +1578,9 @@
     "next8": 3.9714259762088204,
     "season": 18.131767041763396
    },
+   "offer_percentile": 0.9534574468085106,
+   "offers_seen": 752,
+   "note": "offer 1.09 x value; at or above 95% of the 752 nightly offers seen; the eleven loses 2.6 points over the next 4 jornadas, 4.0 over the next 8, 18.1 over the season",
    "per_million": 0.11020441951431897,
    "facts": [
     [
@@ -1592,6 +1643,9 @@
     "next8": 2.2269420871891725,
     "season": 14.028449229454736
    },
+   "offer_percentile": 0.44680851063829785,
+   "offers_seen": 752,
+   "note": "offer 0.99 x value; at or above 45% of the 752 nightly offers seen; the eleven loses 0.4 points over the next 4 jornadas, 2.2 over the next 8, 14.0 over the season",
    "per_million": 0.1111808112201167,
    "facts": [
     [
@@ -1654,6 +1708,9 @@
     "next8": 9.44822773644404,
     "season": 34.05309676950219
    },
+   "offer_percentile": 0.42021276595744683,
+   "offers_seen": 752,
+   "note": "offer 0.98 x value; at or above 42% of the 752 nightly offers seen; the eleven loses 7.6 points over the next 4 jornadas, 9.4 over the next 8, 34.1 over the season",
    "per_million": 0.16492501523912023,
    "facts": [
     [
@@ -1716,6 +1773,9 @@
     "next8": 13.329477831460679,
     "season": 37.87714703846518
    },
+   "offer_percentile": 0.7127659574468085,
+   "offers_seen": 752,
+   "note": "offer 1.04 x value; at or above 71% of the 752 nightly offers seen; the eleven loses 7.5 points over the next 4 jornadas, 13.3 over the next 8, 37.9 over the season",
    "per_million": 0.22708471434035632,
    "facts": [
     [
@@ -1778,6 +1838,9 @@
     "next8": 55.326134281895236,
     "season": 97.87400278494601
    },
+   "offer_percentile": 0.6183510638297872,
+   "offers_seen": 752,
+   "note": "offer 1.02 x value; at or above 62% of the 752 nightly offers seen; the eleven loses 29.9 points over the next 4 jornadas, 55.3 over the next 8, 97.9 over the season",
    "per_million": 3.0415017966562163,
    "facts": [
     [
