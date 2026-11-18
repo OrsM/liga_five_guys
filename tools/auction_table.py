@@ -17,10 +17,10 @@ from ffcore import auction, league, loader, parsed, state
 from ffcore.auction import Model
 
 TARGET = Path(__file__).resolve().parent.parent / "src" / "ffcore" / "auction_table.py"
-HEADER = '''"""The win-chance Model of the auction forecast: auction.fit over every closed auction of the database at one cut,
+HEADER = '''"""The win-chance Model of the auction forecast: auction.fit over every closed auction of the parse cache at one cut,
 with the fixed cuts auction.FIXED_CUTS. A tracked knob, not computed per run: seen_at reads auction.forecast(TABLE, ...).
-Generated, never edited: regenerate with `PYTHONPATH=src python tools/auction_table.py` (reads data/lfg.db read-only;
---db and --cut choose the database and the cut)."""
+Generated, never edited: regenerate with `PYTHONPATH=src python tools/auction_table.py` (reads the parse cache, no database;
+--tidy and --cut choose the cache and the cut)."""
 from __future__ import annotations
 
 from ffcore.auction import Model

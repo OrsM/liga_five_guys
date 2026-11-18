@@ -95,8 +95,7 @@ computes one, and a fact is never stored twice.
 
 **No SQL (#80, step 6):** the raw observations are the parse cache (`data/tidy/parsed.jsonl`, `snapindex.json`, read by
 `ffcore/parsed.py`) and the records (`runs`, `run_measures`, `params`, `measure_log`, `grade_cell`, `auction_calibration`,
-`auction_brier`, `dec_opportunity`) are the record store (`store/`, `ffcore/store.py`). `tools/peek.py` looks at a store;
-`tools/export_store.py` is the one file that opens SQLite, the one-off cutover export of the old `data/lfg.db`.
+`auction_brier`, `dec_opportunity`) are the record store (`store/`, `ffcore/store.py`). `tools/peek.py` looks at a store. Nothing in the code opens a database: the old `data/lfg.db` is an archive.
 
 **Rules.** A layer reads ingest's facts, the cut and earlier layers' exports; never a later layer, never a raw table.
 A test seeds its module's inputs as rows (no Python mirror of a table). A change is judged by its layer's measure; old
@@ -239,7 +238,7 @@ players). Market closes daily 22:24 CET.
 - The ceiling measure is a smoke test, not a gate: gate planner changes on tests and invariants.
 - Untested changes do not go live; the backtest is a noisy smoke test.
 - Look for established solutions first (prior art) for common problems.
-- Clean up scratch copies (DB copies, patches) once used; never leave them in `data/`.
+- Clean up scratch copies (store copies, patches) once used; never leave them in `data/`.
 - Property tests; flag duplication preemptively.
 - Do not touch the account (bids, accepting offers) without your explicit go. Live runs may be triggered freely.
 

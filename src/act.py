@@ -2,7 +2,7 @@
 
 A request names the line (its label). It is acted on if that line is still on the board as it stands now, whatever board the
 phone saw it on, and is one the app can do. A line carries what it acts on as the app knows it (board.py's act: each
-player's place in your team, value), so nothing here reads lfg.db. The calls are the app's own
+player's place in your team, value), so nothing here reads the store. The calls are the app's own
 (fantasy-api.llt-services.com, as LaLigaApp makes them).
 
     python src/act.py accept REQUESTS.json  # what lfg-watch runs: each request's result, as JSON
