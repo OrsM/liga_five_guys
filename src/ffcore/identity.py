@@ -38,7 +38,7 @@ from ffcore.text import stems_meet
 
 __all__ = ["Registered", "Person", "Handle", "Kept", "AppLink", "SlugPlayer", "NamePlayer", "NameClubPlayer", "Clash",
            "Shown", "Unmatched", "app_links", "registry", "crosswalk", "ff_identity_now", "kept_identity",
-           "app_player", "slug_player", "name_player", "name_club_player", "id_clashes", "names", "unmatched",
+           "registered", "slugged", "app_player", "slug_player", "name_player", "name_club_player", "id_clashes", "names", "unmatched",
            "identity_of", "NEEDS"]
 
 NEEDS = ("market", "lineups", "starters", "api_teams", "api_market", "api_players_all")
@@ -159,13 +159,20 @@ def positive(value: float | None) -> bool:
 
 def evidence(obs: ob.Observations) -> dict[tuple[str, str], Evidence]:
     """For each (app id, ff_id) the market stamps at which the app value equalled the player's, and the name triples
-    (app name, app full name, market name) seen then (rules link_by_value)."""
-    market = [r for r in ob.rows_of(obs, "market") if r.ff_id != "" and positive(r.value)]
+    (app name, app full name, market name) seen then (rules link_by_value). Only the market rows the app rows ask for
+    are indexed."""
+    asked = {(r.observed_at, r.market_value) for table in ("api_teams", "api_market") for r in ob.rows_of(obs, table)
+             if positive(r.market_value)}
+    held_values = {r.market_value for r in ob.rows_of(obs, "api_players_all") if positive(r.market_value)}
+    wanted = held_values | {value for _, value in asked}
     at_value: dict[tuple[str, float], list[Any]] = defaultdict(list)
     by_value: dict[float, list[Any]] = defaultdict(list)
-    for r in market:
-        at_value[r.observed_at, r.value].append(r)
-        by_value[r.value].append(r)
+    for r in ob.rows_of(obs, "market"):
+        if r.value in wanted and r.ff_id != "":
+            if (r.observed_at, r.value) in asked:
+                at_value[r.observed_at, r.value].append(r)
+            if r.value in held_values:
+                by_value[r.value].append(r)
     stamps = {v: [r.observed_at for r in held] for v, held in by_value.items()}
     found: dict[tuple[str, str], Evidence] = {}
 
@@ -307,12 +314,25 @@ def first_slugs(obs: ob.Observations, kept: Iterable[Kept], cut: str) -> dict[st
     return slugs
 
 
+def registered(obs: ob.Observations) -> tuple[Person, ...]:
+    """The registry of obs with each player's app id and no slug, computed on first use and kept on obs
+    (Observations.registered): the part of the crosswalk that no cut changes."""
+    if obs.registered is None:
+        obs.registered = tuple(Person(r.player_id, r.name, r.club_id, "", r.app_id)
+                               for r in registry(obs, app_links(obs)))
+    return obs.registered  # type: ignore[no-any-return]
+
+
+def slugged(bare: Iterable[Person], obs: ob.Observations, cut: str) -> tuple[Person, ...]:
+    """bare, each with the slug of obs's rows at or before cut (rule slug_is_first_given)."""
+    held = tuple(bare)
+    slugs = first_slugs(obs, ff_identity_now(obs, held), cut)
+    return tuple(p._replace(ff_slug=slugs.get(p.player_id, "")) for p in held)
+
+
 def crosswalk(obs: ob.Observations, cut: str) -> tuple[Person, ...]:
     """The crosswalk of obs: the registry, with each player's slug."""
-    registered = registry(obs, app_links(obs))
-    bare = tuple(Person(r.player_id, r.name, r.club_id, "", r.app_id) for r in registered)
-    slugs = first_slugs(obs, ff_identity_now(obs, bare), cut)
-    return tuple(p._replace(ff_slug=slugs.get(p.player_id, "")) for p in bare)
+    return slugged(registered(obs), obs, cut)
 
 
 def kept_identity(now: Iterable[Kept], previous: Iterable[Kept], observed: Collection[Handle]) -> tuple[Kept, ...]:
@@ -376,6 +396,60 @@ def _selftest() -> None:
     assert app_links(obs) == (AppLink("A", "p"), AppLink("B", "q")) and \
         {k: len(e.stamps) for k, e in evidence(obs).items()} == {("A", "p"): 2, ("B", "q"): 2}, \
         "link_by_value: A at two stamps, B held from 1 until its next row (3), a value-0 row ending it"
+
+    import random
+
+    def spec_evidence(o: ob.Observations) -> dict[tuple[str, str], Evidence]:
+        want: dict[tuple[str, str], Evidence] = {}
+
+        def meet_spec(aid: str, f: Any, n1: str, n2: str) -> None:
+            e = want.setdefault((aid, f.ff_id), Evidence(set(), set()))
+            e.stamps.add(f.observed_at)
+            e.triples.add((n1, n2, f.name))
+        market_rows = [f for f in ob.rows_of(o, "market") if f.ff_id != "" and positive(f.value)]
+        for table in ("api_teams", "api_market"):
+            for r in ob.rows_of(o, table):
+                for f in market_rows:
+                    if positive(r.market_value) and f.observed_at == r.observed_at and f.value == r.market_value:
+                        meet_spec(r.player_id, f, r.player_name, r.player_name_full)
+        every = ob.rows_of(o, "api_players_all")
+        for i, r in enumerate(every):
+            later = [x.observed_at for x in every[i + 1:] if x.player_id == r.player_id]
+            end = later[0] if later else END_OF_TIME
+            for f in market_rows:
+                if positive(r.market_value) and f.value == r.market_value and r.observed_at <= f.observed_at < end:
+                    meet_spec(r.player_id, f, r.player_name, r.player_name_full)
+        return want
+
+    rng = random.Random(7)
+    for _ in range(40):
+        at = [str(rng.randint(0, 6)) for _ in range(rng.randint(0, 30))]
+        draws = [rng.choice([None, 0.0, 1.0, 2.0, 3.0]) for _ in range(20)]
+        league: dict[str, list[Any]] = {"market": [mk(t, rng.choice(["a", "b", "c", ""]), rng.choice(["Ana Ruiz", "Bo Li"]), value=rng.choice(draws))
+                             for t in at],
+                  "api_teams": [app(t, rng.choice("xyz"), rng.choice(draws), rng.choice(["Ana", "Bo"])) for t in at[::2]],
+                  "api_market": [ob.ApiMarket(t, "app", rng.choice(draws), None, None, None, rng.choice("xyz"), "m", "Bo", "",
+                                              "", "", "", "", "", "") for t in at[1::3]],
+                  "api_players_all": [held(t, rng.choice("xyz"), rng.choice(draws), "Ana") for t in at[::3]]}
+        rand = ob.of(league)
+        assert evidence(rand) == spec_evidence(rand), "link_by_value: the index of the market rows is the specification"
+
+    calls: list[ob.Observations] = []
+    real = evidence
+
+    def counted(o: ob.Observations) -> dict[tuple[str, str], Evidence]:
+        calls.append(o)
+        return real(o)
+    globals()["evidence"] = counted
+    try:
+        same = ob.of(league)
+        other = ob.of(league)
+        first = registered(same)
+        assert registered(same) is first and crosswalk(same, "3") == slugged(registered(same), same, "3") and \
+            crosswalk(same, "9") and calls == [same], "the registry of one Observations is computed once, whatever the cut"
+        assert registered(other) == first and calls == [same, other], "two Observations compute their own"
+    finally:
+        globals()["evidence"] = real
 
     obs = ob.of({"market": [mk("1", "p", "Jonny Castro", value=5.0)], "api_teams": [app("1", "A", 5.0, "Zzzz Yyyy")]})
     assert app_links(obs) == (), "link_needs_a_stem"

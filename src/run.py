@@ -136,6 +136,7 @@ def _stages(argv: list[str], every: Sequence[Stage], records: RunRecords, collec
         try:
             if name in reading and cache is None:
                 cache = parsed.read(parsed.paths_in())
+                gc.freeze()
             counts = call(spec)(*([records] if name in collecting else []), **({"obs": cache} if name in reading else {}))
         except SystemExit as e:
             if e.code:

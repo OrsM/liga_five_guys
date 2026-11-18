@@ -233,8 +233,19 @@ def pooled(values: Iterable[Any]) -> tuple[Any, ...]:
     return tuple(POOL.setdefault(v, v) if type(v) is str else v for v in values)
 
 
-class Observations(NamedTuple):
-    tables: Mapping[str, Table]
+class Observations:
+    """The tables of a read, and `registered`: the value identity.registered(obs) computes on first use from these
+    tables and keeps here (None until then), so one Observations computes it once and two never share it."""
+    __slots__ = ("tables", "registered")
+
+    def __init__(self, tables: Mapping[str, Table]) -> None:
+        self.tables = tables
+        self.registered: tuple[Any, ...] | None = None
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Observations) and self.tables == other.tables
+
+    __hash__ = None  # type: ignore[assignment]
 
 
 def key_of(table: str, row: Any) -> tuple[str, ...]:

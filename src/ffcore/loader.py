@@ -12,6 +12,8 @@ Named rules, each tested:
     the observations (before the fold), the crosswalk read at the cut (the end of time when none): nothing is stored.
   identity_reads_each_handle_once: a line-ups row whose handle (slug, name, team) an earlier row has adds nothing to the
     identity, so identity_in of handles_once(obs) is identity_in(obs).
+  registry_computed_once: the registry with its app ids is identity.registered(obs), kept on obs: every loaded, identity_in
+    and crosswalk of one Observations reads the one computation, whatever the cut.
   replay_cuts_are_app_snapshots: the distinct observed_at stamps of the api_teams snapshots, from since on, in order.
   opportunity_latest_by_cut_and_player: of the opportunity records of every published run, a cut's player has the row of
     the latest run that kept him; the rows come by cut then player.
@@ -75,8 +77,9 @@ def previous_opportunities() -> tuple[Opportunity, ...]:
 
 def identity_in(obs: ob.Observations, cut: str | None = None) -> Identity:
     """Who each player is, from all of obs (rule identity_from_the_observations)."""
-    people = identity.crosswalk(obs, identity.END_OF_TIME if cut is None else cut)
-    return identity.identity_of(identity.ff_identity_now(obs, people), identity.app_player(people))
+    thin = handles_once(obs)
+    people = identity.slugged(identity.registered(obs), thin, identity.END_OF_TIME if cut is None else cut)
+    return identity.identity_of(identity.ff_identity_now(thin, people), identity.app_player(people))
 
 
 def handles_once(obs: ob.Observations) -> ob.Observations:
@@ -114,7 +117,7 @@ def loaded(obs: ob.Observations, cfg: league.Config, cut: str | None = None,
            previous: tuple[Opportunity, ...] = ()) -> Loaded:
     """The Loaded of obs at the cut: the folded observations, their identity, the league cfg names, the model's knobs and
     the opportunity records previous and the snapshots of the whole obs (rule snapshots_are_of_the_whole)."""
-    return assembled(folded(obs, cut), identity_in(handles_once(obs), cut), cfg, previous, snapshots_in(obs, cut))
+    return assembled(folded(obs, cut), identity_in(obs, cut), cfg, previous, snapshots_in(obs, cut))
 
 
 def load(cfg: league.Config, cut: str | None = None, paths: parsed.Paths | None = None,
