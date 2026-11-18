@@ -70,9 +70,16 @@ class Loaded(NamedTuple):
 
 
 def previous_opportunities() -> tuple[Opportunity, ...]:
-    """The opportunity records live runs kept (rule opportunity_latest_by_cut_and_player), by cut then player."""
-    kept = {(o.cut, o.player): Opportunity(**o._asdict()) for o in store.records("dec_opportunity")}
-    return tuple(kept[k] for k in sorted(kept))
+    """The opportunity records live runs kept of the newest cut (rule opportunity_latest_by_cut_and_player: a later run's
+    row of a player replaces an earlier one's), by player; none with no record."""
+    newest = ""
+    kept: dict[str, Opportunity] = {}
+    for o in store.records("dec_opportunity"):
+        if o.cut > newest:
+            newest, kept = o.cut, {}
+        if o.cut == newest:
+            kept[o.player] = Opportunity(**o._asdict())
+    return tuple(kept[p] for p in sorted(kept))
 
 
 def identity_in(obs: ob.Observations, cut: str | None = None) -> Identity:
@@ -234,8 +241,9 @@ def _selftest_newest_snapshot() -> None:
 
 
 def _selftest_previous() -> None:
-    """Rule opportunity_latest_by_cut_and_player: over two published runs the later one's row of a cut's player replaces
-    the earlier one's, every other row stands, by cut then player; no store is no records."""
+    """Rule opportunity_latest_by_cut_and_player: over published runs the later one's row of a cut's player replaces
+    the earlier one's, and only the newest cut's rows are kept (the newest cut, not the newest run's), by player; no
+    store is no records."""
     import os
     import tempfile
 
@@ -253,9 +261,11 @@ def _selftest_previous() -> None:
             assert previous_opportunities() == ()
             store.publish(run(1), dec_opportunity=[record("2026-08-02T0000Z", "b", 1.0), record("2026-08-01T0000Z", "a", 2.0)])
             store.publish(run(2), dec_opportunity=[record("2026-08-02T0000Z", "b", 3.0), record("2026-08-02T0000Z", "c", 4.0)])
-            got = previous_opportunities()
-            assert [(o.cut[:10], o.player, o.gain) for o in got] == [
-                ("2026-08-01", "a", 2.0), ("2026-08-02", "b", 3.0), ("2026-08-02", "c", 4.0)]
+            assert [(o.cut[:10], o.player, o.gain) for o in previous_opportunities()] == [
+                ("2026-08-02", "b", 3.0), ("2026-08-02", "c", 4.0)]
+            store.publish(run(3), dec_opportunity=[record("2026-08-01T0000Z", "z", 5.0)])
+            assert [(o.cut[:10], o.player) for o in previous_opportunities()] == [("2026-08-02", "b"), ("2026-08-02", "c")], \
+                "the newest cut, not the newest run's"
         finally:
             store.clear()
             if kept is None:

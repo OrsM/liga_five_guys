@@ -28,9 +28,22 @@ __all__ = ["backtest", "graded", "latest_values", "record_grades", "scored_at", 
 
 T = TypeVar("T")
 
-RESULT_FOLDS = {name: state.FOLDS[name] for name in auction_facts.AUCTION_FACTS}
-AUCTION_FOLDS = {name: state.FOLDS[name] for name in ("price", *auction_facts.AUCTION_FACTS)}
-PRICE_FOLDS = {"price": state.FOLDS["price"]}
+
+
+def folds_of(names: Iterable[str]) -> dict[str, state.Fold]:
+    """The registered folds named, by name."""
+    return {name: state.FOLDS[name] for name in names}
+
+
+RESULT_FOLDS = folds_of(auction_facts.AUCTION_FACTS)
+AUCTION_FOLDS = folds_of(("price", *auction_facts.AUCTION_FACTS))
+PRICE_FOLDS = folds_of(("price",))
+SEASON_FOLDS = folds_of((*ledger.LEDGER_FACTS, "kickoffs", "first_results", "points_changes", "latest_market",
+                         "latest_matches", "latest_starters"))
+LOCK_FOLDS = folds_of(("kickoffs", "first_results", "points_changes", "season_last", "latest_market", "latest_matches",
+                       "latest_starters", "latest_api_market", "latest_api_players_all", "latest_api_teams",
+                       "latest_lineups", "latest_results_history"))
+MOMENT_FOLDS = folds_of(("price", "latest_api_lineup", "latest_api_players_all", "latest_api_teams", "latest_lineups"))
 
 GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
 RATE = 0.6
@@ -78,7 +91,7 @@ def backtest(loaded: loader.Loaded, now: Season, ahead: int = 0) -> list[GradeCe
     """The forecast at each past lock (lock_moments, read in one sweep) as GradeCells (lock_cells) for the jornada it
     locks and, with ahead, the next ones, each one done; in lock order."""
     moments = lock_moments(now)
-    got = moments_facts(loaded, moments.values(), lambda world: lock_forecast(loaded, world))
+    got = moments_facts(loaded, moments.values(), lambda world: lock_forecast(loaded, world), LOCK_FOLDS)
     return [c for j, moment in moments.items() for c in lock_cells(j, ahead, now.done, got[moment])]
 
 
@@ -271,7 +284,7 @@ def record_grades(records: RunRecords, obs: ob.Observations | None = None) -> di
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, **scored}
     fc = backtest(loaded, now, GRADE_AHEAD)
-    records.add("grade_cell", [c._asdict() for c in fc])
+    records.add("grade_cell", (c._asdict() for c in fc))
     forecasts = len({(c.from_j, c.jornada) for c in fc})
     print("  grade: %d forecasts over %d jornadas" % (forecasts, resolved))
     return {"resolved": resolved, "forecasts": forecasts, **scored}
@@ -315,11 +328,12 @@ def season_at(loaded: loader.Loaded, world: state.World) -> Season:
     return Season(mine, locks, set(season_facts.jornadas_done(world)), scored)
 
 
-def moments_facts(loaded: loader.Loaded, moments: Iterable[dt.datetime], read: Callable[[state.World], T]) -> dict[dt.datetime, T]:
-    """read(world) for each moment, in one sweep over their minute-floored stamps; a moment's result is that of its
-    stamp, the same alone, in any subset or order of moments, and unchanged by rows appended after it."""
+def moments_facts(loaded: loader.Loaded, moments: Iterable[dt.datetime], read: Callable[[state.World], T],
+                  folds: Mapping[str, state.Fold]) -> dict[dt.datetime, T]:
+    """read(world) for each moment, in one sweep of the folds over their minute-floored stamps; a moment's result is that
+    of its stamp, the same alone, in any subset or order of moments, and unchanged by rows appended after it."""
     asked = list(moments)
-    return dict(zip(asked, state.sweep(loaded.obs, [stamp(m) for m in asked], read)))
+    return dict(zip(asked, state.sweep(loaded.obs, [stamp(m) for m in asked], read, folds)))
 
 
 def market_values(history: Sequence[ob.Market], players: Iterable[str]) -> dict[str, float]:
@@ -350,7 +364,7 @@ def facts_for(loaded: loader.Loaded, wanted: Mapping[dt.datetime, Collection[str
     asked: dict[str, set[str]] = {}
     for moment, players in wanted.items():
         asked.setdefault(stamp(moment), set()).update(players)
-    return moments_facts(loaded, wanted, lambda world: facts_at(loaded, world, asked[world.cut]))
+    return moments_facts(loaded, wanted, lambda world: facts_at(loaded, world, asked[world.cut]), MOMENT_FOLDS)
 
 
 MINUTE = dt.timedelta(minutes=1)
@@ -484,8 +498,9 @@ def read_storage(obs: ob.Observations | None = None) -> tuple[loader.Loaded, lis
 
 
 def season(loaded: loader.Loaded) -> Season:
-    """The Season at the run's moment (clock.run_now, LFG_NOW when pinned)."""
-    return state.sweep(loaded.obs, [stamp(run_now())], lambda world: season_at(loaded, world))[0]
+    """The Season at the run's moment (clock.run_now, LFG_NOW when pinned), folding only the folds season_at reads
+    (SEASON_FOLDS)."""
+    return state.sweep(loaded.obs, [stamp(run_now())], lambda world: season_at(loaded, world), SEASON_FOLDS)[0]
 
 
 def latest_values(measure: str) -> dict[str, float]:
@@ -1019,6 +1034,28 @@ def _selftest_lock_forecast() -> None:
     assert {c.jornada for c in lock_cells(1, 1, {2}, fc)} <= {2}, "a jornada not done is not graded"
 
 
+def _selftest_fold_sets() -> None:
+    """Each sweep of grading folds exactly the facts its reader reads: over the same rows the reader gives the same on the
+    named folds as on all of them, and with any one of the named folds left out it reads a fact that is not there."""
+    from ffcore.forecast_facts import _tables
+    obs = ob.of(_tables())
+    loaded = loader.Loaded(obs, forecast_facts.IDENTITY, ledger.League("me", 0.0), forecast_facts.knobs(), ())
+    end = max(stamp(snapshot_stamp(at) or dt.datetime.min) for at in ob.stamps_of(obs, "market"))
+    readers = {
+        "season": (SEASON_FOLDS, lambda world: season_at(loaded, world)),
+        "lock": (LOCK_FOLDS, lambda world: lock_forecast(loaded, world)),
+        "moment": (MOMENT_FOLDS, lambda world: facts_at(loaded, world, ["p1"]))}
+    for name, (named, read) in readers.items():
+        assert state.sweep(obs, [end], read, named) == state.sweep(obs, [end], read), name
+        for dropped in named:
+            rest = {n: f for n, f in named.items() if n != dropped}
+            try:
+                state.sweep(obs, [end], read, rest)
+            except KeyError:
+                continue
+            raise AssertionError("%s does not read %s" % (name, dropped))
+
+
 def _selftest_grades() -> None:
     """Rules actual_is_zero_without_points and star_is_predicted_four_or_more, and accuracy_rows against statistics:
     a player with no scored row has actual 0.0; star rows are those predicted at 4 or more; the figures are those of
@@ -1163,6 +1200,7 @@ def _selftest() -> None:
     _selftest_moment_facts()
     _selftest_record_sales()
     _selftest_lock_forecast()
+    _selftest_fold_sets()
     _selftest_grades()
     _selftest_results()
     _selftest_opportunities()
