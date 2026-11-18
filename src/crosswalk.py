@@ -45,9 +45,10 @@ def players(obs: ob.Observations, at: str) -> list[str]:
     return lines(people, identity.unmatched(people, obs, at))
 
 
-def main() -> None:
-    """The crosswalk stage: print the lines of the players the parse cache names as of t."""
-    print("\n".join(players(parsed.read(parsed.paths_in(), identity.NEEDS), cut())))
+def main(obs: ob.Observations | None = None) -> None:
+    """The crosswalk stage: print the lines of the players the parse cache names as of t (obs: the parse cache as
+    parsed.read gives it; read here when None)."""
+    print("\n".join(players(parsed.read(parsed.paths_in(), identity.NEEDS) if obs is None else obs, cut())))
 
 
 def _selftest() -> None:

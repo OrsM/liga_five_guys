@@ -114,23 +114,15 @@ def loaded(obs: ob.Observations, cfg: league.Config, cut: str | None = None,
            previous: tuple[Opportunity, ...] = ()) -> Loaded:
     """The Loaded of obs at the cut: the folded observations, their identity, the league cfg names, the model's knobs and
     the opportunity records previous and the snapshots of the whole obs (rule snapshots_are_of_the_whole)."""
-    return assembled(folded(obs, cut), identity_in(obs, cut), cfg, previous, snapshots_in(obs, cut))
-
-
-def _read(paths: parsed.Paths, cut: str | None) -> tuple[ob.Observations, ob.Observations, tuple[Snapshot, ...]]:
-    """The files at paths as the folded observations and, beside them, the observations the identity is read from and the
-    snapshots of the whole ones: the whole ones are not kept, so the line-ups that only the identity reads leave memory
-    before it is computed."""
-    whole = parsed.read(paths)
-    return folded(whole, cut), handles_once(whole), snapshots_in(whole, cut)
+    return assembled(folded(obs, cut), identity_in(handles_once(obs), cut), cfg, previous, snapshots_in(obs, cut))
 
 
 def load(cfg: league.Config, cut: str | None = None, paths: parsed.Paths | None = None,
-         previous: tuple[Opportunity, ...] = ()) -> Loaded:
-    """The files at paths (parsed.paths_in() when None) read once, as loaded gives them; previous are the opportunity records
+         previous: tuple[Opportunity, ...] = (), obs: ob.Observations | None = None) -> Loaded:
+    """loaded of obs, or of the files at paths (parsed.paths_in() when None) read once when obs is None: the same Loaded
+    whichever, if obs is what parsed.read gives of those files; previous are the opportunity records
     (previous_opportunities of the store) a board needs, none for a replay."""
-    obs, thin, snapshots = _read(paths or parsed.paths_in(), cut)
-    return assembled(obs, identity_in(thin, cut), cfg, previous, snapshots)
+    return loaded(parsed.read(paths or parsed.paths_in()) if obs is None else obs, cfg, cut, previous)
 
 
 def replay_cuts(obs: ob.Observations, since: str) -> list[str]:
@@ -185,7 +177,12 @@ def _selftest_files() -> None:
                                encoding="utf-8")
         cfg = league.Config("ann", 5.0)
         got = load(cfg, None, paths)
-        assert [r.ff_id for r in ob.rows_of(got.obs, "market")] == ["p1"] and got == loaded(parsed.read(paths), cfg)
+        whole = parsed.read(paths)
+        assert [r.ff_id for r in ob.rows_of(got.obs, "market")] == ["p1"] and got == loaded(whole, cfg)
+        assert all(load(cfg, cut, paths) == load(cfg, cut, obs=whole) for cut in (None, "2026-08-18T1800Z", "2026-08-01T0000Z")), \
+            "load_of_obs_is_load_of_the_files"
+        assert all(ob.rows_of(parsed.read(paths, [t]), t) == ob.rows_of(whole, t) for t in ob.TABLES), \
+            "a table read alone has the rows it has in the read of all"
 
 
 def _selftest_newest_snapshot() -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import collections
 import gc
 import importlib
+import inspect
 import os
 import resource
 import subprocess
@@ -16,7 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
-from ffcore import store
+from ffcore import observations as ob
+from ffcore import parsed, store
 from ffcore.clock import run_now
 from ffcore.parse import stamp
 from ffcore.clock import set_now
@@ -44,6 +46,7 @@ STAGES: list[Stage] = [
 ]
 
 COLLECTING = frozenset({"board", "grade", "health"})  # the stages passed the run's RunRecords
+READING = frozenset({"crosswalk", "board", "grade", "health"})  # the stages passed the run's Observations (obs=)
 
 
 def call(spec: str) -> Callable[..., object]:
@@ -97,26 +100,31 @@ def _finished(begun: Run, ok: bool) -> Run:
     return begun._replace(finished=_utc(), ok=int(ok), peak_mb=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
 
 
-def main(argv: list[str], every: Sequence[Stage] = STAGES, collecting: Collection[str] = COLLECTING) -> int:
+def main(argv: list[str], every: Sequence[Stage] = STAGES, collecting: Collection[str] = COLLECTING,
+         reading: Collection[str] = READING) -> int:
     """Run the stages argv names (all by default), collecting the run's records (run_measures for each stage, the rest
     from the stages named in collecting, which are passed the RunRecords) and publishing them once with the Run row at the end, ok only if every
-    stage was; a run killed before then leaves nothing in the store. 1 if a stage that makes the report failed."""
+    stage was; a run killed before then leaves nothing in the store. The stages named in reading are passed the parse cache
+    read once, as it stands when the first of them starts (read again if the parse stage ran since). 1 if a stage that makes
+    the report failed."""
     records, begun = _start()
     failed: list[tuple[str, bool]] = [("", True)]
     try:
-        failed = _stages(argv, every, records, collecting)
+        failed = _stages(argv, every, records, collecting, reading)
     finally:
         records.publish(_finished(begun, not failed))
     return 1 if any(made for _n, made in failed) else 0
 
 
-def _stages(argv: list[str], every: Sequence[Stage], records: RunRecords, collecting: Collection[str]) -> list[tuple[str, bool]]:
+def _stages(argv: list[str], every: Sequence[Stage], records: RunRecords, collecting: Collection[str],
+            reading: Collection[str]) -> list[tuple[str, bool]]:
     """The stages that failed, each with whether it makes the report (the
     first such ends the run)."""
     want = [a for a in argv if not a.startswith("-")]
     stages = sorted((s for s in every if s.name in want), key=lambda s: want.index(s.name)) if want else list(every)
 
     started, times, failed = time.time(), [], []
+    cache: ob.Observations | None = None
     for name, spec, makes in stages:
         t0 = time.time()
         print("%s" % name, flush=True)
@@ -126,7 +134,9 @@ def _stages(argv: list[str], every: Sequence[Stage], records: RunRecords, collec
             hits, stop, threading.get_ident())).start()
         counts: object = None
         try:
-            counts = call(spec)(records) if name in collecting else call(spec)()
+            if name in reading and cache is None:
+                cache = parsed.read(parsed.paths_in())
+            counts = call(spec)(*([records] if name in collecting else []), **({"obs": cache} if name in reading else {}))
         except SystemExit as e:
             if e.code:
                 print("  FAILED: %s exited %s" % (name, e.code))
@@ -135,6 +145,8 @@ def _stages(argv: list[str], every: Sequence[Stage], records: RunRecords, collec
             traceback.print_exc()
             print("  FAILED: %s" % name)
             failed.append((name, makes))
+        if name == "parse":
+            cache = None
         gc.collect()
         stop.set()
         if failed and failed[-1][0] == name:
@@ -167,6 +179,8 @@ def _selftest_runs() -> None:
         raise SystemExit(1)
     fake.counted = lambda: {"rows": 7}  # type: ignore[attr-defined]
     fake.quiet = lambda records: {"run": records.run}  # type: ignore[attr-defined]
+    seen: list[object] = []
+    fake.saw = lambda obs=None: seen.append(obs)  # type: ignore[attr-defined]
     fake.boom = boom  # type: ignore[attr-defined]
     fake.killed = killed  # type: ignore[attr-defined]
     sys.modules["fake_stages"] = fake
@@ -182,6 +196,24 @@ def _selftest_runs() -> None:
                 code = _commit(Path(tmp))
         assert code != "?" and _commit(Path(tmp)) == code, \
             "the code's commit: a report, data or input commit does not change it"
+    reads: list[ob.Observations] = []
+    was = parsed.read
+    parsed.read = lambda paths, *a, **k: reads.append(ob.of({})) or reads[-1]  # type: ignore[assignment,func-returns-value]
+    try:
+        def passed(order: list[str]) -> tuple[int, list[object]]:
+            reads.clear()
+            seen.clear()
+            every = [Stage(n, "fake_stages:counted" if n == "parse" else "fake_stages:saw", True) for n in order]
+            _stages([], every, RunRecords(1, "c"), set(), {"one", "two"})
+            return len(reads), list(seen)
+        n, taken = passed(["parse", "one", "two"])
+        assert n == 1 and len(taken) == 2 and taken[0] is taken[1] is reads[0], "the stages that read are passed one read of the cache"
+        n, taken = passed(["one", "parse", "two"])
+        assert n == 2 and taken[0] is reads[0] and taken[1] is reads[1], "the cache is read again after the parse stage"
+        n, taken = passed(["parse"])
+        assert n == 0 and not taken, "a run of no reading stage reads nothing"
+    finally:
+        parsed.read = was
     asked = os.environ.pop("LFG_TRIGGER", None)  # the phone's button sets it: say what we want
     root = os.environ.get("FF_ROOT")
     try:
@@ -230,7 +262,10 @@ if __name__ == "__main__":
             assert callable(call(_stage.spec)), _stage.name
         _names = [st.name for st in STAGES]
         assert len(_names) == len(set(_names)), "duplicate stage"
-        assert COLLECTING <= set(_names), "every collecting stage is a stage"
+        assert COLLECTING <= set(_names) and READING <= set(_names), "every collecting and reading stage is a stage"
+        for _stage in STAGES:
+            _params = inspect.signature(call(_stage.spec)).parameters
+            assert ("obs" in _params) == (_stage.name in READING), "%s takes obs= if it is a reading stage" % _stage.name
         assert [st.makes for st in STAGES] == sorted((st.makes for st in STAGES), reverse=True), \
             "the stages that make the report come first"
         print("run.py selftest OK (%d stages)" % len(STAGES))

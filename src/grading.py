@@ -254,12 +254,12 @@ def record_auction(records: RunRecords, loaded: loader.Loaded, cuts: Sequence[st
     return {"auction_points": len(back), "auction_live": len(live), "auction_drift": sum(r["drift"] for r in cal)}
 
 
-def record_grades(records: RunRecords) -> dict[str, int]:
+def record_grades(records: RunRecords, obs: ob.Observations | None = None) -> dict[str, int]:
     """The grade stage (run.py grade): replay each past lock with this code, and add every player forecast against
     what then happened to the run's records (one set a code stands: standing_grades), unless this code has graded them on
     every jornada done (graded); and score the auction forecast (record_auction), unless this code has on every auction
-    closed (auctions_scored)."""
-    loaded, cuts = read_storage()
+    closed (auctions_scored). obs is the parse cache as parsed.read gives it, read here when None."""
+    loaded, cuts = read_storage(obs)
     moment = run_now()
     now = season(loaded)
     resolved = len(now.done)
@@ -476,9 +476,10 @@ def graded_sales(sold: Sequence[Sold], locks: dict[int, dt.datetime], done: set[
     return [salegrade.grade(sale, got, RATE) for sale, got in courses if got is not None]
 
 
-def read_storage() -> tuple[loader.Loaded, list[str]]:
-    """The storage read once: the Loaded the sweeps run over and the cuts a replay runs at (loader.replay_cuts from SALES_FROM)."""
-    loaded = loader.load(league.load_config())
+def read_storage(obs: ob.Observations | None = None) -> tuple[loader.Loaded, list[str]]:
+    """The storage read once (obs when given: the parse cache as parsed.read gives it): the Loaded the sweeps run over and
+    the cuts a replay runs at (loader.replay_cuts from SALES_FROM)."""
+    loaded = loader.load(league.load_config(), obs=obs)
     return loaded, loader.replay_cuts(loaded.obs, SALES_FROM)
 
 
@@ -759,7 +760,7 @@ def _selftest_stand() -> None:
         entered.append("grades")
         return []
     stub: dict[str, Any] = {
-        "read_storage": lambda: (None, []), "season": lambda loaded: Season((), {}, {1, 2}, {}),
+        "read_storage": lambda obs=None: (None, []), "season": lambda loaded: Season((), {}, {1, 2}, {}),
         "results_seen": lambda loaded, moment: Results(1, 1, "c"),
         "graded": lambda sha, last: held["graded"], "auctions_scored": lambda sha, loaded, now: held["scored"],
         "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda loaded, records: None}

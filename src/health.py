@@ -143,20 +143,21 @@ def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterab
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
 
 
-def said(records: RunRecords | None = None) -> str:
-    """text of the parse cache as of t: the status of the sources, the players the app or the line-ups do not reach, and
-    the drifting bins (those of records when it is this run's)."""
-    obs = parsed.read(parsed.paths_in(), sorted({*identity.NEEDS, *HEALTH_SOURCES}))
+def said(records: RunRecords | None = None, obs: ob.Observations | None = None) -> str:
+    """text of the parse cache as of t (obs: as parsed.read gives it; read here when None): the status of the sources, the
+    players the app or the line-ups do not reach, and the drifting bins (those of records when it is this run's)."""
+    if obs is None:
+        obs = parsed.read(parsed.paths_in(), sorted({*identity.NEEDS, *HEALTH_SOURCES}))
     at = cut()
     people = identity.crosswalk(obs, at)
     return text(parser_health(snapshots_of(obs, at), at), identity.unmatched(people, obs, at),
                 drifting(records.rows("auction_calibration") if records is not None else ()))
 
 
-def main(records: RunRecords | None = None, sent: Path = SENT) -> dict[str, int]:
-    """The health stage: tell said(records) if it is new (sent holds what was told last), forget it when there is
+def main(records: RunRecords | None = None, sent: Path = SENT, obs: ob.Observations | None = None) -> dict[str, int]:
+    """The health stage: tell said(records, obs) if it is new (sent holds what was told last), forget it when there is
     nothing to say."""
-    told = said(records)
+    told = said(records, obs)
     if not told:
         sent.unlink(missing_ok=True)
     elif not sent.is_file() or sent.read_text(encoding="utf-8") != told:

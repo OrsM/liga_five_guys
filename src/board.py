@@ -16,6 +16,7 @@ import worth
 from approach import Approach, Club, approach
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
+from ffcore import observations as ob
 from ffcore.auction import Curve, chance
 from ffcore.clock import cut
 from ffcore.store import RunRecords
@@ -333,12 +334,12 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
     return {"component": component, "term": term, "value": float(value), "kind": kind, "n": n}
 
 
-def main(records: RunRecords | None = None) -> None:
+def main(records: RunRecords | None = None, obs: ob.Observations | None = None) -> None:
     """The board stage: decisions.json of the cut, and the run's params and opportunity records added to records (the
-    board is the run's: run it as run.py board)."""
+    board is the run's: run it as run.py board); obs is the parse cache as parsed.read gives it, read here when None."""
     if records is None:
         raise SystemExit("board: the board is the run's: run it as run.py board")
-    loaded = loader.load(league.load_config(), cut(), previous=loader.previous_opportunities())
+    loaded = loader.load(league.load_config(), cut(), previous=loader.previous_opportunities(), obs=obs)
     [(d, rows)] = state.sweep(loaded.obs, [cut()], lambda world: moment_at(loaded, world))
     if isinstance(d, decision.Stale):
         raise SystemExit(d.reason)
