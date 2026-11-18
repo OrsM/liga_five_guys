@@ -3,6 +3,7 @@ jornadas the board reads (Context) and gives a Verdict: the key the offers are s
 over each window, and the reserve price (None when the rule states none). LIVE is the rule the board runs."""
 from __future__ import annotations
 
+import bisect
 import datetime as dt
 import random
 import statistics
@@ -110,6 +111,14 @@ def offer_ratio_distribution(ratios: Iterable[float]) -> OfferDistribution:
     return OfferDistribution(tuple(sorted(ratios)))
 
 
+def offer_percentile(dist: OfferDistribution, ratio: float) -> float | None:
+    """The share of the offers in dist with a ratio at or below ratio: the empirical distribution function, in [0, 1],
+    nondecreasing in ratio, 0 below every offer and 1 at or above the highest. None when dist is empty."""
+    if not dist.ratios:
+        return None
+    return bisect.bisect_right(dist.ratios, ratio) / len(dist.ratios)
+
+
 def offer_reserve_ratio(m: int, c: float, dist: OfferDistribution, hold: float) -> float:
     """The offer over value at which selling tonight and waiting are worth the same, with m nights left to wait, a cost c
     (a fraction of value) for each night waited and one offer a night drawn from dist, i.i.d. and expiring at the next
@@ -214,6 +223,15 @@ def _selftest_option() -> None:
     for m in (1, 3, 5, 7):
         costs = [offer_reserve_ratio(m, c, study, 0.0) for c in (0.0, 0.0017, 0.007, 0.02)]
         assert all(a >= b for a, b in zip(costs, costs[1:])), "a dearer night never raises the reserve"
+    hand = offer_ratio_distribution([1.0, 0.9, 1.1, 1.0, 0.95])
+    assert offer_percentile(NO_OFFERS, 1.0) is None, "no offers seen: no percentile"
+    assert [offer_percentile(hand, x) for x in (0.8, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2)] == [0.0, 0.2, 0.4, 0.8, 0.8, 1.0, 1.0], "the empirical distribution function"
+    grid = [0.85 + 0.01 * i for i in range(40)]
+    for dist in (hand, study, flat):
+        shares = [offer_percentile(dist, x) or 0.0 for x in grid]
+        assert all(0.0 <= g <= 1.0 for g in shares), "a share"
+        assert all(a <= b for a, b in zip(shares, shares[1:])), "nondecreasing in the ratio"
+        assert (offer_percentile(dist, min(dist.ratios)) or 0.0) > 0.0 and offer_percentile(dist, max(dist.ratios)) == 1.0
     point = offer_ratio_distribution([1.0] * 7)
     for m in (1, 2, 5):
         for c in (0.0, 0.0017, 0.01):
