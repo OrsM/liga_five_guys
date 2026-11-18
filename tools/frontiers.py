@@ -38,7 +38,7 @@ EXPORTS = {
 EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
 # Python files that are wholly one module's: their reads are judged as that module's. A file not here (sim, db,
 # facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
-OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest", "observations": "ingest", "parsed": "ingest", "state": "ingest", "current": "ingest", "season_facts": "ingest", "ledger": "ingest", "store": "ingest", "records": "ingest",
+OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest", "observations": "ingest", "parsed": "ingest", "identity": "ingest", "state": "ingest", "current": "ingest", "season_facts": "ingest", "ledger": "ingest", "store": "ingest", "records": "ingest",
         "forecast": "forecast", "forecast_facts": "forecast", "price_fold": "forecast", "auction": "decision", "decision": "decision", "board": "board", "grading": "grading", "salegrade": "grading", "auction_facts": "ingest", "decision_facts": "decision", "loader": "decision"}
 MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
 SKIP = {"k", "model_constants", "params", "runs", "run_measures", "facts_meta", "parser_health"}  # no module: config, bookkeeping
