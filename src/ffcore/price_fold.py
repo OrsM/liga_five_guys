@@ -847,7 +847,7 @@ def _selftest() -> None:
     graded_all = {x.h: x for x in price_grade(mixed) if x.scope == "all"}
     assert graded_all[1].rmse is not None and graded_all[1].rmse_none is not None and graded_all[1].rmse < graded_all[1].rmse_none \
         and graded_all[3].n > 0, "grade_beats_no_change"
-    from ffcore.db import set_constants
+    from ffcore.forecast import set_constants
     with set_constants(PRICE_FOCUS=0.0):
         focused = run(by)
     live_x = {c.ff_id: c.x for c in price_series(focused) if c.day == price_day_now(focused)}

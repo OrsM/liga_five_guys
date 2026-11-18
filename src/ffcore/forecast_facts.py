@@ -1,10 +1,10 @@
 """The forecast's facts (forecast), grown one at a time. They read only what the ingest layer exports (current,
-season_facts, db.prognosis, stats.shrink); no fold of their own.
+season_facts, stats.shrink); no fold of their own.
 
 inputs: the shared pieces of one cut as one Inputs, each built once and eagerly (the only place the ingest selectors are
 called for this group); the selectors are pure functions of an Inputs and call no other selector. forecast_now reads
 the Rate of every player from Inputs.rate, not from forecast_rate.
-knobs: the forecast's model constants as one Knobs, read at the call (a db.set_constants variant is seen).
+knobs: the forecast's model constants as one Knobs, read at the call (a forecast.set_constants variant is seen).
 ppm_prior: one Prior a player_club row (the position's least-squares line of last season's points per match on ln(value),
 at his value; the median of all fitted points when his position has no line).
 forecast_rate: one Rate per player_club row: ppm (his points per match), picked (the chance he is picked), record (the
@@ -43,7 +43,7 @@ Named rules, each tested:
   next_fixture_order                  the club's next fixture is the first by kick (a missing kick sorts after any kick), ties by
                                       the lower jornada.
   one_row_per_fixture                 a club with two fixtures in one jornada gives each of its players two FitRows; never a product.
-  knobs_read_at_call                  knobs() sees db.set_constants(SHRINK_K=...) inside the context and the constant after it.
+  knobs_read_at_call                  knobs() sees forecast.set_constants(SHRINK_K=...) inside the context and the constant after it.
   fixture_by_position                 a goalkeeper or defender faces 1 / attack of the opponent, anyone else its defence; an
                                       opponent with no rating gives 1.0.
   pts_floor                           pts = max(0.0, ppm * fixture); p = min(1.0, q + p_lift * q * (1 - q)), so p is in [0, 1].
@@ -70,20 +70,21 @@ Named rules, each tested:
                                       jornadas the number of his cell rows."""
 from __future__ import annotations
 
-import json
+import datetime as dt
 import math
 import random
+import re
 import statistics
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from typing import Any, NamedTuple
 
-from ffcore import db
 from ffcore import forecast
 from ffcore import observations as ob
 from ffcore import state
 from ffcore.current import (LIST_SOURCE, ClubRating, Identity, Listing, PlayerClub, PlayerStatus, Squad, club_rating, listings,
                             player_club, player_status, player_value, squads)
+from ffcore.parse import snapshot_stamp, year_for
 from ffcore.season_facts import (Calendar, Fixture, Kickoff, LastSeason, ListingClose, PlayedPoints, SeasonRecord, club_fixture,
                                  jornada_calendar, kickoffs, last_season, listing_close, pick, played_points, season_record)
 from stats import shrink
@@ -267,14 +268,42 @@ class Prognosis(NamedTuple):
     j: int | None
 
 
+MONTHS = {m: i + 1 for i, m in enumerate(
+    "enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre".split())}
+PART = {"principios": 5, "princpios": 5, "mediados": 15, "finales": 25}
+UNTIL = re.compile(r"Baja (?:hasta|hsata) (?:(%s) de )?(%s)(?:-\w+)?(?: (\d{4}))?" % ("|".join(PART), "|".join(MONTHS)))
+SAYS = [(re.compile(r"Duda para la jornada (\d+)"), "doubt"),
+        (re.compile(r"Baja confirmada para la jornada (\d+)"), "out"),
+        (re.compile(r"Disponible para la jornada (\d+)"), "back")]
+STATUS_KIND = {"doubt": "doubt", "suspended": "out", "unavailable": "out", "injured": "out"}
+
+
+def prognosis(status: str | None, note: str | None, seen_at: str | None) -> Prognosis | None:
+    """What a flagged player's listing (status, note, the stamp it was seen at) says: kind doubt, out (up to and in j)
+    or back (from j), j a jornada or None for his next match; kind until with the date; or kind never (left the league,
+    or out indefinitely). None if he is fit or it says nothing. The note is read first ('Duda para la jornada 8',
+    'Baja hasta mediados de octubre': a month already past is next year's), else the status."""
+    if status in (None, "", "ok"):
+        return None
+    note = note or ""
+    if status == "gone" or "Baja indefinida" in note:
+        return Prognosis("never", None, None)
+    for pat, kind in SAYS:
+        if m := pat.search(note):
+            return Prognosis(kind, None, int(m.group(1)))
+    seen = snapshot_stamp(seen_at) if seen_at else None
+    if seen and (m := UNTIL.search(note)):
+        month = MONTHS[m.group(2)]
+        year = int(m.group(3)) if m.group(3) else year_for(month, seen.date(), seen.month - 1)
+        return Prognosis("until", dt.date(year, month, PART.get(m.group(1), 15)).isoformat(), None)
+    return Prognosis(STATUS_KIND[status], None, None) if status in STATUS_KIND else None
+
+
 def _prognoses(status: Iterable[PlayerStatus]) -> dict[str, Prognosis]:
     out: dict[str, Prognosis] = {}
     for s in status:
-        raw = db.prognosis(s.status, s.note, s.at) if s.status is not None else None
-        if raw is None:
-            continue
-        g = json.loads(raw)
-        out[s.player] = Prognosis(g["kind"], g.get("until"), g.get("j"))
+        if (p := prognosis(s.status, s.note, s.at) if s.status is not None else None) is not None:
+            out[s.player] = p
     return out
 
 
@@ -641,6 +670,20 @@ def _rates(world: state.World) -> dict[str, Rate]:
 def _selftest() -> None:
     """The named rules on a small league; later rows leave a cut unchanged, any subset or order of cuts gives each
     the same view, and a cut alone equals the cut inside a sweep."""
+    def says(status: str, note: str = "", seen: str = "2026-09-28T1000Z") -> Any:
+        return prognosis(status, note, seen)
+    assert says("doubt", "Lesión Desde 13/09 (15 días) Duda para la jornada 8") == Prognosis("doubt", None, 8)
+    assert says("injured", "x Baja confirmada para la jornada 9") == Prognosis("out", None, 9)
+    assert says("injured", "x Disponible para la jornada 10") == Prognosis("back", None, 10)
+    assert says("injured", "x Baja hasta mediados de octubre") == Prognosis("until", "2026-10-15", None)
+    assert says("injured", "x Baja hasta enero") == Prognosis("until", "2027-01-15", None), "a month already past is next year's"
+    assert says("injured", "x Baja hasta finales de enero 2028") == Prognosis("until", "2028-01-25", None)
+    assert says("injured", "x Baja hsata principios de noviembre") == Prognosis("until", "2026-11-05", None), "the site's own typo"
+    assert says("injured", "x Baja indefinida") == says("gone") == Prognosis("never", None, None), "out for good"
+    assert says("suspended", "Sancionado") == Prognosis("out", None, None), "a status alone: his next match"
+    assert says("doubt") == Prognosis("doubt", None, None)
+    assert says("ok", "Duda para la jornada 9") is None and says("", "") is None, "fit: nothing"
+    assert says("other") is None, "a status that says nothing of playing"
     obs = _scratch()
     views = {c: _view(state.world_at(obs, c)) for c in CUTS}
     assert state.sweep(obs, CUTS, _view) == [views[c] for c in CUTS]
@@ -751,7 +794,7 @@ def _selftest() -> None:
     assert fit_of(until, 1, Fixture(1, "A", "C", "2026-09-02T1800Z")) == 1.0
     assert fit_of(until, 1, Fixture(1, "A", "C", None)) == 1.0
 
-    with db.set_constants(SHRINK_K=1.0):
+    with forecast.set_constants(SHRINK_K=1.0):
         assert knobs().shrink_k == 1.0
     assert knobs().shrink_k == forecast.SHRINK_K
 
@@ -775,11 +818,11 @@ def _selftest() -> None:
         q = w * pr.picked * (1.0 if pr.listed_pct else n.fit) + (1.0 - w) * pr.record * n.fit
         assert abs(n.p - min(1.0, q + k.p_lift * q * (1.0 - q))) < 1e-12, \
             "p_blends_listing_and_record: the listing's share P_LISTING falling by P_DECAY a jornada, lifted by P_LIFT"
-    with db.set_constants(P_LISTING=0.0, P_LIFT=0.0):
+    with forecast.set_constants(P_LISTING=0.0, P_LIFT=0.0):
         record_only = forecast_now(_inp(w1))
     assert all(abs(n.p - rate[n.player].record * n.fit) < 1e-12 for n in record_only), \
         "p_blends_listing_and_record: with no listing share the chance is his record times his fit"
-    with db.set_constants(P_LIFT=0.5):
+    with forecast.set_constants(P_LIFT=0.5):
         lifted = forecast_now(_inp(w1))
     base_by = {(n.player, n.jornada, n.fixture): n for n in now}
     assert all(n.p >= base_by[(n.player, n.jornada, n.fixture)].p - 1e-12 for n in lifted), "raising P_LIFT never lowers p"
@@ -802,7 +845,7 @@ def _selftest() -> None:
         else:
             assert u.p == n.p and u.e == u.pts * u.p and u.pts == n.pts, "late_zeroes_p_and_e_not_pts: others as now"
     assert [u.p for u in used1 if (u.player, u.jornada) == ("q1", 2)] == [0.0, 0.0], "all fixtures of a late pair are zeroed"
-    with db.set_constants(P_LIFT=0.5):
+    with forecast.set_constants(P_LIFT=0.5):
         lifted1 = forecast_used(_inp(w1))
     assert len(lifted1) == len(used1) and all(b.p >= a.p - 1e-12 for a, b in zip(used1, lifted1)), \
         "raising P_LIFT never lowers a used.p"
@@ -835,7 +878,7 @@ def _selftest() -> None:
         "a None row counts toward min_pool: one row of two needed is the seed pool"
     xs = [r.pts for r in rows1 if r.pts is not None]
     assert xs, "the fixture has played points"
-    with db.set_constants(MIN_POOL=1):
+    with forecast.set_constants(MIN_POOL=1):
         played_spread = score_spread(_inp(w_scored))
     assert near(played_spread.m2, (sum(x * x for x in xs) / len(xs)) / (sum(xs) / len(xs)) ** 2), \
         "pool_is_seed_until_enough: from MIN_POOL played rows, the played sums"

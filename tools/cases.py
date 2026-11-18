@@ -7,13 +7,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from ffcore import observations as ob
+
 FIXTURE = Path(__file__).with_name("cases") / "league.json.xz"
 
-AS_OF = "2026-11-08T1157Z"
-WHOLE = ("starters", "points", "matches", "results_history")
-RECENT = ("lineups", "api_teams", "api_market", "api_offers", "api_lineup", "api_standings", "api_leagues")
-RECENT_COUNT = 6
-MANAGERS = ("api_teams", "api_standings")
 CASES = {"raphinha": "4288", "garcia": "7279", "diarra": "10832", "rodri": "2733", "david": "9573", "terrats": "8944",
          "correia": "8091"}
 DEGRADED_CLUB = "getafe"
@@ -45,135 +42,80 @@ Seen = dict[str, Any]
 Check = tuple[str, str, str, Callable[[Seen], bool], Callable[[Seen], Any]]
 
 
-def extract(me: str, as_of: str = AS_OF) -> dict[str, Any]:
-    from ffcore.db import rows, source_table
-
-    def table(name: str, where: str = "", args: tuple[object, ...] = ()) -> dict[str, Any]:
-        cols = [r[1] for r in rows("SELECT * FROM pragma_table_info('%s')" % source_table(name))]
-        got = rows("SELECT %s FROM %s %s ORDER BY rowid" % (", ".join(cols), source_table(name), where), args)
-        return {"columns": cols, "rows": [list(r) for r in got]}
-
-    def at(name: str, stamps: list[str]) -> dict[str, Any]:
-        return table(name, "WHERE observed_at IN (%s)" % ",".join("?" * len(stamps)), tuple(stamps))
-
-    recent = [r[0] for r in rows("SELECT DISTINCT observed_at FROM src_api_teams WHERE observed_at <= ? ORDER BY 1 DESC LIMIT ?",
-                                 (as_of, RECENT_COUNT))]
-    daily = [r[0] for r in rows("SELECT max(observed_at) FROM src_market WHERE observed_at <= ? GROUP BY substr(observed_at, 1, 10)",
-                                (as_of,))]
-    out = {t: table(t, "WHERE observed_at <= ?", (as_of,)) for t in WHOLE}
-    out.update({t: at(t, recent) for t in RECENT})
-    marks = ",".join("?" * len(recent))
-    app = {r[0] for r in rows("SELECT player_id FROM src_api_teams WHERE observed_at IN (%s)" % marks, tuple(recent))}
-    app |= {r[0] for r in rows("SELECT player_id FROM src_api_market WHERE observed_at IN (%s)" % marks, tuple(recent))}
-    link = {k: a for k, a in rows("SELECT player_id, app_id FROM crosswalk")}
-    app |= {link[k] for k in CASES.values() if link.get(k)}
-    ff = {k for k, a in link.items() if a in app} | set(CASES.values())
-    stamps = sorted(set(daily) | set(recent))
-    out["market"] = table("market", "WHERE (observed_at IN (%s) AND ff_id IN (%s)) OR observed_at IN (%s)"
-                          % (",".join("?" * len(stamps)), ",".join("?" * len(ff)), marks), (*stamps, *sorted(ff), *recent))
-    out["api_players_all"] = table("api_players_all", "WHERE observed_at <= ? AND player_id IN (%s)" % ",".join("?" * len(app)),
-                                   (as_of, *sorted(app)))
-    for r in out["api_leagues"]["rows"]:
-        r[out["api_leagues"]["columns"].index("league_name")] = "league"
-    names: dict[str, str] = {}
-    for t in MANAGERS:
-        i = out[t]["columns"].index("manager")
-        for r in out[t]["rows"]:
-            if r[i] and r[i] != me:
-                r[i] = names.setdefault(r[i], "rival%d" % (len(names) + 1))
-    return {"as_of": max(recent), "tables": out}
-
-
-def save(doc: dict[str, Any]) -> None:
-    FIXTURE.parent.mkdir(exist_ok=True)
-    with lzma.open(FIXTURE, "wt", encoding="utf-8", preset=9) as f:
-        json.dump(doc, f, separators=(",", ":"), ensure_ascii=False)
-
-
 def load() -> dict[str, Any]:
     with lzma.open(FIXTURE, "rt", encoding="utf-8") as f:
         doc: dict[str, Any] = json.load(f)
     return doc
 
 
-def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
-    import contextlib
-    import tempfile
-    from contextlib import closing
+def observations(doc: dict[str, Any]) -> ob.Observations:
+    """The fixture's tables as Observations: every table of ob.TABLES, its rows in the order stored, each column read by
+    name into the table's row type (none for a table the fixture lacks)."""
+    out: dict[str, list[Any]] = {}
+    for name, source in ob.TABLES.items():
+        t = doc["tables"].get(name, {"columns": [], "rows": []})
+        at = [t["columns"].index(f) for f in source.row._fields] if t["rows"] else []
+        out[name] = [source.row._make(ob.pooled(r[i] for i in at)) for r in t["rows"]]
+    return ob.of(out)
+
+
+def observed(doc: dict[str, Any], degraded: bool = False) -> Seen:
     from datetime import timedelta
 
-    import crosswalk
     import decision
     import eleven
     from board import board
-    from ffcore import current, forecast_facts, loader, season_facts, state
-    from ffcore.db import connect, cut, record, rows, set_now, source_table
-    from ffcore.league import Config
+    from ffcore import current, forecast_facts, identity, league, loader, season_facts, state
+    from ffcore.clock import cut, set_now
     from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import tables_in
 
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), contextlib.chdir(tmp):
-        with closing(connect()) as db, db:
-            for name, t in doc["tables"].items():
-                cols = t["columns"]
-                db.executemany("INSERT INTO %s (%s) VALUES (%s)" % (source_table(name), ", ".join(cols), ", ".join("?" * len(cols))), t["rows"])
-            if degraded:
-                db.execute("DELETE FROM src_lineups WHERE team_slug = ? AND observed_at = ?", (DEGRADED_CLUB, doc["as_of"]))
-        stamp = snapshot_stamp(doc["as_of"])
-        assert stamp is not None
-        set_now(stamp + timedelta(minutes=CUT_AFTER_MINUTES))
-        with closing(connect()) as db, db:
-            crosswalk.build(db)
-        record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-        with closing(connect()) as db:
-            loaded = loader.load(db, Config())
-        world = state.world_at(loaded.obs, cut())
-        d = decision.decision_at(loaded, world)
-        assert not isinstance(d, decision.Stale), d
-        inp = d.inputs
-        pos, cells = decision.cells_of(inp)
-        mine = decision.squad_of(inp)
-        first = min(c.jornada for c in season_facts.jornada_calendar(world) if c.state == "ahead")
-        next_four = frozenset(range(first, first + AHEAD))
-        windows = {"next4": next_four, "season": frozenset(cells)}
-        values = {w: decision.window_value(pos, cells, js) for w, js in windows.items()}
-        settled = {w: eleven.best_eleven(mine, pos, v) for w, v in values.items()}
-        got = [] if degraded else decision.opportunity_rows(inp)
-        opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
-        doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [], d.extras)
-        seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp.money,
-                      "squad": len(mine), "offers": sum(1 for o in current.offers(world) if o.status == "pending"),
-                      "cases": {}}
-        ids = tuple(CASES.values())
-        marks = ",".join("?" * len(ids))
-
-        def each(sql: str, kind: type[Any]) -> dict[str, list[Any]]:
-            out: dict[str, list[Any]] = {k: [] for k in ids}
-            for r in rows(sql % marks, ids):
-                x = kind._make(r)
-                out[x.player].append(x)
-            return out
-
-        market = each("SELECT ff_id, value FROM src_market WHERE ff_id IN (%s) ORDER BY observed_at", Market)
-        points = each("SELECT ff_id, games, points FROM src_points WHERE ff_id IN (%s) AND season = (SELECT max(season) FROM src_points)"
-                      " ORDER BY observed_at", Played)
-        known = each("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk WHERE player_id IN (%s)", Known)
-        cell = {k: {c.jornada: (c.p, c.e) for c in forecast_facts.cell(d.fc) if c.player == k} for k in ids}
-        total = {t.player: t for t in forecast_facts.cell_total(d.fc)}
-        for name, k in CASES.items():
-            swaps = {w: eleven.swap(k, s.eleven, pos, values[w]) if s else None for w, s in settled.items()}
-            seen["cases"][name] = {
-                "id": k,
-                "value": market[k][-1].value if market[k] else None,
-                "points": points[k][-1] if points[k] else None,
-                "crosswalk": known[k][0] if known[k] else None,
-                "status": d.fc.status.get(k),
-                "rate": d.fc.rate.get(k),
-                "cells": cell[k],
-                "total": total.get(k),
-                "late": sorted(x.jornada for x in d.fc.late if x.player == k),
-                "swaps": swaps,
-                "buy": next((b for b in doc_board["buys"] if b["key"] == k), None)}
+    obs = observations(doc)
+    if degraded:
+        lineups = [r for r in ob.rows_of(obs, "lineups") if (r.team_slug, r.observed_at) != (DEGRADED_CLUB, doc["as_of"])]
+        obs = ob.Observations({**obs.tables, **ob.of({"lineups": lineups}).tables})
+    stamp = snapshot_stamp(doc["as_of"])
+    assert stamp is not None
+    set_now(stamp + timedelta(minutes=CUT_AFTER_MINUTES))
+    loaded = loader.loaded(obs, league.Config())
+    world = state.world_at(loaded.obs, cut())
+    d = decision.decision_at(loaded, world)
+    assert not isinstance(d, decision.Stale), d
+    inp = d.inputs
+    pos, cells = decision.cells_of(inp)
+    mine = decision.squad_of(inp)
+    first = min(c.jornada for c in season_facts.jornada_calendar(world) if c.state == "ahead")
+    next_four = frozenset(range(first, first + AHEAD))
+    windows = {"next4": next_four, "season": frozenset(cells)}
+    values = {w: decision.window_value(pos, cells, js) for w, js in windows.items()}
+    settled = {w: eleven.best_eleven(mine, pos, v) for w, v in values.items()}
+    got = [] if degraded else decision.opportunity_rows(inp)
+    opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
+    doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [], d.extras, loader.health_at(loaded, cut()))
+    seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp.money,
+                  "squad": len(mine), "offers": sum(1 for o in current.offers(world) if o.status == "pending"),
+                  "cases": {}}
+    ids = tuple(CASES.values())
+    people = {p.player_id: Known(*p) for p in identity.crosswalk(obs, identity.END_OF_TIME) if p.player_id in ids}
+    stored = [r for r in ob.rows_of(obs, "points") if r.ff_id in ids]
+    season = max((r.season for r in ob.rows_of(obs, "points")), default="")
+    market = {k: [Market(r.ff_id, r.value) for r in ob.rows_of(obs, "market") if r.ff_id == k] for k in ids}
+    points = {k: [Played(r.ff_id, r.games, r.points) for r in stored if r.ff_id == k and r.season == season] for k in ids}
+    cell = {k: {c.jornada: (c.p, c.e) for c in forecast_facts.cell(d.fc) if c.player == k} for k in ids}
+    total = {t.player: t for t in forecast_facts.cell_total(d.fc)}
+    for name, k in CASES.items():
+        swaps = {w: eleven.swap(k, s.eleven, pos, values[w]) if s else None for w, s in settled.items()}
+        seen["cases"][name] = {
+            "id": k,
+            "value": market[k][-1].value if market[k] else None,
+            "points": points[k][-1] if points[k] else None,
+            "crosswalk": people.get(k),
+            "status": d.fc.status.get(k),
+            "rate": d.fc.rate.get(k),
+            "cells": cell[k],
+            "total": total.get(k),
+            "late": sorted(x.jornada for x in d.fc.late if x.player == k),
+            "swaps": swaps,
+            "buy": next((b for b in doc_board["buys"] if b["key"] == k), None)}
     return seen
 
 
@@ -299,14 +241,14 @@ def failures(results: list[tuple[str, str, str, bool, Any]]) -> tuple[list[str],
 def report() -> None:
     doc = load()
     for group, degraded in ((checks(), False), (degraded_checks(), True)):
-        for case, stage, label, ok, shown in evaluate(observe(doc, degraded), group):
+        for case, stage, label, ok, shown in evaluate(observed(doc, degraded), group):
             mark = "pass" if ok else "XFAIL" if (case, stage, label) in EXPECTED_FAILURES else "FAIL"
             print("%-5s %-8s %-13s %s -> %s" % (mark, case, stage, label, shown))
 
 
 def _selftest() -> None:
     doc = load()
-    results = evaluate(observe(doc), checks()) + evaluate(observe(doc, degraded=True), degraded_checks())
+    results = evaluate(observed(doc), checks()) + evaluate(observed(doc, degraded=True), degraded_checks())
     wrong, healed = failures(results)
     assert not wrong, "cases that fail:\n" + "\n".join(wrong)
     assert not healed, "expected failures that now pass (remove them from EXPECTED_FAILURES):\n" + "\n".join(healed)
@@ -316,11 +258,5 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
-    elif sys.argv[1:2] == ["extract"]:
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-        from ffcore.league import Config
-
-        save(extract(Config.me))
-        print("wrote %s (%d bytes)" % (FIXTURE, FIXTURE.stat().st_size))
     elif sys.argv[1:2] == ["report"]:
         report()

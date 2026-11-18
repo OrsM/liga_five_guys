@@ -6,35 +6,47 @@ import gc
 import importlib
 import os
 import resource
-import sqlite3
 import subprocess
 import sys
 import threading
 import time
 import traceback
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import NamedTuple
 
+from ffcore import store
 from ffcore.clock import run_now
 from ffcore.parse import stamp
-from ffcore.db import RUN_ENV, connect, set_now, this_run
+from ffcore.clock import set_now
+from ffcore.store import RunRecords
+from ffcore.records import Run
 
 
-# Every run, in order: (name, function, makes the report). A stage that
-# makes the report stops the run when it fails; one after it (the report is
-# out) is noted and the run goes on.
-STAGES: list[tuple[str, str, bool]] = [
-    ("parse", "ingest:parse", True),
-    ("crosswalk", "crosswalk:main", True),
-    ("board", "board:main", True),
-    ("publish", "publish:main", False),
-    ("grade", "grading:record_grades", False),
-    ("health", "health:main", False),
+class Stage(NamedTuple):
+    """A stage of a run: its name, the function (module:name) that does it and whether it makes the report (a failure
+    ends the run)."""
+    name: str
+    spec: str
+    makes: bool
+
+
+# Every run, in order. A stage that makes the report stops the run when it fails; one after it (the report is out)
+# is noted and the run goes on.
+STAGES: list[Stage] = [
+    Stage("parse", "ingest:parse", True),
+    Stage("crosswalk", "crosswalk:main", True),
+    Stage("board", "board:main", True),
+    Stage("publish", "publish:main", False),
+    Stage("grade", "grading:record_grades", False),
+    Stage("health", "health:main", False),
 ]
 
+COLLECTING = frozenset({"board", "grade", "health"})  # the stages passed the run's RunRecords
 
-def call(spec: str) -> Callable[[], object]:
+
+def call(spec: str) -> Callable[..., object]:
     mod, fn = spec.split(":")
     return getattr(importlib.import_module(mod), fn)
 
@@ -67,59 +79,42 @@ def _commit(repo: Path = Path(".")) -> str:
         return "?"
 
 
-def _start(db: sqlite3.Connection) -> int:
-    """The run recorded, and t set to its time (the wall clock, LFG_NOW when
-    pinned): every stage reads the league as of it."""
+def _start() -> tuple[RunRecords, Run]:
+    """The run begun: the id after the latest published one (the run lock is held), t set to its time (the wall clock,
+    LFG_NOW when pinned: every stage reads the league as of it), its RunRecords and its Run row so far."""
     now = run_now()
     set_now(now)
-    with db:
-        cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha)"
-                         " VALUES (?, ?, ?, ?)",
-                         (_utc(), stamp(now),
-                          os.environ.get("LFG_TRIGGER", "service"), _commit()))
-    assert cur.lastrowid is not None
-    return cur.lastrowid
+    records = RunRecords.after_latest(_commit())
+    return records, Run(records.run, _utc(), stamp(now), os.environ.get("LFG_TRIGGER", "service"), records.commit_sha, None, None, None)
 
 
-def _measure(db: sqlite3.Connection, run: int, stage: str, seconds: float,
-             counts: object) -> None:
+def _measure(records: RunRecords, stage: str, seconds: float, counts: object) -> None:
     got = {**(counts if isinstance(counts, Mapping) else {}), "seconds": seconds}
-    with db:
-        db.executemany("INSERT INTO run_measures VALUES (?, ?, ?, ?)",
-                       [(run, stage, k, float(v)) for k, v in got.items()])
+    records.add("run_measures", [{"stage": stage, "measure": k, "value": float(v)} for k, v in got.items()])
 
 
-def _finish(db: sqlite3.Connection, run: int, ok: bool) -> None:
-    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
-    with db:
-        db.execute("UPDATE runs SET finished = ?, ok = ?, peak_mb = ? WHERE run_id = ?",
-                   (_utc(), int(ok), peak, run))
+def _finished(begun: Run, ok: bool) -> Run:
+    return begun._replace(finished=_utc(), ok=int(ok), peak_mb=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
 
 
-def main(argv: list[str], every: Sequence[tuple[str, str, bool]] = STAGES,
-         path: Path | None = None) -> int:
-    """Run the stages argv names (all by default), each recorded in runs
-    and run_measures (the run ok only if every one was); 1 if a stage that
-    makes the report failed."""
-    db = connect(path)
-    run = _start(db)
-    os.environ[RUN_ENV] = str(run)
+def main(argv: list[str], every: Sequence[Stage] = STAGES, collecting: Collection[str] = COLLECTING) -> int:
+    """Run the stages argv names (all by default), collecting the run's records (run_measures for each stage, the rest
+    from the stages named in collecting, which are passed the RunRecords) and publishing them once with the Run row at the end, ok only if every
+    stage was; a run killed before then leaves nothing in the store. 1 if a stage that makes the report failed."""
+    records, begun = _start()
     failed: list[tuple[str, bool]] = [("", True)]
     try:
-        failed = _stages(argv, every, db, run)
+        failed = _stages(argv, every, records, collecting)
     finally:
-        _finish(db, run, not failed)
-        db.close()
+        records.publish(_finished(begun, not failed))
     return 1 if any(made for _n, made in failed) else 0
 
 
-def _stages(argv: list[str], every: Sequence[tuple[str, str, bool]],
-            db: sqlite3.Connection, run: int) -> list[tuple[str, bool]]:
+def _stages(argv: list[str], every: Sequence[Stage], records: RunRecords, collecting: Collection[str]) -> list[tuple[str, bool]]:
     """The stages that failed, each with whether it makes the report (the
     first such ends the run)."""
     want = [a for a in argv if not a.startswith("-")]
-    stages = sorted((s for s in every if s[0] in want), key=lambda s: want.index(s[0])) \
-        if want else list(every)
+    stages = sorted((s for s in every if s.name in want), key=lambda s: want.index(s.name)) if want else list(every)
 
     started, times, failed = time.time(), [], []
     for name, spec, makes in stages:
@@ -131,7 +126,7 @@ def _stages(argv: list[str], every: Sequence[tuple[str, str, bool]],
             hits, stop, threading.get_ident())).start()
         counts: object = None
         try:
-            counts = call(spec)()
+            counts = call(spec)(records) if name in collecting else call(spec)()
         except SystemExit as e:
             if e.code:
                 print("  FAILED: %s exited %s" % (name, e.code))
@@ -147,7 +142,7 @@ def _stages(argv: list[str], every: Sequence[tuple[str, str, bool]],
                 return failed
             continue
         times.append((time.time() - t0, name))
-        _measure(db, run, name, times[-1][0], counts)
+        _measure(records, name, times[-1][0], counts)
         if times[-1][0] > float(os.environ.get("LFG_SLOW_S", 8)):
             print("  slow %s, where: %s" % (name, "  ".join(
                 "%d%% %s" % (100 * v // sum(hits.values()), k)
@@ -159,18 +154,21 @@ def _stages(argv: list[str], every: Sequence[tuple[str, str, bool]],
 
 
 def _selftest_runs() -> None:
-    import sqlite3
     import tempfile
     import types
-    from pathlib import Path
 
     fake = types.ModuleType("fake_stages")
 
     def boom() -> None:
         raise RuntimeError("stage broke")
+
+    def killed(records: RunRecords) -> None:
+        records.add("params", [{"component": "c", "term": "t", "value": 1.0, "kind": "constant", "n": None}])
+        raise SystemExit(1)
     fake.counted = lambda: {"rows": 7}  # type: ignore[attr-defined]
-    fake.quiet = lambda: {"run": this_run()}  # type: ignore[attr-defined]
+    fake.quiet = lambda records: {"run": records.run}  # type: ignore[attr-defined]
     fake.boom = boom  # type: ignore[attr-defined]
+    fake.killed = killed  # type: ignore[attr-defined]
     sys.modules["fake_stages"] = fake
     with tempfile.TemporaryDirectory() as tmp:
         git = ["git", "-C", tmp, "-c", "user.name=t", "-c", "user.email=t@t"]
@@ -185,49 +183,55 @@ def _selftest_runs() -> None:
         assert code != "?" and _commit(Path(tmp)) == code, \
             "the code's commit: a report, data or input commit does not change it"
     asked = os.environ.pop("LFG_TRIGGER", None)  # the phone's button sets it: say what we want
+    root = os.environ.get("FF_ROOT")
     try:
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "lfg.db"
-            assert main([], [("count", "fake_stages:counted", True),
-                             ("quiet", "fake_stages:quiet", False)], path) == 0
-            assert main([], [("count", "fake_stages:counted", True),
-                             ("boom", "fake_stages:boom", True),
-                             ("quiet", "fake_stages:quiet", False)], path) == 1
+            os.environ["FF_ROOT"] = str(Path(tmp) / "data")
+            assert main([], [Stage("count", "fake_stages:counted", True),
+                             Stage("quiet", "fake_stages:quiet", False)], {"quiet"}) == 0
+            assert main([], [Stage("count", "fake_stages:counted", True),
+                             Stage("boom", "fake_stages:boom", True),
+                             Stage("quiet", "fake_stages:quiet", False)], {"quiet"}) == 1
             os.environ["LFG_TRIGGER"] = "button"
-            assert main([], [("boom", "fake_stages:boom", False),
-                             ("quiet", "fake_stages:quiet", False)], path) == 0, \
+            assert main([], [Stage("boom", "fake_stages:boom", False),
+                             Stage("quiet", "fake_stages:quiet", False)], {"quiet"}) == 0, \
                 "a stage after the report failing does not fail the run's exit"
-            db = sqlite3.connect(path)
-            runs = db.execute("SELECT run_id, ok, finished IS NOT NULL, trigger, commit_sha,"
-                              " as_of, peak_mb > 0 FROM runs ORDER BY run_id").fetchall()
-            assert [r[:4] for r in runs] == [(1, 1, 1, "service"), (2, 0, 1, "service"),
-                                             (3, 0, 1, "button")], \
-                "the trigger is how the run was asked for: LFG_TRIGGER, else the service"
-            assert all(r[4] and r[5] and r[6] for r in runs), "commit, clock and memory recorded"
-            got = {(r, s, m): v for r, s, m, v in db.execute("SELECT * FROM run_measures")}
+            assert main([], [Stage("killed", "fake_stages:killed", False)], {"killed"}) == 0
+            runs = store.runs()
+            assert [(r.run_id, r.ok, r.finished is not None, r.trigger) for r in runs] == [
+                (1, 1, True, "service"), (2, 0, True, "service"), (3, 0, True, "button"), (4, 0, True, "button")], \
+                "the trigger is how the run was asked for: LFG_TRIGGER, else the service; ids follow the store's latest"
+            assert all(r.commit_sha and r.as_of and r.peak_mb for r in runs), "commit, clock and memory recorded"
+            got = {(m.run_id, m.stage, m.measure): m.value for m in store.records("run_measures")}
             assert got[(1, "count", "rows")] == 7, "a stage's returned counts are measures"
             assert {k[1:] for k in got if k[0] == 1} == {
                 ("count", "rows"), ("count", "seconds"), ("quiet", "run"), ("quiet", "seconds")}, got
-            assert got[(1, "quiet", "run")] == 1, "a stage knows its run (LFG_RUN)"
+            assert got[(1, "quiet", "run")] == 1, "a stage is passed the run's records and knows its run"
             assert {k[1:] for k in got if k[0] == 2} == {("count", "rows"), ("count", "seconds")}, \
                 "a failed stage records nothing; the ones before it stay; one that makes the report ends the run"
             assert {k[1:] for k in got if k[0] == 3} == {("quiet", "run"), ("quiet", "seconds")}, \
                 "after the report, the run goes on past a failed stage (the run is not ok)"
-            db.close()
+            assert [p.run_id for p in store.records("params")] == [4], "what a failed stage collected is published with its run"
+            store.clear()
     finally:
         os.environ.pop("LFG_TRIGGER", None)
         if asked is not None:
             os.environ["LFG_TRIGGER"] = asked
+        if root is None:
+            os.environ.pop("FF_ROOT", None)
+        else:
+            os.environ["FF_ROOT"] = root
 
 
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest_runs()
-        for _name, _spec, _makes in STAGES:
-            assert callable(call(_spec)), _name
-        _names = [n for n, _s, _m in STAGES]
+        for _stage in STAGES:
+            assert callable(call(_stage.spec)), _stage.name
+        _names = [st.name for st in STAGES]
         assert len(_names) == len(set(_names)), "duplicate stage"
-        assert [m for _n, _s, m in STAGES] == sorted((m for _n, _s, m in STAGES), reverse=True), \
+        assert COLLECTING <= set(_names), "every collecting stage is a stage"
+        assert [st.makes for st in STAGES] == sorted((st.makes for st in STAGES), reverse=True), \
             "the stages that make the report come first"
         print("run.py selftest OK (%d stages)" % len(STAGES))
         raise SystemExit(0)

@@ -1,5 +1,4 @@
-"""The market's constants. What they set is SQL (schema.sql: momentum,
-price_trend, auction_looks); market.py reads PRICE_WINDOW too."""
+"""The market's constants: what price_fold's momentum and price trend, and the auction looks, read."""
 from __future__ import annotations
 
 CLIP = 20.0

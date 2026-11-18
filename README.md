@@ -33,12 +33,12 @@ Everything else comes from the app's API and public pages.
 ## The pipeline (`src/run.py`)
 
 1. **parse** (`sources.py`, `ingest.py`): every fetched page is archived in
-   `data/raw/`; parsers turn it into tables in `data/lfg.db`. `sources.py` says
+   `data/raw/`; parsers turn it into the parse cache (`data/tidy/parsed.jsonl`, `snapindex.json`). `sources.py` says
    what to fetch; the parsers live with their provider (`ffcore/futbolfantasy`,
    `ffcore/footballdata`, `ffcore/laliga_api`). Each cached page is keyed by a
    fingerprint of its parser's code, so editing one parser re-parses only its
    pages.
-2. **crosswalk** (`crosswalk.py`): the registry, lfg.db's `crosswalk` table,
+2. **crosswalk** (`crosswalk.py`): the registry computed over the parse cache,
    one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
 3. **board** (`board.py`, `decision.py`, `approach.py`, `eleven.py`, `worth.py`): `reports/decisions.json`: your cash and what you
    can bid, your squad and its eleven, the line that lists your players for sale, and each standing offer on them
@@ -151,7 +151,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     tools/capped bash tools/selftests.sh          # every module's self-test, mypy, ruff (every heavy job goes through tools/capped)
     python tools/frontiers.py                     # the layer check: crossings 0
     python tools/golden.py --selftest             # decisions.json and key features at pinned cuts, against tools/golden/
-    python tools/golden.py --live [check|bless]   # the same at the 5 live cuts, on the database read mode=ro
+    python tools/golden.py --live [check|bless]   # the same at the 5 live cuts, over the parse cache
     python tools/auction_table.py                 # regenerates ffcore/auction_table.py; bless the goldens with it
     tools/lfg-rules                               # the sale rules over every replay cut, on a scratch copy (~3 min)
     python tools/cases.py report                  # seven real players end to end (tools/cases/league.json.xz, a
@@ -159,7 +159,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
-    python tools/q.py --time                      # every saved Datasette query, timed
+    python tools/peek.py params                   # the latest run's rows of a kind in the store (peek.py -i: a REPL)
 
 Run them with `PYTHONPATH=src FF_ROOT=<a copy of data>`; rehearse boards on a
 copy of `data/`, never the live one. A change goes in when the backtest
@@ -175,10 +175,8 @@ rather than reaching through them; ruff flags reads of private members.
     src/            run, ingest, sources, crosswalk, decision (the
                     inputs and the opportunities), board, approach, eleven, worth,
                     publish, grading, salegrade, act, health, stats
-    src/ffcore/     schema.sql (records, raw storage, the crosswalk and health stage),
-                    decide.sql (dec_opportunity), tables.sql and identity.sql
-                    (what parse fills), db, tidy (paths, current/history: rows
-                    with their numbers parsed), clock (now, stamps),
+    src/ffcore/     parsed (the parse cache), store and records (the record store),
+                    tidy (paths, rows with their numbers parsed), clock (now, t, stamps),
                     observations (the rows, read once), state (the World and
                     its sweep), loader (storage to a Loaded, replay_cuts),
                     current, season_facts, ledger, auction_facts, price_fold,
@@ -189,8 +187,8 @@ rather than reaching through them; ruff flags reads of private members.
                     PlayerKey, AppId), source, futbolfantasy, footballdata,
                     laliga_api, parse, text, auth, league
     tools/          selftests.sh, frontiers.py, golden.py (and golden/),
-                    auction_table.py, lfg-rules, lfg-dry-run, capped, q.py, sql.py,
-                    cases.py (and cases/)
+                    auction_table.py, lfg-rules, lfg-dry-run, capped, peek.py,
+                    export_store.py (the cutover export), cases.py (and cases/)
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      parse caches (what parse fills is rebuilt from raw: the

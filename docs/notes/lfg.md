@@ -93,31 +93,30 @@ into a `Loaded`. `state.world_at` (or `state.sweep` over many cuts) folds the ob
 stamps (`loader.replay_cuts(obs, since)`). The sweep is the one place a derived fact is computed: no SQL view
 computes one, and a fact is never stored twice.
 
-**What stays SQL:** the raw `src_*` tables and their `current_*`/`history_*` views, the crosswalk and its identity views,
-`parser_health`, and the records (`runs`, `run_measures`, `params`, `measure_log` with `measure_latest`, `grade_cell`,
-`auction_calibration`, `auction_brier`, `dec_opportunity`), until the storage swap (#80, storage section, not started).
-The live database is read through a `mode=ro` connection.
+**No SQL (#80, step 6):** the raw observations are the parse cache (`data/tidy/parsed.jsonl`, `snapindex.json`, read by
+`ffcore/parsed.py`) and the records (`runs`, `run_measures`, `params`, `measure_log`, `grade_cell`, `auction_calibration`,
+`auction_brier`, `dec_opportunity`) are the record store (`store/`, `ffcore/store.py`). `tools/peek.py` looks at a store;
+`tools/export_store.py` is the one file that opens SQLite, the one-off cutover export of the old `data/lfg.db`.
 
 **Rules.** A layer reads ingest's facts, the cut and earlier layers' exports; never a later layer, never a raw table.
 A test seeds its module's inputs as rows (no Python mirror of a table). A change is judged by its layer's measure; old
-output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/selftests.sh`) enforces the exports
-over the SQL names and the Python reads of them; `python tools/frontiers.py --table` prints them.
+output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/selftests.sh`) checks the import graph:
+a module may not import a later layer; `python tools/frontiers.py --table` prints the layers.
 
 **The auction table.** The win chance of a bid is a fixed `Model` in `ffcore/auction_table.py`, fitted once over every
 closed auction with the fixed cuts `auction.FIXED_CUTS`. It is regenerated only by `tools/auction_table.py`, and the
 goldens are blessed in the same commit (it is an input of every golden decision).
 
 **Checks.** `tools/selftests.sh` (suites, mypy, ruff); `tools/frontiers.py`; `tools/golden.py` (`--selftest` on the fixture
-cuts, `--live` on the 5 live cuts of a database read `mode=ro`; a change to a golden file is `golden.py bless`, with the
-reason in the commit); `tools/lfg-rules` (the sale-rule table over every cut, on a scratch copy of the live database,
+cuts, `--live` on the 5 live cuts of a parse cache; a change to a golden file is `golden.py bless`, with the
+reason in the commit); `tools/lfg-rules` (the sale-rule table over every cut, on a scratch copy of the parse cache,
 about 3 min); `tools/lfg-dry-run` (the stages on a copy). Every heavy job goes through `tools/capped` (a memory-capped
 systemd scope, `LFG_CAP` to change the 1500M default). The git tag `oracle-sql` is the last SQL-view implementation,
 kept as the historic proof; it is not run any more.
 
 **The dictionary:** each concept has one home; a concept with two homes, a layer reaching past the one below, or a
-concept held as mutable state is a fault. Layers: facts -> forecast -> decision -> board/grading. One SQLite file
-`data/lfg.db`, rebuilt from `data/raw`; Datasette on it; saved queries in `datasette.json`, `tools/q.py` runs them in a
-terminal, `tools/sql.py` asks it anything, read-only. Money is whole euros as INTEGER. Pages stay one renderer
+concept held as mutable state is a fault. Layers: facts -> forecast -> decision -> board/grading. The parse cache
+rebuilt from `data/raw`, the record store beside `data/`; `tools/peek.py` looks things up. Money is whole euros as INTEGER. Pages stay one renderer
 (`Fantasy.jsx`).
 
 ## 4. The board: cash, offers, funding a buy (2026-11-08)

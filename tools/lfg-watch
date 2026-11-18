@@ -79,7 +79,7 @@ push_state running
 ( while [ -f "$LOCK" ]; do sleep 4; push_state running; done ) &
 PUSHER=$!
 
-# LFG_TRIGGER: the run's row in data/lfg.db says the button asked for it.
+# LFG_TRIGGER: the run row in the store says the button asked for it.
 if LFG_TRIGGER=button "$HOME/.local/bin/lfg-run" >> "$LOG" 2>&1; then
     echo "$(TZ=Europe/Madrid date +'%H:%M:%S %Z')  done" >> "$LOG"
     FINAL=done

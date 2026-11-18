@@ -1,20 +1,19 @@
 """Regenerates src/ffcore/auction_table.py: the win-chance Model fitted once, with the fixed cuts auction.FIXED_CUTS,
-over every closed auction of a database.
+over every closed auction of the parse cache.
 
-    PYTHONPATH=src python tools/auction_table.py [--db data/lfg.db] [--cut STAMP]
+    PYTHONPATH=src python tools/auction_table.py [--tidy data/tidy] [--cut STAMP]
 
-The database is opened read-only; the World is read at --cut (default: the last replay cut), so the same database and
-cut give the same file byte for byte. Prints one digest line: the cells, the closed auctions they hold, the sha256 of
-the file."""
+The parse cache (parsed.jsonl and snapindex.json under --tidy) is read, no database; the World is read at --cut
+(default: the last replay cut), so the same files and cut give the same file byte for byte. Prints one digest line:
+the cells, the closed auctions they hold, the sha256 of the file."""
 from __future__ import annotations
 
 import argparse
 import hashlib
-import sqlite3
 from pathlib import Path
 from typing import NamedTuple
 
-from ffcore import auction, league, loader, state
+from ffcore import auction, league, loader, parsed, state
 from ffcore.auction import Model
 
 TARGET = Path(__file__).resolve().parent.parent / "src" / "ffcore" / "auction_table.py"
@@ -46,9 +45,9 @@ def digest(model: Model, text: str) -> Digest:
     return Digest(len(model.cells), model.cells.get((), (0, ()))[0], hashlib.sha256(text.encode()).hexdigest())
 
 
-def table_at(db: sqlite3.Connection, cut: str | None = None) -> Model:
-    """auction.fit of the looks of the World at cut, with the fixed cuts."""
-    loaded = loader.load(db, league.load_config())
+def table_at(paths: parsed.Paths, cut: str | None = None) -> Model:
+    """auction.fit of the looks of the World at cut, with the fixed cuts, over the parse cache at paths."""
+    loaded = loader.load(league.load_config(), paths=paths)
     at = cut if cut is not None else loader.replay_cuts(loaded.obs, "")[-1]
     world = state.world_at(loaded.obs, at)
     return auction.fit(auction.looks_of(world, loaded.identity, loaded.league), auction.FIXED_CUTS)
@@ -56,11 +55,10 @@ def table_at(db: sqlite3.Connection, cut: str | None = None) -> Model:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", default="data/lfg.db")
+    ap.add_argument("--tidy", type=Path)
     ap.add_argument("--cut")
     args = ap.parse_args(argv)
-    db = sqlite3.connect("file:%s?mode=ro" % args.db, uri=True)
-    model = table_at(db, args.cut)
+    model = table_at(parsed.paths_in(args.tidy), args.cut)
     text = render(model)
     TARGET.write_text(text, encoding="utf-8")
     d = digest(model, text)

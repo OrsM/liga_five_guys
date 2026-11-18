@@ -1,211 +1,84 @@
+"""The crosswalk stage: who each player is, computed over the observations of the parse cache (identity.crosswalk,
+identity.unmatched, identity.id_clashes), and what to tell about it.
+
+Named rules, each tested:
+  registry_line: how many players the registry holds and the share of them with a probable-XI slug and with an app id.
+  dearest_unmatched_first: the unmatched players are told by value, then player, five at most.
+  clashes_by_kind: each kind of id (app_id before ff_slug) that two players claim is told once, with its values in order."""
 from __future__ import annotations
 
-import sqlite3
 import sys
-import zlib
-from contextlib import closing
+from collections.abc import Iterable
 
-from ffcore import db as lfg
-from ffcore.db import rows
+from ffcore import identity, parsed
+from ffcore import observations as ob
+from ffcore.clock import cut
 
-# Who each player is, as SQL: the registry view (schema.sql) written into
-# crosswalk with no slugs; each ff_identity row (identity.sql) then names
-# its player by name, or name and club, while a slug names nobody; each
-# player's slug is the first one a line-up or starters row of his gave, in
-# the order stored; then ff_identity again, now that slugs name players.
-REGISTRY = """
-INSERT INTO crosswalk (player_id, name, club_id, app_id)
-SELECT player_id, name, club_id, app_id FROM registry
-"""
-SLUGS = """
-UPDATE crosswalk SET ff_slug = f.player_slug
-FROM (SELECT player, player_slug FROM (
-          SELECT player, player_slug, row_number() OVER (PARTITION BY player ORDER BY src, seq) AS n
-          FROM (SELECT 0 AS src, seq, player_slug, player FROM history_lineups
-                UNION ALL SELECT 1, seq, player_slug, player FROM current_starters)
-          WHERE player IS NOT NULL AND player_slug <> '') WHERE n = 1) f
-WHERE crosswalk.player_id = f.player
-"""
+__all__ = ["lines", "main"]
+
+TOLD = 5
 
 
-def identity(db: sqlite3.Connection) -> None:
-    """ff_identity_kept (identity.sql) up to the registry and the rows it is
-    read for: refilled from ff_identity_now when either changed."""
-    if db.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('ff_identity_kept', 'facts_meta')"
-                  ).fetchone()[0] < 2:
-        return
-    reg = db.execute("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk ORDER BY 1").fetchall()
-    through = "%08x:%d:%d" % (
-        zlib.crc32(repr(reg).encode()),
-        db.execute("SELECT coalesce(max(rowid), 0) FROM src_lineups").fetchone()[0],
-        db.execute("SELECT coalesce(max(rowid), 0) FROM src_starters").fetchone()[0])
-    version = "%08x" % zlib.crc32(db.execute(
-        "SELECT sql FROM sqlite_master WHERE name = 'ff_identity_now'").fetchone()[0].encode())
-    if db.execute("SELECT version, through FROM facts_meta WHERE name = 'ff_identity'").fetchone() == (version, through):
-        return
-    own = not db.in_transaction                 # else the caller's transaction holds it
-    if own:
-        db.execute("BEGIN IMMEDIATE")
-    try:
-        db.execute("DELETE FROM ff_identity_kept")
-        db.execute("INSERT INTO ff_identity_kept SELECT * FROM ff_identity_now")
-        db.execute("INSERT OR REPLACE INTO facts_meta VALUES ('ff_identity', ?, ?)", (version, through))
-        if own:
-            db.execute("COMMIT")
-    except BaseException:
-        if own:
-            db.execute("ROLLBACK")
-        raise
+def lines(people: Iterable[identity.Person], lacking: Iterable[identity.Unmatched]) -> list[str]:
+    """What the stage prints for the crosswalk people and its unmatched (rules registry_line, dearest_unmatched_first,
+    clashes_by_kind)."""
+    held = tuple(people)
+    n = len(held)
+    slugs = sum(p.ff_slug != "" for p in held)
+    apps = sum(p.app_id != "" for p in held)
+    out = ["registry: %d players — %.0f%% carry a probable-XI slug, %.0f%% an app id"
+           % (n, 100 * slugs / (n or 1), 100 * apps / (n or 1))]
+    for u in sorted(lacking, key=lambda u: (-u.value, u.player))[:TOLD]:
+        out.append("  unmatched: %s (%s, %.1fM) has no %s" % (u.name, u.club, u.value / 1e6, " or ".join(
+            w for w, no in (("app id", u.no_app), ("probable-XI slug", u.no_slug)) if no)))
+    clashes: dict[str, list[str]] = {}
+    for c in sorted(identity.id_clashes(held), key=lambda c: (c.id, c.value)):
+        clashes.setdefault(c.id, []).append(c.value)
+    out.extend("  warn: %s claimed by two players, refused until resolved: %s" % (kind, ", ".join(values))
+               for kind, values in clashes.items())
+    return out
 
 
-def build(db: sqlite3.Connection) -> None:
-    db.execute("DELETE FROM crosswalk")
-    db.execute(REGISTRY)
-    identity(db)
-    db.execute(SLUGS)
-    identity(db)
-
-
-IDENTITIES = (
-    "SELECT DISTINCT ff_id, name, club FROM src_market ORDER BY 1, 2, 3",
-    "SELECT player_id, player_name, player_name_full FROM src_api_teams UNION SELECT player_id, player_name, player_name_full"
-    " FROM src_api_market UNION SELECT player_id, player_name, player_name_full FROM src_api_players_all ORDER BY 1, 2, 3",
-    "SELECT player_slug, player_name, team_slug FROM src_lineups UNION SELECT player_slug, player_name, team_slug"
-    " FROM src_starters ORDER BY 1, 2, 3")
-
-
-def through(db: sqlite3.Connection) -> str:
-    """Who the sources name, and the day: the crosswalk is made again when either changes (a value that links an
-    app id to a player can arrive any day; a new name, id or slug is made at once)."""
-    names = repr([db.execute(sql).fetchall() for sql in IDENTITIES])
-    return "%08x:%s" % (zlib.crc32(names.encode()), lfg.cut()[:10])
+def players(obs: ob.Observations, at: str) -> list[str]:
+    """lines of the crosswalk of obs at the stamp at."""
+    people = identity.crosswalk(obs, at)
+    return lines(people, identity.unmatched(people, obs, at))
 
 
 def main() -> None:
-    with closing(lfg.connect()) as db, db:
-        now = through(db)
-        if db.execute("SELECT through FROM facts_meta WHERE name = 'crosswalk'").fetchone() == (now,):
-            print("crosswalk: the sources name the same players as at its last build today")
-        else:
-            build(db)
-            db.execute("INSERT OR REPLACE INTO facts_meta VALUES ('crosswalk', '0', ?)", (now,))
-        n, ff, app = db.execute("SELECT count(*), sum(ff_slug <> ''), sum(app_id <> '') FROM crosswalk").fetchone()
-    print("registry: %d players — %.0f%% carry a probable-XI slug, %.0f%% an app id"
-          % (n, 100 * ff / (n or 1), 100 * app / (n or 1)))
-    for player, name, club, value, no_app, no_slug in rows(
-            "SELECT player, name, club, value, no_app, no_slug FROM unmatched ORDER BY value DESC, player LIMIT 5"):
-        print("  unmatched: %s (%s, %.1fM) has no %s" % (name, club, value / 1e6, " or ".join(
-            w for w, no in (("app id", no_app), ("probable-XI slug", no_slug)) if no)))
-    clashes: dict[str, list[str]] = {}
-    for idx, value in rows("SELECT id, value FROM id_clashes ORDER BY id, value"):
-        clashes.setdefault(idx, []).append(value)
-    for idx, ids in clashes.items():
-        print("  warn: %s claimed by two players, refused until resolved: %s"
-              % (idx, ", ".join(ids)))
+    """The crosswalk stage: print the lines of the players the parse cache names as of t."""
+    print("\n".join(players(parsed.read(parsed.paths_in(), identity.NEEDS), cut())))
 
 
 def _selftest() -> None:
-    import tempfile
-    from pathlib import Path
-    from ffcore.tidy import current, store_sql, tables_in
+    def mk(at: str, ff: str, name: str, club: str, value: float | None) -> ob.Market:
+        return ob.Market(at, "ff", value, ff, "DEL", club, name)
+
+    def team(at: str, aid: str, name: str, value: float | None) -> ob.ApiTeams:
+        return ob.ApiTeams(at, "laliga", value, None, None, aid, "t", "m", name, "", "", "")
+
+    def lineup(at: str, slug: str, name: str, club: str) -> ob.Lineups:
+        return ob.Lineups(at, "futbolfantasy", None, slug, name, club, "", "")
 
     a, b = "2026-08-01T0900Z", "2026-08-02T0900Z"
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        store_sql("market", [{"observed_at": a, "ff_id": i, "name": n, "club": c, "value": "1"}
-                             for i, n, c in [("af", "Álvaro Fernández", "espanyol"),
-                                             ("jc", "Jonny Castro", "alaves")]])
-        store_sql("lineups", [{"observed_at": a, "source": "futbolfantasy", "team_slug": "espanyol",
-                               "player_name": "Álvaro Fernández", "player_slug": slug}
-                              for slug in ("alvaro-fdez", "second")])
-        store_sql("starters", [{"observed_at": a, "team_slug": "alaves", "player_name": "Jonny Castro",
-                                "player_slug": "jonny-castro-ff", "role": "starter", "match_id": "m"}])
-        with closing(lfg.connect()) as db, db:
-            build(db)
-            got = dict(db.execute("SELECT player_id, ff_slug FROM crosswalk"))
-        assert got == {"af": "alvaro-fdez", "jc": "jonny-castro-ff"}, \
-            ("a slug, the first his rows gave, to the player the row names by name (within the club)", got)
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        store_sql("market", [{"observed_at": at, "ff_id": i, "name": n, "club": c, "value": v}
-                             for at, i, n, c, v in [
-            (a, "jc", "Jonny Castro", "celta", "19798425"), (b, "jc", "Jonny Castro", "alaves", "19798425"),
-            (a, "lz", "Sergio Jose Lozano", "eibar", "560396"), (a, "ja", "Jose Angel Lopez", "espanyol", "560396"),
-            (a, "pf", "Pablo Fornals", "betis", "5000000"), (a, "gone", "Left Early", "x", "1000000")]])
-        store_sql("api_teams", [{"observed_at": at, "player_id": i, "player_name": n, "market_value": v,
-                                 "manager": "m"} for at, i, n, v in [
-            (a, "2552", "Jonny Otto", "19798425"), (b, "2552", "Jonny Otto", "19798425"),
-            (a, "3178", "Lozano", "560396"), (a, "3172", "Jose Angel", "560396"),
-            (a, "99", "Fornals", "40000000")]])
-        c = "2026-08-03T0900Z"
-        store_sql("market", [{"observed_at": at, "ff_id": "bo", "name": "Cesar Bonafe", "club": "elche",
-                              "value": "1057681"} for at in (a, b, c)]
-                  + [{"observed_at": at, "ff_id": "bn", "name": "Bono Bonafe", "club": "x", "value": "1057681"}
-                     for at in (a,)])
-        store_sql("api_players_all", [{"observed_at": a, "player_id": "3279", "player_name": "Bonafé",
-                                       "market_value": "1057681"}])
-        got = {r[0]: r[1:] for r in rows("SELECT player_id, app_id, name, club_id FROM registry")}
-    assert {k: v[0] for k, v in got.items()} == {
-        "jc": "2552", "lz": "3178", "ja": "3172", "pf": "", "gone": "", "bo": "3279", "bn": ""}, \
-        ("same value, names sharing a stem; at one value, the most stems shared wins; an all-players"
-         " row holds until his next, so it meets every market snapshot in between", got)
-    assert got["jc"][1:] == ("Jonny Castro", "alaves"), "his latest market row; one who left keeps his"
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        with closing(lfg.connect()) as db, db:
-            db.executemany("INSERT INTO crosswalk (player_id, name, club_id, ff_slug, app_id) VALUES (?, ?, ?, ?, ?)", [
-                ("af", "Alvaro Fernandez", "espanyol", "alvaro-fernandez", "2101"),
-                ("jc", "Jonny Castro", "alaves", "jonny-castro", ""),
-                ("cr", "Carlos Romero", "", "", "2614"), ("ir", "Isaac Romero", "", "", "2614"),
-                ("11", "Álvaro García", "betis", "", ""), ("12", "Alvaro Garcia", "rayo", "", "")])
-        store_sql("lineups", [dict(observed_at=a, player_slug=slug, player_name=name,
-                                   team_slug=club) for slug, name, club in [
-            ("alvaro-fernandez", "x", "espanyol"), ("", "Álvaro Fernández", ""),
-            ("who-is-this", "", ""), ("", "Álvaro García", ""), ("", "Alvaro Garcia", "rayo")]])
-        assert [r["player"] for r in current("lineups")] == ["af", "af", None, None, "12"], \
-            "slug, else a name one player has, else a name one player of the club has"
-        store_sql("api_teams", [dict(observed_at=a, player_id=i, manager="m")
-                                for i in ("2101", "2614", "9999")])
-        assert [r["player"] for r in current("api_teams")] == ["af", None, None], \
-            "an app id two players claim names nobody"
-        assert rows("SELECT id, value FROM id_clashes") == [("app_id", "2614")]
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        def who() -> list[tuple[object, ...]]:
-            with closing(lfg.connect()) as db:
-                return db.execute("SELECT player_slug, player FROM ff_identity ORDER BY 1").fetchall()
-        assert who() == []
-        store_sql("lineups", [{"observed_at": "2026-08-10T0800Z", "source": "futbolfantasy",
-                               "player_slug": "x", "player_name": "X", "team_slug": "t"}])
-        with closing(lfg.connect()) as db, db:
-            db.execute("INSERT INTO crosswalk (player_id, name, club_id, ff_slug, app_id) VALUES ('p1', 'X', 't', 'x', '')")
-        assert who() == [("x", "p1")], "a new line-up row and a new registry are named at the next connect"
-        with closing(lfg.connect()) as db, db:
-            db.execute("UPDATE crosswalk SET ff_slug = 'y', name = 'Z'")
-            identity(db)
-        assert who() == [("x", None)], "a changed registry refills it in the caller's transaction"
-
-    import contextlib
-    import io
-
-    def stage() -> str:
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            main()
-        return buf.getvalue()
-
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        store_sql("market", [{"observed_at": a, "ff_id": i, "name": n, "club": "c", "value": v}
-                             for i, n, v in [("x", "Xavi Uno", "9000000"), ("y", "Yago Dos", "1000000")]])
-        first = stage()
-        assert "same players" not in first and "unmatched: Xavi Uno (c, 9.0M) has no app id or probable-XI slug" in first, first
-        assert first.index("Xavi Uno") < first.index("Yago Dos"), "the dearest unmatched first"
-        assert "same players" in stage(), "the sources name nobody new: not made again"
-        store_sql("market", [{"observed_at": b, "ff_id": "x", "name": "Xavi Uno", "club": "c", "value": "9100000"}])
-        assert "same players" in stage(), "a new value names nobody new"
-        store_sql("market", [{"observed_at": b, "ff_id": "z", "name": "Zeno Tres", "club": "c", "value": "500000"}])
-        assert "same players" not in stage() and rows("SELECT count(*) FROM crosswalk") == [(3,)], \
-            "a player the sources have not named before is made at once"
-
+    obs = ob.of({
+        "market": [mk(a, "x", "Xavi Uno", "c", 9e6), mk(a, "y", "Yago Dos", "c", 1e6), mk(a, "af", "Alvaro Fernandez", "espanyol", 5e6),
+                   mk(b, "x", "Xavi Uno", "c", 9.1e6)],
+        "api_teams": [team(a, "2101", "Alvaro Fernandez", 5e6), team(b, "2101", "Alvaro Fernandez", 5e6)],
+        "lineups": [lineup(a, "alvaro-fernandez", "Alvaro Fernandez", "espanyol")],
+    })
+    got = players(obs, b)
+    assert got[0] == "registry: 3 players — 33% carry a probable-XI slug, 33% an app id", got
+    assert got[1:] == ["  unmatched: Xavi Uno (c, 9.1M) has no app id or probable-XI slug",
+                       "  unmatched: Yago Dos (c, 0.0M) has no app id or probable-XI slug"], \
+        "dearest_unmatched_first: valued by the newest snapshot (none: 0), a player with an app id and a slug is not told"
+    many = [mk(a, "p%d" % i, "Player %d" % i, "c", float(i)) for i in range(1, 9)]
+    told = players(ob.of({"market": many}), a)[1:]
+    assert len(told) == TOLD and [u.split("(")[0] for u in told][0] == "  unmatched: Player 8 ", "five, the dearest first"
+    pair = (identity.Person("1", "A", "c", "s", "7"), identity.Person("2", "B", "c", "s", "7"), identity.Person("3", "C", "c", "t", ""))
+    assert lines(pair, ())[1:] == ["  warn: app_id claimed by two players, refused until resolved: 7",
+                                   "  warn: ff_slug claimed by two players, refused until resolved: s"], "clashes_by_kind"
+    assert lines((), ())[0] == "registry: 0 players — 0% carry a probable-XI slug, 0% an app id"
     print("crosswalk self-test OK")
 
 

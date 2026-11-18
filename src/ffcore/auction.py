@@ -9,8 +9,7 @@ from ffcore import auction_facts as af
 from ffcore import current, ledger, price_fold, pricing
 from ffcore import observations as ob
 from ffcore import state as st
-from ffcore.db import stamp_jd
-from ffcore.season_facts import julian_day
+from ffcore.season_facts import julian_day, stamp_jd
 
 __all__ = ["Look", "Sample", "Model", "Forecast", "RATIOS", "sample", "curve", "fit", "predict", "forecast", "chance", "bid_for",
            "looks_of", "open_looks_of", "FIXED_CUTS", "Record", "backtest_records", "points", "backtest", "live_points", "calibration", "briers"]

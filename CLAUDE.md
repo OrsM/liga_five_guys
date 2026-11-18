@@ -6,7 +6,7 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 
 - The systemd timers run from this working tree and each run commits `report:` commits. Never leave it red or dirty.
 - Code changes are made in a git worktree and merged when green. Verify on a copy: `tools/lfg-dry-run board` (scratch under `~/.cache`, never `/tmp`, never `data/`). Delete scratch copies when done.
-- The live database is read only through `file:data/lfg.db?mode=ro` with `ffcore.db.functions(db)`.
+- The record store (`store/`, beside `data/`) and the parse cache (`data/tidy/parsed.jsonl`, `snapindex.json`) are read through `ffcore.store` and `ffcore.parsed`; `tools/peek.py` looks things up in a store (`peek.py params`, `peek.py -i`). SQLite is opened only by `tools/export_store.py`, the one-off cutover export of the old `data/lfg.db`.
 - Do not touch the account (bids, accepting offers) without Miguel's explicit go.
 
 ## Principles
@@ -14,7 +14,7 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 1. **Discuss before code.** Build when told to go. On a mathematical problem, the formulation is written and agreed first.
 2. **Structure and Interpretation of Computer Programs.**
    - Data has constructors and selectors. No reading a row by position (`r[1]`, `k, _, m, *_`); use a named type.
-   - Layers: ingest, forecast, decision, board, grading. A layer reads only what an earlier layer exports (`tools/frontiers.py` checks the SQL names and the Python reads of them; 0 crossings). Derived facts are Python selectors over the sweep's World (`ffcore/state.py`, one sweep over `ffcore/observations.py`); no SQL view computes one. SQLite holds raw `src_*` observations and records (`runs`, `run_measures`, `params`, `measure_log`, `grade_cell`, `auction_*`, `dec_opportunity`) only, plus the crosswalk and `parser_health`.
+   - Layers: ingest, forecast, decision, board, grading. A layer reads only what an earlier layer exports (`tools/frontiers.py` is an import-graph check: a module may not import a later layer; 0 crossings). Derived facts are Python selectors over the sweep's World (`ffcore/state.py`, one sweep over `ffcore/observations.py`). There is no SQL: the parse cache (`ffcore/parsed.py`) holds the raw observations and the store (`ffcore/store.py`, `ffcore/records.py`) holds the records (`runs`, `run_measures`, `params`, `measure_log`, `grade_cell`, `auction_*`, `dec_opportunity`).
    - A procedure is a black box named for what it computes. Compose small general procedures.
    - A docstring states the contract (what goes in, what comes out, what must hold), nothing else. No other comments.
 3. **One concept, one place.** Extend the canonical code; no second copy, no ad-hoc script with its own matching. Win chance is computed only in `ffcore/auction.py`, from the fixed table `ffcore/auction_table.py` (regenerated only by `tools/auction_table.py`, blessed in the same commit); team quality is judged only by `eleven.py`; an optimisation has one objective in one place.
@@ -38,11 +38,13 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 - Scopes of agents running together do not overlap. Each has its own worktree, `TMPDIR` under `~/.cache` (`/tmp` is a small tmpfs) and its own `LFG_SCRATCH`.
 - Agent worktrees start from `origin/main`: push main before spawning.
 - Pin the time with `LFG_NOW` so `decisions.json` can be compared byte for byte.
-- `tools/lfg-dry-run` does not copy the database: seed `$LFG_SCRATCH/data/lfg.db` first with a read-only backup of the live one (`sqlite3` `backup()` from a `mode=ro` connection), and delete it afterwards.
+- `tools/lfg-dry-run` copies the parse cache and the tracked tree's `store/`; until the cutover there is none, so seed `$LFG_SCRATCH/data/lfg.db` first with a read-only backup of the old live database (`sqlite3` `backup()` from a `mode=ro` connection) and the dry run exports it with `tools/export_store.py`; delete both afterwards.
 - On a copy run `tools/lfg-dry-run board grade health`, not `parse`: a copy reparses every snapshot (9 minutes).
 - Read-only agents open the live database as above (`mode=ro`).
 - Every heavy or long job that is not `lfg.service` runs through `tools/capped` (`LFG_CAP`, default 1500M; `tools/lfg-dry-run` already does). The box has 3.8 GB: on 2026-11-17 an uncapped sweep run made the OOM killer take down the Remote Control server and archive the phone session. Run at most two such jobs at once.
 - Never point a tool that calls `ffcore.db.connect()` (`tools/sql.py`, `tools/q.py`, `grading.py`, `run.py`) at the live `data/`: `connect()` migrates the schema, and a migration that drops tables drops them there (2026-11-17). Use a `mode=ro` backup under `~/.cache`.
+- Read-only agents look at a scratch store with `tools/peek.py`, never at the live `data/` or `store/`.
+- Never run a tool against the live `data/` or `store/`: use `FF_ROOT` and `LFG_SCRATCH` on a scratch under `~/.cache`. (2026-11-17: a tool that migrated the old SQLite schema dropped live tables.)
 - Three levels. Small models do the issues, in swarms. A mid-size pickup agent reads their reports and diffs against the brief and the principles and sorts each issue: good, another small-model turn (it writes the corrected brief), or blocked. The main session writes the briefs, merges what is good, and takes what is blocked to Miguel.
 - Before a brief is posted, the main session runs its verify command on main and checks every fact it names (a name exists, a file is where it says). A wrong brief costs a whole turn.
 - At most two small-model turns on an issue; then it is blocked.
@@ -53,7 +55,7 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 ## Checks
 
 ```
-tools/capped bash tools/selftests.sh                 # 48 suites, mypy, ruff
+tools/capped bash tools/selftests.sh                 # 50 suites, mypy, ruff
 tools/capped ~/.local/bin/uv run --frozen python tools/frontiers.py   # 0 crossings
 tools/capped env PYTHONPATH=src ~/.local/bin/uv run --frozen python tools/golden.py --selftest   # decisions.json and key features at pinned cuts
 tools/lfg-rules                                      # the sale-rule table over every replay cut (~3 min, scratch copy of the live db)
@@ -61,7 +63,7 @@ tools/lfg-dry-run board                              # timing and decisions.json
 ```
 
 Every heavy job (selftests, sweeps, replays, dry runs) goes through `tools/capped`, one at a time: the box has 3.8 GB and an uncapped sweep took down Remote Control. Pin `PYTHONHASHSEED=0`.
-Before a merge that changes a fact: `golden.py --live` on a scratch copy of the database; a change to a golden file is `golden.py bless` with the reason in the commit.
+Before a merge that changes a fact: `golden.py --live` on a scratch copy of the parse cache; a change to a golden file is `golden.py bless` with the reason in the commit.
 `oracle-sql` (git tag) is the last SQL-view implementation, kept as the historic proof; it is not run any more.
 Replay cuts are the app snapshot stamps (`loader.replay_cuts(obs, since)`).
 

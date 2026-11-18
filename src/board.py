@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Iterable, Sequence
-from contextlib import closing
 from typing import Any, NamedTuple
 
 import decision
@@ -18,8 +17,10 @@ from approach import Approach, Club, approach
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore.auction import Curve, chance
-from ffcore.db import connect, cut, record, this_run
+from ffcore.clock import cut
+from ffcore.store import RunRecords
 from ffcore.rules import POSITIONS, bid_limit
+from health import Health
 from ffcore.tidy import REPORTS
 from stats import percentile
 
@@ -228,8 +229,9 @@ def market_at(read: str | None) -> str | None:
     return stamped(read) if read else None
 
 
-def sources() -> list[Doc]:
-    return [{"src": x.src, "at": stamped(x.last_at), "hours": x.hours, "status": x.status} for x in decision.source_health()]
+def sources(health: Iterable[Health]) -> list[Doc]:
+    """The sources block of the document: a line for each source health judges, by source."""
+    return [{"src": x.src, "at": stamped(x.last_at), "hours": x.hours_since, "status": x.status} for x in sorted(health, key=lambda h: h.src)]
 
 
 def auction_card() -> Doc:
@@ -242,8 +244,9 @@ def auction_card() -> Doc:
 
 
 def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
-          extras: decision.Extras) -> Doc:
-    """The decisions document of the cut; extras are what the World gives beside the inputs."""
+          extras: decision.Extras, health: Iterable[Health]) -> Doc:
+    """The decisions document of the cut; extras are what the World gives beside the inputs and health the status of each
+    source (health.parser_health over the loaded snapshots)."""
     cash, team_value, debt = inp.money.cash, inp.money.team_value, inp.money.debt
     locks = [x.lock for x in inp.locks]
     bids = sum(b.amount for b in inp.bids)
@@ -262,7 +265,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     sells = offer_lines(inp, names, offered, known)
     funds(buys, sells)
     return {
-        "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(),
+        "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(health),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
@@ -330,9 +333,12 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
     return {"component": component, "term": term, "value": float(value), "kind": kind, "n": n}
 
 
-def main() -> None:
-    with closing(connect()) as db:
-        loaded = loader.load(db, league.load_config(), cut())
+def main(records: RunRecords | None = None) -> None:
+    """The board stage: decisions.json of the cut, and the run's params and opportunity records added to records (the
+    board is the run's: run it as run.py board)."""
+    if records is None:
+        raise SystemExit("board: the board is the run's: run it as run.py board")
+    loaded = loader.load(league.load_config(), cut(), previous=loader.previous_opportunities())
     [(d, rows)] = state.sweep(loaded.obs, [cut()], lambda world: moment_at(loaded, world))
     if isinstance(d, decision.Stale):
         raise SystemExit(d.reason)
@@ -341,13 +347,10 @@ def main() -> None:
     if managers < 2 or not left:
         print("board: nothing to decide (%d managers, %d jornadas left)" % (managers, len(left)))
         return
-    run = this_run()
-    if run is None:
-        raise SystemExit("board: the board is the run's: run it as run.py board")
-    record([{"run_id": run, **r} for r in rows], "params")
+    records.add("params", rows)
     got = decision.opportunity_rows(d.inputs)
-    decision.keep_opportunities(cut(), got)
-    doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras)
+    records.add("dec_opportunity", [{"cut": cut(), **r} for r in got])
+    doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras, loader.health_at(loaded, cut()))
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
@@ -405,6 +408,10 @@ def _selftest() -> None:
     _selftest_params()
     _selftest_world()
     assert stamped("2026-10-30T1809Z") == "2026-10-30T18:09Z"
+    told = sources([Health("b", "2026-11-01T0900Z", 5, 10.0, 2.5, 1.0, "ok", "2026-11-01T0900Z"),
+                    Health("a", "2026-10-31T0900Z", 5, 10.0, 26.0, 1.0, "stale", "2026-10-31T0900Z")])
+    assert told == [{"src": "a", "at": "2026-10-31T09:00Z", "hours": 26.0, "status": "stale"},
+                    {"src": "b", "at": "2026-11-01T09:00Z", "hours": 2.5, "status": "ok"}], "the sources block: by source, hours since the newest"
     buys: list[Doc] = [{"name": "Raphinha", "funding": {"tonight": [{"name": "Pepelu"}, {"name": "Alonso"}]}},
                        {"name": "Gueye", "funding": None}, {"name": "Nobody", "funding": {"feasible": False}}]
     sells: list[Doc] = [{"name": "Pepelu"}, {"name": "Ryan"}]
