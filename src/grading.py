@@ -270,7 +270,7 @@ def record_grades() -> dict[str, int]:
     run = this_run()
     standing = run is not None and bool(now.done) and graded(run, max(now.done))
     scored = {} if run is not None and auctions_scored(run, loaded, results_seen(loaded, moment)) else record_auction(run, loaded, cuts)
-    record_sales()
+    record_sales(loaded)
     if standing:
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, **scored}
@@ -494,11 +494,11 @@ def season(loaded: loader.Loaded) -> Season:
     return state.sweep(loaded.obs, [stamp(run_now())], lambda world: season_at(loaded, world))[0]
 
 
-def record_sales() -> None:
+def record_sales(loaded: loader.Loaded) -> None:
     """Each sale from SALES_FROM with a done jornada at its lock, graded at RATE (salegrade.grade) and summarised
     (salegrade.measure_values), is appended to measure_log as sale_grade with jornadas_done, unless the latest one
-    logged has the same all.lock.n (graded_count) and jornadas_done; then no sale is read."""
-    loaded, _ = read_storage()
+    logged has the same all.lock.n (graded_count) and jornadas_done; then no sale is read. loaded is the storage the
+    caller has read (read_storage): record_sales reads none."""
     now = season(loaded)
     marks = {"all.lock.n": float(graded_count(now)), "jornadas_done": float(len(now.done))}
     latest = dict(rows("SELECT key, value FROM measure_latest WHERE measure = 'sale_grade'"))
@@ -736,7 +736,7 @@ def _selftest_stand() -> None:
         "read_storage": lambda: (None, []), "season": lambda loaded: Season((), {}, {1, 2}, {}),
         "this_run": lambda: 5, "results_seen": lambda loaded, moment: Results(1, 1, "c"),
         "graded": lambda run, last: held["graded"], "auctions_scored": lambda run, loaded, now: held["scored"],
-        "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda: None,
+        "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda loaded: None,
         "record": lambda *a, **k: None, "superseded": lambda run: None}
     kept = {k: globals()[k] for k in stub}
     try:
@@ -859,6 +859,7 @@ def _selftest_record_sales() -> None:
     at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
     locks = {1: at + dt.timedelta(days=2), 2: at + dt.timedelta(days=9)}
     held: dict[str, Any] = {"done": {1}, "read": 0}
+    storage: Any = None
     entries = tuple(ledger.LedgerEntry(at.isoformat(), "sell", "me", None, "p", 5e6, None, "me", 0) for _ in range(2))
     sold = [Sold(at, salegrade.Sale("p", 5e6, 5e6, True, False, False))] * 2
     flat = {h: 1.0 for h in HORIZONS}
@@ -868,7 +869,7 @@ def _selftest_record_sales() -> None:
         held["read"] += 1
         return sold
     stub: dict[str, Any] = {
-        "read_storage": lambda: (None, []), "season": lambda loaded: Season(entries, locks, held["done"], {}),
+        "season": lambda loaded: Season(entries, locks, held["done"], {}),
         "facts_for": lambda loaded, wanted: {}, "sales_since": read,
         "course": lambda s, locks, done, scored, fielded, facts: ok if len(done) else None,
         "fielded_at_locks": lambda locks, done, facts: {}}
@@ -879,13 +880,13 @@ def _selftest_record_sales() -> None:
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
         try:
             globals().update(stub)
-            record_sales()
+            record_sales(storage)
             first = logged()
             assert first > 0 and dict(rows("SELECT key, value FROM measure_latest"))["all.lock.n"] == 2
-            record_sales()
+            record_sales(storage)
             assert logged() == first and held["read"] == 1, "nothing new: no rows, no sale read"
             held["done"] = {1, 2}
-            record_sales()
+            record_sales(storage)
             assert logged() == 2 * first, "a jornada done: a new set"
         finally:
             globals().update(kept)

@@ -209,6 +209,14 @@ class Table(NamedTuple):
 
 EMPTY = Table((), (), 0)
 
+POOL: dict[str, str] = {}
+
+
+def pooled(values: Iterable[Any]) -> tuple[Any, ...]:
+    """values with every str replaced by its one object in POOL (the pool is shared by every read): equal strings
+    are the same object, the values are unchanged."""
+    return tuple(POOL.setdefault(v, v) if type(v) is str else v for v in values)
+
 
 class Observations(NamedTuple):
     tables: Mapping[str, Table]
@@ -243,12 +251,13 @@ def of(tables: Mapping[str, Iterable[Any]]) -> Observations:
 
 
 def read(db: sqlite3.Connection, names: Iterable[str] = tuple(TABLES), until: str | None = None) -> Observations:
-    """The named tables of db, rows with observed_at <= until (all when None), in one range scan each."""
+    """The named tables of db, rows with observed_at <= until (all when None), in one range scan each; every str
+    field of every row is the pooled object (pooled), so a second read adds no second copy of a string."""
     def scan(name: str) -> Iterable[Any]:
         row = TABLES[name].row
         sql = "SELECT %s FROM src_%s%s ORDER BY rowid" % (
             ", ".join(row._fields), name, "" if until is None else " WHERE observed_at <= ?")
-        return map(row._make, db.execute(sql, () if until is None else (until,)))
+        return map(row._make, map(pooled, db.execute(sql, () if until is None else (until,))))
     return of({name: scan(name) for name in names})
 
 
@@ -292,6 +301,11 @@ def _selftest() -> None:
     assert [r.ff_id for r in rows_of(read(_database({"market": stored}), ["market"], "2026-11-01"), "market")] == ["b", "d"]
     assert key_of("matches", Matches("t", "s", 1, "m1", "", "", "", "", "")) == ("m1",)
     assert key_of("market", stored[0]) == ()
+    again = rows_of(read(_database({"market": stored}), ["market"]), "market")
+    first = rows_of(obs, "market")
+    assert [tuple(r) for r in again] == [tuple(r) for r in first], "pooling leaves every field value as stored"
+    assert all(a.observed_at is b.observed_at and a.ff_id is b.ff_id and a.position is b.position
+               for a, b in zip(again, first)), "rows read twice share their strings"
     for name, source in TABLES.items():
         assert set(source.grain) <= set(source.row._fields) and source.row._fields[:2] == ("observed_at", "source")
         assert refolds_of(read(_database({name: []}), [name])) == 0
