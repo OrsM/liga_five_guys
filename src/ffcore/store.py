@@ -23,7 +23,7 @@ import numpy.typing as npt
 from ffcore.records import (GRADE_CELL_DTYPE, KINDS, LATEST, GradeCell, Run, StoreError, decode, encode, grade_cell_array,
                             grade_cell_rows, header, parse_header)
 
-__all__ = ["grade_cells", "latest_run", "publish", "records", "runs", "stage", "commit", "store_root"]
+__all__ = ["clear", "grade_cells", "latest_run", "publish", "records", "runs", "stage", "commit", "store_root"]
 
 
 def store_root() -> Path:
@@ -48,6 +48,12 @@ def _remove(path: Path) -> None:
         if p.is_dir():
             p.chmod(stat.S_IRWXU)
     shutil.rmtree(path)
+
+
+def clear() -> None:
+    """Remove the whole store, published runs included; nothing when there is none."""
+    if store_root().exists():
+        _remove(store_root())
 
 
 def _sweep(keep: Path) -> None:
