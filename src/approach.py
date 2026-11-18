@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import random
 import sys
-from collections.abc import Mapping
-from functools import lru_cache
+from collections.abc import Iterable, Mapping
+from functools import lru_cache, reduce
 from itertools import combinations
+from operator import or_
 from typing import NamedTuple
 
 import eleven
@@ -46,18 +47,53 @@ class Approach(NamedTuple):
 
 
 class Side:
+    """The best eleven's points of a squad and what it costs to sell a set of its players, memoised on the set.
+    A set of players is a bitmask over the squad (`bit`); `cost` takes the players, `cost_of` the mask.
+    Only the first `eleven.DEPTH` survivors of each position can field, so sets that leave the same ones share a cost."""
+
     def __init__(self, squad: frozenset[str], pos: Mapping[str, str], value: Mapping[str, float]):
         self.value, self.ranked = value, eleven.rank(squad, pos, value)
         top = eleven.points_without(self.ranked, value, frozenset())
         self.fields = top is not None
         self.points = top or 0.0
-        self.memo: dict[frozenset[str], float] = {}
+        self.bit = {k: 1 << i for i, k in enumerate(sorted(squad))}
+        self.lanes = {p: (reduce(or_, (self.bit[k] for k in ks), 0), ks) for p, ks in self.ranked.items()}
+        self.lane_id: dict[tuple[str, int], int] = {}
+        self.depths: dict[tuple[str, tuple[float, ...]], int] = {}
+        self.fielding: list[tuple[float, ...]] = []
+        self.shared: dict[tuple[int, ...], float] = {}
+        self.memo: dict[int, float] = {}
+
+    def mask(self, players: Iterable[str]) -> int:
+        return reduce(or_, (self.bit[k] for k in players), 0)
+
+    def players(self, mask: int) -> frozenset[str]:
+        return frozenset(k for k, b in self.bit.items() if mask & b)
+
+    def survivors(self, position: str, mask: int) -> int:
+        lane, ranked = self.lanes[position]
+        key = (position, mask & lane)
+        got = self.lane_id.get(key)
+        if got is None:
+            fielding = tuple(self.value.get(k, 0.0) for k in ranked if not mask & self.bit[k])[:eleven.DEPTH[position]]
+            got = self.lane_id[key] = self.depths.setdefault((position, fielding), len(self.fielding))
+            if got == len(self.fielding):
+                self.fielding.append(fielding)
+        return got
+
+    def cost_of(self, mask: int) -> float:
+        got = self.memo.get(mask)
+        if got is None:
+            key = tuple([self.survivors(p, mask) for p in self.lanes])
+            got = self.shared.get(key)
+            if got is None:
+                left = eleven.top_points({p: self.fielding[i] for p, i in zip(self.lanes, key)})
+                got = self.shared[key] = INF if left is None else self.points - left
+            self.memo[mask] = got
+        return got
 
     def cost(self, gone: frozenset[str]) -> float:
-        if gone not in self.memo:
-            left = eleven.points_without(self.ranked, self.value, gone)
-            self.memo[gone] = INF if left is None else self.points - left
-        return self.memo[gone]
+        return self.cost_of(self.mask(gone))
 
 
 def proceeds(club: Club, k: str) -> float:
@@ -66,16 +102,25 @@ def proceeds(club: Club, k: str) -> float:
 
 def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mapping[str, float], need: float
           ) -> tuple[float, frozenset[str]] | None:
+    """The cheapest set of `pool` to sell, on top of `fixed`, raising at least `need` at `price`, as (cost, set);
+    None when no eleven remains or the pool cannot raise it."""
+    held = side.mask(fixed)
     if need <= 1e-6:
-        c = side.cost(fixed)
-        return None if c == INF else (c, frozenset())
-    order = sorted((k for k in pool if price[k] > 0), key=lambda k: (side.cost(fixed | {k}) / price[k], k))
-    left = [sum(price[k] for k in order[i:]) for i in range(len(order) + 1)]
-    best: tuple[float, frozenset[str]] | None = None
-    stack: list[tuple[int, frozenset[str], float]] = [(0, frozenset(), 0.0)]
+        free = side.cost_of(held)
+        return None if free == INF else (free, frozenset())
+    cost_of, memo = side.cost_of, side.memo
+    order = sorted((k for k in pool if price[k] > 0), key=lambda k: (cost_of(held | side.bit[k]) / price[k], k))
+    bits = [side.bit[k] for k in order]
+    worth = [price[k] for k in order]
+    left = [sum(worth[i:]) for i in range(len(order) + 1)]
+    best: tuple[float, int] | None = None
+    stack: list[tuple[int, int, float]] = [(0, 0, 0.0)]
     while stack:
         i, gone, got = stack.pop()
-        c = side.cost(fixed | gone)
+        m = held | gone
+        c = memo.get(m)
+        if c is None:
+            c = cost_of(m)
         if c == INF or best is not None and c >= best[0] - 1e-12:
             continue
         if got >= need - 1e-6:
@@ -84,8 +129,8 @@ def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mappin
         if i == len(order) or got + left[i] < need - 1e-6:
             continue
         stack.append((i + 1, gone, got))
-        stack.append((i + 1, gone | {order[i]}, got + price[order[i]]))
-    return best
+        stack.append((i + 1, gone | bits[i], got + worth[i]))
+    return None if best is None else (best[0], side.players(best[1]))
 
 
 def approach(club: Club, player: str, bid: float, win: float, value: Mapping[str, float]) -> Approach | None:
@@ -188,6 +233,33 @@ def _selftest() -> None:
         assert eleven.best_eleven(here - got.tonight - got.if_won, pos, value) is not None, "an eleven remains"
         made += 1
     assert made >= 4, "the leagues are not all infeasible"
+    rng = random.Random(9)
+    for _ in range(40):
+        own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+        value = {k: rng.choice([0, 1, 2, 3, 5]) * 1.0 for k in own}
+        squad = frozenset(rng.sample(sorted(own), rng.randint(11, len(own))))
+        side = Side(squad, own, value)
+        base = eleven.best_total(squad, own, value)
+        assert side.fields == (base is not None) and (base is None or abs(side.points - base) < 1e-9)
+        if base is None:
+            continue
+        for _ in range(12):
+            gone = frozenset(rng.sample(sorted(squad), rng.randint(0, 5)))
+            left = eleven.best_total(squad - gone, own, value)
+            want = INF if left is None else base - left
+            assert side.cost(gone) == INF if left is None else abs(side.cost(gone) - want) < 1e-9
+        price = {k: rng.choice([1.0, 2.0, 3.0]) for k in squad}
+        fixed = frozenset(rng.sample(sorted(squad), rng.randint(0, 2)))
+        pool, need = squad - fixed, rng.choice([0.0, 2.0, 5.0, 9.0])
+        covered = cover(side, fixed, pool, price, need)
+        rest = sorted(pool)
+        direct = [(side.points - left, set(b)) for m in range(len(rest) + 1) for b in combinations(rest, m)
+                  if sum(price[k] for k in b) >= need - 1e-6
+                  and (left := eleven.best_total(squad - fixed - frozenset(b), own, value)) is not None]
+        assert (covered is None) == (not direct), "a cover exists exactly when some set of the pool raises the need and keeps an eleven"
+        if covered is not None:
+            assert abs(covered[0] - min(c for c, _ in direct)) < 1e-9, "the cover is the cheapest set"
+            assert covered[1] <= pool and sum(price[k] for k in covered[1]) >= need - 1e-6 and abs(side.cost(fixed | covered[1]) - covered[0]) < 1e-9
     nothing = Club(frozenset({"a"}), {"a": "POR", "s": "DEL"}, {"a": 1e6}, {"a": 1e6}, 0.0, 1e6)
     assert approach(nothing, "s", 1e6, 0.5, {"a": 1.0, "s": 5.0}) is None, "no eleven: nothing to say"
     print("approach self-test OK")
