@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-18T21:33Z",
- "market_at": "2026-11-18T21:33Z",
+ "generated_at": "2026-11-18T21:35Z",
+ "market_at": "2026-11-18T21:35Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-18T21:33Z",
+   "at": "2026-11-18T21:35Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-20T20:00:00+00:00",
  "cash": -12732130.0,
- "cash_locked": 0,
- "can_bid": 72887233.60000001,
+ "cash_locked": 56165301.0,
+ "can_bid": 16721932.600000009,
  "ping": "",
  "do": [],
  "lineup": {
@@ -71,16 +71,16 @@
    "pos": "DEF",
    "what": "buy",
    "label": "buy Dean Huijsen",
-   "step": "bid",
+   "step": "placed",
    "price": 56165301.0,
    "asking": 56165301.0,
-   "amount": 61220178.09,
-   "win": 0.9491525423728814,
+   "amount": 56165301.0,
+   "win": 0.6851851851851852,
    "advised": 61220178.09,
    "advised_win": 0.9491525423728814,
-   "move": "bid",
+   "move": "raise",
    "plan": false,
-   "done": false,
+   "done": true,
    "key": "11830",
    "gain": 38.497662425711965,
    "per": "season",
@@ -100,11 +100,21 @@
     ],
     [
      "bid",
-     61220178.09,
+     56165301.0,
      "money"
     ],
     [
      "chance to win",
+     0.6851851851851852,
+     "chance"
+    ],
+    [
+     "advised bid",
+     61220178.09,
+     "money"
+    ],
+    [
+     "chance at the advised bid",
      0.9491525423728814,
      "chance"
     ],
@@ -114,9 +124,9 @@
      "points"
     ]
    ],
-   "bids": 0,
+   "bids": 1,
    "auction": {
-    "yours": false,
+    "yours": true,
     "listings": 60,
     "thin": false,
     "cell": "0/3/2"
@@ -126,9 +136,9 @@
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 11667055.510000005,
-    "lock_margin": 376052.9099999964,
-    "lock_margin_low": -3860663.6670000106,
+    "margin": 16721932.600000009,
+    "lock_margin": 5430930.0,
+    "lock_margin_low": 1194213.422999993,
     "if_won": [
      "Dani Martinez",
      "Augusto Batalla",
@@ -162,7 +172,7 @@
     "gain": 38.49766242571195,
     "points_lost_if_won": 6.785174078831915,
     "points_lost_if_lost": 0.0,
-    "net": 30.09998893941156
+    "net": 21.728927200640026
    },
    "accepts": [],
    "act": []
@@ -282,7 +292,7 @@
    "asking": 56165301.0,
    "bid": 61220178.09,
    "win": 0.9491525423728814,
-   "placed": null,
+   "placed": 56165301.0,
    "replaces": "Guido Rodriguez",
    "per_million": 0.6854349881559785,
    "price_next": 0.02307113463716126,
