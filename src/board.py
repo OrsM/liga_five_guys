@@ -17,6 +17,7 @@ from approach import Approach, Club, approach
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
+from ffcore import records as rec
 from ffcore.auction import Curve, chance
 from ffcore.clock import cut
 from ffcore.store import RunRecords
@@ -107,6 +108,11 @@ def offers_at(world: state.World) -> worth.OfferDistribution:
     return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
 
 
+def is_bench(lost: Iterable[float]) -> bool:
+    """True when the eleven loses nothing at any window (the lost points of each window, worth.lost_points)."""
+    return not any(lost)
+
+
 def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[int, float]) -> str:
     """One line of facts about a standing offer: its ratio over value; where it stands among the nightly offers seen
     (offers.ratios, none: no such clause; n shown); what the eleven loses by it (lost by window as worth.lost_points gives
@@ -115,7 +121,7 @@ def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mappi
     parts = [] if ratio is None else ["offer %.2f x value" % ratio]
     if share is not None:
         parts.append("at or above %.0f%% of the %d nightly offers seen" % (100 * share, len(offers.ratios)))
-    if not any(lost.values()):
+    if is_bench(lost.values()):
         parts.append("the eleven loses 0 points (bench)")
     else:
         parts.append("the eleven loses %.1f points over the next 4 jornadas, %.1f over the next 8, %.1f over the season"
@@ -147,6 +153,48 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
                       ["season", lost[0], "points"]],
             "accepts": [], "act": []})
     return sorted(out, key=lambda d: (d["per_million"] is None, d["per_million"], d["key"]))
+
+
+class Shown(NamedTuple):
+    """A line of a sells row's facts: its label, value and kind."""
+    label: str
+    value: Any
+    kind: str
+
+
+class Stood(NamedTuple):
+    """A standing offer of the game on one of my players: the player, the money and the app's id and creation stamp."""
+    player: str
+    money: float
+    offer_id: str
+    created_at: str
+
+
+def stood_offers(held: Iterable[decision.Held], offers: Iterable[current.Offer]) -> list[Stood]:
+    """The pending offers of the game on the players held (by player_team_id), each with its player."""
+    team = {h.player_team: h.player for h in held}
+    return [Stood(team[o.player_team_id], o.money, o.offer_id, o.created_at) for o in offers
+            if o.status == "pending" and o.money is not None and o.player_team_id in team]
+
+
+def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[dict[str, Any]]:
+    """The dec_offer rows of the cut: one per row of the sells document, in its order, every field the document's (the
+    value from its facts, bench as is_bench says it, funds the names of its "for" joined by ';') and the offer's id and
+    creation stamp from the stood offer of that player and money (the lowest id first when several are alike)."""
+    waiting: dict[tuple[str, float], list[Stood]] = {}
+    for x in sorted(stood, key=lambda s: s.offer_id):
+        waiting.setdefault((x.player, x.money), []).append(x)
+    rows = []
+    for sale in sells:
+        given = waiting[(sale["key"], sale["offer"])].pop(0)
+        value = next(f.value for f in map(lambda f: Shown(*f), sale["facts"]) if f.label == "value")
+        lost = sale["lost"]
+        rows.append({"cut": at, "player": sale["key"], "offer_id": given.offer_id, "created_at": given.created_at,
+                     "offer": sale["offer"], "value": value, "ratio": sale["ratio"], "percentile": sale["offer_percentile"],
+                     "offers_seen": sale["offers_seen"], "lost4": lost["next4"], "lost8": lost["next8"],
+                     "lost_season": lost["season"], "funds": ";".join(sale["for"]), "bench": is_bench(lost.values()),
+                     "trend": sale["trend"]})
+    return rows
 
 
 def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: float) -> Doc:
@@ -359,12 +407,13 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
 
 
 def main(records: RunRecords | None = None, obs: ob.Observations | None = None) -> None:
-    """The board stage: decisions.json of the cut, and the run's params and opportunity records added to records (the
+    """The board stage: decisions.json of the cut, and the run's params, opportunity and offer records added to records (the
     board is the run's: run it as run.py board); obs is the parse cache as parsed.read gives it, read here when None."""
     if records is None:
         raise SystemExit("board: the board is the run's: run it as run.py board")
     loaded = loader.load(league.load_config(), cut(), previous=loader.previous_opportunities(), obs=obs)
-    [((d, rows), offers)] = state.sweep(loaded.obs, [cut()], lambda world: (moment_at(loaded, world), offers_at(world)))
+    [((d, rows), offers, standing)] = state.sweep(
+        loaded.obs, [cut()], lambda world: (moment_at(loaded, world), offers_at(world), current.offers(world)))
     if isinstance(d, decision.Stale):
         raise SystemExit(d.reason)
     managers = len(d.seen.cash)
@@ -376,6 +425,7 @@ def main(records: RunRecords | None = None, obs: ob.Observations | None = None) 
     got = decision.opportunity_rows(d.inputs)
     records.add("dec_opportunity", [{"cut": cut(), **r} for r in got])
     doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras, loader.health_at(loaded, cut()), offers)
+    records.add("dec_offer", offer_rows(cut(), doc["sells"], stood_offers(d.extras.held, standing)))
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
@@ -456,6 +506,23 @@ def _selftest() -> None:
     assert offer_note(None, seen, {4: 0.0, 8: 0.0, 0: 0.0}) == "the eleven loses 0 points (bench)", "no value: no ratio clause"
     for text in (bench_note, field_note, bare_note):
         assert not any(w in text.lower() for w in ("take", "hold", "sell", "accept", "should", "reserve")), "facts, no advice"
+    asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
+              "lost": {"next4": 0.0, "next8": 0.0, "season": 0.0}, "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},
+             {"key": "p", "offer": 2.0, "ratio": None, "offer_percentile": None, "offers_seen": 0, "trend": 0.5, "for": [],
+              "lost": {"next4": 1.0, "next8": 2.0, "season": 3.0}, "facts": [["value", 0.0, "money"]]},
+             {"key": "q", "offer": 3.0, "ratio": 1.0, "offer_percentile": 0.5, "offers_seen": 5, "trend": 1.0, "for": [],
+              "lost": {"next4": 0.0, "next8": 0.0, "season": 0.5}, "facts": [["value", 3.0, "money"]]}]
+    held = [decision.Held("p", "t1", None, 1.8), decision.Held("q", "t2", None, 3.0), decision.Held("r", "t3", None, 1.0)]
+    standing = [current.Offer("20", "t1", "pending", 2.0, "c20", "", ""), current.Offer("10", "t1", "pending", 2.0, "c10", "", ""),
+                current.Offer("30", "t2", "pending", 3.0, "c30", "", ""), current.Offer("40", "t3", "declined", 9.0, "c40", "", ""),
+                current.Offer("50", "tx", "pending", 9.0, "c50", "", ""), current.Offer("60", "t3", "pending", None, "c60", "", "")]
+    stood = stood_offers(held, standing)
+    assert sorted(x.offer_id for x in stood) == ["10", "20", "30"], "pending, with money, on a player held"
+    made = offer_rows("cut", asked, stood)
+    assert [(m["player"], m["offer_id"], m["created_at"]) for m in made] == [("p", "10", "c10"), ("p", "20", "c20"), ("q", "30", "c30")]
+    assert [m["offer_id"] for m in offer_rows("cut", asked, stood[::-1])] == ["10", "20", "30"], "the order of the standing offers does not matter"
+    assert [(m["value"], m["funds"], m["bench"]) for m in made] == [(1.8, "A;B", True), (0.0, "", False), (3.0, "", False)]
+    assert all(set(m) == set(rec.DecOffer._fields) for m in made), "a field for each field of the kind, no more"
     assert advice((("c", "b", 2.0), ("d", "c", 1.0), ("e", "x", 0.5)), {"d": "D"}) == [
         {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"
     curve: Curve = ((1.0, 0.2), (1.1, 0.6), (1.3, 1.0))

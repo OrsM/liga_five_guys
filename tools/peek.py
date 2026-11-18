@@ -5,7 +5,7 @@
     peek.py -i                                              a REPL with store, records and parsed bound
 
 KIND is one of the record kinds (ffcore.records.KINDS): runs, run_measures, measure_log, params, auction_calibration,
-auction_brier, grade_cell, dec_opportunity, sale_score. A FIELD=VALUE keeps the rows whose field, written as text, is VALUE
+auction_brier, grade_cell, dec_opportunity, dec_offer, sale_score. A FIELD=VALUE keeps the rows whose field, written as text, is VALUE
 (an unknown field is an error). At most n rows (default 20) are printed, then how many matched. The store is the one
 beside FF_ROOT (default ./data), opened only to read.
 
