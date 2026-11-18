@@ -13,6 +13,9 @@ Named rules, each tested:
   drift_is_the_latest_calibration: the drifting bins told are those of the newest calibration, this run's when it
     scored the auctions, else the latest published run's that has any.
 
+  sale_gate_is_the_latest_sale_score: the bench sales told are Miguel's n at the season horizon of the newest sale_score,
+    this run's when it graded the sales, else the latest published run's that has any; told from SALE_GATE_N on.
+
     python src/health.py text    # what to tell you, empty if every source is fine (reads the parse cache)
 """
 from __future__ import annotations
@@ -29,17 +32,18 @@ from ffcore import identity, parsed, store
 from ffcore import observations as ob
 from ffcore.clock import cut
 from ffcore.identity import Unmatched
-from ffcore.records import AuctionCalibration
+from ffcore.records import AuctionCalibration, SaleScore
 from ffcore.season_facts import stamp_jd
 from ffcore.store import RunRecords
 from publish import notify
 
-__all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "said", "snapshots_of", "text", "trouble"]
+__all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "said", "sale_gate_line", "sale_scores", "snapshots_of", "text", "trouble"]
 
 SENT = Path.home() / ".local/state/lfg/health.sent"
 UNMATCHED_FROM = 5e6
 HEALTH_SOURCES = ("market", "lineups", "api_standings", "api_lineup", "api_teams", "api_leagues", "api_market", "api_offers")
 HEALTH_USUAL = 21
+SALE_GATE_N = 40
 
 
 class Snapshot(NamedTuple):
@@ -131,9 +135,32 @@ def drifting(pending: Iterable[AuctionCalibration] = ()) -> list[AuctionCalibrat
     return sorted((c for c in held if c.drift == 1), key=lambda c: (-abs(c.stated - c.observed), c.scope, c.bin))
 
 
-def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterable[AuctionCalibration]) -> str:
-    """trouble of health and unmatched, and one line the drifting bins; empty if all is well."""
+def sale_scores(pending: Iterable[SaleScore] = ()) -> list[SaleScore]:
+    """The sale_score rows of the newest run that has any (rule sale_gate_is_the_latest_sale_score; pending is this run's)."""
+    held = list(pending)
+    for run in reversed(store.runs()):
+        if held:
+            break
+        held = list(store.records("sale_score", run.run_id))
+    return held
+
+
+def sale_gate_line(scores: Iterable[SaleScore]) -> str | None:
+    """The line that the sell-rule gate is due when Miguel's bench sales at the season horizon number SALE_GATE_N or more, else None."""
+    n = max((s.n for s in scores if (s.group, s.case, s.horizon) == ("miguel", "bench", "season")), default=0)
+    if n < SALE_GATE_N:
+        return None
+    return ("sell-rule gate: Miguel has %d bench sales (gate re-test due at %d): run tools/lfg-rules and read the PAIRED block"
+            % (n, SALE_GATE_N))
+
+
+def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterable[AuctionCalibration],
+         sales: Iterable[SaleScore] = ()) -> str:
+    """trouble of health and unmatched, one line the drifting bins, and one line sale_gate_line of sales; empty if all is well."""
     lines = trouble(health, unmatched)
+    gate = sale_gate_line(sales)
+    if gate:
+        lines.append(gate)
     bins = list(drift)
     if bins:
         worst = bins[0]
@@ -151,7 +178,8 @@ def said(records: RunRecords | None = None, obs: ob.Observations | None = None) 
     at = cut()
     people = identity.crosswalk(obs, at)
     return text(parser_health(snapshots_of(obs, at), at), identity.unmatched(people, obs, at),
-                drifting(records.rows("auction_calibration") if records is not None else ()))
+                drifting(records.rows("auction_calibration") if records is not None else ()),
+                sale_scores(records.rows("sale_score") if records is not None else ()))
 
 
 def main(records: RunRecords | None = None, sent: Path = SENT, obs: ob.Observations | None = None) -> dict[str, int]:
@@ -224,6 +252,22 @@ def _selftest() -> None:
             this.add("auction_calibration", [{"scope": "rookies", "bin": "high", "n": 9, "stated": 0.9, "observed": 0.1, "drift": 1}])
             assert [c.run_id for c in drifting(this.rows("auction_calibration"))] == [3], "this run's calibration, once it scored, replaces them"
             assert "rookies" in text((), (), drifting(this.rows("auction_calibration")))
+            this = RunRecords(4, "c")
+
+            def bench(n: int, run: int = 4) -> list[SaleScore]:
+                return [SaleScore(run, g, c, h, n if (g, c) == ("miguel", "bench") else 99, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+                        for g in ("miguel", "rivals") for c in ("all", "bench") for h in ("lock", "season")]
+
+            assert sale_scores(this.rows("sale_score")) == [] and "sell-rule" not in text((), (), (), sale_scores()), "no sale_score yet: no line"
+            assert text((), (), (), bench(SALE_GATE_N - 1)) == "", "below SALE_GATE_N: nothing to say"
+            out = text((), (), (), bench(SALE_GATE_N))
+            assert out.count("sell-rule gate: Miguel has 40 bench sales") == 1 and "tools/lfg-rules" in out, out
+            assert "has 41 bench" in text((), (), (), bench(SALE_GATE_N + 1)), "every run after the first"
+            store.publish(Run(4, "t", "a", "service", "c", "f", 1, 1.0), sale_score=bench(SALE_GATE_N))
+            store.publish(Run(5, "t", "a", "service", "c", "f", 1, 1.0), auction_calibration=[AuctionCalibration(5, "keepers", "low", 30, 0.5, 0.2, 1)])
+            assert "has 40 bench" in text((), (), (), sale_scores()), "the latest run that has sale_score: told from the store"
+            assert "has 41 bench" in text((), (), (), sale_scores(bench(41, 6))), "this run's sale_score replaces it"
+            assert text((), (), drifting(), bench(SALE_GATE_N)).count("\n") == 2, "the gate is one line beside the others"
         finally:
             if kept is None:
                 os.environ.pop("FF_ROOT")
