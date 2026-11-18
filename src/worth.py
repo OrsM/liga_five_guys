@@ -3,9 +3,11 @@ jornadas the board reads (Context) and gives a Verdict: the key the offers are s
 over each window, and the reserve price (None when the rule states none). LIVE is the rule the board runs."""
 from __future__ import annotations
 
+import datetime as dt
 import random
+import statistics
 import sys
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import NamedTuple
 
 import eleven
@@ -13,6 +15,10 @@ from ffcore.rules import SALE_ESTIMATE
 
 PER_MILLION_AHEAD = 8
 STOPGAP_RATE = 0.6
+MAX_NIGHTS = 5
+FORECAST_NIGHTS = 10
+RATE_DAYS = 7
+NO_LOSS = 1e-9
 
 
 class Standing(NamedTuple):
@@ -27,10 +33,19 @@ class Horizon(NamedTuple):
     settled: eleven.Settled | None
 
 
+class OfferDistribution(NamedTuple):
+    ratios: tuple[float, ...]
+
+
+NO_OFFERS = OfferDistribution(())
+
+
 class Context(NamedTuple):
     pos: Mapping[str, str]
     horizons: Mapping[int, Horizon]
     cash: float
+    offers: OfferDistribution = NO_OFFERS
+    rate: float = STOPGAP_RATE
 
 
 class Verdict(NamedTuple):
@@ -89,10 +104,160 @@ def worth_rule(rate: float, *, trend: bool) -> Rule:
     return rule
 
 
+def offer_ratio_distribution(ratios: Iterable[float]) -> OfferDistribution:
+    """The distribution of offer over value ratios: the ratios (one per offer, at its first sighting, as
+    current.offer_ratios gives them) sorted. Empty when there are none."""
+    return OfferDistribution(tuple(sorted(ratios)))
+
+
+def offer_reserve_ratio(m: int, c: float, dist: OfferDistribution, hold: float) -> float:
+    """The offer over value at which selling tonight and waiting are worth the same, with m nights left to wait, a cost c
+    (a fraction of value) for each night waited and one offer a night drawn from dist, i.i.d. and expiring at the next
+    close. hold is what the player is worth if no offer is taken (rho_0); rho_k = mean of max(X, rho_{k-1}) over dist
+    minus c. m >= 0 and dist non-empty. Nondecreasing in m and nonincreasing in c when hold is at most the mean of dist
+    less c; with hold 0, rho_1 is the mean of dist less c, and with every ratio 1.0 rho_m is 1 - c."""
+    if m < 0 or not dist.ratios:
+        raise ValueError("m must be >= 0 and dist non-empty")
+    rho = hold
+    for _ in range(m):
+        rho = sum(max(x, rho) for x in dist.ratios) / len(dist.ratios) - c
+    return rho
+
+
+class Buy(NamedTuple):
+    gain: float
+    bid: float
+
+
+class CutBuys(NamedTuple):
+    at: dt.datetime
+    buys: Sequence[Buy]
+
+
+def best_yield(buys: Iterable[Buy]) -> float | None:
+    """The highest gain points per million bid over the buys with a positive gain and a positive bid (gain in points,
+    bid in euros); None when there is none."""
+    ys = [b.gain / (b.bid / 1e6) for b in buys if b.gain > 0 and b.bid > 0]
+    return max(ys) if ys else None
+
+
+def r_estimate(cuts: Iterable[CutBuys], now: dt.datetime, carry: float = STOPGAP_RATE) -> float:
+    """The exchange rate in points per million at now: the median of best_yield over the cuts in the RATE_DAYS days up to
+    now that have a buy; carry when none has. carry must be positive; the result is positive."""
+    ys = [y for c in cuts if now - dt.timedelta(days=RATE_DAYS) < c.at <= now if (y := best_yield(c.buys)) is not None]
+    return statistics.median(ys) if ys else carry
+
+
+def drift_cost(standing: Standing) -> float:
+    """The cost of a night of waiting, as a fraction of value: the price forecast's rise (later over SALE_ESTIMATE times
+    value, less 1) spread over FORECAST_NIGHTS and negated, so a falling price costs and a rising one pays. 0 for a value
+    that is not positive."""
+    if standing.value <= 0:
+        return 0.0
+    return (1 - standing.later / (SALE_ESTIMATE * standing.value)) / FORECAST_NIGHTS
+
+
+def bench_option(standing: Standing, ctx: Context) -> Verdict:
+    """The reserve of the offers' option value. A player the eleven loses points without in any window (the most over
+    ctx.horizons) gets reserve_price at ctx.rate of that most; no verdict of the board reads it. A bench player (loses
+    nothing in any window, so no jornada needs him: m = MAX_NIGHTS nights of free waiting) gets value times
+    offer_reserve_ratio over ctx.offers with the drift_cost of the standing and hold = later over value, never below later;
+    with no ctx.offers, later. The key is reserve minus offer (negative means sell); with no offer it is None."""
+    lost = lost_points(standing.player, ctx)
+    most = max(lost.values(), default=0.0)
+    if most > NO_LOSS:
+        reserve = reserve_price(most, ctx.rate, standing.later)
+    elif not ctx.offers.ratios or standing.value <= 0:
+        reserve = standing.later
+    else:
+        ratio = offer_reserve_ratio(MAX_NIGHTS, drift_cost(standing), ctx.offers, standing.later / standing.value)
+        reserve = max(standing.later, standing.value * ratio)
+    key = None if standing.offer is None else reserve - standing.offer
+    return Verdict(key, lost, reserve)
+
+
 CHALLENGERS: Mapping[str, Rule] = {
     "r06": worth_rule(STOPGAP_RATE, trend=False),
     "r06_trend": worth_rule(STOPGAP_RATE, trend=True),
+    "bench_option": bench_option,
 }
+
+
+def _histogram(counts: Sequence[int], low: float, width: float) -> OfferDistribution:
+    return offer_ratio_distribution(low + width * (i + 0.5) for i, n in enumerate(counts) for _ in range(n))
+
+
+def _waiting_payoff(m: int, c: float, dist: OfferDistribution, hold: float, shift: float, seed: int, runs: int) -> float:
+    rng = random.Random(seed)
+    ceilings = [offer_reserve_ratio(k, c, dist, hold) + shift for k in range(m)]
+    total = 0.0
+    for _ in range(runs):
+        payoff = hold - c * m
+        for night in range(m):
+            x = rng.choice(dist.ratios)
+            if x >= ceilings[m - night - 1]:
+                payoff = x - c * (night + 1)
+                break
+        total += payoff
+    return total / runs
+
+
+def _selftest_option() -> None:
+    study = _histogram((80, 80, 84, 82, 85, 72, 96, 71, 67, 33), 0.90, 0.021)
+    flat = offer_ratio_distribution(0.9 + 0.2 * (i + 0.5) / 400 for i in range(400))
+    mean = sum(study.ratios) / len(study.ratios)
+    assert offer_ratio_distribution([1.1, 0.9, 1.0]).ratios == (0.9, 1.0, 1.1), "the distribution is sorted"
+    for c in (0.0, 0.0017, 0.007):
+        assert abs(offer_reserve_ratio(1, c, study, 0.0) - (mean - c)) < 1e-12, "one night: the mean offer less the cost"
+        rhos = [offer_reserve_ratio(m, c, study, 0.0) for m in range(0, 12)]
+        assert all(a <= b + 1e-12 for a, b in zip(rhos, rhos[1:])), "more nights never lowers the reserve"
+    for m in (1, 3, 5, 7):
+        costs = [offer_reserve_ratio(m, c, study, 0.0) for c in (0.0, 0.0017, 0.007, 0.02)]
+        assert all(a >= b for a, b in zip(costs, costs[1:])), "a dearer night never raises the reserve"
+    point = offer_ratio_distribution([1.0] * 7)
+    for m in (1, 2, 5):
+        for c in (0.0, 0.0017, 0.01):
+            assert abs(offer_reserve_ratio(m, c, point, 0.0) - (1.0 - c)) < 1e-12, "all ratios 1.0: 1 - c"
+    assert offer_reserve_ratio(3, 0.0017, study, 0.0) >= 1.03 and offer_reserve_ratio(5, 0.0017, study, 0.0) >= 1.04
+    v = 0.0
+    for _ in range(5):
+        v = (1 + v * v) / 2
+    assert abs(offer_reserve_ratio(5, 0.0, flat, 0.0) - (0.9 + 0.2 * v)) < 0.005, "the flat band's closed form"
+    try:
+        offer_reserve_ratio(1, 0.0, NO_OFFERS, 0.0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("no offers, no reserve")
+
+    for m in (1, 3, 5):
+        base = _waiting_payoff(m, 0.0017, study, 0.9, 0.0, 7, 20000)
+        assert abs(base - offer_reserve_ratio(m, 0.0017, study, 0.9)) < 0.003, "the reserve is the optimal waiting value"
+        for shift in (-0.02, -0.01, 0.01, 0.02):
+            assert _waiting_payoff(m, 0.0017, study, 0.9, shift, 7, 20000) <= base + 0.001, "no other threshold waits better"
+
+    value = 1e7
+    now = dt.datetime(2026, 11, 18, tzinfo=dt.timezone.utc)
+    held = _waiting_payoff(MAX_NIGHTS, 0.0, study, SALE_ESTIMATE, 0.0, 11, 20000)
+    bench_ctx = Context({}, {}, 0.0, study)
+    stand = Standing("p", value, None, SALE_ESTIMATE * value)
+    reserve = bench_option(stand, bench_ctx).reserve
+    assert reserve is not None and abs(reserve / value - held) < 0.003, "the rule's reserve is the Monte Carlo waiting value"
+    for gap in (0.004, -0.004):
+        got = bench_option(stand._replace(offer=value * (held + gap)), bench_ctx)
+        assert got.key is not None and (got.key <= 0) == (gap > 0), "the verdict is the Monte Carlo verdict"
+    assert bench_option(stand, bench_ctx._replace(offers=NO_OFFERS)).reserve == stand.later, "no offers seen: the later price"
+    for drift in (-0.2, 0.0, 0.2):
+        s = Standing("p", value, 0.0, SALE_ESTIMATE * value * (1 + drift))
+        assert (bench_option(s, bench_ctx).reserve or 0.0) >= s.later, "a bench reserve is never below the later price"
+    assert Context({}, {}, 0.0) == Context({}, {}, 0.0, NO_OFFERS, STOPGAP_RATE), "the new fields default"
+
+    cuts = [CutBuys(now - dt.timedelta(days=d), [Buy(g, b) for g, b in buys]) for d, buys in
+            ((1, [(10.0, 10e6), (6.0, 5e6)]), (2, []), (3, [(4.0, 8e6)]), (4, [(0.0, 1e6), (-1.0, 1e6)]), (6, [(9.0, 3e6)]), (9, [(90.0, 1e6)]))]
+    assert best_yield([Buy(10.0, 10e6), Buy(6.0, 5e6)]) == 1.2 and best_yield([Buy(0.0, 1e6), Buy(3.0, 0.0)]) is None
+    assert r_estimate(cuts, now) == statistics.median([1.2, 0.5, 3.0]), "the median of the 7 days' best yields"
+    assert r_estimate([], now, 0.4) == 0.4 and r_estimate(cuts[-1:], now) == STOPGAP_RATE, "no buy: carry the last rate"
+    assert r_estimate(cuts, now) > 0
 
 
 def _selftest() -> None:
@@ -148,13 +313,14 @@ def _selftest() -> None:
             pass
         else:
             raise AssertionError("a rate that is not positive is refused")
-    assert set(CHALLENGERS) == {"r06", "r06_trend"}
+    assert set(CHALLENGERS) == {"r06", "r06_trend", "bench_option"}
     assert LIVE is points_per_million
 
     def stub(standing: Standing, ctx: Context) -> Verdict:
         return Verdict(1.0, {}, 2.0)
     rule: Rule = stub
     assert rule(Standing("x", 1.0, 1.0, 1.0), Context({}, {}, 0.0)) == Verdict(1.0, {}, 2.0)
+    _selftest_option()
     print("worth self-test OK")
 
 
