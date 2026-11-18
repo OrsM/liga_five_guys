@@ -5,6 +5,7 @@ import datetime as dt
 import math
 import os
 import sys
+from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, TypeVar
@@ -290,21 +291,31 @@ def record_grades(records: RunRecords, obs: ob.Observations | None = None) -> di
     return {"resolved": resolved, "forecasts": forecasts, **scored}
 
 
+ME = "miguel"
+SIDES = {"buy": ("buy",), "sell": ("sell", "transfer")}
+
+
 class Trade(NamedTuple):
-    """A ledger row of mine: the player, when it happened (with its offset) and the amount."""
+    """A ledger row of a manager: the player, when it happened (with its offset), the amount and the manager (the buyer
+    of a buy, the seller of a sale)."""
     player: str
     at: dt.datetime
     amount: float
+    manager: str
 
 
 class Season(NamedTuple):
-    """What the grading reads of the world at the run's moment: my ledger rows (a row of mine is one whose who is me
-    and that names a player), each jornada's lock in lock order, the jornadas done and each player's points by jornada
-    played."""
+    """What the grading reads of the world at the run's moment: every manager's ledger rows that name a player, which
+    manager is me, each jornada's lock in lock order, the jornadas done, each player's points by jornada played, each
+    player's position and the mean points of the players of a position that scored in a jornada (rule
+    position_mean_counts_appearances)."""
     entries: tuple[ledger.LedgerEntry, ...]
+    me: str
     locks: dict[int, dt.datetime]
     done: set[int]
     scored: dict[str, dict[int, float]]
+    positions: Mapping[str, str]
+    means: Mapping[tuple[str, int], float]
 
 
 class MomentFacts(NamedTuple):
@@ -316,16 +327,30 @@ class MomentFacts(NamedTuple):
     squad: frozenset[str]
 
 
+def position_means(scored: Mapping[str, Mapping[int, float]], positions: Mapping[str, str]) -> dict[tuple[str, int], float]:
+    """For each (position, jornada) with a player of that position who scored in it, the mean of their points; a player
+    with no position counts nowhere."""
+    found: dict[tuple[str, int], list[float]] = {}
+    for player, by_jornada in scored.items():
+        if player in positions:
+            for j, pts in by_jornada.items():
+                found.setdefault((positions[player], j), []).append(pts)
+    return {key: math.fsum(pts) / len(pts) for key, pts in found.items()}
+
+
 def season_at(loaded: loader.Loaded, world: state.World) -> Season:
-    """The Season of the world (rules my_rows_name_a_player, locks_in_lock_order, scored_is_points_played)."""
-    mine = tuple(e for e in ledger.ledger(world, loaded.identity) if e.who == loaded.league.me and e.player is not None)
+    """The Season of the world (rules ledger_rows_name_a_player, locks_in_lock_order, scored_is_points_played,
+    position_mean_counts_appearances)."""
+    rows = tuple(e for e in ledger.ledger(world, loaded.identity) if e.player is not None)
     locks = {r.jornada: when for r in sorted(season_facts.round_locks(world), key=lambda r: (r.lock, r.jornada))
              if (when := snapshot_stamp(r.lock)) is not None}
     scored: dict[str, dict[int, float]] = {}
     for p in season_facts.player_jornadas(world, loaded.identity):
         if p.pts is not None:
             scored.setdefault(p.player, {})[p.jornada] = p.pts
-    return Season(mine, locks, set(season_facts.jornadas_done(world)), scored)
+    positions = {c.player: c.pos for c in current.player_club(world) if c.pos}
+    return Season(rows, loaded.league.me, locks, set(season_facts.jornadas_done(world)), scored, positions,
+                  position_means(scored, positions))
 
 
 def moments_facts(loaded: loader.Loaded, moments: Iterable[dt.datetime], read: Callable[[state.World], T],
@@ -384,11 +409,13 @@ def wanted_moments(trades: Iterable[Trade], locks: Mapping[int, dt.datetime], do
     return out
 
 
-def my_trades(season: Season, kind: str, since: str) -> list[Trade]:
-    """My ledger rows of one kind (buy, sell) from since on (a text comparison of the row's at), oldest first."""
-    found = [Trade(str(e.player), dt.datetime.fromisoformat(e.at), e.amount) for e in season.entries
-             if e.kind == kind and e.at >= since]
-    return sorted(found, key=lambda t: t.at)
+def trades(season: Season, side: str, since: str, who: str | None = None) -> list[Trade]:
+    """The ledger rows of a side (SIDES: buy, or sell for a sale to the game or to a manager) from since on (a text
+    comparison of the row's at), oldest first, each with its manager (the buyer, or the seller); only the rows of who
+    (the manager's name) when given."""
+    found = [Trade(str(e.player), dt.datetime.fromisoformat(e.at), e.amount, str(e.buyer if side == "buy" else e.seller))
+             for e in season.entries if e.kind in SIDES[side] and e.at >= since]
+    return sorted((t for t in found if who in (None, t.manager)), key=lambda t: (t.at, t.player))
 
 
 def lock_after(at: dt.datetime, locks: Sequence[dt.datetime]) -> dt.datetime | None:
@@ -404,25 +431,41 @@ def buys_between(buys: Sequence[Trade], start: dt.datetime, end: dt.datetime | N
 def sale_facts(sale: Trade, buys: Sequence[Trade], lock: dt.datetime | None,
                facts: Mapping[dt.datetime, MomentFacts]) -> salegrade.Sale:
     """The sale as the facts stood a minute before it (facts at that moment): his market value (the amount if none was
-    seen), whether he was in the latest line-up seen, whether he was flagged, and whether a buy of mine fell before the
-    lock (lock None: no bound)."""
+    seen), whether he was in my latest line-up seen, whether he was flagged, and whether a buy fell before the lock (lock
+    None: no bound). The line-up is mine: the caller states in_eleven None for a sale of another manager's."""
     then = facts[sale.at - MINUTE]
     return salegrade.Sale(sale.player, sale.amount, then.market.get(sale.player) or sale.amount, sale.player in then.eleven,
                           sale.player in then.flagged, buys_between(buys, sale.at, lock))
 
 
 class Sold(NamedTuple):
-    """A sale of mine with the moment it was made."""
+    """A sale with the moment it was made and who made it: ME, or m1, m2, ... for the other managers (the name never
+    leaves the Season)."""
     at: dt.datetime
     sale: salegrade.Sale
+    who: str
 
 
-def sales_since(season: Season, day: str, facts: Mapping[dt.datetime, MomentFacts]) -> list[Sold]:
-    """Each of my sales from the day on (a date, YYYY-MM-DD), with its moment and as a salegrade.Sale read at that
-    moment (sale_facts); funded_buy is a buy of mine between the sale and the next lock."""
-    buys = my_trades(season, "buy", day)
+def aliases(sells: Iterable[Trade], me: str) -> dict[str, str]:
+    """A label for each manager of the sales: ME for me, then m1, m2, ... for the others in order of most sales (a tie
+    by name)."""
+    count = Counter(t.manager for t in sells if t.manager != me)
+    return {me: ME} | {m: "m%d" % i for i, m in enumerate(sorted(count, key=lambda m: (-count[m], m)), 1)}
+
+
+def sold_since(season: Season, day: str, facts: Mapping[dt.datetime, MomentFacts]) -> list[Sold]:
+    """Every manager's sales from the day on (a date, YYYY-MM-DD), oldest first, each with its moment, its label (aliases)
+    and as a salegrade.Sale read at that moment (sale_facts); funded_buy is a buy of the same manager between the sale
+    and the next lock. in_eleven is known for my sales only, else None."""
+    sells = trades(season, "sell", day)
+    label = aliases(sells, season.me)
+    buys = trades(season, "buy", day)
     locks = sorted(season.locks.values())
-    return [Sold(s.at, sale_facts(s, buys, lock_after(s.at, locks), facts)) for s in my_trades(season, "sell", day)]
+    out = []
+    for s in sells:
+        sale = sale_facts(s, [b for b in buys if b.manager == s.manager], lock_after(s.at, locks), facts)
+        out.append(Sold(s.at, sale if s.manager == season.me else sale._replace(in_eleven=None), label[s.manager]))
+    return out
 
 
 def horizon_jornadas(at: dt.datetime, locks: dict[int, dt.datetime], done: set[int]) -> dict[str, frozenset[int]]:
@@ -455,39 +498,94 @@ def fielded_at_locks(locks: dict[int, dt.datetime], done: set[int],
     return {j: set(facts[locks[j] - MINUTE].eleven) for j in done & set(locks)}
 
 
-def course(sold: Sold, locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]],
-           fielded: dict[int, set[str]], facts: Mapping[dt.datetime, MomentFacts]) -> salegrade.Course | None:
-    """What followed the sale at each horizon of horizon_jornadas: what he scored (sold); what my players on the bench
-    when he was sold (benched_at) scored in the jornadas they were fielded (fielded: the eleven at each lock), for an
-    eleven sale only, else 0 (cover); and his latest market value at the lock of the horizon's last jornada
-    (value_after, from facts; never the sale amount). None if no jornada is done at the lock horizon (then none is at
-    any) or if no market value of his was seen by then."""
-    spans = horizon_jornadas(sold.at, locks, done)
+def course(sold: Sold, season: Season, fielded: dict[int, set[str]], facts: Mapping[dt.datetime, MomentFacts]) -> salegrade.Course | None:
+    """What followed the sale at each horizon of horizon_jornadas: what he scored (sold); for an eleven sale what my
+    players on the bench when he was sold (benched_at) scored in the jornadas they were fielded (fielded: the eleven at
+    each lock), for a sale of unknown eleven membership the position's mean points over the horizon (Season.means), for a
+    bench sale 0 (cover); and his latest market value at the lock of the horizon's last jornada (value_after, from facts;
+    never the sale amount). None if no jornada is done at the lock horizon (then none is at any), if no market value of
+    his was seen by then, or if his position is unknown and so is his membership."""
+    spans = horizon_jornadas(sold.at, season.locks, season.done)
     if not spans["lock"]:
         return None
-    bench = benched_at(sold.at - MINUTE, facts) if sold.sale.in_eleven else set()
+    player = sold.sale.player
+    if sold.sale.in_eleven is None:
+        position = season.positions.get(player)
+        if position is None:
+            return None
+        cover = {h: math.fsum(season.means.get((position, j), 0.0) for j in spans[h]) for h in HORIZONS}
+    else:
+        bench = benched_at(sold.at - MINUTE, facts) if sold.sale.in_eleven else set()
+        cover = {h: sum(points(season.scored, p, [j]) for j in spans[h] for p in bench & fielded[j]) for h in HORIZONS}
     after: dict[str, float] = {}
     for h in HORIZONS:
-        value = facts[locks[max(spans[h])]].market.get(sold.sale.player)
+        value = facts[season.locks[max(spans[h])]].market.get(player)
         if value is None:
             return None
         after[h] = value
-    return salegrade.Course(
-        sold={h: points(scored, sold.sale.player, spans[h]) for h in HORIZONS},
-        cover={h: sum(points(scored, p, [j]) for j in spans[h] for p in bench & fielded[j]) for h in HORIZONS},
-        value_after=after)
+    return salegrade.Course({h: points(season.scored, player, spans[h]) for h in HORIZONS}, cover, after)
 
 
 def graded_count(season: Season) -> int:
     """How many of my sales from SALES_FROM have a done jornada at their lock horizon, from the ledger alone."""
-    return sum(1 for t in my_trades(season, "sell", SALES_FROM) if horizon_jornadas(t.at, season.locks, season.done)["lock"])
+    return sum(1 for t in trades(season, "sell", SALES_FROM, season.me) if horizon_jornadas(t.at, season.locks, season.done)["lock"])
 
 
-def graded_sales(sold: Sequence[Sold], locks: dict[int, dt.datetime], done: set[int], scored: dict[str, dict[int, float]],
-                 fielded: dict[int, set[str]], facts: Mapping[dt.datetime, MomentFacts]) -> list[salegrade.Graded]:
-    """The sales that have a course (course), each graded at RATE (salegrade.grade); a sale with no course is left out."""
-    courses = [(s.sale, course(s, locks, done, scored, fielded, facts)) for s in sold]
-    return [salegrade.grade(sale, got, RATE) for sale, got in courses if got is not None]
+class Followed(NamedTuple):
+    """A sale with the course that followed it."""
+    sale: salegrade.Sale
+    course: salegrade.Course
+
+
+def followed(sold: Sequence[Sold], season: Season, fielded: dict[int, set[str]],
+             facts: Mapping[dt.datetime, MomentFacts]) -> list[Followed]:
+    """The sales that have a course (course); a sale with none is left out."""
+    courses = [(s.sale, course(s, season, fielded, facts)) for s in sold]
+    return [Followed(sale, got) for sale, got in courses if got is not None]
+
+
+def graded_sales(sold: Sequence[Sold], season: Season, fielded: dict[int, set[str]],
+                 facts: Mapping[dt.datetime, MomentFacts]) -> list[salegrade.Graded]:
+    """The sales that have a course, each graded at RATE (salegrade.grade); their in_eleven is known."""
+    return [salegrade.grade(f.sale, f.course, RATE) for f in followed(sold, season, fielded, facts)]
+
+
+def proxied_sales(sold: Sequence[Sold], season: Season, fielded: dict[int, set[str]],
+                  facts: Mapping[dt.datetime, MomentFacts]) -> list[salegrade.Readings]:
+    """The sales that have a course once their eleven membership is taken as unknown (a sale of mine too), each as its
+    two readings at RATE (salegrade.readings): benched and in the eleven."""
+    unknown = [s._replace(sale=s.sale._replace(in_eleven=None)) for s in sold]
+    return [salegrade.readings(f.sale, f.course, RATE) for f in followed(unknown, season, fielded, facts)]
+
+
+class Scored(NamedTuple):
+    """A Score of a group of sales: miguel, a rival (m1, m2, ...), rivals, league, or a rule."""
+    group: str
+    score: salegrade.Score
+
+
+def known_scores(group: str, sold: Sequence[Sold], season: Season, fielded: dict[int, set[str]],
+                 facts: Mapping[dt.datetime, MomentFacts]) -> list[Scored]:
+    """The Scores (salegrade.scores: all, bench, eleven) of the group's sales, whose eleven membership is known."""
+    return [Scored(group, x) for x in salegrade.scores(graded_sales(sold, season, fielded, facts))]
+
+
+def league_scores(sold: Sequence[Sold], season: Season, fielded: dict[int, set[str]],
+                  facts: Mapping[dt.datetime, MomentFacts]) -> list[Scored]:
+    """The proxy Scores (salegrade.proxy_scores) of each rival, m1 on, then of all rivals and of the league (every
+    manager's sales, mine too, taken as unknown)."""
+    rivals = [s for s in sold if s.who != ME]
+    groups = {who: [s for s in rivals if s.who == who] for who in sorted({s.who for s in rivals})}
+    groups |= {"rivals": rivals, "league": list(sold)}
+    return [Scored(group, x) for group, members in groups.items()
+            for x in salegrade.proxy_scores(proxied_sales(members, season, fielded, facts))]
+
+
+def sale_scores(sold: Sequence[Sold], season: Season, fielded: dict[int, set[str]],
+                facts: Mapping[dt.datetime, MomentFacts]) -> list[Scored]:
+    """The Scores of my sales (known_scores, group miguel) then of the league's (league_scores): the sale_score records."""
+    mine = [s for s in sold if s.who == ME]
+    return [*known_scores(ME, mine, season, fielded, facts), *league_scores(sold, season, fielded, facts)]
 
 
 def read_storage(obs: ob.Observations | None = None) -> tuple[loader.Loaded, list[str]]:
@@ -510,19 +608,22 @@ def latest_values(measure: str) -> dict[str, float]:
 
 
 def record_sales(loaded: loader.Loaded, records: RunRecords) -> None:
-    """Each sale from SALES_FROM with a done jornada at its lock, graded at RATE (salegrade.grade) and summarised
-    (salegrade.measure_values), is added to the run's measure_log as sale_grade with jornadas_done, unless the latest one
-    logged has the same all.lock.n (graded_count) and jornadas_done; then no sale is read. loaded is the storage the
-    caller has read (read_storage): record_sales reads none."""
+    """Every manager's sales from SALES_FROM with a done jornada at their lock, graded at RATE, are added to the run's
+    records as sale_score (sale_scores: my sales by case, then each rival's, all rivals' and the league's by proxy), whatever
+    the run before held; and my sales summarised (salegrade.measure_values) are added to the measure_log as sale_grade with
+    jornadas_done, unless the latest one logged has the same all.lock.n (graded_count) and jornadas_done. loaded is the
+    storage the caller has read (read_storage)."""
     now = season(loaded)
+    facts = facts_for(loaded, wanted_moments(trades(now, "sell", SALES_FROM), now.locks, now.done))
+    fielded = fielded_at_locks(now.locks, now.done, facts)
+    sold = sold_since(now, SALES_FROM, facts)
+    records.add("sale_score", [{"group": x.group, **x.score._asdict()} for x in sale_scores(sold, now, fielded, facts)])
     marks = {"all.lock.n": float(graded_count(now)), "jornadas_done": float(len(now.done))}
     latest = latest_values("sale_grade")
     if all(latest.get(k) == v for k, v in marks.items()):
         return
-    facts = facts_for(loaded, wanted_moments(my_trades(now, "sell", SALES_FROM), now.locks, now.done))
-    fielded = fielded_at_locks(now.locks, now.done, facts)
-    sold = sales_since(now, SALES_FROM, facts)
-    values = salegrade.measure_values(salegrade.summary(graded_sales(sold, now.locks, now.done, now.scored, fielded, facts)))
+    mine = [s for s in sold if s.who == ME]
+    values = salegrade.measure_values(salegrade.summary(graded_sales(mine, now, fielded, facts)))
     log_measure(records, "sale_grade", values | {"jornadas_done": marks["jornadas_done"]})
 
 
@@ -539,14 +640,6 @@ class Choice(NamedTuple):
     player: str
     at: dt.datetime
     amount: float
-
-
-class RuleScore(NamedTuple):
-    rule: str
-    horizon: str
-    n: int
-    total_net: float
-    per_million: float
 
 
 def first_sales(cuts: Sequence[Cut], rules: Mapping[str, worth.Rule]) -> dict[str, list[Choice]]:
@@ -567,59 +660,109 @@ def first_sales(cuts: Sequence[Cut], rules: Mapping[str, worth.Rule]) -> dict[st
     return out
 
 
-def score_rows(name: str, graded: Sequence[salegrade.Graded]) -> list[RuleScore]:
-    """One RuleScore per horizon of salegrade.HORIZONS for the graded sales: their count, total net points and net
-    points per million raised; n is 0 and the totals 0 when there are none."""
-    return [RuleScore(name, r.horizon, r.n, r.mean_net * r.n, r.per_million)
-            for r in salegrade.summary(graded) if r.case == "all"]
+def offers_at(world: state.World) -> worth.OfferDistribution:
+    """The distribution of offer over value (worth.offer_ratio_distribution) of the market offers the world has seen: each
+    was created before it was first observed, so none is created after the cut."""
+    return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
 
 
-def replayed_cut(decided: decision.Decided | decision.Stale) -> Cut | None:
+def buys_at(decided: decision.Decided, at: dt.datetime) -> worth.CutBuys:
+    """The buys of the decision at the moment at: each market opportunity with a bid, its gain and its bid."""
+    return worth.CutBuys(at, [worth.Buy(r["gain"], r["bid"]) for r in decision.opportunity_rows(decided.inputs)
+                              if r["status"] == "market" and r["bid"] is not None])
+
+
+def replayed_cut(decided: decision.Decided | decision.Stale, offers: worth.OfferDistribution = worth.NO_OFFERS,
+                 rate: float = worth.STOPGAP_RATE) -> Cut | None:
     """The Cut of a decision that has standing offers on my players (rule replayed_cut_needs_offers: its extras'
-    offers), so the context and the later sale prices are those of the cut; None for a Stale cut or one with no offer."""
+    offers), so the context (with the offers distribution and exchange rate given) and the later sale prices are those of
+    the cut; None for a Stale cut or one with no offer."""
     at = None if isinstance(decided, decision.Stale) else snapshot_stamp(decided.cut)
     if isinstance(decided, decision.Stale) or at is None or not decided.extras.offers:
         return None
     standings = [worth.Standing(o.player, o.value, o.money, later_sale(decided.inputs, o.player, o.value))
                  for o in decided.extras.offers]
-    return Cut(at + MINUTE, context(decided.inputs), standings)
+    return Cut(at + MINUTE, context(decided.inputs, offers, rate), standings)
 
 
 def replayed_cuts(loaded: loader.Loaded, cuts: Sequence[str]) -> list[Cut]:
-    """The Cut (replayed_cut) of each cut that has one, ascending, from one streamed replay: only the Cuts are kept."""
+    """The Cut (replayed_cut) of each cut that has one, ascending, from one streamed replay, each with the offers seen by
+    its cut (offers_at) and the exchange rate at it (worth.r_estimate over the buys of the cuts up to it, carrying the
+    rate of the Cut before it); only the Cuts and the buys are kept."""
     out: list[Cut] = []
+    seen: list[worth.CutBuys] = []
 
-    def keep(_: str, decided: decision.Decided | decision.Stale) -> None:
-        cut = replayed_cut(decided)
+    def keep(world: state.World) -> None:
+        decided = decision.decision_at(loaded, world)
+        at = None if isinstance(decided, decision.Stale) else snapshot_stamp(world.cut)
+        if isinstance(decided, decision.Stale) or at is None:
+            return
+        seen.append(buys_at(decided, at))
+        cut = replayed_cut(decided, offers_at(world), worth.r_estimate(seen, at + MINUTE, out[-1].ctx.rate if out else worth.STOPGAP_RATE))
         if cut is not None:
             out.append(cut)
-    decision.replay(loaded, cuts, keep)
+    state.sweep(loaded.obs, cuts, keep)
     return out
 
 
-def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> list[RuleScore]:
-    """On demand, never in the grade stage: "actual" (my real sales from since, sales_since) and each rule (first_sales
-    over replayed_cuts at the replay cuts from since) as RuleScores, every sale graded by the same
-    course at RATE (graded_sales)."""
+class RuleScores(NamedTuple):
+    """What rule_scores grades: the Scores, and the sales behind them by group (ME and each rule), first sale of a player
+    first."""
+    scores: list[Scored]
+    graded: dict[str, list[salegrade.Graded]]
+
+
+def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> RuleScores:
+    """On demand, never in the grade stage: my real sales from since (group miguel) and each rule's (first_sales over
+    replayed_cuts at the replay cuts from since) as Scores by case, then the league's proxy Scores (league_scores), with
+    the graded sales of me and of each rule; every sale graded by the same course at RATE."""
     loaded, cuts = read_storage()
     now = season(loaded)
     chosen = first_sales(replayed_cuts(loaded, [c for c in cuts if c >= since and snapshot_stamp(c) is not None]), rules)
-    made = {name: [Trade(c.player, c.at, c.amount) for c in got] for name, got in chosen.items()}
-    facts = facts_for(loaded, wanted_moments([*my_trades(now, "sell", since), *(t for ts in made.values() for t in ts)], now.locks, now.done))
+    made = {name: [Trade(c.player, c.at, c.amount, now.me) for c in got] for name, got in chosen.items()}
+    facts = facts_for(loaded, wanted_moments([*trades(now, "sell", since), *(t for ts in made.values() for t in ts)], now.locks, now.done))
     fielded = fielded_at_locks(now.locks, now.done, facts)
-    sold = {"actual": sales_since(now, since, facts)} | {
-        name: [Sold(t.at, sale_facts(t, [], None, facts)) for t in ts] for name, ts in made.items()}
-    return [row for name, found in sold.items()
-            for row in score_rows(name, graded_sales(found, now.locks, now.done, now.scored, fielded, facts))]
+    sold = sold_since(now, since, facts)
+    ruled = {name: [Sold(t.at, sale_facts(t, [], None, facts), ME) for t in ts] for name, ts in made.items()}
+    groups = {ME: [s for s in sold if s.who == ME], **ruled}
+    return RuleScores([*(x for group, members in groups.items() for x in known_scores(group, members, now, fielded, facts)),
+                       *league_scores(sold, now, fielded, facts)],
+                      {group: graded_sales(members, now, fielded, facts) for group, members in groups.items()})
 
 
-def rule_report(scores: Sequence[RuleScore]) -> str:
-    """A table, a line for each score: rule, horizon, n, total net points and net points per million. Every line is
-    the same length."""
-    head = ("rule", "horizon", "n", "net", "net/M")
-    body = [(s.rule, s.horizon, str(s.n), "%.1f" % s.total_net, "%.2f" % s.per_million) for s in scores]
+PAIRED_RULE = "bench_option"
+PAIRED_CASE = "bench"
+
+
+def paired_report(graded: Mapping[str, Sequence[salegrade.Graded]]) -> str:
+    """The paired comparison of PAIRED_RULE with my sales on the PAIRED_CASE subset (salegrade.paired, per horizon: the
+    total difference D with n_U, its pieces and its bootstrap 90% interval), each side's total per million raised, and the
+    gate verdict line (salegrade.gate)."""
+    rule, mine = (salegrade.first_per_player([g for g in graded[who] if PAIRED_CASE in salegrade.cases(g.sale)]) for who in (PAIRED_RULE, ME))
+    pairs = [salegrade.paired(rule, mine, h) for h in HORIZONS]
+    sides = {who: [salegrade.score(PAIRED_CASE, side, h) for h in HORIZONS] for who, side in ((PAIRED_RULE, rule), (ME, mine))}
+    lines = ["PAIRED %s minus %s, %s sales only, first sale of each player, net 0 where a side did not sell him" % (
+        PAIRED_RULE, ME, PAIRED_CASE)]
+    for p in pairs:
+        lines.append("  D(%-6s) %+8.1f  n_U %d  both %d: %+.1f  only %s %d: %+.1f  only %s %d: %+.1f  bootstrap 90%% %.1f..%.1f" % (
+            p.horizon, p.total, p.n, p.both.n, p.both.net, PAIRED_RULE, p.only_rule.n, p.only_rule.net, ME, p.only_other.n,
+            p.only_other.net, p.low, p.high))
+    for who, scored in sides.items():
+        lines.append("  %-12s n %d  per million raised  %s" % (who, scored[0].n, "  ".join("%s %.3f" % (s.horizon, s.per_million) for s in scored)))
+    verdict = salegrade.gate(pairs, sides[PAIRED_RULE], sides[ME])
+    lines.append("GATE %s: %s" % ("PASS" if verdict.passed else "FAIL", "; ".join(verdict.reasons)))
+    return "\n".join(lines)
+
+
+def rule_report(scores: Sequence[Scored]) -> str:
+    """A table, a line for each Score: group, case, horizon, n, total net points, net points per million, the total
+    with one sale left out (min..max) and its bootstrap interval. Every line is the same length."""
+    head = ("group", "case", "horizon", "n", "net", "net/M", "leave-one-out", "bootstrap 95%")
+    body = [(x.group, x.score.case, x.score.horizon, str(x.score.n), "%.1f" % x.score.total_net, "%.2f" % x.score.per_million,
+             "%.1f..%.1f" % (x.score.loo_min, x.score.loo_max), "%.1f..%.1f" % (x.score.bootstrap_lo, x.score.bootstrap_hi))
+            for x in scores]
     widths = [max(len(r[i]) for r in [head, *body]) for i in range(len(head))]
-    return "\n".join("  ".join(c.ljust(w) if i < 2 else c.rjust(w) for i, (c, w) in enumerate(zip(r, widths)))
+    return "\n".join("  ".join(c.ljust(w) if i < 3 else c.rjust(w) for i, (c, w) in enumerate(zip(r, widths)))
                      for r in [head, *body])
 
 
@@ -717,6 +860,12 @@ def price_grades(loaded: loader.Loaded) -> list[price_fold.Grade]:
     return sorted(sorted(got, key=lambda g: g.h), key=lambda g: g.scope, reverse=True)
 
 
+def _season(entries: tuple[ledger.LedgerEntry, ...] = (), locks: dict[int, dt.datetime] | None = None, done: set[int] | None = None,
+            scored: dict[str, dict[int, float]] | None = None, positions: Mapping[str, str] | None = None,
+            means: Mapping[tuple[str, int], float] | None = None) -> Season:
+    return Season(entries, "me", locks or {}, done or set(), scored or {}, positions or {}, means or {})
+
+
 @contextlib.contextmanager
 def _selftest_scratch_store() -> Iterator[None]:
     """A store under a scratch root (FF_ROOT) for the block, the environment restored after."""
@@ -775,7 +924,7 @@ def _selftest_stand() -> None:
         entered.append("grades")
         return []
     stub: dict[str, Any] = {
-        "read_storage": lambda obs=None: (None, []), "season": lambda loaded: Season((), {}, {1, 2}, {}),
+        "read_storage": lambda obs=None: (None, []), "season": lambda loaded: _season(done={1, 2}),
         "results_seen": lambda loaded, moment: Results(1, 1, "c"),
         "graded": lambda sha, last: held["graded"], "auctions_scored": lambda sha, loaded, now: held["scored"],
         "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda loaded, records: None}
@@ -799,7 +948,7 @@ def _selftest_window() -> None:
     sale = lock - dt.timedelta(days=1)
 
     def buy(at: dt.datetime) -> Trade:
-        return Trade("x", at, 1.0)
+        return Trade("x", at, 1.0, "me")
     assert buys_between([buy(sale + hour)], sale, lock), "a buy inside the window funds the sale"
     assert not buys_between([buy(sale - hour)], sale, lock), "a buy before the sale does not"
     assert not buys_between([buy(lock)], sale, lock), "a buy exactly at the lock does not"
@@ -826,18 +975,24 @@ def _selftest_cover() -> None:
         out[day - MINUTE] = MomentFacts({}, frozenset("sc"), frozenset(), frozenset("sabc"))
         return out
     assert benched_at(day - MINUTE, facts_with({})) == {"a", "b"}, "my squad less the eleven fielded then"
-    assert course(Sold(day, sale), locks, done, scored, fielded, facts_with({})) is None, "no value of his seen: not graded"
+    now = _season(locks=locks, done=done, scored=scored, positions={"s": "MED"}, means={("MED", 1): 2.0, ("MED", 2): 5.0})
+    assert course(Sold(day, sale, ME), now, fielded, facts_with({})) is None, "no value of his seen: not graded"
     facts = facts_with({1: 4e6, 2: 6e6, 3: 7e6})
-    got = course(Sold(day, sale), locks, done, scored, fielded, facts)
+    got = course(Sold(day, sale, ME), now, fielded, facts)
     assert got is not None
     assert got.value_after == {"lock": 4e6, "next4": 7e6, "season": 7e6}, \
         "his value at the lock of each horizon's last jornada, never the sale amount"
     assert got.cover == {"lock": 0.0, "next4": 6.0 + 1.0 + 2.0, "season": 6.0 + 1.0 + 2.0}, \
         "a and b count only in the jornadas they were fielded (c was never on the bench)"
     assert got.sold["season"] == 9.0
-    other = course(Sold(day, sale._replace(in_eleven=False)), locks, done, scored, fielded, facts)
+    other = course(Sold(day, sale._replace(in_eleven=False), ME), now, fielded, facts)
     assert other is not None and not any(other.cover.values()), "a bench sale has no cover"
-    assert course(Sold(locks[3], sale), locks, done, scored, fielded, facts) is None, "no jornada after the sale"
+    assert course(Sold(locks[3], sale, ME), now, fielded, facts) is None, "no jornada after the sale"
+    unknown = sale._replace(in_eleven=None)
+    proxy = course(Sold(day, unknown, "m1"), now, fielded, facts)
+    assert proxy is not None and proxy.cover == {"lock": 2.0, "next4": 7.0, "season": 7.0}, \
+        "an unknown sale's cover is the position's mean points over the horizon's jornadas"
+    assert course(Sold(day, unknown, "m1"), now._replace(positions={}), fielded, facts) is None, "no position: not graded"
 
 
 def _selftest_moment_facts() -> None:
@@ -893,42 +1048,85 @@ def _selftest_points() -> None:
 
 
 def _selftest_record_sales() -> None:
-    """record_sales logs the sales' measure once for a given number of graded sales and jornadas done: a second call
-    with nothing new adds no rows and reads no sale, a jornada done adds a set; a sale with no course is not graded."""
+    """record_sales adds the sale scores to every run, the same rows when nothing is new, and logs the sales' measure
+    once for a given number of graded sales and jornadas done: a second call adds no measure rows, a jornada done adds a
+    set; a sale with no course is not graded."""
     at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
     locks = {1: at + dt.timedelta(days=2), 2: at + dt.timedelta(days=9)}
-    held: dict[str, Any] = {"done": {1}, "read": 0}
+    held: dict[str, Any] = {"done": {1}}
     storage: Any = None
     entries = tuple(ledger.LedgerEntry(at.isoformat(), "sell", "me", None, "p", 5e6, None, "me", 0) for _ in range(2))
-    sold = [Sold(at, salegrade.Sale("p", 5e6, 5e6, True, False, False))] * 2
+    sale = salegrade.Sale("p", 5e6, 5e6, True, False, False)
+    sold = [Sold(at, sale, ME)] * 2 + [Sold(at, sale._replace(in_eleven=None), "m1")]
     flat = {h: 1.0 for h in HORIZONS}
     ok = salegrade.Course(flat, flat, flat)
-
-    def read(now: Season, day: str, facts: Mapping[dt.datetime, MomentFacts]) -> list[Sold]:
-        held["read"] += 1
-        return sold
     stub: dict[str, Any] = {
-        "season": lambda loaded: Season(entries, locks, held["done"], {}),
-        "facts_for": lambda loaded, wanted: {}, "sales_since": read,
-        "course": lambda s, locks, done, scored, fielded, facts: ok if len(done) else None,
+        "season": lambda loaded: _season(entries, locks, held["done"], positions={"p": "MED"}),
+        "facts_for": lambda loaded, wanted: {}, "sold_since": lambda now, day, facts: sold,
+        "course": lambda s, now, fielded, facts: ok if len(now.done) else None,
         "fielded_at_locks": lambda locks, done, facts: {}}
     kept = {k: globals()[k] for k in stub}
 
-    def logged(run: int) -> int:
+    def logged(run: int) -> tuple[int, list[Any]]:
         records = RunRecords(run, "a")
         record_sales(storage, records)
         records.publish(rec.Run(run, "t", "t", "service", "a", "t", 1, 1.0))
-        return len(records.rows("measure_log"))
+        return len(records.rows("measure_log")), records.rows("sale_score")
     with _selftest_scratch_store():
         try:
             globals().update(stub)
-            first = logged(1)
+            first, scores = logged(1)
             assert first > 0 and latest_values("sale_grade")["all.lock.n"] == 2
-            assert logged(2) == 0 and held["read"] == 1, "nothing new: no rows, no sale read"
+            assert {r.group for r in scores} == {ME, "m1", "rivals", "league"} and all(r.run_id == 1 for r in scores)
+            again, rows = logged(2)
+            assert again == 0 and [r._replace(run_id=1) for r in rows] == scores, "nothing new: no measure rows, the same scores"
             held["done"] = {1, 2}
-            assert logged(3) == first, "a jornada done: a new set"
+            assert logged(3)[0] == first, "a jornada done: a new set"
         finally:
             globals().update(kept)
+
+
+def _selftest_league() -> None:
+    """Every manager's sales are built by one function and graded by the same grader: each sale of every manager (to the game
+    or to another manager) is there once, the labels hide the names (me first, the others by sale count), my eleven
+    membership is known and a rival's is not, a buy funds only its own manager's sale, the league group is every sale, and
+    the scores do not change with the order of the sales or by grading them twice."""
+    at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
+    lock = {1: at + dt.timedelta(days=3), 2: at + dt.timedelta(days=10)}
+
+    def entry(day: int, kind: str, who: str, other: str | None, player: str, amount: float, buyer: str | None, seller: str | None) -> ledger.LedgerEntry:
+        return ledger.LedgerEntry((at + dt.timedelta(days=day)).isoformat(), kind, who, other, player, amount, buyer, seller, 0)
+    rows = (entry(0, "sell", "me", None, "a", 5e6, None, "me"), entry(0, "sell", "bob", None, "b", 6e6, None, "bob"),
+            entry(1, "sell", "cat", None, "c", 4e6, None, "cat"), entry(1, "transfer", "cat", "bob", "d", 3e6, "cat", "bob"),
+            entry(1, "sell", "bob", None, "e", 2e6, None, "bob"), entry(1, "buy", "bob", None, "f", 9e6, "bob", None),
+            entry(-9, "sell", "bob", None, "g", 1e6, None, "bob"))
+    now = _season(rows, lock, {1, 2}, {p: {1: 3.0, 2: 1.0} for p in "abcdef"}, dict.fromkeys("abcdef", "DEF"), {("DEF", 1): 1.0, ("DEF", 2): 2.0})
+    got = trades(now, "sell", "2026-08-25")
+    assert sorted((t.player, t.manager) for t in got) == [("a", "me"), ("b", "bob"), ("c", "cat"), ("d", "bob"), ("e", "bob")], \
+        "a sale to the game and a transfer are each a sale of the seller, nothing before the day"
+    assert [t.player for t in trades(now, "buy", "2026-08-25")] == ["f"] and not trades(now, "sell", "2026-08-25", "nobody")
+    assert aliases(got, "me") == {"me": ME, "bob": "m1", "cat": "m2"}, "me first, the others by most sales"
+    market = {"a": 5e6, "b": 6e6, "c": 4e6, "d": 3e6, "e": 2e6}
+    facts = {t.at - MINUTE: MomentFacts(market, frozenset("a"), frozenset(), frozenset("a")) for t in got}
+    facts |= {when: MomentFacts({p: 4e6 for p in "abcde"}, frozenset(), frozenset(), frozenset()) for when in lock.values()}
+    sold = sold_since(now, "2026-08-25", facts)
+    assert sorted((s.who, s.sale.player) for s in sold) == [("m1", "b"), ("m1", "d"), ("m1", "e"), ("m2", "c"), (ME, "a")]
+    assert all((s.sale.in_eleven is None) == (s.who != ME) for s in sold) and next(s for s in sold if s.who == ME).sale.in_eleven
+    assert next(s for s in sold if s.sale.player == "b").sale.funded_buy and not next(s for s in sold if s.sale.player == "c").sale.funded_buy, \
+        "bob's buy funds bob's sale, not cat's"
+    fielded = {1: set("a"), 2: set("a")}
+    base = sale_scores(sold, now, fielded, facts)
+    assert {x.group for x in base} == {ME, "m1", "m2", "rivals", "league"}
+    by = {(x.group, x.score.case, x.score.horizon): x.score for x in base}
+    assert by[(ME, "all", "lock")].n == 1 and by[("rivals", "bench-proxy", "lock")].n == 4 and by[("league", "bench-proxy", "lock")].n == 5, \
+        "rivals' sales, and the league's with mine"
+    for h in HORIZONS:
+        assert by[("league", "eleven-proxy bound", h)].total_net != by[("league", "bench-proxy", h)].total_net
+    assert sale_scores(sold, now, fielded, facts) == base, "grading twice gives the same rows"
+    assert sale_scores(sold[::-1], now, fielded, facts) == base, "the order of the sales does not matter"
+    assert sale_scores(sold + sold[:0], now._replace(positions={}), fielded, facts) != base, "a rival with no position is left out"
+    assert position_means({"a": {1: 4.0}, "b": {1: 2.0, 2: 6.0}, "c": {1: 9.0}}, {"a": "X", "b": "X"}) == {("X", 1): 3.0, ("X", 2): 6.0}, \
+        "the position's mean over the players who scored; a player with no position counts nowhere"
 
 
 def _selftest_horizons() -> None:
@@ -973,10 +1171,12 @@ def _selftest_rule_scores() -> None:
     flat = {h: 1.0 for h in HORIZONS}
     sale = salegrade.Sale("p", 2e6, 2e6, True, False, False)
     graded = [salegrade.grade(sale, salegrade.Course(flat, flat, flat), RATE)] * 3
-    for h, row in zip(HORIZONS, score_rows("r", graded)):
-        assert row.rule == "r" and row.horizon == h and row.n == 3 and abs(row.total_net - 3 * graded[0].net[h]) < 1e-9
-    assert [r.n for r in score_rows("r", [])] == [0] * len(HORIZONS), "no sales: n is 0"
-    table = rule_report(score_rows("a_long_rule_name", graded) + score_rows("r", []))
+    scored = [Scored("r", x) for x in salegrade.scores(graded)]
+    for h, row in zip(HORIZONS, [x.score for x in scored if x.score.case == "all"]):
+        assert row.horizon == h and row.n == 3 and abs(row.total_net - 3 * graded[0].net[h]) < 1e-9
+    empty = [Scored("a_long_rule_name", x) for x in salegrade.scores([])]
+    assert all(x.score.n == 0 for x in empty), "no sales: n is 0"
+    table = rule_report(scored + empty)
     assert len({len(line) for line in table.splitlines()}) == 1, "every line is the same length"
 
 
@@ -993,7 +1193,13 @@ def _selftest_replayed_cuts() -> None:
     got = [c for c in map(replayed_cut, decided) if c is not None]
     assert [stamp(c.at - MINUTE) for c in got] == [d.cut for d in offered], "a Cut a decision with offers, a minute on"
     assert [[s.player for s in c.standings] for c in got] == [[o.player for o in d.extras.offers] for d in offered]
-    assert replayed_cuts(loaded, _CUTS) == got, "the streamed replay keeps the same Cuts"
+    streamed = replayed_cuts(loaded, _CUTS)
+    assert [(c.at, c.standings) for c in streamed] == [(c.at, c.standings) for c in got], "the streamed replay keeps the same Cuts"
+    assert all(c.ctx.horizons == d.ctx.horizons and c.ctx.rate > 0 for c, d in zip(streamed, got)), "the rate is positive"
+    offered_at = [len(c.ctx.offers.ratios) for c in streamed]
+    assert offered_at == sorted(offered_at), "offers are only added as the cuts go on: none from after a cut"
+    with_offers = replayed_cut(offered[0], worth.offer_ratio_distribution([0.9, 1.1]), 0.25)
+    assert with_offers is not None and with_offers.ctx.offers.ratios == (0.9, 1.1) and with_offers.ctx.rate == 0.25
     emptied = [d._replace(extras=d.extras._replace(offers=[])) if isinstance(d, decision.Decided) else d for d in decided]
     assert all(replayed_cut(d) is None for d in emptied), "no standing offer on my players: no Cut"
     assert replayed_cut(decision.Stale("old")) is None, "a Stale cut is skipped"
@@ -1010,7 +1216,7 @@ def _selftest_lock_forecast() -> None:
     lock = snapshot_stamp(forecast_facts.D3)
     assert lock is not None
     lock += MINUTE
-    now = Season((), {1: lock, 2: lock + dt.timedelta(days=7), 3: lock + dt.timedelta(days=14)}, {1, 2}, {})
+    now = _season(locks={1: lock, 2: lock + dt.timedelta(days=7), 3: lock + dt.timedelta(days=14)}, done={1, 2})
     assert lock_moments(now) == {1: lock - MINUTE, 2: lock + dt.timedelta(days=7) - MINUTE}, \
         "a minute before the lock of each done jornada, and none for a jornada not done"
     got = backtest(loaded, now, 1)
@@ -1129,7 +1335,7 @@ def _selftest_opportunities() -> None:
         universe=[decision.Candidate(k, "MED", "market", a, a) for k, a in market.items()],
         cells=[decision.Cell(k, j, v) for k, v in e.items() for j in (1, 2)],
         locks=[decision.Lock(1, "2026-11-06T20:00Z"), decision.Lock(2, "2026-11-13T20:00Z")])
-    now = Season((), {}, {1, 2}, {"star": {1: 10.0, 2: 6.0}, "near": {1: 4.0, 2: 2.0}, "m4": {1: 1.0, 2: 1.0}, "far": {1: 20.0}})
+    now = _season(done={1, 2}, scored={"star": {1: 10.0, 2: 6.0}, "near": {1: 4.0, 2: 2.0}, "m4": {1: 1.0, 2: 1.0}, "far": {1: 20.0}})
     got = {g.player: g for g in graded_opportunities("c", inp, now, 5, 4)}
     assert sorted(g.rank for g in got.values()) == [1, 2, 3], "ranked among the cut's gains"
     star = got["star"]
@@ -1203,6 +1409,7 @@ def _selftest() -> None:
     _selftest_cover()
     _selftest_moment_facts()
     _selftest_record_sales()
+    _selftest_league()
     _selftest_lock_forecast()
     _selftest_fold_sets()
     _selftest_grades()
@@ -1255,7 +1462,9 @@ if __name__ == "__main__":
         print(opportunity_report(opportunity_grade(loaded, season(loaded), [c for c in cuts if snapshot_stamp(c) is not None])), flush=True)
         os._exit(0)
     if sys.argv[1:2] == ["rules"]:
-        print(rule_report(rule_scores(worth.CHALLENGERS)), flush=True)
+        got = rule_scores(worth.CHALLENGERS)
+        print(rule_report(got.scores), flush=True)
+        print(paired_report(got.graded), flush=True)
         os._exit(0)
     print("grading.py --selftest | accuracy | price | opportunities | rules")
     raise SystemExit(2)

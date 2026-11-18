@@ -254,7 +254,8 @@ def _selftest() -> None:
             "auction_brier": [rec.AuctionBrier(i, "all", 4, rng.random(), 0.25)],
             "grade_cell": [GradeCell(i, 3, 4, "Pedri ñ", rng.random(), None, 1), GradeCell(i, 3, 5, "Gavi", 2.0, 0.5, 0)],
             "dec_opportunity": [rec.DecOpportunity("2026-11-0%dT1000Z" % i, "Pedri", "MED", "open", None, None, 4, None,
-                                                   rng.random(), None, None, None, 4.2, 0.3, None)]}
+                                                   rng.random(), None, None, None, 4.2, 0.3, None)],
+            "sale_score": [rec.SaleScore(i, "miguel", "all", "lock", 30, rng.random(), 0.05, -1.0, 1.0, -2.0, 2.0)]}
 
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["FF_ROOT"] = str(Path(tmp) / "data")

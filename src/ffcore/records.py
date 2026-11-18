@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 
 __all__ = ["AuctionBrier", "AuctionCalibration", "DecOpportunity", "GRADE_CELL_DTYPE", "GradeCell", "KINDS", "KindSpec",
-           "LATEST", "Latest", "MeasureLog", "PLAYER_BYTES", "Param", "READERS", "Run", "RunMeasure", "StoreError",
+           "LATEST", "Latest", "MeasureLog", "PLAYER_BYTES", "Param", "READERS", "Run", "RunMeasure", "SaleScore", "StoreError",
            "change", "decode", "encode", "grade_cell_array", "grade_cell_rows", "header", "latest", "parse_header"]
 
 
@@ -105,6 +105,20 @@ class DecOpportunity(NamedTuple):
     placed: float | None
 
 
+class SaleScore(NamedTuple):
+    run_id: int
+    group: str
+    case: str
+    horizon: str
+    n: int
+    total_net: float
+    per_million: float
+    loo_min: float
+    loo_max: float
+    bootstrap_lo: float
+    bootstrap_hi: float
+
+
 class KindSpec(NamedTuple):
     """A kind's name, its row type and the file (inside a run directory) that holds it."""
     name: str
@@ -120,7 +134,8 @@ KINDS: Mapping[str, KindSpec] = {s.name: s for s in (
     KindSpec("auction_calibration", AuctionCalibration, "calibration.jsonl"),
     KindSpec("auction_brier", AuctionBrier, "brier.jsonl"),
     KindSpec("grade_cell", GradeCell, "grade_cell.npy"),
-    KindSpec("dec_opportunity", DecOpportunity, "opportunity.jsonl"))}
+    KindSpec("dec_opportunity", DecOpportunity, "opportunity.jsonl"),
+    KindSpec("sale_score", SaleScore, "sale_score.jsonl"))}
 
 LATEST: Mapping[str, int] = {name: 1 for name in KINDS}
 
@@ -233,7 +248,8 @@ def _selftest() -> None:
         "auction_brier": AuctionBrier(7, "all", 30, float("inf"), -0.0),
         "grade_cell": GradeCell(7, 3, 4, "Pedri ñ", 2.5, None, 1),
         "dec_opportunity": DecOpportunity("2026-11-01T1000Z", "Pedri", "MED", "open", None, None, 4, None, 1.5,
-                                          None, None, None, 4.2, 0.3, None)}
+                                          None, None, None, 4.2, 0.3, None),
+        "sale_score": SaleScore(7, "m1", "eleven-proxy bound", "season", 12, -3.5, -0.25, -9.0, 2.0, -11.5, 4.5)}
     assert set(sample) == set(KINDS) == set(LATEST), "every kind has a sample, a spec and a version"
     for kind, row in sample.items():
         assert type(row) is KINDS[kind].row, kind

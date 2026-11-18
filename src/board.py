@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, NamedTuple
 
 import decision
@@ -83,7 +83,7 @@ def lineup_doc(inp: decision.Inputs, names: dict[str, str]) -> Doc:
             "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
-def context(inp: decision.Inputs) -> worth.Context:
+def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = worth.STOPGAP_RATE) -> worth.Context:
     pos, cells = decision.cells_of(inp)
     mine = decision.squad_of(inp)
     js = sorted(cells)
@@ -92,7 +92,7 @@ def context(inp: decision.Inputs) -> worth.Context:
     for n in AHEAD:
         v = decision.window_value(pos, cells, frozenset(js[:n or len(js)]))
         horizons[n] = worth.Horizon(v, eleven.best_eleven(mine, pos, v, fielded))
-    return worth.Context(pos, horizons, inp.money.cash)
+    return worth.Context(pos, horizons, inp.money.cash, offers, rate)
 
 
 def later_sale(inp: decision.Inputs, player: str, value: float) -> float:
@@ -102,7 +102,29 @@ def later_sale(inp: decision.Inputs, player: str, value: float) -> float:
     return rules.SALE_ESTIMATE * value * (1 + decision.rise(max(rows, key=lambda x: x.h)))
 
 
-def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.Offer], known: dict[str, decision.Fact]) -> list[Doc]:
+def offers_at(world: state.World) -> worth.OfferDistribution:
+    """The distribution of offer over value (worth.offer_ratio_distribution) of the market offers the world has seen."""
+    return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
+
+
+def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[int, float]) -> str:
+    """One line of facts about a standing offer: its ratio over value; where it stands among the nightly offers seen
+    (offers.ratios, none: no such clause; n shown); what the eleven loses by it (lost by window as worth.lost_points gives
+    it: 0 at every window is a bench player). No advice."""
+    share = None if ratio is None else worth.offer_percentile(offers, ratio)
+    parts = [] if ratio is None else ["offer %.2f x value" % ratio]
+    if share is not None:
+        parts.append("at or above %.0f%% of the %d nightly offers seen" % (100 * share, len(offers.ratios)))
+    if not any(lost.values()):
+        parts.append("the eleven loses 0 points (bench)")
+    else:
+        parts.append("the eleven loses %.1f points over the next 4 jornadas, %.1f over the next 8, %.1f over the season"
+                     % (lost[4], lost[8], lost[0]))
+    return "; ".join(parts)
+
+
+def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.Offer], known: dict[str, decision.Fact],
+                offers: worth.OfferDistribution = worth.NO_OFFERS) -> list[Doc]:
     ctx = context(inp)
     out = []
     for offer in got:
@@ -117,6 +139,8 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
             "offer": money, "waiting": None, "trend": fact.trend, "plan": False, "amount": money, "done": False, "key": k,
             "gain": 0.0 - lost[0], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
             "ratio": ratio, "lost": {"next4": lost[4], "next8": lost[8], "season": lost[0]},
+            "offer_percentile": None if ratio is None else worth.offer_percentile(offers, ratio), "offers_seen": len(offers.ratios),
+            "note": offer_note(ratio, offers, lost),
             "per_million": verdict.key,
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
                       ["points lost, next 4", lost[4], "points"], ["next 8", lost[8], "points"],
@@ -245,9 +269,9 @@ def auction_card() -> Doc:
 
 
 def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
-          extras: decision.Extras, health: Iterable[Health]) -> Doc:
-    """The decisions document of the cut; extras are what the World gives beside the inputs and health the status of each
-    source (health.parser_health over the loaded snapshots)."""
+          extras: decision.Extras, health: Iterable[Health], offers: worth.OfferDistribution = worth.NO_OFFERS) -> Doc:
+    """The decisions document of the cut; extras are what the World gives beside the inputs, health the status of each
+    source (health.parser_health over the loaded snapshots) and offers the nightly offers seen by the cut (offers_at)."""
     cash, team_value, debt = inp.money.cash, inp.money.team_value, inp.money.debt
     locks = [x.lock for x in inp.locks]
     bids = sum(b.amount for b in inp.bids)
@@ -263,7 +287,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
                "win": r["win"], "placed": r["placed"]} for r in top if r["player"] in arrivals]
     buys = buy_lines(inp, names, club, got)
-    sells = offer_lines(inp, names, offered, known)
+    sells = offer_lines(inp, names, offered, known, offers)
     funds(buys, sells)
     return {
         "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(health),
@@ -340,7 +364,7 @@ def main(records: RunRecords | None = None, obs: ob.Observations | None = None) 
     if records is None:
         raise SystemExit("board: the board is the run's: run it as run.py board")
     loaded = loader.load(league.load_config(), cut(), previous=loader.previous_opportunities(), obs=obs)
-    [(d, rows)] = state.sweep(loaded.obs, [cut()], lambda world: moment_at(loaded, world))
+    [((d, rows), offers)] = state.sweep(loaded.obs, [cut()], lambda world: (moment_at(loaded, world), offers_at(world)))
     if isinstance(d, decision.Stale):
         raise SystemExit(d.reason)
     managers = len(d.seen.cash)
@@ -351,7 +375,7 @@ def main(records: RunRecords | None = None, obs: ob.Observations | None = None) 
     records.add("params", rows)
     got = decision.opportunity_rows(d.inputs)
     records.add("dec_opportunity", [{"cut": cut(), **r} for r in got])
-    doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras, loader.health_at(loaded, cut()))
+    doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras, loader.health_at(loaded, cut()), offers)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
@@ -422,6 +446,16 @@ def _selftest() -> None:
     assert later_sale(decision.Inputs(money), "p", 10.0) == rules.SALE_ESTIMATE * 10.0, "no price row: the estimate"
     priced = decision.Inputs(money, prices=[decision.Price("p", 1, 10.5, 10.0), decision.Price("p", 3, 11.0, 10.0)])
     assert abs(later_sale(priced, "p", 10.0) - rules.SALE_ESTIMATE * 10.0 * 1.1) < 1e-9, "the price row furthest ahead: 10% above"
+    seen = worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.05, 1.1])
+    bench_note = offer_note(1.05, seen, {4: 0.0, 8: 0.0, 0: 0.0})
+    field_note = offer_note(1.05, seen, {4: 3.2, 8: 5.1, 0: 9.8})
+    bare_note = offer_note(1.05, worth.NO_OFFERS, {4: 0.0, 8: 0.0, 0: 0.0})
+    assert "1.05" in bench_note and "80%" in bench_note and "5 nightly offers" in bench_note and bench_note.endswith("0 points (bench)")
+    assert "bench" not in field_note and "3.2" in field_note and "5.1" in field_note and "9.8" in field_note and "80%" in field_note
+    assert "nightly" not in bare_note and "bench" in bare_note, "no offers seen: no percentile clause"
+    assert offer_note(None, seen, {4: 0.0, 8: 0.0, 0: 0.0}) == "the eleven loses 0 points (bench)", "no value: no ratio clause"
+    for text in (bench_note, field_note, bare_note):
+        assert not any(w in text.lower() for w in ("take", "hold", "sell", "accept", "should", "reserve")), "facts, no advice"
     assert advice((("c", "b", 2.0), ("d", "c", 1.0), ("e", "x", 0.5)), {"d": "D"}) == [
         {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"
     curve: Curve = ((1.0, 0.2), (1.1, 0.6), (1.3, 1.0))
