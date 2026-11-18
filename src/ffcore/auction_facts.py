@@ -1,4 +1,4 @@
-"""The auctions' outcomes and your bids (ingest): the SQL views auction_results and bid_changes as selectors over a
+"""The auctions' outcomes and your bids (ingest): auction_results and bid_changes as selectors over a
 World, each fact group with its own fold. An outcome is a predicate on (cut, newest feed stamp) over the listings' ends
 and the buys, evaluated at the read: it is not a prefix, so no list of results is kept.
 Named rules, each tested:
@@ -18,8 +18,7 @@ Named rules, each tested:
   closed_is_utc_stamp_of_close: closed is the UTC stamp of the close; close is the raw text, offset kept.
   outcome_waits_for_feed: a result is present only if closed <= cut and the newest feed stamp is at least
     close + 600.0 / 86400; with no feed rows there are no results.
-  mine_is_as_of_standings: your user_ids are those of the standings rows up to the cut whose manager is league.me
-    (the SQL reads the standings of all time; the two agree whenever your user_id never changes).
+  mine_is_as_of_standings: your user_ids are those of the standings rows up to the cut whose manager is league.me.
   bid_first_row_is_a_change: the first observation of a bid_id is a change (was None); a row with an unchanged
     bid_money is not; a change to or from None is; rows with an empty bid_id are no bid.
   bid_change_carries_close: a BidChange's close is the raw expires_at of the listing it was seen on.

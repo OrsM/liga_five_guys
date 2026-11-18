@@ -1,9 +1,9 @@
-"""What the latest rows say (ingest): the facts the SQL views player_status, player_club, player_value, club_rating,
+"""What the latest rows say (ingest): the facts player_status, player_club, player_value, club_rating,
 listings, offers, squads, standings, owners, users, app_lineup, feed_ledger, price_paid, offer_ratios and
 player_roster hold, as selectors over a World (state.py) and, for offer_ratios, two folds of their own (offers_made,
 team_values).
 
-A selector takes the World at a cut (and an Identity where the SQL joined ff_identity or app_player) and returns
+A selector takes the World at a cut (and an Identity where the player is named by a futbolfantasy or app row) and returns
 tuples of named rows, in no particular order. Identity is the one identity type, used by season_facts too: its ff
 maps a futbolfantasy row (slug, name, team) to a player id, its app maps an app player_id to a player id; a row with
 none has no player. Named rules, each tested:

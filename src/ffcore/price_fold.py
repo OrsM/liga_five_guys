@@ -1,5 +1,5 @@
-"""Price series, momentum and the price trend as a fold over the market snapshots (forecast): what the SQL views
-price_history .. price_grade and the kept price_step / momentum_day say, from the observed market rows alone.
+"""Price series, momentum and the price trend as a fold over the market snapshots (forecast): what the selectors
+price_history .. price_grade and price_step / momentum_day say, from the observed market rows alone.
 
 One fold, "price", registered with ffcore.state: its state holds each day's closing snapshot of the market, each
 player's closed days (price_step), his changes with the signal x each carries (price_series), and per horizon
@@ -9,13 +9,13 @@ the cut is the day of the last snapshot, its rows are live (not closed) and only
 days. Momentum has no window: all-time sums over the closed days, with the live day's pairs added. The constants
 (pricing.CLIP, PRICE_W0..2, PRICE_FOCUS) are those standing when the sweep starts.
 
-Rules copied from the SQL, each tested:
+Named rules, each tested:
   last_snapshot_of_a_day: a day closes on the rows of its last snapshot; earlier ones that day are dropped.
   step_needs_positive_prev: a value's change is None for a player's first day or after a value of 0.
   signal_falls_back: a missing older change counts as the next newer one (x = w0*c + w1*(c1|c) + w2*(c2|c1|c)).
   live_rows_not_chained: two rows of one player in the live snapshot are each worked out against the last closed
     day, while two in a closed snapshot chain.
-  zero_start_no_y: a pair whose start value is 0 has no change (SQL NULL): it adds x*x, nothing to x*y.
+  zero_start_no_y: a pair whose start value is 0 has no change (None): it adds x*x, nothing to x*y.
   slope_none_on_zero_sxx: a cumulative slope with sum x*x 0 is None, and a trend with no slope is 0.
   hmax_median: the longest horizon is a quarter of the median count of changes over players (closed or live; the
     live rows of one player add), at least 1.
@@ -28,7 +28,7 @@ Rules copied from the SQL, each tested:
   forecast_follows_slope: expected_value is value * (1 + slope * x / 100) for h up to the longest horizon, with a spread
     only for a player worth PRICE_FOCUS.
   grade_days: price_grade fits from the day a quarter through the distinct change days.
-Selectors: price_state; the views by their names (price_history .. price_grade) over a PriceState;
+Selectors: price_state; the selectors by their names (price_history .. price_grade) over a PriceState;
 price_momentum_of is the Prices of the state."""
 from __future__ import annotations
 
@@ -397,13 +397,8 @@ def price_obs(s: PriceState) -> list[Obs]:
 
 
 def price_step(s: PriceState) -> list[Step]:
-    """The closed days of every player (what the kept price_step table holds as of the cut)."""
+    """The closed days of every player (as of the cut)."""
     return [x for ch in s.steps.values() for x in ch]
-
-
-def price_past(s: PriceState) -> list[Step]:
-    """The closed days before the cut's day."""
-    return price_step(s)
 
 
 def momentum_day(s: PriceState) -> list[DayFit]:
@@ -690,7 +685,7 @@ def _market(rng: random.Random) -> list[ob.Market]:
 
 def _selftest() -> None:
     """Later rows leave a cut unchanged; any subset or order of cuts gives each cut the same facts; one cut alone
-    equals the cut inside a sweep; the incremental sums equal a recomputation from the pairs; the named SQL
+    equals the cut inside a sweep; the incremental sums equal a recomputation from the pairs; the named
     rules hold on small cases."""
     rows = _market(random.Random(7))
     obs = ob.of({"market": rows})

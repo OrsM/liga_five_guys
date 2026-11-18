@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta, timezone, tzinfo
 from ffcore.parse import snapshot_stamp, stamp
 
-__all__ = ["MADRID", "run_now", "shown", "variant", "set_variant", "cut", "set_now"]
+__all__ = ["MADRID", "run_now", "shown", "cut", "set_now"]
 
 
 def _madrid() -> tzinfo:
@@ -28,19 +28,6 @@ def run_now() -> datetime:
     if when is None:
         raise ValueError("LFG_NOW=%r is not a time (2026-10-07T0934Z)" % pinned)
     return when
-
-
-_VARIANT: list[str] = ["live"]
-
-
-def variant() -> str:
-    """The set of model constants in force (variants): live unless a replay
-    of a challenger says otherwise."""
-    return _VARIANT[0]
-
-
-def set_variant(name: str) -> None:
-    _VARIANT[:] = [name]
 
 
 LOOK: dict[str, datetime | None] = {"t": None}

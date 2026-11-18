@@ -188,7 +188,7 @@ rather than reaching through them; ruff flags reads of private members.
                     laliga_api, parse, text, auth, league
     tools/          selftests.sh, frontiers.py, golden.py (and golden/),
                     auction_table.py, lfg-rules, lfg-dry-run, capped, peek.py,
-                    export_store.py (the cutover export), cases.py (and cases/)
+                    cases.py (and cases/)
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      parse caches (what parse fills is rebuilt from raw: the

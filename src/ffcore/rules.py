@@ -3,12 +3,11 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "BID_TARGET", "SALE_ESTIMATE", "SALE_SD", "bid_limit", "bid_margin", "cash_at_lock", "SQUAD_MAX", "CLAUSE_BUYS", "MANAGER_TRADES", "Squad", "Squads", "POSITIONS", "slot", "position", "FREE_FORMATIONS", "SHAPES", "MATCH_LEN"]
+__all__ = ["XI_SIZE", "DEBT_SHARE", "BID_TARGET", "SALE_ESTIMATE", "SALE_SD", "bid_limit", "bid_margin", "cash_at_lock", "SQUAD_MAX", "Squad", "POSITIONS", "slot", "position", "FREE_FORMATIONS", "SHAPES", "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
 
 Squad = dict[str, str]     # player: position
-Squads = dict[str, Squad]  # manager: squad
 
 _SLOT = {
     "portero": "POR",
@@ -82,13 +81,6 @@ def in_force(locks: dict[int, str], jornada: int, due: str | None) -> bool:
 # Players a squad may hold, its bids in counted: the app refuses a bid past
 # it ("Bid or offer for more players is not allowed", 23 and a bid, 2026-10-30).
 SQUAD_MAX = 24
-
-# What the plan considers: our choices, not the game's rules, each lifted
-# here, in one place, if the league turns nasty. The code each one narrows
-# fails loudly when it is lifted (NotImplementedError), where the plan must
-# first learn the move, rather than go on silently without it.
-CLAUSE_BUYS = False     # a rival's player bought by paying his clause: you do not shoot first
-MANAGER_TRADES = False  # offers to or from another manager: only the game's market and its offers
 
 
 def _selftest() -> None:

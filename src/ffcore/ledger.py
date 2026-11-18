@@ -1,4 +1,4 @@
-"""The ledger and each manager's cash (ingest): the SQL views ledger and cash as selectors over a World. The ledger is
+"""The ledger and each manager's cash (ingest): the ledger and cash as selectors over a World. The ledger is
 the feed's events (current.feed_ledger) plus the exits the squad snapshots show beyond those the feed records, each a
 sale at the player's last value; cash is each manager's budget less what he paid, plus what he received and his
 bonuses, plus the untracked gap for everyone, which is your real balance less the same sum for you.

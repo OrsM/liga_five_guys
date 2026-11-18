@@ -4,7 +4,7 @@ season_facts, stats.shrink); no fold of their own.
 inputs: the shared pieces of one cut as one Inputs, each built once and eagerly (the only place the ingest selectors are
 called for this group); the selectors are pure functions of an Inputs and call no other selector. forecast_now reads
 the Rate of every player from Inputs.rate, not from forecast_rate.
-knobs: the forecast's model constants as one Knobs, read at the call (a forecast.set_constants variant is seen).
+knobs: the forecast's model constants as one Knobs, read at the call (a forecast.set_constants override is seen).
 ppm_prior: one Prior a player_club row (the position's least-squares line of last season's points per match on ln(value),
 at his value; the median of all fitted points when his position has no line).
 forecast_rate: one Rate per player_club row: ppm (his points per match), picked (the chance he is picked), record (the
@@ -20,17 +20,17 @@ spread: the Spread of one cut, from season_facts.played_points and forecast.SEED
 held: the players in the latest squads or listings, in Inputs.held (by _held).
 pool: the PoolCell rows (player rows and each position's stand-in) of one cut, in Inputs.pool (by _pool).
 score_spread, held, cell_pool, cell and cell_total read Inputs.spread, Inputs.held and Inputs.pool; cell and cell_total are
-  views over Inputs.pool (both through _player_cells).
+  selectors over Inputs.pool (both through _player_cells).
 
 Named rules, each tested:
   fit_needs_value_and_ten_matches     a last-season row joins the fit only if its player has a value above 0, a position
                                       other than "" and pj >= 10.
   position_line_needs_three           per position the line is least squares only if it has at least 3 rows and
                                       avg(x*x) > avg(x)*avg(x); else its slope is 0.0 (the position's mean y).
-  no_value_means_position_mean        a player with no value has x NULL, counted as the position's mean x: his prior is the
+  no_value_means_position_mean        a player with no value has x None, counted as the position's mean x: his prior is the
                                       position's mean y.
   never_below_zero_else_null_median   the prior is max(line, 0.0); a player whose position has no fit (none of the position
-                                      qualified, or position "") has a NULL line and gets the median y of all fitted rows.
+                                      qualified, or position "") has a None line and gets the median y of all fitted rows.
   last_season_with_null_points        a qualifying row with no points is an error, not a skipped row.
   listing_beats_record                picked is pct / 100 whenever the listing has a pct, whatever his status; listed_pct says so.
   known_player_pull                   with no pct, picked and record are pick(base / 100, PICK_K, apps, squads), base NEUTRAL_START
@@ -58,8 +58,8 @@ Named rules, each tested:
                                       every other row has p as in NowRow and e = pts * p.
   pool_is_seed_until_enough           fewer than knobs.min_pool played rows (a row whose sum is None counts toward the size)
                                       -> the pool is forecast.SEED_POOL; otherwise the played sums; a None sum is not averaged.
-  m2_zero_mean_guard                  m2 = mean(x*x) / (mean(x)*mean(x) if abs(mean(x)) > 1e-9 else 1.0), means over non-null
-                                      x; m2 None when the pool has no non-null x.
+  m2_zero_mean_guard                  m2 = mean(x*x) / (mean(x)*mean(x) if abs(mean(x)) > 1e-9 else 1.0), means over non-None
+                                      x; m2 None when the pool has no non-None x.
   standin_is_average_of_held          per (jornada, position) one stand-in row (player None, pos set): pts and p are the means
                                       over the used rows of held players whose position is not ""; e = pts_mean * p_mean (the
                                       product of the means); a position with no held player in a jornada has no stand-in.
@@ -871,7 +871,7 @@ def _selftest() -> None:
     rows1 = played_points(w_scored, IDENTITY)
     assert _spread([PlayedPoints("a", 1, 0.0)], k._replace(min_pool=0.0)).m2 == 0.0, \
         "m2_zero_mean_guard: a zero mean divides by 1.0"
-    assert _spread([PlayedPoints("a", 1, None)], k._replace(min_pool=0.0)).m2 is None, "m2 None with no non-null x"
+    assert _spread([PlayedPoints("a", 1, None)], k._replace(min_pool=0.0)).m2 is None, "m2 None with no non-None x"
     assert _spread([PlayedPoints("a", 1, None), PlayedPoints("b", 1, 2.0)], k._replace(min_pool=0.0)).m2 == 1.0, \
         "a None sum counts in the pool's size, not in its averages"
     assert near(_spread([PlayedPoints("a", 1, None)], k._replace(min_pool=2.0)).m2, seed_m2), \

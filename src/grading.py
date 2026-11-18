@@ -35,7 +35,7 @@ def folds_of(names: Iterable[str]) -> dict[str, state.Fold]:
     return {name: state.FOLDS[name] for name in names}
 
 
-RESULT_FOLDS = folds_of(auction_facts.AUCTION_FACTS)
+RESULT_FOLDS = folds_of((auction_facts.MARKET_ENDS, auction_facts.BUYS, auction_facts.FEED_SEEN, auction_facts.USER_IDS))
 AUCTION_FOLDS = folds_of(("price", *auction_facts.AUCTION_FACTS))
 PRICE_FOLDS = folds_of(("price",))
 SEASON_FOLDS = folds_of((*ledger.LEDGER_FACTS, "kickoffs", "first_results", "points_changes", "latest_market",
@@ -199,7 +199,7 @@ def summarised(results: Iterable[auction_facts.AuctionResult]) -> Results:
 
 def results_seen(loaded: loader.Loaded, moment: dt.datetime) -> Results:
     """The Results (summarised) of auction_facts.auction_results in the world of the moment's minute, folding only the
-    auction facts (RESULT_FOLDS)."""
+    facts auction_results reads (RESULT_FOLDS)."""
     return state.sweep(loaded.obs, [stamp(moment)], lambda world: summarised(
         auction_facts.auction_results(world, loaded.identity, loaded.league)), RESULT_FOLDS)[0]
 
@@ -1037,20 +1037,24 @@ def _selftest_lock_forecast() -> None:
 def _selftest_fold_sets() -> None:
     """Each sweep of grading folds exactly the facts its reader reads: over the same rows the reader gives the same on the
     named folds as on all of them, and with any one of the named folds left out it reads a fact that is not there."""
+    from ffcore.auction_facts import _scratch
     from ffcore.forecast_facts import _tables
     obs = ob.of(_tables())
     loaded = loader.Loaded(obs, forecast_facts.IDENTITY, ledger.League("me", 0.0), forecast_facts.knobs(), ())
-    end = max(stamp(snapshot_stamp(at) or dt.datetime.min) for at in ob.stamps_of(obs, "market"))
+    feed, identity, league = _scratch()
     readers = {
-        "season": (SEASON_FOLDS, lambda world: season_at(loaded, world)),
-        "lock": (LOCK_FOLDS, lambda world: lock_forecast(loaded, world)),
-        "moment": (MOMENT_FOLDS, lambda world: facts_at(loaded, world, ["p1"]))}
-    for name, (named, read) in readers.items():
-        assert state.sweep(obs, [end], read, named) == state.sweep(obs, [end], read), name
+        "season": (obs, "market", SEASON_FOLDS, lambda world: season_at(loaded, world)),
+        "lock": (obs, "market", LOCK_FOLDS, lambda world: lock_forecast(loaded, world)),
+        "moment": (obs, "market", MOMENT_FOLDS, lambda world: facts_at(loaded, world, ["p1"])),
+        "results": (feed, "api_market", RESULT_FOLDS, lambda world: summarised(
+            auction_facts.auction_results(world, identity, league)))}
+    for name, (rows, kind, named, read) in readers.items():
+        end = max(stamp(snapshot_stamp(at) or dt.datetime.min) for at in ob.stamps_of(rows, kind))
+        assert state.sweep(rows, [end], read, named) == state.sweep(rows, [end], read), name
         for dropped in named:
             rest = {n: f for n, f in named.items() if n != dropped}
             try:
-                state.sweep(obs, [end], read, rest)
+                state.sweep(rows, [end], read, rest)
             except KeyError:
                 continue
             raise AssertionError("%s does not read %s" % (name, dropped))

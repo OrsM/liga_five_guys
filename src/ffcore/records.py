@@ -1,8 +1,8 @@
-"""The record kinds a run leaves behind (what the old SQLite record tables held), one NamedTuple each, and
+"""The record kinds a run leaves behind one NamedTuple each, and
 their line format. A row on disk is one JSON object with the NamedTuple's field names; a file's first line is
 its header {"format": kind, "v": N}. Writers write LATEST[kind]; a reader upgrades a row of version v through
 READERS[(kind, v)] to the current NamedTuple, and an unknown version is an error. Floats round-trip exactly (JSON
-repr), NULL is None. The big kind is stored as a typed array (GRADE_CELL_DTYPE: player is PLAYER_BYTES of UTF-8,
+repr), null is None. The big kind is stored as a typed array (GRADE_CELL_DTYPE: player is PLAYER_BYTES of UTF-8,
 plays NaN for None), run_id being the directory's. latest(rows, key) is the last two measure_log rows per key by
 (at, position in rows)."""
 from __future__ import annotations
@@ -208,7 +208,7 @@ class Latest(NamedTuple):
 
 
 def latest(rows: Iterable[MeasureLog], key: Callable[[MeasureLog], Hashable]) -> dict[Hashable, Latest]:
-    """Per key, the newest row by (at, position in rows) and the one before it. Replaces the measure_latest view."""
+    """Per key, the newest row by (at, position in rows) and the one before it."""
     kept: dict[Hashable, list[tuple[str, int, MeasureLog]]] = {}
     for position, r in enumerate(rows):
         pair = kept.setdefault(key(r), [])

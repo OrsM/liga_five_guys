@@ -186,8 +186,7 @@ def utc_stamp(text: str | None) -> str | None:
 
 
 def julian_day(text: str | None) -> float | None:
-    """The julian day of an instant's text as SQLite's julianday gives it (rounded to the millisecond), None when
-    it is not one."""
+    """The julian day of an instant's text (rounded to the millisecond), None when it is not one."""
     t = _utc(text)
     if t is None:
         return None

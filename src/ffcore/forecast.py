@@ -1,4 +1,4 @@
-"""The forecast's constants, and set_constants, which sets any constant of the model's modules for a variant or a test."""
+"""The forecast's constants, and set_constants, which sets any constant of the model's modules for a test."""
 from __future__ import annotations
 
 import importlib

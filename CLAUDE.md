@@ -6,7 +6,7 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 
 - The systemd timers run from this working tree and each run commits `report:` commits. Never leave it red or dirty.
 - Code changes are made in a git worktree and merged when green. Verify on a copy: `tools/lfg-dry-run board` (scratch under `~/.cache`, never `/tmp`, never `data/`). Delete scratch copies when done.
-- The record store (`store/`, beside `data/`) and the parse cache (`data/tidy/parsed.jsonl`, `snapindex.json`) are read through `ffcore.store` and `ffcore.parsed`; `tools/peek.py` looks things up in a store (`peek.py params`, `peek.py -i`). SQLite is opened only by `tools/export_store.py`, the one-off cutover export of the old `data/lfg.db`.
+- The record store (`store/`, beside `data/`) and the parse cache (`data/tidy/parsed.jsonl`, `snapindex.json`) are read through `ffcore.store` and `ffcore.parsed`; `tools/peek.py` looks things up in a store (`peek.py params`, `peek.py -i`). Nothing in the code opens a database; the old `data/lfg.db` is an archive.
 - Do not touch the account (bids, accepting offers) without Miguel's explicit go.
 
 ## Principles
@@ -38,13 +38,11 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 - Scopes of agents running together do not overlap. Each has its own worktree, `TMPDIR` under `~/.cache` (`/tmp` is a small tmpfs) and its own `LFG_SCRATCH`.
 - Agent worktrees start from `origin/main`: push main before spawning.
 - Pin the time with `LFG_NOW` so `decisions.json` can be compared byte for byte.
-- `tools/lfg-dry-run` copies the parse cache and the tracked tree's `store/`; until the cutover there is none, so seed `$LFG_SCRATCH/data/lfg.db` first with a read-only backup of the old live database (`sqlite3` `backup()` from a `mode=ro` connection) and the dry run exports it with `tools/export_store.py`; delete both afterwards.
+- `tools/lfg-dry-run` copies the parse cache and the tracked tree's `store/` (`cp -r`) into the scratch; delete the scratch afterwards.
 - On a copy run `tools/lfg-dry-run board grade health`, not `parse`: a copy reparses every snapshot (9 minutes).
-- Read-only agents open the live database as above (`mode=ro`).
 - Every heavy or long job that is not `lfg.service` runs through `tools/capped` (`LFG_CAP`, default 1500M; `tools/lfg-dry-run` already does). The box has 3.8 GB: on 2026-11-17 an uncapped sweep run made the OOM killer take down the Remote Control server and archive the phone session. Run at most two such jobs at once.
-- Never point a tool that calls `ffcore.db.connect()` (`tools/sql.py`, `tools/q.py`, `grading.py`, `run.py`) at the live `data/`: `connect()` migrates the schema, and a migration that drops tables drops them there (2026-11-17). Use a `mode=ro` backup under `~/.cache`.
 - Read-only agents look at a scratch store with `tools/peek.py`, never at the live `data/` or `store/`.
-- Never run a tool against the live `data/` or `store/`: use `FF_ROOT` and `LFG_SCRATCH` on a scratch under `~/.cache`. (2026-11-17: a tool that migrated the old SQLite schema dropped live tables.)
+- Never run a tool against the live `data/` or `store/`: agents run on scratch copies of `store/` and the tidy files, with `FF_ROOT` and `LFG_SCRATCH` under `~/.cache`. (2026-11-17: a tool that migrated the old SQLite schema dropped live tables; no code opens a database now.)
 - Three levels. Small models do the issues, in swarms. A mid-size pickup agent reads their reports and diffs against the brief and the principles and sorts each issue: good, another small-model turn (it writes the corrected brief), or blocked. The main session writes the briefs, merges what is good, and takes what is blocked to Miguel.
 - Before a brief is posted, the main session runs its verify command on main and checks every fact it names (a name exists, a file is where it says). A wrong brief costs a whole turn.
 - At most two small-model turns on an issue; then it is blocked.
@@ -55,10 +53,10 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 ## Checks
 
 ```
-tools/capped bash tools/selftests.sh                 # 50 suites, mypy, ruff
+tools/capped bash tools/selftests.sh                 # 49 suites, mypy, ruff
 tools/capped ~/.local/bin/uv run --frozen python tools/frontiers.py   # 0 crossings
 tools/capped env PYTHONPATH=src ~/.local/bin/uv run --frozen python tools/golden.py --selftest   # decisions.json and key features at pinned cuts
-tools/lfg-rules                                      # the sale-rule table over every replay cut (~3 min, scratch copy of the live db)
+tools/lfg-rules                                      # the sale-rule table over every replay cut (~3 min, scratch copy of the parse cache)
 tools/lfg-dry-run board                              # timing and decisions.json on a copy
 ```
 

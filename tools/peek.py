@@ -1,4 +1,4 @@
-"""Look at the record store, read-only: what datasette was for.
+"""Look at the record store, read-only.
 
     peek.py KIND [FIELD=VALUE ...] [--run N] [--limit n]    the rows of KIND of the latest run (run N), as a table
     peek.py runs [FIELD=VALUE ...] [--limit n]              the runs, the newest n
