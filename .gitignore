@@ -52,3 +52,6 @@ data/lfg.db*
 /lfg.db*
 data/*.schema.lock
 *.egg-info/
+
+# The record store (store/runs/<id>/): immutable run directories written by the run, never committed.
+store/
