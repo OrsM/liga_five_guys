@@ -1,6 +1,6 @@
-"""The run's SQLite file: what each run measured and concluded, for
-Datasette and ask.py. Disposable: every table but runs is rebuilt from
-data/raw, git or a replay (docs/notes/lfg.md)."""
+"""The run's SQLite file (the observations and the crosswalk, for Datasette and ask.py; disposable: rebuilt from
+data/raw, git or a replay, docs/notes/lfg.md) and the run's context: t (set_now, cut) and RunRecords, the records the
+run collects and publishes once to the store."""
 from __future__ import annotations
 
 import datetime as dt
@@ -12,7 +12,7 @@ import re
 import sqlite3
 import time
 import zlib
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Any
@@ -22,10 +22,12 @@ from datetime import datetime
 from ffcore.clock import run_now, variant
 from ffcore.names import Name
 from ffcore.parse import snapshot_stamp, stamp, year_for
+from ffcore import store
+from ffcore.records import KINDS, Run
 from ffcore.text import stems_meet
 
-__all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "RUN_ENV", "SCHEMA", "connect", "cut",
-           "functions", "query", "record", "rows", "set_now", "this_run", "LOOK"]
+__all__ = ["DB", "DECIDE_SQL", "IDENTITY", "META", "ROOT", "TABLES_SQL", "named", "params", "queries", "SCHEMA", "RunRecords", "connect", "cut",
+           "functions", "query", "rows", "set_now", "LOOK"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 DB = ROOT / "lfg.db"  # tidy.tables_in moves it with the tables
@@ -53,7 +55,6 @@ def migrate(db: sqlite3.Connection) -> None:
         for (trigger,) in db.execute("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?", (t,)).fetchall():
             db.execute('DROP TRIGGER "%s"' % trigger)
         db.execute('ALTER TABLE "%s" RENAME TO "%s"' % (t, source_table(t)))
-RUN_ENV = "LFG_RUN"
 _APPLIED: set[tuple[Path, Path]] = set()  # (file, schema) this process has applied
 
 
@@ -325,23 +326,67 @@ def rows(sql: str, params: Sequence[object] | Mapping[str, object] = (),
     return query(sql, params, path)[1]
 
 
-def this_run() -> int | None:
-    """The run src/run.py is recording (LFG_RUN), or None outside one."""
-    got = os.environ.get(RUN_ENV, "")
-    return int(got) if got else None
+class RunRecords:
+    """The records of one run, collected in memory and published once. add(kind, rows) keeps the rows of a kind in the
+    order given, a mapping lacking run_id taking this run's (a kind's row type is ffcore.records.KINDS); rows(kind)
+    returns what was added; publish(run) writes the Run row and every kind added as one store directory
+    (store.publish), so a run that does not reach it leaves nothing. commit_sha is the code the run is."""
+
+    def __init__(self, run: int, commit_sha: str) -> None:
+        self.run = run
+        self.commit_sha = commit_sha
+        self._kinds: dict[str, list[Any]] = {}
+
+    @classmethod
+    def after_latest(cls, commit_sha: str) -> "RunRecords":
+        """The RunRecords of the run after the latest published one (called under the run lock)."""
+        latest = store.latest_run()
+        return cls((latest.run_id if latest else 0) + 1, commit_sha)
+
+    def add(self, kind: str, rows: Iterable[Any]) -> None:
+        row = KINDS[kind].row
+        owned = {"run_id": self.run} if "run_id" in row._fields else {}
+        self._kinds.setdefault(kind, []).extend(r if isinstance(r, row) else row(**owned, **r) for r in rows)
+
+    def rows(self, kind: str) -> list[Any]:
+        return list(self._kinds.get(kind, ()))
+
+    def publish(self, run: Run) -> Path:
+        return store.publish(run, **self._kinds)
 
 
-def record(rows: Sequence[Mapping[str, object]], table: str,
-           path: Path | None = None, schema: Path = SCHEMA) -> None:
-    """Insert rows into table, each a mapping of column to value; a column
-    a row lacks is NULL."""
-    if not rows:
-        return
-    cols = list(dict.fromkeys(c for r in rows for c in r))
-    sql = 'INSERT INTO "%s" (%s) VALUES (%s)' % (
-        table, ", ".join('"%s"' % c for c in cols), ", ".join("?" * len(cols)))
-    with closing(connect(path, schema)) as db, db:
-        db.executemany(sql, [[r.get(c) for c in cols] for r in rows])
+def _selftest_run_records() -> None:
+    import tempfile
+
+    from ffcore.records import Param
+
+    with tempfile.TemporaryDirectory() as tmp:
+        kept = os.environ.get("FF_ROOT")
+        os.environ["FF_ROOT"] = str(Path(tmp) / "data")
+        try:
+            assert RunRecords.after_latest("x").run == 1
+            got = RunRecords(3, "abc")
+            got.add("params", [{"component": "c", "term": "t", "value": 1.0, "kind": "fitted", "n": None}, Param(3, "d", "", 2.0, "constant", 4)])
+            got.add("dec_opportunity", [])
+            assert [(p.run_id, p.component) for p in got.rows("params")] == [(3, "c"), (3, "d")] and got.rows("auction_brier") == [], \
+                "a mapping takes the run's id; rows come back in the order added"
+            assert store.runs() == [], "nothing is visible before publish"
+            run = Run(3, "t", "a", "service", "abc", "f", 1, 1.0)
+            got.publish(run)
+            assert store.runs() == [run] and list(store.records("params", 3)) == got.rows("params"), "published once, whole"
+            assert RunRecords.after_latest("x").run == 4, "the run after the latest published"
+            try:
+                got.add("params", [{"component": "c"}])
+            except TypeError:
+                pass
+            else:
+                raise AssertionError("a row lacking a field is refused")
+        finally:
+            store.clear()
+            if kept is None:
+                os.environ.pop("FF_ROOT")
+            else:
+                os.environ["FF_ROOT"] = kept
 
 
 def _selftest() -> None:
@@ -451,24 +496,7 @@ def _selftest() -> None:
         reader.close()
         connect(Path(tmp) / "real.db").close()
 
-        record([], "t", path, schema)
-        record([{"k": "c"}, {"k": "d"}], "t", path, schema)
-        with closing(connect(path, schema)) as db:
-            assert [k for (k,) in db.execute("SELECT k FROM t ORDER BY k")] \
-                == ["a", "b", "c", "d"], "record inserts dict rows by column name"
-            db.execute("CREATE TABLE u (k TEXT, v TEXT)")
-            db.commit()
-        record([{"k": "e"}, {"k": "f", "v": "x"}], "u", path, schema)
-        with closing(connect(path, schema)) as db:
-            assert db.execute("SELECT * FROM u ORDER BY k").fetchall() \
-                == [("e", None), ("f", "x")], "a key a row lacks is NULL"
 
-    import os
-    for env, want in [("", None), ("12", 12)]:
-        os.environ[RUN_ENV] = env
-        assert this_run() == want, (env, this_run())
-    os.environ.pop(RUN_ENV)
-    assert this_run() is None, "outside run.py there is no run"
     with tempfile.TemporaryDirectory() as tmp:
         assert rows("SELECT name_key(' Iñigo  VICENTE '), name_shown('nico van gaal')",
                     path=Path(tmp) / "f.db") == [("inigo vicente", "Nico van Gaal")], \
@@ -501,6 +529,7 @@ def _selftest() -> None:
                                "FROM x WHERE observed_at <= (SELECT cut()) GROUP BY source) ORDER BY v").fetchall()
             loose = db.execute("SELECT v FROM x t WHERE %s ORDER BY v" % _latest_of("x")).fetchall()
             assert loose == plain, "each source's newest rows at or before cut(): the same as the grouped maximum"
+    _selftest_run_records()
     print("ffcore.db self-test OK")
 
 

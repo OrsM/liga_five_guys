@@ -14,14 +14,12 @@ Named rules, each tested:
     who was 'market' at the newest earlier cut is not an arrival."""
 from __future__ import annotations
 
-from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence
 
 import eleven
-from ffcore import current, forecast_facts, jornadas, price_fold, season_facts, state
+from ffcore import current, forecast_facts, jornadas, price_fold, season_facts, state, store
 from ffcore.current import AppLineup, Identity, PlayerClub
-from ffcore.db import connect, record, rows
 from ffcore.decision_facts import DEFAULT_POS, PlayerFact, Seen, SeenAuction, my_cash, my_squad, seen_at
 from ffcore.ledger import Cash, League
 from ffcore.loader import Loaded, Opportunity
@@ -29,14 +27,15 @@ from ffcore.names import Name
 from ffcore.parse import snapshot_stamp
 from ffcore.tidy import APP_FRESH_HOURS
 from ffcore.price_fold import Expected
+from ffcore.records import AuctionBrier, AuctionCalibration
 from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
 
-__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows", "keep_opportunities",
+__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows",
            "Fact", "UNKNOWN", "Offer", "Held",
            "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions",
-           "Source", "source_health", "Brier", "Drift", "latest_auction_run", "brier_by_scope", "drifting_bins"]
+           "latest_auction_run", "brier_by_scope", "drifting_bins"]
 
 
 class Player(NamedTuple):
@@ -316,14 +315,8 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
     return sorted(out, key=lambda o: (-o["gain"], o["player"]))
 
 
-def keep_opportunities(cut: str, got: list[dict[str, Any]]) -> None:
-    with closing(connect()) as db, db:
-        db.execute("DELETE FROM dec_opportunity WHERE cut = ?", (cut,))
-    record([{"cut": cut, **r} for r in got], "dec_opportunity")
-
-
-# What the board shows beside the decision: facts about players, the offers on your players, who is listed, how fresh
-# each source is, how the auction forecast has done. Each selector is named for what it returns.
+# What the board shows beside the decision: facts about players, the offers on your players, who is listed, how the
+# auction forecast has done. Each selector is named for what it returns.
 
 class Fact(NamedTuple):
     name: str
@@ -347,45 +340,19 @@ class Held(NamedTuple):
     value: float
 
 
-class Source(NamedTuple):
-    src: str
-    last_at: str
-    hours: float
-    status: str
-
-
-def source_health() -> list[Source]:
-    return [Source(*r) for r in rows("SELECT src, last_at, hours_since, status FROM parser_health ORDER BY src")]
-
-
-class Brier(NamedTuple):
-    scope: str
-    n: int
-    model: float
-    pooled: float
-
-
-class Drift(NamedTuple):
-    scope: str
-    bin: str
-    n: int
-    stated: float
-    observed: float
-
-
 def latest_auction_run() -> int | None:
-    """The run that last measured the auction forecast (auction_brier), None if none has."""
-    (run,), = rows("SELECT max(run_id) FROM auction_brier")
-    return run
+    """The run that last measured the auction forecast (the greatest run_id with an auction_brier row), None if none has."""
+    return max((b.run_id for b in store.records("auction_brier")), default=None)
 
 
-def brier_by_scope(run: int) -> list[Brier]:
-    return [Brier(*r) for r in rows("SELECT scope, n, model, pooled FROM auction_brier WHERE run_id = ? ORDER BY scope", (run,))]
+def brier_by_scope(run: int) -> list[AuctionBrier]:
+    """The run's auction_brier rows by scope."""
+    return sorted(store.records("auction_brier", run), key=lambda b: b.scope)
 
 
-def drifting_bins(run: int) -> list[Drift]:
-    return [Drift(*r) for r in rows(
-        "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE run_id = ? AND drift = 1 ORDER BY scope, bin", (run,))]
+def drifting_bins(run: int) -> list[AuctionCalibration]:
+    """The run's auction_calibration rows that drift, by scope then bin."""
+    return sorted((c for c in store.records("auction_calibration", run) if c.drift == 1), key=lambda c: (c.scope, c.bin))
 
 
 class Extras(NamedTuple):

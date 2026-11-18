@@ -1,6 +1,6 @@
 """The one module that reads storage for the sweep (ingest): the observations and the identity from the parse cache
 (parsed.py: parsed.jsonl and snapindex.json under ingest.TIDY), the league, the model's knobs, and the opportunity
-records of earlier live runs (SQL, until records move), read once into a Loaded, from which every cut's decision is
+records of earlier live runs (the store), read once into a Loaded, from which every cut's decision is
 a pure function of the World (decision.decision_at). A change of storage changes this file only.
 Contract: load(cfg, cut, paths, previous) reads the files once and gives the same Loaded for the same files and cut;
 loaded(obs, cfg, cut, previous) is the same from Observations already built; replay_cuts(obs, since) are the cuts a
@@ -12,19 +12,24 @@ Named rules, each tested:
     the observations (before the fold), the crosswalk read at the cut (the end of time when none): nothing is stored.
   identity_reads_each_handle_once: a line-ups row whose handle (slug, name, team) an earlier row has adds nothing to the
     identity, so identity_in of handles_once(obs) is identity_in(obs).
-  replay_cuts_are_app_snapshots: the distinct observed_at stamps of the api_teams snapshots, from since on, in order."""
+  replay_cuts_are_app_snapshots: the distinct observed_at stamps of the api_teams snapshots, from since on, in order.
+  opportunity_latest_by_cut_and_player: of the opportunity records of every published run, a cut's player has the row of
+    the latest run that kept him; the rows come by cut then player.
+  snapshots_are_of_the_whole: Loaded.snapshots are health.snapshots_of the whole observations up to the cut, before the
+    fold of SNAPSHOT_FOLDED cuts three of the sources down to their newest snapshot.
+  health_at_judges_what_was_seen: health_at(loaded, cut) is health.parser_health of the snapshots not after the cut."""
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import ingest
-from ffcore import forecast_facts, identity, league, ledger, parsed
+from health import Health, Snapshot, parser_health, snapshots_of
+from ffcore import forecast_facts, identity, league, ledger, parsed, store
 from ffcore import observations as ob
 from ffcore.current import Identity
 
-__all__ = ["SNAPSHOT_FOLDED", "Opportunity", "Loaded", "identity_in", "handles_once", "folded", "paths_in", "previous_opportunities", "load",
+__all__ = ["SNAPSHOT_FOLDED", "Opportunity", "Loaded", "identity_in", "handles_once", "folded", "paths_in", "previous_opportunities", "snapshots_in", "health_at", "load",
            "loaded", "replay_cuts"]
 
 SNAPSHOT_FOLDED = ("lineups", "api_lineup", "api_standings")
@@ -59,12 +64,13 @@ class Loaded(NamedTuple):
     league: ledger.League
     knobs: forecast_facts.Knobs
     previous: tuple[Opportunity, ...]
+    snapshots: tuple[Snapshot, ...] = ()
 
 
-def previous_opportunities(db: sqlite3.Connection) -> tuple[Opportunity, ...]:
-    """The opportunity records live runs kept, by cut then player."""
-    return tuple(Opportunity._make(r) for r in db.execute(
-        "SELECT %s FROM dec_opportunity ORDER BY cut, player" % ", ".join(OPPORTUNITY_COLUMNS)))
+def previous_opportunities() -> tuple[Opportunity, ...]:
+    """The opportunity records live runs kept (rule opportunity_latest_by_cut_and_player), by cut then player."""
+    kept = {(o.cut, o.player): Opportunity(**o._asdict()) for o in store.records("dec_opportunity")}
+    return tuple(kept[k] for k in sorted(kept))
 
 
 def paths_in(tidy: Path | None = None) -> parsed.Paths:
@@ -95,30 +101,42 @@ def folded(obs: ob.Observations, cut: str | None) -> ob.Observations:
     return ob.Observations({**obs.tables, **ob.of(newest).tables})
 
 
-def assembled(obs: ob.Observations, who: Identity, cfg: league.Config, previous: tuple[Opportunity, ...]) -> Loaded:
-    return Loaded(obs, who, ledger.League(cfg.me, cfg.budget), forecast_facts.knobs(), previous)
+def snapshots_in(obs: ob.Observations, cut: str | None) -> tuple[Snapshot, ...]:
+    """health.snapshots_of obs up to the cut (all of them without one)."""
+    return snapshots_of(obs, identity.END_OF_TIME if cut is None else cut)
+
+
+def health_at(loaded: Loaded, cut: str) -> tuple[Health, ...]:
+    """The status of each source at the cut (rule health_at_judges_what_was_seen)."""
+    return parser_health((s for s in loaded.snapshots if s.at <= cut), cut)
+
+
+def assembled(obs: ob.Observations, who: Identity, cfg: league.Config, previous: tuple[Opportunity, ...],
+              snapshots: tuple[Snapshot, ...] = ()) -> Loaded:
+    return Loaded(obs, who, ledger.League(cfg.me, cfg.budget), forecast_facts.knobs(), previous, snapshots)
 
 
 def loaded(obs: ob.Observations, cfg: league.Config, cut: str | None = None,
            previous: tuple[Opportunity, ...] = ()) -> Loaded:
     """The Loaded of obs at the cut: the folded observations, their identity, the league cfg names, the model's knobs and
-    the opportunity records previous."""
-    return assembled(folded(obs, cut), identity_in(obs, cut), cfg, previous)
+    the opportunity records previous and the snapshots of the whole obs (rule snapshots_are_of_the_whole)."""
+    return assembled(folded(obs, cut), identity_in(obs, cut), cfg, previous, snapshots_in(obs, cut))
 
 
-def _read(paths: parsed.Paths, cut: str | None) -> tuple[ob.Observations, ob.Observations]:
-    """The files at paths as the folded observations and, beside them, the observations the identity is read from: the
-    whole ones are not kept, so the line-ups that only the identity reads leave memory before it is computed."""
+def _read(paths: parsed.Paths, cut: str | None) -> tuple[ob.Observations, ob.Observations, tuple[Snapshot, ...]]:
+    """The files at paths as the folded observations and, beside them, the observations the identity is read from and the
+    snapshots of the whole ones: the whole ones are not kept, so the line-ups that only the identity reads leave memory
+    before it is computed."""
     whole = parsed.read(paths)
-    return folded(whole, cut), handles_once(whole)
+    return folded(whole, cut), handles_once(whole), snapshots_in(whole, cut)
 
 
 def load(cfg: league.Config, cut: str | None = None, paths: parsed.Paths | None = None,
          previous: tuple[Opportunity, ...] = ()) -> Loaded:
     """The files at paths (paths_in() when None) read once, as loaded gives them; previous are the opportunity records
-    (previous_opportunities of the database) a board needs, none for a replay."""
-    obs, thin = _read(paths or paths_in(), cut)
-    return assembled(obs, identity_in(thin, cut), cfg, previous)
+    (previous_opportunities of the store) a board needs, none for a replay."""
+    obs, thin, snapshots = _read(paths or paths_in(), cut)
+    return assembled(obs, identity_in(thin, cut), cfg, previous, snapshots)
 
 
 def replay_cuts(obs: ob.Observations, since: str) -> list[str]:
@@ -154,6 +172,7 @@ def _selftest() -> None:
     assert replay_cuts(snaps, "2026-08-18") == ["2026-08-18T0000Z", "2026-08-19T0000Z"], "replay_cuts_are_app_snapshots"
     _selftest_files()
     _selftest_newest_snapshot()
+    _selftest_previous()
     print("ffcore.loader self-test OK")
 
 
@@ -210,6 +229,45 @@ def _selftest_newest_snapshot() -> None:
             assert ob.rows_of(cut_loaded.obs, name) == ob.rows_of(full.obs, name), name
         assert decision_at(cut_loaded, state.world_at(cut_loaded.obs, cut)) == decision_at(
             full, state.world_at(full.obs, cut)), cut
+    kept = loaded(whole, league.Config(), _CUTS[2])
+    assert {older, _ST, _CUTS[2]} <= {s.at for s in kept.snapshots if s.src == "lineups"} and \
+        len(set(ob.stamps_of(kept.obs, "lineups"))) == 1 and kept.snapshots == snapshots_in(whole, _CUTS[2]), \
+        "snapshots_are_of_the_whole: the folded table holds one snapshot, the snapshots all up to the cut"
+    early = loaded(whole, league.Config())
+    assert health_at(early, older) == parser_health(snapshots_in(whole, older), older) and \
+        health_at(early, _CUTS[2]) == parser_health(snapshots_in(whole, _CUTS[2]), _CUTS[2]), \
+        "health_at_judges_what_was_seen: a cut sees none of the snapshots after it"
+
+
+def _selftest_previous() -> None:
+    """Rule opportunity_latest_by_cut_and_player: over two published runs the later one's row of a cut's player replaces
+    the earlier one's, every other row stands, by cut then player; no store is no records."""
+    import os
+    import tempfile
+
+    from ffcore.records import DecOpportunity, Run
+
+    def record(cut: str, player: str, gain: float) -> DecOpportunity:
+        return DecOpportunity(cut, player, "MED", "market", 1.0, None, 1, None, gain, None, None, None, None, None, None)
+
+    def run(i: int) -> Run:
+        return Run(i, "t", "a", "service", "c", "f", 1, 1.0)
+    with tempfile.TemporaryDirectory() as tmp:
+        kept = os.environ.get("FF_ROOT")
+        os.environ["FF_ROOT"] = str(Path(tmp) / "data")
+        try:
+            assert previous_opportunities() == ()
+            store.publish(run(1), dec_opportunity=[record("2026-08-02T0000Z", "b", 1.0), record("2026-08-01T0000Z", "a", 2.0)])
+            store.publish(run(2), dec_opportunity=[record("2026-08-02T0000Z", "b", 3.0), record("2026-08-02T0000Z", "c", 4.0)])
+            got = previous_opportunities()
+            assert [(o.cut[:10], o.player, o.gain) for o in got] == [
+                ("2026-08-01", "a", 2.0), ("2026-08-02", "b", 3.0), ("2026-08-02", "c", 4.0)]
+        finally:
+            store.clear()
+            if kept is None:
+                os.environ.pop("FF_ROOT")
+            else:
+                os.environ["FF_ROOT"] = kept
 
 
 if __name__ == "__main__":

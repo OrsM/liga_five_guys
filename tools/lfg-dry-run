@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # src/run.py on a scratch copy: data/raw linked in read-only, the parse cache
 # (data/tidy/parsed.jsonl and snapindex.json) copied so a copy does not reparse every snapshot,
-# everything written (lfg.db, reports) under the scratch dir, nothing published or sent.
+# the record store (SCRATCH/store) copied from the tracked tree's store/ or, without one, exported from SCRATCH/data/lfg.db
+# (a read-only backup of the live database: tools/export_store.py), everything written (lfg.db, store, reports)
+# under the scratch dir, nothing published or sent.
 # For checking and timing a change; the tracked repo is never touched.
 #
 #     tools/lfg-dry-run              every stage
@@ -19,6 +21,18 @@ for f in parsed.jsonl snapindex.json; do
         cp "$REPO/data/tidy/$f" "$SCRATCH/data/tidy/$f"
     fi
 done
+
+TREE="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"     # the tracked tree that holds store/, also from a worktree
+if [ ! -e "$SCRATCH/store" ]; then
+    if [ -d "$TREE/store" ]; then
+        cp -r "$TREE/store" "$SCRATCH/store"
+    elif [ -f "$SCRATCH/data/lfg.db" ]; then
+        PYTHONPATH=src "$HOME/.local/bin/uv" run --frozen python tools/export_store.py "$SCRATCH/data/lfg.db" "$SCRATCH"
+    else
+        echo "lfg-dry-run: no store: seed $SCRATCH/store, or $SCRATCH/data/lfg.db to export it from" >&2
+        exit 1
+    fi
+fi
 
 export PYTHONPATH=src FF_ROOT="$SCRATCH/data" LFG_REPORTS="$SCRATCH/reports" LFG_NO_PUBLISH=1
 echo "lfg-dry-run: scratch=$SCRATCH"

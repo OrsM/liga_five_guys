@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# grading.py rules on a scratch copy: the live database is read once through a mode=ro connection and
-# backed up into the scratch, the parse cache (data/tidy/parsed.jsonl, snapindex.json) copied as plain files, data/raw linked in, the replay and scoring run under tools/capped
+# grading.py rules on a scratch copy: the parse cache (data/tidy/parsed.jsonl, snapindex.json) copied as plain files, data/raw linked in, the replay and scoring run under tools/capped
 # (LFG_CAP, 1500M by default; LFG_CAPPED names another wrapper), the scratch deleted after
 # (LFG_KEEP=1 keeps it). Prints rule_report's table and `seconds S peak_mb M`.
 # For re-checking a change over every past cutoff; the tracked repo is never touched.
@@ -14,7 +13,6 @@ cd "$REPO"
 SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-rules}"       # not /tmp: a tmpfs too small for lfg.db; LFG_SCRATCH: one each when several run at once
 CAPPED="${LFG_CAPPED:-$REPO/tools/capped}"
 TREE="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"     # the tracked tree that holds data/, also from a worktree
-LIVE="$TREE/data/lfg.db"
 if [ ! -x "$CAPPED" ]; then
     echo "lfg-rules: $CAPPED is missing (tools/capped is not merged yet: ~/.cache/lfg-capped-wt/tools/capped); set LFG_CAPPED to it" >&2
     exit 1
@@ -24,16 +22,6 @@ rm -rf "$SCRATCH"
 mkdir -p "$SCRATCH/data/tidy"
 cp "$TREE/data/tidy/parsed.jsonl" "$TREE/data/tidy/snapindex.json" "$SCRATCH/data/tidy/"
 ln -sfn "$TREE/data/raw" "$SCRATCH/data/raw"
-python3 - "$LIVE" "$SCRATCH/data/lfg.db" <<'PY'
-import sqlite3
-import sys
-src = sqlite3.connect("file:%s?mode=ro" % sys.argv[1], uri=True)
-dst = sqlite3.connect(sys.argv[2])
-src.backup(dst)
-dst.close()
-src.close()
-PY
-
 export PYTHONPATH=src FF_ROOT="$SCRATCH/data"
 start=$SECONDS
 status=0

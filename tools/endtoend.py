@@ -9,17 +9,12 @@ import sys
 def _selftest() -> None:
     """The observation rows, their Loaded, decision.decisions (the seen facts, the forecast, the inputs, the extras) and
     board.board (the decision's inputs, your squad and its eleven, the standing offers ranked): a forecast and a board come out."""
-    import contextlib
-    import tempfile
-    from pathlib import Path
-
     from ffcore import decision_facts, forecast_facts, identity, ledger
     from ffcore import observations as ob
-    from ffcore.db import cut, record, set_now
+    from ffcore.db import cut, set_now
     from ffcore.parse import snapshot_stamp
-    from ffcore.tidy import tables_in
     from ffcore.league import Config
-    from ffcore.loader import Loaded
+    from ffcore.loader import Loaded, health_at
     import decision
     from board import TOP_BUYS, TOP_TARGETS, board
 
@@ -56,41 +51,37 @@ def _selftest() -> None:
     apps = [identity.AppLink(str(n), k) for n, (k, _c, _p) in enumerate(players, 1)]
     cfg = Config()
     loaded = Loaded(obs, identity.identity_of((), apps), ledger.League(cfg.me, cfg.budget), forecast_facts.knobs(), ())
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), contextlib.chdir(tmp):
-        set_now(snapshot_stamp(cut_at))
-        try:
-            record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-
-            [d] = decision.decisions(loaded, [cut()])
-            assert not isinstance(d, decision.Stale), d
-            assert len(d.fc.now) > 0, "a forecast"
-            assert len(decision_facts.my_squad(d.seen, loaded.league)) == len(mine), "your squad as the app showed it"
-            inp = d.inputs
-            got = decision.opportunity_rows(inp)
-            decision.keep_opportunities(cut(), got)
-            doc = board(inp, got, decision.arrivals(got, loaded.previous), d.extras)
-            assert len(doc["squad"]) == len(mine) and sum(r["xi"] for r in doc["squad"]) == 11, "your squad and its eleven"
-            assert {"generated_at", "market_at", "sources", "cash", "can_bid", "lock_at", "do", "buys", "sells"} <= set(doc), doc
-            (line,) = doc["sells"]
-            assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
-            assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"
-            assert all(b["gain"] > 0 and b["accepts"] == [] for b in doc["buys"]), doc["buys"]
-            assert all((b["advised"] is None) == (b["advised_win"] is None) and (b["win"] is None or 0 < b["win"] <= 1)
-                       for b in doc["buys"]), ("a chance is one from a curve or none at all", doc["buys"])
-            kinds = {r["player"]: r["status"] for r in got}
-            assert {kinds[k] for k in rivals} == {"rival"} and {kinds[k] for k in listed} <= {"market"}, \
-                "the market's players are on sale, the rivals' are not: both are judged"
-            assert all(b["advised"] is None or b["advised"] >= b["asking"] for b in doc["buys"]), "never a bid advised below the asking price"
-            assert {t["status"] for t in doc["targets"]} >= {"rival"} or not doc["targets"], doc["targets"]
-            assert len(doc["targets"]) == min(TOP_TARGETS, sum(1 for r in got if r["gain"] > 0)), "the targets: those with a gain"
-            assert len(doc["buys"]) == min(TOP_BUYS, sum(1 for r in got if r["gain"] > 0 and r["status"] == "market")), \
-                "the buys: those on the market with a gain"
-            (listing,) = doc["do"]
-            assert listing["what"] == "list" and listing["accepts"] == [None] and len(listing["act"]) == len(mine), \
-                "no one of yours is listed yet: one line lists them all, each with his place in your team"
-            assert {a["player_team"] for a in listing["act"]} == {"t%d" % n for n in range(1, len(mine) + 1)}, listing["act"]
-        finally:
-            set_now(None)
+    set_now(snapshot_stamp(cut_at))
+    try:
+        [d] = decision.decisions(loaded, [cut()])
+        assert not isinstance(d, decision.Stale), d
+        assert len(d.fc.now) > 0, "a forecast"
+        assert len(decision_facts.my_squad(d.seen, loaded.league)) == len(mine), "your squad as the app showed it"
+        inp = d.inputs
+        got = decision.opportunity_rows(inp)
+        doc = board(inp, got, decision.arrivals(got, loaded.previous), d.extras, health_at(loaded, cut()))
+        assert len(doc["squad"]) == len(mine) and sum(r["xi"] for r in doc["squad"]) == 11, "your squad and its eleven"
+        assert {"generated_at", "market_at", "sources", "cash", "can_bid", "lock_at", "do", "buys", "sells"} <= set(doc), doc
+        (line,) = doc["sells"]
+        assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
+        assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"
+        assert all(b["gain"] > 0 and b["accepts"] == [] for b in doc["buys"]), doc["buys"]
+        assert all((b["advised"] is None) == (b["advised_win"] is None) and (b["win"] is None or 0 < b["win"] <= 1)
+                   for b in doc["buys"]), ("a chance is one from a curve or none at all", doc["buys"])
+        kinds = {r["player"]: r["status"] for r in got}
+        assert {kinds[k] for k in rivals} == {"rival"} and {kinds[k] for k in listed} <= {"market"}, \
+            "the market's players are on sale, the rivals' are not: both are judged"
+        assert all(b["advised"] is None or b["advised"] >= b["asking"] for b in doc["buys"]), "never a bid advised below the asking price"
+        assert {t["status"] for t in doc["targets"]} >= {"rival"} or not doc["targets"], doc["targets"]
+        assert len(doc["targets"]) == min(TOP_TARGETS, sum(1 for r in got if r["gain"] > 0)), "the targets: those with a gain"
+        assert len(doc["buys"]) == min(TOP_BUYS, sum(1 for r in got if r["gain"] > 0 and r["status"] == "market")), \
+            "the buys: those on the market with a gain"
+        (listing,) = doc["do"]
+        assert listing["what"] == "list" and listing["accepts"] == [None] and len(listing["act"]) == len(mine), \
+            "no one of yours is listed yet: one line lists them all, each with his place in your team"
+        assert {a["player_team"] for a in listing["act"]} == {"t%d" % n for n in range(1, len(mine) + 1)}, listing["act"]
+    finally:
+        set_now(None)
     print("endtoend self-test OK")
 
 

@@ -1,26 +1,30 @@
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import math
 import os
 import sys
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
-from contextlib import closing
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, TypeVar
+
+import numpy as np
+import numpy.typing as npt
 
 import decision
 import salegrade
 import worth
 from board import context, later_sale
-from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state
+from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
 from ffcore.clock import run_now
-from ffcore.db import connect, record, rows, this_run
+from ffcore import records as rec
+from ffcore.db import RunRecords
 from ffcore.parse import snapshot_stamp, stamp
 from salegrade import HORIZONS
 
-__all__ = ["backtest", "superseded", "record_grades"]
+__all__ = ["backtest", "graded", "latest_values", "record_grades", "scored_at", "standing_grades"]
 
 T = TypeVar("T")
 
@@ -148,28 +152,22 @@ def opportunity_report(got: Sequence[OpportunityGrade]) -> str:
     return "\n".join(lines)
 
 
-# What the grade stage keeps, a set a run.
-GRADED = ("grade_cell",)
+def standing_grades(sha: str) -> npt.NDArray[Any]:
+    """The grade_cell array that stands for the code sha (rule grades_stand_from_the_latest_graded_run): that of its
+    latest published run with any cell, an earlier run's of the same code being superseded; empty when it has none."""
+    for run in sorted((r for r in store.runs() if r.commit_sha == sha), key=lambda r: r.run_id, reverse=True):
+        cells = store.grade_cells(run.run_id)
+        if len(cells):
+            return cells
+    return np.empty(0, dtype=rec.GRADE_CELL_DTYPE)
 
 
-def superseded(run: int, path: Path | None = None) -> None:
-    """Drop the grades of earlier runs of the same code (runs.commit_sha):
-    this run's, on as much data or more, stand for that code."""
-    with closing(connect(path)) as db, db:
-        for t in GRADED:
-            db.execute("DELETE FROM %s WHERE run_id IN (SELECT e.run_id FROM runs e, runs r"
-                       " WHERE r.run_id = ? AND e.commit_sha = r.commit_sha AND e.run_id < r.run_id)"
-                       % t, (run,))
-
-
-def graded(run: int, last: int, path: Path | None = None) -> bool:
-    """Whether an earlier run of this run's code (runs.commit_sha) graded the
-    past locks on every jornada done up to last: its grades stand, and
-    nothing would change them."""
-    with closing(connect(path)) as db:
-        return db.execute("SELECT 1 FROM grade_cell g JOIN runs e ON e.run_id = g.run_id"
-                          " JOIN runs r ON r.run_id = ? AND e.commit_sha = r.commit_sha AND e.run_id < r.run_id"
-                          " GROUP BY g.run_id HAVING max(g.jornada) >= ? LIMIT 1", (run, last)).fetchone() is not None
+def graded(sha: str, last: int) -> bool:
+    """Whether a published run of the code sha graded the past locks on every jornada done up to last (rule
+    graded_covers_the_jornadas_done: the jornada of its standing grades reaches last): its grades stand, and nothing
+    would change them."""
+    cells = standing_grades(sha)
+    return bool(len(cells)) and int(cells["jornada"].max()) >= last
 
 
 class Results(NamedTuple):
@@ -193,19 +191,17 @@ def results_seen(loaded: loader.Loaded, moment: dt.datetime) -> Results:
         auction_facts.auction_results(world, loaded.identity, loaded.league)), RESULT_FOLDS)[0]
 
 
-def scored_at(run: int, path: Path | None = None) -> str | None:
-    """When (runs.as_of) the latest earlier run of this run's code (runs.commit_sha) that recorded the auction scores
-    (auction_brier) was made; None if none was."""
-    with closing(connect(path)) as db:
-        return db.execute("SELECT max(e.as_of) FROM auction_brier b JOIN runs e ON e.run_id = b.run_id"
-                          " JOIN runs r ON r.run_id = ? AND e.commit_sha = r.commit_sha AND e.run_id < r.run_id",
-                          (run,)).fetchone()[0]
+def scored_at(sha: str) -> str | None:
+    """When (as_of) the latest published run of the code sha that recorded the auction scores (an auction_brier row) was
+    made (rule scored_at_is_the_latest_scoring_run); None if none was."""
+    scoring = {b.run_id for b in store.records("auction_brier")}
+    return max((r.as_of for r in store.runs() if r.commit_sha == sha and r.run_id in scoring), default=None)
 
 
-def auctions_scored(run: int, loaded: loader.Loaded, now: Results) -> bool:
-    """Whether an earlier run of this run's code scored the auctions on the outcomes seen now: its scores stand, as
+def auctions_scored(sha: str, loaded: loader.Loaded, now: Results) -> bool:
+    """Whether an earlier run of the code sha scored the auctions on the outcomes seen now: its scores stand, as
     no outcome has come since (the results as they stood at that run's cut equal now)."""
-    then = scored_at(run)
+    then = scored_at(sha)
     if then is None or not now.n:
         return False
     when = snapshot_stamp(then)
@@ -244,40 +240,38 @@ def auction_reads(loaded: loader.Loaded, cuts: Sequence[str], moment: dt.datetim
     return AuctionReads({c: r.forecast for c, r in zip(asked, got)}, got[-1].looks, got[-1].results)
 
 
-def record_auction(run: int | None, loaded: loader.Loaded, cuts: Sequence[str]) -> dict[str, int]:
+def record_auction(records: RunRecords, loaded: loader.Loaded, cuts: Sequence[str]) -> dict[str, int]:
     """Scores the auction forecast: backtest (an expanding fit over the closed looks) and live (the stated chance of
     each decision, auction_reads' forecasts of the fixed table at the cuts, against the results); calibration and Brier
-    scores of both are recorded for the run, and their sizes and drifts returned."""
+    scores of both are added to the run's records, and their sizes and drifts returned."""
     reads = auction_reads(loaded, cuts, run_now())
     live = auction.live_points(reads.forecasts, reads.results)
     back = auction.backtest(reads.looks)
     cal = auction.calibration(back, "backtest:") + auction.calibration(live, "live:")
     brier = auction.briers(back, "backtest:") + auction.briers(live, "live:")
-    if run is not None:
-        record([{"run_id": run, **r} for r in cal], "auction_calibration")
-        record([{"run_id": run, **r} for r in brier], "auction_brier")
+    records.add("auction_calibration", cal)
+    records.add("auction_brier", brier)
     return {"auction_points": len(back), "auction_live": len(live), "auction_drift": sum(r["drift"] for r in cal)}
 
 
-def record_grades() -> dict[str, int]:
-    """The grade stage (run.py grade): replay each past lock with this code, and keep every player forecast against
-    what then happened (one set a code: superseded), unless this code has graded them on every jornada done (graded);
-    and score the auction forecast (record_auction), unless this code has on every auction closed (auctions_scored)."""
+def record_grades(records: RunRecords) -> dict[str, int]:
+    """The grade stage (run.py grade): replay each past lock with this code, and add every player forecast against
+    what then happened to the run's records (one set a code stands: standing_grades), unless this code has graded them on
+    every jornada done (graded); and score the auction forecast (record_auction), unless this code has on every auction
+    closed (auctions_scored)."""
     loaded, cuts = read_storage()
     moment = run_now()
     now = season(loaded)
     resolved = len(now.done)
-    run = this_run()
-    standing = run is not None and bool(now.done) and graded(run, max(now.done))
-    scored = {} if run is not None and auctions_scored(run, loaded, results_seen(loaded, moment)) else record_auction(run, loaded, cuts)
-    record_sales(loaded)
+    sha = records.commit_sha
+    standing = bool(now.done) and graded(sha, max(now.done))
+    scored = {} if auctions_scored(sha, loaded, results_seen(loaded, moment)) else record_auction(records, loaded, cuts)
+    record_sales(loaded, records)
     if standing:
         print("  grade: this code's grades stand (every jornada done graded)")
         return {"resolved": resolved, "forecasts": 0, **scored}
     fc = backtest(loaded, now, GRADE_AHEAD)
-    if run is not None:
-        record([{"run_id": run, **c._asdict()} for c in fc], "grade_cell")
-        superseded(run)
+    records.add("grade_cell", [c._asdict() for c in fc])
     forecasts = len({(c.from_j, c.jornada) for c in fc})
     print("  grade: %d forecasts over %d jornadas" % (forecasts, resolved))
     return {"resolved": resolved, "forecasts": forecasts, **scored}
@@ -493,21 +487,27 @@ def season(loaded: loader.Loaded) -> Season:
     return state.sweep(loaded.obs, [stamp(run_now())], lambda world: season_at(loaded, world))[0]
 
 
-def record_sales(loaded: loader.Loaded) -> None:
+def latest_values(measure: str) -> dict[str, float]:
+    """The newest logged value of each key of the measure (records.latest over the measure_log of every published run)."""
+    newest = rec.latest((r for r in store.records("measure_log") if r.measure == measure), lambda r: r.key)
+    return {pair.last.key: pair.last.value for pair in newest.values()}
+
+
+def record_sales(loaded: loader.Loaded, records: RunRecords) -> None:
     """Each sale from SALES_FROM with a done jornada at its lock, graded at RATE (salegrade.grade) and summarised
-    (salegrade.measure_values), is appended to measure_log as sale_grade with jornadas_done, unless the latest one
+    (salegrade.measure_values), is added to the run's measure_log as sale_grade with jornadas_done, unless the latest one
     logged has the same all.lock.n (graded_count) and jornadas_done; then no sale is read. loaded is the storage the
     caller has read (read_storage): record_sales reads none."""
     now = season(loaded)
     marks = {"all.lock.n": float(graded_count(now)), "jornadas_done": float(len(now.done))}
-    latest = dict(rows("SELECT key, value FROM measure_latest WHERE measure = 'sale_grade'"))
+    latest = latest_values("sale_grade")
     if all(latest.get(k) == v for k, v in marks.items()):
         return
     facts = facts_for(loaded, wanted_moments(my_trades(now, "sell", SALES_FROM), now.locks, now.done))
     fielded = fielded_at_locks(now.locks, now.done, facts)
     sold = sales_since(now, SALES_FROM, facts)
     values = salegrade.measure_values(salegrade.summary(graded_sales(sold, now.locks, now.done, now.scored, fielded, facts)))
-    log_measure("sale_grade", values | {"jornadas_done": marks["jornadas_done"]})
+    log_measure(records, "sale_grade", values | {"jornadas_done": marks["jornadas_done"]})
 
 
 class Cut(NamedTuple):
@@ -607,16 +607,14 @@ def rule_report(scores: Sequence[RuleScore]) -> str:
                      for r in [head, *body])
 
 
-def log_measure(measure: str, values: dict[str, float]) -> None:
-    """The headline numbers of a measure appended to measure_log, beside
-    the code's short commit (measure_latest shows each against the one
-    before)."""
+def log_measure(records: RunRecords, measure: str, values: dict[str, float]) -> None:
+    """The headline numbers of a measure added to the run's measure_log, beside the code's short commit (latest_values
+    gives each key's newest)."""
     import subprocess
     sha = subprocess.run(["git", "-C", str(Path(__file__).parent), "rev-parse", "--short", "HEAD"],
                          capture_output=True, text=True).stdout.strip() or "unknown"
     at = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    record([{"at": at, "commit_sha": sha, "measure": measure,
-             "key": k, "value": v} for k, v in values.items()], "measure_log")
+    records.add("measure_log", [{"at": at, "commit_sha": sha, "measure": measure, "key": k, "value": v} for k, v in values.items()])
 
 
 class GradeRow(NamedTuple):
@@ -681,20 +679,18 @@ def accuracy_rows(graded_rows: Iterable[GradeRow]) -> list[Accuracy]:
 
 
 def accuracy(ahead: int = 5) -> list[Accuracy]:
-    """The forecast at each lock (backtest) graded as a run of its own (trigger 'accuracy'; its cells are kept as
-    grade_cell records): the Accuracy at the next jornada and at ahead, the star group first."""
+    """The forecast at each lock (backtest) graded as a run of its own (trigger 'accuracy', published with its cells as
+    grade_cell records and its numbers as measure_log): the Accuracy at the next jornada and at ahead, the star group first."""
     loaded, _ = read_storage()
     now = season(loaded)
     cells = backtest(loaded, now, ahead)
-    with closing(connect()) as db, db:
-        run = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
-                         " VALUES ('', '', 'accuracy', '', 1)").lastrowid
-    assert run is not None
-    record([{"run_id": run, **c._asdict()} for c in cells], "grade_cell")
+    records = RunRecords.after_latest("")
+    records.add("grade_cell", [c._asdict() for c in cells])
     got = [a for a in accuracy_rows(grade_rows(cells, now.scored)) if a.ahead in (0, ahead)]
-    log_measure("accuracy", {"%s%s@%d" % ("" if a.grp == "all" else "star_", k, a.ahead): v for a in got
-                             for k, v in (("n", a.n), ("rmse", a.rmse), ("mae", a.mae), ("bias", a.bias), ("r", a.r), ("slope", a.slope))
-                             if v is not None})
+    log_measure(records, "accuracy", {"%s%s@%d" % ("" if a.grp == "all" else "star_", k, a.ahead): v for a in got
+                                      for k, v in (("n", a.n), ("rmse", a.rmse), ("mae", a.mae), ("bias", a.bias), ("r", a.r), ("slope", a.slope))
+                                      if v is not None})
+    records.publish(rec.Run(records.run, "", "", "accuracy", "", None, 1, None))
     return got
 
 
@@ -705,17 +701,48 @@ def price_grades(loaded: loader.Loaded) -> list[price_fold.Grade]:
     return sorted(sorted(got, key=lambda g: g.h), key=lambda g: g.scope, reverse=True)
 
 
-def _selftest_measure_log() -> None:
-    """measure_log keeps each run's headline numbers; measure_latest sets the latest beside the one before."""
+@contextlib.contextmanager
+def _selftest_scratch_store() -> Iterator[None]:
+    """A store under a scratch root (FF_ROOT) for the block, the environment restored after."""
     import tempfile
-    from ffcore.tidy import tables_in
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        log_measure("accuracy", {"share": 0.25})
-        assert rows("SELECT measure, key, value, previous FROM measure_latest") == [("accuracy", "share", 0.25, None)]
-        (sha,), = rows("SELECT commit_sha FROM measure_log")
-        assert sha != "unknown" and 4 <= len(sha) <= 12, sha
-        log_measure("accuracy", {"share": 0.5})
-        assert rows("SELECT key, value, previous, change FROM measure_latest") == [("share", 0.5, 0.25, 0.25)]
+    kept = os.environ.get("FF_ROOT")
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["FF_ROOT"] = str(Path(tmp) / "data")
+        try:
+            yield
+        finally:
+            store.clear()
+            if kept is None:
+                os.environ.pop("FF_ROOT")
+            else:
+                os.environ["FF_ROOT"] = kept
+
+
+def _published(run: int, sha: str, as_of: str = "t", **kinds: Any) -> None:
+    """Publish run (of the code sha, made at as_of) with the kinds' rows, each a list of mappings."""
+    records = RunRecords(run, sha)
+    for kind, rows in kinds.items():
+        records.add(kind, rows)
+    records.publish(rec.Run(run, "t", as_of, "service", sha, "t", 1, 1.0))
+
+
+def _selftest_measure_log() -> None:
+    """Rule measure_latest_reader: latest_values gives, of the measure_log of the published runs, the newest value of each
+    key of the measure asked, and only of that measure."""
+    with _selftest_scratch_store():
+        first = RunRecords(1, "a")
+        log_measure(first, "accuracy", {"share": 0.25})
+        (logged,) = first.rows("measure_log")
+        assert logged.commit_sha != "unknown" and 4 <= len(logged.commit_sha) <= 12, logged
+        assert latest_values("accuracy") == {}, "nothing published, nothing read"
+        first.publish(rec.Run(1, "t", "t", "service", "a", "t", 1, 1.0))
+        assert latest_values("accuracy") == {"share": 0.25}
+        second = RunRecords(2, "a")
+        log_measure(second, "accuracy", {"share": 0.5, "n": 3.0})
+        log_measure(second, "sale_grade", {"share": 9.0})
+        second.publish(rec.Run(2, "t", "t", "service", "a", "t", 1, 1.0))
+        assert latest_values("accuracy") == {"share": 0.5, "n": 3.0} and latest_values("sale_grade") == {"share": 9.0}, \
+            "the newest value of each key, of the measure asked"
 
 
 def _selftest_stand() -> None:
@@ -724,7 +751,7 @@ def _selftest_stand() -> None:
     entered: list[str] = []
     held = {"graded": True, "scored": True}
 
-    def auction_scored(run: int | None, loaded: Any, cuts: Sequence[str]) -> dict[str, int]:
+    def auction_scored(records: RunRecords, loaded: Any, cuts: Sequence[str]) -> dict[str, int]:
         entered.append("auction")
         return {}
 
@@ -733,17 +760,16 @@ def _selftest_stand() -> None:
         return []
     stub: dict[str, Any] = {
         "read_storage": lambda: (None, []), "season": lambda loaded: Season((), {}, {1, 2}, {}),
-        "this_run": lambda: 5, "results_seen": lambda loaded, moment: Results(1, 1, "c"),
-        "graded": lambda run, last: held["graded"], "auctions_scored": lambda run, loaded, now: held["scored"],
-        "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda loaded: None,
-        "record": lambda *a, **k: None, "superseded": lambda run: None}
+        "results_seen": lambda loaded, moment: Results(1, 1, "c"),
+        "graded": lambda sha, last: held["graded"], "auctions_scored": lambda sha, loaded, now: held["scored"],
+        "record_auction": auction_scored, "backtest": regraded, "record_sales": lambda loaded, records: None}
     kept = {k: globals()[k] for k in stub}
     try:
         globals().update(stub)
         for g, a, want in ((True, True, []), (False, True, ["grades"]), (True, False, ["auction"]), (False, False, ["auction", "grades"])):
             held.update(graded=g, scored=a)
             entered.clear()
-            record_grades()
+            record_grades(RunRecords(5, "c"))
             assert entered == want, (g, a, entered)
     finally:
         globals().update(kept)
@@ -853,8 +879,6 @@ def _selftest_points() -> None:
 def _selftest_record_sales() -> None:
     """record_sales logs the sales' measure once for a given number of graded sales and jornadas done: a second call
     with nothing new adds no rows and reads no sale, a jornada done adds a set; a sale with no course is not graded."""
-    import tempfile
-    from ffcore.tidy import tables_in
     at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
     locks = {1: at + dt.timedelta(days=2), 2: at + dt.timedelta(days=9)}
     held: dict[str, Any] = {"done": {1}, "read": 0}
@@ -874,19 +898,19 @@ def _selftest_record_sales() -> None:
         "fielded_at_locks": lambda locks, done, facts: {}}
     kept = {k: globals()[k] for k in stub}
 
-    def logged() -> int:
-        return rows("SELECT count(*) FROM measure_log WHERE measure = 'sale_grade'")[0][0]
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+    def logged(run: int) -> int:
+        records = RunRecords(run, "a")
+        record_sales(storage, records)
+        records.publish(rec.Run(run, "t", "t", "service", "a", "t", 1, 1.0))
+        return len(records.rows("measure_log"))
+    with _selftest_scratch_store():
         try:
             globals().update(stub)
-            record_sales(storage)
-            first = logged()
-            assert first > 0 and dict(rows("SELECT key, value FROM measure_latest"))["all.lock.n"] == 2
-            record_sales(storage)
-            assert logged() == first and held["read"] == 1, "nothing new: no rows, no sale read"
+            first = logged(1)
+            assert first > 0 and latest_values("sale_grade")["all.lock.n"] == 2
+            assert logged(2) == 0 and held["read"] == 1, "nothing new: no rows, no sale read"
             held["done"] = {1, 2}
-            record_sales(storage)
-            assert logged() == 2 * first, "a jornada done: a new set"
+            assert logged(3) == first, "a jornada done: a new set"
         finally:
             globals().update(kept)
 
@@ -1105,6 +1129,29 @@ def _selftest_auction_reads() -> None:
     assert all(0.0 <= p.stated <= 1.0 and p.stated == p.pooled for p in live)
 
 
+def _selftest_standing() -> None:
+    """The ports of the SQL joins over the runs of a code (commit_sha): grades_stand_from_the_latest_graded_run (an earlier
+    run's grades of the same code are superseded, another code's stay), graded_covers_the_jornadas_done and
+    scored_at_is_the_latest_scoring_run (the latest published run of this code that scored, not another's)."""
+    def cell(jornada: int) -> dict[str, Any]:
+        return {"from_j": 7, "jornada": jornada, "player": "p", "predicted": 1.0, "plays": None, "flagged": 0}
+    brier = {"scope": "live:", "n": 1, "model": 0.1, "pooled": 0.2}
+    with _selftest_scratch_store():
+        assert len(standing_grades("a")) == 0 and not graded("a", 1) and scored_at("a") is None, "no run, nothing stands"
+        _published(1, "a", "2026-11-01T2210Z", grade_cell=[cell(7)], auction_brier=[brier])
+        _published(2, "b", "2026-11-02T0000Z", grade_cell=[cell(9)])
+        _published(3, "a", "2026-11-03T0000Z", grade_cell=[cell(7), cell(8)])
+        _published(4, "a", "2026-11-04T0000Z")
+        assert sorted(int(j) for j in standing_grades("a")["jornada"]) == [7, 8] and [int(j) for j in standing_grades("b")["jornada"]] == [9], \
+            "grades_stand_from_the_latest_graded_run: the latest run of the code with cells; a run without cells supersedes nothing"
+        assert graded("a", 8) and not graded("a", 9) and graded("b", 9) and not graded("c", 1), \
+            "graded_covers_the_jornadas_done: this code graded up to the last jornada done; a jornada more, or other code, is not"
+        assert scored_at("a") == "2026-11-01T2210Z" and scored_at("b") is None and scored_at("c") is None, \
+            "scored_at_is_the_latest_scoring_run: the run of this code that scored the auctions, not another's"
+        _published(5, "a", "2026-11-05T0000Z", auction_brier=[brier])
+        assert scored_at("a") == "2026-11-05T0000Z", "the latest of the runs that scored"
+
+
 def _selftest() -> None:
     _selftest_replayed_cuts()
     _selftest_rule_scores()
@@ -1119,32 +1166,7 @@ def _selftest() -> None:
     _selftest_results()
     _selftest_opportunities()
     _selftest_auction_reads()
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp, closing(connect(Path(tmp) / "lfg.db")) as db:
-        path = Path(tmp) / "lfg.db"
-
-        def run(commit: str) -> int:
-            with db:
-                cur = db.execute("INSERT INTO runs (started, as_of, trigger, commit_sha, ok)"
-                                 " VALUES ('t', 't', 'service', ?, 1)", (commit,))
-            assert cur.lastrowid is not None
-            return cur.lastrowid
-        old, other, now = run("a"), run("b"), run("a")
-        for r in (old, other, now):
-            record([{"run_id": r, "from_j": 7, "jornada": 7, "player": "p", "predicted": 1.0, "flagged": 0}],
-                   "grade_cell", path)
-        superseded(now, path)
-        for t in GRADED:
-            assert [r for r, in db.execute("SELECT run_id FROM %s ORDER BY run_id" % t)] in (
-                [other, now], []), "the same code's earlier grade goes; another code's stays"
-        later, elsewhere = run("a"), run("c")
-        assert graded(later, 7, path) and not graded(later, 8, path) and not graded(elsewhere, 7, path), \
-            "this code graded on every jornada done: nothing to grade again; a jornada more, or other code, is"
-        with db:
-            db.execute("UPDATE runs SET as_of = '2026-11-01T2210Z' WHERE run_id = ?", (old,))
-            db.execute("INSERT INTO auction_brier VALUES (?, 'live:', 1, 0.1, 0.2)", (old,))
-        assert scored_at(later, path) == "2026-11-01T2210Z" and scored_at(elsewhere, path) is None and scored_at(old, path) is None, \
-            "the run of this code that scored the auctions, not another's, nor one that came after"
+    _selftest_standing()
     _selftest_stand()
     _selftest_window()
     print("grading self-test OK")
@@ -1156,7 +1178,7 @@ if __name__ == "__main__":
         raise SystemExit(0)
     if sys.argv[1:2] == ["accuracy"]:
         # accuracy: predicted e against actual points, next jornada and five ahead, at every past lock
-        # (records a run of trigger 'accuracy' in the database it reads)
+        # (publishes a run of trigger 'accuracy' to the store)
         for a in accuracy():
             print("%-4s ahead %d  n=%d  rmse=%.4f  mae=%.4f  bias=%+.4f  r=%.4f  slope=%.3f" % (a.grp, a.ahead, a.n, a.rmse, a.mae, a.bias, a.r or 0, a.slope or 0), flush=True)
         os._exit(0)

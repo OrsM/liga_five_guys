@@ -11,6 +11,8 @@ Named rules, each tested:
   last_good_is_newest_usual: last_good is the newest snapshot (of all, up to the cut) of at least half the usual
     rows.
   rounded_half_up: usual_rows, hours_since and usual_gap_h are rounded to a tenth, a tie away from zero (as SQLite).
+  drift_is_the_latest_calibration: the drifting bins told are those of the newest calibration, this run's when it
+    scored the auctions, else the latest published run's that has any.
 
     python src/health.py text    # what to tell you, empty if every source is fine
 """
@@ -24,12 +26,13 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import NamedTuple
 
-from ffcore import observations as ob
-from ffcore.db import HEALTH_SOURCES, HEALTH_USUAL, rows, stamp_jd
+from ffcore import observations as ob, store
+from ffcore.db import HEALTH_SOURCES, HEALTH_USUAL, RunRecords, rows, stamp_jd
 from ffcore.identity import Unmatched
+from ffcore.records import AuctionCalibration
 from publish import notify
 
-__all__ = ["Snapshot", "Health", "main", "parser_health", "snapshots_of", "text", "trouble"]
+__all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "snapshots_of", "text", "trouble"]
 
 SENT = Path.home() / ".local/state/lfg/health.sent"
 UNMATCHED_FROM = 5e6
@@ -114,7 +117,17 @@ def trouble(health: Iterable[Health], unmatched: Iterable[Unmatched]) -> list[st
         unmatched_line(u) for u in sorted(unmatched, key=lambda u: -u.value) if u.value >= UNMATCHED_FROM]
 
 
-def text() -> str:
+def drifting(pending: Iterable[AuctionCalibration] = ()) -> list[AuctionCalibration]:
+    """The bins of the newest calibration that drift (rule drift_is_the_latest_calibration; pending is this run's), the
+    furthest stated from observed first, then by scope and bin."""
+    held = list(pending)
+    if not held:
+        newest = max((c.run_id for c in store.records("auction_calibration")), default=None)
+        held = list(store.records("auction_calibration", newest)) if newest is not None else []
+    return sorted((c for c in held if c.drift == 1), key=lambda c: (-abs(c.stated - c.observed), c.scope, c.bin))
+
+
+def text(records: RunRecords | None = None) -> str:
     """One line a source that is not ok, and one a player worth UNMATCHED_FROM or more the app or the line-ups do
     not reach; empty if all is well."""
     lines = trouble(
@@ -123,21 +136,19 @@ def text() -> str:
             " FROM parser_health WHERE status <> 'ok' ORDER BY src")),
         (Unmatched._make(r) for r in rows("SELECT player, name, club, value, no_app, no_slug FROM unmatched"
                                           " WHERE value >= ? ORDER BY value DESC", (UNMATCHED_FROM,))))
-    drift = list(rows(
-            "SELECT scope, bin, n, stated, observed FROM auction_calibration WHERE drift = 1"
-            " AND run_id = (SELECT max(run_id) FROM auction_calibration) ORDER BY abs(stated - observed) DESC, scope, bin"))
+    drift = drifting(records.rows("auction_calibration") if records is not None else ())
     if drift:
-        scope, bin_, n, stated, observed = drift[0]
-        scopes = ", ".join(sorted({scope for scope, _, _, _, _ in drift}))
+        worst = drift[0]
+        scopes = ", ".join(sorted({c.scope for c in drift}))
         lines.append("auction forecast drifting in %d bins (%s); worst %s, chance %s: stated %.2f, observed %.2f over %d"
-                     % (len(drift), scopes, scope, bin_, stated, observed, n))
+                     % (len(drift), scopes, worst.scope, worst.bin, worst.stated, worst.observed, worst.n))
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
 
 
-def main(sent: Path = SENT) -> dict[str, int]:
-    """The health stage: tell text() if it is new (sent holds what was
-    told last), forget it when there is nothing to say."""
-    said = text()
+def main(records: RunRecords | None = None, sent: Path = SENT) -> dict[str, int]:
+    """The health stage: tell text(records) if it is new (sent holds what was told last), forget it when there is
+    nothing to say."""
+    said = text(records)
     if not said:
         sent.unlink(missing_ok=True)
     elif not sent.is_file() or sent.read_text(encoding="utf-8") != said:
@@ -148,12 +159,14 @@ def main(sent: Path = SENT) -> dict[str, int]:
 
 
 def _selftest() -> None:
+    import os
     import tempfile
     from contextlib import closing
     from datetime import datetime, timedelta, timezone
     from pathlib import Path
 
     from ffcore.db import connect, set_now
+    from ffcore.records import Run
     from ffcore.tidy import store_sql, tables_in
 
     now = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
@@ -205,19 +218,31 @@ def _selftest() -> None:
             set_now(None)
 
     with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+        kept = os.environ.get("FF_ROOT")
+        os.environ["FF_ROOT"] = str(Path(tmp) / "data")
         try:
             set_now(now)
-            with closing(connect()) as db, db:
-                db.executemany("INSERT INTO auction_calibration (run_id, scope, bin, n, stated, observed, drift) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                               [(1, "rookies", "high", 52, 0.93, 0.77, 1), (1, "veterans", "mid", 42, 0.97, 0.85, 1),
-                                (1, "keepers", "low", 30, 0.50, 0.49, 0)])
+            store.publish(Run(1, "t", "a", "service", "c", "f", 1, 1.0), auction_calibration=[
+                AuctionCalibration(1, "rookies", "high", 52, 0.93, 0.77, 1), AuctionCalibration(1, "veterans", "mid", 42, 0.97, 0.85, 1),
+                AuctionCalibration(1, "keepers", "low", 30, 0.50, 0.49, 0)])
             out = text()
-            drifting = [line for line in out.splitlines() if "drifting" in line]
-            assert len(drifting) == 1, out
-            assert "rookies" in drifting[0] and "veterans" in drifting[0] and "0.93" in drifting[0] and "0.77" in drifting[0], out
+            drifting_lines = [line for line in out.splitlines() if "drifting" in line]
+            assert len(drifting_lines) == 1, out
+            assert "rookies" in drifting_lines[0] and "veterans" in drifting_lines[0] and "0.93" in drifting_lines[0] and "0.77" in drifting_lines[0], out
             assert "keepers" not in out, out
+            store.publish(Run(2, "t", "a", "service", "c", "f", 1, 1.0), auction_calibration=[AuctionCalibration(2, "keepers", "low", 30, 0.5, 0.2, 1)])
+            assert [c.scope for c in drifting()] == ["keepers"], "drift_is_the_latest_calibration: the newest run that scored"
+            this = RunRecords(3, "c")
+            assert [c.scope for c in drifting(this.rows("auction_calibration"))] == ["keepers"], "a run that scored nothing leaves the latest published one"
+            this.add("auction_calibration", [{"scope": "rookies", "bin": "high", "n": 9, "stated": 0.9, "observed": 0.1, "drift": 1}])
+            assert [c.run_id for c in drifting(this.rows("auction_calibration"))] == [3], "this run's calibration, once it scored, replaces them"
+            assert "rookies" in text(this) and "keepers" not in text(this)
         finally:
             set_now(None)
+            if kept is None:
+                os.environ.pop("FF_ROOT")
+            else:
+                os.environ["FF_ROOT"] = kept
     def feed_py(src: str, last: float, n: int, usual: int = 10, gap: float = 2.0, count: int = 21) -> list[Snapshot]:
         return [Snapshot(src, stamp(last + gap * i), n if i == 0 else usual) for i in range(count)]
     snaps = (feed_py("market", 1, 5) + feed_py("lineups", 1, 3) + feed_py("api_standings", 30, 10)

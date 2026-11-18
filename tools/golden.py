@@ -179,7 +179,7 @@ def replayed(loaded: loader.Loaded, cuts: Sequence[Cut], with_document: bool) ->
         store.set_now(snapshot_stamp(world.cut))
         d = decided_at(loaded, world)
         got = decision.opportunity_rows(d.inputs)
-        document = board(d.inputs, got, [], d.extras) if with_document else None
+        document = board(d.inputs, got, [], d.extras, loader.health_at(loaded, world.cut)) if with_document else None
         return Replayed(by_at[world.cut], features(loaded, world, d, got), document)
 
     return state.sweep(loaded.obs, [c.at for c in cuts], read)
@@ -200,7 +200,7 @@ def fixture_cuts(doc: dict[str, Any]) -> list[Cut]:
 
 
 def fixture_loaded(doc: dict[str, Any]) -> loader.Loaded:
-    """The fixture's tables as Observations (cases.observations), loaded; render inside cases.scratch_sources."""
+    """The fixture's tables as Observations (cases.observations), loaded."""
     return loader.loaded(cases.observations(doc), Config())
 
 
@@ -214,8 +214,7 @@ def rendered(loaded: loader.Loaded, cuts: Sequence[Cut]) -> Rendered:
 
 
 def render_fixture(doc: dict[str, Any]) -> Rendered:
-    with cases.scratch_sources(doc):
-        return rendered(fixture_loaded(doc), fixture_cuts(doc))
+    return rendered(fixture_loaded(doc), fixture_cuts(doc))
 
 
 def render_live(paths: parsed.Paths) -> Rendered:
@@ -239,14 +238,13 @@ def _selftest() -> None:
     cuts = fixture_cuts(doc)
     t0 = time.monotonic()
     loaded = fixture_loaded(doc)
-    with cases.scratch_sources(doc):
-        made = rendered(loaded, cuts)
-        last = cuts[-1]
-        os.environ["LFG_NOW"] = "2031-01-01T0000Z"
-        try:
-            again = replayed(loaded, [last], with_document=True)[0]
-        finally:
-            del os.environ["LFG_NOW"]
+    made = rendered(loaded, cuts)
+    last = cuts[-1]
+    os.environ["LFG_NOW"] = "2031-01-01T0000Z"
+    try:
+        again = replayed(loaded, [last], with_document=True)[0]
+    finally:
+        del os.environ["LFG_NOW"]
     assert len(cuts) == FIXTURE_CUTS and set(made) == {"%s-%s.json" % (k, c.name) for c in cuts for k in ("decisions", "features")}
 
     found = check(GOLDEN, made)

@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import contextlib
 import json
 import lzma
 import sys
-import tempfile
-from collections.abc import Callable, Iterator
-from contextlib import closing
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -112,28 +109,7 @@ def observations(doc: dict[str, Any]) -> ob.Observations:
     return ob.of(out)
 
 
-@contextlib.contextmanager
-def scratch_sources(doc: dict[str, Any], degraded: bool = False) -> Iterator[None]:
-    """Inside the block the working directory is a scratch root whose database holds the fixture's tables (the degraded
-    club's line-ups at as_of left out when degraded): board.sources reads the parser health there, nothing else does."""
-    from ffcore.db import connect, source_table
-    from ffcore.tidy import tables_in
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)), contextlib.chdir(tmp):
-        with closing(connect()) as db, db:
-            for name, t in doc["tables"].items():
-                cols = t["columns"]
-                db.executemany("INSERT INTO %s (%s) VALUES (%s)" % (source_table(name), ", ".join(cols), ", ".join("?" * len(cols))), t["rows"])
-            if degraded:
-                db.execute("DELETE FROM src_lineups WHERE team_slug = ? AND observed_at = ?", (DEGRADED_CLUB, doc["as_of"]))
-        yield
-
-
-def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
-    with scratch_sources(doc, degraded):
-        return observed(doc, degraded)
-
-
-def observed(doc: dict[str, Any], degraded: bool) -> Seen:
+def observed(doc: dict[str, Any], degraded: bool = False) -> Seen:
     from datetime import timedelta
 
     import decision
@@ -164,7 +140,7 @@ def observed(doc: dict[str, Any], degraded: bool) -> Seen:
     settled = {w: eleven.best_eleven(mine, pos, v) for w, v in values.items()}
     got = [] if degraded else decision.opportunity_rows(inp)
     opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
-    doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [], d.extras)
+    doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [], d.extras, loader.health_at(loaded, cut()))
     seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp.money,
                   "squad": len(mine), "offers": sum(1 for o in current.offers(world) if o.status == "pending"),
                   "cases": {}}
@@ -315,14 +291,14 @@ def failures(results: list[tuple[str, str, str, bool, Any]]) -> tuple[list[str],
 def report() -> None:
     doc = load()
     for group, degraded in ((checks(), False), (degraded_checks(), True)):
-        for case, stage, label, ok, shown in evaluate(observe(doc, degraded), group):
+        for case, stage, label, ok, shown in evaluate(observed(doc, degraded), group):
             mark = "pass" if ok else "XFAIL" if (case, stage, label) in EXPECTED_FAILURES else "FAIL"
             print("%-5s %-8s %-13s %s -> %s" % (mark, case, stage, label, shown))
 
 
 def _selftest() -> None:
     doc = load()
-    results = evaluate(observe(doc), checks()) + evaluate(observe(doc, degraded=True), degraded_checks())
+    results = evaluate(observed(doc), checks()) + evaluate(observed(doc, degraded=True), degraded_checks())
     wrong, healed = failures(results)
     assert not wrong, "cases that fail:\n" + "\n".join(wrong)
     assert not healed, "expected failures that now pass (remove them from EXPECTED_FAILURES):\n" + "\n".join(healed)
