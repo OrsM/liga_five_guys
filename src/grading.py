@@ -660,33 +660,62 @@ def first_sales(cuts: Sequence[Cut], rules: Mapping[str, worth.Rule]) -> dict[st
     return out
 
 
-def replayed_cut(decided: decision.Decided | decision.Stale) -> Cut | None:
+def offers_at(world: state.World) -> worth.OfferDistribution:
+    """The distribution of offer over value (worth.offer_ratio_distribution) of the market offers the world has seen: each
+    was created before it was first observed, so none is created after the cut."""
+    return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
+
+
+def buys_at(decided: decision.Decided, at: dt.datetime) -> worth.CutBuys:
+    """The buys of the decision at the moment at: each market opportunity with a bid, its gain and its bid."""
+    return worth.CutBuys(at, [worth.Buy(r["gain"], r["bid"]) for r in decision.opportunity_rows(decided.inputs)
+                              if r["status"] == "market" and r["bid"] is not None])
+
+
+def replayed_cut(decided: decision.Decided | decision.Stale, offers: worth.OfferDistribution = worth.NO_OFFERS,
+                 rate: float = worth.STOPGAP_RATE) -> Cut | None:
     """The Cut of a decision that has standing offers on my players (rule replayed_cut_needs_offers: its extras'
-    offers), so the context and the later sale prices are those of the cut; None for a Stale cut or one with no offer."""
+    offers), so the context (with the offers distribution and exchange rate given) and the later sale prices are those of
+    the cut; None for a Stale cut or one with no offer."""
     at = None if isinstance(decided, decision.Stale) else snapshot_stamp(decided.cut)
     if isinstance(decided, decision.Stale) or at is None or not decided.extras.offers:
         return None
     standings = [worth.Standing(o.player, o.value, o.money, later_sale(decided.inputs, o.player, o.value))
                  for o in decided.extras.offers]
-    return Cut(at + MINUTE, context(decided.inputs), standings)
+    return Cut(at + MINUTE, context(decided.inputs, offers, rate), standings)
 
 
 def replayed_cuts(loaded: loader.Loaded, cuts: Sequence[str]) -> list[Cut]:
-    """The Cut (replayed_cut) of each cut that has one, ascending, from one streamed replay: only the Cuts are kept."""
+    """The Cut (replayed_cut) of each cut that has one, ascending, from one streamed replay, each with the offers seen by
+    its cut (offers_at) and the exchange rate at it (worth.r_estimate over the buys of the cuts up to it, carrying the
+    rate of the Cut before it); only the Cuts and the buys are kept."""
     out: list[Cut] = []
+    seen: list[worth.CutBuys] = []
 
-    def keep(_: str, decided: decision.Decided | decision.Stale) -> None:
-        cut = replayed_cut(decided)
+    def keep(world: state.World) -> None:
+        decided = decision.decision_at(loaded, world)
+        at = None if isinstance(decided, decision.Stale) else snapshot_stamp(world.cut)
+        if isinstance(decided, decision.Stale) or at is None:
+            return
+        seen.append(buys_at(decided, at))
+        cut = replayed_cut(decided, offers_at(world), worth.r_estimate(seen, at + MINUTE, out[-1].ctx.rate if out else worth.STOPGAP_RATE))
         if cut is not None:
             out.append(cut)
-    decision.replay(loaded, cuts, keep)
+    state.sweep(loaded.obs, cuts, keep)
     return out
 
 
-def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> list[Scored]:
+class RuleScores(NamedTuple):
+    """What rule_scores grades: the Scores, and the sales behind them by group (ME and each rule), first sale of a player
+    first."""
+    scores: list[Scored]
+    graded: dict[str, list[salegrade.Graded]]
+
+
+def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> RuleScores:
     """On demand, never in the grade stage: my real sales from since (group miguel) and each rule's (first_sales over
-    replayed_cuts at the replay cuts from since) as Scores by case, then the league's proxy Scores (league_scores); every
-    sale graded by the same course at RATE."""
+    replayed_cuts at the replay cuts from since) as Scores by case, then the league's proxy Scores (league_scores), with
+    the graded sales of me and of each rule; every sale graded by the same course at RATE."""
     loaded, cuts = read_storage()
     now = season(loaded)
     chosen = first_sales(replayed_cuts(loaded, [c for c in cuts if c >= since and snapshot_stamp(c) is not None]), rules)
@@ -695,9 +724,34 @@ def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> lis
     fielded = fielded_at_locks(now.locks, now.done, facts)
     sold = sold_since(now, since, facts)
     ruled = {name: [Sold(t.at, sale_facts(t, [], None, facts), ME) for t in ts] for name, ts in made.items()}
-    return [*known_scores(ME, [s for s in sold if s.who == ME], now, fielded, facts),
-            *(x for name, found in ruled.items() for x in known_scores(name, found, now, fielded, facts)),
-            *league_scores(sold, now, fielded, facts)]
+    groups = {ME: [s for s in sold if s.who == ME], **ruled}
+    return RuleScores([*(x for group, members in groups.items() for x in known_scores(group, members, now, fielded, facts)),
+                       *league_scores(sold, now, fielded, facts)],
+                      {group: graded_sales(members, now, fielded, facts) for group, members in groups.items()})
+
+
+PAIRED_RULE = "bench_option"
+PAIRED_CASE = "bench"
+
+
+def paired_report(graded: Mapping[str, Sequence[salegrade.Graded]]) -> str:
+    """The paired comparison of PAIRED_RULE with my sales on the PAIRED_CASE subset (salegrade.paired, per horizon: the
+    total difference D with n_U, its pieces and its bootstrap 90% interval), each side's total per million raised, and the
+    gate verdict line (salegrade.gate)."""
+    rule, mine = (salegrade.first_per_player([g for g in graded[who] if PAIRED_CASE in salegrade.cases(g.sale)]) for who in (PAIRED_RULE, ME))
+    pairs = [salegrade.paired(rule, mine, h) for h in HORIZONS]
+    sides = {who: [salegrade.score(PAIRED_CASE, side, h) for h in HORIZONS] for who, side in ((PAIRED_RULE, rule), (ME, mine))}
+    lines = ["PAIRED %s minus %s, %s sales only, first sale of each player, net 0 where a side did not sell him" % (
+        PAIRED_RULE, ME, PAIRED_CASE)]
+    for p in pairs:
+        lines.append("  D(%-6s) %+8.1f  n_U %d  both %d: %+.1f  only %s %d: %+.1f  only %s %d: %+.1f  bootstrap 90%% %.1f..%.1f" % (
+            p.horizon, p.total, p.n, p.both.n, p.both.net, PAIRED_RULE, p.only_rule.n, p.only_rule.net, ME, p.only_other.n,
+            p.only_other.net, p.low, p.high))
+    for who, scored in sides.items():
+        lines.append("  %-12s n %d  per million raised  %s" % (who, scored[0].n, "  ".join("%s %.3f" % (s.horizon, s.per_million) for s in scored)))
+    verdict = salegrade.gate(pairs, sides[PAIRED_RULE], sides[ME])
+    lines.append("GATE %s: %s" % ("PASS" if verdict.passed else "FAIL", "; ".join(verdict.reasons)))
+    return "\n".join(lines)
 
 
 def rule_report(scores: Sequence[Scored]) -> str:
@@ -1139,7 +1193,13 @@ def _selftest_replayed_cuts() -> None:
     got = [c for c in map(replayed_cut, decided) if c is not None]
     assert [stamp(c.at - MINUTE) for c in got] == [d.cut for d in offered], "a Cut a decision with offers, a minute on"
     assert [[s.player for s in c.standings] for c in got] == [[o.player for o in d.extras.offers] for d in offered]
-    assert replayed_cuts(loaded, _CUTS) == got, "the streamed replay keeps the same Cuts"
+    streamed = replayed_cuts(loaded, _CUTS)
+    assert [(c.at, c.standings) for c in streamed] == [(c.at, c.standings) for c in got], "the streamed replay keeps the same Cuts"
+    assert all(c.ctx.horizons == d.ctx.horizons and c.ctx.rate > 0 for c, d in zip(streamed, got)), "the rate is positive"
+    offered_at = [len(c.ctx.offers.ratios) for c in streamed]
+    assert offered_at == sorted(offered_at), "offers are only added as the cuts go on: none from after a cut"
+    with_offers = replayed_cut(offered[0], worth.offer_ratio_distribution([0.9, 1.1]), 0.25)
+    assert with_offers is not None and with_offers.ctx.offers.ratios == (0.9, 1.1) and with_offers.ctx.rate == 0.25
     emptied = [d._replace(extras=d.extras._replace(offers=[])) if isinstance(d, decision.Decided) else d for d in decided]
     assert all(replayed_cut(d) is None for d in emptied), "no standing offer on my players: no Cut"
     assert replayed_cut(decision.Stale("old")) is None, "a Stale cut is skipped"
@@ -1402,7 +1462,9 @@ if __name__ == "__main__":
         print(opportunity_report(opportunity_grade(loaded, season(loaded), [c for c in cuts if snapshot_stamp(c) is not None])), flush=True)
         os._exit(0)
     if sys.argv[1:2] == ["rules"]:
-        print(rule_report(rule_scores(worth.CHALLENGERS)), flush=True)
+        got = rule_scores(worth.CHALLENGERS)
+        print(rule_report(got.scores), flush=True)
+        print(paired_report(got.graded), flush=True)
         os._exit(0)
     print("grading.py --selftest | accuracy | price | opportunities | rules")
     raise SystemExit(2)

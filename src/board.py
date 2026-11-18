@@ -83,7 +83,7 @@ def lineup_doc(inp: decision.Inputs, names: dict[str, str]) -> Doc:
             "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
-def context(inp: decision.Inputs) -> worth.Context:
+def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = worth.STOPGAP_RATE) -> worth.Context:
     pos, cells = decision.cells_of(inp)
     mine = decision.squad_of(inp)
     js = sorted(cells)
@@ -92,7 +92,7 @@ def context(inp: decision.Inputs) -> worth.Context:
     for n in AHEAD:
         v = decision.window_value(pos, cells, frozenset(js[:n or len(js)]))
         horizons[n] = worth.Horizon(v, eleven.best_eleven(mine, pos, v, fielded))
-    return worth.Context(pos, horizons, inp.money.cash)
+    return worth.Context(pos, horizons, inp.money.cash, offers, rate)
 
 
 def later_sale(inp: decision.Inputs, player: str, value: float) -> float:

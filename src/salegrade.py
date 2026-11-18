@@ -18,6 +18,9 @@ HORIZONS = ("lock", "next4", "season")
 BOOTSTRAP_DRAWS = 2000
 BOOTSTRAP_SEED = 131
 BOOTSTRAP_TAIL = 2.5
+PAIRED_SEED = 133
+PAIRED_TAIL = 5.0
+GATE_HORIZONS = ("next4", "season")
 
 
 class Sale(NamedTuple):
@@ -148,6 +151,69 @@ def proxy_scores(proxied: Sequence[Readings]) -> list[Score]:
             for case, side in (("bench-proxy", "benched"), ("eleven-proxy bound", "fielded")) for h in HORIZONS]
 
 
+class Piece(NamedTuple):
+    n: int
+    net: float
+
+
+class Paired(NamedTuple):
+    horizon: str
+    both: Piece
+    only_rule: Piece
+    only_other: Piece
+    total: float
+    low: float
+    high: float
+
+    @property
+    def n(self) -> int:
+        return self.both.n + self.only_rule.n + self.only_other.n
+
+
+class Gate(NamedTuple):
+    passed: bool
+    reasons: tuple[str, ...]
+
+
+def first_per_player(graded: Sequence[Graded]) -> list[Graded]:
+    """The first sale of each player, in the order given."""
+    first: dict[str, Graded] = {}
+    for g in graded:
+        first.setdefault(g.sale.player, g)
+    return list(first.values())
+
+
+def paired(rule: Sequence[Graded], other: Sequence[Graded], horizon: str) -> Paired:
+    """D at the horizon: over U, the players either side sold (the first sale of each), the sum of the rule's net less the
+    other's, a side that did not sell the player counting 0 (holding is the zero of the grade). Pieces: the players both
+    sold, only the rule, only the other (each with its n and its part of D). The interval is the PAIRED_TAIL and 100 less
+    PAIRED_TAIL percentiles of BOOTSTRAP_DRAWS resamples of the differences over U under PAIRED_SEED. Swapping the sides
+    negates D, the pieces swapped and the interval; the same sales on both sides give D 0."""
+    a = {g.sale.player: g.net[horizon] for g in first_per_player(rule)}
+    b = {g.sale.player: g.net[horizon] for g in first_per_player(other)}
+    both, only_a, only_b = sorted(a.keys() & b.keys()), sorted(a.keys() - b.keys()), sorted(b.keys() - a.keys())
+    diffs = {**{p: a[p] - b[p] for p in both}, **{p: a[p] for p in only_a}, **{p: -b[p] for p in only_b}}
+    pieces = tuple(Piece(len(ps), math.fsum(diffs[p] for p in ps)) for ps in (both, only_a, only_b))
+    ordered = [diffs[p] for p in sorted(diffs)]
+    if not ordered:
+        return Paired(horizon, pieces[0], pieces[1], pieces[2], 0.0, 0.0, 0.0)
+    draws = np.random.default_rng(PAIRED_SEED).integers(0, len(ordered), (BOOTSTRAP_DRAWS, len(ordered)))
+    lo, hi = np.percentile(np.asarray(ordered)[draws].sum(axis=1), [PAIRED_TAIL, 100 - PAIRED_TAIL])
+    return Paired(horizon, pieces[0], pieces[1], pieces[2], math.fsum(ordered), float(lo), float(hi))
+
+
+def gate(pairs: Sequence[Paired], rule: Sequence[Score], other: Sequence[Score]) -> Gate:
+    """The pre-registered gate: passed iff D is not below 0 at next4 and at season (point estimates) and the rule's total
+    net per million raised is not below the other's at next4 and at season; the reasons name each condition that fails,
+    or say that all hold. rule and other are one Score per horizon of HORIZONS, as scores gives them for a case."""
+    d = {p.horizon: p.total for p in pairs}
+    per = {s.horizon: s.per_million for s in rule}
+    base = {s.horizon: s.per_million for s in other}
+    failed = [f"D({h}) {d[h]:+.1f} < 0" for h in GATE_HORIZONS if d[h] < 0]
+    failed += [f"per million {h} {per[h]:.3f} < {base[h]:.3f}" for h in GATE_HORIZONS if per[h] < base[h]]
+    return Gate(not failed, tuple(failed) or ("D(next4) and D(season) >= 0 and per million raised >= the other's at next4 and season",))
+
+
 def measure_values(rows: Sequence[Row]) -> dict[str, float]:
     """For each Row three keys: "<case>.<horizon>.n", ".mean" and ".per_million". Keys are distinct across rows."""
     pairs = []
@@ -159,6 +225,38 @@ def measure_values(rows: Sequence[Row]) -> dict[str, float]:
 
 def _flat(x: float) -> dict[str, float]:
     return {h: x for h in HORIZONS}
+
+
+def _selftest_paired() -> None:
+    import random
+    tol = 1e-9
+    rng = random.Random(7)
+    names = [f"p{i}" for i in range(12)]
+
+    def sales(players: Sequence[str]) -> list[Graded]:
+        return [Graded(Sale(p, 1e6, 1e6, False, False, False), {h: rng.uniform(-9.0, 9.0) for h in HORIZONS}) for p in players]
+    for _ in range(25):
+        a, b = sales(rng.sample(names, rng.randint(0, 9))), sales(rng.sample(names, rng.randint(0, 9)))
+        for h in HORIZONS:
+            ab, ba = paired(a, b, h), paired(b, a, h)
+            assert abs(ab.total + ba.total) < tol, "swapping the sides negates D"
+            assert ab.n == ba.n and (ab.both.n, ab.only_rule.n, ab.only_other.n) == (ba.both.n, ba.only_other.n, ba.only_rule.n)
+            assert abs(ab.only_rule.net + ba.only_other.net) < tol and abs(ab.both.net + ba.both.net) < tol
+            assert abs(ab.low + ba.high) < 1e-6 and abs(ab.high + ba.low) < 1e-6, "the interval is negated and swapped"
+            assert abs(ab.both.net + ab.only_rule.net + ab.only_other.net - ab.total) < tol, "the pieces add up to D"
+            assert ab.low - 1e-6 <= ab.total + 1e-6 or ab.n == 0
+            assert abs(paired(a, [], h).total - sum(g.net[h] for g in first_per_player(a))) < tol, "no sale on a side: 0 for him"
+    same = sales(names[:7])
+    for h in HORIZONS:
+        got = paired(same, same[::-1], h)
+        assert got == Paired(h, Piece(7, 0.0), Piece(0, 0.0), Piece(0, 0.0), 0.0, 0.0, 0.0), "the same sales: D is 0"
+    assert paired([], [], "lock").n == 0
+    up = [Paired(h, Piece(1, 1.0), Piece(0, 0.0), Piece(0, 0.0), 1.0, 0.0, 2.0) for h in HORIZONS]
+    low = [Score("bench", h, 1, 1.0, 0.1, 0.0, 0.0, 0.0, 0.0) for h in HORIZONS]
+    high = [x._replace(per_million=0.2) for x in low]
+    assert gate(up, high, low).passed and gate(up, high, high).passed and not gate(up, low, high).passed
+    down = [p._replace(total=-1.0) if p.horizon == "season" else p for p in up]
+    assert not gate(down, high, low).passed and "season" in gate(down, high, low).reasons[0]
 
 
 def _selftest() -> None:
@@ -259,6 +357,7 @@ def _selftest() -> None:
     proxied = [readings(s._replace(in_eleven=None), c, 0.6) for s, c in pairs]
     prox = proxy_scores(proxied)
     assert [s.case for s in prox] == ["bench-proxy"] * 3 + ["eleven-proxy bound"] * 3 and all(s.n == len(pairs) for s in prox)
+    _selftest_paired()
     print("salegrade self-test OK")
 
 
