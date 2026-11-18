@@ -1,8 +1,7 @@
 """Parser self-report: a source whose newest snapshot is late or thin is
 told to you, with the last good one to start from: once, again only when
-the trouble changes, forgotten when it is gone. parser_health (the view in
-schema.sql, or the Python parser_health over snapshots_of) decides; main is
-the run's health stage.
+the trouble changes, forgotten when it is gone. parser_health over snapshots_of
+decides; main is the run's health stage.
 
 Named rules, each tested:
   usual_needs_five: a source is judged only with at least 5 snapshots among the 20 before its newest.
@@ -14,7 +13,7 @@ Named rules, each tested:
   drift_is_the_latest_calibration: the drifting bins told are those of the newest calibration, this run's when it
     scored the auctions, else the latest published run's that has any.
 
-    python src/health.py text    # what to tell you, empty if every source is fine
+    python src/health.py text    # what to tell you, empty if every source is fine (reads the parse cache)
 """
 from __future__ import annotations
 
@@ -26,13 +25,14 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import NamedTuple
 
-from ffcore import observations as ob, store
-from ffcore.db import HEALTH_SOURCES, HEALTH_USUAL, RunRecords, rows, stamp_jd
+from ffcore import identity, parsed, store
+from ffcore import observations as ob
+from ffcore.db import HEALTH_SOURCES, HEALTH_USUAL, RunRecords, cut, stamp_jd
 from ffcore.identity import Unmatched
 from ffcore.records import AuctionCalibration
 from publish import notify
 
-__all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "snapshots_of", "text", "trouble"]
+__all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "said", "snapshots_of", "text", "trouble"]
 
 SENT = Path.home() / ".local/state/lfg/health.sent"
 UNMATCHED_FROM = 5e6
@@ -127,105 +127,88 @@ def drifting(pending: Iterable[AuctionCalibration] = ()) -> list[AuctionCalibrat
     return sorted((c for c in held if c.drift == 1), key=lambda c: (-abs(c.stated - c.observed), c.scope, c.bin))
 
 
-def text(records: RunRecords | None = None) -> str:
-    """One line a source that is not ok, and one a player worth UNMATCHED_FROM or more the app or the line-ups do
-    not reach; empty if all is well."""
-    lines = trouble(
-        (Health._make(r) for r in rows(
-            "SELECT src, last_at, rows, usual_rows, hours_since, usual_gap_h, status, last_good"
-            " FROM parser_health WHERE status <> 'ok' ORDER BY src")),
-        (Unmatched._make(r) for r in rows("SELECT player, name, club, value, no_app, no_slug FROM unmatched"
-                                          " WHERE value >= ? ORDER BY value DESC", (UNMATCHED_FROM,))))
-    drift = drifting(records.rows("auction_calibration") if records is not None else ())
-    if drift:
-        worst = drift[0]
-        scopes = ", ".join(sorted({c.scope for c in drift}))
+def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterable[AuctionCalibration]) -> str:
+    """trouble of health and unmatched, and one line the drifting bins; empty if all is well."""
+    lines = trouble(health, unmatched)
+    bins = list(drift)
+    if bins:
+        worst = bins[0]
+        scopes = ", ".join(sorted({c.scope for c in bins}))
         lines.append("auction forecast drifting in %d bins (%s); worst %s, chance %s: stated %.2f, observed %.2f over %d"
-                     % (len(drift), scopes, worst.scope, worst.bin, worst.stated, worst.observed, worst.n))
+                     % (len(bins), scopes, worst.scope, worst.bin, worst.stated, worst.observed, worst.n))
     return ("parser trouble:\n" + "\n".join(lines)) if lines else ""
 
 
+def said(records: RunRecords | None = None) -> str:
+    """text of the parse cache as of t: the status of the sources, the players the app or the line-ups do not reach, and
+    the drifting bins (those of records when it is this run's)."""
+    from ffcore import loader
+    obs = parsed.read(loader.paths_in(), sorted({*identity.NEEDS, *HEALTH_SOURCES}))
+    at = cut()
+    people = identity.crosswalk(obs, at)
+    return text(parser_health(snapshots_of(obs, at), at), identity.unmatched(people, obs, at),
+                drifting(records.rows("auction_calibration") if records is not None else ()))
+
+
 def main(records: RunRecords | None = None, sent: Path = SENT) -> dict[str, int]:
-    """The health stage: tell text(records) if it is new (sent holds what was told last), forget it when there is
+    """The health stage: tell said(records) if it is new (sent holds what was told last), forget it when there is
     nothing to say."""
-    said = text(records)
-    if not said:
+    told = said(records)
+    if not told:
         sent.unlink(missing_ok=True)
-    elif not sent.is_file() or sent.read_text(encoding="utf-8") != said:
-        if notify(said):
+    elif not sent.is_file() or sent.read_text(encoding="utf-8") != told:
+        if notify(told):
             sent.parent.mkdir(parents=True, exist_ok=True)
-            sent.write_text(said, encoding="utf-8")
-    return {"trouble": int(bool(said))}
+            sent.write_text(told, encoding="utf-8")
+    return {"trouble": int(bool(told))}
 
 
 def _selftest() -> None:
     import os
     import tempfile
-    from contextlib import closing
     from datetime import datetime, timedelta, timezone
-    from pathlib import Path
 
-    from ffcore.db import connect, set_now
     from ffcore.records import Run
-    from ffcore.tidy import store_sql, tables_in
 
     now = datetime(2026, 10, 15, 12, tzinfo=timezone.utc)
 
     def stamp(ago_h: float) -> str:
         return (now - timedelta(hours=ago_h)).strftime("%Y-%m-%dT%H%MZ")
 
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(now)
-            assert text() == "", "nothing fetched yet: nothing to say"
-            # 21 snapshots `gap` hours apart, the newest `last` hours ago with `n` rows (the rest `usual`)
-            def feed(table: str, key: str, last: float, n: int, usual: int = 10, gap: float = 2.0,
-                     count: int = 21) -> None:
-                for i in range(count):
-                    store_sql(table, [{"observed_at": stamp(last + gap * i), key: "p%d" % j}
-                                      for j in range(n if i == 0 else usual)])
-            feed("market", "ff_id", last=1, n=5)                    # 5 of 10 is half: not thin
-            feed("lineups", "player_slug", last=1, n=3)             # thin: 3 rows against 10
-            feed("api_standings", "user_id", last=30, n=10)         # stale: 30h, one every 2h
-            feed("api_teams", "player_id", last=8, n=10, gap=4.0)   # 8h late of every 4h: under 3 gaps, ok
-            feed("api_lineup", "player_id", last=4, n=10, gap=0.5)  # 4h late of every half hour: under 6h, ok
-            feed("api_leagues", "league_id", last=1, n=10, count=4)    # too few to know the usual: not judged
-            feed("api_market", "market_id", last=1, n=2)            # thin: 2 rows against 10
-            got = {r[0]: r for r in rows("SELECT src, status, last_good FROM parser_health")}
-            assert {s: v[1] for s, v in got.items()} == {
-                "market": "ok", "lineups": "thin", "api_standings": "stale", "api_teams": "ok",
-                "api_lineup": "ok", "api_market": "thin"}, got
-            assert got["lineups"][2] == stamp(3), "the last good one is the newest of the usual size"
-            out = text()
-            assert out.startswith("parser trouble:") and "lineups: 3 rows against the usual 10" in out \
-                and "api_standings: no snapshot for 30h" in out and "\nmarket:" not in out, out
-        finally:
-            set_now(None)
+    def feed(src: str, last: float, n: int, usual: int = 10, gap: float = 2.0, count: int = 21) -> list[Snapshot]:
+        return [Snapshot(src, stamp(last + gap * i), n if i == 0 else usual) for i in range(count)]
 
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
-        try:
-            set_now(now)
-            store_sql("market", [{"observed_at": stamp(1), "ff_id": i, "name": n, "club": "x", "value": v}
-                                 for i, n, v in [("s", "Star Man", "6000000"), ("t", "Cheap Man", "1000000"),
-                                                 ("m", "Matched Man", "9000000")]])
-            with closing(connect()) as db, db:
-                db.executemany("INSERT INTO crosswalk (player_id, name, club_id, ff_slug, app_id) VALUES (?, ?, 'x', 'slug', ?)",
-                               [("s", "Star Man", ""), ("t", "Cheap Man", ""), ("m", "Matched Man", "7")])
-            out = text()
-            assert "unmatched: Star Man (x, 6.0M) has no app id" in out and "Cheap Man" not in out and "Matched" not in out, \
-                "a player of UNMATCHED_FROM or more the app does not reach is told; a cheap one or a matched one is not"
-        finally:
-            set_now(None)
+    def unmatched(name: str, value: float, no_app: bool = True) -> Unmatched:
+        return Unmatched("id", name, "x", value, no_app, not no_app)
 
-    with tempfile.TemporaryDirectory() as tmp, tables_in(Path(tmp)):
+    assert text((), (), ()) == "", "nothing fetched yet: nothing to say"
+    snaps = (feed("market", 1, 5) + feed("lineups", 1, 3) + feed("api_standings", 30, 10)
+             + feed("api_teams", 8, 10, gap=4.0) + feed("api_leagues", 1, 10, count=6)
+             + feed("api_market", 1, 2) + feed("api_offers", 1, 10, count=5))
+    got = {h.src: h for h in parser_health(snaps, stamp(0))}
+    assert "api_offers" not in got and "api_leagues" in got, "usual_needs_five: 4 snapshots before the newest is too few"
+    assert {s: h.status for s, h in got.items()} == {
+        "market": "ok", "lineups": "thin", "api_standings": "stale", "api_teams": "ok", "api_leagues": "ok",
+        "api_market": "thin"}, "stale_before_thin"
+    assert got["lineups"].last_good == stamp(3), "last_good_is_newest_usual"
+    tie = [Snapshot("x", stamp(1), 12)] + [Snapshot("x", stamp(3 + 2 * i), n) for i, n in enumerate([12] * 6 + [13, 13])]
+    assert tenth(12.35) == 12.3 and parser_health(tie, stamp(0))[0].usual_rows == 12.3, "rounded_half_up"
+    out = text(got.values(), (), ())
+    assert out.startswith("parser trouble:") and "lineups: 3 rows against the usual 10" in out \
+        and "api_standings: no snapshot for 30h" in out and "\nmarket:" not in out and "api_teams" not in out, out
+    out = text((), [unmatched("Star Man", 6e6), unmatched("Cheap Man", 1e6), unmatched("Slugless", 7e6, False)], ())
+    assert out.splitlines()[1:] == ["unmatched: Slugless (x, 7.0M) has no probable-XI slug",
+                                    "unmatched: Star Man (x, 6.0M) has no app id"], \
+        "a player of UNMATCHED_FROM or more the app or the line-ups do not reach is told, the dearest first; a cheap one is not"
+
+    with tempfile.TemporaryDirectory() as tmp:
         kept = os.environ.get("FF_ROOT")
         os.environ["FF_ROOT"] = str(Path(tmp) / "data")
         try:
-            set_now(now)
             store.publish(Run(1, "t", "a", "service", "c", "f", 1, 1.0), auction_calibration=[
                 AuctionCalibration(1, "rookies", "high", 52, 0.93, 0.77, 1), AuctionCalibration(1, "veterans", "mid", 42, 0.97, 0.85, 1),
                 AuctionCalibration(1, "keepers", "low", 30, 0.50, 0.49, 0)])
-            out = text()
+            out = text((), (), drifting())
             drifting_lines = [line for line in out.splitlines() if "drifting" in line]
             assert len(drifting_lines) == 1, out
             assert "rookies" in drifting_lines[0] and "veterans" in drifting_lines[0] and "0.93" in drifting_lines[0] and "0.77" in drifting_lines[0], out
@@ -236,27 +219,12 @@ def _selftest() -> None:
             assert [c.scope for c in drifting(this.rows("auction_calibration"))] == ["keepers"], "a run that scored nothing leaves the latest published one"
             this.add("auction_calibration", [{"scope": "rookies", "bin": "high", "n": 9, "stated": 0.9, "observed": 0.1, "drift": 1}])
             assert [c.run_id for c in drifting(this.rows("auction_calibration"))] == [3], "this run's calibration, once it scored, replaces them"
-            assert "rookies" in text(this) and "keepers" not in text(this)
+            assert "rookies" in text((), (), drifting(this.rows("auction_calibration")))
         finally:
-            set_now(None)
             if kept is None:
                 os.environ.pop("FF_ROOT")
             else:
                 os.environ["FF_ROOT"] = kept
-    def feed_py(src: str, last: float, n: int, usual: int = 10, gap: float = 2.0, count: int = 21) -> list[Snapshot]:
-        return [Snapshot(src, stamp(last + gap * i), n if i == 0 else usual) for i in range(count)]
-    snaps = (feed_py("market", 1, 5) + feed_py("lineups", 1, 3) + feed_py("api_standings", 30, 10)
-             + feed_py("api_teams", 8, 10, gap=4.0) + feed_py("api_leagues", 1, 10, count=6)
-             + feed_py("api_market", 1, 2) + feed_py("api_offers", 1, 10, count=5))
-    got_py = {h.src: h for h in parser_health(snaps, stamp(0))}
-    assert "api_offers" not in got_py and "api_leagues" in got_py, "usual_needs_five: 4 snapshots before the newest is too few"
-    assert {s: h.status for s, h in got_py.items()} == {
-        "market": "ok", "lineups": "thin", "api_standings": "stale", "api_teams": "ok", "api_leagues": "ok",
-        "api_market": "thin"}, "stale_before_thin"
-    assert got_py["lineups"].last_good == stamp(3), "last_good_is_newest_usual"
-    tie = [Snapshot("x", stamp(1), 12)] + [Snapshot("x", stamp(3 + 2 * i), n) for i, n in enumerate([12] * 6 + [13, 13])]
-    assert tenth(12.35) == 12.3 and parser_health(tie, stamp(0))[0].usual_rows == 12.3, \
-        "rounded_half_up"
     print("health self-test OK")
 
 
@@ -264,4 +232,5 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
         raise SystemExit(0)
-    sys.stdout.write(text() + "\n" if sys.argv[1:] == ["text"] and text() else "")
+    told = said() if sys.argv[1:] == ["text"] else ""
+    sys.stdout.write(told + "\n" if told else "")

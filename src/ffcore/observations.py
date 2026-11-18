@@ -1,18 +1,16 @@
-"""The observations (ingest): every source table's rows as typed rows, read once and sorted by (observed_at,
-rowid). The only place that reads storage for the sweep.
+"""The observations (ingest): every source table's rows as typed rows, sorted by (observed_at, storage order).
 
-TABLES names the sources (the src_<name> tables of the database); each has a NamedTuple (its needed columns) and a
+TABLES names the sources (the tables of the parse cache); each has a NamedTuple (its needed columns) and a
 grain: () for a snapshot table (every fetch repeats the whole table) or the key columns of a table that keeps a
-row per key, and the columns that with observed_at hold a row once (unique). read(db, names, until, latest) and of(rows) give an Observations: for each table its rows in (observed_at, rowid)
+row per key, and the columns that with observed_at hold a row once (unique). of(rows) gives an Observations: for each table its rows in (observed_at, storage)
 order, their stamps, and refolds, the number of rows that arrived with a stamp before an earlier row of their
 source (storage order is not time order there, so a fold that already passed them must start again). Selectors:
-rows_of, stamps_of, refolds_of, key_of. kept(table, rows), keeper(table) and newest(rows) are the rules parsed.read (the same
-Observations from the parse cache) applies: the dedupe the tables do on insert, and the newest snapshot."""
+rows_of, stamps_of, refolds_of, key_of. kept(table, rows), keeper(table) and newest(rows) are the rules parsed.read (which
+builds the Observations from the parse cache) applies: the dedupe the tables do on insert, and the newest snapshot."""
 from __future__ import annotations
 
 import itertools
 import operator
-import sqlite3
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from typing import Any, NamedTuple
 
@@ -349,22 +347,6 @@ def of(tables: Mapping[str, Iterable[Any]]) -> Observations:
     return Observations({name: arranged(rows) for name, rows in tables.items()})
 
 
-def read(db: sqlite3.Connection, names: Iterable[str] = tuple(TABLES), until: str | None = None,
-         latest: bool = False) -> Observations:
-    """The named tables of db, rows with observed_at <= until (all when None), in one range scan each; every str
-    field of every row is the pooled object (pooled), so a second read adds no second copy of a string. With latest,
-    a table keeps only each source's newest snapshot in that range (the rows whose observed_at is the greatest of
-    their source), as the whole range would leave in a fold that keeps the newest snapshot."""
-    def scan(name: str) -> Iterable[Any]:
-        row = TABLES[name].row
-        bound = "" if until is None else " WHERE observed_at <= ?"
-        keep = " WHERE (source, observed_at) IN (SELECT source, MAX(observed_at) FROM src_%s%s GROUP BY source)" % (
-            name, bound) if latest else bound
-        sql = "SELECT %s FROM src_%s%s ORDER BY rowid" % (", ".join(row._fields), name, keep)
-        return map(row._make, map(pooled, db.execute(sql, () if until is None else (until,))))
-    return of({name: scan(name) for name in names})
-
-
 def rows_of(obs: Observations, table: str) -> tuple[Any, ...]:
     """The rows of table in (observed_at, rowid) order (none for a table not read)."""
     return obs.tables.get(table, EMPTY).rows
@@ -380,19 +362,10 @@ def refolds_of(obs: Observations) -> int:
     return sum(t.refolds for t in obs.tables.values())
 
 
-def _database(rows: Mapping[str, Iterable[Any]]) -> sqlite3.Connection:
-    db = sqlite3.connect(":memory:")
-    for name, held in rows.items():
-        fields = TABLES[name].row._fields
-        db.execute("CREATE TABLE src_%s (%s)" % (name, ", ".join(fields)))
-        db.executemany("INSERT INTO src_%s VALUES (%s)" % (name, ", ".join("?" * len(fields))), list(held))
-    return db
-
-
 def _selftest_parsed() -> None:
     """From a parsed fixture: a snapshot table keeps every fetch and drops a key repeated within one; a keyed table
     drops a repeated row, keeps a changed one, treats None as equal to None, and keeps a row that went back to an
-    earlier value; until and latest bound the rows as read() does."""
+    earlier value; until and latest bound the rows as parsed.read does."""
     import json
     import tempfile
     from pathlib import Path
@@ -447,36 +420,32 @@ def _selftest_parsed() -> None:
 
 
 def _selftest() -> None:
-    """Rows come back in (observed_at, rowid) order whatever the storage order; refolds counts exactly the rows
-    behind their source's clock; until bounds the scan; every table's fields are the stored columns."""
+    """Rows come back in (observed_at, storage) order whatever the storage order; refolds counts exactly the rows
+    behind their source's clock; every table's fields are the stored columns."""
     def m(at: str, ff: str, source: str = "ff") -> Market:
         return Market(at, source, 1.0, ff, "DEL", "RMA")
     stored = [m("2026-11-02", "a"), m("2026-11-01", "b"), m("2026-11-02", "c"), m("2026-11-01", "d", "other"),
               m("2026-11-03", "e")]
-    obs = read(_database({"market": stored}), ["market"])
+    obs = of({"market": stored})
     assert [r.ff_id for r in rows_of(obs, "market")] == ["b", "d", "a", "c", "e"]
     assert list(stamps_of(obs, "market")) == sorted(stamps_of(obs, "market"))
     assert refolds_of(obs) == 1
     assert refolds_of(of({"market": sorted(stored, key=lambda r: r.observed_at)})) == 0
     assert refolds_of(of({"market": stored[::-1]})) >= 1
-    assert [r.ff_id for r in rows_of(read(_database({"market": stored}), ["market"], "2026-11-01"), "market")] == ["b", "d"]
     snaps = [Market(at, source, 1.0, ff, "DEL", "RMA") for at, source, ff in
              [("01", "ff", "a"), ("02", "ff", "b"), ("02", "ff", "c"), ("03", "ff", "d"), ("01", "other", "e"),
               ("02", "other", "f")]]
 
-    def newest(until: str | None) -> list[str]:
-        return sorted(r.ff_id for r in rows_of(read(_database({"market": snaps}), ["market"], until, True), "market"))
-    assert newest(None) == ["d", "f"] and newest("02") == ["b", "c", "f"] and newest("00") == []
+    def newest_by(until: str | None) -> list[str]:
+        return sorted(r.ff_id for r in newest(r for r in snaps if until is None or r.observed_at <= until))
+    assert newest_by(None) == ["d", "f"] and newest_by("02") == ["b", "c", "f"] and newest_by("00") == []
     assert key_of("matches", Matches("t", "s", 1, "m1", "", "", "", "", "")) == ("m1",)
     assert key_of("market", stored[0]) == ()
-    again = rows_of(read(_database({"market": stored}), ["market"]), "market")
-    first = rows_of(obs, "market")
-    assert [tuple(r) for r in again] == [tuple(r) for r in first], "pooling leaves every field value as stored"
-    assert all(a.observed_at is b.observed_at and a.ff_id is b.ff_id and a.position is b.position
-               for a, b in zip(again, first)), "rows read twice share their strings"
+    first, second = pooled(("a" + "b", 1.0)), pooled(("".join("ab"), 2.0))
+    assert first[0] is second[0] and first[1] == 1.0, "pooled: equal strings are one object, other values unchanged"
     for name, source in TABLES.items():
         assert set(source.grain) <= set(source.row._fields) and source.row._fields[:2] == ("observed_at", "source")
-        assert refolds_of(read(_database({name: []}), [name])) == 0
+        assert refolds_of(of({name: []})) == 0
     _selftest_parsed()
     print("ffcore.observations self-test OK")
 

@@ -22,11 +22,8 @@ from urllib.parse import urlparse
 
 from ffcore.auth import API_BASE, TokenStore
 from ffcore.league import load_config
-from ffcore.db import TABLES_SQL
-from ffcore.tidy import (NUMBERS, ROOT, TIDY, clear_sql, store_sql, stored,
-                         csv_string)
+from ffcore.tidy import ROOT, TIDY, csv_string
 from ffcore.futbolfantasy import MATCH_KEY_RE
-from ffcore.laliga_api import ROW_TABLE
 from sources import source, source_for, sources
 
 from ffcore.parse import Row, snapshot_stamp
@@ -336,101 +333,68 @@ def look() -> Path:
     return fetch(only=LOOK_KEYS)
 
 
-def _version() -> str:
-    """What the stored tables depend on: the parsers, the number parsers
-    they are stored through (NUMBERS) and the tables (tables.sql)."""
-    numbers = sorted("%s.%s:%s" % (t, c, fingerprint(parse))
-                     for t, cols in NUMBERS.items() for c, parse in cols)
-    return hashlib.blake2b("\n".join([fingerprint(source_for), *numbers,
-                                       TABLES_SQL.read_text(encoding="utf-8")]).encode(),
-                           digest_size=8).hexdigest()
-
-
 def parse() -> dict[str, int]:
-    """Fold new snapshots into the tidy tables (an empty lfg.db first gets
-    last season's points from the raw archive: load_season); how many
-    snapshots, documents parsed and rows routed."""
-    version = _version()
+    """Bring the parse cache (_CACHE: one record per document, its key and the rows the page's parser emits, and
+    _INDEX, which document each page had at each snapshot) up to the raw snapshots: every document of every
+    snapshot whose key (the document's hash and its parser's fingerprint) the cache lacks is parsed and appended, a
+    record the snapshots no longer use is dropped, and nothing else is written. A cache emptied is rebuilt whole,
+    one that has all keys is left as it is. How many snapshots had a document parsed, how many documents and how
+    many rows."""
     walk = doc_keys()
-    state = _read_json(TIDY / _STATE, {})
-    done = set(state.get("stamps") or ())
-    tables = set(state.get("tables") or ())
-    if (state.get("version") != version
-            or not done <= {stamp for stamp, _docs in walk}
-            or not all(stored(t) for t in tables)):
-        for t in tables:
-            clear_sql(t)
-        done, tables = set(), set()
-    todo = [(stamp, docs) for stamp, docs in walk if stamp not in done]
-    if not todo:
-        print("  nothing new to parse (%d snapshots already folded in)"
-              % len(done))
-        return {"snapshots": 0, "documents": 0, "rows": 0}
-
-    parsed = rows_out = 0
+    held = _keys_held()
+    cached = set(held)
     used: set[str] = set()
-    for i in range(0, len(todo), CHUNK):
-        chunk = [(stamp, {page: (_parsed_key(page, ck), origin)
-                          for page, (ck, origin) in docs.items()
-                          if source_for(page)}) for stamp, docs in todo[i:i + CHUNK]]
-        cache = _read_cache({ck for _stamp, docs in chunk
-                             for ck, _o in docs.values()})
+    origins: set[str] = set()
+    parsed = rows_out = market_rows = 0
+    for i in range(0, len(walk), CHUNK):
         need: dict[str, set[str]] = {}
-        for _stamp, docs in chunk:
+        home: dict[str, str] = {}
+        for _stamp, docs in walk[i:i + CHUNK]:
             for page, (ck, origin) in docs.items():
-                used.add(ck)
-                if ck not in cache:
+                if not source_for(page):
+                    continue
+                key = _parsed_key(page, ck)
+                used.add(key)
+                if key not in cached:
+                    cached.add(key)
                     need.setdefault(origin, set()).add(page)
+                    home[key] = source(page).table
         fresh = _parse_all(need)
-        cache.update(fresh)
+        origins.update(origin for origin, pages in need.items() if pages)
         parsed += len(fresh)
+        rows_out += sum(len(rows) for rows in fresh.values())
+        market_rows += sum(len(rows) for key, rows in fresh.items() if home[key] == "market")
         TIDY.mkdir(parents=True, exist_ok=True)
         with (TIDY / _CACHE).open("a", encoding="utf-8") as fh:
-            for ck, rows in fresh.items():
-                fh.write(json.dumps({"k": ck, "r": rows}) + "\n")
-        pending: dict[str, list[Row]] = {}
-        for stamp, docs in chunk:
-            for page, (ck, _origin) in sorted(docs.items()):
-                route(pending, cache.get(ck, []), source(page).table, stamp)
-        for table, rows in pending.items():
-            store_sql(table, rows)
-            rows_out += len(rows)
-        tables |= set(pending)
-        done |= {stamp for stamp, _docs in chunk}
-        _write_json(TIDY / _STATE, {"version": version, "stamps": sorted(done),
-                                    "tables": sorted(tables)})
-    if len(todo) == len(walk):
+            for key, rows in fresh.items():
+                fh.write(json.dumps({"k": key, "r": rows}) + "\n")
+    if cached - used:
         _keep_cache(used)
-    print("  %d snapshot(s): %d document(s) parsed, %d row(s) routed"
-          % (len(todo), parsed, rows_out))
-    if not stored("market"):
+    if not parsed:
+        print("  nothing new to parse (%d snapshots)" % len(walk))
+        return {"snapshots": 0, "documents": 0, "rows": 0}
+    print("  %d snapshot(s): %d document(s) parsed, %d row(s)" % (len(origins), parsed, rows_out))
+    if not held and not market_rows:
         sys.exit("ERROR: market parse produced 0 rows — the markup changed.")
-    return {"snapshots": len(todo), "documents": parsed, "rows": rows_out}
+    return {"snapshots": len(origins), "documents": parsed, "rows": rows_out}
 
 
 CHUNK = 25
-_STATE = "parse_state.json"
 _CACHE = "parsed.jsonl"
 
 
-def _read_cache(keys: set[str]) -> dict[str, list[Row]]:
-    out: dict[str, list[Row]] = {}
+def _keys_held() -> list[str]:
+    """The key of each record of the parse cache, in order (none without one)."""
     try:
         fh = (TIDY / _CACHE).open(encoding="utf-8")
     except OSError:
-        return out
+        return []
     with fh:
-        for line in fh:
-            if line[7:line.find('"', 7)] in keys:
-                rec = json.loads(line)
-                out[rec["k"]] = rec["r"]
-    return out
+        return [line[7:line.find('"', 7)] for line in fh]
 
 
 def _keep_cache(keys: set[str]) -> None:
     path = TIDY / _CACHE
-    if not path.exists():
-        return
     tmp = path.with_suffix(".tmp")
     with path.open(encoding="utf-8") as src, tmp.open("w", encoding="utf-8") as dst:
         dst.writelines(line for line in src
@@ -519,15 +483,6 @@ class Sigs:
         return ck
 
 
-def route(tables: dict[str, list[Row]], rows: list[Row], default: str, stamp: str) -> None:
-    for r in rows:
-        table = r.get(ROW_TABLE) or default
-        d = dict(r)
-        d.pop(ROW_TABLE, None)
-        d["observed_at"] = stamp
-        tables.setdefault(table, []).append(d)
-
-
 def _fetch_selftest() -> None:
     """With stubs and no network, fetch(only=LOOK_KEYS) asks for exactly the look sources and writes one raw snapshot, nothing else."""
     import re
@@ -589,6 +544,54 @@ def _fetch_selftest() -> None:
     assert len(written) == 2 and all(f.startswith("raw/dt=") for f in written), written
 
 
+def _selftest_parse() -> None:
+    """parse leaves exactly one record per document the snapshots use, rebuilds what is missing to the same bytes,
+    drops what is not used, and parses nothing when the cache has every key."""
+    import contextlib
+    import tempfile
+    from unittest import mock
+
+    from ffcore.futbolfantasy import _FIXTURE
+
+    def manifest(*pages: str) -> str:
+        return csv_string([{"page": p, "sig": "s", "stored": "t", "seen": "t"} for p in pages], MANIFEST_FIELDS)
+
+    def run() -> tuple[dict[str, int], str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            counts = parse()
+        return counts, out.getvalue()
+    with tempfile.TemporaryDirectory() as tmp, \
+            mock.patch.object(sys.modules[__name__], "RAW", Path(tmp) / "raw"), \
+            mock.patch.object(sys.modules[__name__], "TIDY", Path(tmp) / "tidy"):
+        _write(RAW / "dt=2026-01-01T0000Z.tar.xz", {"team_celta.html": _FIXTURE, MANIFEST: manifest("team_celta")})
+        _write(RAW / "dt=2026-01-02T0000Z.tar.xz", {MANIFEST: manifest("team_celta")})
+        _write(RAW / "dt=2026-01-03T0000Z.tar.xz", {"team_celta.html": _FIXTURE.replace("Pedri 70%", "Pedri 60%"),
+                                                    MANIFEST: manifest("team_celta")})
+        cache = TIDY / _CACHE
+        try:
+            run()
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("a cache built from nothing that holds no market rows is refused")
+        counts, said = run()
+        full = cache.read_bytes()
+        assert counts["documents"] == 0 and "nothing new" in said, "a cache that has every key is left alone"
+        assert len(full.splitlines()) == 2 and counts["snapshots"] == 0, "one record per distinct document"
+        cache.write_bytes(full.splitlines(keepends=True)[0])
+        counts, _ = run()
+        assert (counts["documents"], counts["snapshots"]) == (1, 1) and cache.read_bytes() == full, \
+            "the missing record is parsed again and appended: the same bytes"
+        cache.write_bytes(full + b'{"k": "team_celta:gone", "r": []}\n')
+        run()
+        assert cache.read_bytes() == full, "a record no snapshot uses is dropped"
+        cache.unlink()
+        with contextlib.suppress(SystemExit):
+            run()
+        assert cache.read_bytes() == full, "an empty cache is rebuilt whole, to the same bytes"
+
+
 def _selftest() -> None:
     uses = compile("mod.thing", "<fp>", "eval")
     at = {}
@@ -599,9 +602,9 @@ def _selftest() -> None:
     assert len(set(at.values())) == 1, \
         "a module is fingerprinted by name, not by where it is installed"
     import subprocess
-    other = subprocess.run([sys.executable, "-c", "import ingest; print(ingest._version())"],
+    other = subprocess.run([sys.executable, "-c", "import ingest; print(ingest._parsed_key('market', 'k'))"],
                            capture_output=True, text=True, check=True).stdout.strip()
-    assert other == _version(), "the parse version is the same in every process"
+    assert other == _parsed_key("market", "k"), "a document's parsed key is the same in every process"
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -662,16 +665,6 @@ def _selftest() -> None:
     rows = [{"page": "market", "sig": "s1", "stored": "t0", "seen": "t1"}]
     assert _manifest({MANIFEST: csv_string(rows, MANIFEST_FIELDS)}) == rows
 
-
-    out: dict[str, list[Row]] = {}
-    route(out, [{"a": "1"}, {ROW_TABLE: "api_standings", "stat": "goals"}],
-          "api_teams", "t1")
-    assert set(out) == {"api_teams", "api_standings"}, list(out)
-    assert out["api_teams"][0] == {"a": "1", "observed_at": "t1"}
-    assert out["api_standings"][0]["observed_at"] == "t1"
-    route(out, [{ROW_TABLE: "api_teams", "b": "2"}], "api_teams", "t2")
-    assert len(out["api_teams"]) == 2, out["api_teams"]
-    assert all(ROW_TABLE not in r for rs in out.values() for r in rs), out
 
     from ffcore.futbolfantasy import parse_market
     from ffcore.source import Source
@@ -741,6 +734,7 @@ def _selftest() -> None:
     names = {n for n, _spec, _makes in run.STAGES}
     assert "parse" in names and {"board", "publish"} <= names, names
     _fetch_selftest()
+    _selftest_parse()
 
     print("ingest.py selftest OK")
 

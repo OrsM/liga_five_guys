@@ -2,7 +2,7 @@
 # src/run.py on a scratch copy: data/raw linked in read-only, the parse cache
 # (data/tidy/parsed.jsonl and snapindex.json) copied so a copy does not reparse every snapshot,
 # the record store (SCRATCH/store) copied from the tracked tree's store/ or, without one, exported from SCRATCH/data/lfg.db
-# (a read-only backup of the live database: tools/export_store.py), everything written (lfg.db, store, reports)
+# (a read-only backup of the live database: tools/export_store.py), everything written (store, reports)
 # under the scratch dir, nothing published or sent.
 # For checking and timing a change; the tracked repo is never touched.
 #
@@ -13,7 +13,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
-SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-dry-run}"     # not /tmp: a tmpfs too small for lfg.db; LFG_SCRATCH: one each when several run at once
+SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-dry-run}"     # not /tmp: a tmpfs too small for the parse cache and the store; LFG_SCRATCH: one each when several run at once
 mkdir -p "$SCRATCH/data/tidy" "$SCRATCH/reports"
 ln -sfn "$REPO/data/raw" "$SCRATCH/data/raw"
 for f in parsed.jsonl snapindex.json; do
