@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-18T21:36Z",
- "market_at": "2026-11-18T21:36Z",
+ "generated_at": "2026-11-18T21:38Z",
+ "market_at": "2026-11-18T21:38Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-18T21:36Z",
+   "at": "2026-11-18T21:38Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -58,12 +58,30 @@
  "ping": "",
  "do": [],
  "lineup": {
-  "eleven": null,
-  "message": "the app's line-up is not a legal eleven (8 players)",
+  "eleven": [
+   "Mathew Ryan",
+   "Natan",
+   "Robin Le Normand",
+   "Gerard Martin",
+   "Pablo Fornals",
+   "German Valera",
+   "Pepelu",
+   "Guido Rodriguez",
+   "Mikel Oyarzabal",
+   "Vinicius Junior",
+   "Martin Satriano"
+  ],
+  "message": "",
   "unmapped": [],
-  "points": null,
+  "points": 56.829913000249796,
   "best": 57.786150104372226,
-  "advice": []
+  "advice": [
+   {
+    "in": "Aitor Paredes",
+    "out": "Gerard Martin",
+    "gain": 0.956237104122434
+   }
+  ]
  },
  "buys": [
   {
@@ -332,21 +350,21 @@
   "brier": [
    {
     "scope": "backtest:all",
-    "n": 3293,
-    "model": 0.03313821268962532,
-    "pooled": 0.04332574256487082
+    "n": 3344,
+    "model": 0.03266092606164733,
+    "pooled": 0.042716713373403215
    },
    {
     "scope": "backtest:big",
-    "n": 280,
-    "model": 0.10530043883611473,
-    "pooled": 0.12288154922583779
+    "n": 287,
+    "model": 0.10280286504259338,
+    "pooled": 0.11994628856938763
    },
    {
     "scope": "backtest:norival",
-    "n": 3077,
-    "model": 0.02193794994556372,
-    "pooled": 0.026052502677883293
+    "n": 3128,
+    "model": 0.021610317885457815,
+    "pooled": 0.025683046673397575
    },
    {
     "scope": "backtest:ours",
@@ -362,21 +380,21 @@
    },
    {
     "scope": "backtest:small",
-    "n": 3013,
-    "model": 0.026432131268776655,
-    "pooled": 0.03593257101987555
+    "n": 3057,
+    "model": 0.026075797998993906,
+    "pooled": 0.03546617752739486
    },
    {
     "scope": "live:all",
-    "n": 4317,
-    "model": 0.032293385370554185,
-    "pooled": 0.032293385370554185
+    "n": 4368,
+    "model": 0.03193988613657448,
+    "pooled": 0.03193988613657448
    },
    {
     "scope": "live:norival",
-    "n": 4043,
-    "model": 0.022218260472377918,
-    "pooled": 0.022218260472377918
+    "n": 4094,
+    "model": 0.02196661091590103,
+    "pooled": 0.02196661091590103
    },
    {
     "scope": "live:ours",
@@ -392,25 +410,25 @@
    },
    {
     "scope": "live:small",
-    "n": 4317,
-    "model": 0.032293385370554185,
-    "pooled": 0.032293385370554185
+    "n": 4368,
+    "model": 0.03193988613657448,
+    "pooled": 0.03193988613657448
    }
   ],
   "drift": [
    {
     "scope": "backtest:big",
     "bin": "0.99-1.00",
-    "n": 24,
+    "n": 28,
     "stated": 1.0,
-    "observed": 0.875
+    "observed": 0.8928571428571429
    },
    {
     "scope": "backtest:norival",
     "bin": "0.50-0.80",
-    "n": 59,
-    "stated": 0.7312311572083865,
-    "observed": 0.576271186440678
+    "n": 60,
+    "stated": 0.7320922168689485,
+    "observed": 0.5833333333333334
    },
    {
     "scope": "backtest:ours",
@@ -1342,19 +1360,19 @@
    "sold": false
   },
   {
-   "name": "Aitor Paredes",
-   "pos": "DEF",
-   "next": 4.360653356396503,
-   "xi": true,
-   "best": true,
-   "sold": false
-  },
-  {
    "name": "Robin Le Normand",
    "pos": "DEF",
    "next": 4.251028887127761,
    "xi": true,
    "best": true,
+   "sold": false
+  },
+  {
+   "name": "Gerard Martin",
+   "pos": "DEF",
+   "next": 3.4044162522740686,
+   "xi": true,
+   "best": false,
    "sold": false
   },
   {
@@ -1422,11 +1440,11 @@
    "sold": false
   },
   {
-   "name": "Gerard Martin",
+   "name": "Aitor Paredes",
    "pos": "DEF",
-   "next": 3.4044162522740686,
+   "next": 4.360653356396503,
    "xi": false,
-   "best": false,
+   "best": true,
    "sold": false
   },
   {
