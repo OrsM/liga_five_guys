@@ -1,5 +1,5 @@
-"""The facts a decision reads at a cut, as one value computed from the World (seen_at): the SQL views player_facts,
-my_squad and my_cash and the stored copies seen, seen_cash, seen_auction and seen_curve become selectors over a Seen.
+"""The facts a decision reads at a cut, as one value computed from the World (seen_at): the player facts, my squad, my cash, the open
+listings' clearing-price forecasts and their curves are selectors over a Seen.
 Named rules, each tested:
   roster_is_the_universe: one PlayerFact per player_roster row, in its order.
   name_falls_back_to_key: an empty roster name is shown as the player key.
@@ -19,7 +19,7 @@ Named rules, each tested:
   my_squad_pos_default: a squad member with no position is 'MED'.
   my_cash_zero_without_row: my_cash is 0.0 when league.me has no cash row.
 Contract: seen_at(world, identity, league) gives the Seen of the cut; it is the same alone or inside a sweep, unchanged by
-rows observed after the cut, and reads no SQL."""
+rows observed after the cut."""
 from __future__ import annotations
 
 from collections import defaultdict

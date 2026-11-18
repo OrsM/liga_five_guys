@@ -11,7 +11,7 @@ from typing import Any
 from ffcore.parse import count, money, pct100, ratio
 
 __all__ = ["ROOT", "TIDY", "REPORTS",
-           "cell", "APP_FRESH_HOURS", "input_path", "csv_string", "NUMBERS", "LINEUP_SOURCE"]
+           "cell", "APP_FRESH_HOURS", "input_path", "csv_string", "NUMBERS"]
 
 ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
@@ -81,9 +81,6 @@ def _stripped(value: Any) -> Any:
 
 
 APP_FRESH_HOURS = 14.4
-
-
-LINEUP_SOURCE = "futbolfantasy"
 
 
 def _selftest() -> None:

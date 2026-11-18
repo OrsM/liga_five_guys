@@ -1,12 +1,10 @@
-"""The observations (ingest) read from the parse cache instead of from src_*: the same rows read() returns, row for
-row, built from Paths.cache (parsed.jsonl: a document's rows by content key) and Paths.snaps (snapindex.json: which
-document each page had at each snapshot stamp), through the typing store_sql applies (tidy.cell) and the dedupe
-the tables apply on insert (observations.keeper).
+"""The observations (ingest) read from the parse cache: Paths.cache (parsed.jsonl: a document's rows by content key) and
+Paths.snaps (snapindex.json: which document each page had at each snapshot stamp), typed by tidy.cell and deduped as
+the tables dedupe on insert (observations.keeper).
 
-read(paths, names, until, latest) gives an Observations equal to observations.read of a database that parse filled
-from the same cache; a page whose document is not in the cache has no rows, as parse would have needed to parse it.
-A document is typed once, each distinct raw value of a column once; a document the tables already hold is answered
-by one comparison. Selectors: Paths."""
+read(paths, names, until, latest) gives an Observations of the rows of each page's documents at each snapshot stamp; a
+page whose document is not in the cache has no rows. A document is typed once, each distinct raw value of a column
+once. Selectors: Paths."""
 from __future__ import annotations
 
 import contextlib
@@ -57,7 +55,7 @@ def _whole(value: Any) -> int | None:
 
 
 def _coercion(hint: Any) -> Callable[[Any], Any]:
-    """How a column of the type hint is stored: text never NULL, a number as its affinity."""
+    """How a column of the type hint is stored: text never None, a number as its declared type."""
     kinds = [a for a in typing.get_args(hint) if a is not type(None)] or [hint]
     return {str: _text, float: _real, int: _whole}[kinds[0]]
 
@@ -169,9 +167,8 @@ def _steady() -> Iterator[None]:
 
 def read(paths: Paths, names: Iterable[str] = tuple(ob.TABLES), until: str | None = None,
          latest: bool = False) -> ob.Observations:
-    """The named tables as ob.read would return them from a database parse filled from paths: rows of the
-    snapshots at most until (all when None), deduped as the tables dedupe on insert, in the order parse stores them;
-    with latest, only each source's newest snapshot of that range."""
+    """The named tables from paths: rows of the snapshots at most until (all when None), deduped as the tables
+    dedupe on insert, in the order the snapshots were taken; with latest, only each source's newest snapshot of that range."""
     with _steady():
         wanted = list(names)
         walk = list(documents(paths.snaps, until))

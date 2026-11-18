@@ -2,20 +2,17 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Any
 from datetime import date, datetime, timezone, tzinfo
 from functools import lru_cache
 
-__all__ = ["Row", "Rows", "money", "ratio", "pct100", "count", "text", "snapshot_stamp"]
+__all__ = ["Row", "money", "ratio", "pct100", "count", "text", "snapshot_stamp"]
 
 _DOT_GROUPED = re.compile(r"\d{1,3}(?:\.\d{3})+$")
 _CLEAN = str.maketrans({"\u00a0": "", " ": "", "\u202f": ""})
 
 
-# Rows of a table as current() and history() hand them out: read-only,
-# numeric columns already parsed (tidy.Table.numbers).
-Rows = Sequence[Mapping[str, Any]]
 # A row as a parser builds it, before it is written to a table.
 Row = dict[str, Any]
 

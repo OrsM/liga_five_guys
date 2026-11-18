@@ -6,9 +6,9 @@ the table's rows in (observed_at, rowid) order. A step may update its state in p
 cut and each fact's state. sweep(obs, cuts, read) folds forward once through the sorted cuts and returns
 read(world) for each cut in the order given: the result at a cut is the same alone, in any subset, in any
 order, and does not change when rows with observed_at after it are appended. world_at(obs, cut) is the
-World at one cut (its states are its own). Rows with observed_at <= cut count, as the current_* views do.
+World at one cut (its states are its own). Rows with observed_at <= cut count.
 
-The first facts: latest_<table> for every table, the rows the table's current_* view holds: each source's
+The first facts: latest_<table> for every table, the table's live rows: each source's
 newest snapshot (snapshot tables) or each key's newest row, a key with an empty part excluded (keyed tables).
 Selectors: fact, latest."""
 from __future__ import annotations
@@ -75,7 +75,7 @@ def world_at(obs: ob.Observations, cut: str, folds: Mapping[str, Fold] | None = 
 
 
 def latest_fact(table: str) -> str:
-    """The name of the fact holding the rows of table's current_* view."""
+    """The name of the fact holding the live rows of table."""
     return "latest_" + table
 
 
@@ -98,7 +98,7 @@ def _keyed_step(table: str) -> Callable[[dict[Any, Any], Any], dict[Any, Any]]:
 
 
 def latest(world: World, table: str) -> tuple[Any, ...]:
-    """The rows of table's current_* view at the world's cut (order unspecified)."""
+    """The live rows of table at the world's cut (order unspecified)."""
     state = fact(world, latest_fact(table))
     if ob.TABLES[table].grain:
         return tuple(state.values())
