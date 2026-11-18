@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import functools
 import io
 import os
 import sqlite3
@@ -15,7 +16,7 @@ from ffcore.db import ROOT, source_table
 from ffcore.parse import count, money, pct100, ratio, snapshot_stamp
 
 __all__ = ["ROOT", "TIDY", "REPORTS",
-           "current", "history", "typed", "APP_FRESH_HOURS", "tables_in",
+           "current", "history", "cell", "APP_FRESH_HOURS", "tables_in",
            "input_path", "csv_string", "store_sql", "stored",
            "clear_sql", "NUMBERS", "LINEUP_SOURCE"]
 
@@ -87,19 +88,17 @@ def store_sql(name: str, rows: Sequence[Mapping[str, Any]]) -> None:
     (so no reader trims). A keyed table's trigger skips a row its key's last
     already says, and a row its unique key already holds is skipped; a column
     the table does not declare is reported, not kept."""
-    nums = dict(NUMBERS.get(name, ()))
-    fresh = typed(name, [{k: v.strip() if isinstance(v, str) else v for k, v in r.items()}
-                         for r in rows])
     with closing(lfg.connect()) as db, db:
         cols = _columns(db, name)
         if not cols:
             raise ValueError("%s is not a table in tables.sql" % name)
-        extra = sorted({c for r in fresh for c in r} - set(cols))
+        cells = [cell(name, c) for c in cols]
+        extra = sorted({c for r in rows for c in r} - set(cols))
         if extra:
             print("  warn: %s: columns not in tables.sql, not kept: %s" % (name, ", ".join(extra)))
         db.executemany(
             "INSERT OR IGNORE INTO %s (%s) VALUES (%s)" % (source_table(name), ", ".join(cols), ", ".join("?" * len(cols))),
-            [[r.get(c) if c in nums else (r.get(c) or "") for c in cols] for r in fresh])
+            [[to(r.get(c)) for c, to in zip(cols, cells)] for r in rows])
 
 
 def stored(name: str) -> int:
@@ -128,12 +127,25 @@ def _read_sql(view: str) -> list[dict[str, Any]]:
     return [dict(zip(cols, r)) for r in got]
 
 
-def typed(name: str, rows: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    """Rows of a table as it is written (text) with its numeric columns
-    parsed (NUMBERS): what is stored."""
-    numbers = NUMBERS.get(name, ())
-    return [MappingProxyType({**r, **{c: parse(r.get(c)) for c, parse in numbers if c in r}})
-            for r in rows]
+def cell(name: str, column: str) -> Callable[[Any], Any]:
+    """What table name stores for a raw value of column (a document's, as parse emitted it; None when the row has
+    none): a numeric column's value parsed (NUMBERS) after the strip, any other column's text stripped, and empty when
+    missing. Equal raw values give equal results; columns stored alike get the same function."""
+    parse = dict(NUMBERS.get(name, ())).get(column)
+    return _text_cell if parse is None else _number_cell(parse)
+
+
+def _text_cell(raw: Any) -> Any:
+    return _stripped(raw) or ""
+
+
+@functools.cache
+def _number_cell(parse: Callable[[object], Any]) -> Callable[[Any], Any]:
+    return lambda raw: parse(_stripped(raw))
+
+
+def _stripped(value: Any) -> Any:
+    return value.strip() if isinstance(value, str) else value
 
 
 def history(name: str, source: str = "") -> list[Mapping[str, Any]]:

@@ -6,10 +6,11 @@ grain: () for a snapshot table (every fetch repeats the whole table) or the key 
 row per key, and the columns that with observed_at hold a row once (unique). read(db, names, until, latest) and of(rows) give an Observations: for each table its rows in (observed_at, rowid)
 order, their stamps, and refolds, the number of rows that arrived with a stamp before an earlier row of their
 source (storage order is not time order there, so a fold that already passed them must start again). Selectors:
-rows_of, stamps_of, refolds_of, key_of. kept(table, rows) and newest(rows) are the rules parsed.read (the same
+rows_of, stamps_of, refolds_of, key_of. kept(table, rows), keeper(table) and newest(rows) are the rules parsed.read (the same
 Observations from the parse cache) applies: the dedupe the tables do on insert, and the newest snapshot."""
 from __future__ import annotations
 
+import itertools
 import operator
 import sqlite3
 from collections.abc import Callable, Iterable, Iterator, Mapping
@@ -235,35 +236,71 @@ class Stamped(NamedTuple):
     body: tuple[Any, ...]
 
 
-def kept(table: str, rows: Iterable[Stamped]) -> Iterator[Stamped]:
-    """The rows of table that its storage keeps, from rows in storage order with observed_at not decreasing (body:
-    the fields after observed_at, in the order of the table's row type): a row is dropped when a kept row has the
-    same unique columns (TABLES) and observed_at, and, in a table with a grain, when its body equals the last kept
-    row's of its grain key (None equals None). A row dropped is never the last of its key; a row that changed,
-    or came back to an earlier value after another, is kept."""
-    spec = TABLES[table]
-    fields = spec.row._fields[1:]
+class Part(NamedTuple):
+    bodies: list[tuple[Any, ...]]
+    marks: list[Any]
+    distinct: bool
 
-    def pick(cols: tuple[str, ...]) -> Callable[[tuple[Any, ...]], Any]:
-        return operator.itemgetter(*(fields.index(c) for c in cols))
-    unique = pick(spec.unique)
-    grain = pick(spec.grain) if spec.grain else None
+
+def _picker(table: str, cols: tuple[str, ...]) -> Callable[[tuple[Any, ...]], Any]:
+    fields = TABLES[table].row._fields[1:]
+    return operator.itemgetter(*(fields.index(c) for c in cols))
+
+
+def part(table: str, bodies: list[tuple[Any, ...]]) -> Part:
+    """The bodies of table (the fields after observed_at) with what keeper reads of them once: marks, the grain key of
+    each body (its unique columns in a snapshot table), and whether no two marks are equal."""
+    spec = TABLES[table]
+    marks = list(map(_picker(table, spec.grain or spec.unique), bodies))
+    return Part(bodies, marks, len(set(marks)) == len(marks))
+
+
+def keeper(table: str) -> Callable[[str, Part], Iterable[tuple[Any, ...]]]:
+    """A function that, given a stamp (not decreasing from call to call) and the next Part in storage order, returns the
+    bodies of table that its storage keeps: a body is dropped when a kept body has the same unique columns (TABLES)
+    and stamp, and, in a table with a grain, when it equals the last kept body of its grain key (None equals None). A
+    body dropped is never the last of its key; one that changed, or came back to an earlier value after another, is
+    kept. A Part that adds nothing new is answered without looking at its bodies one by one."""
+    spec = TABLES[table]
+    unique = _picker(table, spec.unique)
+    grain = _picker(table, spec.grain) if spec.grain else None
     last: dict[Any, tuple[Any, ...]] = {}
     seen: set[Any] = set()
     at = None
-    for r in rows:
-        if r.observed_at != at:
-            at, seen = r.observed_at, set()
-        u = unique(r.body)
-        if u in seen:
-            continue
-        if grain is not None:
-            k = grain(r.body)
-            if last.get(k) == r.body:
+
+    def keep(stamp: str, held: Part) -> Iterable[tuple[Any, ...]]:
+        nonlocal at, seen
+        if stamp != at:
+            at, seen = stamp, set()
+        if grain is None:
+            if held.distinct and seen.isdisjoint(held.marks):
+                seen.update(held.marks)
+                return held.bodies
+        elif list(map(last.get, held.marks)) == held.bodies:
+            return ()
+        out = []
+        for body in held.bodies:
+            u = unique(body)
+            if u in seen:
                 continue
-            last[k] = r.body
-        seen.add(u)
-        yield r
+            if grain is not None:
+                k = grain(body)
+                if last.get(k) == body:
+                    continue
+                last[k] = body
+            seen.add(u)
+            out.append(body)
+        return out
+    return keep
+
+
+def kept(table: str, rows: Iterable[Stamped]) -> Iterator[Stamped]:
+    """The rows of table that its storage keeps (keeper's rule), from rows in storage order with observed_at not
+    decreasing (body: the fields after observed_at, in the order of the table's row type)."""
+    keep = keeper(table)
+    for at, group in itertools.groupby(rows, operator.attrgetter("observed_at")):
+        for body in keep(at, part(table, [r.body for r in group])):
+            yield Stamped(at, body)
 
 
 def newest(rows: Iterable[Any]) -> list[Any]:
@@ -389,6 +426,11 @@ def _selftest_parsed() -> None:
         assert all(a.ff_id is b.ff_id for a, b in zip(market[::2], market[2::2])), "strings are pooled"
     twice = [Stamped("t", ("s", None, "a", "", "", "")), Stamped("t", ("s", 1.0, "a", "", "", ""))]
     assert [r.body[1] for r in kept("market", twice)] == [None], "the first of two rows with one unique key and stamp is kept"
+    keep = keeper("points")
+    rows = [("s", 1.0, 1.0, 1.0, "a", "", "", "", "2026"), ("s", 2.0, 1.0, 1.0, "b", "", "", "", "2026")]
+    assert [list(keep(at, part("points", rows))) for at in ("t", "u")] == [rows, []], "a Part the table holds adds nothing"
+    again = [Stamped(at, b) for at in ("t", "u") for b in rows]
+    assert [r.body for r in kept("points", again)] == rows, "keeper over Parts and kept over rows give the same rows"
 
 
 def _selftest() -> None:
