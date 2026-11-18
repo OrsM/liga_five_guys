@@ -1,0 +1,300 @@
+"""The record kinds a run leaves behind (what the SQLite record tables hold today), one NamedTuple each, and
+their line format. A row on disk is one JSON object with the NamedTuple's field names; a file's first line is
+its header {"format": kind, "v": N}. Writers write LATEST[kind]; a reader upgrades a row of version v through
+READERS[(kind, v)] to the current NamedTuple, and an unknown version is an error. Floats round-trip exactly (JSON
+repr), NULL is None. The big kind is stored as a typed array (GRADE_CELL_DTYPE: player is PLAYER_BYTES of UTF-8,
+plays NaN for None), run_id being the directory's. latest(rows, key) is the last two measure_log rows per key by
+(at, position in rows)."""
+from __future__ import annotations
+
+import json
+import sys
+from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping
+from typing import Any, NamedTuple
+
+import numpy as np
+import numpy.typing as npt
+
+__all__ = ["AuctionBrier", "AuctionCalibration", "DecOpportunity", "GRADE_CELL_DTYPE", "GradeCell", "KINDS", "KindSpec",
+           "LATEST", "Latest", "MeasureLog", "PLAYER_BYTES", "Param", "READERS", "Run", "RunMeasure", "StoreError",
+           "change", "decode", "encode", "grade_cell_array", "grade_cell_rows", "header", "latest", "parse_header"]
+
+
+class StoreError(ValueError):
+    """A stored file that cannot be trusted: its message names the file and line."""
+
+
+class Run(NamedTuple):
+    run_id: int
+    started: str
+    as_of: str
+    trigger: str
+    commit_sha: str
+    finished: str | None
+    ok: int | None
+    peak_mb: float | None
+
+
+class RunMeasure(NamedTuple):
+    run_id: int
+    stage: str
+    measure: str
+    value: float
+
+
+class MeasureLog(NamedTuple):
+    at: str
+    commit_sha: str
+    measure: str
+    key: str
+    value: float
+
+
+class Param(NamedTuple):
+    run_id: int
+    component: str
+    term: str
+    value: float
+    kind: str
+    n: int | None
+
+
+class AuctionCalibration(NamedTuple):
+    run_id: int
+    scope: str
+    bin: str
+    n: int
+    stated: float
+    observed: float
+    drift: int
+
+
+class AuctionBrier(NamedTuple):
+    run_id: int
+    scope: str
+    n: int
+    model: float
+    pooled: float
+
+
+class GradeCell(NamedTuple):
+    run_id: int
+    from_j: int
+    jornada: int
+    player: str
+    predicted: float
+    plays: float | None
+    flagged: int
+
+
+class DecOpportunity(NamedTuple):
+    cut: str
+    player: str
+    pos: str
+    status: str
+    asking: float | None
+    close_at: str | None
+    from_j: int
+    replaces: str | None
+    gain: float
+    per_million: float | None
+    price_next: float | None
+    price_lock: float | None
+    bid: float | None
+    win: float | None
+    placed: float | None
+
+
+class KindSpec(NamedTuple):
+    """A kind's name, its row type and the file (inside a run directory) that holds it."""
+    name: str
+    row: type[Any]
+    filename: str
+
+
+KINDS: Mapping[str, KindSpec] = {s.name: s for s in (
+    KindSpec("runs", Run, "run.json"),
+    KindSpec("run_measures", RunMeasure, "measures.jsonl"),
+    KindSpec("measure_log", MeasureLog, "measure_log.jsonl"),
+    KindSpec("params", Param, "params.jsonl"),
+    KindSpec("auction_calibration", AuctionCalibration, "calibration.jsonl"),
+    KindSpec("auction_brier", AuctionBrier, "brier.jsonl"),
+    KindSpec("grade_cell", GradeCell, "grade_cell.npy"),
+    KindSpec("dec_opportunity", DecOpportunity, "opportunity.jsonl"))}
+
+LATEST: Mapping[str, int] = {name: 1 for name in KINDS}
+
+PLAYER_BYTES = 24
+GRADE_CELL_DTYPE = np.dtype([("from_j", "<i4"), ("jornada", "<i4"), ("player", f"S{PLAYER_BYTES}"),
+                             ("predicted", "<f8"), ("plays", "<f8"), ("flagged", "<i4")])
+
+
+def _read_v1(kind: str) -> Callable[[Mapping[str, Any]], Any]:
+    row = KINDS[kind].row
+
+    def read(obj: Mapping[str, Any]) -> Any:
+        if set(obj) != set(row._fields):
+            raise StoreError("%s row has fields %s, expected %s" % (kind, sorted(obj), sorted(row._fields)))
+        return row(**obj)
+    return read
+
+
+READERS: Mapping[tuple[str, int], Callable[[Mapping[str, Any]], Any]] = {
+    (name, 1): _read_v1(name) for name in KINDS}
+
+
+def header(kind: str) -> str:
+    """The first line of a kind's file (newline-terminated)."""
+    return json.dumps({"format": kind, "v": LATEST[kind]}) + "\n"
+
+
+def parse_header(line: bytes, kind: str) -> int:
+    """The version a file's first line declares; StoreError when it is not a header of that kind."""
+    try:
+        head = json.loads(line)
+    except ValueError:
+        head = None
+    if not isinstance(head, dict) or head.get("format") != kind or not isinstance(head.get("v"), int):
+        raise StoreError("not a %s file: first line is %r" % (kind, line[:60]))
+    version: int = head["v"]
+    if (kind, version) not in READERS:
+        raise StoreError("%s file is version %d; this code reads %s" % (
+            kind, version, sorted(v for k, v in READERS if k == kind)))
+    return version
+
+
+def encode(row: NamedTuple) -> str:
+    """One row as a line of JSON (newline-terminated), keys the field names."""
+    return json.dumps(row._asdict()) + "\n"
+
+
+def decode(kind: str, version: int, line: bytes) -> Any:
+    """A line of a kind's file at that version as the current NamedTuple; StoreError when it is torn or wrong."""
+    if not line.endswith(b"\n"):
+        raise StoreError("line is cut short (no newline): %r" % line[-40:])
+    try:
+        obj = json.loads(line)
+    except ValueError as e:
+        raise StoreError("line is not JSON (%s): %r" % (e, line[:60])) from None
+    if not isinstance(obj, dict):
+        raise StoreError("line is not an object: %r" % line[:60])
+    return READERS[(kind, version)](obj)
+
+
+def grade_cell_array(rows: Iterable[GradeCell]) -> npt.NDArray[Any]:
+    """The rows (one run's) as a GRADE_CELL_DTYPE array; plays None becomes NaN. A player longer than PLAYER_BYTES
+    in UTF-8 is a StoreError."""
+    def cells() -> Iterator[tuple[int, int, bytes, float, float, int]]:
+        for r in rows:
+            name = r.player.encode()
+            if len(name) > PLAYER_BYTES:
+                raise StoreError("player %r is longer than %d bytes" % (r.player, PLAYER_BYTES))
+            yield (r.from_j, r.jornada, name, r.predicted, float("nan") if r.plays is None else r.plays, r.flagged)
+    return np.fromiter(cells(), dtype=GRADE_CELL_DTYPE)
+
+
+def grade_cell_rows(cells: npt.NDArray[Any], run_id: int) -> Iterator[GradeCell]:
+    """An array's rows as GradeCell tuples of that run, in order; NaN plays is None."""
+    for c in cells:
+        plays = float(c["plays"])
+        yield GradeCell(run_id, int(c["from_j"]), int(c["jornada"]), bytes(c["player"]).decode(),
+                        float(c["predicted"]), None if plays != plays else plays, int(c["flagged"]))
+
+
+class Latest(NamedTuple):
+    """A key's newest measure_log row and the one before it (None when there is only one)."""
+    last: MeasureLog
+    previous: MeasureLog | None
+
+
+def latest(rows: Iterable[MeasureLog], key: Callable[[MeasureLog], Hashable]) -> dict[Hashable, Latest]:
+    """Per key, the newest row by (at, position in rows) and the one before it. Replaces the measure_latest view."""
+    kept: dict[Hashable, list[tuple[str, int, MeasureLog]]] = {}
+    for position, r in enumerate(rows):
+        pair = kept.setdefault(key(r), [])
+        pair.append((r.at, position, r))
+        pair.sort(key=lambda t: t[:2])
+        del pair[:-2]
+    return {k: Latest(v[-1][2], v[-2][2] if len(v) > 1 else None) for k, v in kept.items()}
+
+
+def change(pair: Latest) -> float | None:
+    """The newest value less the previous one; None when there is no previous."""
+    return None if pair.previous is None else pair.last.value - pair.previous.value
+
+
+def _selftest() -> None:
+    import sqlite3
+
+    sample: dict[str, Any] = {
+        "runs": Run(7, "2026-11-01T10:00:00Z", "2026-11-01T10:00:00Z", "service", "abc1234", None, None, 12.5),
+        "run_measures": RunMeasure(7, "board", "secs", 0.1 + 0.2),
+        "measure_log": MeasureLog("2026-11-01T10:00:00Z", "abc1234", "accuracy", "rmse@5", 1 / 3),
+        "params": Param(7, "auction", "", 5e-324, "fitted", None),
+        "auction_calibration": AuctionCalibration(7, "all", "0.1-0.2", 12, 0.15, 1e300, 1),
+        "auction_brier": AuctionBrier(7, "all", 30, float("inf"), -0.0),
+        "grade_cell": GradeCell(7, 3, 4, "Pedri ñ", 2.5, None, 1),
+        "dec_opportunity": DecOpportunity("2026-11-01T1000Z", "Pedri", "MED", "open", None, None, 4, None, 1.5,
+                                          None, None, None, 4.2, 0.3, None)}
+    assert set(sample) == set(KINDS) == set(LATEST), "every kind has a sample, a spec and a version"
+    for kind, row in sample.items():
+        assert type(row) is KINDS[kind].row, kind
+        if kind == "grade_cell":
+            back = list(grade_cell_rows(grade_cell_array([row]), row.run_id))[0]
+        else:
+            back = decode(kind, parse_header(header(kind).encode(), kind), encode(row).encode())
+        assert back == row, (kind, back, row)
+        assert [type(a) for a in back] == [type(a) for a in row], "types, so None stays None and 1.0 stays a float"
+    for x in (0.1 + 0.2, float("nan"), -0.0, 1.7976931348623157e308):
+        got = decode("run_measures", 1, encode(RunMeasure(1, "s", "m", x)).encode()).value
+        assert np.float64(got).tobytes() == np.float64(x).tobytes(), "float bits survive the line format"
+
+    for torn in (b'{"run_id": 1, "stage": "s", "measure": "m", "va', b'{"run_id": 1}\n', b"[1]\n", b'{"run_id": 1, "stage": "s", "measure": "m", "value": 1.0}'):
+        try:
+            decode("run_measures", 1, torn)
+        except StoreError as e:
+            assert str(e), "a readable message"
+        else:
+            raise AssertionError("accepted %r" % torn)
+    for bad in (b'{"format": "params", "v": 1}', b'{"format": "run_measures", "v": 99}', b"nonsense"):
+        try:
+            parse_header(bad, "run_measures")
+        except StoreError:
+            pass
+        else:
+            raise AssertionError("accepted header %r" % bad)
+
+    long_name = GradeCell(1, 1, 1, "x" * (PLAYER_BYTES + 1), 1.0, None, 0)
+    try:
+        grade_cell_array([long_name])
+    except StoreError:
+        pass
+    else:
+        raise AssertionError("a player that does not fit is refused, not cut")
+
+    import random
+    rng = random.Random(5)
+    log = [MeasureLog("2026-11-%02dT00:00:00Z" % rng.randint(1, 4), "sha%d" % i, rng.choice(["accuracy", "sale_grade"]),
+                      rng.choice("abc"), rng.random()) for i in range(300)]
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE log (at TEXT, commit_sha TEXT, measure TEXT, key TEXT, value REAL)")
+    db.executemany("INSERT INTO log VALUES (?, ?, ?, ?, ?)", log)
+    db.execute("""CREATE VIEW newest AS
+        WITH r AS (SELECT *, row_number() OVER (PARTITION BY measure, key ORDER BY at DESC, rowid DESC) AS n FROM log)
+        SELECT a.measure, a.key, a.value, a.at, a.commit_sha, p.value AS previous, p.at AS previous_at,
+               p.commit_sha AS previous_commit, a.value - p.value AS change
+        FROM r a LEFT JOIN r p ON p.measure = a.measure AND p.key = a.key AND p.n = 2 WHERE a.n = 1""")
+    expected = {(m, k): (v, at, sha, p, pat, psha, ch) for m, k, v, at, sha, p, pat, psha, ch
+                in db.execute("SELECT * FROM newest")}
+    got = {k: (p.last.value, p.last.at, p.last.commit_sha, p.previous.value if p.previous else None,
+               p.previous.at if p.previous else None, p.previous.commit_sha if p.previous else None, change(p))
+           for k, p in latest(log, lambda r: (r.measure, r.key)).items()}
+    assert got == expected and len(got) == 6, "latest is the measure_latest view, ties by position"
+    assert latest([], lambda r: r.key) == {}
+    only = latest(log[:1], lambda r: r.key)[log[0].key]
+    assert only.previous is None and change(only) is None
+
+
+if __name__ == "__main__":
+    if "--selftest" in sys.argv:
+        _selftest()
