@@ -29,13 +29,15 @@ bless_is_explicit: check never writes; only bless changes a golden file."""
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import math
 import os
 import sys
 import tempfile
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -170,6 +172,22 @@ def decided_at(loaded: loader.Loaded, world: state.World) -> decision.Decided:
     return d
 
 
+@contextmanager
+def empty_store() -> Iterator[None]:
+    """FF_ROOT on an empty data root for the duration: the board document reads the latest auction scores from the
+    store, and the fixture goldens must not depend on whichever store the environment has."""
+    with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as tmp:
+        before = os.environ.get("FF_ROOT")
+        os.environ["FF_ROOT"] = str(Path(tmp) / "data")
+        try:
+            yield
+        finally:
+            if before is None:
+                del os.environ["FF_ROOT"]
+            else:
+                os.environ["FF_ROOT"] = before
+
+
 def replayed(loaded: loader.Loaded, cuts: Sequence[Cut], with_document: bool) -> list[Replayed]:
     """Each cut decided in one state.sweep of the loaded observations, in the order given; the wall clock is set to
     the cut before anything reads it."""
@@ -182,7 +200,8 @@ def replayed(loaded: loader.Loaded, cuts: Sequence[Cut], with_document: bool) ->
         document = board(d.inputs, got, [], d.extras, loader.health_at(loaded, world.cut)) if with_document else None
         return Replayed(by_at[world.cut], features(loaded, world, d, got), document)
 
-    return state.sweep(loaded.obs, [c.at for c in cuts], read)
+    with empty_store() if with_document else contextlib.nullcontext():
+        return state.sweep(loaded.obs, [c.at for c in cuts], read)
 
 
 def after(at: str, delay: timedelta) -> str:
