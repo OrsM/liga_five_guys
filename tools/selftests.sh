@@ -3,6 +3,7 @@
 # _selftest() is run (nothing to list or keep in step), then mypy and ruff.
 # Modules that gate their self-test on a flag take --selftest; the rest
 # ignore it. A failure prints that suite's own output once.
+# Every suite runs on an empty data root (and so an empty store) under ~/.cache: none sees or writes the live data/ or store/.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,7 +11,9 @@ cd "$REPO_ROOT"
 
 UV="$HOME/.local/bin/uv"
 export PYTHONPATH=src
-export FF_ROOT=./data
+FF_SCRATCH="$(mktemp -d "$HOME/.cache/selftests.XXXXXX")"
+trap 'chmod -R u+w "$FF_SCRATCH" 2>/dev/null; rm -rf "$FF_SCRATCH"' EXIT
+export FF_ROOT="$FF_SCRATCH/data"
 export UV
 
 mapfile -t SUITES < <(grep -rl --include='*.py' '^def _selftest' src tools | sort)
