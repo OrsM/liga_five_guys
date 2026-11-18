@@ -7,19 +7,20 @@ import sys
 
 
 def _selftest() -> None:
-    """The view build (connect), board.replayed (seen, the forecast moment, look, the inputs) and board.board (the decision's
-    inputs, your squad and its eleven, the standing offers ranked): a forecast and a board come out."""
+    """The stored scraped tables, loader.load, decision.decisions (the seen facts, the forecast, the inputs, the extras) and
+    board.board (the decision's inputs, your squad and its eleven, the standing offers ranked): a forecast and a board come out."""
     import contextlib
     import tempfile
+    from contextlib import closing
     from pathlib import Path
 
-    from board import replayed
-    from ffcore.db import cut, record, rows, set_now
+    from ffcore import decision_facts, loader
+    from ffcore.db import connect, cut, record, set_now
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import store_sql, tables_in
     from ffcore.league import Config
     import decision
-    from board import board
+    from board import TOP_BUYS, TOP_TARGETS, board
 
     ME = Config.me
 
@@ -63,14 +64,16 @@ def _selftest() -> None:
                                       "status": "pending", "expires_at": "2026-09-21T22:00:00+02:00"}])
             record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
 
-            at = replayed()
-            assert at is not None
-            assert rows("SELECT count(*) FROM forecast_cell WHERE moment = ?", (at.moment,))[0][0] > 0, "a forecast"
-            assert len(rows("SELECT player FROM my_squad")) == len(mine), "your squad as the app showed it"
-            inp = at.inputs
+            with closing(connect()) as db:
+                loaded = loader.load(db, Config())
+            [d] = decision.decisions(loaded, [cut()])
+            assert not isinstance(d, decision.Stale), d
+            assert len(d.fc.now) > 0, "a forecast"
+            assert len(decision_facts.my_squad(d.seen, loaded.league)) == len(mine), "your squad as the app showed it"
+            inp = d.inputs
             got = decision.opportunity_rows(inp)
             decision.keep_opportunities(cut(), got)
-            doc = board(inp, got, decision.read_arrivals())
+            doc = board(inp, got, decision.arrivals(got, loaded.previous), d.extras)
             assert len(doc["squad"]) == len(mine) and sum(r["xi"] for r in doc["squad"]) == 11, "your squad and its eleven"
             assert {"generated_at", "market_at", "sources", "cash", "can_bid", "lock_at", "do", "buys", "sells"} <= set(doc), doc
             (line,) = doc["sells"]
@@ -84,8 +87,9 @@ def _selftest() -> None:
                 "the market's players are on sale, the rivals' are not: both are judged"
             assert all(b["advised"] is None or b["advised"] >= b["asking"] for b in doc["buys"]), "never a bid advised below the asking price"
             assert {t["status"] for t in doc["targets"]} >= {"rival"} or not doc["targets"], doc["targets"]
-            assert rows("SELECT count(*) FROM dec_targets")[0][0] == sum(1 for r in got if r["gain"] > 0), "the targets view"
-            assert rows("SELECT count(*) FROM dec_opportunities")[0][0] == sum(1 for r in got if r["gain"] > 0 and r["status"] == "market")
+            assert len(doc["targets"]) == min(TOP_TARGETS, sum(1 for r in got if r["gain"] > 0)), "the targets: those with a gain"
+            assert len(doc["buys"]) == min(TOP_BUYS, sum(1 for r in got if r["gain"] > 0 and r["status"] == "market")), \
+                "the buys: those on the market with a gain"
             (listing,) = doc["do"]
             assert listing["what"] == "list" and listing["accepts"] == [None] and len(listing["act"]) == len(mine), \
                 "no one of yours is listed yet: one line lists them all, each with his place in your team"

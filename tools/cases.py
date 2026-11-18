@@ -5,7 +5,7 @@ import lzma
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 FIXTURE = Path(__file__).with_name("cases") / "league.json.xz"
 
@@ -19,6 +19,27 @@ CASES = {"raphinha": "4288", "garcia": "7279", "diarra": "10832", "rodri": "2733
 DEGRADED_CLUB = "getafe"
 CUT_AFTER_MINUTES = 10
 AHEAD = 4
+
+
+
+class Market(NamedTuple):
+    player: str
+    value: float
+
+
+class Played(NamedTuple):
+    player: str
+    games: float
+    points: float
+
+
+class Known(NamedTuple):
+    player: str
+    name: str
+    club_id: str
+    ff_slug: str
+    app_id: str
+
 
 Seen = dict[str, Any]
 Check = tuple[str, str, str, Callable[[Seen], bool], Callable[[Seen], Any]]
@@ -84,9 +105,10 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
     import crosswalk
     import decision
     import eleven
-    from board import board, replayed
-    from ffcore.db import connect, record, rows, set_now, source_table
-    from ffcore.league import write_config
+    from board import board
+    from ffcore import current, forecast_facts, loader, season_facts, state
+    from ffcore.db import connect, cut, record, rows, set_now, source_table
+    from ffcore.league import Config
     from ffcore.parse import snapshot_stamp
     from ffcore.tidy import tables_in
 
@@ -97,59 +119,59 @@ def observe(doc: dict[str, Any], degraded: bool = False) -> Seen:
                 db.executemany("INSERT INTO %s (%s) VALUES (%s)" % (source_table(name), ", ".join(cols), ", ".join("?" * len(cols))), t["rows"])
             if degraded:
                 db.execute("DELETE FROM src_lineups WHERE team_slug = ? AND observed_at = ?", (DEGRADED_CLUB, doc["as_of"]))
-        write_config()
         stamp = snapshot_stamp(doc["as_of"])
         assert stamp is not None
         set_now(stamp + timedelta(minutes=CUT_AFTER_MINUTES))
         with closing(connect()) as db, db:
             crosswalk.build(db)
         record([{"run_id": 1, "started": "t", "as_of": "t", "trigger": "test", "commit_sha": "c"}], "runs")
-        at = replayed()
-        assert at is not None
-        inp = at.inputs
+        with closing(connect()) as db:
+            loaded = loader.load(db, Config())
+        world = state.world_at(loaded.obs, cut())
+        d = decision.decision_at(loaded, world)
+        assert not isinstance(d, decision.Stale), d
+        inp = d.inputs
         pos, cells = decision.cells_of(inp)
         mine = decision.squad_of(inp)
-        first = rows("SELECT min(jornada) FROM jornada_calendar WHERE state = 'ahead'")[0][0]
+        first = min(c.jornada for c in season_facts.jornada_calendar(world) if c.state == "ahead")
         next_four = frozenset(range(first, first + AHEAD))
         windows = {"next4": next_four, "season": frozenset(cells)}
         values = {w: decision.window_value(pos, cells, js) for w, js in windows.items()}
         settled = {w: eleven.best_eleven(mine, pos, v) for w, v in values.items()}
         got = [] if degraded else decision.opportunity_rows(inp)
         opportunities = {r["player"] for r in got if r["status"] == "market" and r["gain"] > 0}
-        doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [])
+        doc_board: dict[str, Any] = {"buys": [], "can_bid": 0.0} if degraded else board(inp, got, [], d.extras)
         seen: Seen = {"first": first, "opportunities": opportunities, "board": doc_board, "money": inp.money,
-                      "squad": len(mine), "offers": rows("SELECT count(*) FROM offers WHERE status = 'pending'")[0][0],
+                      "squad": len(mine), "offers": sum(1 for o in current.offers(world) if o.status == "pending"),
                       "cases": {}}
         ids = tuple(CASES.values())
         marks = ",".join("?" * len(ids))
 
-        def each(sql: str) -> dict[str, list[tuple[Any, ...]]]:
-            out: dict[str, list[tuple[Any, ...]]] = {k: [] for k in ids}
+        def each(sql: str, kind: type[Any]) -> dict[str, list[Any]]:
+            out: dict[str, list[Any]] = {k: [] for k in ids}
             for r in rows(sql % marks, ids):
-                out[r[0]].append(tuple(r[1:]))
+                x = kind._make(r)
+                out[x.player].append(x)
             return out
 
-        market = each("SELECT ff_id, value FROM src_market WHERE ff_id IN (%s) ORDER BY observed_at")
+        market = each("SELECT ff_id, value FROM src_market WHERE ff_id IN (%s) ORDER BY observed_at", Market)
         points = each("SELECT ff_id, games, points FROM src_points WHERE ff_id IN (%s) AND season = (SELECT max(season) FROM src_points)"
-                      " ORDER BY observed_at")
-        known = each("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk WHERE player_id IN (%s)")
-        status = each("SELECT player, listed, pct, status, note FROM player_status WHERE player IN (%s)")
-        rate = each("SELECT player, ppm, picked, record, listed_pct FROM forecast_rate WHERE player IN (%s)")
-        cell = each("SELECT player, jornada, p, e FROM cell WHERE player IN (%s)")
-        total = each("SELECT player, e, v, jornadas FROM cell_total WHERE player IN (%s)")
-        late = each("SELECT player, jornada FROM late_arrivals WHERE player IN (%s)")
+                      " ORDER BY observed_at", Played)
+        known = each("SELECT player_id, name, club_id, ff_slug, app_id FROM crosswalk WHERE player_id IN (%s)", Known)
+        cell = {k: {c.jornada: (c.p, c.e) for c in forecast_facts.cell(d.fc) if c.player == k} for k in ids}
+        total = {t.player: t for t in forecast_facts.cell_total(d.fc)}
         for name, k in CASES.items():
             swaps = {w: eleven.swap(k, s.eleven, pos, values[w]) if s else None for w, s in settled.items()}
             seen["cases"][name] = {
                 "id": k,
-                "value": market[k][-1][0] if market[k] else None,
+                "value": market[k][-1].value if market[k] else None,
                 "points": points[k][-1] if points[k] else None,
                 "crosswalk": known[k][0] if known[k] else None,
-                "status": status[k][0] if status[k] else None,
-                "rate": rate[k][0] if rate[k] else None,
-                "cells": {j: (p, e) for j, p, e in cell[k]},
-                "total": total[k][0] if total[k] else None,
-                "late": [j for (j,) in late[k]],
+                "status": d.fc.status.get(k),
+                "rate": d.fc.rate.get(k),
+                "cells": cell[k],
+                "total": total.get(k),
+                "late": sorted(x.jornada for x in d.fc.late if x.player == k),
                 "swaps": swaps,
                 "buy": next((b for b in doc_board["buys"] if b["key"] == k), None)}
     return seen
@@ -185,12 +207,12 @@ def checks() -> list[Check]:
          lambda s: all(a["gain"] > 0 and a["in"] != a["out"] for a in s["board"]["lineup"]["advice"]),
          lambda s: s["board"]["lineup"]["advice"]),
         ("raphinha", "tables", "price 150-200M, 8+ games at 12+ a game",
-         lambda s: 150e6 < c(s, "raphinha")["value"] < 200e6 and c(s, "raphinha")["points"][0] >= 8
-         and c(s, "raphinha")["points"][1] / c(s, "raphinha")["points"][0] >= 12, lambda s: (c(s, "raphinha")["value"], c(s, "raphinha")["points"])),
+         lambda s: 150e6 < c(s, "raphinha")["value"] < 200e6 and c(s, "raphinha")["points"].games >= 8
+         and c(s, "raphinha")["points"].points / c(s, "raphinha")["points"].games >= 12, lambda s: (c(s, "raphinha")["value"], c(s, "raphinha")["points"])),
         ("raphinha", "crosswalk", "has his slug and his app id",
-         lambda s: bool(c(s, "raphinha")["crosswalk"][2]) and bool(c(s, "raphinha")["crosswalk"][3]), lambda s: c(s, "raphinha")["crosswalk"]),
+         lambda s: bool(c(s, "raphinha")["crosswalk"].ff_slug) and bool(c(s, "raphinha")["crosswalk"].app_id), lambda s: c(s, "raphinha")["crosswalk"]),
         ("raphinha", "status", "listed, starting 85%+, no flag",
-         lambda s: c(s, "raphinha")["status"][1] >= 85 and c(s, "raphinha")["status"][2] is None, lambda s: c(s, "raphinha")["status"]),
+         lambda s: c(s, "raphinha")["status"].pct >= 85 and c(s, "raphinha")["status"].status is None, lambda s: c(s, "raphinha")["status"]),
         ("raphinha", "forecast", "plays (p 0.9+) and e 9-14 a jornada over the next 4",
          lambda s: mean_p(c(s, "raphinha"), s["first"]) >= 0.9 and 9 <= mean_e(c(s, "raphinha"), s["first"]) <= 14,
          lambda s: (round(mean_p(c(s, "raphinha"), s["first"]), 2), round(mean_e(c(s, "raphinha"), s["first"]), 1))),
@@ -208,31 +230,31 @@ def checks() -> list[Check]:
          lambda s: {k: funding(s).get(k) for k in ("feasible", "raises", "margin", "lock_margin", "lock_margin_low")}),
         ("raphinha", "board", "if the bid is lost cash is left to reuse (the net gain at the honest bid is reported, not asserted)",
          lambda s: funding(s)["cash_if_lost"] > 0, lambda s: (funding(s)["cash_if_lost"], funding(s)["net"])),
-        ("garcia", "tables", "price 40-70M, 8+ games", lambda s: 40e6 < c(s, "garcia")["value"] < 70e6 and c(s, "garcia")["points"][0] >= 8,
+        ("garcia", "tables", "price 40-70M, 8+ games", lambda s: 40e6 < c(s, "garcia")["value"] < 70e6 and c(s, "garcia")["points"].games >= 8,
          lambda s: (c(s, "garcia")["value"], c(s, "garcia")["points"])),
-        ("garcia", "crosswalk", "has his slug", lambda s: bool(c(s, "garcia")["crosswalk"][2]), lambda s: c(s, "garcia")["crosswalk"]),
+        ("garcia", "crosswalk", "has his slug", lambda s: bool(c(s, "garcia")["crosswalk"].ff_slug), lambda s: c(s, "garcia")["crosswalk"]),
         ("garcia", "forecast", "e 6-8 a jornada over the next 4", lambda s: 6 <= mean_e(c(s, "garcia"), s["first"]) <= 8,
          lambda s: round(mean_e(c(s, "garcia"), s["first"]), 1)),
         ("garcia", "opportunities", "not for sale, so not an opportunity", lambda s: c(s, "garcia")["id"] not in s["opportunities"], lambda s: sorted(s["opportunities"])),
         ("diarra", "tables", "under 1M, never scored", lambda s: c(s, "diarra")["value"] < 1e6 and c(s, "diarra")["points"] is None,
          lambda s: (c(s, "diarra")["value"], c(s, "diarra")["points"])),
-        ("diarra", "crosswalk", "has his app id, so the app can say he left", lambda s: bool(c(s, "diarra")["crosswalk"][3]), lambda s: c(s, "diarra")["crosswalk"]),
-        ("diarra", "status", "gone", lambda s: c(s, "diarra")["status"] is not None and c(s, "diarra")["status"][2] == "gone", lambda s: c(s, "diarra")["status"]),
-        ("diarra", "forecast", "p 0 and e 0 all season", lambda s: all(v == (0.0, 0.0) for v in c(s, "diarra")["cells"].values()) and c(s, "diarra")["total"][0] == 0.0,
+        ("diarra", "crosswalk", "has his app id, so the app can say he left", lambda s: bool(c(s, "diarra")["crosswalk"].app_id), lambda s: c(s, "diarra")["crosswalk"]),
+        ("diarra", "status", "gone", lambda s: c(s, "diarra")["status"] is not None and c(s, "diarra")["status"].status == "gone", lambda s: c(s, "diarra")["status"]),
+        ("diarra", "forecast", "p 0 and e 0 all season", lambda s: all(v == (0.0, 0.0) for v in c(s, "diarra")["cells"].values()) and c(s, "diarra")["total"].e == 0.0,
          lambda s: (c(s, "diarra")["total"], len(c(s, "diarra")["cells"]))),
         ("diarra", "opportunities", "never an opportunity", lambda s: c(s, "diarra")["id"] not in s["opportunities"], lambda s: sorted(s["opportunities"])),
-        ("rodri", "status", "injured, with the return note", lambda s: c(s, "rodri")["status"][2] == "injured" and "diciembre" in c(s, "rodri")["status"][3],
+        ("rodri", "status", "injured, with the return note", lambda s: c(s, "rodri")["status"].status == "injured" and "diciembre" in c(s, "rodri")["status"].note,
          lambda s: c(s, "rodri")["status"]),
         ("rodri", "forecast", "out (p 0) for the 3 jornadas to come, then back", lambda s: all(c(s, "rodri")["cells"][s["first"] - 1 + i][0] == 0.0 for i in range(3))
          and c(s, "rodri")["cells"][s["first"] + 2][0] > 0, lambda s: [(j, round(p, 2)) for j, (p, _) in sorted(c(s, "rodri")["cells"].items())[:6]]),
         ("rodri", "forecast", "after the return e is near his 6 a game (4.5-7 over the 3 jornadas after it)",
          lambda s: 4.5 <= mean_e(c(s, "rodri"), s["first"] + 2, 3) <= 7, lambda s: round(mean_e(c(s, "rodri"), s["first"] + 2, 3), 1)),
-        ("david", "status", "listed at a low start % (40 or less)", lambda s: c(s, "david")["status"][1] <= 40, lambda s: c(s, "david")["status"]),
+        ("david", "status", "listed at a low start % (40 or less)", lambda s: c(s, "david")["status"].pct <= 40, lambda s: c(s, "david")["status"]),
         ("david", "forecast", "low but not zero over the next 4 (above 1, under his 8.8 a game)",
          lambda s: 1 < mean_e(c(s, "david"), s["first"]) < 8.8, lambda s: round(mean_e(c(s, "david"), s["first"]), 1)),
-        ("david", "forecast", "season total clearly above 0 (over 30)", lambda s: c(s, "david")["total"][0] > 30, lambda s: c(s, "david")["total"]),
-        ("correia", "tables", "6-12M, 7+ games at 6+ a game", lambda s: 6e6 < c(s, "correia")["value"] < 12e6 and c(s, "correia")["points"][0] >= 7
-         and c(s, "correia")["points"][1] / c(s, "correia")["points"][0] >= 6, lambda s: (c(s, "correia")["value"], c(s, "correia")["points"])),
+        ("david", "forecast", "season total clearly above 0 (over 30)", lambda s: c(s, "david")["total"].e > 30, lambda s: c(s, "david")["total"]),
+        ("correia", "tables", "6-12M, 7+ games at 6+ a game", lambda s: 6e6 < c(s, "correia")["value"] < 12e6 and c(s, "correia")["points"].games >= 7
+         and c(s, "correia")["points"].points / c(s, "correia")["points"].games >= 6, lambda s: (c(s, "correia")["value"], c(s, "correia")["points"])),
         ("correia", "forecast", "e 5-7 a jornada over the next 4", lambda s: 5 <= mean_e(c(s, "correia"), s["first"]) <= 7,
          lambda s: round(mean_e(c(s, "correia"), s["first"]), 1)),
         ("correia", "eleven", "a verdict from the swap rule over the next 4", lambda s: c(s, "correia")["swaps"]["next4"] is not None,
@@ -249,7 +271,7 @@ def degraded_checks() -> list[Check]:
 
     return [
         ("terrats", "status", "no listing row (the club's page missing from the latest snapshot)", lambda s: t(s)["status"] is None, lambda s: t(s)["status"]),
-        ("terrats", "forecast", "flagged as having no start % (listed_pct 0)", lambda s: t(s)["rate"][3] == 0, lambda s: t(s)["rate"]),
+        ("terrats", "forecast", "flagged as having no start % (listed_pct 0)", lambda s: not t(s)["rate"].listed_pct, lambda s: t(s)["rate"]),
         ("terrats", "forecast", "from his record: p 0.8+ and e 3-4 a jornada over the next 4",
          lambda s: mean_p(t(s), s["first"]) >= 0.8 and 3 <= mean_e(t(s), s["first"]) <= 4,
          lambda s: (round(mean_p(t(s), s["first"]), 2), round(mean_e(t(s), s["first"]), 1))),

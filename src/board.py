@@ -5,25 +5,22 @@ players ranked by what taking it costs your eleven (eleven.remove). The one line
 their value."""
 from __future__ import annotations
 
-import hashlib
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from contextlib import closing
 from typing import Any, NamedTuple
 
 import decision
 import eleven
 import worth
 from approach import Approach, Club, approach
+from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore.auction import Curve, chance
-from ffcore.db import cut, record, schema_version, set_look, this_run
-from ffcore.forecast_store import club_ratings, forecast, market_offer_ratios, pin, price_carry
-from ffcore.jornadas import rounds
-from ffcore.league import write_config
+from ffcore.db import connect, cut, record, this_run
 from ffcore.rules import POSITIONS, bid_limit
-from ffcore.seen import see as see_at
-from ffcore.tidy import REPORTS, app_stale
+from ffcore.tidy import REPORTS
 from stats import percentile
 
 __all__ = ["board", "main"]
@@ -206,10 +203,11 @@ def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
             for r in [r for r in got if r["gain"] > 0][:TOP_TARGETS]]
 
 
-def list_line(inp: decision.Inputs, names: dict[str, str], known: dict[str, decision.Fact]) -> list[Doc]:
+def list_line(inp: decision.Inputs, names: dict[str, str], extras: decision.Extras) -> list[Doc]:
     mine = decision.squad_of(inp)
-    got = {h.player: h for h in decision.held(mine)}
-    todo = sorted(mine - decision.listed(), key=lambda k: (names.get(k, k), k))
+    got = {h.player: h for h in extras.held}
+    known = extras.known
+    todo = sorted(mine - extras.listed, key=lambda k: (names.get(k, k), k))
     if not todo:
         return []
     label = "list " + ", ".join(names.get(k, k) for k in todo)
@@ -226,9 +224,8 @@ def funds(buys: list[Doc], sells: list[Doc]) -> None:
                        if any(t["name"] == sale["name"] for t in (b.get("funding") or {}).get("tonight", []))]
 
 
-def market_at() -> str | None:
-    at = decision.market_read_at()
-    return stamped(at) if at else None
+def market_at(read: str | None) -> str | None:
+    return stamped(read) if read else None
 
 
 def sources() -> list[Doc]:
@@ -244,17 +241,19 @@ def auction_card() -> Doc:
                       for d in decision.drifting_bins(run)]}
 
 
-def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str]) -> Doc:
+def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
+          extras: decision.Extras) -> Doc:
+    """The decisions document of the cut; extras are what the World gives beside the inputs."""
     cash, team_value, debt = inp.money.cash, inp.money.team_value, inp.money.debt
     locks = [x.lock for x in inp.locks]
     bids = sum(b.amount for b in inp.bids)
-    known = decision.player_facts()
+    known = extras.known
     names = {k: fact.name for k, fact in known.items()}
     squad = squad_rows(inp, names)
     mine = decision.squad_of(inp)
-    offered = decision.standing_offers(mine)
+    offered = extras.offers
     pos = {p.player: p.pos for p in inp.players if p.pos in POSITIONS}
-    club = Club(mine, pos, {h.player: h.value for h in decision.held(mine)},
+    club = Club(mine, pos, {h.player: h.value for h in extras.held},
                 {o.player: o.money for o in offered}, cash, team_value, (len(inp.bids), bids), debt=debt)
     top = [r for r in got if r["gain"] > 0][:TOP_TARGETS]
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
@@ -263,11 +262,11 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str]) 
     sells = offer_lines(inp, names, offered, known)
     funds(buys, sells)
     return {
-        "generated_at": stamped(cut()), "market_at": market_at(), "sources": sources(),
+        "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
-        "do": list_line(inp, names, known), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
+        "do": list_line(inp, names, extras), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
         "alerts": alerts, "auction": auction_card(),
         "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
@@ -289,19 +288,10 @@ def constants() -> dict[str, dict[str, float]]:
     return {m: {n: getattr(MODULES[m], n) for n in names} for m, names in NAMES.items()}
 
 
-def see() -> str:
-    """The market and the league as of t into seen, seen_cash and seen_odds (the decision's
-    snapshot, seen.see), made once a cut, variant and code: the key is the SQL's version and
-    every constant, so another schema or a variant redefined makes them again, never reads a
-    stale one."""
-    return see_at(hashlib.sha1(repr((schema_version(), sorted((m, sorted(c.items())) for m, c in constants().items())))
-                               .encode()).hexdigest()[:12])
-
-
 def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
            carry: Sequence[float]) -> list[dict[str, Any]]:
     """Every constant and fitted value a run is built with, one row each:
-    (component, term, value, kind, n); the forecast's fits (forecast_fits)."""
+    (component, term, value, kind, n); fits are the forecast's, as fit_rows gives them."""
     return ([_param(m, name, v, "constant") for m, names in constants().items()
              for name, v in names.items()]
             + list(fits)
@@ -310,11 +300,29 @@ def params(fits: Sequence[dict[str, Any]], ratios: Sequence[float],
             + [_param("pricing.carry", str(h), v) for h, v in enumerate(carry, 1)])
 
 
-def forecast_fits() -> list[dict[str, Any]]:
-    """What the forecast fits at t, one params row each: each club's
-    attack and defence (club_rating)."""
-    return [_param("forecast.%s" % t, r.club, v) for r in club_ratings()
+def fit_rows(ratings: Iterable[Any]) -> list[dict[str, Any]]:
+    """One params row for each club's attack and defence, clubs in club order; ratings have club, attack, defence."""
+    return [_param("forecast.%s" % t, r.club, v) for r in sorted(ratings, key=lambda r: r.club)
             for t, v in (("attack", r.attack), ("defence", r.defence))]
+
+
+def world_params(world: state.World, fc: Any) -> list[dict[str, Any]]:
+    """params of the cut at the World: the forecast's club ratings (fc.rating), the offers over value
+    (current.offer_ratios) and the share of a price trend made after each update (price_fold.price_carry, by horizon)."""
+    carry = tuple(c.carry for c in sorted(price_fold.price_carry(price_fold.price_state(world)), key=lambda c: c.h))
+    return params(fit_rows(fc.rating.values()), [r.ratio for r in current.offer_ratios(world)], carry)
+
+
+class Moment(NamedTuple):
+    """The cut's decision (Decided, or Stale with its reason) and the params it is made with ([] when stale)."""
+    decided: decision.Decided | decision.Stale
+    params: list[dict[str, Any]]
+
+
+def moment_at(loaded: loader.Loaded, world: state.World) -> Moment:
+    """decision.decision_at and, for a decision made, its params, from one World."""
+    d = decision.decision_at(loaded, world)
+    return Moment(d, [] if isinstance(d, decision.Stale) else world_params(world, d.fc))
 
 
 def _param(component: str, term: str, value: float, kind: str = "fitted",
@@ -322,62 +330,24 @@ def _param(component: str, term: str, value: float, kind: str = "fitted",
     return {"component": component, "term": term, "value": float(value), "kind": kind, "n": n}
 
 
-class Built(NamedTuple):
-    params: list[dict[str, Any]]
-    moment: int
-
-
-class Replay(NamedTuple):
-    moment: int
-    inputs: decision.Inputs
-
-
-def at_cut() -> int:
-    """The league at t made for a decision (look): the market and the league seen then (see), the forecast at t,
-    its moment returned, and you and that moment in look. SystemExit when the app's squads are older than
-    APP_FRESH_HOURS."""
-    stale = app_stale()
-    if stale:
-        raise SystemExit(stale)
-    me = write_config()
-    see()
-    moment = forecast()
-    set_look(me=me, moment=moment)
-    return moment
-
-
-def replayed() -> Replay | None:
-    """The cut at t made (at_cut) and the decision's inputs read from it, with no parameters made; None when
-    the app's squads are too old to make it."""
-    try:
-        moment = at_cut()
-    except SystemExit:
-        return None
-    return Replay(moment, decision.read_inputs())
-
-
-def built() -> Built:
-    """at_cut and the parameters it was made with (params): what a run records."""
-    moment = at_cut()
-    return Built(params(forecast_fits(), market_offer_ratios(), price_carry()), moment)
-
-
 def main() -> None:
-    b = built()
-    managers = decision.manager_count()
-    left = rounds().rem
+    with closing(connect()) as db:
+        loaded = loader.load(db, league.load_config(), cut())
+    [(d, rows)] = state.sweep(loaded.obs, [cut()], lambda world: moment_at(loaded, world))
+    if isinstance(d, decision.Stale):
+        raise SystemExit(d.reason)
+    managers = len(d.seen.cash)
+    left = d.rounds_left
     if managers < 2 or not left:
         print("board: nothing to decide (%d managers, %d jornadas left)" % (managers, len(left)))
         return
     run = this_run()
     if run is None:
         raise SystemExit("board: the board is the run's: run it as run.py board")
-    record([{"run_id": run, **r} for r in b.params], "params")
-    pin(b.moment)
-    inp = decision.read_inputs()
-    got = decision.opportunity_rows(inp)
+    record([{"run_id": run, **r} for r in rows], "params")
+    got = decision.opportunity_rows(d.inputs)
     decision.keep_opportunities(cut(), got)
-    doc = board(inp, got, decision.read_arrivals())
+    doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print("wrote %s" % (REPORTS / "decisions.json"))
@@ -399,8 +369,41 @@ def _selftest_params() -> None:
     assert got[("rules", "DEBT_SHARE")]["kind"] == "constant"
 
 
+def _selftest_world() -> None:
+    """The params and the extras read from a World are the selectors' own values, and any cut alone equals the cut inside
+    a sweep."""
+    from ffcore import forecast_facts
+    from ffcore.decision_facts import _CUTS, _ST, _scratch
+    obs, ident, lg = _scratch()
+    loaded = loader.Loaded(obs, ident, lg, forecast_facts.knobs(), ())
+    world = state.world_at(obs, _ST)
+    got = moment_at(loaded, world)
+    d = got.decided
+    assert isinstance(d, decision.Decided) and got.params == world_params(world, d.fc)
+    clubs = sorted(d.fc.rating)
+    assert [r["term"] for r in got.params if r["component"] == "forecast.attack"] == clubs, "a row a club, in club order"
+    assert [r["value"] for r in got.params if r["component"] == "forecast.defence"] == [d.fc.rating[c].defence for c in clubs]
+    ratios = [r.ratio for r in current.offer_ratios(world)]
+    assert [r for r in got.params if r["component"] == "pricing.offer_ratios"] == [
+        r for r in params([], ratios, ()) if r["component"] == "pricing.offer_ratios"]
+    carry = price_fold.price_carry(price_fold.price_state(world))
+    assert [r["value"] for r in got.params if r["component"] == "pricing.carry"] == [c.carry for c in sorted(carry, key=lambda c: c.h)]
+    assert state.sweep(obs, _CUTS, lambda w: moment_at(loaded, w)) == [moment_at(loaded, state.world_at(obs, c)) for c in _CUTS]
+    assert isinstance(moment_at(loaded, state.world_at(obs, _CUTS[0])).decided, decision.Stale)
+    assert moment_at(loaded, state.world_at(obs, _CUTS[0])).params == [], "no decision, no params"
+    mine = decision.squad_of(d.inputs)
+    hand = decision.Extras(dict(d.extras.known), frozenset(d.extras.held_names), list(d.extras.offers), list(d.extras.held),
+                           frozenset(d.extras.listed), d.extras.market_read)
+    names = {k: f.name for k, f in hand.known.items()}
+    assert list_line(d.inputs, names, hand) == list_line(d.inputs, names, d.extras)
+    listed_all = hand._replace(listed=frozenset(mine))
+    assert list_line(d.inputs, names, listed_all) == [], "every player of yours listed: nothing to list"
+    assert market_at(None) is None and market_at("2026-10-30T1809Z") == "2026-10-30T18:09Z"
+
+
 def _selftest() -> None:
     _selftest_params()
+    _selftest_world()
     assert stamped("2026-10-30T1809Z") == "2026-10-30T18:09Z"
     buys: list[Doc] = [{"name": "Raphinha", "funding": {"tonight": [{"name": "Pepelu"}, {"name": "Alonso"}]}},
                        {"name": "Gueye", "funding": None}, {"name": "Nobody", "funding": {"feasible": False}}]

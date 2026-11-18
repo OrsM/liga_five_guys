@@ -4,14 +4,15 @@ import itertools
 import random
 import sys
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
 from ffcore.rules import POSITIONS, SHAPES, XI_SIZE
 
-__all__ = ["Swap", "Settled", "Removed", "legal", "swap", "settle", "removal_cost", "build", "best_eleven", "remove", "remove_all", "total", "rank", "points_without"]
+__all__ = ["Swap", "Settled", "Removed", "legal", "swap", "settle", "removal_cost", "build", "best_eleven", "remove", "remove_all", "total", "rank", "DEPTH", "top_points", "points_without"]
 
 COUNTS = {tuple(shape[p] for p in POSITIONS) for shape in SHAPES}
+DEPTH = {p: max(shape[p] for shape in SHAPES) for p in POSITIONS}
 
 Pos = Mapping[str, str]
 Value = Mapping[str, float]
@@ -110,15 +111,18 @@ def rank(squad: frozenset[str], pos: Pos, value: Value) -> dict[str, list[str]]:
     return {p: sorted((k for k in squad if pos.get(k) == p), key=lambda k: (-value.get(k, 0.0), k)) for p in POSITIONS}
 
 
-def points_without(ranked: Mapping[str, list[str]], value: Value, gone: frozenset[str]) -> float | None:
-    kept = {p: [k for k in ranked[p] if k not in gone] for p in POSITIONS}
+def top_points(kept: Mapping[str, Sequence[float]]) -> float | None:
     top: float | None = None
     for shape in SHAPES:
         if all(len(kept[p]) >= shape[p] for p in POSITIONS):
-            got = sum(value.get(k, 0.0) for p in POSITIONS for k in kept[p][:shape[p]])
+            got = sum(itertools.chain.from_iterable(kept[p][:shape[p]] for p in POSITIONS))
             if top is None or got > top:
                 top = got
     return top
+
+
+def points_without(ranked: Mapping[str, list[str]], value: Value, gone: frozenset[str]) -> float | None:
+    return top_points({p: [value.get(k, 0.0) for k in ranked[p] if k not in gone] for p in POSITIONS})
 
 
 def best_eleven(squad: frozenset[str], pos: Pos, value: Value, fielded: frozenset[str] | None = None) -> Settled | None:
