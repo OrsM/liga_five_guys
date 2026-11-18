@@ -8,12 +8,12 @@ from pathlib import Path
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
-from ffcore.db import ROOT
 from ffcore.parse import count, money, pct100, ratio
 
 __all__ = ["ROOT", "TIDY", "REPORTS",
            "cell", "APP_FRESH_HOURS", "input_path", "csv_string", "NUMBERS", "LINEUP_SOURCE"]
 
+ROOT = Path(os.environ.get("FF_ROOT", "./data"))
 TIDY = ROOT / "tidy"
 REPORTS = Path(os.environ.get("LFG_REPORTS", "reports"))
 

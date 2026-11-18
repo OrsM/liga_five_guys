@@ -1,4 +1,4 @@
-"""The jornada calendar as schema.sql's jornada_calendar has it, as of
+"""The jornada calendar as the old SQL view jornada_calendar had it, as of
 t: when each round locks, the jornadas left, and which jornada a match
 belongs to."""
 from __future__ import annotations

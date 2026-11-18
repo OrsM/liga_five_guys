@@ -27,15 +27,19 @@ from typing import NamedTuple
 
 from ffcore import identity, parsed, store
 from ffcore import observations as ob
-from ffcore.db import HEALTH_SOURCES, HEALTH_USUAL, RunRecords, cut, stamp_jd
+from ffcore.clock import cut
 from ffcore.identity import Unmatched
 from ffcore.records import AuctionCalibration
+from ffcore.season_facts import stamp_jd
+from ffcore.store import RunRecords
 from publish import notify
 
 __all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "said", "snapshots_of", "text", "trouble"]
 
 SENT = Path.home() / ".local/state/lfg/health.sent"
 UNMATCHED_FROM = 5e6
+HEALTH_SOURCES = ("market", "lineups", "api_standings", "api_lineup", "api_teams", "api_leagues", "api_market", "api_offers")
+HEALTH_USUAL = 21
 
 
 class Snapshot(NamedTuple):
@@ -142,8 +146,7 @@ def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterab
 def said(records: RunRecords | None = None) -> str:
     """text of the parse cache as of t: the status of the sources, the players the app or the line-ups do not reach, and
     the drifting bins (those of records when it is this run's)."""
-    from ffcore import loader
-    obs = parsed.read(loader.paths_in(), sorted({*identity.NEEDS, *HEALTH_SOURCES}))
+    obs = parsed.read(parsed.paths_in(), sorted({*identity.NEEDS, *HEALTH_SOURCES}))
     at = cut()
     people = identity.crosswalk(obs, at)
     return text(parser_health(snapshots_of(obs, at), at), identity.unmatched(people, obs, at),

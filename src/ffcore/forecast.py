@@ -1,8 +1,12 @@
-"""The forecast's constants (schema.sql's forecast views read them through
-const(), as k)."""
+"""The forecast's constants, and set_constants, which sets any constant of the model's modules for a variant or a test."""
 from __future__ import annotations
 
-__all__ = ["SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE",
+import importlib
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
+
+__all__ = ["set_constants", "SEED_POOL", "MIN_POOL", "PERSISTENT_SHARE",
            "SHRINK_K", "PICK_K", "NEUTRAL_START", "ABSENT_START", "FIXTURE_K", "P_LIFT", "P_LISTING", "P_DECAY"]
 
 SHRINK_K = 16.0       # matches a prior of points per match is worth (forecast_ppm)
@@ -22,3 +26,28 @@ SEED_POOL = (-1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
 MIN_POOL = 200
 
 PERSISTENT_SHARE = 0.08
+
+
+CONSTANT_MODULES = ("ffcore.forecast", "ffcore.pricing", "ffcore.rules", "ffcore.tidy")
+
+
+def _owner(name: str) -> Any:
+    for module in CONSTANT_MODULES:
+        owner = importlib.import_module(module)
+        if hasattr(owner, name):
+            return owner
+    raise KeyError("no module has the constant %s" % name)
+
+
+@contextmanager
+def set_constants(**values: float) -> Iterator[None]:
+    """Constants set on the modules that own them (CONSTANT_MODULES), put back on leaving; a name no module has is a
+    KeyError."""
+    was = {n: getattr(_owner(n), n) for n in values}
+    try:
+        for n, v in values.items():
+            setattr(_owner(n), n, v)
+        yield
+    finally:
+        for n, v in was.items():
+            setattr(_owner(n), n, v)

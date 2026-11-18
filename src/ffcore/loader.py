@@ -29,7 +29,7 @@ from ffcore import forecast_facts, identity, league, ledger, parsed, store
 from ffcore import observations as ob
 from ffcore.current import Identity
 
-__all__ = ["SNAPSHOT_FOLDED", "Opportunity", "Loaded", "identity_in", "handles_once", "folded", "paths_in", "previous_opportunities", "snapshots_in", "health_at", "load",
+__all__ = ["SNAPSHOT_FOLDED", "Opportunity", "Loaded", "identity_in", "handles_once", "folded", "previous_opportunities", "snapshots_in", "health_at", "load",
            "loaded", "replay_cuts"]
 
 SNAPSHOT_FOLDED = ("lineups", "api_lineup", "api_standings")
@@ -71,12 +71,6 @@ def previous_opportunities() -> tuple[Opportunity, ...]:
     """The opportunity records live runs kept (rule opportunity_latest_by_cut_and_player), by cut then player."""
     kept = {(o.cut, o.player): Opportunity(**o._asdict()) for o in store.records("dec_opportunity")}
     return tuple(kept[k] for k in sorted(kept))
-
-
-def paths_in(tidy: Path | None = None) -> parsed.Paths:
-    """The parse cache and the snapshot index in tidy (ingest.TIDY when None)."""
-    home = ingest.TIDY if tidy is None else tidy
-    return parsed.Paths(home / ingest._CACHE, home / ingest._INDEX)  # noqa: SLF001 -- the file names are ingest's, not repeated here
 
 
 def identity_in(obs: ob.Observations, cut: str | None = None) -> Identity:
@@ -133,9 +127,9 @@ def _read(paths: parsed.Paths, cut: str | None) -> tuple[ob.Observations, ob.Obs
 
 def load(cfg: league.Config, cut: str | None = None, paths: parsed.Paths | None = None,
          previous: tuple[Opportunity, ...] = ()) -> Loaded:
-    """The files at paths (paths_in() when None) read once, as loaded gives them; previous are the opportunity records
+    """The files at paths (parsed.paths_in() when None) read once, as loaded gives them; previous are the opportunity records
     (previous_opportunities of the store) a board needs, none for a replay."""
-    obs, thin, snapshots = _read(paths or paths_in(), cut)
+    obs, thin, snapshots = _read(paths or parsed.paths_in(), cut)
     return assembled(obs, identity_in(thin, cut), cfg, previous, snapshots)
 
 
@@ -184,7 +178,7 @@ def _selftest_files() -> None:
     from sources import source
     row = {"source": "ff", "ff_id": "p1", "value": "5", "position": "DEL", "club": "RMA", "name": "Ana Lopez"}
     with tempfile.TemporaryDirectory() as tmp:
-        paths = paths_in(Path(tmp))
+        paths = parsed.paths_in(Path(tmp))
         paths.cache.write_text(json.dumps({"k": "c1:%s" % ingest.fingerprint(source("market").parse), "r": [row]}) + "\n",
                                encoding="utf-8")
         paths.snaps.write_text(json.dumps({"snaps": {"2026-08-18T1800Z": {"size": 0, "pages": {"market": ["c1", "x"]}}}}),

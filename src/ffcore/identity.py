@@ -1,6 +1,6 @@
 """Who each player is (ingest), computed from Observations in Python: the crosswalk, the identity maps the sweep
 consumes, the kept futbolfantasy identities, the registry, app_links, id_clashes and unmatched. Each is the value
-identity.sql and schema.sql give (the SQL stays until the consumers switch); the previous kept identities are an
+the old SQL views gave (git tag oracle-sql); the previous kept identities are an
 explicit input of kept_identity.
 
 Named rules, each tested:

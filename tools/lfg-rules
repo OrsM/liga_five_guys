@@ -10,7 +10,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
-SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-rules}"       # not /tmp: a tmpfs too small for lfg.db; LFG_SCRATCH: one each when several run at once
+SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-rules}"       # not /tmp: a tmpfs too small for the parse cache; LFG_SCRATCH: one each when several run at once
 CAPPED="${LFG_CAPPED:-$REPO/tools/capped}"
 TREE="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"     # the tracked tree that holds data/, also from a worktree
 if [ ! -x "$CAPPED" ]; then

@@ -19,7 +19,8 @@ from typing import NamedTuple
 from ffcore import store
 from ffcore.clock import run_now
 from ffcore.parse import stamp
-from ffcore.db import RunRecords, set_now
+from ffcore.clock import set_now
+from ffcore.store import RunRecords
 from ffcore.records import Run
 
 

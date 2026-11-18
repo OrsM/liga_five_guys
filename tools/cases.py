@@ -11,11 +11,6 @@ from ffcore import observations as ob
 
 FIXTURE = Path(__file__).with_name("cases") / "league.json.xz"
 
-AS_OF = "2026-11-08T1157Z"
-WHOLE = ("starters", "points", "matches", "results_history")
-RECENT = ("lineups", "api_teams", "api_market", "api_offers", "api_lineup", "api_standings", "api_leagues")
-RECENT_COUNT = 6
-MANAGERS = ("api_teams", "api_standings")
 CASES = {"raphinha": "4288", "garcia": "7279", "diarra": "10832", "rodri": "2733", "david": "9573", "terrats": "8944",
          "correia": "8091"}
 DEGRADED_CLUB = "getafe"
@@ -47,51 +42,6 @@ Seen = dict[str, Any]
 Check = tuple[str, str, str, Callable[[Seen], bool], Callable[[Seen], Any]]
 
 
-def extract(me: str, as_of: str = AS_OF) -> dict[str, Any]:
-    from ffcore.db import rows, source_table
-
-    def table(name: str, where: str = "", args: tuple[object, ...] = ()) -> dict[str, Any]:
-        cols = [r[1] for r in rows("SELECT * FROM pragma_table_info('%s')" % source_table(name))]
-        got = rows("SELECT %s FROM %s %s ORDER BY rowid" % (", ".join(cols), source_table(name), where), args)
-        return {"columns": cols, "rows": [list(r) for r in got]}
-
-    def at(name: str, stamps: list[str]) -> dict[str, Any]:
-        return table(name, "WHERE observed_at IN (%s)" % ",".join("?" * len(stamps)), tuple(stamps))
-
-    recent = [r[0] for r in rows("SELECT DISTINCT observed_at FROM src_api_teams WHERE observed_at <= ? ORDER BY 1 DESC LIMIT ?",
-                                 (as_of, RECENT_COUNT))]
-    daily = [r[0] for r in rows("SELECT max(observed_at) FROM src_market WHERE observed_at <= ? GROUP BY substr(observed_at, 1, 10)",
-                                (as_of,))]
-    out = {t: table(t, "WHERE observed_at <= ?", (as_of,)) for t in WHOLE}
-    out.update({t: at(t, recent) for t in RECENT})
-    marks = ",".join("?" * len(recent))
-    app = {r[0] for r in rows("SELECT player_id FROM src_api_teams WHERE observed_at IN (%s)" % marks, tuple(recent))}
-    app |= {r[0] for r in rows("SELECT player_id FROM src_api_market WHERE observed_at IN (%s)" % marks, tuple(recent))}
-    link = {k: a for k, a in rows("SELECT player_id, app_id FROM crosswalk")}
-    app |= {link[k] for k in CASES.values() if link.get(k)}
-    ff = {k for k, a in link.items() if a in app} | set(CASES.values())
-    stamps = sorted(set(daily) | set(recent))
-    out["market"] = table("market", "WHERE (observed_at IN (%s) AND ff_id IN (%s)) OR observed_at IN (%s)"
-                          % (",".join("?" * len(stamps)), ",".join("?" * len(ff)), marks), (*stamps, *sorted(ff), *recent))
-    out["api_players_all"] = table("api_players_all", "WHERE observed_at <= ? AND player_id IN (%s)" % ",".join("?" * len(app)),
-                                   (as_of, *sorted(app)))
-    for r in out["api_leagues"]["rows"]:
-        r[out["api_leagues"]["columns"].index("league_name")] = "league"
-    names: dict[str, str] = {}
-    for t in MANAGERS:
-        i = out[t]["columns"].index("manager")
-        for r in out[t]["rows"]:
-            if r[i] and r[i] != me:
-                r[i] = names.setdefault(r[i], "rival%d" % (len(names) + 1))
-    return {"as_of": max(recent), "tables": out}
-
-
-def save(doc: dict[str, Any]) -> None:
-    FIXTURE.parent.mkdir(exist_ok=True)
-    with lzma.open(FIXTURE, "wt", encoding="utf-8", preset=9) as f:
-        json.dump(doc, f, separators=(",", ":"), ensure_ascii=False)
-
-
 def load() -> dict[str, Any]:
     with lzma.open(FIXTURE, "rt", encoding="utf-8") as f:
         doc: dict[str, Any] = json.load(f)
@@ -116,7 +66,7 @@ def observed(doc: dict[str, Any], degraded: bool = False) -> Seen:
     import eleven
     from board import board
     from ffcore import current, forecast_facts, identity, league, loader, season_facts, state
-    from ffcore.db import cut, set_now
+    from ffcore.clock import cut, set_now
     from ffcore.parse import snapshot_stamp
 
     obs = observations(doc)
@@ -308,11 +258,5 @@ def _selftest() -> None:
 if __name__ == "__main__":
     if "--selftest" in sys.argv:
         _selftest()
-    elif sys.argv[1:2] == ["extract"]:
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-        from ffcore.league import Config
-
-        save(extract(Config.me))
-        print("wrote %s (%d bytes)" % (FIXTURE, FIXTURE.stat().st_size))
     elif sys.argv[1:2] == ["report"]:
         report()

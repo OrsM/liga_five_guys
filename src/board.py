@@ -17,7 +17,8 @@ from approach import Approach, Club, approach
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore.auction import Curve, chance
-from ffcore.db import RunRecords, cut
+from ffcore.clock import cut
+from ffcore.store import RunRecords
 from ffcore.rules import POSITIONS, bid_limit
 from health import Health
 from ffcore.tidy import REPORTS

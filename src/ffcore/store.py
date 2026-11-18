@@ -23,7 +23,7 @@ import numpy.typing as npt
 from ffcore.records import (GRADE_CELL_DTYPE, KINDS, LATEST, GradeCell, Run, StoreError, decode, encode, grade_cell_array,
                             grade_cell_rows, header, parse_header)
 
-__all__ = ["clear", "grade_cells", "latest_run", "publish", "records", "runs", "stage", "commit", "store_root"]
+__all__ = ["RunRecords", "clear", "grade_cells", "latest_run", "publish", "records", "runs", "stage", "commit", "store_root"]
 
 
 def store_root() -> Path:
@@ -129,6 +129,35 @@ def commit(tmp: Path, run_id: int) -> Path:
 def publish(run: Run, **kinds: Iterable[Any]) -> Path:
     """Stage and commit one run: its Run row and its rows of each kind given. Returns the run's directory."""
     return commit(stage(run, **kinds), run.run_id)
+
+
+class RunRecords:
+    """The records of one run, collected in memory and published once. add(kind, rows) keeps the rows of a kind in the
+    order given, a mapping lacking run_id taking this run's (a kind's row type is ffcore.records.KINDS); rows(kind)
+    returns what was added; publish(run) writes the Run row and every kind added as one store directory
+    (store.publish), so a run that does not reach it leaves nothing. commit_sha is the code the run is."""
+
+    def __init__(self, run: int, commit_sha: str) -> None:
+        self.run = run
+        self.commit_sha = commit_sha
+        self._kinds: dict[str, list[Any]] = {}
+
+    @classmethod
+    def after_latest(cls, commit_sha: str) -> "RunRecords":
+        """The RunRecords of the run after the latest published one (called under the run lock)."""
+        latest = latest_run()
+        return cls((latest.run_id if latest else 0) + 1, commit_sha)
+
+    def add(self, kind: str, rows: Iterable[Any]) -> None:
+        row = KINDS[kind].row
+        owned = {"run_id": self.run} if "run_id" in row._fields else {}
+        self._kinds.setdefault(kind, []).extend(r if isinstance(r, row) else row(**owned, **r) for r in rows)
+
+    def rows(self, kind: str) -> list[Any]:
+        return list(self._kinds.get(kind, ()))
+
+    def publish(self, run: Run) -> Path:
+        return publish(run, **self._kinds)
 
 
 def _meta(d: Path) -> dict[str, Any]:
@@ -312,6 +341,25 @@ def _selftest() -> None:
                                   int(big[0]["flagged"]))
         assert len(grade_cells(1)) == 2 and len(grade_cells(2)) == 2
         _remove(store_root())
+
+        assert RunRecords.after_latest("x").run == 1
+        pending = RunRecords(3, "abc")
+        pending.add("params", [{"component": "c", "term": "t", "value": 1.0, "kind": "fitted", "n": None}, rec.Param(3, "d", "", 2.0, "constant", 4)])
+        pending.add("dec_opportunity", [])
+        assert [(p.run_id, p.component) for p in pending.rows("params")] == [(3, "c"), (3, "d")] and pending.rows("auction_brier") == [], \
+            "a mapping takes the run's id; rows come back in the order added"
+        assert runs() == [], "nothing is visible before publish"
+        done = Run(3, "t", "a", "service", "abc", "f", 1, 1.0)
+        pending.publish(done)
+        assert runs() == [done] and list(records("params", 3)) == pending.rows("params"), "published once, whole"
+        assert RunRecords.after_latest("x").run == 4, "the run after the latest published"
+        try:
+            pending.add("params", [{"component": "c"}])
+        except TypeError:
+            pass
+        else:
+            raise AssertionError("a row lacking a field is refused")
+        clear()
         os.environ.pop("FF_ROOT")
 
 

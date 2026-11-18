@@ -14,8 +14,7 @@ Attachment rule: measure_log and dec_opportunity rows carry no run_id. A row bel
 `started` that is not after its time (`at`; for dec_opportunity the `cut`, read as HH:MM:00 of its minute), ties to
 the greater run_id; a run whose `started` is empty is never chosen; a row earlier than every run belongs to the
 earliest. The attached run_id must not decrease along table order, otherwise records(kind) could not return the
-table's order and the export fails. Under it records(kind) equals the table row for row, and latest() over the
-store's measure_log equals the measure_latest view.
+table's order and the export fails. Under it records(kind) equals the table row for row.
 
 league_config: the table is gone from the schema; league.load_config reads me and budget from inputs/league.ini
 (relative to the working directory, or the --config path). They are exported as ROOT/store/league.json.
@@ -205,11 +204,7 @@ def _selftest() -> None:
     from ffcore.records import latest
 
     def table_ddl(name: str) -> str:
-        for sql in ("src/ffcore/schema.sql", "src/ffcore/decide.sql"):
-            m = re.search(r"CREATE TABLE IF NOT EXISTS %s \(.*?\n\)[^;]*;" % name, Path(sql).read_text(), re.S)
-            if m:
-                return m[0]
-        raise AssertionError(name)
+        return "CREATE TABLE %s (%s)" % (name, ", ".join(KINDS[name].row._fields))
 
     def run(i: int, started: str) -> Run:
         return Run(i, started, started, "service", "abc", None, None, 1.5)
@@ -235,9 +230,6 @@ def _selftest() -> None:
         db = sqlite3.connect(path)
         for name in KINDS:
             db.execute(table_ddl(name))
-        view = re.search(r"CREATE VIEW measure_latest AS.*?;", Path("src/ffcore/schema.sql").read_text(), re.S)
-        assert view is not None
-        db.execute(view[0])
         db.executemany("INSERT INTO runs VALUES (?,?,?,?,?,?,?,?)", runs)
         for r in runs:
             db.execute("INSERT INTO run_measures VALUES (?,?,?,?)", (r.run_id, "board", "secs", 0.1 * r.run_id))
@@ -272,12 +264,10 @@ def _selftest() -> None:
         assert [len(rows_by_run[i]) for i in (1, 2, 3, 4)] == [2, 0, 0, 2], "attached by cut to the run before it"
         in_store = list(store.records("measure_log"))
         assert in_store == list(table_rows(mro, "measure_log")), "records() is the table, in order"
-        want = {(m, k): (v, at, sha, p, pat, psha, ch) for m, k, v, at, sha, p, pat, psha, ch in mro.execute("SELECT * FROM measure_latest")}
-        got = {k: (p.last.value, p.last.at, p.last.commit_sha, p.previous.value if p.previous else None,
-                   p.previous.at if p.previous else None, p.previous.commit_sha if p.previous else None,
-                   None if p.previous is None else p.last.value - p.previous.value)
+        got = {k: (p.last.value, p.last.at, None if p.previous is None else p.previous.value)
                for k, p in latest(in_store, lambda r: (r.measure, r.key)).items()}
-        assert got == want and len(got) == 2, "latest over the store is measure_latest"
+        assert got == {("accuracy", "a"): (1 / 7, "2026-11-04T00:00:00Z", 1 / 6), ("accuracy", "b"): (1 / 5, "2026-11-01T10:00:00Z", None)}, \
+            "latest over the store: each key's newest row and the one before it"
         league = json.loads((base / "a" / "store" / LEAGUE_FILE).read_text())
         assert (league["me"], league["budget"]) == ("someone", 90e6)
         assert [c.player for c in store.records("grade_cell", 1)] == ["Pedri ñ", "Gavi"] and \

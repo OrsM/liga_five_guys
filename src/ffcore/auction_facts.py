@@ -43,9 +43,8 @@ from typing import Any, NamedTuple
 from ffcore import current
 from ffcore import observations as ob
 from ffcore import state
-from ffcore.db import stamp_jd
 from ffcore.ledger import League
-from ffcore.season_facts import julian_day, utc_stamp
+from ffcore.season_facts import julian_day, stamp_jd, utc_stamp
 
 LEAGUE_SELLER = "marketPlayerLeague"
 LISTING_SELLERS = (LEAGUE_SELLER, "marketPlayerTeam")

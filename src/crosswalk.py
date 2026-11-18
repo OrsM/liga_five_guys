@@ -10,9 +10,9 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterable
 
-from ffcore import identity, loader, parsed
+from ffcore import identity, parsed
 from ffcore import observations as ob
-from ffcore.db import cut
+from ffcore.clock import cut
 
 __all__ = ["lines", "main"]
 
@@ -47,7 +47,7 @@ def players(obs: ob.Observations, at: str) -> list[str]:
 
 def main() -> None:
     """The crosswalk stage: print the lines of the players the parse cache names as of t."""
-    print("\n".join(players(parsed.read(loader.paths_in(), identity.NEEDS), cut())))
+    print("\n".join(players(parsed.read(parsed.paths_in(), identity.NEEDS), cut())))
 
 
 def _selftest() -> None:

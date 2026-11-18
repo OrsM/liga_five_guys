@@ -23,6 +23,7 @@ from typing import Any, NamedTuple
 from ffcore import observations as ob
 from ffcore.laliga_api import ROW_TABLE
 from ffcore.tidy import cell
+import ingest
 from ingest import fingerprint
 from sources import source, source_for
 
@@ -30,6 +31,12 @@ from sources import source, source_for
 class Paths(NamedTuple):
     cache: Path
     snaps: Path
+
+
+def paths_in(tidy: Path | None = None) -> Paths:
+    """The parse cache and the snapshot index in tidy (ingest.TIDY when None)."""
+    home = ingest.TIDY if tidy is None else tidy
+    return Paths(home / ingest._CACHE, home / ingest._INDEX)  # noqa: SLF001 -- the file names are ingest's, not repeated here
 
 
 class Doc(NamedTuple):

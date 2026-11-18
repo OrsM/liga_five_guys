@@ -43,7 +43,7 @@ from typing import Any, NamedTuple
 import cases
 import decision
 from board import board, stamped
-from ffcore import current, db as store, ledger, loader, parsed, price_fold, state
+from ffcore import clock, current, ledger, loader, parsed, price_fold, state
 from ffcore.league import Config, load_config
 from ffcore.parse import snapshot_stamp, stamp
 from stats import percentile
@@ -176,7 +176,7 @@ def replayed(loaded: loader.Loaded, cuts: Sequence[Cut], with_document: bool) ->
     by_at = {c.at: c for c in cuts}
 
     def read(world: state.World) -> Replayed:
-        store.set_now(snapshot_stamp(world.cut))
+        clock.set_now(snapshot_stamp(world.cut))
         d = decided_at(loaded, world)
         got = decision.opportunity_rows(d.inputs)
         document = board(d.inputs, got, [], d.extras, loader.health_at(loaded, world.cut)) if with_document else None
@@ -288,7 +288,7 @@ def main() -> int:
     if args.selftest:
         _selftest()
         return 0
-    made = render_live(loader.paths_in(args.tidy)) if args.live else render_fixture(cases.load())
+    made = render_live(parsed.paths_in(args.tidy)) if args.live else render_fixture(cases.load())
     kinds = LIVE_KINDS if args.live else FIXTURE_KINDS
     if args.command == "bless":
         bless(GOLDEN, made, kinds)

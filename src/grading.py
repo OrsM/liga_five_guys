@@ -20,7 +20,7 @@ from ffcore import auction, auction_facts, auction_table, current, forecast_fact
 from ffcore import observations as ob
 from ffcore.clock import run_now
 from ffcore import records as rec
-from ffcore.db import RunRecords
+from ffcore.store import RunRecords
 from ffcore.parse import snapshot_stamp, stamp
 from salegrade import HORIZONS
 

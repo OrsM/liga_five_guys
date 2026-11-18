@@ -1,4 +1,4 @@
-"""The record kinds a run leaves behind (what the SQLite record tables hold today), one NamedTuple each, and
+"""The record kinds a run leaves behind (what the old SQLite record tables held), one NamedTuple each, and
 their line format. A row on disk is one JSON object with the NamedTuple's field names; a file's first line is
 its header {"format": kind, "v": N}. Writers write LATEST[kind]; a reader upgrades a row of version v through
 READERS[(kind, v)] to the current NamedTuple, and an unknown version is an error. Floats round-trip exactly (JSON
@@ -224,8 +224,6 @@ def change(pair: Latest) -> float | None:
 
 
 def _selftest() -> None:
-    import sqlite3
-
     sample: dict[str, Any] = {
         "runs": Run(7, "2026-11-01T10:00:00Z", "2026-11-01T10:00:00Z", "service", "abc1234", None, None, 12.5),
         "run_measures": RunMeasure(7, "board", "secs", 0.1 + 0.2),
@@ -276,20 +274,17 @@ def _selftest() -> None:
     rng = random.Random(5)
     log = [MeasureLog("2026-11-%02dT00:00:00Z" % rng.randint(1, 4), "sha%d" % i, rng.choice(["accuracy", "sale_grade"]),
                       rng.choice("abc"), rng.random()) for i in range(300)]
-    db = sqlite3.connect(":memory:")
-    db.execute("CREATE TABLE log (at TEXT, commit_sha TEXT, measure TEXT, key TEXT, value REAL)")
-    db.executemany("INSERT INTO log VALUES (?, ?, ?, ?, ?)", log)
-    db.execute("""CREATE VIEW newest AS
-        WITH r AS (SELECT *, row_number() OVER (PARTITION BY measure, key ORDER BY at DESC, rowid DESC) AS n FROM log)
-        SELECT a.measure, a.key, a.value, a.at, a.commit_sha, p.value AS previous, p.at AS previous_at,
-               p.commit_sha AS previous_commit, a.value - p.value AS change
-        FROM r a LEFT JOIN r p ON p.measure = a.measure AND p.key = a.key AND p.n = 2 WHERE a.n = 1""")
-    expected = {(m, k): (v, at, sha, p, pat, psha, ch) for m, k, v, at, sha, p, pat, psha, ch
-                in db.execute("SELECT * FROM newest")}
+    expected: dict[tuple[str, str], tuple[Any, ...]] = {}
+    for measure, key in {(r.measure, r.key) for r in log}:
+        rows_of_key = [r for r in log if (r.measure, r.key) == (measure, key)]
+        order = sorted(range(len(rows_of_key)), key=lambda i: (rows_of_key[i].at, i))
+        new, old = rows_of_key[order[-1]], (rows_of_key[order[-2]] if len(order) > 1 else None)
+        expected[(measure, key)] = (new.value, new.at, new.commit_sha, old and old.value, old and old.at, old and old.commit_sha,
+                                    None if old is None else new.value - old.value)
     got = {k: (p.last.value, p.last.at, p.last.commit_sha, p.previous.value if p.previous else None,
                p.previous.at if p.previous else None, p.previous.commit_sha if p.previous else None, change(p))
            for k, p in latest(log, lambda r: (r.measure, r.key)).items()}
-    assert got == expected and len(got) == 6, "latest is the measure_latest view, ties by position"
+    assert got == expected and len(got) == 6, "latest is each key's newest row and the one before it, ties by position"
     assert latest([], lambda r: r.key) == {}
     only = latest(log[:1], lambda r: r.key)[log[0].key]
     assert only.previous is None and change(only) is None

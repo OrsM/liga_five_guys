@@ -43,7 +43,7 @@ from typing import Any, NamedTuple
 from ffcore import observations as ob
 from ffcore import state as st
 from ffcore.current import Identity, listings, player_club
-from ffcore.db import stamp_jd
+from ffcore.parse import snapshot_stamp
 from ffcore.rules import MATCH_LEN
 from stats import shrink
 
@@ -193,6 +193,13 @@ def julian_day(text: str | None) -> float | None:
         return None
     millis = ((t - UNIX_EPOCH) // timedelta(microseconds=1) + 500) // 1000
     return (millis + JULIAN_EPOCH_MS) / 86400000.0
+
+
+def stamp_jd(s: str | None) -> float | None:
+    """A snapshot stamp (2026-11-01T2224Z, or with seconds or a zone as snapshot_stamp reads them) as a julian day,
+    None if it is not one."""
+    t = snapshot_stamp(s) if s else None
+    return None if t is None else t.timestamp() / 86400.0 + 2440587.5
 
 
 def _kickoffs_step(state: dict[tuple[str, str], Kickoff], row: ob.Matches) -> dict[tuple[str, str], Kickoff]:
@@ -551,6 +558,7 @@ def _selftest() -> None:
     the same view, and a cut alone equals the cut inside a sweep."""
     assert utc_stamp("2026-08-15T20:00:00+02:00") == "2026-08-15T1800Z"
     assert utc_stamp("2026-08-15T20:00:00") == "2026-08-15T2000Z" and utc_stamp("") is None and utc_stamp("soon") is None
+    assert stamp_jd("1970-01-01T0000Z") == 2440587.5 and stamp_jd("x") is None and stamp_jd(None) is None
     assert julian_day("1970-01-01T00:00:00Z") == 2440587.5 and julian_day("x") is None
     assert julian_day("2026-01-01T00:00:00.0006Z") == julian_day("2026-01-01T00:00:00.001Z") != julian_day("2026-01-01T00:00:00Z")
     obs = _scratch()

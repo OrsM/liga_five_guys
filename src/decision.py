@@ -1,5 +1,5 @@
-"""The decision's inputs: the league at t (schema.sql look, my_squad, my_cash) made into the rows the board and
-approach.approach read (decide.sql dec_*), and the players on the market who would improve your eleven.
+"""The decision's inputs: the league at t (my squad, my cash) made into the rows the board and
+approach.approach read, and the players on the market who would improve your eleven.
 decision_at(loaded, world) is the decision at a cut as one value computed from the World, live and replay alike; the
 board's extras (Extras) are selectors over the same World.
 Named rules, each tested:

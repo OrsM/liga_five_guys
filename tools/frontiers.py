@@ -1,75 +1,33 @@
-"""Frontier check (docs/notes/lfg.md, "Architecture"): read-only.
-Builds a scratch DB from the schema, finds what each view reads (names after FROM/JOIN, CTEs
-skipped) and prints every read past the frontier: a read of a later module, or of a scraped
-table from outside ingest. Any module may read the facts and t (look) and an earlier module's contract. Exit 1 if there is one.
-Each module's EXPORTS is its contract: reading another module's name that is not exported fails, in views and in the
-production code of src/*.py (selftests excluded). No exemptions: grading is the last module and reads contracts only.
-A Python file that implements several modules (sim, db, facts, fixtures) is no module's: whatever it reads
-of a module that is not exported is a crossing. Every crossing is printed, grouped by the reading module, with
-file:line. `--table` prints the exports as markdown."""
+"""Layer check (CLAUDE.md, principle 2: a layer reads only what an earlier layer exports), read-only.
+Parses every .py under src/ and src/ffcore with ast and maps each module to its layer through OWNS (layers in order:
+ingest, forecast, decision, board, grading). An import of a module of a LATER layer, in production code (top-level
+_selftest functions excluded, lazy imports inside functions counted), is a crossing, printed grouped by the importing
+layer with file:line. A module in no layer (a utility or a stage) is listed as unassigned and not checked.
+A for statement or comprehension that unpacks an Inputs row by position is a crossing of its module as well.
+Exit 1 if there is one. `--table` prints the layers and their modules as markdown."""
 import ast
 import re
-import shutil
-import sqlite3
-import subprocess
 import sys
-import tempfile
+from collections.abc import Mapping
 from pathlib import Path
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parent.parent
-ORDER = ["ingest", "forecast", "decision", "board"]
-ORDER_ALL = ORDER + ["grading"]  # grading, the measure, is last: it reads contracts like the rest
-PREFIX = {"src_": "ingest", "current_": "ingest", "history_": "ingest", "ff_identity": "ingest", "name_": "ingest",
-          "dec_": "decision", "grade_": "grading"}
-NAMES = {
-    "ingest": "unmatched crosswalk app_player slug_player id_clashes names registry app_links",
-    "forecast": "",
-    "decision": "auction_calibration auction_brier",
-    "board": "",
-    "grading": "measure_log measure_latest"}
-# Each module's contract, as the note lists it: what the next module reads and nothing else. Ingest's are its facts.
-EXPORTS = {
-    "ingest": "unmatched app_player ff_identity_kept",
-    "forecast": "",
-    "decision": "auction_calibration auction_brier",
-    "board": "",
-    "grading": "",  # a measure: nothing downstream reads it
-}
-EXPORT = {m: set(s.split()) for m, s in EXPORTS.items()}
-# Python files that are wholly one module's: their reads are judged as that module's. A file not here (sim, db,
-# facts, fixtures, ...) implements several modules and is nobody's: it may read only exports.
-OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest", "observations": "ingest", "parsed": "ingest", "identity": "ingest", "state": "ingest", "current": "ingest", "season_facts": "ingest", "ledger": "ingest", "store": "ingest", "records": "ingest",
-        "forecast": "forecast", "forecast_facts": "forecast", "price_fold": "forecast", "auction": "decision", "decision": "decision", "board": "board", "grading": "grading", "salegrade": "grading", "auction_facts": "ingest", "decision_facts": "decision", "loader": "decision"}
-MODULE = {n: m for m, s in NAMES.items() for n in s.split()}
-SKIP = {"k", "model_constants", "params", "runs", "run_measures", "facts_meta", "parser_health"}  # no module: config, bookkeeping
+ORDER = ["ingest", "forecast", "decision", "board", "grading"]
+OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest", "observations": "ingest",
+        "parsed": "ingest", "identity": "ingest", "state": "ingest", "current": "ingest", "season_facts": "ingest", "ledger": "ingest",
+        "store": "ingest", "records": "ingest", "auction_facts": "ingest",
+        "forecast": "forecast", "forecast_facts": "forecast", "price_fold": "forecast",
+        "auction": "decision", "decision": "decision", "decision_facts": "decision", "loader": "decision",
+        "board": "board",
+        "grading": "grading", "salegrade": "grading"}
 
 
-def module(name: str) -> str | None:
-    if name in MODULE:
-        return MODULE[name]
-    return next((m for p, m in PREFIX.items() if name.startswith(p)), None)
-
-
-def raw(name: str) -> bool:
-    """A scraped table: only ingest's views read it; the rest read ingest's facts."""
-    return name.startswith(("src_", "current_", "history_"))
-
-
-def reads(sql: str, own: str) -> set[str]:
-    sql = re.sub(r"--[^\n]*|'[^']*'", " ", sql)
-    ctes = set(re.findall(r"(\w+)\s+AS\s*\(", sql, re.I))
-    return {t for t in re.findall(r"\b(?:from|join)\s+(\w+)", sql, re.I) if t not in ctes and t != own}
-
-
-def scratch() -> list[tuple[str, str, str]]:
-    tmp = tempfile.mkdtemp()
-    try:
-        subprocess.run([sys.executable, "-c", "from ffcore.db import connect; connect()"], check=True,
-                       env={"PATH": "/usr/bin", "PYTHONPATH": str(ROOT / "src"), "FF_ROOT": tmp})
-        db = sqlite3.connect(next(Path(tmp).glob("*.db")))
-        return db.execute("select type, name, sql from sqlite_master where type in ('table','view')").fetchall()
-    finally:
-        shutil.rmtree(tmp)
+class Crossing(NamedTuple):
+    file: str
+    line: int
+    layer: str
+    what: str
 
 
 def prod(text: str) -> str:
@@ -77,18 +35,23 @@ def prod(text: str) -> str:
     return re.sub(r"(?ms)^def _selftest\w*\(.*?(?=^\S)", lambda m: re.sub(r"[^\n]", "", m.group()), text + "\nX")[:-2]
 
 
-def lines(text: str, t: str) -> list[int]:
-    """The 1-based lines of text that read t (after FROM or JOIN), comments and quoted text ignored."""
-    return [i for i, line in enumerate(text.split("\n"), 1)
-            if re.search(r"\b(?:from|join)\s+%s\b" % t, re.sub(r"--.*|#.*|'[^']*'", " ", line), re.I)]
-
-
-def board_queries(text: str) -> list[int]:
-    """The lines of a Python file that run a query: a call to rows, execute or executemany (the board has no SQL)."""
-    calls = [n for n in ast.walk(ast.parse(prod(text))) if isinstance(n, ast.Call)]
-    return sorted(c.lineno for c in calls
-                  if (isinstance(c.func, ast.Name) and c.func.id == "rows")
-                  or (isinstance(c.func, ast.Attribute) and c.func.attr in ("rows", "execute", "executemany")))
+def imported(tree: ast.AST, modules: set[str]) -> list[tuple[int, str]]:
+    """The (line, module stem) of every import in tree of a module in modules, whether written `import a.b`,
+    `from a import b` or `from ffcore import b`."""
+    out = []
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            names = [a.name for a in n.names]
+        elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+            names = [n.module] + [n.module + "." + a.name for a in n.names]
+        else:
+            continue
+        for name in names:
+            parts = name.split(".")
+            stem = parts[1] if parts[0] == "ffcore" and len(parts) > 1 else parts[0]
+            if stem in modules:
+                out.append((n.lineno, stem))
+    return sorted(set(out))
 
 
 def unpacks_inp(target: ast.expr, iterable: ast.expr) -> bool:
@@ -112,55 +75,55 @@ def positional_reads(text: str) -> list[int]:
     return sorted(hits)
 
 
-def view_spans() -> dict[str, tuple[Path, int, str]]:
-    """Where each view is written: its .sql file, first line and text (up to the next CREATE VIEW)."""
-    spans = {}
-    for f in sorted((ROOT / "src/ffcore").glob("*.sql")):
-        text = f.read_text()
-        starts = [(m.start(), m.group(1))
-                  for m in re.finditer(r"(?im)^CREATE\s+VIEW\s+(?:IF NOT EXISTS\s+)?(\w+)", text)]
-        for k, (at, name) in enumerate(starts):
-            end = starts[k + 1][0] if k + 1 < len(starts) else len(text)
-            spans[name] = (f, text.count("\n", 0, at) + 1, text[at:end])
-    return spans
+def crossings(sources: Mapping[str, str]) -> list[Crossing]:
+    """The crossings of the modules whose text is given, by module stem: each import of a later layer's module by a
+    module in an earlier one, each positional read of an Inputs row by a module in a layer."""
+    stems = set(sources)
+    found = []
+    for stem, text in sorted(sources.items()):
+        layer = OWNS.get(stem)
+        if layer is None:
+            continue
+        for line, other in imported(ast.parse(prod(text)), stems):
+            if ORDER.index(OWNS.get(other, layer)) > ORDER.index(layer):
+                found.append(Crossing(stem, line, layer, "imports %s, of the later layer %s" % (other, OWNS[other])))
+        found += [Crossing(stem, line, layer, "unpacks an Inputs row by position") for line in positional_reads(text)]
+    return found
 
 
-def crossing(a: str | None, t: str) -> str | None:
-    """Why a reader in module a (None: a file of no single module) may not read t, or None if it may."""
-    b = module(t)
-    if b is None or b == a:
-        return None
-    if a is not None and ORDER_ALL.index(b) > ORDER_ALL.index(a):
-        return f"{b}, a later module"
-    if a != "ingest" and raw(t):
-        return f"{b}, a scraped table"
-    return None if t in EXPORT[b] else f"{b}, not exported"
+def tree_sources() -> dict[str, Path]:
+    """Each module stem under src/ and src/ffcore and its file."""
+    return {f.stem: f for f in sorted((ROOT / "src").glob("*.py")) + sorted((ROOT / "src/ffcore").glob("*.py"))
+            if f.stem != "__init__"}
 
 
 def table() -> str:
-    rows = ["| Module | Exports (its contract) |", "|---|---|"]
-    rows += [f"| {m} | {', '.join(sorted(EXPORT[m])) or '(none yet)'} |" for m in ORDER_ALL]
+    rows = ["| Layer | Modules |", "|---|---|"]
+    rows += [f"| {m} | {', '.join(sorted(s for s, o in OWNS.items() if o == m))} |" for m in ORDER]
     return "\n".join(rows)
 
 
 def _selftest() -> None:
-    """The rule is enforced: a later module, a scraped table and an unexported name are crossings; an export is not."""
-    assert crossing("forecast", "dec_player")  # a later module
-    assert crossing("decision", "src_market")  # a scraped table
-    assert crossing("ingest", "src_market") is None  # ingest reads its own
-    assert crossing(None, "measure_log")  # a grading internal, not exported
-    assert crossing(None, "auction_brier") is None  # exported
-    assert crossing(None, "app_player") is None  # exported
-    assert board_queries("def f(db):\n    return db.execute('select 1')\n") == [2]  # a query in the board
-    assert board_queries("def f(db):\n    return squad_rows(inp)\n") == []  # a helper named *_rows is not a query
-    assert board_queries("def _selftest():\n    db.rows(1)\n\nX = 1\n") == []  # selftest code is ignored
-    assert positional_reads("for a, b in inp.bids:\n    pass\n") == [1]  # an Inputs row unpacked by position
-    assert positional_reads("ys = [a for a, b in inp.bids]\n") == [1]  # the same in a comprehension
-    assert positional_reads("for c in inp.universe:\n    pass\n") == []  # a named row is fine
+    """A later layer's import is a crossing, in any form and lazily; an earlier or same layer's, a utility's and a
+    self-test's are not; a clean graph has none."""
+    clean = {"state": "x = 1\n", "forecast_facts": "from ffcore import state\n", "auction": "from ffcore.forecast_facts import f\n",
+             "board": "import ffcore.auction\nfrom ffcore import state, auction\n", "grading": "from board import b\n",
+             "stats": "import grading\n", "eleven": "x = 1\n"}
+    assert crossings(clean) == [], "earlier and same layers, and a module in no layer, cross nothing"
+    seeded = {**clean, "state": "def f():\n    from ffcore import forecast_facts\n",
+              "forecast_facts": "import ffcore.board\n", "auction": "from grading import g\n"}
+    got = {(c.file, c.layer) for c in crossings(seeded)}
+    assert got == {("state", "ingest"), ("forecast_facts", "forecast"), ("auction", "decision")}, got
+    assert {c.line for c in crossings(seeded) if c.file == "state"} == {2}, "a lazy import inside a function is found, at its line"
+    assert crossings({**clean, "state": "def _selftest():\n    import board\n\nX = 1\n"}) == [], "a self-test may import anything"
+    assert crossings({**clean, "state": "import eleven\n"}) == [], "a module in no layer is not a crossing"
+    assert positional_reads("for a, b in inp.bids:\n    pass\n") == [1]
+    assert positional_reads("ys = [a for a, b in inp.bids]\n") == [1]
+    assert positional_reads("for c in inp.universe:\n    pass\n") == []
     assert positional_reads("def _selftest():\n    for a, b in inp.bids:\n        pass\n\nX = 1\n") == []
-    assert lines("select 1\nfrom a join cell c -- from cell", "cell") == [2]
-    assert prod("x\ndef _selftest():\n    from cell\n\ny from cell\n").count("\n") == 5
-    assert main() == 0, "the tree has crossings (listed above)"  # the gate: red until they are fixed
+    assert [c.what for c in crossings({"board": "for a, b in inp.bids:\n    pass\n"})] == ["unpacks an Inputs row by position"]
+    assert prod("x\ndef _selftest():\n    import a\n\ny = 1\n").count("\n") == 5
+    assert main() == 0, "the tree has crossings (listed above)"
     print("frontiers selftest ok")
 
 
@@ -168,44 +131,18 @@ def main() -> int:
     if "--table" in sys.argv:
         print(table())
         return 0
-    objs = scratch()
-    names = {n for _, n, _ in objs}
-    unassigned = sorted(n for n in names if module(n) is None and n not in SKIP)
-    found: dict[str, set[str]] = {}  # the reading module (or a file of no module) -> its crossings
-    spans = view_spans()
-    for kind, n, sql in objs:
-        a = module(n)
-        if kind != "view" or a is None:
-            continue
-        f, first, text = spans.get(n, (None, 0, ""))
-        for t in sorted(reads(sql, n) & names):
-            why = crossing(a, t)
-            for ln in [first + i - 1 for i in lines(text, t)] or [first] if why else []:
-                where = f"{f.relative_to(ROOT)}:{ln}" if f else "(view source not found)"
-                found.setdefault(a, set()).add(f"{where}  view {n} reads {t} ({why})")
-    for f in sorted((ROOT / "src").glob("*.py")) + sorted((ROOT / "src/ffcore").glob("*.py")):
-        a = OWNS.get(f.stem)
-        text = prod(f.read_text())
-        for t in sorted(names):
-            why = crossing(a, t)
-            for ln in lines(text, t) if why else []:
-                found.setdefault(a or "no module: " + f.name, set()).add(
-                    f"{f.relative_to(ROOT)}:{ln}  reads {t} ({why})")
-        for ln in positional_reads(text):
-            found.setdefault(a or "no module: " + f.name, set()).add(
-                f"{f.relative_to(ROOT)}:{ln}  unpacks an Inputs row by position")
-    for ln in board_queries((ROOT / "src/board.py").read_text()):
-        found.setdefault("board", set()).add(f"src/board.py:{ln}  runs a query (the board has no SQL)")
-    stale = sorted(f"{m}.{t}" for m, e in EXPORT.items() for t in e if t not in names)
+    files = tree_sources()
+    found = crossings({stem: f.read_text() for stem, f in files.items()})
     total = 0
-    for who in sorted(found, key=lambda w: (ORDER_ALL.index(w) if w in ORDER_ALL else 9, w)):
-        total += len(found[who])
-        print(f"== {who}: {len(found[who])} crossings")
-        print("\n".join("  " + r for r in sorted(found[who])))
+    for layer in ORDER:
+        mine = sorted(c for c in found if c.layer == layer)
+        if mine:
+            total += len(mine)
+            print(f"== {layer}: {len(mine)} crossings")
+            print("\n".join(f"  {files[c.file].relative_to(ROOT)}:{c.line}  {c.what}" for c in mine))
     print(f"crossings: {total}")
-    print("unassigned:", " ".join(unassigned) or "none")
-    print("exported but not in the schema:", " ".join(stale) or "none")
-    return 1 if found or stale else 0
+    print("unassigned:", " ".join(sorted(s for s in files if s not in OWNS)) or "none")
+    return 1 if found else 0
 
 
 if __name__ == "__main__":

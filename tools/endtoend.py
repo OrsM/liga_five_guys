@@ -11,7 +11,7 @@ def _selftest() -> None:
     board.board (the decision's inputs, your squad and its eleven, the standing offers ranked): a forecast and a board come out."""
     from ffcore import decision_facts, forecast_facts, identity, ledger
     from ffcore import observations as ob
-    from ffcore.db import cut, set_now
+    from ffcore.clock import cut, set_now
     from ffcore.parse import snapshot_stamp
     from ffcore.league import Config
     from ffcore.loader import Loaded, health_at

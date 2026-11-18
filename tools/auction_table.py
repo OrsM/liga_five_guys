@@ -58,7 +58,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--tidy", type=Path)
     ap.add_argument("--cut")
     args = ap.parse_args(argv)
-    model = table_at(loader.paths_in(args.tidy), args.cut)
+    model = table_at(parsed.paths_in(args.tidy), args.cut)
     text = render(model)
     TARGET.write_text(text, encoding="utf-8")
     d = digest(model, text)
