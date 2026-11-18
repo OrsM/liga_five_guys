@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-18T06:04Z",
- "market_at": "2026-11-18T06:03Z",
+ "generated_at": "2026-11-18T07:08Z",
+ "market_at": "2026-11-18T07:07Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-18T06:03Z",
+   "at": "2026-11-18T07:07Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -144,10 +144,10 @@
    "step": "bid",
    "price": 72231169.0,
    "asking": 72231169.0,
-   "amount": 78009662.52000001,
-   "win": 0.9032258064516129,
-   "advised": 78009662.52000001,
-   "advised_win": 0.9032258064516129,
+   "amount": 78731974.21000001,
+   "win": 0.9491525423728814,
+   "advised": 78731974.21000001,
+   "advised_win": 0.9491525423728814,
    "move": "bid",
    "plan": false,
    "done": false,
@@ -161,7 +161,7 @@
    "replaces": "Antony",
    "per_million": 0.2912327000542917,
    "price_next": 0.029014710547935918,
-   "price_lock": 0.08453583527348774,
+   "price_lock": 0.08453583527348751,
    "facts": [
     [
      "asking",
@@ -170,12 +170,12 @@
     ],
     [
      "bid",
-     78009662.52000001,
+     78731974.21000001,
      "money"
     ],
     [
      "chance to win",
-     0.9032258064516129,
+     0.9491525423728814,
      "chance"
     ],
     [
@@ -187,7 +187,7 @@
    "bids": 0,
    "auction": {
     "yours": false,
-    "listings": 63,
+    "listings": 60,
     "thin": false,
     "cell": "0/3/2"
    },
@@ -201,15 +201,15 @@
       "ratio": 1.0955507457910543
      },
      {
-      "name": "Ferran Jutgla",
-      "offer": 11567934.0,
-      "ratio": 1.0292874341598852
+      "name": "Fran Garcia",
+      "offer": 19254645.0,
+      "ratio": 0.9457567207556488
      }
     ],
-    "raises": 33606058.0,
-    "margin": 234500.67999999225,
-    "lock_margin": 3203595.4799999893,
-    "lock_margin_low": -1763841.8310000151,
+    "raises": 41292769.0,
+    "margin": 5374859.189999998,
+    "lock_margin": 2481283.7899999917,
+    "lock_margin_low": -2048010.9940000176,
     "if_won": [
      "Dani Martinez",
      "Raul Asencio",
@@ -219,14 +219,9 @@
      "Thomas Lemar",
      "Adria Pedrosa",
      "Robin Le Normand",
-     "Fran Garcia"
+     "Ferran Jutgla"
     ],
-    "if_lost": [
-     "Dani Martinez",
-     "Raul Asencio",
-     "Augusto Batalla",
-     "Miguel Roman"
-    ],
+    "if_lost": [],
     "held": [
      "Natan",
      "Dani Martinez",
@@ -241,18 +236,18 @@
      "Thomas Lemar",
      "Adria Pedrosa",
      "Robin Le Normand",
-     "Fran Garcia",
      "German Valera",
      "Guido Rodriguez",
+     "Ferran Jutgla",
      "Aitor Paredes",
      "Antony",
      "Martin Satriano"
     ],
-    "cash_if_lost": 6742766.0,
+    "cash_if_lost": 1751946.0,
     "gain": 21.03607837594791,
     "points_lost_if_won": 7.691718956653858,
     "points_lost_if_lost": 0.0,
-    "net": 12.052969798072045
+    "net": 12.665832669160455
    },
    "accepts": [],
    "act": []
@@ -346,7 +341,7 @@
    "replaces": "Guido Rodriguez",
    "per_million": 0.5047933282915934,
    "price_next": 0.0134152951402291,
-   "price_lock": 0.03908614487971507,
+   "price_lock": 0.039086144879714846,
    "available": false
   },
   {
@@ -390,8 +385,8 @@
    "placed": null,
    "replaces": "Guido Rodriguez",
    "per_million": 0.6458080239443814,
-   "price_next": -0.010278983448835155,
-   "price_lock": -0.02994834121036738,
+   "price_next": -0.010278983448834933,
+   "price_lock": -0.02994834121036727,
    "available": false
   },
   {
@@ -548,7 +543,7 @@
    "step": "take offer",
    "offer": 652928.0,
    "waiting": null,
-   "trend": 12.170154831310366,
+   "trend": 12.170154831310377,
    "plan": false,
    "amount": 652928.0,
    "done": false,
@@ -610,7 +605,7 @@
    "step": "take offer",
    "offer": 750057.0,
    "waiting": null,
-   "trend": -0.2478633489231453,
+   "trend": -0.2478633489231455,
    "plan": false,
    "amount": 750057.0,
    "done": false,
@@ -672,7 +667,7 @@
    "step": "take offer",
    "offer": 3612250.0,
    "waiting": null,
-   "trend": -33.268526931383995,
+   "trend": -33.26852693138402,
    "plan": false,
    "amount": 3612250.0,
    "done": false,
@@ -734,7 +729,7 @@
    "step": "take offer",
    "offer": 7662296.0,
    "waiting": null,
-   "trend": -27.763690845292526,
+   "trend": -27.763690845292547,
    "plan": false,
    "amount": 7662296.0,
    "done": false,
@@ -796,7 +791,7 @@
    "step": "take offer",
    "offer": 6147956.0,
    "waiting": null,
-   "trend": -19.729331247291125,
+   "trend": -19.72933124729114,
    "plan": false,
    "amount": 6147956.0,
    "done": false,
@@ -858,7 +853,7 @@
    "step": "take offer",
    "offer": 3094236.0,
    "waiting": null,
-   "trend": -12.245197130514146,
+   "trend": -12.245197130514155,
    "plan": false,
    "amount": 3094236.0,
    "done": false,
@@ -920,7 +915,7 @@
    "step": "take offer",
    "offer": 4816146.0,
    "waiting": null,
-   "trend": -21.48754251690044,
+   "trend": -21.487542516900458,
    "plan": false,
    "amount": 4816146.0,
    "done": false,
@@ -982,7 +977,7 @@
    "step": "take offer",
    "offer": 22038124.0,
    "waiting": null,
-   "trend": -17.862334171888264,
+   "trend": -17.86233417188828,
    "plan": false,
    "amount": 22038124.0,
    "done": false,
@@ -1046,7 +1041,7 @@
    "step": "take offer",
    "offer": 11567934.0,
    "waiting": null,
-   "trend": -24.52918201875693,
+   "trend": -24.52918201875695,
    "plan": false,
    "amount": 11567934.0,
    "done": false,
@@ -1098,9 +1093,7 @@
    ],
    "accepts": [],
    "act": [],
-   "for": [
-    "Vinicius Junior"
-   ]
+   "for": []
   },
   {
    "name": "Aitor Paredes",
@@ -1110,7 +1103,7 @@
    "step": "take offer",
    "offer": 22014786.0,
    "waiting": null,
-   "trend": -31.95673563676718,
+   "trend": -31.956735636767203,
    "plan": false,
    "amount": 22014786.0,
    "done": false,
@@ -1172,7 +1165,7 @@
    "step": "take offer",
    "offer": 35206879.0,
    "waiting": null,
-   "trend": -15.816702485636885,
+   "trend": -15.816702485636897,
    "plan": false,
    "amount": 35206879.0,
    "done": false,
@@ -1234,7 +1227,7 @@
    "step": "take offer",
    "offer": 57534664.0,
    "waiting": null,
-   "trend": 32.48231483936968,
+   "trend": 32.4823148393697,
    "plan": false,
    "amount": 57534664.0,
    "done": false,
@@ -1296,7 +1289,7 @@
    "step": "take offer",
    "offer": 10385956.0,
    "waiting": null,
-   "trend": -14.674945556867977,
+   "trend": -14.674945556867987,
    "plan": false,
    "amount": 10385956.0,
    "done": false,
@@ -1358,7 +1351,7 @@
    "step": "take offer",
    "offer": 19254645.0,
    "waiting": null,
-   "trend": 9.840408697980635,
+   "trend": 9.840408697980644,
    "plan": false,
    "amount": 19254645.0,
    "done": false,
@@ -1410,7 +1403,9 @@
    ],
    "accepts": [],
    "act": [],
-   "for": []
+   "for": [
+    "Vinicius Junior"
+   ]
   },
   {
    "name": "German Valera",
@@ -1420,7 +1415,7 @@
    "step": "take offer",
    "offer": 21280601.0,
    "waiting": null,
-   "trend": 9.204125553464857,
+   "trend": 9.204125553464864,
    "plan": false,
    "amount": 21280601.0,
    "done": false,
@@ -1482,7 +1477,7 @@
    "step": "take offer",
    "offer": 41157509.0,
    "waiting": null,
-   "trend": -16.573522915643114,
+   "trend": -16.573522915643125,
    "plan": false,
    "amount": 41157509.0,
    "done": false,
@@ -1544,7 +1539,7 @@
    "step": "take offer",
    "offer": 36036903.0,
    "waiting": null,
-   "trend": -9.726195214977034,
+   "trend": -9.726195214977041,
    "plan": false,
    "amount": 36036903.0,
    "done": false,
@@ -1606,7 +1601,7 @@
    "step": "take offer",
    "offer": 20029914.0,
    "waiting": null,
-   "trend": -8.697108662662147,
+   "trend": -8.697108662662155,
    "plan": false,
    "amount": 20029914.0,
    "done": false,
@@ -1668,7 +1663,7 @@
    "step": "take offer",
    "offer": 57288021.0,
    "waiting": null,
-   "trend": 24.211616077789103,
+   "trend": 24.21161607778912,
    "plan": false,
    "amount": 57288021.0,
    "done": false,
@@ -1730,7 +1725,7 @@
    "step": "take offer",
    "offer": 58698261.0,
    "waiting": null,
-   "trend": 21.583847652551512,
+   "trend": 21.58384765255153,
    "plan": false,
    "amount": 58698261.0,
    "done": false,
@@ -1792,7 +1787,7 @@
    "step": "take offer",
    "offer": 18190400.0,
    "waiting": null,
-   "trend": -5.303983191791386,
+   "trend": -5.30398319179139,
    "plan": false,
    "amount": 18190400.0,
    "done": false,
