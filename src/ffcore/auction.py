@@ -74,6 +74,11 @@ class Forecast(NamedTuple):
     curve: Curve
 
 
+def at_decision(mins: float) -> bool:
+    """Whether a look with this many minutes to close is at or before the look the decision is taken at, DECISION_MINS."""
+    return mins >= DECISION_MINS
+
+
 def sample(look: Look) -> Sample:
     if look.by_me and look.won is not None:
         return Sample("me", look.won / look.ask)
@@ -120,9 +125,10 @@ def keys(cuts: tuple[Sequence[float], Sequence[float]], x: Look) -> list[Key]:
 
 
 def fit(ls: Sequence[Look], cuts: Cuts | None = None) -> Model:
-    """The Model of the closed looks of ls: the cells of keys over the ask and trend cuts, each the curve of the samples
-    held there. cuts are the quantiles of the closed looks unless given, then used as they are."""
-    closed = sorted((x for x in ls if not x.is_open), key=lambda x: x.look)
+    """The Model of the closed looks of ls with at_decision mins: the cells of keys over the ask and trend cuts, each the
+    curve of the samples held there. Looks later than the decision look never change it. cuts are the quantiles of those
+    looks unless given, then used as they are."""
+    closed = sorted((x for x in ls if not x.is_open and at_decision(x.mins)), key=lambda x: x.look)
     last: dict[tuple[str, str], float] = {}
     for x in closed:
         last[(x.player, x.close)] = x.ask
@@ -251,7 +257,7 @@ def backtest_records(ls: Sequence[Look], blocks: int = 8) -> list[Record]:
         for k, v in by.items():
             if not first <= k[1][:10] < until:
                 continue
-            d = max((x for x in v if x.mins >= DECISION_MINS), key=lambda x: x.look, default=None)
+            d = max((x for x in v if at_decision(x.mins)), key=lambda x: x.look, default=None)
             if d is None:
                 continue
             big = bool(model.ask_cuts) and d.ask >= model.ask_cuts[-1]
@@ -286,7 +292,7 @@ def live_points(forecasts: Mapping[str, Sequence[Forecast]], results: Sequence[a
     last: dict[tuple[str, str], tuple[str, Forecast]] = {}
     for cut in sorted(forecasts):
         for f in forecasts[cut]:
-            if f.mins >= DECISION_MINS and (f.player, f.close) in sold:
+            if at_decision(f.mins) and (f.player, f.close) in sold:
                 last[(f.player, f.close)] = (cut, f)
     out: list[Point] = []
     for key, (cut, f) in last.items():
@@ -359,6 +365,9 @@ def _selftest() -> None:
     assert not quiet.thin and quiet.n >= pricing.AUCTION_MIN
     thin = predict(fit(ls[:20]), Look("n", "c", "l", 39.0, 2e6, 0, False, 0, 3.0, None, None, False, True))
     assert thin.thin and thin.cell == "all", "too few listings: the pooled curve, flagged thin"
+    late = [x._replace(mins=m, look=x.look + "z", ask=x.ask * 3, won=None) for x in ls for m in (20.0, 5.0)]
+    assert fit(ls + late) == fit(ls) and fit(late + ls, FIXED_CUTS) == fit(ls, FIXED_CUTS), \
+        "looks with fewer minutes than DECISION_MINS are stored but never change the fit"
     pts = backtest(ls)
     assert pts and all(0.0 <= p.stated <= 1.0 for p in pts)
     cal = calibration([Point(("all",), 0.97, 0.9, i < 5) for i in range(40)], "t:")
