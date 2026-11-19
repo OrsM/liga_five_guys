@@ -10,7 +10,9 @@ Named rules, each tested:
     player stays, with player None.
   buy_is_last_row_of_its_activity: per activity_id the last kind-buy row wins; rows without activity_id or of
     another kind are no buy.
-  buy_window_is_ten_minutes: a buy belongs to an end if its player_id matches and abs(t - close) * 86400 < 600.
+  buy_settles_within_horizon: a buy belongs to an end if its player_id matches and -600 < (t - close) * 86400 <
+    SETTLE_SECONDS: the game settles a close up to about two hours late (gaps observed 702 to 6881 s, none between
+    6881 s and two days; the same player is listed again three days later at the earliest).
   top_buy_is_highest_amount: of several buys in the window the highest amount, None amounts last; a tie is not
     specified.
   bar_rules: bar is None for a manager's listing (seller team); 1.0 when nobody bought or the winner is you; else
@@ -29,6 +31,10 @@ Named rules, each tested:
   closed_look_needs_its_outcome: a look whose close is at or before the cut and has no outcome is absent; a look
     closing after the cut is open (is_open True, won None); a look with an unparseable close is never kept.
   rival_excludes_own_bid: rival = bids - mine, with bids 0 when None.
+  own_win_without_bid_paid_its_price: a listing we won and no look of which carries a bid of ours has my_bid equal to
+    the price paid on its looks (the game is first price: a win pays exactly our bid).
+  withdrawn_bid_is_no_loss: a listing with a bid of ours on some look, no bid on its newest look, and not won by us has
+    withdrawn True on all its looks.
   mins_before_close: minutes from the look's stamp to its close, times 1440.0.
 Contract: auction_results(world, identity, league) gives one AuctionResult per listing whose outcome is seen at the cut;
 bid_changes(world, identity) one BidChange per change of one of your bids; auction_looks(world, identity, league) one
@@ -48,6 +54,7 @@ from ffcore.season_facts import julian_day, stamp_jd, utc_stamp
 LEAGUE_SELLER = "marketPlayerLeague"
 LISTING_SELLERS = (LEAGUE_SELLER, "marketPlayerTeam")
 WINDOW_SECONDS = 600
+SETTLE_SECONDS = 3 * 3600
 DAY_SECONDS = 86400.0
 
 
@@ -120,6 +127,7 @@ class LookRow(NamedTuple):
     won: float | None
     by_me: bool | None
     is_open: bool
+    withdrawn: bool
 
 
 MARKET_ENDS = "market_ends"
@@ -189,8 +197,13 @@ def _buys_by_player(world: state.World) -> dict[str, list[Buy]]:
     return out
 
 
+def _settles(end: End, buy: Buy) -> bool:
+    """Whether the buy is the settlement of the end (rule buy_settles_within_horizon)."""
+    return buy.t is not None and -WINDOW_SECONDS < (buy.t - end.close) * DAY_SECONDS < SETTLE_SECONDS
+
+
 def _top_buy(end: End, buys: list[Buy]) -> Buy | None:
-    inside = [b for b in buys if b.t is not None and abs(b.t - end.close) * DAY_SECONDS < WINDOW_SECONDS]
+    inside = [b for b in buys if _settles(end, b)]
     if not inside:
         return None
     return max(inside, key=lambda b: (b.amount is not None, b.amount if b.amount is not None else 0.0))
@@ -233,6 +246,20 @@ def bid_changes(world: state.World, identity: current.Identity) -> tuple[BidChan
                  for c in state.fact(world, BID_CHANGES).changes)
 
 
+def _my_bid(row: ob.ApiMarket, rows: list[ob.ApiMarket], result: AuctionResult | None) -> float | None:
+    """The bid of ours on the row; when result is a win by us of a listing none of whose rows (its looks) carries a bid of
+    ours, the price paid (rule own_win_without_bid_paid_its_price)."""
+    if result is not None and result.by_me and result.won is not None and all(r.bid_id == "" for r in rows):
+        return result.won
+    return row.bid_money
+
+
+def _bid_withdrawn(rows: list[ob.ApiMarket], result: AuctionResult | None) -> bool:
+    """Whether a row of the listing carries a bid of ours, its newest row has no bid, and result is not a win by us."""
+    newest = max(rows, key=lambda r: r.observed_at)
+    return any(r.bid_id != "" for r in rows) and not (newest.bids or 0) and not (result is not None and result.by_me)
+
+
 def auction_looks(world: state.World, identity: current.Identity, league: League) -> tuple[LookRow, ...]:
     """One row per league listing observed by the cut, with its outcome if the cut has one (the rules
     look_needs_game_listing to mins_before_close and unmapped_player_dropped)."""
@@ -241,6 +268,9 @@ def auction_looks(world: state.World, identity: current.Identity, league: League
         if r.seller == LEAGUE_SELLER:
             outcomes[(r.player, r.close)].append(r)
     cut = stamp_jd(world.cut)
+    listings: dict[tuple[str, str], list[ob.ApiMarket]] = defaultdict(list)
+    for row in state.fact(world, LOOKS):
+        listings[(row.player_id, row.expires_at)].append(row)
     out = []
     for row in state.fact(world, LOOKS):
         player = identity.app.get(row.player_id)
@@ -254,14 +284,16 @@ def auction_looks(world: state.World, identity: current.Identity, league: League
         mine = row.bid_id != ""
         bids = row.bids or 0
         outcome: list[AuctionResult | None] = [*held] if held else [None]
+        rows = listings[(row.player_id, row.expires_at)]
         for res in outcome:
             out.append(LookRow(player, row.expires_at, row.observed_at, (close - seen) * 1440.0, row.sale_price or 0.0,
-                               bids, mine, bids - mine, row.bid_money,
-                               None if res is None else res.won, None if res is None else res.by_me, res is None))
+                               bids, mine, bids - mine, _my_bid(row, rows, res),
+                               None if res is None else res.won, None if res is None else res.by_me, res is None,
+                               _bid_withdrawn(rows, res)))
     return tuple(out)
 
 
-_APP = {"a1": "p1", "a2": "p2", "a3": "p3"}
+_APP = {"a1": "p1", "a2": "p2", "a3": "p3", "a4": "p4", "a5": "p5", "a6": "p6"}
 _ME = League("ann", 100.0)
 _SOON = "2026-08-18T20:24:00+02:00"
 _C1 = "2026-08-18T22:24:00+02:00"
@@ -284,6 +316,10 @@ def _buy(hhmm: str, aid: str, uid: str, pid: str, amount: float | None, at: str,
 
 def _standing(hhmm: str, uid: str, manager: str) -> ob.ApiStandings:
     return ob.ApiStandings(_stamp(hhmm), "laliga", 1, 0.0, 0.0, 0.0, 0.0, "t" + uid, uid, manager)
+
+
+def _clock(seconds: int) -> str:
+    return "%02d:%02d:%02d" % (seconds // 3600, seconds // 60 % 60, seconds % 60)
 
 
 def _tables() -> dict[str, list[Any]]:
@@ -312,8 +348,8 @@ def _tables() -> dict[str, list[Any]]:
             _buy("2029", "e1", "u2", "a1", 22.0, "2026-08-18T20:27:00+00:00"),
             _buy("2029", "", "u2", "a1", 99.0, "2026-08-18T20:27:00+00:00"),
             _buy("2029", "e2", "u2", "a1", 98.0, "2026-08-18T20:27:00+00:00", "sell"),
-            _buy("2030", "e3", "u2", "a1", 40.0, "2026-08-18T20:34:00+00:00"),
-            _buy("2040", "e4", "u2", "a1", 30.0, "2026-08-18T20:40:00+00:00"),
+            _buy("2030", "e3", "u2", "a1", 40.0, "2026-08-18T23:24:00+00:00"),
+            _buy("2040", "e4", "u2", "a1", 30.0, "2026-08-18T23:40:00+00:00"),
             _buy("2045", "e5", "u1", "a1", 25.0, "2026-08-18T20:30:00+00:00")],
         "api_standings": [_standing("1800", "u2", "bob"), _standing("2042", "u1", "ann"),
                           _standing("2042", "u9", "")],
@@ -356,6 +392,30 @@ def _look_tables() -> dict[str, list[Any]]:
         "api_activity": [_buy("1015", "e1", "u2", "a1", 12.0, "2026-08-18T10:02:00+00:00")],
         "api_standings": [],
     }
+
+
+def _own_tables() -> dict[str, list[Any]]:
+    lg = LEAGUE_SELLER
+    close = "2026-08-18T10:00:00+00:00"
+    return {
+        "api_market": [
+            _listing("0900", "a1", lg, close, 10.0)._replace(bids=2),
+            _listing("0930", "a1", lg, close, 10.0)._replace(bids=3),
+            _listing("0900", "a2", lg, close, 10.0, "b2", 9.0)._replace(bids=1),
+            _listing("0930", "a2", lg, close, 10.0),
+            _listing("0900", "a3", lg, close, 10.0)._replace(bids=2),
+            _listing("0930", "a3", lg, close, 10.0)._replace(bids=2),
+            _listing("0900", "a4", lg, close, 10.0, "b4", 11.0)._replace(bids=1),
+            _listing("0930", "a4", lg, close, 10.0)._replace(bids=1),
+            _listing("0900", "a5", lg, close, 10.0, "b5", 11.0)._replace(bids=2),
+            _listing("0930", "a5", lg, close, 10.0)._replace(bids=1),
+            _listing("0900", "a6", lg, close, 10.0)._replace(bids=2),
+            _listing("0930", "a6", lg, close, 10.0)._replace(bids=2)],
+        "api_activity": [_buy("1015", "e1", "u1", "a1", 12.0, "2026-08-18T10:00:15+00:00"),
+                         _buy("1015", "e3", "u2", "a3", 12.0, "2026-08-18T10:00:15+00:00"),
+                         _buy("1015", "e4", "u1", "a4", 11.0, "2026-08-18T10:00:15+00:00"),
+                         _buy("1015", "e5", "u2", "a5", 12.0, "2026-08-18T10:00:15+00:00")],
+        "api_standings": [_standing("0800", "u1", "ann"), _standing("0800", "u2", "bob")]}
 
 
 def _looks_at(tables: dict[str, list[Any]], cut: str) -> tuple[LookRow, ...]:
@@ -419,18 +479,22 @@ def _selftest() -> None:
     assert _results_at(standings_late, _stamp("2100"))[0].by_me is True
     assert _results_at(standings_late, _stamp("2100"), League("zed", 0.0))[0].by_me is False
 
+    hold = SETTLE_SECONDS
     base: dict[str, list[Any]] = {"api_market": [_listing("1800", "a1", LEAGUE_SELLER, "2026-08-18T10:00:00+00:00", 10.0)],
-            "api_activity": [_buy("1800", "w0", "u2", "a1", 1.0, "2026-08-18T10:09:59+00:00"),
-                             _buy("1800", "w1", "u2", "a1", 5.0, "2026-08-18T09:50:01+00:00"),
-                             _buy("1800", "w2", "u2", "a1", 7.0, "2026-08-18T10:10:00+00:00"),
-                             _buy("1800", "w3", "u2", "a2", 9.0, "2026-08-18T10:00:00+00:00")],
+            "api_activity": [_buy("1800", "w0", "u2", "a1", 1.0, "2026-08-18T09:50:01+00:00"),
+                             _buy("1800", "w1", "u2", "a1", 5.0, "2026-08-18T09:50:00+00:00"),
+                             _buy("1800", "w2", "u2", "a1", 7.0, "2026-08-18T10:00:00+00:00", "sell"),
+                             _buy("1800", "w3", "u2", "a2", 9.0, "2026-08-18T10:00:00+00:00"),
+                             _buy("1800", "w4", "u2", "a1", 20.0, "2026-08-18T%s+00:00" % _clock(10 * 3600 + hold)),
+                             _buy("1800", "w5", "u2", "a1", 3.0, "2026-08-18T%s+00:00" % _clock(10 * 3600 + hold - 1))],
             "api_standings": []}
-    top = _results_at(base, _stamp("1800"))
-    assert [r.won for r in top] == [5.0], "buy_window_is_ten_minutes: exactly ten minutes and other players are out"
-    base["api_activity"].append(_buy("1800", "w4", "u2", "a1", None, "2026-08-18T10:00:00+00:00"))
-    base["api_activity"].append(_buy("1800", "w5", "u2", "a1", 6.0, "2026-08-18T10:03:00+00:00"))
+    assert [r.won for r in _results_at(base, _stamp("1800"))] == [3.0], (
+        "buy_settles_within_horizon: a buy just inside the horizon settles the end, 600 s before the close, the "
+        "horizon itself, kinds other than buy and other players do not")
+    base["api_activity"].append(_buy("1800", "w6", "u2", "a1", None, "2026-08-18T10:00:00+00:00"))
+    base["api_activity"].append(_buy("1800", "w7", "u2", "a1", 6.0, "2026-08-18T10:03:00+00:00"))
     assert [r.won for r in _results_at(base, _stamp("1800"))] == [6.0], "top_buy_is_highest_amount: None last"
-    only_none = {**base, "api_activity": [_buy("1800", "w4", "u2", "a1", None, "2026-08-18T10:00:00+00:00")]}
+    only_none = {**base, "api_activity": [_buy("1800", "w6", "u2", "a1", None, "2026-08-18T10:00:00+00:00")]}
     assert [(r.won, r.bar) for r in _results_at(only_none, _stamp("1800"))] == [(None, 1.0)]
 
     changes = alone[_stamp("2100")][2]
@@ -462,6 +526,21 @@ def _selftest() -> None:
         assert late[key].won == 12.0 and late[key].by_me is False and late[key].is_open is False, (
             "closed_look_needs_its_outcome: a closed look takes its outcome, non-prefix with the cut at 10:05")
     assert late[("p1", _stamp("0910"))].is_open is True and late[("p1", _stamp("0910"))].won is None
+
+    owned = _own_tables()
+    kept = _looks_at(owned, "2026-08-18T1015Z")
+    unseen = [r for r in kept if r.player == "p1"]
+    assert unseen and all(r.by_me is True and r.won == 12.0 and not r.mine and r.my_bid == 12.0 for r in unseen), (
+        "own_win_without_bid_paid_its_price: no bid of ours seen, a win by us: my_bid is the price paid on every look")
+    assert all(r.my_bid is None for r in kept if r.player == "p3") and all(
+            r.my_bid == 11.0 for r in kept if r.player == "p4" and r.look == _stamp("0900")), (
+        "own_win_without_bid_paid_its_price: a rival's win or a bid of ours seen keeps what was seen")
+    assert not any(r.withdrawn for r in kept if r.player in ("p1", "p4")), "withdrawn_bid_is_no_loss: a win by us is no withdrawal"
+    gone = {r.player: r for r in kept if r.look == _stamp("0930")}
+    assert gone["p2"].withdrawn and {r.withdrawn for r in kept if r.player == "p2"} == {True}, (
+        "withdrawn_bid_is_no_loss: our bid seen, then no bid on the newest look, on every look of the listing")
+    assert not any(r.withdrawn for r in kept if r.player in ("p3", "p5", "p6")), (
+        "withdrawn_bid_is_no_loss: never our bid, or bids of others left, or the listing sold")
     print("ffcore.auction_facts self-test OK")
 
 

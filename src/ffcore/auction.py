@@ -46,6 +46,7 @@ class Look(NamedTuple):
     won: float | None
     by_me: bool
     is_open: bool
+    withdrawn: bool = False
 
 
 class Sample(NamedTuple):
@@ -125,10 +126,10 @@ def keys(cuts: tuple[Sequence[float], Sequence[float]], x: Look) -> list[Key]:
 
 
 def fit(ls: Sequence[Look], cuts: Cuts | None = None) -> Model:
-    """The Model of the closed looks of ls with at_decision mins: the cells of keys over the ask and trend cuts, each the
-    curve of the samples held there. Looks later than the decision look never change it. cuts are the quantiles of those
-    looks unless given, then used as they are."""
-    closed = sorted((x for x in ls if not x.is_open and at_decision(x.mins)), key=lambda x: x.look)
+    """The Model of the closed looks of ls with at_decision mins, those of a listing with a withdrawn bid of ours left out:
+    the cells of keys over the ask and trend cuts, each the curve of the samples held there. Looks later than the decision
+    look never change it. cuts are the quantiles of those looks unless given, then used as they are."""
+    closed = sorted((x for x in ls if not x.is_open and not x.withdrawn and at_decision(x.mins)), key=lambda x: x.look)
     last: dict[tuple[str, str], float] = {}
     for x in closed:
         last[(x.player, x.close)] = x.ask
@@ -178,7 +179,7 @@ def looks_of(world: st.World, identity: current.Identity, league: ledger.League)
     (trend_is_last_day_on_or_before_look; None before the player's first day), bools as bool."""
     trend_at = price_fold.price_trend_at(price_fold.price_state(world))
     rows = [Look(r.player, r.close, r.look, r.mins, r.ask, r.bids, r.mine, r.rival, trend_at(r.player, r.look), r.my_bid,
-                 r.won, bool(r.by_me), r.is_open) for r in af.auction_looks(world, identity, league)]
+                 r.won, bool(r.by_me), r.is_open, r.withdrawn) for r in af.auction_looks(world, identity, league)]
     return sorted(rows, key=lambda x: x.look)
 
 
@@ -240,7 +241,7 @@ class Record(NamedTuple):
 def backtest_records(ls: Sequence[Look], blocks: int = 8) -> list[Record]:
     by: dict[tuple[str, str], list[Look]] = defaultdict(list)
     for x in ls:
-        if not x.is_open:
+        if not x.is_open and not x.withdrawn:
             by[(x.player, x.close)].append(x)
     days = sorted({k[1][:10] for k in by})
     if len(days) < 4:
@@ -370,6 +371,9 @@ def _selftest() -> None:
         "looks with fewer minutes than DECISION_MINS are stored but never change the fit"
     pts = backtest(ls)
     assert pts and all(0.0 <= p.stated <= 1.0 for p in pts)
+    pulled = [x._replace(player="w" + x.player, withdrawn=True, won=None, ask=x.ask * 2, mine=True, my_bid=x.ask) for x in ls]
+    assert fit(ls + pulled) == fit(ls) and backtest(ls + pulled) == pts, \
+        "a listing with a withdrawn bid of ours is no sample: neither the fit nor the backtest sees it"
     cal = calibration([Point(("all",), 0.97, 0.9, i < 5) for i in range(40)], "t:")
     assert cal and cal[0]["drift"] == 1, "stated 0.97, observed 0.125 over 40: drift"
     assert calibration([Point(("all",), 0.97, 0.9, True)] * 10, "t:")[0]["drift"] == 0, "too few to call it drift"
