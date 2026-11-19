@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-19T21:39Z",
- "market_at": "2026-11-19T21:39Z",
+ "generated_at": "2026-11-19T23:09Z",
+ "market_at": "2026-11-19T23:09Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-19T21:39Z",
+   "at": "2026-11-19T23:09Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,70 +56,7 @@
  "cash_locked": 0,
  "can_bid": 35011835.0,
  "ping": "",
- "do": [
-  {
-   "name": "Dean Huijsen, Guido Rodriguez, Mikel Oyarzabal, Pablo Fornals, Pepelu",
-   "pos": "",
-   "what": "list",
-   "label": "list Dean Huijsen, Guido Rodriguez, Mikel Oyarzabal, Pablo Fornals, Pepelu",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "117647305",
-     "player": "2530",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 57419184.0
-    },
-    {
-     "player_team": "112907378",
-     "player": "3128",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 10588615.0
-    },
-    {
-     "player_team": "114200866",
-     "player": "3091",
-     "market": null,
-     "bid": null,
-     "pos": "DEL",
-     "value": 44035638.0
-    },
-    {
-     "player_team": "111434450",
-     "player": "3099",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 58948464.0
-    },
-    {
-     "player_team": "114200863",
-     "player": "2464",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 55107558.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
@@ -309,57 +246,57 @@
   "brier": [
    {
     "scope": "backtest:all",
-    "n": 3336,
-    "model": 0.03417686407168447,
-    "pooled": 0.04564843054133826
+    "n": 3388,
+    "model": 0.03370153416296894,
+    "pooled": 0.0450151336405132
    },
    {
     "scope": "backtest:big",
-    "n": 287,
-    "model": 0.10304853480674127,
-    "pooled": 0.11903051001036538
+    "n": 295,
+    "model": 0.1007141085021896,
+    "pooled": 0.11597934434012741
    },
    {
     "scope": "backtest:norival",
-    "n": 3120,
-    "model": 0.02218852097185948,
-    "pooled": 0.027060915011618187
+    "n": 3172,
+    "model": 0.021903187995810765,
+    "pooled": 0.026689461816505063
    },
    {
     "scope": "backtest:ours",
-    "n": 276,
-    "model": 0.20261995444031844,
-    "pooled": 0.27487473310295246
+    "n": 281,
+    "model": 0.20056196890558536,
+    "pooled": 0.2701394961686243
    },
    {
     "scope": "backtest:rival",
     "n": 216,
-    "model": 0.2073418199580455,
-    "pooled": 0.31413476597062817
+    "model": 0.2069624325066066,
+    "pooled": 0.31413101801900295
    },
    {
     "scope": "backtest:small",
-    "n": 3049,
-    "model": 0.027694027239621076,
-    "pooled": 0.03874103244110514
+    "n": 3093,
+    "model": 0.02731009884771834,
+    "pooled": 0.038246804459657655
    },
    {
     "scope": "live:all",
-    "n": 4368,
-    "model": 0.032643625322729936,
-    "pooled": 0.032643625322729936
+    "n": 4420,
+    "model": 0.032295363136159036,
+    "pooled": 0.032295363136159036
    },
    {
     "scope": "live:norival",
-    "n": 4094,
-    "model": 0.02260414329496125,
-    "pooled": 0.02260414329496125
+    "n": 4146,
+    "model": 0.022358782513678222,
+    "pooled": 0.022358782513678222
    },
    {
     "scope": "live:ours",
-    "n": 265,
-    "model": 0.155460260577165,
-    "pooled": 0.155460260577165
+    "n": 269,
+    "model": 0.15360148314463698,
+    "pooled": 0.15360148314463698
    },
    {
     "scope": "live:rival",
@@ -369,9 +306,9 @@
    },
    {
     "scope": "live:small",
-    "n": 4368,
-    "model": 0.032643625322729936,
-    "pooled": 0.032643625322729936
+    "n": 4420,
+    "model": 0.032295363136159036,
+    "pooled": 0.032295363136159036
    }
   ],
   "drift": [
@@ -385,65 +322,58 @@
    {
     "scope": "backtest:ours",
     "bin": "0.00-0.50",
-    "n": 21,
-    "stated": 0.3443284167471544,
-    "observed": 0.09523809523809523
-   },
-   {
-    "scope": "backtest:ours",
-    "bin": "0.50-0.80",
-    "n": 50,
-    "stated": 0.6739542506030043,
-    "observed": 0.52
+    "n": 20,
+    "stated": 0.33586274201743604,
+    "observed": 0.1
    },
    {
     "scope": "backtest:ours",
     "bin": "0.80-0.90",
-    "n": 59,
-    "stated": 0.8380333201351344,
-    "observed": 0.6610169491525424
+    "n": 62,
+    "stated": 0.8381944924317274,
+    "observed": 0.6774193548387096
    },
    {
     "scope": "backtest:ours",
     "bin": "0.90-0.95",
-    "n": 44,
-    "stated": 0.9309534357829363,
-    "observed": 0.75
+    "n": 48,
+    "stated": 0.9301726878733906,
+    "observed": 0.7708333333333334
    },
    {
     "scope": "backtest:ours",
     "bin": "0.95-0.99",
-    "n": 51,
-    "stated": 0.9713927512017789,
-    "observed": 0.7647058823529411
+    "n": 50,
+    "stated": 0.9729058905067807,
+    "observed": 0.76
    },
    {
     "scope": "backtest:ours",
     "bin": "0.99-1.00",
-    "n": 51,
+    "n": 48,
     "stated": 1.0,
-    "observed": 0.9411764705882353
+    "observed": 0.9375
    },
    {
     "scope": "live:ours",
     "bin": "0.50-0.80",
-    "n": 47,
-    "stated": 0.6603058075647649,
-    "observed": 0.3617021276595745
+    "n": 48,
+    "stated": 0.660824127931857,
+    "observed": 0.375
    },
    {
     "scope": "live:ours",
     "bin": "0.80-0.90",
-    "n": 54,
-    "stated": 0.8418881116526677,
-    "observed": 0.6851851851851852
+    "n": 55,
+    "stated": 0.8422550362683873,
+    "observed": 0.6909090909090909
    },
    {
     "scope": "live:ours",
     "bin": "0.90-0.95",
-    "n": 43,
-    "stated": 0.9311955377237603,
-    "observed": 0.7906976744186046
+    "n": 44,
+    "stated": 0.9316036514657859,
+    "observed": 0.7954545454545454
    }
   ]
  },
