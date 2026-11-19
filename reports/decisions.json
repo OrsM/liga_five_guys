@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-19T10:36Z",
- "market_at": "2026-11-19T10:36Z",
+ "generated_at": "2026-11-19T20:46Z",
+ "market_at": "2026-11-19T20:45Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-19T10:36Z",
+   "at": "2026-11-19T20:45Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -73,8 +73,8 @@
   ],
   "message": "",
   "unmapped": [],
-  "points": 56.834667460569655,
-  "best": 57.78822104411075,
+  "points": 57.77085575401898,
+  "best": 58.724409337560076,
   "advice": [
    {
     "in": "Aitor Paredes",
@@ -100,14 +100,14 @@
    "plan": false,
    "done": true,
    "key": "11830",
-   "gain": 38.5743495327703,
+   "gain": 35.004359038166626,
    "per": "season",
    "more": false,
    "detail": null,
    "trace": null,
    "flip": null,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.6718024681919949,
+   "per_million": 0.6096282914464027,
    "price_next": 0.020949276128273686,
    "price_lock": 0.041370746655690294,
    "facts": [
@@ -138,7 +138,7 @@
     ],
     [
      "points added",
-     38.5743495327703,
+     35.004359038166626,
      "points"
     ]
    ],
@@ -184,10 +184,10 @@
      "Martin Satriano"
     ],
     "cash_if_lost": 2645320.0,
-    "gain": 38.574349532770384,
+    "gain": 35.00435903816674,
     "points_lost_if_won": 6.848365989497552,
     "points_lost_if_lost": 0.0,
-    "net": 17.264533257009383
+    "net": 15.32182848515493
    },
    "accepts": [],
    "act": []
@@ -303,13 +303,13 @@
    "name": "Dean Huijsen",
    "pos": "DEF",
    "status": "market",
-   "gain": 38.5743495327703,
+   "gain": 35.004359038166626,
    "asking": 57419184.0,
    "bid": 62586910.56,
    "win": 0.9491525423728814,
    "placed": 56165301.0,
    "replaces": "Guido Rodriguez",
-   "per_million": 0.6718024681919949,
+   "per_million": 0.6096282914464027,
    "price_next": 0.020949276128273686,
    "price_lock": 0.041370746655690294,
    "available": true
@@ -647,13 +647,13 @@
    "flip": null,
    "ratio": 0.9069590830701972,
    "lost": {
-    "next4": 0.0,
+    "next4": 0.7087513621301866,
     "next8": 0.0,
     "season": 0.0
    },
    "offer_percentile": 0.03501945525291829,
    "offers_seen": 771,
-   "note": "offer 0.91 x value; at or above 4% of the 771 nightly offers seen; the eleven loses 0 points (bench)",
+   "note": "offer 0.91 x value; at or above 4% of the 771 nightly offers seen; the eleven loses 0.7 points over the next 4 jornadas, 0.0 over the next 8, 0.0 over the season",
    "per_million": 0.0,
    "facts": [
     [
@@ -673,7 +673,7 @@
     ],
     [
      "points lost, next 4",
-     0.0,
+     0.7087513621301866,
      "points"
     ],
     [
@@ -704,7 +704,7 @@
    "amount": 58950911.0,
    "done": false,
    "key": "2715",
-   "gain": -29.521240232656737,
+   "gain": -22.81302744946015,
    "per": "season",
    "more": false,
    "detail": null,
@@ -712,14 +712,14 @@
    "flip": null,
    "ratio": 1.0697427565198951,
    "lost": {
-    "next4": 2.791620802183729,
-    "next8": 9.766754606150414,
-    "season": 29.521240232656737
+    "next4": 0.860466070238715,
+    "next8": 5.534868734559325,
+    "season": 22.81302744946015
    },
    "offer_percentile": 0.874189364461738,
    "offers_seen": 771,
-   "note": "offer 1.07 x value; at or above 87% of the 771 nightly offers seen; the eleven loses 2.8 points over the next 4 jornadas, 9.8 over the next 8, 29.5 over the season",
-   "per_million": 0.16567605895268378,
+   "note": "offer 1.07 x value; at or above 87% of the 771 nightly offers seen; the eleven loses 0.9 points over the next 4 jornadas, 5.5 over the next 8, 22.8 over the season",
+   "per_million": 0.09388945209954982,
    "facts": [
     [
      "value",
@@ -738,17 +738,17 @@
     ],
     [
      "points lost, next 4",
-     2.791620802183729,
+     0.860466070238715,
      "points"
     ],
     [
      "next 8",
-     9.766754606150414,
+     5.534868734559325,
      "points"
     ],
     [
      "season",
-     29.521240232656737,
+     22.81302744946015,
      "points"
     ]
    ],
@@ -769,7 +769,7 @@
    "amount": 23720663.0,
    "done": false,
    "key": "7916",
-   "gain": -30.145872443636563,
+   "gain": -23.437659660439977,
    "per": "season",
    "more": false,
    "detail": null,
@@ -777,14 +777,14 @@
    "flip": null,
    "ratio": 1.053876555674027,
    "lost": {
-    "next4": 2.8953330601488574,
-    "next8": 7.178659213696164,
-    "season": 30.145872443636563
+    "next4": 0.9641783282038432,
+    "next8": 2.9467733421050752,
+    "season": 23.437659660439977
    },
    "offer_percentile": 0.7976653696498055,
    "offers_seen": 771,
-   "note": "offer 1.05 x value; at or above 80% of the 771 nightly offers seen; the eleven loses 2.9 points over the next 4 jornadas, 7.2 over the next 8, 30.1 over the season",
-   "per_million": 0.3026331605358655,
+   "note": "offer 1.05 x value; at or above 80% of the 771 nightly offers seen; the eleven loses 1.0 points over the next 4 jornadas, 2.9 over the next 8, 23.4 over the season",
+   "per_million": 0.12422811883905081,
    "facts": [
     [
      "value",
@@ -803,212 +803,17 @@
     ],
     [
      "points lost, next 4",
-     2.8953330601488574,
+     0.9641783282038432,
      "points"
     ],
     [
      "next 8",
-     7.178659213696164,
+     2.9467733421050752,
      "points"
     ],
     [
      "season",
-     30.145872443636563,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
-   "name": "Pablo Fornals",
-   "pos": "MED",
-   "what": "sell",
-   "label": "sell Pablo Fornals",
-   "step": "take offer",
-   "offer": 53102276.0,
-   "waiting": null,
-   "trend": 19.436266448829304,
-   "plan": false,
-   "amount": 53102276.0,
-   "done": false,
-   "key": "2632",
-   "gain": -54.73842371676278,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 0.9008254396586144,
-   "lost": {
-    "next4": 9.541626226833785,
-    "next8": 16.655369515178734,
-    "season": 54.73842371676278
-   },
-   "offer_percentile": 0.0025940337224383916,
-   "offers_seen": 771,
-   "note": "offer 0.90 x value; at or above 0% of the 771 nightly offers seen; the eleven loses 9.5 points over the next 4 jornadas, 16.7 over the next 8, 54.7 over the season",
-   "per_million": 0.31364699914517286,
-   "facts": [
-    [
-     "value",
-     58948464.0,
-     "money"
-    ],
-    [
-     "offer",
-     53102276.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9008254396586144,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     9.541626226833785,
-     "points"
-    ],
-    [
-     "next 8",
-     16.655369515178734,
-     "points"
-    ],
-    [
-     "season",
-     54.73842371676278,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
-   "name": "Gerard Martin",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Gerard Martin",
-   "step": "take offer",
-   "offer": 34536626.0,
-   "waiting": null,
-   "trend": -4.447602746679076,
-   "plan": false,
-   "amount": 34536626.0,
-   "done": false,
-   "key": "12641",
-   "gain": -38.79172093634884,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.043812176209807,
-   "lost": {
-    "next4": 4.549493927303644,
-    "next8": 11.17087849164102,
-    "season": 38.79172093634884
-   },
-   "offer_percentile": 0.7392996108949417,
-   "offers_seen": 771,
-   "note": "offer 1.04 x value; at or above 74% of the 771 nightly offers seen; the eleven loses 4.5 points over the next 4 jornadas, 11.2 over the next 8, 38.8 over the season",
-   "per_million": 0.3234501972381732,
-   "facts": [
-    [
-     "value",
-     33087012.0,
-     "money"
-    ],
-    [
-     "offer",
-     34536626.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.043812176209807,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     4.549493927303644,
-     "points"
-    ],
-    [
-     "next 8",
-     11.17087849164102,
-     "points"
-    ],
-    [
-     "season",
-     38.79172093634884,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
-   "name": "Mikel Oyarzabal",
-   "pos": "DEL",
-   "what": "sell",
-   "label": "sell Mikel Oyarzabal",
-   "step": "take offer",
-   "offer": 40323076.0,
-   "waiting": null,
-   "trend": -12.689876671601267,
-   "plan": false,
-   "amount": 40323076.0,
-   "done": false,
-   "key": "2675",
-   "gain": -44.48089052742648,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 0.9156918766568115,
-   "lost": {
-    "next4": 8.482141471128074,
-    "next8": 13.115765485961845,
-    "season": 44.48089052742648
-   },
-   "offer_percentile": 0.07392996108949416,
-   "offers_seen": 771,
-   "note": "offer 0.92 x value; at or above 7% of the 771 nightly offers seen; the eleven loses 8.5 points over the next 4 jornadas, 13.1 over the next 8, 44.5 over the season",
-   "per_million": 0.32526698821195693,
-   "facts": [
-    [
-     "value",
-     44035638.0,
-     "money"
-    ],
-    [
-     "offer",
-     40323076.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9156918766568115,
-     "ratio"
-    ],
-    [
-     "points lost, next 4",
-     8.482141471128074,
-     "points"
-    ],
-    [
-     "next 8",
-     13.115765485961845,
-     "points"
-    ],
-    [
-     "season",
-     44.48089052742648,
+     23.437659660439977,
      "points"
     ]
    ],
@@ -1029,7 +834,7 @@
    "amount": 23845784.0,
    "done": false,
    "key": "7658",
-   "gain": -30.13037188091721,
+   "gain": -23.422159097720623,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1037,14 +842,14 @@
    "flip": null,
    "ratio": 1.090071754488347,
    "lost": {
-    "next4": 4.443752961815164,
-    "next8": 8.756190934767517,
-    "season": 30.13037188091721
+    "next4": 2.5125982298701217,
+    "next8": 4.524305063176428,
+    "season": 23.422159097720623
    },
    "offer_percentile": 0.9571984435797666,
    "offers_seen": 771,
-   "note": "offer 1.09 x value; at or above 96% of the 771 nightly offers seen; the eleven loses 4.4 points over the next 4 jornadas, 8.8 over the next 8, 30.1 over the season",
-   "per_million": 0.36720079888199597,
+   "note": "offer 1.09 x value; at or above 96% of the 771 nightly offers seen; the eleven loses 2.5 points over the next 4 jornadas, 4.5 over the next 8, 23.4 over the season",
+   "per_million": 0.1897318646841902,
    "facts": [
     [
      "value",
@@ -1063,17 +868,212 @@
     ],
     [
      "points lost, next 4",
-     4.443752961815164,
+     2.5125982298701217,
      "points"
     ],
     [
      "next 8",
-     8.756190934767517,
+     4.524305063176428,
      "points"
     ],
     [
      "season",
-     30.13037188091721,
+     23.422159097720623,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
+   "name": "Gerard Martin",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Gerard Martin",
+   "step": "take offer",
+   "offer": 34536626.0,
+   "waiting": null,
+   "trend": -4.447602746679076,
+   "plan": false,
+   "amount": 34536626.0,
+   "done": false,
+   "key": "12641",
+   "gain": -32.08350815315225,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 1.043812176209807,
+   "lost": {
+    "next4": 2.618339195358601,
+    "next8": 6.93899262004993,
+    "season": 32.08350815315225
+   },
+   "offer_percentile": 0.7392996108949417,
+   "offers_seen": 771,
+   "note": "offer 1.04 x value; at or above 74% of the 771 nightly offers seen; the eleven loses 2.6 points over the next 4 jornadas, 6.9 over the next 8, 32.1 over the season",
+   "per_million": 0.20091692280681764,
+   "facts": [
+    [
+     "value",
+     33087012.0,
+     "money"
+    ],
+    [
+     "offer",
+     34536626.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     1.043812176209807,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     2.618339195358601,
+     "points"
+    ],
+    [
+     "next 8",
+     6.93899262004993,
+     "points"
+    ],
+    [
+     "season",
+     32.08350815315225,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
+   "name": "Mikel Oyarzabal",
+   "pos": "DEL",
+   "what": "sell",
+   "label": "sell Mikel Oyarzabal",
+   "step": "take offer",
+   "offer": 40323076.0,
+   "waiting": null,
+   "trend": -12.689876671601267,
+   "plan": false,
+   "amount": 40323076.0,
+   "done": false,
+   "key": "2675",
+   "gain": -37.772677744229895,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 0.9156918766568115,
+   "lost": {
+    "next4": 6.550986739183031,
+    "next8": 8.883879614370755,
+    "season": 37.772677744229895
+   },
+   "offer_percentile": 0.07392996108949416,
+   "offers_seen": 771,
+   "note": "offer 0.92 x value; at or above 7% of the 771 nightly offers seen; the eleven loses 6.6 points over the next 4 jornadas, 8.9 over the next 8, 37.8 over the season",
+   "per_million": 0.22031750787987392,
+   "facts": [
+    [
+     "value",
+     44035638.0,
+     "money"
+    ],
+    [
+     "offer",
+     40323076.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9156918766568115,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     6.550986739183031,
+     "points"
+    ],
+    [
+     "next 8",
+     8.883879614370755,
+     "points"
+    ],
+    [
+     "season",
+     37.772677744229895,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
+   "name": "Pablo Fornals",
+   "pos": "MED",
+   "what": "sell",
+   "label": "sell Pablo Fornals",
+   "step": "take offer",
+   "offer": 53102276.0,
+   "waiting": null,
+   "trend": 19.436266448829304,
+   "plan": false,
+   "amount": 53102276.0,
+   "done": false,
+   "key": "2632",
+   "gain": -48.03021093356597,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 0.9008254396586144,
+   "lost": {
+    "next4": 7.610471494888742,
+    "next8": 12.423483643587645,
+    "season": 48.03021093356597
+   },
+   "offer_percentile": 0.0025940337224383916,
+   "offers_seen": 771,
+   "note": "offer 0.90 x value; at or above 0% of the 771 nightly offers seen; the eleven loses 7.6 points over the next 4 jornadas, 12.4 over the next 8, 48.0 over the season",
+   "per_million": 0.23395388257158023,
+   "facts": [
+    [
+     "value",
+     58948464.0,
+     "money"
+    ],
+    [
+     "offer",
+     53102276.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9008254396586144,
+     "ratio"
+    ],
+    [
+     "points lost, next 4",
+     7.610471494888742,
+     "points"
+    ],
+    [
+     "next 8",
+     12.423483643587645,
+     "points"
+    ],
+    [
+     "season",
+     48.03021093356597,
      "points"
     ]
    ],
@@ -1094,7 +1094,7 @@
    "amount": 53674560.0,
    "done": false,
    "key": "11813",
-   "gain": -58.564479948755434,
+   "gain": -51.85626716555885,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1102,14 +1102,14 @@
    "flip": null,
    "ratio": 0.9388784998699378,
    "lost": {
-    "next4": 9.412687885505107,
-    "next8": 20.537568002853334,
-    "season": 58.564479948755434
+    "next4": 7.481533153560065,
+    "next8": 16.305682131262245,
+    "season": 51.85626716555885
    },
    "offer_percentile": 0.19844357976653695,
    "offers_seen": 771,
-   "note": "offer 0.94 x value; at or above 20% of the 771 nightly offers seen; the eleven loses 9.4 points over the next 4 jornadas, 20.5 over the next 8, 58.6 over the season",
-   "per_million": 0.38263132483719164,
+   "note": "offer 0.94 x value; at or above 20% of the 771 nightly offers seen; the eleven loses 7.5 points over the next 4 jornadas, 16.3 over the next 8, 51.9 over the season",
+   "per_million": 0.30378790494532687,
    "facts": [
     [
      "value",
@@ -1128,17 +1128,17 @@
     ],
     [
      "points lost, next 4",
-     9.412687885505107,
+     7.481533153560065,
      "points"
     ],
     [
      "next 8",
-     20.537568002853334,
+     16.305682131262245,
      "points"
     ],
     [
      "season",
-     58.564479948755434,
+     51.85626716555885,
      "points"
     ]
    ],
@@ -1159,7 +1159,7 @@
    "amount": 21504881.0,
    "done": false,
    "key": "8496",
-   "gain": -42.30576645445444,
+   "gain": -35.597553671257856,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1167,14 +1167,14 @@
    "flip": null,
    "ratio": 1.0645790966101594,
    "lost": {
-    "next4": 5.389784963589307,
-    "next8": 11.240208086822008,
-    "season": 42.30576645445444
+    "next4": 3.4586302316442925,
+    "next8": 7.008322215230919,
+    "season": 35.597553671257856
    },
    "offer_percentile": 0.8469520103761349,
    "offers_seen": 771,
-   "note": "offer 1.06 x value; at or above 85% of the 771 nightly offers seen; the eleven loses 5.4 points over the next 4 jornadas, 11.2 over the next 8, 42.3 over the season",
-   "per_million": 0.5226817152265111,
+   "note": "offer 1.06 x value; at or above 85% of the 771 nightly offers seen; the eleven loses 3.5 points over the next 4 jornadas, 7.0 over the next 8, 35.6 over the season",
+   "per_million": 0.3258944894989616,
    "facts": [
     [
      "value",
@@ -1193,17 +1193,17 @@
     ],
     [
      "points lost, next 4",
-     5.389784963589307,
+     3.4586302316442925,
      "points"
     ],
     [
      "next 8",
-     11.240208086822008,
+     7.008322215230919,
      "points"
     ],
     [
      "season",
-     42.30576645445444,
+     35.597553671257856,
      "points"
     ]
    ],
@@ -1224,7 +1224,7 @@
    "amount": 10053896.0,
    "done": false,
    "key": "7676",
-   "gain": -22.672874243159185,
+   "gain": -15.964661459962599,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1232,14 +1232,14 @@
    "flip": null,
    "ratio": 0.9495005720767069,
    "lost": {
-    "next4": 1.9311547319450426,
-    "next8": 7.781637509606469,
-    "season": 22.672874243159185
+    "next4": 0.0,
+    "next8": 3.5497516380153797,
+    "season": 15.964661459962599
    },
    "offer_percentile": 0.25551232166018156,
    "offers_seen": 771,
-   "note": "offer 0.95 x value; at or above 26% of the 771 nightly offers seen; the eleven loses 1.9 points over the next 4 jornadas, 7.8 over the next 8, 22.7 over the season",
-   "per_million": 0.7739922423711633,
+   "note": "offer 0.95 x value; at or above 26% of the 771 nightly offers seen; the eleven loses 0.0 points over the next 4 jornadas, 3.5 over the next 8, 16.0 over the season",
+   "per_million": 0.35307224562650935,
    "facts": [
     [
      "value",
@@ -1258,17 +1258,17 @@
     ],
     [
      "points lost, next 4",
-     1.9311547319450426,
+     0.0,
      "points"
     ],
     [
      "next 8",
-     7.781637509606469,
+     3.5497516380153797,
      "points"
     ],
     [
      "season",
-     22.672874243159185,
+     15.964661459962599,
      "points"
     ]
    ],
@@ -1362,7 +1362,7 @@
   {
    "name": "Robin Le Normand",
    "pos": "DEF",
-   "next": 4.251122678967513,
+   "next": 5.18731097241684,
    "xi": true,
    "best": true,
    "sold": false
@@ -1450,7 +1450,7 @@
   {
    "name": "Dani Martinez",
    "pos": "DEF",
-   "next": 0.9204445973503432,
+   "next": 1.4249608009267707,
    "xi": false,
    "best": false,
    "sold": false
