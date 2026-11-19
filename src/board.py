@@ -316,6 +316,12 @@ def auction_card() -> Doc:
                       for d in decision.drifting_bins(run)]}
 
 
+def arrival_rows(got: Sequence[dict[str, Any]], arrivals: Sequence[str]) -> list[dict[str, Any]]:
+    """The rows of got whose player is in arrivals, in the order of arrivals (best first), at most TOP_TARGETS."""
+    row = {r["player"]: r for r in got}
+    return [row[p] for p in arrivals if p in row][:TOP_TARGETS]
+
+
 def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
           extras: decision.Extras, health: Iterable[Health], offers: worth.OfferDistribution = worth.NO_OFFERS) -> Doc:
     """The decisions document of the cut; extras are what the World gives beside the inputs, health the status of each
@@ -331,9 +337,8 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     pos = {p.player: p.pos for p in inp.players if p.pos in POSITIONS}
     club = Club(mine, pos, {h.player: h.value for h in extras.held},
                 {o.player: o.money for o in offered}, cash, team_value, (len(inp.bids), bids), debt=debt)
-    top = [r for r in got if r["gain"] > 0][:TOP_TARGETS]
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
-               "win": r["win"], "placed": r["placed"]} for r in top if r["player"] in arrivals]
+               "win": r["win"], "placed": r["placed"]} for r in arrival_rows(got, arrivals)]
     buys = buy_lines(inp, names, club, got)
     sells = offer_lines(inp, names, offered, known, offers)
     funds(buys, sells)
@@ -479,8 +484,19 @@ def _selftest_world() -> None:
     assert market_at(None) is None and market_at("2026-10-30T1809Z") == "2026-10-30T18:09Z"
 
 
+def _selftest_alerts() -> None:
+    rows = [{"player": "r%d" % i, "gain": 50.0 - i} for i in range(TOP_TARGETS + 5)] + [{"player": "new", "gain": 0.5}]
+    assert [r["player"] for r in arrival_rows(rows, ["new"])] == ["new"], "an arrival ranking low among all gains still alerts"
+    assert arrival_rows(rows, []) == [], "no arrivals, no alerts"
+    assert arrival_rows(rows, ["ghost"]) == [], "only rows of got alert"
+    many = ["r%d" % i for i in range(TOP_TARGETS + 3)]
+    assert [r["player"] for r in arrival_rows(rows, many)] == many[:TOP_TARGETS], "best first, capped"
+    assert {r["player"] for r in arrival_rows(rows, ["new", "r2"])} <= {"new", "r2"}, "a non-arrival never alerts"
+
+
 def _selftest() -> None:
     _selftest_params()
+    _selftest_alerts()
     _selftest_world()
     assert stamped("2026-10-30T1809Z") == "2026-10-30T18:09Z"
     told = sources([Health("b", "2026-11-01T0900Z", 5, 10.0, 2.5, 1.0, "ok", "2026-11-01T0900Z"),
