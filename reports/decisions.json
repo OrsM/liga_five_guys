@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-19T09:02Z",
- "market_at": "2026-11-19T09:01Z",
+ "generated_at": "2026-11-19T10:32Z",
+ "market_at": "2026-11-19T10:32Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-19T09:01Z",
+   "at": "2026-11-19T10:32Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,54 +56,7 @@
  "cash_locked": 56165301.0,
  "can_bid": 23527998.200000003,
  "ping": "",
- "do": [
-  {
-   "name": "German Valera, Mathew Ryan, Natan",
-   "pos": "",
-   "what": "list",
-   "label": "list German Valera, Mathew Ryan, Natan",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "90937863",
-     "player": "3074",
-     "market": null,
-     "bid": null,
-     "pos": "MED",
-     "value": 21875426.0
-    },
-    {
-     "player_team": "64086240",
-     "player": "2755",
-     "market": null,
-     "bid": null,
-     "pos": "POR",
-     "value": 17788829.0
-    },
-    {
-     "player_team": "47459928",
-     "player": "2543",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 57168803.0
-    }
-   ]
-  }
- ],
+ "do": [],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
@@ -398,37 +351,37 @@
    {
     "scope": "backtest:all",
     "n": 3344,
-    "model": 0.03266092606164733,
+    "model": 0.03264215055049453,
     "pooled": 0.042716713373403215
    },
    {
     "scope": "backtest:big",
     "n": 287,
-    "model": 0.10280286504259338,
+    "model": 0.10277159650460871,
     "pooled": 0.11994628856938763
    },
    {
     "scope": "backtest:norival",
     "n": 3128,
-    "model": 0.021610317885457815,
+    "model": 0.021575762155684613,
     "pooled": 0.025683046673397575
    },
    {
     "scope": "backtest:ours",
     "n": 279,
-    "model": 0.18785781454847392,
+    "model": 0.18813476923186312,
     "pooled": 0.25841268375614884
    },
    {
     "scope": "backtest:rival",
     "n": 216,
-    "model": 0.19269010372424358,
+    "model": 0.19289984915681588,
     "pooled": 0.2893894422512626
    },
    {
     "scope": "backtest:small",
     "n": 3057,
-    "model": 0.026075797998993906,
+    "model": 0.026058195369326458,
     "pooled": 0.03546617752739486
    },
    {
@@ -473,43 +426,43 @@
    {
     "scope": "backtest:norival",
     "bin": "0.50-0.80",
-    "n": 60,
-    "stated": 0.7320922168689485,
-    "observed": 0.5833333333333334
+    "n": 58,
+    "stated": 0.730595212642514,
+    "observed": 0.5689655172413793
    },
    {
     "scope": "backtest:ours",
     "bin": "0.00-0.50",
     "n": 20,
-    "stated": 0.3767940052853177,
+    "stated": 0.37794712999359587,
     "observed": 0.1
    },
    {
     "scope": "backtest:ours",
     "bin": "0.50-0.80",
     "n": 44,
-    "stated": 0.6860980749465923,
+    "stated": 0.6878235887270555,
     "observed": 0.4772727272727273
    },
    {
     "scope": "backtest:ours",
     "bin": "0.80-0.90",
     "n": 65,
-    "stated": 0.8447397146292233,
+    "stated": 0.8449216177503813,
     "observed": 0.676923076923077
    },
    {
     "scope": "backtest:ours",
     "bin": "0.90-0.95",
     "n": 47,
-    "stated": 0.9308076528169879,
+    "stated": 0.9307063356943941,
     "observed": 0.7872340425531915
    },
    {
     "scope": "backtest:ours",
     "bin": "0.95-0.99",
     "n": 44,
-    "stated": 0.9733674272865983,
+    "stated": 0.9733310766508937,
     "observed": 0.7954545454545454
    },
    {
