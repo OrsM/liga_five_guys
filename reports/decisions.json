@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-20T21:27Z",
- "market_at": "2026-11-20T21:25Z",
+ "generated_at": "2026-11-20T21:38Z",
+ "market_at": "2026-11-20T21:38Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-20T21:25Z",
+   "at": "2026-11-20T21:38Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -55,7 +55,7 @@
  "cash": -3550435.0,
  "cash_locked": 0,
  "can_bid": 82211548.80000001,
- "ping": "on the market: Alex Grimaldo (+79 points), Kang-In Lee (+36 points), Ante Budimir (+14 points)",
+ "ping": "",
  "do": [
   {
    "name": "Aitor Paredes",
@@ -120,44 +120,6 @@
    "why": "cash -3550435 is below 0: these offers bring it to 17538571 at the lock, losing 24.2 points",
    "set_points_lost": 24.246911628485122,
    "set_cash_after": 17538571.0
-  },
-  {
-   "name": "Fernando Calero, Sergio Carreira",
-   "pos": "",
-   "what": "list",
-   "label": "list Fernando Calero, Sergio Carreira",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "117924195",
-     "player": "2398",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 706692.0
-    },
-    {
-     "player_team": "117924193",
-     "player": "2604",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 5339031.0
-    }
-   ]
   }
  ],
  "lineup": {
@@ -624,32 +586,7 @@
    "available": false
   }
  ],
- "alerts": [
-  {
-   "name": "Alex Grimaldo",
-   "gain": 79.26778059607555,
-   "asking": 85761117.0,
-   "bid": 85761117.0,
-   "win": 1.0,
-   "placed": null
-  },
-  {
-   "name": "Kang-In Lee",
-   "gain": 36.023077471850996,
-   "asking": 56843492.0,
-   "bid": 56843492.0,
-   "win": 1.0,
-   "placed": null
-  },
-  {
-   "name": "Ante Budimir",
-   "gain": 14.05505578910379,
-   "asking": 62812766.0,
-   "bid": 65953404.300000004,
-   "win": 0.9,
-   "placed": null
-  }
- ],
+ "alerts": [],
  "auction": {
   "brier": [
    {
