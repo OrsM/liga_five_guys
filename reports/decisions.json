@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-20T21:00Z",
- "market_at": "2026-11-20T20:59Z",
+ "generated_at": "2026-11-20T21:05Z",
+ "market_at": "2026-11-20T21:05Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-20T20:59Z",
+   "at": "2026-11-20T21:05Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -56,7 +56,38 @@
  "cash_locked": 6045723.0,
  "can_bid": 81002404.2,
  "ping": "",
- "do": [],
+ "do": [
+  {
+   "name": "Dani Martinez",
+   "pos": "",
+   "what": "list",
+   "label": "list Dani Martinez",
+   "step": "list",
+   "amount": null,
+   "done": false,
+   "accepts": [
+    null
+   ],
+   "gain": null,
+   "per": null,
+   "facts": [],
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "plan": false,
+   "act": [
+    {
+     "player_team": "109094611",
+     "player": "2881",
+     "market": null,
+     "bid": null,
+     "pos": "DEF",
+     "value": 661704.0
+    }
+   ]
+  }
+ ],
  "lineup": {
   "eleven": [
    "Mathew Ryan",
