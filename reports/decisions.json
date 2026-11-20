@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-20T16:42Z",
- "market_at": "2026-11-20T16:42Z",
+ "generated_at": "2026-11-20T17:01Z",
+ "market_at": "2026-11-20T17:01Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-20T16:42Z",
+   "at": "2026-11-20T17:01Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -200,9 +200,9 @@
   "eleven": [
    "Mathew Ryan",
    "Natan",
-   "Robin Le Normand",
    "Dean Huijsen",
    "Aitor Paredes",
+   "Dani Martinez",
    "Pablo Fornals",
    "Pepelu",
    "Guido Rodriguez",
@@ -212,9 +212,15 @@
   ],
   "message": "",
   "unmapped": [],
-  "points": 59.017617520354456,
+  "points": 55.256013788539974,
   "best": 59.017617520354456,
-  "advice": []
+  "advice": [
+   {
+    "in": "Robin Le Normand",
+    "out": "Dani Martinez",
+    "gain": 3.7616037318144824
+   }
+  ]
  },
  "buys": [],
  "targets": [
@@ -1045,14 +1051,6 @@
    "sold": false
   },
   {
-   "name": "Robin Le Normand",
-   "pos": "DEF",
-   "next": 5.1890470385104255,
-   "xi": true,
-   "best": true,
-   "sold": false
-  },
-  {
    "name": "Dean Huijsen",
    "pos": "DEF",
    "next": 5.099225380335886,
@@ -1066,6 +1064,14 @@
    "next": 4.861344650780408,
    "xi": true,
    "best": true,
+   "sold": false
+  },
+  {
+   "name": "Dani Martinez",
+   "pos": "DEF",
+   "next": 1.427443306695943,
+   "xi": true,
+   "best": false,
    "sold": false
   },
   {
@@ -1125,11 +1131,11 @@
    "sold": false
   },
   {
-   "name": "Dani Martinez",
+   "name": "Robin Le Normand",
    "pos": "DEF",
-   "next": 1.427443306695943,
+   "next": 5.1890470385104255,
    "xi": false,
-   "best": false,
+   "best": true,
    "sold": false
   }
  ]
