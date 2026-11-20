@@ -1,7 +1,6 @@
 """Sell rules: how a standing offer on one of your players is judged. A rule takes the offer (Standing) and the windows of
-jornadas the board reads (Context) and gives a Verdict: the key the offers are sorted by, the points your eleven loses
-over each window (None when the eleven has no legal replacement for him), and the reserve price (None when the rule states
-none). LIVE is the rule the board runs."""
+jornadas the board reads (Context) and gives a Verdict: the key the offers are sorted by, the Reading of selling him (its
+points None when the squad without him has no legal eleven), and the reserve price (None when the rule states none). LIVE is the rule the board runs."""
 from __future__ import annotations
 
 import bisect
@@ -15,7 +14,7 @@ from typing import NamedTuple
 import eleven
 from ffcore.rules import SALE_ESTIMATE
 import valuation
-from valuation import READERS, Window
+from valuation import Reading, Window
 
 STOPGAP_RATE = 0.6
 MAX_NIGHTS = 5
@@ -39,10 +38,10 @@ NO_OFFERS = OfferDistribution(())
 
 
 class Context(NamedTuple):
-    """What a rule reads: the positions, the window of each reader (valuation.READERS), your cash, the offers seen and the
+    """What a rule reads: the positions, the Window a sale made now counts for, your cash, the offers seen and the
     rate, and what the points are made of: your squad, each jornada's forecast per player and the locks."""
     pos: Mapping[str, str]
-    horizons: Mapping[str, Window]
+    window: Window
     cash: float
     offers: OfferDistribution = NO_OFFERS
     rate: float = STOPGAP_RATE
@@ -50,38 +49,26 @@ class Context(NamedTuple):
     cells: valuation.Cells = {}
     locks: Mapping[int, str] = {}
 
+    def sale(self, player: str) -> Reading:
+        """The Reading of selling the player now, over the window of the context."""
+        return valuation.read(self.squad, valuation.selling(player), self.window, self.locks, self.pos, self.cells)
+
 
 class Verdict(NamedTuple):
     key: float | None
-    lost: Mapping[str, float] | None
+    sale: Reading
     reserve: float | None
 
 
 Rule = Callable[[Standing, Context], Verdict]
 
 
-def lost_points(player: str, ctx: Context) -> Mapping[str, float] | None:
-    """The points your squad loses by selling player now, for each window of ctx.horizons: valuation.delta of the sale,
-    the eleven picked afresh in each jornada, negated (0 for a player no jornada's eleven needs). Zero where the squad
-    fields no eleven. None when the squad without him fields none: his sale has no points loss to quote."""
-    if eleven.points(ctx.squad, ctx.pos, {}) is None:
-        return {n: 0.0 for n in ctx.horizons}
-    sale = valuation.Move(frozenset({player}), frozenset(), None, None)
-    out: dict[str, float] = {}
-    for n, window in ctx.horizons.items():
-        got = valuation.delta(ctx.squad, sale, window, ctx.locks, ctx.pos, ctx.cells).points
-        if got is None:
-            return None
-        out[n] = 0.0 - got
-    return out
-
-
 def points_per_million(standing: Standing, ctx: Context) -> Verdict:
     """Ranks an offer by the points lost over the season per million raised: None when the offer is None or 0 or
-    when lost_points is None. States no reserve price."""
-    lost = lost_points(standing.player, ctx)
-    key = None if lost is None or not standing.offer else lost["season"] / (standing.offer / 1e6)
-    return Verdict(key, lost, None)
+    when the sale has no Delta (no legal eleven without him). States no reserve price."""
+    sale = ctx.sale(standing.player)
+    key = None if sale.points is None or not standing.offer else (0.0 - sale.points) / (standing.offer / 1e6)
+    return Verdict(key, sale, None)
 
 
 LIVE: Rule = points_per_million
@@ -96,18 +83,18 @@ def reserve_price(lost_season: float, rate: float, later: float) -> float:
 def worth_rule(rate: float, *, trend: bool) -> Rule:
     """A sell rule at rate points per million. The key is reserve minus offer (negative means sell); the reserve uses the
     expected later sale price, which is standing.later when trend is set and SALE_ESTIMATE times the value otherwise.
-    With no offer the key is None and the reserve is still stated; where lost_points is None both are None."""
+    With no offer the key is None and the reserve is still stated; where the sale has no Delta both are None."""
     if not rate > 0:
         raise ValueError("rate must be > 0")
 
     def rule(standing: Standing, ctx: Context) -> Verdict:
-        lost = lost_points(standing.player, ctx)
-        if lost is None:
-            return Verdict(None, None, None)
+        sale = ctx.sale(standing.player)
+        if sale.points is None:
+            return Verdict(None, sale, None)
         later = standing.later if trend else SALE_ESTIMATE * standing.value
-        reserve = reserve_price(lost["season"], rate, later)
+        reserve = reserve_price(0.0 - sale.points, rate, later)
         key = None if standing.offer is None else reserve - standing.offer
-        return Verdict(key, lost, reserve)
+        return Verdict(key, sale, reserve)
 
     return rule
 
@@ -175,15 +162,15 @@ def drift_cost(standing: Standing) -> float:
 
 def bench_option(standing: Standing, ctx: Context) -> Verdict:
     """The reserve of the offers' option value. A player the eleven loses points without in any window (the most over
-    ctx.horizons) gets reserve_price at ctx.rate of that most; no verdict of the board reads it. A bench player (loses
+    the readers) gets reserve_price at ctx.rate of that most; no verdict of the board reads it. A bench player (loses
     nothing in any window, so no jornada needs him: m = MAX_NIGHTS nights of free waiting) gets value times
     offer_reserve_ratio over ctx.offers with the drift_cost of the standing and hold = later over value, never below later;
     with no ctx.offers, later. The key is reserve minus offer (negative means sell); with no offer it is None. Where
-    lost_points is None key and reserve are None."""
-    lost = lost_points(standing.player, ctx)
-    if lost is None:
-        return Verdict(None, None, None)
-    most = max(lost.values(), default=0.0)
+    the sale has no Delta key and reserve are None."""
+    sale = ctx.sale(standing.player)
+    if sale.points is None:
+        return Verdict(None, sale, None)
+    most = max((0.0 - v for v in sale.window.values() if v is not None), default=0.0)
     if most > NO_LOSS:
         reserve = reserve_price(most, ctx.rate, standing.later)
     elif not ctx.offers.ratios or standing.value <= 0:
@@ -192,7 +179,7 @@ def bench_option(standing: Standing, ctx: Context) -> Verdict:
         ratio = offer_reserve_ratio(MAX_NIGHTS, drift_cost(standing), ctx.offers, standing.later / standing.value)
         reserve = max(standing.later, standing.value * ratio)
     key = None if standing.offer is None else reserve - standing.offer
-    return Verdict(key, lost, reserve)
+    return Verdict(key, sale, reserve)
 
 
 CHALLENGERS: Mapping[str, Rule] = {
@@ -267,7 +254,10 @@ def _selftest_option() -> None:
     value = 1e7
     now = dt.datetime(2026, 11, 18, tzinfo=dt.timezone.utc)
     held = _waiting_payoff(MAX_NIGHTS, 0.0, study, SALE_ESTIMATE, 0.0, 11, 20000)
-    bench_ctx = Context({}, {}, 0.0, study)
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    squad = {"%s%d" % (q, i): q for q, n in shape.items() for i in range(n)} | {"p": "DEF"}
+    still = {1: {k: 1.0 for k in squad} | {"p": 0.0}}
+    bench_ctx = Context(squad, Window((1,)), 0.0, study, squad=frozenset(squad), cells=still)
     stand = Standing("p", value, None, SALE_ESTIMATE * value)
     reserve = bench_option(stand, bench_ctx).reserve
     assert reserve is not None and abs(reserve / value - held) < 0.003, "the rule's reserve is the Monte Carlo waiting value"
@@ -278,7 +268,7 @@ def _selftest_option() -> None:
     for drift in (-0.2, 0.0, 0.2):
         s = Standing("p", value, 0.0, SALE_ESTIMATE * value * (1 + drift))
         assert (bench_option(s, bench_ctx).reserve or 0.0) >= s.later, "a bench reserve is never below the later price"
-    assert Context({}, {}, 0.0) == Context({}, {}, 0.0, NO_OFFERS, STOPGAP_RATE), "the new fields default"
+    assert Context({}, Window(), 0.0) == Context({}, Window(), 0.0, NO_OFFERS, STOPGAP_RATE), "the new fields default"
 
     cuts = [CutBuys(now - dt.timedelta(days=d), [Buy(g, b) for g, b in buys]) for d, buys in
             ((1, [(10.0, 10e6), (6.0, 5e6)]), (2, []), (3, [(4.0, 8e6)]), (4, [(0.0, 1e6), (-1.0, 1e6)]), (6, [(9.0, 3e6)]), (9, [(90.0, 1e6)]))]
@@ -288,14 +278,18 @@ def _selftest_option() -> None:
     assert r_estimate(cuts, now) > 0
 
 
+def _lost(player: str, ctx: Context) -> Mapping[str, float] | None:
+    sale = ctx.sale(player)
+    return None if sale.points is None else {n: 0.0 - v for n, v in sale.window.items() if v is not None}
+
+
 def _cells_of(rng: random.Random, value: Mapping[str, float]) -> dict[int, dict[str, float]]:
     return {1: dict(value), 2: {k: v * rng.choice([0.0, 0.5, 1.0, 2.0]) for k, v in value.items()},
             3: {k: rng.choice([0.0, 1.0, 3.0, 5.0]) for k in value}}
 
 
 def _context(squad: Iterable[str], pos: Mapping[str, str], cells: valuation.Cells) -> Context:
-    season = Window(sorted(cells))
-    return Context(pos, {n: getattr(season, n) for n in READERS}, 0.0, squad=frozenset(squad), cells=cells, locks={1: "2026-12-01T20:00Z"})
+    return Context(pos, Window(sorted(cells)), 0.0, squad=frozenset(squad), cells=cells, locks={1: "2026-12-01T20:00Z"})
 
 
 def _selftest_no_legal_eleven() -> None:
@@ -308,23 +302,23 @@ def _selftest_no_legal_eleven() -> None:
     bare = _context(pos, pos, cells)
     for p in pos:
         v = LIVE(Standing(p, value[p], 1e6, value[p]), bare)
-        assert lost_points(p, bare) is None and v == Verdict(None, None, None), "eleven players only: nobody has a quotable loss"
-        assert worth_rule(1.0, trend=False)(Standing(p, value[p], 1e6, value[p]), bare) == Verdict(None, None, None)
-        assert bench_option(Standing(p, value[p], 1e6, value[p]), bare) == Verdict(None, None, None)
+        assert _lost(p, bare) is None and v == Verdict(None, bare.sale(p), None) and bare.sale(p).points is None, "eleven players only: nobody has a quotable loss"
+        assert worth_rule(1.0, trend=False)(Standing(p, value[p], 1e6, value[p]), bare) == Verdict(None, bare.sale(p), None)
+        assert bench_option(Standing(p, value[p], 1e6, value[p]), bare) == Verdict(None, bare.sale(p), None)
     extra = "DEF9"
     pos[extra], value[extra] = "DEF", 0.5
     cells = {j: c | {extra: 0.5} for j, c in cells.items()}
     backed = _context(pos, pos, cells)
     whole = sum(eleven.total(frozenset(k for k in pos if k != extra), c) for c in cells.values())
     for p in pos:
-        got = lost_points(p, backed)
+        got = _lost(p, backed)
         if eleven.points(backed.squad - {p}, pos, {}) is None:
             assert got is None, "no replacement fills the slot: no legal eleven"
         else:
             assert got is not None and all(0 <= x < whole for x in got.values()), "covered: costed as the swap, never the whole eleven"
-    assert lost_points("POR0", backed) is None, "the only keeper with no bench keeper: no legal eleven"
-    assert lost_points("DEF0", backed) is not None, "a starter of the benched position is covered"
-    costs = [lost_points(p, backed) for p in pos]
+    assert _lost("POR0", backed) is None, "the only keeper with no bench keeper: no legal eleven"
+    assert _lost("DEF0", backed) is not None, "a starter of the benched position is covered"
+    costs = [_lost(p, backed) for p in pos]
     assert len({tuple(c.values()) for c in costs if c is not None}) > 1, "covered rows differ per player"
 
 
@@ -341,13 +335,14 @@ def _selftest() -> None:
             ctx = _context(squad, pos, cells)
             played = _played(squad, pos, cells)
             for p in squad:
-                got = lost_points(p, ctx)
+                got = _lost(p, ctx)
                 if p not in played:
                     assert got is not None and not any(got.values()), "a player no jornada's eleven fields costs nothing"
                 if got is None:
                     assert eleven.points(squad - {p}, pos, {}) is None
                     continue
-                for n, w in ctx.horizons.items():
+                for n in valuation.READERS:
+                    w = getattr(ctx.window, n)
                     lose = sum((eleven.best_total(squad, pos, cells[j]) or 0.0) - (eleven.best_total(squad - {p}, pos, cells[j]) or 0.0) for j in w)
                     assert abs(got[n] - lose) < 1e-9, "the loss is V(S) less V(S-p) in each jornada, summed"
                     assert got[n] >= -1e-9, "selling never gains points"
@@ -356,12 +351,12 @@ def _selftest() -> None:
                 offer = 1e6 * (1 + seed)
                 s = Standing(p, value[p], offer, value[p])
                 v = LIVE(s, ctx)
-                assert v.lost == lost_points(p, ctx)
+                assert v.sale == ctx.sale(p)
                 assert v.reserve is None, "the baseline states no reserve"
-                if v.lost is None:
+                if v.sale.points is None:
                     assert v.key is None, "no legal eleven without him: no key"
                     continue
-                per_million = v.lost["season"] / (offer / 1e6)
+                per_million = (0.0 - (v.sale.points or 0.0)) / (offer / 1e6)
                 assert v.key == per_million, "key is points lost per million"
                 half = LIVE(s._replace(offer=2 * offer), ctx).key
                 assert half is not None and abs(half - per_million / 2) < 1e-9, "key halves when the offer doubles"
@@ -372,9 +367,9 @@ def _selftest() -> None:
                 trended = worth_rule(rate, trend=True)
                 for p in squad:
                     a = SALE_ESTIMATE * value[p]
-                    got = lost_points(p, ctx)
+                    got = _lost(p, ctx)
                     if got is None:
-                        assert plain(Standing(p, value[p], 1e6, a), ctx) == Verdict(None, None, None), "no legal eleven: no reserve, no key"
+                        assert plain(Standing(p, value[p], 1e6, a), ctx) == Verdict(None, ctx.sale(p), None), "no legal eleven: no reserve, no key"
                         continue
                     lost = got["season"]
                     for offer in (1e6 * (1 + seed), 3e6 * (1 + seed)):
@@ -401,9 +396,9 @@ def _selftest() -> None:
     assert LIVE is points_per_million
 
     def stub(standing: Standing, ctx: Context) -> Verdict:
-        return Verdict(1.0, {}, 2.0)
+        return Verdict(1.0, Reading(None, {}, ()), 2.0)
     rule: Rule = stub
-    assert rule(Standing("x", 1.0, 1.0, 1.0), Context({}, {}, 0.0)) == Verdict(1.0, {}, 2.0)
+    assert rule(Standing("x", 1.0, 1.0, 1.0), Context({}, Window(), 0.0)) == Verdict(1.0, Reading(None, {}, ()), 2.0)
     _selftest_option()
     _selftest_no_legal_eleven()
     print("worth self-test OK")

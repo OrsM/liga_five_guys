@@ -1,7 +1,7 @@
 """The board stage: decisions.json, the phone's copy of the board, from the league at t. Your cash and what you can
 bid, your squad with its eleven, the players on the market who would add points to it (buys, most first, each with
 the bid to make and, for the first few, the sales that fund it: approach.approach), and each standing offer on your
-players ranked by what taking it costs your eleven (eleven.remove). The one line act.py takes is do: list your unlisted players at
+players ranked by what taking it costs your eleven (valuation.read). The one line act.py takes is do: list your unlisted players at
 their value."""
 from __future__ import annotations
 
@@ -89,8 +89,7 @@ def lineup_doc(inp: decision.Inputs, names: dict[str, str]) -> Doc:
 def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = worth.STOPGAP_RATE) -> worth.Context:
     pos, cells = decision.cells_of(inp)
     locks = decision.lock_times(inp)
-    window = decision.window_of(locks, cells, None)
-    return worth.Context(pos, {name: getattr(window, name) for name in READERS}, inp.money.cash, offers, rate,
+    return worth.Context(pos, decision.window_of(locks, cells, None), inp.money.cash, offers, rate,
                          decision.squad_of(inp), cells, locks)
 
 
@@ -106,8 +105,13 @@ def offers_at(world: state.World) -> worth.OfferDistribution:
     return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
 
 
+def lost_of(sale: valuation.Reading) -> dict[str, float] | None:
+    """The points the eleven loses by the sale in each reader (the negated Delta), None when it has no Delta."""
+    return None if sale.points is None else {n: 0.0 - v for n, v in sale.window.items() if v is not None}
+
+
 def is_bench(lost: Mapping[Any, float] | None) -> bool:
-    """True when the eleven loses nothing at any window (the lost points of each window, keyed as worth.lost_points or as
+    """True when the eleven loses nothing at any window (the lost points of each window, keyed as lost_of gives them or as
     a sells row's "lost"). False when
     lost is None: a player the eleven cannot do without is not a bench player."""
     return lost is not None and not any(lost.values())
@@ -115,7 +119,7 @@ def is_bench(lost: Mapping[Any, float] | None) -> bool:
 
 def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[str, float] | None) -> str:
     """One line of facts about a standing offer: its ratio over value; where it stands among the nightly offers seen
-    (offers.ratios, none: no such clause; n shown); what the eleven loses by it (lost by window as worth.lost_points gives
+    (offers.ratios, none: no such clause; n shown); what the eleven loses by it (lost by window as lost_of gives
     it: 0 at every window is a bench player; None says there is no legal eleven without him, a replacement must be bought
     first). No advice."""
     share = None if ratio is None else worth.offer_percentile(offers, ratio)
@@ -140,14 +144,17 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
         k, value, money = offer.player, offer.value, offer.money
         fact = known.get(k, decision.UNKNOWN)
         verdict = worth.LIVE(worth.Standing(k, value, money, later_sale(inp, k, value)), ctx)
-        lost = verdict.lost
+        sale = verdict.sale
+        lost = lost_of(sale)
         ratio = money / value if value else None
         name = names.get(k, k)
         out.append({
             "name": name, "pos": fact.pos or ctx.pos.get(k, ""), "what": "sell", "label": "sell " + name, "step": "take offer",
             "offer": money, "waiting": None, "trend": fact.trend, "plan": False, "amount": money, "done": False, "key": k,
             "gain": None if lost is None else 0.0 - lost["season"], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
-            "ratio": ratio, "lost": None if lost is None else dict(lost),
+            "ratio": ratio, "lost": lost,
+            "delta": {"points": sale.points, "window": dict(sale.window), "gap": list(sale.gap)},
+            "feasible": sale.points is not None, "why_infeasible": None if sale.points is not None else "no_eleven",
             "offer_percentile": None if ratio is None else worth.offer_percentile(offers, ratio), "offers_seen": len(offers.ratios),
             "note": offer_note(ratio, offers, lost),
             "per_million": verdict.key,
@@ -527,6 +534,9 @@ def _selftest_sells() -> None:
     assert all(v is None for r in bare for f in r["facts"] if f[0] in ("points lost, next 4", "season") for v in [f[1]])
     assert all(r["lost"] != dict.fromkeys(READERS, whole) for r in bare), "never the whole eleven as one player's loss"
     assert [r["key"] for r in bare] == sorted(squad), "rows with no figure: in key order"
+    assert all(r["delta"]["points"] is None and set(r["delta"]["window"]) == set(READERS) and set(r["delta"]["window"].values()) == {None}
+               and not r["feasible"] and r["why_infeasible"] == "no_eleven" for r in bare), \
+        "a squad of exactly 11: every sale says no legal eleven, with no number and so never two equal ones"
     rows = [{"what": "sell", "key": r["key"], "lost": r["lost"], "offer": r["offer"], "facts": r["facts"], "ratio": r["ratio"],
              "offer_percentile": None, "offers_seen": 0, "trend": None, "for": []} for r in bare]
     made = offer_rows("cut", rows, [Stood(r["key"], r["offer"], "id" + r["key"], "c") for r in rows])
@@ -539,6 +549,14 @@ def _selftest_sells() -> None:
     assert all(r["per"] == "season" and r["gain"] == -r["lost"]["season"] for r in figures), "one window in a row"
     assert len({tuple(r["lost"].values()) for r in figures}) > 1, "the figures differ per player"
     assert next(r for r in rows if r["key"] == "POR0")["lost"] is None, "the only keeper with no bench keeper"
+    for r in rows:
+        d = r["delta"]
+        assert r["feasible"] == (d["points"] is not None) and (r["why_infeasible"] is None) == r["feasible"], "typed and untyped agree"
+        if d["points"] is None:
+            assert d["gap"] and set(d["window"].values()) == {None}
+            continue
+        assert d["points"] == d["window"]["season"] == r["gain"] and d["gap"] == [] and all(v <= 1e-9 for v in d["window"].values())
+        assert (not any(d["window"].values())) == (not any(r["lost"].values())), "a bench sale is 0 in every window"
 
 
 def _selftest_one_meaning() -> None:

@@ -8,7 +8,7 @@ from typing import NamedTuple
 import eleven
 from ffcore.rules import XI_SIZE, in_force
 
-__all__ = ["Window", "READERS", "NEXT_JORNADAS", "window_at", "Move", "Value", "Delta", "Cells", "NOTHING", "squad_at", "value_of", "delta", "Buyer"]
+__all__ = ["Window", "READERS", "NEXT_JORNADAS", "window_at", "Move", "Value", "Delta", "Cells", "NOTHING", "selling", "squad_at", "value_of", "delta", "Reading", "read", "Buyer"]
 
 Cells = Mapping[int, Mapping[str, float]]
 
@@ -66,6 +66,11 @@ class Delta(NamedTuple):
 NOTHING = Move(frozenset(), frozenset(), None, None)
 
 
+def selling(*players: str) -> Move:
+    """The Move that sells the players now (no moment known) and buys nobody."""
+    return Move(frozenset(players), frozenset(), None, None)
+
+
 def squad_at(squad: frozenset[str], move: Move, jornada: int, locks: Mapping[int, str]) -> frozenset[str]:
     """The squad that plays a jornada: `squad` less the players sold and plus the players bought, each side only when
     `rules.in_force` counts its moment for that jornada."""
@@ -89,6 +94,23 @@ def delta(squad: frozenset[str], move: Move, window: tuple[int, ...], locks: Map
     before = value_of(squad, NOTHING, window, locks, pos, cells)
     whole = eleven.points((squad - move.sold) | move.bought, pos, {})
     return Delta(None if whole is None else after.points - before.points, after.gap)
+
+
+class Reading(NamedTuple):
+    """The Delta of a move over a Window as the board states it: `points` over the whole window (the decision value), `window`
+    the same Delta over each of READERS (lock, next4, season, each a prefix of the one Window), `gap` the jornadas of the whole
+    window the move leaves without a legal eleven. Every number is None exactly when the squad after the whole move has no
+    legal eleven."""
+    points: float | None
+    window: Mapping[str, float | None]
+    gap: tuple[int, ...]
+
+
+def read(squad: frozenset[str], move: Move, window: Window, locks: Mapping[int, str],
+         pos: Mapping[str, str], cells: Cells) -> Reading:
+    """The Reading of the move over the Window: `delta` over each of READERS, `points` that of the season."""
+    got = {name: delta(squad, move, getattr(window, name), locks, pos, cells) for name in READERS}
+    return Reading(got["season"].points, {name: d.points for name, d in got.items()}, got["season"].gap)
 
 
 class Buyer:
@@ -121,6 +143,35 @@ def _league(rng: random.Random, ties: bool, jornadas: tuple[int, ...]) -> tuple[
     sizes = {"POR": rng.randint(1, 3), "DEF": rng.randint(4, 7), "MED": rng.randint(4, 7), "DEL": rng.randint(2, 5)}
     pos = {"%s%d" % (p, i): p for p, n in sizes.items() for i in range(n)}
     return pos, {j: {k: float(rng.randint(0, 5)) if ties else rng.uniform(0, 9) for k in pos} for j in jornadas}
+
+
+def _selftest_read(rng: random.Random) -> None:
+    locks = {5: "2026-11-27T20:00Z", 6: "2026-12-04T20:00Z", 7: "2026-12-11T20:00Z", 8: "2026-12-18T20:00Z", 9: "2026-12-25T20:00Z",
+             10: "2027-01-01T20:00Z"}
+    window = window_at(locks, locks, "2026-11-20T10:00Z")
+    for case in range(120):
+        pos, cells = _league(rng, case % 2 == 0, tuple(locks))
+        squad = frozenset(rng.sample(sorted(pos), rng.randint(XI_SIZE, len(pos))))
+        sale = selling(*rng.sample(sorted(squad), rng.randint(1, 3)))
+        got = read(squad, sale, window, locks, pos, cells)
+        assert set(got.window) == set(READERS) and got.points == got.window["season"]
+        for name in READERS:
+            alone = delta(squad, sale, getattr(window, name), locks, pos, cells)
+            assert alone.points == got.window[name], "a reading's split is the Delta over each prefix of the one window"
+        assert (got.points is None) == (eleven.points(squad - sale.sold, pos, {}) is None) == all(v is None for v in got.window.values())
+        if got.points is not None:
+            lock, next4, season = (got.window[n] for n in READERS)
+            assert lock is not None and next4 is not None and season is not None
+            assert got.gap == () and lock >= next4 - 1e-9 >= season - 2e-9, "a longer window loses at least as much"
+        else:
+            assert got.gap == tuple(window)
+    while True:
+        pos, cells = _league(rng, False, tuple(locks))
+        exact = frozenset(rng.sample(sorted(pos), XI_SIZE))
+        if eleven.points(exact, pos, {}) is not None:
+            break
+    rows = [read(exact, selling(k), window, locks, pos, cells) for k in sorted(exact)]
+    assert all(r.points is None and set(r.window.values()) == {None} for r in rows), "a squad of exactly 11 quotes no sale"
 
 
 def _selftest_window() -> None:
@@ -212,6 +263,7 @@ def _selftest() -> None:
     assert squad_at(here, Move(frozenset("a"), frozenset("c"), early, early), 5, locks) == frozenset("bc")
     assert squad_at(here, NOTHING, 5, locks) == here
     _selftest_window()
+    _selftest_read(rng)
     print("valuation self-test OK")
 
 

@@ -468,6 +468,15 @@
    "accepts": [],
    "act": [],
    "amount": 644149.0,
+   "delta": {
+    "gap": [],
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -497,6 +506,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Jonathan David"
@@ -528,12 +538,22 @@
    "trend": 0.18561000848040757,
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points"
+   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 1576701.0,
+   "delta": {
+    "gap": [],
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -563,6 +583,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Jonathan David"
@@ -594,12 +615,22 @@
    "trend": -2.025866749265319,
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points"
+   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 47188627.0,
+   "delta": {
+    "gap": [],
+    "points": -21.40752526653864,
+    "window": {
+     "lock": 0.0,
+     "next4": -1.605236878313093,
+     "season": -21.40752526653864
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -629,6 +660,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Raphinha"
@@ -660,12 +692,22 @@
    "trend": 1.3189711608554608,
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points"
+   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 5337731.0,
+   "delta": {
+    "gap": [],
+    "points": -2.5358789345270907,
+    "window": {
+     "lock": 0.0,
+     "next4": -0.17696328715135223,
+     "season": -2.5358789345270907
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -695,6 +737,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -2.5358789345270907,
@@ -724,7 +767,8 @@
    "trend": -1.348355535307556,
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points"
+   "why": "cash -49472707 is below 0: these offers bring it to 5274501 at the lock, losing 24.1 points",
+   "why_infeasible": null
   }
  ],
  "generated_at": "2026-11-08T12:07Z",
@@ -767,6 +811,15 @@
    "accepts": [],
    "act": [],
    "amount": 644149.0,
+   "delta": {
+    "gap": [],
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -796,6 +849,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Jonathan David"
@@ -823,12 +877,22 @@
    "trace": null,
    "trend": 0.18561000848040757,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 1576701.0,
+   "delta": {
+    "gap": [],
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -858,6 +922,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Jonathan David"
@@ -885,12 +950,22 @@
    "trace": null,
    "trend": -2.025866749265319,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 22801375.0,
+   "delta": {
+    "gap": [],
+    "points": -8.44978950471318,
+    "window": {
+     "lock": -0.7693931315254829,
+     "next4": -2.375248948950059,
+     "season": -8.44978950471318
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -920,6 +995,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Jonathan David"
@@ -947,12 +1023,22 @@
    "trace": null,
    "trend": -0.9599715530509632,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 47188627.0,
+   "delta": {
+    "gap": [],
+    "points": -21.40752526653864,
+    "window": {
+     "lock": 0.0,
+     "next4": -1.605236878313093,
+     "season": -21.40752526653864
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -982,6 +1068,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Raphinha"
@@ -1009,12 +1096,22 @@
    "trace": null,
    "trend": 1.3189711608554608,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 5337731.0,
+   "delta": {
+    "gap": [],
+    "points": -2.5358789345270907,
+    "window": {
+     "lock": 0.0,
+     "next4": -0.17696328715135223,
+     "season": -2.5358789345270907
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1044,6 +1141,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -2.5358789345270907,
@@ -1069,12 +1167,22 @@
    "trace": null,
    "trend": -1.348355535307556,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 46035874.0,
+   "delta": {
+    "gap": [],
+    "points": -23.418907624602298,
+    "window": {
+     "lock": -2.0251324513698776,
+     "next4": -3.8786243746526736,
+     "season": -23.418907624602298
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1104,6 +1212,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Raphinha"
@@ -1131,12 +1240,22 @@
    "trace": null,
    "trend": -1.2828104837476024,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 40009473.0,
+   "delta": {
+    "gap": [],
+    "points": -21.816214840048133,
+    "window": {
+     "lock": -0.900003188958415,
+     "next4": -4.44712566708489,
+     "season": -21.816214840048133
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1166,6 +1285,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Raphinha"
@@ -1193,12 +1313,22 @@
    "trace": null,
    "trend": 1.9707289480553332,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 9145609.0,
+   "delta": {
+    "gap": [],
+    "points": -7.8418815194993385,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": -7.8418815194993385
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1228,6 +1358,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -7.8418815194993385,
@@ -1253,12 +1384,22 @@
    "trace": null,
    "trend": -1.812562856210546,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 2953995.0,
+   "delta": {
+    "gap": [],
+    "points": -2.567978970785589,
+    "window": {
+     "lock": -0.3788409456838906,
+     "next4": -1.011484839871855,
+     "season": -2.567978970785589
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1288,6 +1429,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -2.567978970785589,
@@ -1313,12 +1455,22 @@
    "trace": null,
    "trend": 0.1486109849343848,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 36847734.0,
+   "delta": {
+    "gap": [],
+    "points": -32.810527141930606,
+    "window": {
+     "lock": -0.02587325995741452,
+     "next4": -6.341608491191664,
+     "season": -32.810527141930606
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1348,6 +1500,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -32.810527141930606,
@@ -1373,12 +1526,22 @@
    "trace": null,
    "trend": -1.167641877951558,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 49571725.0,
+   "delta": {
+    "gap": [],
+    "points": -50.58267086194837,
+    "window": {
+     "lock": -2.9558587848953763,
+     "next4": -11.522773783893484,
+     "season": -50.58267086194837
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1408,6 +1571,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [
     "Raphinha"
@@ -1435,12 +1599,22 @@
    "trace": null,
    "trend": -0.41770354506100393,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 21289009.0,
+   "delta": {
+    "gap": [],
+    "points": -23.511702713852856,
+    "window": {
+     "lock": -2.1705803250185696,
+     "next4": -6.897036167103892,
+     "season": -23.511702713852856
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1470,6 +1644,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -23.511702713852856,
@@ -1495,12 +1670,22 @@
    "trace": null,
    "trend": 0.7009092811851191,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 18882612.0,
+   "delta": {
+    "gap": [],
+    "points": -21.228761914468123,
+    "window": {
+     "lock": -0.012976736738458783,
+     "next4": -2.4661815470695387,
+     "season": -21.228761914468123
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1530,6 +1715,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -21.228761914468123,
@@ -1555,12 +1741,22 @@
    "trace": null,
    "trend": 1.9785105195726127,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 44527367.0,
+   "delta": {
+    "gap": [],
+    "points": -51.257809738158585,
+    "window": {
+     "lock": -3.2064426778817676,
+     "next4": -13.366793904509109,
+     "season": -51.257809738158585
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1590,6 +1786,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -51.257809738158585,
@@ -1615,12 +1812,22 @@
    "trace": null,
    "trend": 1.9936865166470912,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 25283889.0,
+   "delta": {
+    "gap": [],
+    "points": -29.257363816730503,
+    "window": {
+     "lock": 0.0,
+     "next4": -2.5087926677937276,
+     "season": -29.257363816730503
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1650,6 +1857,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -29.257363816730503,
@@ -1675,12 +1883,22 @@
    "trace": null,
    "trend": -0.802633666539891,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 10813953.0,
+   "delta": {
+    "gap": [],
+    "points": -14.674587403700116,
+    "window": {
+     "lock": -0.49278167433939757,
+     "next4": -2.9661783175590983,
+     "season": -14.674587403700116
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1710,6 +1928,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -14.674587403700116,
@@ -1735,12 +1954,22 @@
    "trace": null,
    "trend": 0.6019579764866829,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
    "amount": 18261001.0,
+   "delta": {
+    "gap": [],
+    "points": -83.45508412443019,
+    "window": {
+     "lock": -6.523988901787966,
+     "next4": -28.46793735434244,
+     "season": -83.45508412443019
+    }
+   },
    "detail": null,
    "done": false,
    "facts": [
@@ -1770,6 +1999,7 @@
      "points"
     ]
    ],
+   "feasible": true,
    "flip": null,
    "for": [],
    "gain": -83.45508412443019,
@@ -1795,7 +2025,8 @@
    "trace": null,
    "trend": -1.0060886321197136,
    "waiting": null,
-   "what": "sell"
+   "what": "sell",
+   "why_infeasible": null
   }
  ],
  "sources": [

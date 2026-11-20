@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from ffcore.rules import POSITIONS, SHAPES, XI_SIZE
 
-__all__ = ["Swap", "Settled", "Removed", "legal", "swap", "settle", "removal_cost", "build", "best_eleven", "remove", "remove_all", "total", "rank", "DEPTH", "top_points", "points_without", "points"]
+__all__ = ["Swap", "Settled", "legal", "swap", "settle", "build", "best_eleven", "total", "rank", "DEPTH", "points"]
 
 COUNTS = {tuple(shape[p] for p in POSITIONS) for shape in SHAPES}
 DEPTH = {p: max(shape[p] for shape in SHAPES) for p in POSITIONS}
@@ -29,12 +29,6 @@ class Settled(NamedTuple):
     eleven: frozenset[str]
     bench: frozenset[str]
     swaps: tuple[tuple[str, str, float], ...]
-
-
-class Removed(NamedTuple):
-    cost: float
-    eleven: frozenset[str]
-    bench: frozenset[str]
 
 
 def fits(count: Counter[str]) -> bool:
@@ -74,18 +68,6 @@ def settle(eleven: frozenset[str], bench: frozenset[str], pos: Pos, value: Value
         swaps.append((b, s.replaces, s.gain))
 
 
-def removal_cost(player: str, eleven: frozenset[str], bench: frozenset[str], pos: Pos, value: Value) -> float | None:
-    if not legal(eleven, pos):
-        return None
-    if player not in eleven:
-        return 0.0
-    rest = eleven - {player}
-    back = [b for b in bench if legal(rest | {b}, pos)]
-    if not back:
-        return None
-    return value.get(player, 0.0) - max(value.get(b, 0.0) for b in back)
-
-
 def total(eleven: frozenset[str], value: Value) -> float:
     return sum(value.get(k, 0.0) for k in eleven)
 
@@ -111,7 +93,7 @@ def rank(squad: frozenset[str], pos: Pos, value: Value) -> dict[str, list[str]]:
     return {p: sorted((k for k in squad if pos.get(k) == p), key=lambda k: (-value.get(k, 0.0), k)) for p in POSITIONS}
 
 
-def top_points(kept: Mapping[str, Sequence[float]]) -> float | None:
+def _top_points(kept: Mapping[str, Sequence[float]]) -> float | None:
     top: float | None = None
     for shape in SHAPES:
         if all(len(kept[p]) >= shape[p] for p in POSITIONS):
@@ -121,45 +103,17 @@ def top_points(kept: Mapping[str, Sequence[float]]) -> float | None:
     return top
 
 
-def points_without(ranked: Mapping[str, list[str]], value: Value, gone: frozenset[str]) -> float | None:
-    return top_points({p: [value.get(k, 0.0) for k in ranked[p] if k not in gone] for p in POSITIONS})
-
-
 def points(squad: frozenset[str], pos: Pos, value: Value) -> float | None:
     """V: the points of the best legal eleven of the squad (the best shape's top players of each position, summed),
     None when no legal eleven exists (fewer than 11 players or no shape fits). Depends on the positions of the squad
     alone for None, never on value; equals the brute-force `best_total`."""
-    return points_without(rank(squad, pos, value), value, frozenset())
+    ranked = rank(squad, pos, value)
+    return _top_points({p: [value.get(k, 0.0) for k in ranked[p]] for p in POSITIONS})
 
 
 def best_eleven(squad: frozenset[str], pos: Pos, value: Value, fielded: frozenset[str] | None = None) -> Settled | None:
     start = fielded if fielded is not None and fielded <= squad and legal(fielded, pos) else build(squad, pos, value)
     return None if start is None else settle(start, squad - start, pos, value)
-
-
-def remove(player: str, eleven: frozenset[str], bench: frozenset[str], pos: Pos, value: Value) -> Removed | None:
-    if not legal(eleven, pos):
-        return None
-    if player in bench:
-        return Removed(0.0, eleven, bench - {player})
-    rest = eleven - {player}
-    back = [b for b in bench if legal(rest | {b}, pos)]
-    if not back:
-        return None
-    cover = max(back, key=lambda b: (value.get(b, 0.0), b))
-    done = settle(rest | {cover}, bench - {cover}, pos, value)
-    assert done is not None
-    return Removed(total(eleven, value) - total(done.eleven, value), done.eleven, done.bench)
-
-
-def remove_all(players: frozenset[str], eleven: frozenset[str], bench: frozenset[str], pos: Pos, value: Value) -> Removed | None:
-    start = total(eleven, value)
-    for k in sorted(players, key=lambda k: (k in eleven, k)):
-        got = remove(k, eleven, bench, pos, value)
-        if got is None:
-            return None
-        eleven, bench = got.eleven, got.bench
-    return Removed(start - total(eleven, value), eleven, bench)
 
 
 def best_total(squad: frozenset[str], pos: Pos, value: Value) -> float | None:
@@ -228,15 +182,6 @@ def _selftest() -> None:
             if s.improves:
                 assert abs(total(s.eleven_after, value) - start - s.gain) < 1e-9
                 assert s.eleven_after - {b} | {s.replaces} == eleven, "reversing the swap restores the eleven"
-        for k in eleven | bench:
-            cost = removal_cost(k, eleven, bench, pos, value)
-            if k in bench:
-                assert cost == 0.0
-            elif cost is not None:
-                rest = best_total((eleven - {k}) | bench, pos, value)
-                assert rest is not None and rest >= start - cost - 1e-9, "the one-swap cover is never better than the best eleven"
-            else:
-                assert not any(legal((eleven - {k}) | {b}, pos) for b in bench)
     assert wrong == 0, "settle matched the best legal eleven in every random squad (%d did not)" % wrong
     rng = random.Random(11)
     for case in range(400):
@@ -250,18 +195,6 @@ def _selftest() -> None:
         assert from_app.swaps == () or total(from_app.eleven, value) >= total(eleven, value) - 1e-9
         foreign = best_eleven(every, pos, value, frozenset(list(eleven)[:-1] + ["nobody"]))
         assert foreign is not None and abs(total(foreign.eleven, value) - top) < 1e-9, "a fielded eleven not in the squad is built over"
-        gone = frozenset(rng.sample(sorted(every), rng.randint(1, min(3, len(every) - 1))))
-        out = remove_all(gone, fit.eleven, fit.bench, pos, value)
-        rest = best_total(every - gone, pos, value)
-        assert (out is None) == (rest is None), "an eleven remains exactly when some eleven of the rest is legal"
-        if out is not None and rest is not None:
-            assert abs(out.cost - (top - rest)) < 1e-9, "selling a set costs the best eleven's points less the best eleven's of the rest"
-            assert legal(out.eleven, pos) and out.eleven | out.bench == every - gone
-        ranked = rank(every, pos, value)
-        left = points_without(ranked, value, gone)
-        assert points_without(ranked, value, frozenset()) == top and points(every, pos, value) == top and (left is None) == (rest is None)
-        if left is not None and rest is not None:
-            assert abs(left - rest) < 1e-9, "the best eleven of what is left, straight from the ranking"
     _points_selftest()
     assert build(frozenset(), {}, {}) is None and best_eleven(frozenset({"a"}), {"a": "POR"}, {"a": 1.0}) is None, "no eleven"
     squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
@@ -273,9 +206,7 @@ def _selftest() -> None:
     got = swap("star", frozenset(eleven - {"f2"} | {"bench"}), squad, value)
     assert got is not None and got.replaces == "bench", "a forward takes the slot a position with slack gives up"
     assert swap("star", frozenset(eleven - {"k"}), squad, value) is None, "no eleven"
-    assert settle(frozenset(), frozenset(squad), squad, value) is None and removal_cost("k", frozenset(), frozenset(), squad, value) is None
-    assert removal_cost("k", eleven, frozenset({"kb", "star"}), squad, value) == 3.5, "a keeper is covered by the keeper"
-    assert removal_cost("k", eleven, frozenset({"star"}), squad, value) is None, "no keeper on the bench: no eleven"
+    assert settle(frozenset(), frozenset(squad), squad, value) is None
     print("eleven self-test OK")
 
 

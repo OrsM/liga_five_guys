@@ -1151,10 +1151,10 @@ def _selftest_rule_scores() -> None:
     offered at many cuts is sold at the first only; the report's lines are all the same length."""
     import itertools
     at = dt.datetime(2026, 9, 1, tzinfo=dt.timezone.utc)
-    ctx = worth.Context({}, {}, 0.0)
+    ctx = worth.Context({}, valuation.Window(), 0.0)
 
     def rule(reserve: float | None) -> worth.Rule:
-        return lambda standing, ctx: worth.Verdict(None, {}, reserve)
+        return lambda standing, ctx: worth.Verdict(None, valuation.Reading(None, {}, ()), reserve)
     cases: list[list[list[str]]] = [[["a"], ["a", "b"], ["b", "a", "c"]], [["x"]], [[]]]
     for offers in cases:
         cuts = [Cut(at + dt.timedelta(days=i), ctx, [worth.Standing(p, 1e6, 1e6 * (1 + i), 1e6) for p in ps])
@@ -1193,7 +1193,7 @@ def _selftest_replayed_cuts() -> None:
     assert [[s.player for s in c.standings] for c in got] == [[o.player for o in d.extras.offers] for d in offered]
     streamed = replayed_cuts(loaded, _CUTS)
     assert [(c.at, c.standings) for c in streamed] == [(c.at, c.standings) for c in got], "the streamed replay keeps the same Cuts"
-    assert all(c.ctx.horizons == d.ctx.horizons and c.ctx.rate > 0 for c, d in zip(streamed, got)), "the rate is positive"
+    assert all(c.ctx.window == d.ctx.window and c.ctx.rate > 0 for c, d in zip(streamed, got)), "the rate is positive"
     offered_at = [len(c.ctx.offers.ratios) for c in streamed]
     assert offered_at == sorted(offered_at), "offers are only added as the cuts go on: none from after a cut"
     with_offers = replayed_cut(offered[0], worth.offer_ratio_distribution([0.9, 1.1]), 0.25)

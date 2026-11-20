@@ -121,9 +121,9 @@ class Side:
         return self.cost_of(self.mask(gone))
 
 
-def per_unit(cost: float | None, price: float) -> float:
-    """The cost per unit of price; infinite (sorts last) when the cost is None, no eleven remaining."""
-    return float("inf") if cost is None else cost / price
+def per_unit(cost: float | None, price: float) -> tuple[bool, float]:
+    """The sort key of a cost per unit of price: ascending by it puts every cost before a None (no eleven remaining)."""
+    return cost is None, 0.0 if cost is None else cost / price
 
 
 def proceeds(club: Club, k: str) -> float:
