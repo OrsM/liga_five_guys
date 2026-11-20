@@ -1,6 +1,7 @@
 """Sell rules: how a standing offer on one of your players is judged. A rule takes the offer (Standing) and the windows of
 jornadas the board reads (Context) and gives a Verdict: the key the offers are sorted by, the points your eleven loses
-over each window, and the reserve price (None when the rule states none). LIVE is the rule the board runs."""
+over each window (None when the eleven has no legal replacement for him), and the reserve price (None when the rule states
+none). LIVE is the rule the board runs."""
 from __future__ import annotations
 
 import bisect
@@ -51,31 +52,34 @@ class Context(NamedTuple):
 
 class Verdict(NamedTuple):
     key: float | None
-    lost: Mapping[int, float]
+    lost: Mapping[int, float] | None
     reserve: float | None
 
 
 Rule = Callable[[Standing, Context], Verdict]
 
 
-def lost_points(player: str, ctx: Context) -> Mapping[int, float]:
+def lost_points(player: str, ctx: Context) -> Mapping[int, float] | None:
     """The points your eleven loses without player, for each horizon of ctx (keyed as ctx.horizons). Zero where there is
-    no settled eleven; the total of the eleven where removing player leaves no legal one."""
+    no settled eleven. None when at some horizon removing player leaves no legal eleven (eleven.remove is None): his sale
+    has no points loss to quote, it needs a replacement bought first."""
     out: dict[int, float] = {}
     for n, h in ctx.horizons.items():
         if h.settled is None:
             out[n] = 0.0
             continue
         gone = eleven.remove(player, h.settled.eleven, h.settled.bench, ctx.pos, h.value)
-        out[n] = gone.cost if gone else eleven.total(h.settled.eleven, h.value)
+        if gone is None:
+            return None
+        out[n] = gone.cost
     return out
 
 
 def points_per_million(standing: Standing, ctx: Context) -> Verdict:
-    """Ranks an offer by the points lost over PER_MILLION_AHEAD per million raised: None when the offer is None or 0.
-    States no reserve price."""
+    """Ranks an offer by the points lost over PER_MILLION_AHEAD per million raised: None when the offer is None or 0 or
+    when lost_points is None. States no reserve price."""
     lost = lost_points(standing.player, ctx)
-    key = lost[PER_MILLION_AHEAD] / (standing.offer / 1e6) if standing.offer else None
+    key = None if lost is None or not standing.offer else lost[PER_MILLION_AHEAD] / (standing.offer / 1e6)
     return Verdict(key, lost, None)
 
 
@@ -91,12 +95,14 @@ def reserve_price(lost_season: float, rate: float, later: float) -> float:
 def worth_rule(rate: float, *, trend: bool) -> Rule:
     """A sell rule at rate points per million. The key is reserve minus offer (negative means sell); the reserve uses the
     expected later sale price, which is standing.later when trend is set and SALE_ESTIMATE times the value otherwise.
-    With no offer the key is None and the reserve is still stated."""
+    With no offer the key is None and the reserve is still stated; where lost_points is None both are None."""
     if not rate > 0:
         raise ValueError("rate must be > 0")
 
     def rule(standing: Standing, ctx: Context) -> Verdict:
         lost = lost_points(standing.player, ctx)
+        if lost is None:
+            return Verdict(None, None, None)
         later = standing.later if trend else SALE_ESTIMATE * standing.value
         reserve = reserve_price(lost[0], rate, later)
         key = None if standing.offer is None else reserve - standing.offer
@@ -171,8 +177,11 @@ def bench_option(standing: Standing, ctx: Context) -> Verdict:
     ctx.horizons) gets reserve_price at ctx.rate of that most; no verdict of the board reads it. A bench player (loses
     nothing in any window, so no jornada needs him: m = MAX_NIGHTS nights of free waiting) gets value times
     offer_reserve_ratio over ctx.offers with the drift_cost of the standing and hold = later over value, never below later;
-    with no ctx.offers, later. The key is reserve minus offer (negative means sell); with no offer it is None."""
+    with no ctx.offers, later. The key is reserve minus offer (negative means sell); with no offer it is None. Where
+    lost_points is None key and reserve are None."""
     lost = lost_points(standing.player, ctx)
+    if lost is None:
+        return Verdict(None, None, None)
     most = max(lost.values(), default=0.0)
     if most > NO_LOSS:
         reserve = reserve_price(most, ctx.rate, standing.later)
@@ -278,6 +287,42 @@ def _selftest_option() -> None:
     assert r_estimate(cuts, now) > 0
 
 
+def _selftest_no_legal_eleven() -> None:
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    pos = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
+    value = {k: 1.0 + i for i, k in enumerate(sorted(pos))}
+
+    def at(squad: Iterable[str], fielded: frozenset[str] | None = None) -> Context:
+        mine = frozenset(squad)
+        return Context(pos, {n: Horizon(value, eleven.best_eleven(mine, pos, value, fielded)) for n in (4, 8, PER_MILLION_AHEAD, 0)}, 0.0)
+
+    bare = at(pos)
+    whole = eleven.total(frozenset(pos), value)
+    for p in pos:
+        v = LIVE(Standing(p, value[p], 1e6, value[p]), bare)
+        assert lost_points(p, bare) is None and v == Verdict(None, None, None), "eleven players only: nobody has a quotable loss"
+        assert worth_rule(1.0, trend=False)(Standing(p, value[p], 1e6, value[p]), bare) == Verdict(None, None, None)
+        assert bench_option(Standing(p, value[p], 1e6, value[p]), bare) == Verdict(None, None, None)
+    extra = "DEF9"
+    pos[extra], value[extra] = "DEF", 0.5
+    backed = at([*pos])
+    assert backed.horizons[0].settled is not None
+    mine, bench = backed.horizons[0].settled.eleven, backed.horizons[0].settled.bench
+    for p in pos:
+        got = lost_points(p, backed)
+        fills = p not in bench and any(eleven.legal((mine - {p}) | {b}, pos) for b in bench)
+        if p in bench:
+            assert got is not None and not any(got.values()), "a bench player costs nothing"
+        elif fills:
+            assert got is not None and all(0 <= x < whole for x in got.values()), "covered: costed as the swap, never the whole eleven"
+        else:
+            assert got is None, "no bench player fills the slot: no legal eleven"
+    assert lost_points("POR0", backed) is None, "the only keeper with no bench keeper: no legal eleven"
+    assert lost_points("DEF0", backed) is not None, "a starter of the benched position is covered"
+    costs = [lost_points(p, backed) for p in pos]
+    assert len({tuple(c.values()) for c in costs if c is not None}) > 1, "covered rows differ per player"
+
+
 def _selftest() -> None:
     for seed in range(40):
         for ties in (False, True):
@@ -289,20 +334,25 @@ def _selftest() -> None:
                 if h.settled is None:
                     continue
                 for p in h.settled.bench:
-                    assert lost_points(p, ctx)[n] == 0.0, "a bench player costs the eleven nothing"
+                    got = lost_points(p, ctx)
+                    assert got is not None and got[n] == 0.0, "a bench player costs the eleven nothing"
                 for p in h.settled.eleven:
-                    assert lost_points(p, ctx)[n] >= -1e-9, "an eleven player never costs negative points"
+                    got = lost_points(p, ctx)
+                    assert got is None or got[n] >= -1e-9, "an eleven player never costs negative points"
             for p in squad:
                 offer = 1e6 * (1 + seed)
                 s = Standing(p, value[p], offer, value[p])
                 v = LIVE(s, ctx)
+                assert v.lost == lost_points(p, ctx)
+                assert v.reserve is None, "the baseline states no reserve"
+                if v.lost is None:
+                    assert v.key is None, "no legal eleven without him: no key"
+                    continue
                 want = v.lost[PER_MILLION_AHEAD] / (offer / 1e6)
                 assert v.key == want, "key is points lost per million"
                 half = LIVE(s._replace(offer=2 * offer), ctx).key
                 assert half is not None and abs(half - want / 2) < 1e-9, "key halves when the offer doubles"
                 assert LIVE(s._replace(offer=None), ctx).key is None and LIVE(s._replace(offer=0.0), ctx).key is None
-                assert v.reserve is None, "the baseline states no reserve"
-                assert v.lost == lost_points(p, ctx)
 
             settled0 = horizons[0].settled
             for rate in (0.3, STOPGAP_RATE, 2.0):
@@ -310,7 +360,11 @@ def _selftest() -> None:
                 trended = worth_rule(rate, trend=True)
                 for p in squad:
                     a = SALE_ESTIMATE * value[p]
-                    lost = lost_points(p, ctx)[0]
+                    got = lost_points(p, ctx)
+                    if got is None:
+                        assert plain(Standing(p, value[p], 1e6, a), ctx) == Verdict(None, None, None), "no legal eleven: no reserve, no key"
+                        continue
+                    lost = got[0]
                     for offer in (1e6 * (1 + seed), 3e6 * (1 + seed)):
                         s = Standing(p, value[p], offer, a)
                         v = plain(s, ctx)
@@ -339,6 +393,7 @@ def _selftest() -> None:
     rule: Rule = stub
     assert rule(Standing("x", 1.0, 1.0, 1.0), Context({}, {}, 0.0)) == Verdict(1.0, {}, 2.0)
     _selftest_option()
+    _selftest_no_legal_eleven()
     print("worth self-test OK")
 
 

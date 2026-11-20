@@ -6,6 +6,7 @@ their value."""
 from __future__ import annotations
 
 import json
+import random
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, NamedTuple
@@ -13,7 +14,7 @@ from typing import Any, NamedTuple
 import decision
 import eleven
 import worth
-from approach import Approach, Club, approach, settle
+from approach import INF, Approach, Club, Side, approach, settle
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
@@ -108,20 +109,25 @@ def offers_at(world: state.World) -> worth.OfferDistribution:
     return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
 
 
-def is_bench(lost: Iterable[float]) -> bool:
-    """True when the eleven loses nothing at any window (the lost points of each window, worth.lost_points)."""
-    return not any(lost)
+def is_bench(lost: Mapping[Any, float] | None) -> bool:
+    """True when the eleven loses nothing at any window (the lost points of each window, keyed as worth.lost_points or as
+    a sells row's "lost"). False when
+    lost is None: a player the eleven cannot do without is not a bench player."""
+    return lost is not None and not any(lost.values())
 
 
-def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[int, float]) -> str:
+def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[int, float] | None) -> str:
     """One line of facts about a standing offer: its ratio over value; where it stands among the nightly offers seen
     (offers.ratios, none: no such clause; n shown); what the eleven loses by it (lost by window as worth.lost_points gives
-    it: 0 at every window is a bench player). No advice."""
+    it: 0 at every window is a bench player; None says there is no legal eleven without him, a replacement must be bought
+    first). No advice."""
     share = None if ratio is None else worth.offer_percentile(offers, ratio)
     parts = [] if ratio is None else ["offer %.2f x value" % ratio]
     if share is not None:
         parts.append("at or above %.0f%% of the %d nightly offers seen" % (100 * share, len(offers.ratios)))
-    if is_bench(lost.values()):
+    if lost is None:
+        parts.append("there is no legal eleven without him: a replacement must be bought first")
+    elif is_bench(lost):
         parts.append("the eleven loses 0 points (bench)")
     else:
         parts.append("the eleven loses %.1f points over the next 4 jornadas, %.1f over the next 8, %.1f over the season"
@@ -143,14 +149,15 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
         out.append({
             "name": name, "pos": fact.pos or ctx.pos.get(k, ""), "what": "sell", "label": "sell " + name, "step": "take offer",
             "offer": money, "waiting": None, "trend": fact.trend, "plan": False, "amount": money, "done": False, "key": k,
-            "gain": 0.0 - lost[0], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
-            "ratio": ratio, "lost": {"next4": lost[4], "next8": lost[8], "season": lost[0]},
+            "gain": None if lost is None else 0.0 - lost[worth.PER_MILLION_AHEAD], "per": "next %d" % worth.PER_MILLION_AHEAD, "more": False, "detail": None, "trace": None, "flip": None,
+            "ratio": ratio, "lost": None if lost is None else {"next4": lost[4], "next8": lost[8], "season": lost[0]},
             "offer_percentile": None if ratio is None else worth.offer_percentile(offers, ratio), "offers_seen": len(offers.ratios),
             "note": offer_note(ratio, offers, lost),
             "per_million": verdict.key,
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
-                      ["points lost, next 4", lost[4], "points"], ["next 8", lost[8], "points"],
-                      ["season", lost[0], "points"]],
+                      ["points lost, next 4", None if lost is None else lost[4], "points"],
+                      ["next 8", None if lost is None else lost[8], "points"],
+                      ["season", None if lost is None else lost[0], "points"]],
             "accepts": [], "act": []})
     return sorted(out, key=lambda d: (d["per_million"] is None, d["per_million"], d["key"]))
 
@@ -191,8 +198,9 @@ def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[di
         lost = sale["lost"]
         rows.append({"cut": at, "player": sale["key"], "offer_id": given.offer_id, "created_at": given.created_at,
                      "offer": sale["offer"], "value": value, "ratio": sale["ratio"], "percentile": sale["offer_percentile"],
-                     "offers_seen": sale["offers_seen"], "lost4": lost["next4"], "lost8": lost["next8"],
-                     "lost_season": lost["season"], "funds": ";".join(sale["for"]), "bench": is_bench(lost.values()),
+                     "offers_seen": sale["offers_seen"], "lost4": None if lost is None else lost["next4"],
+                     "lost8": None if lost is None else lost["next8"], "lost_season": None if lost is None else lost["season"],
+                     "funds": ";".join(sale["for"]), "bench": is_bench(lost),
                      "trend": sale["trend"]})
     return rows
 
@@ -300,7 +308,8 @@ def funds(buys: list[Doc], sells: list[Doc]) -> None:
 
 def cover_lines(club: Club, value: Mapping[str, float], sells: Sequence[Doc]) -> list[Doc]:
     """The lines of do that bring cash to 0 or more at the lock when it is below 0 (approach.settle): one "sell" line for
-    each offer to take, a copy of its row of sells marked "needed" with the points the set loses and the cash after it,
+    each offer to take, a copy of its row of sells marked "needed" with the points the whole set loses (set_points_lost) and the cash after it
+    (set_cash_after), not one sale's,
     or one "short" line with the money the offers lack. No lines when cash is 0 or more or no eleven is fielded."""
     got = settle(club, value)
     if got is None or club.cash >= 0:
@@ -311,7 +320,7 @@ def cover_lines(club: Club, value: Mapping[str, float], sells: Sequence[Doc]) ->
         return [{"what": "short", "label": "short of cash at the lock", "step": "list", "needed": True, "short": got.short,
                  "why": why, "accepts": [], "act": []}]
     why = "cash %.0f is below 0: these offers bring it to %.0f at the lock, losing %.1f points" % (club.cash, club.cash + got.raised, got.lost)
-    return [{**sale, "needed": True, "why": why, "points_lost": got.lost, "cash_after": club.cash + got.raised}
+    return [{**sale, "needed": True, "why": why, "set_points_lost": got.lost, "set_cash_after": club.cash + got.raised}
             for sale in sells if sale["key"] in got.sells]
 
 
@@ -503,6 +512,52 @@ def _selftest_world() -> None:
     assert market_at(None) is None and market_at("2026-10-30T1809Z") == "2026-10-30T18:09Z"
 
 
+def _sells_of(squad: dict[str, str], offered: Iterable[str]) -> list[Doc]:
+    ks = sorted(squad)
+    inp = decision.Inputs(decision.Money(0.0, 0.0, 0.0, 0, 0), players=[decision.Player(k, squad[k], 1, None) for k in ks],
+                          cells=[decision.Cell(k, j, 1.0 + i % 7 + j / 10) for i, k in enumerate(ks) for j in range(1, 11)])
+    names = {k: k for k in ks}
+    return offer_lines(inp, names, [decision.Offer(k, 5e6, 5e6 + 1e5 * i) for i, k in enumerate(offered)], {})
+
+
+def _selftest_sells() -> None:
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
+    bare = _sells_of(squad, squad)
+    whole = eleven.total(frozenset(squad), {k: sum(1.0 + i % 7 + j / 10 for j in range(1, 11)) for i, k in enumerate(sorted(squad))})
+    assert len(bare) == len(squad) and all(r["lost"] is None and r["gain"] is None and r["per_million"] is None for r in bare), \
+        "eleven players only: no row carries a number"
+    assert all("no legal eleven without him" in r["note"] and "bench" not in r["note"] for r in bare)
+    assert all(v is None for r in bare for f in r["facts"] if f[0] in ("next 8", "season") for v in [f[1]])
+    assert all(r["lost"] != {"next4": whole, "next8": whole, "season": whole} for r in bare), "never the whole eleven as one player's loss"
+    assert [r["key"] for r in bare] == sorted(squad), "rows with no figure: in key order"
+    rows = [{"what": "sell", "key": r["key"], "lost": r["lost"], "offer": r["offer"], "facts": r["facts"], "ratio": r["ratio"],
+             "offer_percentile": None, "offers_seen": 0, "trend": None, "for": []} for r in bare]
+    made = offer_rows("cut", rows, [Stood(r["key"], r["offer"], "id" + r["key"], "c") for r in rows])
+    assert all(m["lost4"] is None and m["lost8"] is None and m["lost_season"] is None and not m["bench"] for m in made), \
+        "the record states no number and no bench for a sale with no legal eleven"
+    backed = {**squad, "DEF9": "DEF", "MED9": "MED"}
+    rows = _sells_of(backed, backed)
+    figures = [r for r in rows if r["lost"] is not None]
+    assert figures and rows[:len(figures)] == figures and all(r["lost"] is None for r in rows[len(figures):]), "figures first"
+    assert all(r["per"] == "next 8" and r["gain"] == -r["lost"]["next8"] for r in figures), "one window in a row"
+    assert len({tuple(r["lost"].values()) for r in figures}) > 1, "the figures differ per player"
+    assert next(r for r in rows if r["key"] == "POR0")["lost"] is None, "the only keeper with no bench keeper"
+
+
+def _selftest_one_meaning() -> None:
+    for seed in range(60):
+        for ties in (False, True):
+            fielded, bench, pos, value = eleven.random_league(random.Random(seed), ties)
+            squad = fielded | bench
+            settled = eleven.best_eleven(squad, pos, value, fielded)
+            assert settled is not None
+            side = Side(squad, pos, value)
+            for p in squad:
+                gone = eleven.remove(p, settled.eleven, settled.bench, pos, value)
+                assert (gone is None) == (side.cost(frozenset([p])) == INF), "no legal eleven without him: one meaning in worth and approach"
+
+
 def _selftest_alerts() -> None:
     rows = [{"player": "r%d" % i, "gain": 50.0 - i} for i in range(TOP_TARGETS + 5)] + [{"player": "new", "gain": 0.5}]
     assert [r["player"] for r in arrival_rows(rows, ["new"])] == ["new"], "an arrival ranking low among all gains still alerts"
@@ -516,6 +571,8 @@ def _selftest_alerts() -> None:
 def _selftest() -> None:
     _selftest_params()
     _selftest_alerts()
+    _selftest_sells()
+    _selftest_one_meaning()
     _selftest_world()
     assert stamped("2026-10-30T1809Z") == "2026-10-30T18:09Z"
     told = sources([Health("b", "2026-11-01T0900Z", 5, 10.0, 2.5, 1.0, "ok", "2026-11-01T0900Z"),
@@ -539,7 +596,7 @@ def _selftest() -> None:
             assert lines == [], "cash 0 or more: no line, the board is unchanged"
             continue
         assert lines and all(x["needed"] and x["what"] == "sell" for x in lines)
-        assert cash + sum(x["offer"] for x in lines) >= 0 and all(x["cash_after"] == lines[0]["cash_after"] >= 0 for x in lines)
+        assert cash + sum(x["offer"] for x in lines) >= 0 and all(x["set_cash_after"] == lines[0]["set_cash_after"] >= 0 for x in lines)
         assert lines[0]["key"] == "m00", "a bench player is sold first"
     short = cover_lines(Club(frozenset(own), own, worth_of, {"m00": 1e6}, -5e6, 5e7), points, rows[:1])
     assert [x["what"] for x in short] == ["short"] and short[0]["short"] == 4e6, "offers that cannot cover say the shortfall"
@@ -555,7 +612,10 @@ def _selftest() -> None:
     assert "bench" not in field_note and "3.2" in field_note and "5.1" in field_note and "9.8" in field_note and "80%" in field_note
     assert "nightly" not in bare_note and "bench" in bare_note, "no offers seen: no percentile clause"
     assert offer_note(None, seen, {4: 0.0, 8: 0.0, 0: 0.0}) == "the eleven loses 0 points (bench)", "no value: no ratio clause"
-    for text in (bench_note, field_note, bare_note):
+    none_note = offer_note(1.05, seen, None)
+    assert "no legal eleven without him" in none_note and "bench" not in none_note and "loses" not in none_note, "no legal eleven: said so, no number"
+    assert not is_bench(None) and is_bench({4: 0.0, 8: 0.0, 0: 0.0}) and not is_bench({"next4": 0.0, "next8": 0.1, "season": 0.0})
+    for text in (bench_note, field_note, bare_note, none_note):
         assert not any(w in text.lower() for w in ("take", "hold", "sell", "accept", "should", "reserve")), "facts, no advice"
     asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
               "lost": {"next4": 0.0, "next8": 0.0, "season": 0.0}, "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},

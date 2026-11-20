@@ -106,8 +106,8 @@ class DecOpportunity(NamedTuple):
 
 
 class DecOffer(NamedTuple):
-    """One standing offer on one of my players at a run's cut, as the board stated it: bench is lost 0 at the three windows,
-    funds the names of the buys it funds tonight joined by ';' (empty: none)."""
+    """One standing offer on one of my players at a run's cut, as the board stated it: bench is lost 0 at the three windows, the three lost None when
+    no legal eleven remains without him (a replacement must be bought first), funds the names of the buys it funds tonight joined by ';' (empty: none)."""
     cut: str
     player: str
     offer_id: str
@@ -117,9 +117,9 @@ class DecOffer(NamedTuple):
     ratio: float | None
     percentile: float | None
     offers_seen: int
-    lost4: float
-    lost8: float
-    lost_season: float
+    lost4: float | None
+    lost8: float | None
+    lost_season: float | None
     funds: str
     bench: bool
     trend: float | None
