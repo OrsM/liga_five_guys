@@ -24,13 +24,13 @@ from ffcore.clock import cut
 from ffcore.store import RunRecords
 from ffcore.rules import POSITIONS, bid_limit
 from health import Health
+from valuation import READERS
 from ffcore.tidy import REPORTS
 from stats import percentile
 
 __all__ = ["board", "main"]
 
 Doc = dict[str, Any]
-AHEAD = (4, 8, 0)
 TOP_BUYS = 10
 TOP_FUNDED = 3
 TOP_TARGETS = 10
@@ -88,12 +88,12 @@ def lineup_doc(inp: decision.Inputs, names: dict[str, str]) -> Doc:
 def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = worth.STOPGAP_RATE) -> worth.Context:
     pos, cells = decision.cells_of(inp)
     mine = decision.squad_of(inp)
-    js = sorted(cells)
+    window = decision.window_of(decision.lock_times(inp), cells, None)
     fielded = decision.lineup_of(inp, pos).eleven
     horizons = {}
-    for n in AHEAD:
-        v = decision.window_value(pos, cells, frozenset(js[:n or len(js)]))
-        horizons[n] = worth.Horizon(v, eleven.best_eleven(mine, pos, v, fielded))
+    for name in READERS:
+        v = decision.window_value(pos, cells, getattr(window, name))
+        horizons[name] = worth.Horizon(v, eleven.best_eleven(mine, pos, v, fielded))
     return worth.Context(pos, horizons, inp.money.cash, offers, rate)
 
 
@@ -116,7 +116,7 @@ def is_bench(lost: Mapping[Any, float] | None) -> bool:
     return lost is not None and not any(lost.values())
 
 
-def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[int, float] | None) -> str:
+def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[str, float] | None) -> str:
     """One line of facts about a standing offer: its ratio over value; where it stands among the nightly offers seen
     (offers.ratios, none: no such clause; n shown); what the eleven loses by it (lost by window as worth.lost_points gives
     it: 0 at every window is a bench player; None says there is no legal eleven without him, a replacement must be bought
@@ -130,8 +130,8 @@ def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mappi
     elif is_bench(lost):
         parts.append("the eleven loses 0 points (bench)")
     else:
-        parts.append("the eleven loses %.1f points over the next 4 jornadas, %.1f over the next 8, %.1f over the season"
-                     % (lost[4], lost[8], lost[0]))
+        parts.append("the eleven loses %.1f points over the next 4 jornadas, %.1f over the season"
+                     % (lost["next4"], lost["season"]))
     return "; ".join(parts)
 
 
@@ -149,15 +149,14 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
         out.append({
             "name": name, "pos": fact.pos or ctx.pos.get(k, ""), "what": "sell", "label": "sell " + name, "step": "take offer",
             "offer": money, "waiting": None, "trend": fact.trend, "plan": False, "amount": money, "done": False, "key": k,
-            "gain": None if lost is None else 0.0 - lost[worth.PER_MILLION_AHEAD], "per": "next %d" % worth.PER_MILLION_AHEAD, "more": False, "detail": None, "trace": None, "flip": None,
-            "ratio": ratio, "lost": None if lost is None else {"next4": lost[4], "next8": lost[8], "season": lost[0]},
+            "gain": None if lost is None else 0.0 - lost["season"], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
+            "ratio": ratio, "lost": None if lost is None else dict(lost),
             "offer_percentile": None if ratio is None else worth.offer_percentile(offers, ratio), "offers_seen": len(offers.ratios),
             "note": offer_note(ratio, offers, lost),
             "per_million": verdict.key,
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
-                      ["points lost, next 4", None if lost is None else lost[4], "points"],
-                      ["next 8", None if lost is None else lost[8], "points"],
-                      ["season", None if lost is None else lost[0], "points"]],
+                      ["points lost, next 4", None if lost is None else lost["next4"], "points"],
+                      ["season", None if lost is None else lost["season"], "points"]],
             "accepts": [], "act": []})
     return sorted(out, key=lambda d: (d["per_million"] is None, d["per_million"], d["key"]))
 
@@ -199,7 +198,7 @@ def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[di
         rows.append({"cut": at, "player": sale["key"], "offer_id": given.offer_id, "created_at": given.created_at,
                      "offer": sale["offer"], "value": value, "ratio": sale["ratio"], "percentile": sale["offer_percentile"],
                      "offers_seen": sale["offers_seen"], "lost4": None if lost is None else lost["next4"],
-                     "lost8": None if lost is None else lost["next8"], "lost_season": None if lost is None else lost["season"],
+                     "lost8": None, "lost_season": None if lost is None else lost["season"],
                      "funds": ";".join(sale["for"]), "bench": is_bench(lost),
                      "trend": sale["trend"]})
     return rows
@@ -244,6 +243,7 @@ def stance(r: dict[str, Any], curve: Curve | None) -> Stance:
 
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
     pos, cells = decision.cells_of(inp)
+    locks = decision.lock_times(inp)
     curves = decision.curves_of(inp)
     seen = {a.player: a for a in inp.auctions}
     bids = {b.player: b.amount for b in inp.bids}
@@ -254,9 +254,9 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         amount, win = at.amount, at.win
         auction = seen.get(k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
-        where = frozenset(j for j in cells if j >= r["from_j"])
+        where = decision.window_of(locks, cells, r["close_at"])
         funding = funding_doc(club, names, approach(club._replace(pending=others), k, amount, win,
-                                                    decision.window_value(pos, cells, where)), amount) \
+                                                    decision.window_value(pos, cells, where.season)), amount) \
             if i < TOP_FUNDED and amount is not None and win is not None else None
         name = names.get(k, k)
         out.append({
@@ -369,7 +369,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     sells = offer_lines(inp, names, offered, known, offers)
     funds(buys, sells)
     pos_of, cells = decision.cells_of(inp)
-    owed = cover_lines(club, decision.window_value(pos_of, cells, frozenset(cells)), sells) if locks else []
+    owed = cover_lines(club, decision.window_value(pos_of, cells, decision.window_of(decision.lock_times(inp), cells, None).season), sells) if locks else []
     return {
         "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(health),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
@@ -528,8 +528,8 @@ def _selftest_sells() -> None:
     assert len(bare) == len(squad) and all(r["lost"] is None and r["gain"] is None and r["per_million"] is None for r in bare), \
         "eleven players only: no row carries a number"
     assert all("no legal eleven without him" in r["note"] and "bench" not in r["note"] for r in bare)
-    assert all(v is None for r in bare for f in r["facts"] if f[0] in ("next 8", "season") for v in [f[1]])
-    assert all(r["lost"] != {"next4": whole, "next8": whole, "season": whole} for r in bare), "never the whole eleven as one player's loss"
+    assert all(v is None for r in bare for f in r["facts"] if f[0] in ("points lost, next 4", "season") for v in [f[1]])
+    assert all(r["lost"] != dict.fromkeys(READERS, whole) for r in bare), "never the whole eleven as one player's loss"
     assert [r["key"] for r in bare] == sorted(squad), "rows with no figure: in key order"
     rows = [{"what": "sell", "key": r["key"], "lost": r["lost"], "offer": r["offer"], "facts": r["facts"], "ratio": r["ratio"],
              "offer_percentile": None, "offers_seen": 0, "trend": None, "for": []} for r in bare]
@@ -540,7 +540,7 @@ def _selftest_sells() -> None:
     rows = _sells_of(backed, backed)
     figures = [r for r in rows if r["lost"] is not None]
     assert figures and rows[:len(figures)] == figures and all(r["lost"] is None for r in rows[len(figures):]), "figures first"
-    assert all(r["per"] == "next 8" and r["gain"] == -r["lost"]["next8"] for r in figures), "one window in a row"
+    assert all(r["per"] == "season" and r["gain"] == -r["lost"]["season"] for r in figures), "one window in a row"
     assert len({tuple(r["lost"].values()) for r in figures}) > 1, "the figures differ per player"
     assert next(r for r in rows if r["key"] == "POR0")["lost"] is None, "the only keeper with no bench keeper"
 
@@ -605,24 +605,24 @@ def _selftest() -> None:
     priced = decision.Inputs(money, prices=[decision.Price("p", 1, 10.5, 10.0), decision.Price("p", 3, 11.0, 10.0)])
     assert abs(later_sale(priced, "p", 10.0) - rules.SALE_ESTIMATE * 10.0 * 1.1) < 1e-9, "the price row furthest ahead: 10% above"
     seen = worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.05, 1.1])
-    bench_note = offer_note(1.05, seen, {4: 0.0, 8: 0.0, 0: 0.0})
-    field_note = offer_note(1.05, seen, {4: 3.2, 8: 5.1, 0: 9.8})
-    bare_note = offer_note(1.05, worth.NO_OFFERS, {4: 0.0, 8: 0.0, 0: 0.0})
+    bench_note = offer_note(1.05, seen, {"lock": 0.0, "next4": 0.0, "season": 0.0})
+    field_note = offer_note(1.05, seen, {"lock": 3.2, "next4": 3.2, "season": 9.8})
+    bare_note = offer_note(1.05, worth.NO_OFFERS, {"lock": 0.0, "next4": 0.0, "season": 0.0})
     assert "1.05" in bench_note and "80%" in bench_note and "5 nightly offers" in bench_note and bench_note.endswith("0 points (bench)")
-    assert "bench" not in field_note and "3.2" in field_note and "5.1" in field_note and "9.8" in field_note and "80%" in field_note
+    assert "bench" not in field_note and "3.2" in field_note and "9.8" in field_note and "80%" in field_note
     assert "nightly" not in bare_note and "bench" in bare_note, "no offers seen: no percentile clause"
-    assert offer_note(None, seen, {4: 0.0, 8: 0.0, 0: 0.0}) == "the eleven loses 0 points (bench)", "no value: no ratio clause"
+    assert offer_note(None, seen, {"lock": 0.0, "next4": 0.0, "season": 0.0}) == "the eleven loses 0 points (bench)", "no value: no ratio clause"
     none_note = offer_note(1.05, seen, None)
     assert "no legal eleven without him" in none_note and "bench" not in none_note and "loses" not in none_note, "no legal eleven: said so, no number"
-    assert not is_bench(None) and is_bench({4: 0.0, 8: 0.0, 0: 0.0}) and not is_bench({"next4": 0.0, "next8": 0.1, "season": 0.0})
+    assert not is_bench(None) and is_bench({"lock": 0.0, "next4": 0.0, "season": 0.0}) and not is_bench({"next4": 0.0, "season": 0.1})
     for text in (bench_note, field_note, bare_note, none_note):
         assert not any(w in text.lower() for w in ("take", "hold", "sell", "accept", "should", "reserve")), "facts, no advice"
     asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
-              "lost": {"next4": 0.0, "next8": 0.0, "season": 0.0}, "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},
+              "lost": {"next4": 0.0, "season": 0.0}, "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},
              {"key": "p", "offer": 2.0, "ratio": None, "offer_percentile": None, "offers_seen": 0, "trend": 0.5, "for": [],
-              "lost": {"next4": 1.0, "next8": 2.0, "season": 3.0}, "facts": [["value", 0.0, "money"]]},
+              "lost": {"next4": 1.0, "season": 3.0}, "facts": [["value", 0.0, "money"]]},
              {"key": "q", "offer": 3.0, "ratio": 1.0, "offer_percentile": 0.5, "offers_seen": 5, "trend": 1.0, "for": [],
-              "lost": {"next4": 0.0, "next8": 0.0, "season": 0.5}, "facts": [["value", 3.0, "money"]]}]
+              "lost": {"next4": 0.0, "season": 0.5}, "facts": [["value", 3.0, "money"]]}]
     held = [decision.Held("p", "t1", None, 1.8), decision.Held("q", "t2", None, 3.0), decision.Held("r", "t3", None, 1.0)]
     standing = [current.Offer("20", "t1", "pending", 2.0, "c20", "", ""), current.Offer("10", "t1", "pending", 2.0, "c10", "", ""),
                 current.Offer("30", "t2", "pending", 3.0, "c30", "", ""), current.Offer("40", "t3", "declined", 9.0, "c40", "", ""),

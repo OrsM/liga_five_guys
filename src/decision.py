@@ -30,9 +30,10 @@ from ffcore.price_fold import Expected
 from ffcore.records import AuctionBrier, AuctionCalibration
 from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve, bid_for
-from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, in_force
+from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
+from valuation import Window, window_at
 
-__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "window_value", "curves_of", "opportunity_rows",
+__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "window_value", "curves_of", "opportunity_rows",
            "Fact", "UNKNOWN", "Offer", "Held",
            "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions",
            "latest_auction_run", "brier_by_scope", "drifting_bins"]
@@ -252,8 +253,20 @@ def cells_of(inp: Inputs) -> tuple[dict[str, str], dict[int, dict[str, float]]]:
     return pos, cells
 
 
-def window_value(pos: dict[str, str], cells: dict[int, dict[str, float]], where: frozenset[int]) -> dict[str, float]:
-    return {k: sum(cells[j].get(k, 0.0) for j in where) for k in pos}
+def lock_times(inp: Inputs) -> dict[int, str]:
+    return {x.jornada: x.lock for x in inp.locks}
+
+
+def window_of(locks: dict[int, str], cells: dict[int, dict[str, float]], close: str | None) -> Window:
+    """The Window of a player bought at close, or of one with no auction (close None) bought as soon as the next lock
+    allows; over the jornadas the forecast has."""
+    return window_at(locks, cells, close or min(locks.values(), default=None))
+
+
+def window_value(pos: dict[str, str], cells: dict[int, dict[str, float]], where: Iterable[int]) -> dict[str, float]:
+    """Each player's forecast summed over the jornadas `where`; 0 for a jornada the player has no cell in."""
+    gathered = tuple(where)
+    return {k: sum(cells[j].get(k, 0.0) for j in gathered) for k in pos}
 
 
 def curves_of(inp: Inputs) -> dict[str, Curve]:
@@ -271,27 +284,26 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
     pos, cells = cells_of(inp)
     mine = squad_of(inp)
     curves = curves_of(inp)
-    locks = {x.jornada: x.lock for x in inp.locks}
+    locks = lock_times(inp)
     closes = {x.player: x.close for x in inp.closes}
     placed = {x.player: x.amount for x in inp.bids}
-    soon = min(locks.values(), default=None)
     ahead: dict[str, dict[int, Price]] = {}
     for x in inp.prices:
         if x.value:
             ahead.setdefault(x.player, {})[x.h] = x
     fielded = lineup_of(inp, pos).eleven
-    seen: dict[frozenset[int], tuple[dict[str, float], eleven.Settled | None]] = {}
+    seen: dict[Window, tuple[dict[str, float], eleven.Settled | None]] = {}
     out = []
     for c in inp.universe:
         k, status, asking, value = c.player, c.status, c.asking, c.value
         if k not in pos or not any(k in at for at in cells.values()):
             continue
         close = closes.get(k) if status == "market" else None
-        where = frozenset(j for j in cells if in_force(locks, j, close or soon))
+        where = window_of(locks, cells, close)
         if not where:
             continue
         if where not in seen:
-            v = window_value(pos, cells, where)
+            v = window_value(pos, cells, where.season)
             seen[where] = (v, eleven.best_eleven(mine, pos, v, fielded))
         v, settled = seen[where]
         if settled is None:
@@ -307,7 +319,7 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
             ratio, win = bid_for(curves[k], BID_TARGET)
             bid = asking * ratio
         out.append({
-            "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": min(where),
+            "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": where.lock[0],
             "replaces": got.replaces, "gain": got.gain, "per_million": got.gain / (price / 1e6) if price else None,
             "price_next": rise(steps[1]) if 1 in steps else None,
             "price_lock": rise(steps[max(steps)]) if steps else None,

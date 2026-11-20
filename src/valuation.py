@@ -2,15 +2,43 @@ from __future__ import annotations
 
 import random
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import NamedTuple
 
 import eleven
 from ffcore.rules import XI_SIZE, in_force
 
-__all__ = ["Move", "Value", "Delta", "Cells", "NOTHING", "squad_at", "value_of", "delta"]
+__all__ = ["Window", "READERS", "NEXT_JORNADAS", "window_at", "Move", "Value", "Delta", "Cells", "NOTHING", "squad_at", "value_of", "delta"]
 
 Cells = Mapping[int, Mapping[str, float]]
+
+NEXT_JORNADAS = 4
+READERS = ("lock", "next4", "season")
+
+
+class Window(tuple[int, ...]):
+    """The jornadas, in order, that a move counts for (those `rules.in_force` keeps for the moment it is made). The one
+    window of a move: `lock` is its first jornada, `next4` its first NEXT_JORNADAS, `season` all of it, each a Window
+    inside the next. The decision value of a move is read over `season`; the others are shown for risk."""
+
+    @property
+    def lock(self) -> Window:
+        return Window(self[:1])
+
+    @property
+    def next4(self) -> Window:
+        return Window(self[:NEXT_JORNADAS])
+
+    @property
+    def season(self) -> Window:
+        return self
+
+
+def window_at(locks: Mapping[int, str], jornadas: Iterable[int], at: str | None) -> Window:
+    """The Window of a move made at `at` (the game clock, None: unknown) over `jornadas`: those of them
+    `rules.in_force` counts, in order."""
+    held = dict(locks)
+    return Window(sorted(j for j in jornadas if in_force(held, j, at)))
 
 
 class Move(NamedTuple):
@@ -67,6 +95,21 @@ def _league(rng: random.Random, ties: bool, jornadas: tuple[int, ...]) -> tuple[
     sizes = {"POR": rng.randint(1, 3), "DEF": rng.randint(4, 7), "MED": rng.randint(4, 7), "DEL": rng.randint(2, 5)}
     pos = {"%s%d" % (p, i): p for p, n in sizes.items() for i in range(n)}
     return pos, {j: {k: float(rng.randint(0, 5)) if ties else rng.uniform(0, 9) for k in pos} for j in jornadas}
+
+
+def _selftest_window() -> None:
+    locks = {5: "2026-11-27T20:00Z", 6: "2026-12-04T20:00Z", 7: "2026-12-11T20:00Z"}
+    every = range(1, 12)
+    for at in (None, "2026-11-20T10:00Z", "2026-11-27T20:00Z", "2026-11-30T10:00Z", "2026-12-20T10:00Z"):
+        w = window_at(locks, every, at)
+        assert list(w) == sorted(w) and all(in_force(dict(locks), j, at) for j in w) and not any(
+            in_force(dict(locks), j, at) for j in every if j not in w), "a window is exactly the jornadas in force"
+        assert w.season == w and set(w.lock) <= set(w.next4) <= set(w.season)
+        assert len(w.next4) == min(NEXT_JORNADAS, len(w)) and len(w.lock) == min(1, len(w))
+        assert w.lock == w[:1] and w.next4 == w[:NEXT_JORNADAS]
+    early, late = window_at(locks, every, "2026-11-20T10:00Z"), window_at(locks, every, "2026-11-30T10:00Z")
+    assert early[0] == 5 and late[0] == 6, "a move made after a lock does not count for it"
+    assert window_at({}, (), None) == () and window_at(locks, (1, 2), None) == ()
 
 
 def _selftest() -> None:
@@ -131,6 +174,7 @@ def _selftest() -> None:
     assert squad_at(here, Move(frozenset("a"), frozenset("c"), early, late), 5, locks) == frozenset("b"), "only the sale is in force"
     assert squad_at(here, Move(frozenset("a"), frozenset("c"), early, early), 5, locks) == frozenset("bc")
     assert squad_at(here, NOTHING, 5, locks) == here
+    _selftest_window()
     print("valuation self-test OK")
 
 

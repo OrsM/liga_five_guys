@@ -14,8 +14,8 @@ from typing import NamedTuple
 
 import eleven
 from ffcore.rules import SALE_ESTIMATE
+from valuation import READERS
 
-PER_MILLION_AHEAD = 8
 STOPGAP_RATE = 0.6
 MAX_NIGHTS = 5
 FORECAST_NIGHTS = 10
@@ -44,7 +44,7 @@ NO_OFFERS = OfferDistribution(())
 
 class Context(NamedTuple):
     pos: Mapping[str, str]
-    horizons: Mapping[int, Horizon]
+    horizons: Mapping[str, Horizon]
     cash: float
     offers: OfferDistribution = NO_OFFERS
     rate: float = STOPGAP_RATE
@@ -52,18 +52,18 @@ class Context(NamedTuple):
 
 class Verdict(NamedTuple):
     key: float | None
-    lost: Mapping[int, float] | None
+    lost: Mapping[str, float] | None
     reserve: float | None
 
 
 Rule = Callable[[Standing, Context], Verdict]
 
 
-def lost_points(player: str, ctx: Context) -> Mapping[int, float] | None:
-    """The points your eleven loses without player, for each horizon of ctx (keyed as ctx.horizons). Zero where there is
-    no settled eleven. None when at some horizon removing player leaves no legal eleven (eleven.remove is None): his sale
+def lost_points(player: str, ctx: Context) -> Mapping[str, float] | None:
+    """The points your eleven loses without player, for each horizon of ctx (keyed as ctx.horizons: the
+    valuation.READERS of one Window). Zero where there is no settled eleven. None when at some horizon removing player leaves no legal eleven (eleven.remove is None): his sale
     has no points loss to quote, it needs a replacement bought first."""
-    out: dict[int, float] = {}
+    out: dict[str, float] = {}
     for n, h in ctx.horizons.items():
         if h.settled is None:
             out[n] = 0.0
@@ -76,10 +76,10 @@ def lost_points(player: str, ctx: Context) -> Mapping[int, float] | None:
 
 
 def points_per_million(standing: Standing, ctx: Context) -> Verdict:
-    """Ranks an offer by the points lost over PER_MILLION_AHEAD per million raised: None when the offer is None or 0 or
+    """Ranks an offer by the points lost over the season per million raised: None when the offer is None or 0 or
     when lost_points is None. States no reserve price."""
     lost = lost_points(standing.player, ctx)
-    key = None if lost is None or not standing.offer else lost[PER_MILLION_AHEAD] / (standing.offer / 1e6)
+    key = None if lost is None or not standing.offer else lost["season"] / (standing.offer / 1e6)
     return Verdict(key, lost, None)
 
 
@@ -104,7 +104,7 @@ def worth_rule(rate: float, *, trend: bool) -> Rule:
         if lost is None:
             return Verdict(None, None, None)
         later = standing.later if trend else SALE_ESTIMATE * standing.value
-        reserve = reserve_price(lost[0], rate, later)
+        reserve = reserve_price(lost["season"], rate, later)
         key = None if standing.offer is None else reserve - standing.offer
         return Verdict(key, lost, reserve)
 
@@ -294,7 +294,7 @@ def _selftest_no_legal_eleven() -> None:
 
     def at(squad: Iterable[str], fielded: frozenset[str] | None = None) -> Context:
         mine = frozenset(squad)
-        return Context(pos, {n: Horizon(value, eleven.best_eleven(mine, pos, value, fielded)) for n in (4, 8, PER_MILLION_AHEAD, 0)}, 0.0)
+        return Context(pos, {n: Horizon(value, eleven.best_eleven(mine, pos, value, fielded)) for n in READERS}, 0.0)
 
     bare = at(pos)
     whole = eleven.total(frozenset(pos), value)
@@ -306,8 +306,8 @@ def _selftest_no_legal_eleven() -> None:
     extra = "DEF9"
     pos[extra], value[extra] = "DEF", 0.5
     backed = at([*pos])
-    assert backed.horizons[0].settled is not None
-    mine, bench = backed.horizons[0].settled.eleven, backed.horizons[0].settled.bench
+    assert backed.horizons["season"].settled is not None
+    mine, bench = backed.horizons["season"].settled.eleven, backed.horizons["season"].settled.bench
     for p in pos:
         got = lost_points(p, backed)
         fills = p not in bench and any(eleven.legal((mine - {p}) | {b}, pos) for b in bench)
@@ -328,7 +328,7 @@ def _selftest() -> None:
         for ties in (False, True):
             fielded, bench, pos, value = eleven.random_league(random.Random(seed), ties)
             squad = fielded | bench
-            horizons = {n: Horizon(value, eleven.best_eleven(squad, pos, value, fielded)) for n in (4, 8, PER_MILLION_AHEAD, 0)}
+            horizons = {n: Horizon(value, eleven.best_eleven(squad, pos, value, fielded)) for n in READERS}
             ctx = Context(pos, horizons, 0.0)
             for n, h in horizons.items():
                 if h.settled is None:
@@ -348,13 +348,13 @@ def _selftest() -> None:
                 if v.lost is None:
                     assert v.key is None, "no legal eleven without him: no key"
                     continue
-                want = v.lost[PER_MILLION_AHEAD] / (offer / 1e6)
+                want = v.lost["season"] / (offer / 1e6)
                 assert v.key == want, "key is points lost per million"
                 half = LIVE(s._replace(offer=2 * offer), ctx).key
                 assert half is not None and abs(half - want / 2) < 1e-9, "key halves when the offer doubles"
                 assert LIVE(s._replace(offer=None), ctx).key is None and LIVE(s._replace(offer=0.0), ctx).key is None
 
-            settled0 = horizons[0].settled
+            settled0 = horizons["season"].settled
             for rate in (0.3, STOPGAP_RATE, 2.0):
                 plain = worth_rule(rate, trend=False)
                 trended = worth_rule(rate, trend=True)
@@ -364,7 +364,7 @@ def _selftest() -> None:
                     if got is None:
                         assert plain(Standing(p, value[p], 1e6, a), ctx) == Verdict(None, None, None), "no legal eleven: no reserve, no key"
                         continue
-                    lost = got[0]
+                    lost = got["season"]
                     for offer in (1e6 * (1 + seed), 3e6 * (1 + seed)):
                         s = Standing(p, value[p], offer, a)
                         v = plain(s, ctx)

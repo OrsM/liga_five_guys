@@ -15,6 +15,7 @@ import numpy.typing as npt
 
 import decision
 import salegrade
+import valuation
 import worth
 from board import context, later_sale
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
@@ -46,7 +47,7 @@ LOCK_FOLDS = folds_of(("kickoffs", "first_results", "points_changes", "season_la
                        "latest_lineups", "latest_results_history"))
 MOMENT_FOLDS = folds_of(("price", "latest_api_lineup", "latest_api_players_all", "latest_api_teams", "latest_lineups"))
 
-GRADE_AHEAD = 4  # jornadas past the lock each replayed forecast is scored on
+GRADE_AHEAD = valuation.NEXT_JORNADAS  # jornadas past the lock each replayed forecast is scored on
 RATE = 0.6
 SALES_FROM = "2026-08-25"
 
@@ -469,14 +470,11 @@ def sold_since(season: Season, day: str, facts: Mapping[dt.datetime, MomentFacts
 
 
 def horizon_jornadas(at: dt.datetime, locks: dict[int, dt.datetime], done: set[int]) -> dict[str, frozenset[int]]:
-    """Per horizon of salegrade.HORIZONS, the done jornadas a sale at at is graded on: lock is j0, the first jornada
-    whose lock is after at; next4 is j0 to j0+3; season is every jornada from j0 on. Each set is inside done, and a
+    """Per horizon of salegrade.HORIZONS, the done jornadas a sale at at is graded on: the horizons are the lock, next4 and
+    season readers of the Window of the jornadas whose lock is after at. Each set is inside done, and a
     set is empty when no jornada of its horizon is done (or none follows the sale)."""
-    after = sorted((j for j in locks if locks[j] > at), key=locks.__getitem__)
-    if not after:
-        return {h: frozenset() for h in HORIZONS}
-    j0 = after[0]
-    spans = {"lock": {j0}, "next4": set(range(j0, j0 + 4)), "season": {j for j in locks if j >= j0}}
+    window = valuation.Window(sorted(j for j in locks if locks[j] > at))
+    spans = {name: set(getattr(window, name)) for name in valuation.READERS}
     return {h: frozenset(spans[h] & done) for h in HORIZONS}
 
 
