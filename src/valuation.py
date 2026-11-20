@@ -8,7 +8,7 @@ from typing import NamedTuple
 import eleven
 from ffcore.rules import XI_SIZE, in_force
 
-__all__ = ["Window", "READERS", "NEXT_JORNADAS", "window_at", "Move", "Value", "Delta", "Cells", "NOTHING", "squad_at", "value_of", "delta"]
+__all__ = ["Window", "READERS", "NEXT_JORNADAS", "window_at", "Move", "Value", "Delta", "Cells", "NOTHING", "squad_at", "value_of", "delta", "Buyer"]
 
 Cells = Mapping[int, Mapping[str, float]]
 
@@ -91,6 +91,32 @@ def delta(squad: frozenset[str], move: Move, window: tuple[int, ...], locks: Map
     return Delta(None if whole is None else after.points - before.points, after.gap)
 
 
+class Buyer:
+    """The gain of buying one player who arrives before every jornada of the window, asked of many players over one squad:
+    the Delta of that move, summed over the window. The squad must field a legal eleven. V_j of the squad plus a player
+    never falls as his forecast rises, so each (jornada, position) remembers the highest forecast known to add nothing and
+    a player no better there is not valued again."""
+
+    def __init__(self, squad: frozenset[str], window: tuple[int, ...], pos: Mapping[str, str], cells: Cells):
+        self.squad, self.window, self.pos, self.cells = squad, window, pos, cells
+        self.base = {j: eleven.points(squad, pos, cells[j]) or 0.0 for j in window}
+        self.nothing: dict[tuple[int, str], float] = {}
+
+    def gain(self, player: str) -> float:
+        total = 0.0
+        position = self.pos[player]
+        for j in self.window:
+            e = self.cells[j].get(player, 0.0)
+            if e <= self.nothing.get((j, position), float("-inf")):
+                continue
+            got = (eleven.points(self.squad | {player}, self.pos, self.cells[j]) or 0.0) - self.base[j]
+            if got > 0.0:
+                total += got
+            else:
+                self.nothing[(j, position)] = e
+        return total
+
+
 def _league(rng: random.Random, ties: bool, jornadas: tuple[int, ...]) -> tuple[dict[str, str], dict[int, dict[str, float]]]:
     sizes = {"POR": rng.randint(1, 3), "DEF": rng.randint(4, 7), "MED": rng.randint(4, 7), "DEL": rng.randint(2, 5)}
     pos = {"%s%d" % (p, i): p for p, n in sizes.items() for i in range(n)}
@@ -170,6 +196,17 @@ def _selftest() -> None:
                     assert delta(squad, Move(frozenset({k}), frozenset(), early, None), window, locks, pos, cells).points is None, \
                         "a squad of exactly 11 has no eleven after any single sale"
                 break
+    for case in range(60):
+        pos, cells = _league(rng, case % 2 == 0, window)
+        squad = frozenset(rng.sample(sorted(pos), rng.randint(XI_SIZE, max(XI_SIZE, len(pos) - 1))))
+        if eleven.points(squad, pos, {}) is None:
+            continue
+        buyer = Buyer(squad, window, pos, cells)
+        outside = sorted(set(pos) - squad)
+        for k in outside + outside[::-1]:
+            bought = delta(squad, Move(frozenset(), frozenset({k}), None, early), window, locks, pos, cells).points
+            assert bought is not None and abs(buyer.gain(k) - bought) < 1e-9, "the Buyer's gain is the Delta of the buy, whatever the order asked"
+            assert bought >= -1e-9, "a buy never loses points"
     here = frozenset("ab")
     assert squad_at(here, Move(frozenset("a"), frozenset("c"), early, late), 5, locks) == frozenset("b"), "only the sale is in force"
     assert squad_at(here, Move(frozenset("a"), frozenset("c"), early, early), 5, locks) == frozenset("bc")

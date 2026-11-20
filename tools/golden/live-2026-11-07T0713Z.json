@@ -1295,141 +1295,141 @@
  "opportunities": [
   {
    "bid": null,
-   "gain": 140.45414798644873,
+   "gain": 151.22232912544752,
    "player": "11520",
    "status": "rival",
    "win": null
   },
   {
    "bid": null,
-   "gain": 116.59215881384884,
+   "gain": 127.36033995284761,
    "player": "3429",
    "status": "unlisted",
    "win": null
   },
   {
    "bid": null,
-   "gain": 109.85735170366317,
+   "gain": 120.62553284266193,
    "player": "4288",
    "status": "unlisted",
    "win": null
   },
   {
    "bid": null,
-   "gain": 71.24203841394434,
-   "player": "11439",
-   "status": "unlisted",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 71.00553232604575,
+   "gain": 86.79615930412321,
    "player": "2771",
    "status": "unlisted",
    "win": null
   },
   {
    "bid": null,
-   "gain": 69.9474245592897,
+   "gain": 80.9649174738827,
+   "player": "11439",
+   "status": "unlisted",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 79.67030361922804,
    "player": "8386",
    "status": "rival",
    "win": null
   },
   {
    "bid": null,
-   "gain": 53.020072740708784,
+   "gain": 62.74295180064713,
    "player": "11709",
    "status": "rival",
    "win": null
   },
   {
    "bid": null,
-   "gain": 39.906949736810276,
-   "player": "7279",
-   "status": "rival",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 36.67744784549042,
+   "gain": 53.907957144167604,
    "player": "5995",
    "status": "rival",
    "win": null
   },
   {
    "bid": null,
-   "gain": 35.37627160710743,
-   "player": "7257",
-   "status": "rival",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 34.92085354614585,
-   "player": "3686",
-   "status": "unlisted",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 34.47963706984022,
+   "gain": 51.765750241387195,
    "player": "1931",
    "status": "rival",
    "win": null
   },
   {
    "bid": null,
-   "gain": 32.69977096590935,
-   "player": "1826",
-   "status": "rival",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 32.1589005762993,
+   "gain": 48.686326229048895,
    "player": "11830",
    "status": "unlisted",
    "win": null
   },
   {
    "bid": null,
-   "gain": 31.87000897573283,
+   "gain": 45.57526769578808,
+   "player": "7257",
+   "status": "rival",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 43.29390913637701,
+   "player": "7279",
+   "status": "rival",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 42.640030448319706,
    "player": "7645",
    "status": "unlisted",
    "win": null
   },
   {
    "bid": null,
-   "gain": 26.00479552728318,
-   "player": "3758",
+   "gain": 40.200930077768454,
+   "player": "9931",
+   "status": "rival",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 40.038945027783726,
+   "player": "3686",
    "status": "unlisted",
    "win": null
   },
   {
    "bid": null,
-   "gain": 24.833805964217518,
-   "player": "9990",
-   "status": "unlisted",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 23.595908141402788,
-   "player": "15342",
-   "status": "unlisted",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 22.89253211411399,
-   "player": "6337",
-   "status": "unlisted",
-   "win": null
-  },
-  {
-   "bid": null,
-   "gain": 22.264798511148953,
+   "gain": 38.17901762586422,
    "player": "11706",
+   "status": "unlisted",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 37.32775137062136,
+   "player": "14210",
+   "status": "unlisted",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 36.89472682871733,
+   "player": "1826",
+   "status": "rival",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 36.00854605182496,
+   "player": "7542",
+   "status": "unlisted",
+   "win": null
+  },
+  {
+   "bid": null,
+   "gain": 35.95561155887861,
+   "player": "3758",
    "status": "unlisted",
    "win": null
   }

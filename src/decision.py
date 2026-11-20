@@ -14,6 +14,7 @@ Named rules, each tested:
     who was 'market' at the newest earlier cut is not an arrival."""
 from __future__ import annotations
 
+import random
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence
 
@@ -31,9 +32,10 @@ from ffcore.records import AuctionBrier, AuctionCalibration
 from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
+import valuation
 from valuation import Window, window_at
 
-__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "window_value", "curves_of", "opportunity_rows",
+__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "arrival", "window_value", "curves_of", "opportunity_rows",
            "Fact", "UNKNOWN", "Offer", "Held",
            "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions",
            "latest_auction_run", "brier_by_scope", "drifting_bins"]
@@ -257,10 +259,16 @@ def lock_times(inp: Inputs) -> dict[int, str]:
     return {x.jornada: x.lock for x in inp.locks}
 
 
+def arrival(locks: dict[int, str], close: str | None) -> str | None:
+    """The moment a player bought arrives: his auction's close, or for one with no auction (close None) the first lock
+    (None when no lock is ahead)."""
+    return close or min(locks.values(), default=None)
+
+
 def window_of(locks: dict[int, str], cells: dict[int, dict[str, float]], close: str | None) -> Window:
     """The Window of a player bought at close, or of one with no auction (close None) bought as soon as the next lock
     allows; over the jornadas the forecast has."""
-    return window_at(locks, cells, close or min(locks.values(), default=None))
+    return window_at(locks, cells, arrival(locks, close))
 
 
 def window_value(pos: dict[str, str], cells: dict[int, dict[str, float]], where: Iterable[int]) -> dict[str, float]:
@@ -292,7 +300,7 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
         if x.value:
             ahead.setdefault(x.player, {})[x.h] = x
     fielded = lineup_of(inp, pos).eleven
-    seen: dict[Window, tuple[dict[str, float], eleven.Settled | None]] = {}
+    seen: dict[Window, tuple[dict[str, float], eleven.Settled | None, valuation.Buyer]] = {}
     out = []
     for c in inp.universe:
         k, status, asking, value = c.player, c.status, c.asking, c.value
@@ -304,13 +312,14 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
             continue
         if where not in seen:
             v = window_value(pos, cells, where.season)
-            seen[where] = (v, eleven.best_eleven(mine, pos, v, fielded))
-        v, settled = seen[where]
+            seen[where] = (v, eleven.best_eleven(mine, pos, v, fielded), valuation.Buyer(mine, where, pos, cells))
+        v, settled, buyer = seen[where]
         if settled is None:
             continue
         got = eleven.swap(k, settled.eleven, pos, v)
         if got is None:
             continue
+        gain = buyer.gain(k)
         price = asking if asking is not None else value
         steps = ahead.get(k, {})
         bid: float | None = None
@@ -320,7 +329,7 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
             bid = asking * ratio
         out.append({
             "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": where.lock[0],
-            "replaces": got.replaces, "gain": got.gain, "per_million": got.gain / (price / 1e6) if price else None,
+            "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
             "price_next": rise(steps[1]) if 1 in steps else None,
             "price_lock": rise(steps[max(steps)]) if steps else None,
             "bid": bid, "win": win, "placed": placed.get(k)})
@@ -488,15 +497,44 @@ def _selftest_opportunities() -> None:
     assert (got["good"]["bid"], got["good"]["win"]) == (6e6, 0.7), "none reaches the target: the likeliest"
     assert got["late"]["gain"] > 0 and (got["late"]["bid"], got["late"]["win"]) == (None, None), \
         "on the market with no curve: his gain is said, no bid or chance is made up"
-    assert got["keeper"]["gain"] == -2.0 and got["keeper"]["replaces"] == "k", "a worse keeper would replace the keeper, for less"
+    assert got["keeper"]["gain"] == 0.0 and got["keeper"]["replaces"] == "k", "a worse keeper would replace the keeper and adds nothing"
     assert got["late"]["gain"] == 7.0 and got["late"]["from_j"] == 2, "an auction closing after jornada 1's lock counts from jornada 2: your eleven is frozen at the lock"
     assert got["rival"]["status"] == "rival" and got["rival"]["bid"] is None and got["rival"]["gain"] == 10.0, "a target is judged without being on sale"
-    assert got["free"]["status"] == "unlisted" and got["free"]["gain"] < 0
+    assert got["free"]["status"] == "unlisted" and got["free"]["gain"] == 0.0 and all(r["gain"] >= 0 for r in got.values()), "a gain is never negative"
     assert abs(got["star"]["price_next"] - 0.05) < 1e-12 and abs(got["star"]["price_lock"] - 0.10) < 1e-12 and got["good"]["price_next"] is None
     assert got["star"]["per_million"] == 12.0 / 8.0, "points a million of his asking price"
     assert [r["player"] for r in opportunity_rows(inp)][0] == "star", "most points first"
     short = inp._replace(players=[p for p in inp.players if p.player != "k"])
     assert opportunity_rows(short) == [], "no eleven: no opportunities"
+
+
+def _selftest_gain_is_value() -> None:
+    rng = random.Random(7)
+    seen = improving = 0
+    for case in range(300):
+        fielded, bench, pos, value = eleven.random_league(rng, case % 2 == 0)
+        squad = fielded | bench
+        newcomer = "new"
+        pos = {**pos, newcomer: rng.choice(["POR", "DEF", "MED", "DEL"])}
+        value = {**value, newcomer: rng.choice([0, 1, 2, 3, 4, 5, 8]) * 1.0}
+        settled = eleven.best_eleven(squad, pos, value)
+        if settled is None:
+            continue
+        cells = {1: value}
+        got = valuation.delta(squad, valuation.Move(frozenset(), frozenset({newcomer}), None, None), (1,), {}, pos, cells).points
+        label = eleven.swap(newcomer, settled.eleven, pos, value)
+        assert got is not None and label is not None
+        assert abs(got - max(label.gain, 0.0)) < 1e-9, "the swap that names who he replaces gains exactly what the Delta of the buy says"
+        seen += 1
+        improving += label.improves
+    assert seen > 200 and improving > 20, "the property was exercised"
+    for case in range(100):
+        fielded, bench, pos, value = eleven.random_league(rng, False)
+        squad = fielded | bench
+        cells = {j: {k: rng.uniform(0, 9) for k in pos} for j in (1, 2, 3)}
+        per_jornada = sum(eleven.points(squad, pos, cells[j]) or 0.0 for j in cells)
+        one_eleven = eleven.points(squad, pos, window_value(pos, cells, tuple(cells))) or 0.0
+        assert per_jornada >= one_eleven - 1e-9, "an eleven picked afresh in each jornada is worth at least one picked for the sum"
 
 
 def _selftest_lineup() -> None:
@@ -672,6 +710,7 @@ def _selftest() -> None:
     _selftest_builders()
     _selftest_inputs_at()
     _selftest_opportunities()
+    _selftest_gain_is_value()
     _selftest_lineup()
     _selftest_decision_at()
     _selftest_arrivals_at()

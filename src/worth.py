@@ -14,7 +14,8 @@ from typing import NamedTuple
 
 import eleven
 from ffcore.rules import SALE_ESTIMATE
-from valuation import READERS
+import valuation
+from valuation import READERS, Window
 
 STOPGAP_RATE = 0.6
 MAX_NIGHTS = 5
@@ -30,11 +31,6 @@ class Standing(NamedTuple):
     later: float
 
 
-class Horizon(NamedTuple):
-    value: Mapping[str, float]
-    settled: eleven.Settled | None
-
-
 class OfferDistribution(NamedTuple):
     ratios: tuple[float, ...]
 
@@ -43,11 +39,16 @@ NO_OFFERS = OfferDistribution(())
 
 
 class Context(NamedTuple):
+    """What a rule reads: the positions, the window of each reader (valuation.READERS), your cash, the offers seen and the
+    rate, and what the points are made of: your squad, each jornada's forecast per player and the locks."""
     pos: Mapping[str, str]
-    horizons: Mapping[str, Horizon]
+    horizons: Mapping[str, Window]
     cash: float
     offers: OfferDistribution = NO_OFFERS
     rate: float = STOPGAP_RATE
+    squad: frozenset[str] = frozenset()
+    cells: valuation.Cells = {}
+    locks: Mapping[int, str] = {}
 
 
 class Verdict(NamedTuple):
@@ -60,18 +61,18 @@ Rule = Callable[[Standing, Context], Verdict]
 
 
 def lost_points(player: str, ctx: Context) -> Mapping[str, float] | None:
-    """The points your eleven loses without player, for each horizon of ctx (keyed as ctx.horizons: the
-    valuation.READERS of one Window). Zero where there is no settled eleven. None when at some horizon removing player leaves no legal eleven (eleven.remove is None): his sale
-    has no points loss to quote, it needs a replacement bought first."""
+    """The points your squad loses by selling player now, for each window of ctx.horizons: valuation.delta of the sale,
+    the eleven picked afresh in each jornada, negated (0 for a player no jornada's eleven needs). Zero where the squad
+    fields no eleven. None when the squad without him fields none: his sale has no points loss to quote."""
+    if eleven.points(ctx.squad, ctx.pos, {}) is None:
+        return {n: 0.0 for n in ctx.horizons}
+    sale = valuation.Move(frozenset({player}), frozenset(), None, None)
     out: dict[str, float] = {}
-    for n, h in ctx.horizons.items():
-        if h.settled is None:
-            out[n] = 0.0
-            continue
-        gone = eleven.remove(player, h.settled.eleven, h.settled.bench, ctx.pos, h.value)
-        if gone is None:
+    for n, window in ctx.horizons.items():
+        got = valuation.delta(ctx.squad, sale, window, ctx.locks, ctx.pos, ctx.cells).points
+        if got is None:
             return None
-        out[n] = gone.cost
+        out[n] = 0.0 - got
     return out
 
 
@@ -287,17 +288,24 @@ def _selftest_option() -> None:
     assert r_estimate(cuts, now) > 0
 
 
+def _cells_of(rng: random.Random, value: Mapping[str, float]) -> dict[int, dict[str, float]]:
+    return {1: dict(value), 2: {k: v * rng.choice([0.0, 0.5, 1.0, 2.0]) for k, v in value.items()},
+            3: {k: rng.choice([0.0, 1.0, 3.0, 5.0]) for k in value}}
+
+
+def _context(squad: Iterable[str], pos: Mapping[str, str], cells: valuation.Cells) -> Context:
+    season = Window(sorted(cells))
+    return Context(pos, {n: getattr(season, n) for n in READERS}, 0.0, squad=frozenset(squad), cells=cells, locks={1: "2026-12-01T20:00Z"})
+
+
 def _selftest_no_legal_eleven() -> None:
     shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
     pos = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
     value = {k: 1.0 + i for i, k in enumerate(sorted(pos))}
+    rng = random.Random(3)
+    cells = _cells_of(rng, value)
 
-    def at(squad: Iterable[str], fielded: frozenset[str] | None = None) -> Context:
-        mine = frozenset(squad)
-        return Context(pos, {n: Horizon(value, eleven.best_eleven(mine, pos, value, fielded)) for n in READERS}, 0.0)
-
-    bare = at(pos)
-    whole = eleven.total(frozenset(pos), value)
+    bare = _context(pos, pos, cells)
     for p in pos:
         v = LIVE(Standing(p, value[p], 1e6, value[p]), bare)
         assert lost_points(p, bare) is None and v == Verdict(None, None, None), "eleven players only: nobody has a quotable loss"
@@ -305,22 +313,23 @@ def _selftest_no_legal_eleven() -> None:
         assert bench_option(Standing(p, value[p], 1e6, value[p]), bare) == Verdict(None, None, None)
     extra = "DEF9"
     pos[extra], value[extra] = "DEF", 0.5
-    backed = at([*pos])
-    assert backed.horizons["season"].settled is not None
-    mine, bench = backed.horizons["season"].settled.eleven, backed.horizons["season"].settled.bench
+    cells = {j: c | {extra: 0.5} for j, c in cells.items()}
+    backed = _context(pos, pos, cells)
+    whole = sum(eleven.total(frozenset(k for k in pos if k != extra), c) for c in cells.values())
     for p in pos:
         got = lost_points(p, backed)
-        fills = p not in bench and any(eleven.legal((mine - {p}) | {b}, pos) for b in bench)
-        if p in bench:
-            assert got is not None and not any(got.values()), "a bench player costs nothing"
-        elif fills:
-            assert got is not None and all(0 <= x < whole for x in got.values()), "covered: costed as the swap, never the whole eleven"
+        if eleven.points(backed.squad - {p}, pos, {}) is None:
+            assert got is None, "no replacement fills the slot: no legal eleven"
         else:
-            assert got is None, "no bench player fills the slot: no legal eleven"
+            assert got is not None and all(0 <= x < whole for x in got.values()), "covered: costed as the swap, never the whole eleven"
     assert lost_points("POR0", backed) is None, "the only keeper with no bench keeper: no legal eleven"
     assert lost_points("DEF0", backed) is not None, "a starter of the benched position is covered"
     costs = [lost_points(p, backed) for p in pos]
     assert len({tuple(c.values()) for c in costs if c is not None}) > 1, "covered rows differ per player"
+
+
+def _played(squad: frozenset[str], pos: Mapping[str, str], cells: valuation.Cells) -> frozenset[str]:
+    return frozenset().union(*(s.eleven for c in cells.values() if (s := eleven.best_eleven(squad, pos, c)) is not None))
 
 
 def _selftest() -> None:
@@ -328,17 +337,21 @@ def _selftest() -> None:
         for ties in (False, True):
             fielded, bench, pos, value = eleven.random_league(random.Random(seed), ties)
             squad = fielded | bench
-            horizons = {n: Horizon(value, eleven.best_eleven(squad, pos, value, fielded)) for n in READERS}
-            ctx = Context(pos, horizons, 0.0)
-            for n, h in horizons.items():
-                if h.settled is None:
+            cells = _cells_of(random.Random(seed), value)
+            ctx = _context(squad, pos, cells)
+            played = _played(squad, pos, cells)
+            for p in squad:
+                got = lost_points(p, ctx)
+                if p not in played:
+                    assert got is not None and not any(got.values()), "a player no jornada's eleven fields costs nothing"
+                if got is None:
+                    assert eleven.points(squad - {p}, pos, {}) is None
                     continue
-                for p in h.settled.bench:
-                    got = lost_points(p, ctx)
-                    assert got is not None and got[n] == 0.0, "a bench player costs the eleven nothing"
-                for p in h.settled.eleven:
-                    got = lost_points(p, ctx)
-                    assert got is None or got[n] >= -1e-9, "an eleven player never costs negative points"
+                for n, w in ctx.horizons.items():
+                    lose = sum((eleven.best_total(squad, pos, cells[j]) or 0.0) - (eleven.best_total(squad - {p}, pos, cells[j]) or 0.0) for j in w)
+                    assert abs(got[n] - lose) < 1e-9, "the loss is V(S) less V(S-p) in each jornada, summed"
+                    assert got[n] >= -1e-9, "selling never gains points"
+                assert got["lock"] <= got["next4"] + 1e-9 <= got["season"] + 2e-9, "a longer window loses at least as much"
             for p in squad:
                 offer = 1e6 * (1 + seed)
                 s = Standing(p, value[p], offer, value[p])
@@ -348,13 +361,12 @@ def _selftest() -> None:
                 if v.lost is None:
                     assert v.key is None, "no legal eleven without him: no key"
                     continue
-                want = v.lost["season"] / (offer / 1e6)
-                assert v.key == want, "key is points lost per million"
+                per_million = v.lost["season"] / (offer / 1e6)
+                assert v.key == per_million, "key is points lost per million"
                 half = LIVE(s._replace(offer=2 * offer), ctx).key
-                assert half is not None and abs(half - want / 2) < 1e-9, "key halves when the offer doubles"
+                assert half is not None and abs(half - per_million / 2) < 1e-9, "key halves when the offer doubles"
                 assert LIVE(s._replace(offer=None), ctx).key is None and LIVE(s._replace(offer=0.0), ctx).key is None
 
-            settled0 = horizons["season"].settled
             for rate in (0.3, STOPGAP_RATE, 2.0):
                 plain = worth_rule(rate, trend=False)
                 trended = worth_rule(rate, trend=True)
@@ -373,8 +385,8 @@ def _selftest() -> None:
                         assert (offer >= v.reserve) == (v.key is not None and v.key <= 0), "sell iff offer reaches reserve"
                         assert trended(s._replace(later=a), ctx) == v, "trend equals plain when later is the plain estimate"
                     assert plain(Standing(p, value[p], None, a), ctx).key is None, "no offer, no key"
-                    if settled0 is not None and p in settled0.bench:
-                        assert plain(s, ctx).reserve == a, "a bench player's reserve is the later sale price"
+                    if p not in played:
+                        assert plain(s, ctx).reserve == a, "a player no eleven fields has the later sale price as reserve"
                     assert reserve_price(lost, rate, a) <= reserve_price(lost + 1.0, rate, a), "reserve rises with points lost"
                     assert reserve_price(lost, rate, a) >= reserve_price(lost, 2 * rate, a) - 1e-9, "reserve falls as rate rises"
 
