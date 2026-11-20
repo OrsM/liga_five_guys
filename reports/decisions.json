@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-20T20:46Z",
- "market_at": "2026-11-20T20:45Z",
+ "generated_at": "2026-11-20T21:00Z",
+ "market_at": "2026-11-20T20:59Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-20T20:45Z",
+   "at": "2026-11-20T20:59Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -180,10 +180,10 @@
    "step": "bid",
    "price": 5567636.0,
    "asking": 5567636.0,
-   "amount": 6013046.880000001,
-   "win": 0.905982905982906,
-   "advised": 6013046.880000001,
-   "advised_win": 0.905982905982906,
+   "amount": 6514134.119999999,
+   "win": 0.9,
+   "advised": 6514134.119999999,
+   "advised_win": 0.9,
    "move": "bid",
    "plan": false,
    "done": false,
@@ -206,12 +206,12 @@
     ],
     [
      "bid",
-     6013046.880000001,
+     6514134.119999999,
      "money"
     ],
     [
      "chance to win",
-     0.905982905982906,
+     0.9,
      "chance"
     ],
     [
@@ -220,21 +220,21 @@
      "points"
     ]
    ],
-   "bids": 0,
+   "bids": 1,
    "auction": {
     "yours": false,
-    "listings": 118,
+    "listings": 30,
     "thin": false,
-    "cell": "0/1/2"
+    "cell": "1/1"
    },
    "funding": {
     "feasible": true,
     "short": 0.0,
     "tonight": [],
     "raises": 0,
-    "margin": 74989357.32000001,
-    "lock_margin": 18044720.119999997,
-    "lock_margin_low": 16815658.817,
+    "margin": 74488270.08,
+    "lock_margin": 17543632.880000003,
+    "lock_margin_low": 16314571.577000001,
     "if_won": [
      "Aitor Paredes"
     ],
@@ -251,7 +251,7 @@
     "gain": 42.94141898179328,
     "points_lost_if_won": 65.6818106955734,
     "points_lost_if_lost": 0.0,
-    "net": -20.602406168040115
+    "net": -20.466352542402117
    },
    "accepts": [],
    "act": []
