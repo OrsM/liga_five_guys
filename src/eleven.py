@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from ffcore.rules import POSITIONS, SHAPES, XI_SIZE
 
-__all__ = ["Swap", "Settled", "Removed", "legal", "swap", "settle", "removal_cost", "build", "best_eleven", "remove", "remove_all", "total", "rank", "DEPTH", "top_points", "points_without"]
+__all__ = ["Swap", "Settled", "Removed", "legal", "swap", "settle", "removal_cost", "build", "best_eleven", "remove", "remove_all", "total", "rank", "DEPTH", "top_points", "points_without", "points"]
 
 COUNTS = {tuple(shape[p] for p in POSITIONS) for shape in SHAPES}
 DEPTH = {p: max(shape[p] for shape in SHAPES) for p in POSITIONS}
@@ -125,6 +125,13 @@ def points_without(ranked: Mapping[str, list[str]], value: Value, gone: frozense
     return top_points({p: [value.get(k, 0.0) for k in ranked[p] if k not in gone] for p in POSITIONS})
 
 
+def points(squad: frozenset[str], pos: Pos, value: Value) -> float | None:
+    """V: the points of the best legal eleven of the squad (the best shape's top players of each position, summed),
+    None when no legal eleven exists (fewer than 11 players or no shape fits). Depends on the positions of the squad
+    alone for None, never on value; equals the brute-force `best_total`."""
+    return points_without(rank(squad, pos, value), value, frozenset())
+
+
 def best_eleven(squad: frozenset[str], pos: Pos, value: Value, fielded: frozenset[str] | None = None) -> Settled | None:
     start = fielded if fielded is not None and fielded <= squad and legal(fielded, pos) else build(squad, pos, value)
     return None if start is None else settle(start, squad - start, pos, value)
@@ -179,6 +186,22 @@ def random_league(rng: random.Random, ties: bool) -> tuple[frozenset[str], froze
         picked |= set(rng.sample(have, shape[p]))
     eleven = frozenset(picked)
     return eleven, frozenset(pos) - eleven, pos, value
+
+
+def _points_selftest() -> None:
+    rng = random.Random(17)
+    for case in range(800):
+        sizes = {"POR": rng.randint(0, 3), "DEF": rng.randint(0, 7), "MED": rng.randint(0, 7), "DEL": rng.randint(0, 5)}
+        pos = {"%s%d" % (p, i): p for p, n in sizes.items() for i in range(n)}
+        value = {k: float(rng.randint(0, 4)) if case % 2 == 0 else rng.uniform(-2, 10) for k in pos}
+        squad = frozenset(rng.sample(sorted(pos), rng.randint(0, min(len(pos), 14))))
+        got, want = points(squad, pos, value), best_total(squad, pos, value)
+        assert (got is None) == (want is None), "V is None exactly when no legal eleven exists"
+        if got is not None and want is not None:
+            assert abs(got - want) < 1e-9, "V is the best legal eleven's points"
+            built = build(squad, pos, value)
+            assert built is not None and abs(total(built, value) - got) < 1e-9, "V is the built eleven's total"
+        assert (points(squad, pos, {k: 0.0 for k in pos}) is None) == (got is None), "legality does not depend on the values"
 
 
 def _selftest() -> None:
@@ -236,9 +259,10 @@ def _selftest() -> None:
             assert legal(out.eleven, pos) and out.eleven | out.bench == every - gone
         ranked = rank(every, pos, value)
         left = points_without(ranked, value, gone)
-        assert points_without(ranked, value, frozenset()) == top and (left is None) == (rest is None)
+        assert points_without(ranked, value, frozenset()) == top and points(every, pos, value) == top and (left is None) == (rest is None)
         if left is not None and rest is not None:
             assert abs(left - rest) < 1e-9, "the best eleven of what is left, straight from the ranking"
+    _points_selftest()
     assert build(frozenset(), {}, {}) is None and best_eleven(frozenset({"a"}), {"a": "POR"}, {"a": 1.0}) is None, "no eleven"
     squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "d4": "DEF", "m1": "MED", "m2": "MED", "m3": "MED",
              "m4": "MED", "f1": "DEL", "f2": "DEL", "star": "DEL", "bench": "DEF", "kb": "POR"}
