@@ -13,8 +13,6 @@ from ffcore.rules import DEBT_SHARE, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_marg
 
 __all__ = ["Club", "Approach", "Settlement", "approach", "settle"]
 
-INF = float("inf")
-
 
 class Club(NamedTuple):
     squad: frozenset[str]
@@ -48,21 +46,22 @@ class Approach(NamedTuple):
 
 class Side:
     """The best eleven's points of a squad and what it costs to sell a set of its players, memoised on the set.
-    A set of players is a bitmask over the squad (`bit`); `cost` takes the players, `cost_of` the mask.
+    A set of players is a bitmask over the squad (`bit`); `cost` takes the players, `cost_of` the mask, both None when
+    no legal eleven remains. The cost is `eleven.points` of the squad less that of what is left, nothing else.
     Only the first `eleven.DEPTH` survivors of each position can field, so sets that leave the same ones share a cost."""
 
     def __init__(self, squad: frozenset[str], pos: Mapping[str, str], value: Mapping[str, float]):
-        self.value, self.ranked = value, eleven.rank(squad, pos, value)
-        top = eleven.points_without(self.ranked, value, frozenset())
+        self.pos, self.value = pos, value
+        top = eleven.points(squad, pos, value)
         self.fields = top is not None
         self.points = top or 0.0
         self.bit = {k: 1 << i for i, k in enumerate(sorted(squad))}
-        self.lanes = {p: (reduce(or_, (self.bit[k] for k in ks), 0), ks) for p, ks in self.ranked.items()}
+        self.lanes = {p: (reduce(or_, (self.bit[k] for k in ks), 0), ks) for p, ks in eleven.rank(squad, pos, value).items()}
         self.lane_id: dict[tuple[str, int], int] = {}
         self.depths: dict[tuple[str, tuple[float, ...]], int] = {}
-        self.fielding: list[tuple[float, ...]] = []
-        self.shared: dict[tuple[int, ...], float] = {}
-        self.memo: dict[int, float] = {}
+        self.fielding: list[tuple[str, ...]] = []
+        self.shared: dict[tuple[int, ...], float | None] = {}
+        self.memo: dict[int, float | None] = {}
 
     def mask(self, players: Iterable[str]) -> int:
         return reduce(or_, (self.bit[k] for k in players), 0)
@@ -75,25 +74,29 @@ class Side:
         key = (position, mask & lane)
         got = self.lane_id.get(key)
         if got is None:
-            fielding = tuple(self.value.get(k, 0.0) for k in ranked if not mask & self.bit[k])[:eleven.DEPTH[position]]
-            got = self.lane_id[key] = self.depths.setdefault((position, fielding), len(self.fielding))
+            fielding = tuple(k for k in ranked if not mask & self.bit[k])[:eleven.DEPTH[position]]
+            got = self.lane_id[key] = self.depths.setdefault((position, tuple(self.value.get(k, 0.0) for k in fielding)), len(self.fielding))
             if got == len(self.fielding):
                 self.fielding.append(fielding)
         return got
 
-    def cost_of(self, mask: int) -> float:
-        got = self.memo.get(mask)
-        if got is None:
-            key = tuple([self.survivors(p, mask) for p in self.lanes])
-            got = self.shared.get(key)
-            if got is None:
-                left = eleven.top_points({p: self.fielding[i] for p, i in zip(self.lanes, key)})
-                got = self.shared[key] = INF if left is None else self.points - left
-            self.memo[mask] = got
+    def cost_of(self, mask: int) -> float | None:
+        if mask in self.memo:
+            return self.memo[mask]
+        key = tuple([self.survivors(p, mask) for p in self.lanes])
+        if key not in self.shared:
+            left = eleven.points(frozenset(k for i in key for k in self.fielding[i]), self.pos, self.value)
+            self.shared[key] = None if left is None else self.points - left
+        got = self.memo[mask] = self.shared[key]
         return got
 
-    def cost(self, gone: frozenset[str]) -> float:
+    def cost(self, gone: frozenset[str]) -> float | None:
         return self.cost_of(self.mask(gone))
+
+
+def per_unit(cost: float | None, price: float) -> float:
+    """The cost per unit of price; infinite (sorts last) when the cost is None, no eleven remaining."""
+    return float("inf") if cost is None else cost / price
 
 
 def proceeds(club: Club, k: str) -> float:
@@ -107,9 +110,10 @@ def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mappin
     held = side.mask(fixed)
     if need <= 1e-6:
         free = side.cost_of(held)
-        return None if free == INF else (free, frozenset())
+        return None if free is None else (free, frozenset())
     cost_of, memo = side.cost_of, side.memo
-    order = sorted((k for k in pool if price[k] > 0), key=lambda k: (cost_of(held | side.bit[k]) / price[k], k))
+    alone = {k: cost_of(held | side.bit[k]) for k in pool if price[k] > 0}
+    order = sorted(alone, key=lambda k: (per_unit(alone[k], price[k]), k))
     bits = [side.bit[k] for k in order]
     worth = [price[k] for k in order]
     left = [sum(worth[i:]) for i in range(len(order) + 1)]
@@ -118,10 +122,8 @@ def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mappin
     while stack:
         i, gone, got = stack.pop()
         m = held | gone
-        c = memo.get(m)
-        if c is None:
-            c = cost_of(m)
-        if c == INF or best is not None and c >= best[0] - 1e-12:
+        c = memo[m] if m in memo else cost_of(m)
+        if c is None or best is not None and c >= best[0] - 1e-12:
             continue
         if got >= need - 1e-6:
             best = (c, gone)
@@ -165,7 +167,7 @@ def approach(club: Club, player: str, bid: float, win: float, value: Mapping[str
     pend_n, pend_amount = club.pending
     price = {k: proceeds(club, k) for k in club.squad}
     offered = sorted((k for k in club.squad if k in club.offers),
-                     key=lambda k: (won_side.cost(frozenset({k})) / max(club.offers[k], 1.0), k))
+                     key=lambda k: (per_unit(won_side.cost(frozenset({k})), max(club.offers[k], 1.0)), k))
     reach = [sum(club.offers[k] - club.debt * club.worth[k] for k in offered[i:]) for i in range(len(offered) + 1)]
     best: tuple[float, frozenset[str], frozenset[str], frozenset[str], float, float] | None = None
     ceiling = bid_margin(club.cash, sum(club.offers[k] for k in offered), club.team_value,
@@ -174,7 +176,7 @@ def approach(club: Club, player: str, bid: float, win: float, value: Mapping[str
     while stack:
         i, a = stack.pop()
         cw, cl = won_side.cost(a), lost_side.cost(a)
-        if cw == INF or cl == INF or best is not None and win * cw + (1 - win) * cl >= best[0] - 1e-12:
+        if cw is None or cl is None or best is not None and win * cw + (1 - win) * cl >= best[0] - 1e-12:
             continue
         raised, sold = sum(club.offers[k] for k in a), sum(club.worth[k] for k in a)
         margin = bid_margin(club.cash, raised, club.team_value, sold, bid, pend_amount, club.debt)
@@ -269,8 +271,8 @@ def _selftest() -> None:
         for _ in range(12):
             gone = frozenset(rng.sample(sorted(squad), rng.randint(0, 5)))
             left = eleven.best_total(squad - gone, own, value)
-            want = INF if left is None else base - left
-            assert side.cost(gone) == INF if left is None else abs(side.cost(gone) - want) < 1e-9
+            paid = side.cost(gone)
+            assert (paid is None) if left is None else paid is not None and abs(paid - (base - left)) < 1e-9
         price = {k: rng.choice([1.0, 2.0, 3.0]) for k in squad}
         fixed = frozenset(rng.sample(sorted(squad), rng.randint(0, 2)))
         pool, need = squad - fixed, rng.choice([0.0, 2.0, 5.0, 9.0])
@@ -282,7 +284,8 @@ def _selftest() -> None:
         assert (covered is None) == (not direct), "a cover exists exactly when some set of the pool raises the need and keeps an eleven"
         if covered is not None:
             assert abs(covered[0] - min(c for c, _ in direct)) < 1e-9, "the cover is the cheapest set"
-            assert covered[1] <= pool and sum(price[k] for k in covered[1]) >= need - 1e-6 and abs(side.cost(fixed | covered[1]) - covered[0]) < 1e-9
+            kept = side.cost(fixed | covered[1])
+            assert covered[1] <= pool and sum(price[k] for k in covered[1]) >= need - 1e-6 and kept is not None and abs(kept - covered[0]) < 1e-9
     rng = random.Random(11)
     for _ in range(30):
         own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}

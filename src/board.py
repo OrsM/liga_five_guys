@@ -14,7 +14,7 @@ from typing import Any, NamedTuple
 import decision
 import eleven
 import worth
-from approach import INF, Approach, Club, Side, approach, settle
+from approach import Approach, Club, Side, approach, settle
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
@@ -555,7 +555,7 @@ def _selftest_one_meaning() -> None:
             side = Side(squad, pos, value)
             for p in squad:
                 gone = eleven.remove(p, settled.eleven, settled.bench, pos, value)
-                assert (gone is None) == (side.cost(frozenset([p])) == INF), "no legal eleven without him: one meaning in worth and approach"
+                assert (gone is None) == (side.cost(frozenset([p])) is None), "no legal eleven without him: one meaning in worth and approach"
 
 
 def _selftest_alerts() -> None:
