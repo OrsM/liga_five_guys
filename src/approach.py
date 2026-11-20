@@ -11,7 +11,7 @@ from typing import NamedTuple
 import eleven
 from ffcore.rules import DEBT_SHARE, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
 
-__all__ = ["Club", "Approach", "approach"]
+__all__ = ["Club", "Approach", "Settlement", "approach", "settle"]
 
 INF = float("inf")
 
@@ -131,6 +131,29 @@ def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mappin
         stack.append((i + 1, gone, got))
         stack.append((i + 1, gone | bits[i], got + worth[i]))
     return None if best is None else (best[0], side.players(best[1]))
+
+
+class Settlement(NamedTuple):
+    feasible: bool
+    sells: frozenset[str]
+    raised: float
+    lost: float
+    short: float
+
+
+def settle(club: Club, value: Mapping[str, float]) -> Settlement | None:
+    """The cheapest standing offers to take so that cash is 0 or more at the lock with no buy: the players, the money
+    they raise and the points the eleven loses (valued by `value`), by `cover`. Nothing to sell (empty set, 0 lost) when
+    cash is 0 or more. Infeasible, with the sells empty and `short` the money the offers lack (0 when they suffice but
+    would leave no eleven), when no set of them does it. None when the squad fields no eleven."""
+    side = Side(club.squad, club.pos, value)
+    if not side.fields:
+        return None
+    offered = frozenset(club.offers) & club.squad
+    got = cover(side, frozenset(), offered, club.offers, -club.cash)
+    if got is None:
+        return Settlement(False, frozenset(), 0.0, 0.0, max(0.0, -club.cash - sum(club.offers[k] for k in offered)))
+    return Settlement(True, got[1], sum(club.offers[k] for k in got[1]), got[0], 0.0)
 
 
 def approach(club: Club, player: str, bid: float, win: float, value: Mapping[str, float]) -> Approach | None:
@@ -260,6 +283,29 @@ def _selftest() -> None:
         if covered is not None:
             assert abs(covered[0] - min(c for c, _ in direct)) < 1e-9, "the cover is the cheapest set"
             assert covered[1] <= pool and sum(price[k] for k in covered[1]) >= need - 1e-6 and abs(side.cost(fixed | covered[1]) - covered[0]) < 1e-9
+    rng = random.Random(11)
+    for _ in range(30):
+        own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+        value = {k: rng.choice([0, 0, 1, 3, 5]) * 1.0 for k in own}
+        worth = {k: rng.choice([2e6, 4e6, 6e6]) for k in own}
+        offers = {k: worth[k] * rng.choice([0.2, 0.9, 1.1]) for k in rng.sample(sorted(own), 6)}
+        cash = rng.choice([-9e6, -5e6, -1e6, 0.0, 2e6])
+        club = Club(frozenset(own), own, worth, offers, cash, 5e6 * len(own))
+        settled = settle(club, value)
+        assert settled is not None
+        if cash >= 0:
+            assert settled == Settlement(True, frozenset(), 0.0, 0.0, 0.0), "cash 0 or more: nothing to sell"
+            continue
+        rest = sorted(offers)
+        owed = [(eleven.best_total(club.squad, own, value) or 0.0) - left for m in range(len(rest) + 1) for b in combinations(rest, m)
+                  if sum(offers[k] for k in b) >= -cash - 1e-6
+                  and (left := eleven.best_total(club.squad - frozenset(b), own, value)) is not None]
+        assert settled.feasible == bool(owed)
+        if not settled.feasible:
+            assert settled.sells == frozenset() and settled.short >= 0
+            continue
+        assert settled.sells <= frozenset(offers) and club.cash + settled.raised >= -1e-6, "the sales bring cash to 0 or more"
+        assert abs(settled.lost - min(owed)) < 1e-9, "no cheaper set"
     nothing = Club(frozenset({"a"}), {"a": "POR", "s": "DEL"}, {"a": 1e6}, {"a": 1e6}, 0.0, 1e6)
     assert approach(nothing, "s", 1e6, 0.5, {"a": 1.0, "s": 5.0}) is None, "no eleven: nothing to say"
     print("approach self-test OK")

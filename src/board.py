@@ -13,7 +13,7 @@ from typing import Any, NamedTuple
 import decision
 import eleven
 import worth
-from approach import Approach, Club, approach
+from approach import Approach, Club, approach, settle
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
@@ -298,6 +298,23 @@ def funds(buys: list[Doc], sells: list[Doc]) -> None:
                        if any(t["name"] == sale["name"] for t in (b.get("funding") or {}).get("tonight", []))]
 
 
+def cover_lines(club: Club, value: Mapping[str, float], sells: Sequence[Doc]) -> list[Doc]:
+    """The lines of do that bring cash to 0 or more at the lock when it is below 0 (approach.settle): one "sell" line for
+    each offer to take, a copy of its row of sells marked "needed" with the points the set loses and the cash after it,
+    or one "short" line with the money the offers lack. No lines when cash is 0 or more or no eleven is fielded."""
+    got = settle(club, value)
+    if got is None or club.cash >= 0:
+        return []
+    if not got.feasible:
+        why = "cash %.0f is below 0 and the standing offers lack %.0f" % (club.cash, got.short) if got.short \
+            else "cash %.0f is below 0 and no set of the standing offers brings it to 0 and keeps an eleven" % club.cash
+        return [{"what": "short", "label": "short of cash at the lock", "step": "list", "needed": True, "short": got.short,
+                 "why": why, "accepts": [], "act": []}]
+    why = "cash %.0f is below 0: these offers bring it to %.0f at the lock, losing %.1f points" % (club.cash, club.cash + got.raised, got.lost)
+    return [{**sale, "needed": True, "why": why, "points_lost": got.lost, "cash_after": club.cash + got.raised}
+            for sale in sells if sale["key"] in got.sells]
+
+
 def market_at(read: str | None) -> str | None:
     return stamped(read) if read else None
 
@@ -342,12 +359,14 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     buys = buy_lines(inp, names, club, got)
     sells = offer_lines(inp, names, offered, known, offers)
     funds(buys, sells)
+    pos_of, cells = decision.cells_of(inp)
+    owed = cover_lines(club, decision.window_value(pos_of, cells, frozenset(cells)), sells) if locks else []
     return {
         "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(health),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
-        "do": list_line(inp, names, extras), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
+        "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
         "alerts": alerts, "auction": auction_card(),
         "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
@@ -508,6 +527,22 @@ def _selftest() -> None:
     sells: list[Doc] = [{"name": "Pepelu"}, {"name": "Ryan"}]
     funds(buys, sells)
     assert [s["for"] for s in sells] == [["Raphinha"], []], "an offer is taken tonight when a funded buy sells him tonight"
+    own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+    worth_of = {k: 4e6 for k in own}
+    points = {k: float(i % 4) for i, k in enumerate(sorted(own))}
+    points |= {"m00": 0.0, "m01": 0.0}
+    rows: list[Doc] = [{"what": "sell", "key": k, "name": k, "offer": 3e6} for k in ("m00", "m05", "m09", "m14")]
+    for cash in (-5e6, -1e6, 0.0, 2e6):
+        club = Club(frozenset(own), own, worth_of, {r["key"]: r["offer"] for r in rows}, cash, 5e7)
+        lines = cover_lines(club, points, rows)
+        if cash >= 0:
+            assert lines == [], "cash 0 or more: no line, the board is unchanged"
+            continue
+        assert lines and all(x["needed"] and x["what"] == "sell" for x in lines)
+        assert cash + sum(x["offer"] for x in lines) >= 0 and all(x["cash_after"] == lines[0]["cash_after"] >= 0 for x in lines)
+        assert lines[0]["key"] == "m00", "a bench player is sold first"
+    short = cover_lines(Club(frozenset(own), own, worth_of, {"m00": 1e6}, -5e6, 5e7), points, rows[:1])
+    assert [x["what"] for x in short] == ["short"] and short[0]["short"] == 4e6, "offers that cannot cover say the shortfall"
     money = decision.Money(0.0, 0.0, 0.0, 0, 0)
     assert later_sale(decision.Inputs(money), "p", 10.0) == rules.SALE_ESTIMATE * 10.0, "no price row: the estimate"
     priced = decision.Inputs(money, prices=[decision.Price("p", 1, 10.5, 10.0), decision.Price("p", 3, 11.0, 10.0)])
