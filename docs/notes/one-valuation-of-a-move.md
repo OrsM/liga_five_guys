@@ -1,5 +1,27 @@
 # One valuation of a move: V, Window, Delta (#139, #140, #52, #69; for Miguel's agreement, 2026-11-20)
 
+## Status (2026-11-20)
+
+Steps 1-5 are merged; step 6 (lfg.md rewritten for V and the strict rule) is this commit. The rest of the note is the design as agreed,
+before the corrections below.
+
+- Step 1: `ea340384` (`eleven.points`, `valuation` with Move, squad_at, Value, Delta).
+- Step 2: `6c215187` (`approach.Side` is a memo of `eleven.points`; no eleven is None, not INF).
+- Step 3: `5708ef21` (one Window: lock, next4, season, from `rules.in_force`; the 8 is gone) and `726b239f` (3b: V per jornada; funding
+  sales costed from the moment of the sale).
+- Step 4: `0155fc81` (`valuation.read` is the one sale reading; `eleven.remove*`, `worth.lost_points`, INF gone; typed Delta on sells).
+- Step 5: `c1eb8652` (facts and replacement pairs on sells; `dec_offer` v2; grading leaves out the made-up rows).
+- Step 6: this commit (docs only).
+
+Corrections found while implementing:
+- Sign: a sale's Delta is 0 or less (the points it loses are `-Delta`); a bench sale is 0.
+- `squad_at` takes the locks (`squad_at(squad, move, jornada, locks)`), since `rules.in_force` needs them.
+- Inside `approach`, `gap` cannot be non-zero for a sale that fields an eleven after it (None is skipped), so gap is only read on the board's
+  rows and in `replacement`, where a jornada with no eleven scores nothing.
+- A buy's gain is never negative (V of a squad plus a player never falls).
+- The board time moved from 10.1 s to about 10.6 s on a busier box, not 10.4 as written in section 5; accepted.
+- `dec_offer` is not read by grading, so `grading.sound_offers` is exposed (and `health` prints its excluded count) but unconsumed.
+
 No code follows until section 7 is answered (CLAUDE.md principle 1). Every name was checked against `src/` on main (2026-11-20).
 
 ## 0. Root cause
@@ -17,7 +39,7 @@ Issue 140 item 3 (funding sales costed in the buy's window, so a sale before the
 against the same player, not additive) are the same defect: the thing valued is a transaction, not a row.
 
 Rule (Miguel): fewer than 11 players, or an illegal shape, scores nothing. Code agrees (`eleven.legal`; `approach.Side.fields`).
-`docs/notes/lfg.md` section 1 says "an empty slot scores nothing": contradicts it, fixed in step 6.
+`docs/notes/lfg.md` section 1 says "an empty slot scores nothing": contradicted it, fixed in step 6.
 
 ## 1. One valuation
 

@@ -11,8 +11,9 @@ shows it. You act on the account; the tool never does.
 
 ## 1. The rules the plan lives under [model]
 
-- Points go to the owner only if **cash ≥ 0 at the lock** and with a **legal eleven** (one of `rules.SHAPES`: one
-  keeper, 3–5 defenders, 3–5 midfielders, 1–3 forwards; an empty slot scores nothing).
+- Points go to the owner only if **cash ≥ 0 at the lock** and with a **full legal eleven** (one of `rules.SHAPES`: one
+  keeper, 3–5 defenders, 3–5 midfielders, 1–3 forwards). Fewer than 11 players, or a shape that is not legal, scores
+  nothing for that jornada: there is no partial eleven (`eleven.legal`, `eleven.points` is `None` then).
 - **The eleven is frozen at the jornada's lock, for every player.** A move counts for the jornadas that lock after it
   is made (`rules.in_force`). Cash must be ≥ 0 at each lock, counting the moves made by it. [simplify, memory]
 - A bid may total cash plus `DEBT_SHARE` (20%) of team value (`rules.bid_limit`): a second check, on a value that
@@ -106,10 +107,13 @@ a module may not import a later layer; `python tools/frontiers.py --table` print
 closed auction with the fixed cuts `auction.FIXED_CUTS`. It is regenerated only by `tools/auction_table.py`, and the
 goldens are blessed in the same commit (it is an input of every golden decision).
 
-**Checks.** `tools/selftests.sh` (suites, mypy, ruff); `tools/frontiers.py`; `tools/golden.py` (`--selftest` on the fixture
+**Checks.** `tools/selftests.sh` (50 suites at 2026-11-20, one per module with a top-level `_selftest`, then mypy and ruff; it prints
+`selftests: N suites pass`, the count is the number of such modules under `src` and `tools`); `tools/frontiers.py`; `tools/golden.py` (`--selftest` on the fixture
 cuts, `--live` on the 5 live cuts of a parse cache; a change to a golden file is `golden.py bless`, with the
 reason in the commit); `tools/lfg-rules` (the sale-rule table over every cut, on a scratch copy of the parse cache,
-about 3 min); `tools/lfg-dry-run` (the stages on a copy). Every heavy job goes through `tools/capped` (a memory-capped
+about 3 min); `tools/lfg-dry-run board` (the stages on a copy; with `LFG_NOW` pinned `decisions.json` can be diffed byte for
+byte). The board must not get slower: it took 10.1 s before the one valuation (V per jornada) and about 10.6 s after it, on a
+busier box, which was accepted; a slowdown past that is a regression to profile before commit. Every heavy job goes through `tools/capped` (a memory-capped
 systemd scope, `LFG_CAP` to change the 1500M default). The git tag `oracle-sql` is the last SQL-view implementation,
 kept as the historic proof; it is not run any more.
 
@@ -126,26 +130,57 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
 - **`board.py`** (stage `board`): `decisions.json` from the league at t: `cash`, `can_bid` (cash plus 20% of team
   value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada, `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
-  offer on your players ranked by the points the best eleven loses per million it raises: next 4, next 8, season), and
+  offer on your players ranked by the points the sale loses per million it raises, each row typed: `delta`
+  (`points` over the season, `window` over lock, next4 and season, `gap` the jornadas left without a legal eleven; all
+  null when the squad after the sale has no legal eleven), `feasible`, `why_infeasible` (`"no_eleven"`), `facts` (a list of
+  `[label, value, kind]`, the page reads fields never prose), and `replacement` for a sale that leaves no eleven: the best
+  pair (sell him, buy a player of the market) by `Approach.net`, funded by `approach.replacement`, or null with
+  `replacement_why_not` (`no_cash`, `no_candidate`); a sale's Delta is 0 or less), and
   `buys` (`decision.opportunity_rows`: the players on the market who add points to your best eleven, most first; the bid is
   `auction.bid_for`, the least bid as likely to win as any; the first three carry `funding` from `approach.approach`:
   the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.
-- **`eleven.py`** (pure, no database): the eleven is fixed, never searched by formation. `best_eleven` builds the best eleven of
-  a squad by a value (a player's e over the jornadas that count) and settles it (`settle`: a bench player who improves it
-  swaps in, until none does); `swap` is "does this player improve my eleven, for whom, by how much"; `remove`/`remove_all`
-  is what selling costs (the cover from the bench, then settled); `removal_cost` the one-swap cover. A squad with no legal
-  eleven answers `None`. Checked against brute force over every eleven.
-- **`approach.approach(club, player, bid, win, value)`**: how to get a buy: the sales tonight on the standing offers (they raise
+- **`eleven.py`** (pure, no database): the eleven is fixed, never searched by formation. `points(squad, pos, value)` is V,
+  the points of the best legal eleven of one jornada (the best shape's top players of each position summed), `None` when
+  no legal eleven exists (fewer than 11 players or no shape fits; that depends on the positions alone, never on value).
+  `best_eleven` builds who plays (`build`) and settles it (`settle`: a bench player who improves it swaps in, until none
+  does); `swap` is the label "does this player improve my eleven, for whom, by how much". `best_total` is the brute-force
+  oracle over every eleven, used by the selftests only. Nothing else values a squad: the old `remove`, `remove_all`,
+  `removal_cost` and `worth.lost_points` are gone.
+- **`valuation.py`** (decision layer): the one valuation of a move (`docs/notes/one-valuation-of-a-move.md`). A `Move` is the
+  players sold and bought, each side with the game-clock moment it is made; `squad_at(squad, move, jornada, locks)` is the
+  squad that plays a jornada (each side only if `rules.in_force` counts its moment); `Value` is V summed over a `Window`
+  with `gap` the jornadas that have no legal eleven (they score 0); `Delta` is the Value after the move less the Value
+  without it (`value_of`, `delta`). A `Window` is the jornadas a move counts for, from `rules.in_force`; its readers
+  `lock`, `next4` (`NEXT_JORNADAS` = 4) and `season` are prefixes of that one window, and the decision value is the
+  season. `read` gives a `Reading` (`points`, `window` over `READERS`, `gap`) and is the one reading of a sale;
+  `Buyer.gain` the gain of buying one player over one squad. V is taken per jornada (the eleven is re-picked at each
+  lock), not once for the summed forecast. Checked against brute force.
+- **`approach.approach(club, player, bid, win, rounds)`**: how to get a buy: the sales tonight on the standing offers (they raise
   cash and the debt limit, `rules.bid_margin`), the sales after the auction by the lock (`rules.cash_at_lock`; the price of a
   player with no offer is `SALE_ESTIMATE` x his value, and the lock margin is also shown with those sales `SALE_SD` lower),
   the offers to hold, the cash left if the bid is lost, and the net gain: the win-weighted points the buy adds less the points
-  the sales cost (by `eleven.remove_all`). No cap on the sales; squad max counts pending bids; a legal eleven always remains;
-  checked against brute force on small leagues.
-- **`decision.inputs_at`**: the league at a cut as the typed `Inputs` and the cells; `cells_of`, `window_value` and `opportunity_rows`
-  (each market player by `eleven.swap`); `decision_at`, `replay` and `decisions` run it at one cut or over many. Nothing else of the old decision survives.
+  the sales cost (`Approach.gain`, `cost_won`, `cost_lost`, `net`, all V differences from `eleven.points`). `Rounds` holds
+  the forecast cells, `now` (the jornadas a sale made now counts for) and `arrives` (those the won buy counts for; `before`
+  is the difference): a sale tonight is gone from the squad in every jornada of `now`, so a sale before the lock that is
+  covered only after it costs the jornada between. `approach.Side` is only a memo of V per jornada over subsets of one
+  squad (a set of players is a bitmask); a set that leaves no legal eleven costs `None`, and `approach` skips it. No cap on
+  the sales; squad max counts pending bids; a legal eleven always remains; checked against brute force on small leagues.
+  `approach.replacement(club, sold, player, bid, win, rounds)` is the pair that sells a player whose sale leaves no eleven
+  and buys one: a jornada with no legal eleven scores nothing and the cost counts it (`Side.forgone`).
+- **`decision.inputs_at`**: the league at a cut as the typed `Inputs` and the cells; `cells_of`, `lock_times`, `window_of`
+  (the Window of a buy at its close), `window_value` and `opportunity_rows`
+  (each market player by `valuation.Buyer`); `decision_at`, `replay` and `decisions` run it at one cut or over many. Nothing else of the old decision survives.
 - **Taps:** only `list` is done from the phone (`act.py`; an already-listed player, error 030.01.52, counts as listed).
-- **Not true any more:** the recommender, `plan_rows`, `worth_on`, the ledger and sale due times, `sim_*` and
+- **`dec_offer`** (the record of each standing offer at a run's cut, version 2): `delta_next4`, `delta_season` (the
+  sale's Delta, 0 for a bench player, null when no eleven remains), `fields` (the squad after the sale fields a legal eleven),
+  `gap`; version 1 rows (`lost4`, `lost_season`) are read as v2 through `records`. Grading leaves out, by
+  `grading.sound_offers`, the rows without `fields` from `grading.FABRICATED_FROM` (2026-11-20T19:40Z, when a squad of 11
+  with no bench was given the whole eleven as every player's loss) until the first row that has `fields`; the store is
+  not edited, and `health` prints the number excluded. Grading does not read `dec_offer` yet, so `sound_offers` is
+  exposed and unconsumed.
+- **Not true any more:** the horizon of 8 jornadas (`board.AHEAD`, `worth.PER_MILLION_AHEAD`), the sale note strings
+  (`offer_note`), the `INF` cost, `eleven.remove*`, `worth.lost_points`, the recommender, `plan_rows`, `worth_on`, the ledger and sale due times, `sim_*` and
   `decision_*` tables, the hold, the line-up reminder (`remind.py`, `lock_due`, `lineup_alert`).
 
 Sections 5, 7 and 8 describe the planner removed on 2026-11-08; they are kept as the record of why it was built.
