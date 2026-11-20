@@ -182,17 +182,25 @@ def said(records: RunRecords | None = None, obs: ob.Observations | None = None) 
                 sale_scores(records.rows("sale_score") if records is not None else ()))
 
 
+def offers_excluded(records: RunRecords | None = None) -> int:
+    """The number of dec_offer rows (the store's and this run's) grading leaves out as made up (grading.sound_offers)."""
+    from grading import sound_offers
+    return sound_offers([*store.records("dec_offer"), *(records.rows("dec_offer") if records is not None else ())])[1]
+
+
 def main(records: RunRecords | None = None, sent: Path = SENT, obs: ob.Observations | None = None) -> dict[str, int]:
     """The health stage: tell said(records, obs) if it is new (sent holds what was told last), forget it when there is
     nothing to say."""
     told = said(records, obs)
+    excluded = offers_excluded(records)
+    print("health: %d dec_offer rows excluded from grading as made up (grading.FABRICATED_FROM)" % excluded)
     if not told:
         sent.unlink(missing_ok=True)
     elif not sent.is_file() or sent.read_text(encoding="utf-8") != told:
         if notify(told):
             sent.parent.mkdir(parents=True, exist_ok=True)
             sent.write_text(told, encoding="utf-8")
-    return {"trouble": int(bool(told))}
+    return {"trouble": int(bool(told)), "offers_excluded": excluded}
 
 
 def _selftest() -> None:

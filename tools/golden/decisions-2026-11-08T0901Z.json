@@ -496,12 +496,27 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
      0.0,
      "points"
     ],
     [
-     "season",
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
      0.0,
      "points"
     ]
@@ -514,15 +529,9 @@
    "gain": 0.0,
    "key": "11579",
    "label": "sell Arnau Ortiz",
-   "lost": {
-    "lock": 0.0,
-    "next4": 0.0,
-    "season": 0.0
-   },
    "more": false,
    "name": "Arnau Ortiz",
    "needed": true,
-   "note": "offer 0.97 x value; the eleven loses 0 points (bench)",
    "offer": 644149.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -531,6 +540,8 @@
    "plan": false,
    "pos": "DEL",
    "ratio": 0.9723326661413662,
+   "replacement": null,
+   "replacement_why_not": null,
    "set_cash_after": 5174501.0,
    "set_points_lost": 24.12711037951567,
    "step": "take offer",
@@ -573,12 +584,27 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
      0.0,
      "points"
     ],
     [
-     "season",
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
      0.0,
      "points"
     ]
@@ -591,15 +617,9 @@
    "gain": 0.0,
    "key": "15316",
    "label": "sell Roger Hinojo",
-   "lost": {
-    "lock": 0.0,
-    "next4": 0.0,
-    "season": 0.0
-   },
    "more": false,
    "name": "Roger Hinojo",
    "needed": true,
-   "note": "offer 1.02 x value; the eleven loses 0 points (bench)",
    "offer": 1576701.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -608,6 +628,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 1.015893991944759,
+   "replacement": null,
+   "replacement_why_not": null,
    "set_cash_after": 5174501.0,
    "set_points_lost": 24.12711037951567,
    "step": "take offer",
@@ -650,13 +672,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     1.605236878313093,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     0.0,
      "points"
     ],
     [
-     "season",
-     21.40752526653864,
+     "points, next4",
+     -1.605236878313093,
+     "points"
+    ],
+    [
+     "points, season",
+     -21.40752526653864,
      "points"
     ]
    ],
@@ -668,15 +705,9 @@
    "gain": -21.40752526653864,
    "key": "12139",
    "label": "sell Georges Mikautadze",
-   "lost": {
-    "lock": 0.0,
-    "next4": 1.605236878313093,
-    "season": 21.40752526653864
-   },
    "more": false,
    "name": "Georges Mikautadze",
    "needed": true,
-   "note": "offer 1.05 x value; the eleven loses 1.6 points over the next 4 jornadas, 21.4 over the season",
    "offer": 47188627.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -685,6 +716,8 @@
    "plan": false,
    "pos": "DEL",
    "ratio": 1.0458380507121436,
+   "replacement": null,
+   "replacement_why_not": null,
    "set_cash_after": 5174501.0,
    "set_points_lost": 24.12711037951567,
    "step": "take offer",
@@ -727,13 +760,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     0.17696328715135223,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     0.0,
      "points"
     ],
     [
-     "season",
-     2.5358789345268633,
+     "points, next4",
+     -0.17696328715135223,
+     "points"
+    ],
+    [
+     "points, season",
+     -2.5358789345268633,
      "points"
     ]
    ],
@@ -743,15 +791,9 @@
    "gain": -2.5358789345268633,
    "key": "6002",
    "label": "sell Robin Le Normand",
-   "lost": {
-    "lock": 0.0,
-    "next4": 0.17696328715135223,
-    "season": 2.5358789345268633
-   },
    "more": false,
    "name": "Robin Le Normand",
    "needed": true,
-   "note": "offer 0.94 x value; the eleven loses 0.2 points over the next 4 jornadas, 2.5 over the season",
    "offer": 5337731.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -760,6 +802,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 0.9368184337529981,
+   "replacement": null,
+   "replacement_why_not": null,
    "set_cash_after": 5174501.0,
    "set_points_lost": 24.12711037951567,
    "step": "take offer",
@@ -885,12 +929,27 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
      0.0,
      "points"
     ],
     [
-     "season",
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
      0.0,
      "points"
     ]
@@ -903,14 +962,8 @@
    "gain": 0.0,
    "key": "11579",
    "label": "sell Arnau Ortiz",
-   "lost": {
-    "lock": 0.0,
-    "next4": 0.0,
-    "season": 0.0
-   },
    "more": false,
    "name": "Arnau Ortiz",
-   "note": "offer 0.97 x value; the eleven loses 0 points (bench)",
    "offer": 644149.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -919,6 +972,8 @@
    "plan": false,
    "pos": "DEL",
    "ratio": 0.9723326661413662,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 0.18561000848040757,
@@ -958,12 +1013,27 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
      0.0,
      "points"
     ],
     [
-     "season",
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
      0.0,
      "points"
     ]
@@ -976,14 +1046,8 @@
    "gain": 0.0,
    "key": "15316",
    "label": "sell Roger Hinojo",
-   "lost": {
-    "lock": 0.0,
-    "next4": 0.0,
-    "season": 0.0
-   },
    "more": false,
    "name": "Roger Hinojo",
-   "note": "offer 1.02 x value; the eleven loses 0 points (bench)",
    "offer": 1576701.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -992,6 +1056,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 1.015893991944759,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
@@ -1031,13 +1097,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     2.375248948950059,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.7693931315254758,
      "points"
     ],
     [
-     "season",
-     8.55637184828447,
+     "points, next4",
+     -2.375248948950059,
+     "points"
+    ],
+    [
+     "points, season",
+     -8.55637184828447,
      "points"
     ]
    ],
@@ -1049,14 +1130,8 @@
    "gain": -8.55637184828447,
    "key": "6442",
    "label": "sell Iñigo Vicente",
-   "lost": {
-    "lock": 0.7693931315254758,
-    "next4": 2.375248948950059,
-    "season": 8.55637184828447
-   },
    "more": false,
    "name": "Iñigo Vicente",
-   "note": "offer 0.98 x value; the eleven loses 2.4 points over the next 4 jornadas, 8.6 over the season",
    "offer": 22801375.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1065,6 +1140,8 @@
    "plan": false,
    "pos": "DEL",
    "ratio": 0.976677574954734,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -0.9599715530509632,
@@ -1104,13 +1181,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     1.605236878313093,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     0.0,
      "points"
     ],
     [
-     "season",
-     21.40752526653864,
+     "points, next4",
+     -1.605236878313093,
+     "points"
+    ],
+    [
+     "points, season",
+     -21.40752526653864,
      "points"
     ]
    ],
@@ -1122,14 +1214,8 @@
    "gain": -21.40752526653864,
    "key": "12139",
    "label": "sell Georges Mikautadze",
-   "lost": {
-    "lock": 0.0,
-    "next4": 1.605236878313093,
-    "season": 21.40752526653864
-   },
    "more": false,
    "name": "Georges Mikautadze",
-   "note": "offer 1.05 x value; the eleven loses 1.6 points over the next 4 jornadas, 21.4 over the season",
    "offer": 47188627.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1138,6 +1224,8 @@
    "plan": false,
    "pos": "DEL",
    "ratio": 1.0458380507121436,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 1.3189711608554608,
@@ -1177,13 +1265,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     0.17696328715135223,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     0.0,
      "points"
     ],
     [
-     "season",
-     2.5358789345268633,
+     "points, next4",
+     -0.17696328715135223,
+     "points"
+    ],
+    [
+     "points, season",
+     -2.5358789345268633,
      "points"
     ]
    ],
@@ -1193,14 +1296,8 @@
    "gain": -2.5358789345268633,
    "key": "6002",
    "label": "sell Robin Le Normand",
-   "lost": {
-    "lock": 0.0,
-    "next4": 0.17696328715135223,
-    "season": 2.5358789345268633
-   },
    "more": false,
    "name": "Robin Le Normand",
-   "note": "offer 0.94 x value; the eleven loses 0.2 points over the next 4 jornadas, 2.5 over the season",
    "offer": 5337731.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1209,6 +1306,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 0.9368184337529981,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -1.348355535307556,
@@ -1248,13 +1347,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     3.8786243746526736,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -2.0251324513698776,
      "points"
     ],
     [
-     "season",
-     23.525489968173588,
+     "points, next4",
+     -3.8786243746526736,
+     "points"
+    ],
+    [
+     "points, season",
+     -23.525489968173588,
      "points"
     ]
    ],
@@ -1266,14 +1380,8 @@
    "gain": -23.525489968173588,
    "key": "7081",
    "label": "sell Fernando Niño",
-   "lost": {
-    "lock": 2.0251324513698776,
-    "next4": 3.8786243746526736,
-    "season": 23.525489968173588
-   },
    "more": false,
    "name": "Fernando Niño",
-   "note": "offer 0.96 x value; the eleven loses 3.9 points over the next 4 jornadas, 23.5 over the season",
    "offer": 46035874.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1282,6 +1390,8 @@
    "plan": false,
    "pos": "DEL",
    "ratio": 0.9573894399963531,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -1.2828104837476024,
@@ -1321,13 +1431,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     4.44712566708489,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.9000031889584079,
      "points"
     ],
     [
-     "season",
-     22.090227111081504,
+     "points, next4",
+     -4.44712566708489,
+     "points"
+    ],
+    [
+     "points, season",
+     -22.090227111081504,
      "points"
     ]
    ],
@@ -1339,14 +1464,8 @@
    "gain": -22.090227111081504,
    "key": "2715",
    "label": "sell Pepelu",
-   "lost": {
-    "lock": 0.9000031889584079,
-    "next4": 4.44712566708489,
-    "season": 22.090227111081504
-   },
    "more": false,
    "name": "Pepelu",
-   "note": "offer 0.91 x value; the eleven loses 4.4 points over the next 4 jornadas, 22.1 over the season",
    "offer": 40009473.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1355,6 +1474,8 @@
    "plan": false,
    "pos": "MED",
    "ratio": 0.9055025587290986,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 1.9707289480553332,
@@ -1394,13 +1515,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     7.038922866776716,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -1.5984824006666472,
      "points"
     ],
     [
-     "season",
-     38.89927200620991,
+     "points, next4",
+     -7.038922866776716,
+     "points"
+    ],
+    [
+     "points, season",
+     -38.89927200620991,
      "points"
     ]
    ],
@@ -1412,14 +1548,8 @@
    "gain": -38.89927200620991,
    "key": "11813",
    "label": "sell Natan",
-   "lost": {
-    "lock": 1.5984824006666472,
-    "next4": 7.038922866776716,
-    "season": 38.89927200620991
-   },
    "more": false,
    "name": "Natan",
-   "note": "offer 0.97 x value; the eleven loses 7.0 points over the next 4 jornadas, 38.9 over the season",
    "offer": 49571725.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1428,6 +1558,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 0.9736207836390577,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -0.41770354506100393,
@@ -1467,13 +1599,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     1.011484839871855,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.3788409456838906,
      "points"
     ],
     [
-     "season",
-     2.5679789707853615,
+     "points, next4",
+     -1.011484839871855,
+     "points"
+    ],
+    [
+     "points, season",
+     -2.5679789707853615,
      "points"
     ]
    ],
@@ -1483,14 +1630,8 @@
    "gain": -2.5679789707853615,
    "key": "5587",
    "label": "sell Adria Pedrosa",
-   "lost": {
-    "lock": 0.3788409456838906,
-    "next4": 1.011484839871855,
-    "season": 2.5679789707853615
-   },
    "more": false,
    "name": "Adria Pedrosa",
-   "note": "offer 0.92 x value; the eleven loses 1.0 points over the next 4 jornadas, 2.6 over the season",
    "offer": 2953995.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1499,6 +1640,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 0.9224949877895684,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 0.1486109849343848,
@@ -1538,13 +1681,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
      0.0,
      "points"
     ],
     [
-     "season",
-     8.00931144696142,
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
+     -8.00931144696142,
      "points"
     ]
    ],
@@ -1554,14 +1712,8 @@
    "gain": -8.00931144696142,
    "key": "13808",
    "label": "sell Miguel Roman",
-   "lost": {
-    "lock": 0.0,
-    "next4": 0.0,
-    "season": 8.00931144696142
-   },
    "more": false,
    "name": "Miguel Roman",
-   "note": "offer 1.04 x value; the eleven loses 0.0 points over the next 4 jornadas, 8.0 over the season",
    "offer": 9145609.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1570,6 +1722,8 @@
    "plan": false,
    "pos": "MED",
    "ratio": 1.035674780139017,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -1.812562856210546,
@@ -1609,13 +1763,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     6.341608491191636,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.025873259957407413,
      "points"
     ],
     [
-     "season",
-     33.03027273484645,
+     "points, next4",
+     -6.341608491191636,
+     "points"
+    ],
+    [
+     "points, season",
+     -33.03027273484645,
      "points"
     ]
    ],
@@ -1625,14 +1794,8 @@
    "gain": -33.03027273484645,
    "key": "12641",
    "label": "sell Gerard Martin",
-   "lost": {
-    "lock": 0.025873259957407413,
-    "next4": 6.341608491191636,
-    "season": 33.03027273484645
-   },
    "more": false,
    "name": "Gerard Martin",
-   "note": "offer 0.99 x value; the eleven loses 6.3 points over the next 4 jornadas, 33.0 over the season",
    "offer": 36847734.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1641,6 +1804,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 0.9940102948032778,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -1.167641877951558,
@@ -1680,13 +1845,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     11.321054708871173,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -2.597627960074938,
      "points"
     ],
     [
-     "season",
-     46.126677635758824,
+     "points, next4",
+     -11.321054708871173,
+     "points"
+    ],
+    [
+     "points, season",
+     -46.126677635758824,
      "points"
     ]
    ],
@@ -1696,14 +1876,8 @@
    "gain": -46.126677635758824,
    "key": "2632",
    "label": "sell Pablo Fornals",
-   "lost": {
-    "lock": 2.597627960074938,
-    "next4": 11.321054708871173,
-    "season": 46.126677635758824
-   },
    "more": false,
    "name": "Pablo Fornals",
-   "note": "offer 0.94 x value; the eleven loses 11.3 points over the next 4 jornadas, 46.1 over the season",
    "offer": 44527367.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1712,6 +1886,8 @@
    "plan": false,
    "pos": "MED",
    "ratio": 0.942703305364462,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 1.9936865166470912,
@@ -1751,13 +1927,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     6.897036167103892,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -2.1705803250185696,
      "points"
     ],
     [
-     "season",
-     23.785714984886226,
+     "points, next4",
+     -6.897036167103892,
+     "points"
+    ],
+    [
+     "points, season",
+     -23.785714984886226,
      "points"
     ]
    ],
@@ -1767,14 +1958,8 @@
    "gain": -23.785714984886226,
    "key": "7658",
    "label": "sell German Valera",
-   "lost": {
-    "lock": 2.1705803250185696,
-    "next4": 6.897036167103892,
-    "season": 23.785714984886226
-   },
    "more": false,
    "name": "German Valera",
-   "note": "offer 1.08 x value; the eleven loses 6.9 points over the next 4 jornadas, 23.8 over the season",
    "offer": 21289009.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1783,6 +1968,8 @@
    "plan": false,
    "pos": "MED",
    "ratio": 1.0760606059074382,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 0.7009092811851191,
@@ -1822,13 +2009,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     2.4661815470695387,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.012976736738458783,
      "points"
     ],
     [
-     "season",
-     21.335344258039413,
+     "points, next4",
+     -2.4661815470695387,
+     "points"
+    ],
+    [
+     "points, season",
+     -21.335344258039413,
      "points"
     ]
    ],
@@ -1838,14 +2040,8 @@
    "gain": -21.335344258039413,
    "key": "8496",
    "label": "sell Martin Satriano",
-   "lost": {
-    "lock": 0.012976736738458783,
-    "next4": 2.4661815470695387,
-    "season": 21.335344258039413
-   },
    "more": false,
    "name": "Martin Satriano",
-   "note": "offer 0.95 x value; the eleven loses 2.5 points over the next 4 jornadas, 21.3 over the season",
    "offer": 18882612.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1854,6 +2050,8 @@
    "plan": false,
    "pos": "DEL",
    "ratio": 0.9507571395735427,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 1.9785105195726127,
@@ -1893,13 +2091,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     2.508792667793699,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     0.0,
      "points"
     ],
     [
-     "season",
-     29.477109409646573,
+     "points, next4",
+     -2.508792667793699,
+     "points"
+    ],
+    [
+     "points, season",
+     -29.477109409646573,
      "points"
     ]
    ],
@@ -1909,14 +2122,8 @@
    "gain": -29.477109409646573,
    "key": "4397",
    "label": "sell Marcos Alonso",
-   "lost": {
-    "lock": 0.0,
-    "next4": 2.508792667793699,
-    "season": 29.477109409646573
-   },
    "more": false,
    "name": "Marcos Alonso",
-   "note": "offer 1.08 x value; the eleven loses 2.5 points over the next 4 jornadas, 29.5 over the season",
    "offer": 25283889.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1925,6 +2132,8 @@
    "plan": false,
    "pos": "DEF",
    "ratio": 1.0821252993094936,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -0.802633666539891,
@@ -1964,13 +2173,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     2.9661783175590983,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.49278167433939757,
      "points"
     ],
     [
-     "season",
-     14.948599674733487,
+     "points, next4",
+     -2.9661783175590983,
+     "points"
+    ],
+    [
+     "points, season",
+     -14.948599674733487,
      "points"
     ]
    ],
@@ -1980,14 +2204,8 @@
    "gain": -14.948599674733487,
    "key": "7676",
    "label": "sell Guido Rodriguez",
-   "lost": {
-    "lock": 0.49278167433939757,
-    "next4": 2.9661783175590983,
-    "season": 14.948599674733487
-   },
    "more": false,
    "name": "Guido Rodriguez",
-   "note": "offer 0.90 x value; the eleven loses 3.0 points over the next 4 jornadas, 14.9 over the season",
    "offer": 10813953.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -1996,6 +2214,8 @@
    "plan": false,
    "pos": "MED",
    "ratio": 0.8980726317529102,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": 0.6019579764866829,
@@ -2035,13 +2255,28 @@
      "ratio"
     ],
     [
-     "points lost, next 4",
-     28.46793735434241,
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -6.523988901787966,
      "points"
     ],
     [
-     "season",
-     83.45508412443019,
+     "points, next4",
+     -28.46793735434241,
+     "points"
+    ],
+    [
+     "points, season",
+     -83.45508412443019,
      "points"
     ]
    ],
@@ -2051,14 +2286,8 @@
    "gain": -83.45508412443019,
    "key": "1743",
    "label": "sell Mathew Ryan",
-   "lost": {
-    "lock": 6.523988901787966,
-    "next4": 28.46793735434241,
-    "season": 83.45508412443019
-   },
    "more": false,
    "name": "Mathew Ryan",
-   "note": "offer 0.99 x value; the eleven loses 28.5 points over the next 4 jornadas, 83.5 over the season",
    "offer": 18261001.0,
    "offer_percentile": null,
    "offers_seen": 0,
@@ -2067,6 +2296,8 @@
    "plan": false,
    "pos": "POR",
    "ratio": 0.9908845786385786,
+   "replacement": null,
+   "replacement_why_not": null,
    "step": "take offer",
    "trace": null,
    "trend": -1.0060886321197136,

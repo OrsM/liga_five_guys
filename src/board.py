@@ -8,13 +8,13 @@ from __future__ import annotations
 import json
 import random
 import sys
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from typing import Any, NamedTuple
 
 import decision
 import eleven
 import worth
-from approach import Approach, Club, Rounds, Side, approach, settle
+from approach import Approach, Club, Rounds, Side, approach, replacement, settle
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
@@ -35,6 +35,8 @@ Doc = dict[str, Any]
 TOP_BUYS = 10
 TOP_FUNDED = 3
 TOP_TARGETS = 10
+TOP_REPLACEMENTS = 8
+EXAMINED_REPLACEMENTS = 40
 
 
 def stamped(t: str) -> str:
@@ -105,35 +107,10 @@ def offers_at(world: state.World) -> worth.OfferDistribution:
     return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
 
 
-def lost_of(sale: valuation.Reading) -> dict[str, float] | None:
-    """The points the eleven loses by the sale in each reader (the negated Delta), None when it has no Delta."""
-    return None if sale.points is None else {n: 0.0 - v for n, v in sale.window.items() if v is not None}
-
-
-def is_bench(lost: Mapping[Any, float] | None) -> bool:
-    """True when the eleven loses nothing at any window (the lost points of each window, keyed as lost_of gives them or as
-    a sells row's "lost"). False when
-    lost is None: a player the eleven cannot do without is not a bench player."""
-    return lost is not None and not any(lost.values())
-
-
-def offer_note(ratio: float | None, offers: worth.OfferDistribution, lost: Mapping[str, float] | None) -> str:
-    """One line of facts about a standing offer: its ratio over value; where it stands among the nightly offers seen
-    (offers.ratios, none: no such clause; n shown); what the eleven loses by it (lost by window as lost_of gives
-    it: 0 at every window is a bench player; None says there is no legal eleven without him, a replacement must be bought
-    first). No advice."""
-    share = None if ratio is None else worth.offer_percentile(offers, ratio)
-    parts = [] if ratio is None else ["offer %.2f x value" % ratio]
-    if share is not None:
-        parts.append("at or above %.0f%% of the %d nightly offers seen" % (100 * share, len(offers.ratios)))
-    if lost is None:
-        parts.append("there is no legal eleven without him: a replacement must be bought first")
-    elif is_bench(lost):
-        parts.append("the eleven loses 0 points (bench)")
-    else:
-        parts.append("the eleven loses %.1f points over the next 4 jornadas, %.1f over the season"
-                     % (lost["next4"], lost["season"]))
-    return "; ".join(parts)
+def delta_doc(sale: valuation.Reading) -> Doc:
+    """The Delta of a move as the document states it: points (the season), window (points over each of valuation.READERS)
+    and gap (the jornadas the move leaves without a legal eleven); every number null when the squad after the move has none."""
+    return {"points": sale.points, "window": dict(sale.window), "gap": list(sale.gap)}
 
 
 def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.Offer], known: dict[str, decision.Fact],
@@ -145,22 +122,21 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
         fact = known.get(k, decision.UNKNOWN)
         verdict = worth.LIVE(worth.Standing(k, value, money, later_sale(inp, k, value)), ctx)
         sale = verdict.sale
-        lost = lost_of(sale)
         ratio = money / value if value else None
+        share = None if ratio is None else worth.offer_percentile(offers, ratio)
         name = names.get(k, k)
         out.append({
             "name": name, "pos": fact.pos or ctx.pos.get(k, ""), "what": "sell", "label": "sell " + name, "step": "take offer",
             "offer": money, "waiting": None, "trend": fact.trend, "plan": False, "amount": money, "done": False, "key": k,
-            "gain": None if lost is None else 0.0 - lost["season"], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
-            "ratio": ratio, "lost": lost,
-            "delta": {"points": sale.points, "window": dict(sale.window), "gap": list(sale.gap)},
+            "gain": sale.points, "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
+            "ratio": ratio, "delta": delta_doc(sale),
             "feasible": sale.points is not None, "why_infeasible": None if sale.points is not None else "no_eleven",
-            "offer_percentile": None if ratio is None else worth.offer_percentile(offers, ratio), "offers_seen": len(offers.ratios),
-            "note": offer_note(ratio, offers, lost),
+            "replacement": None, "replacement_why_not": None,
+            "offer_percentile": share, "offers_seen": len(offers.ratios),
             "per_million": verdict.key,
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
-                      ["points lost, next 4", None if lost is None else lost["next4"], "points"],
-                      ["season", None if lost is None else lost["season"], "points"]],
+                      ["offer percentile", share, "chance"], ["offers seen", len(offers.ratios), "count"],
+                      *[["points, " + name, sale.window[name], "points"] for name in READERS]],
             "accepts": [], "act": []})
     return sorted(out, key=lambda d: (d["per_million"] is None, d["per_million"], d["key"]))
 
@@ -189,7 +165,8 @@ def stood_offers(held: Iterable[decision.Held], offers: Iterable[current.Offer])
 
 def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[dict[str, Any]]:
     """The dec_offer rows of the cut: one per row of the sells document, in its order, every field the document's (the
-    value from its facts, bench as is_bench says it, funds the names of its "for" joined by ';') and the offer's id and
+    value from its facts, delta_next4 and delta_season its Delta's, fields whether the sale leaves a legal eleven, gap the jornadas it
+    leaves without one joined by ';', funds the names of its "for" joined by ';') and the offer's id and
     creation stamp from the stood offer of that player and money (the lowest id first when several are alike)."""
     waiting: dict[tuple[str, float], list[Stood]] = {}
     for x in sorted(stood, key=lambda s: s.offer_id):
@@ -198,13 +175,12 @@ def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[di
     for sale in sells:
         given = waiting[(sale["key"], sale["offer"])].pop(0)
         value = next(f.value for f in map(lambda f: Shown(*f), sale["facts"]) if f.label == "value")
-        lost = sale["lost"]
+        delta = sale["delta"]
         rows.append({"cut": at, "player": sale["key"], "offer_id": given.offer_id, "created_at": given.created_at,
                      "offer": sale["offer"], "value": value, "ratio": sale["ratio"], "percentile": sale["offer_percentile"],
-                     "offers_seen": sale["offers_seen"], "lost4": None if lost is None else lost["next4"],
-                     "lost8": None, "lost_season": None if lost is None else lost["season"],
-                     "funds": ";".join(sale["for"]), "bench": is_bench(lost),
-                     "trend": sale["trend"]})
+                     "offers_seen": sale["offers_seen"], "delta_next4": delta["window"]["next4"],
+                     "delta_season": delta["points"], "fields": sale["feasible"], "gap": ";".join(map(str, delta["gap"])),
+                     "funds": ";".join(sale["for"]), "trend": sale["trend"]})
     return rows
 
 
@@ -303,6 +279,59 @@ def list_line(inp: decision.Inputs, names: dict[str, str], extras: decision.Extr
                       "pos": known.get(k, decision.UNKNOWN).pos, "value": got[k].value} for k in todo if k in got]}]
 
 
+def replacement_row(inp: decision.Inputs, names: dict[str, str], club: Club, sold: str, r: dict[str, Any], found: Approach) -> Doc:
+    """The row of the pair that sells `sold` and buys the market row r, funded as found says: the buy's asking and bid and chance,
+    the pair's Delta (valuation.read, the buy arriving at its close) and its net (Approach.net, the bid lost counted), the cash at
+    the lock if the bid is won and the funding."""
+    pos, cells = decision.cells_of(inp)
+    locks = decision.lock_times(inp)
+    k = r["player"]
+    pair = valuation.read(club.squad, valuation.Move(frozenset({sold}), frozenset({k}), None, r["close_at"]), decision.window_of(locks, cells, None),
+                          locks, pos, cells)
+    return {"what": "replace", "name": names.get(k, k), "key": k, "pos": r["pos"], "sell": names.get(sold, sold),
+            "asking": r["asking"], "bid": r["bid"], "win": r["win"], "gain": found.gain, "net": found.net, "delta": delta_doc(pair),
+            "cash_after": found.lock_margin, "feasible": True, "why_infeasible": None,
+            "facts": [["asking", r["asking"], "money"], ["bid", r["bid"], "money"], ["chance to win", r["win"], "chance"],
+                      ["net points", found.net, "points"]],
+            "funding": funding_doc(club, names, found, r["bid"])}
+
+
+def replacement_rows(inp: decision.Inputs, names: dict[str, str], club: Club, got: Sequence[dict[str, Any]], sells: Sequence[Doc]) -> None:
+    """Sets, on every row of sells whose sale leaves no legal eleven, "replacement": the best pair (replacement_row) that sells the
+    player and buys a player of the market with a bid advised (his row of got) in the positions that make the squad legal again, the
+    most net points (Approach.net) of those approach.replacement funds, among the TOP_REPLACEMENTS best forecast of the
+    EXAMINED_REPLACEMENTS best forecast that fit; or None with "replacement_why_not" "no_candidate" (no such player on the market)
+    or "no_cash" (none is funded)."""
+    pos, cells = decision.cells_of(inp)
+    locks = decision.lock_times(inp)
+    bids = {b.player: b.amount for b in inp.bids}
+    for sale in sells:
+        if sale["feasible"]:
+            continue
+        sold = sale["key"]
+        fits = [r for r in got if r["status"] == "market" and r["bid"] is not None and r["win"] is not None and r["player"] not in club.squad
+                and eleven.points((club.squad - {sold}) | {r["player"]}, pos, {}) is not None]
+        ahead = {r["player"]: sum(cells[j].get(r["player"], 0.0) for j in decision.window_of(locks, cells, r["close_at"])) for r in fits}
+        best: tuple[float, str, dict[str, Any], Approach] | None = None
+        funded_n = 0
+        for r in sorted(fits, key=lambda r: (-ahead[r["player"]], r["player"]))[:EXAMINED_REPLACEMENTS]:
+            k = r["player"]
+            others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
+            rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]))
+            found = replacement(club._replace(pending=others), sold, k, r["bid"], r["win"], rounds)
+            if not found.feasible:
+                continue
+            funded_n += 1
+            if best is None or (found.net, k) > best[:2]:
+                best = (found.net, k, r, found)
+            if funded_n == TOP_REPLACEMENTS:
+                break
+        if best is None:
+            sale["replacement_why_not"] = "no_cash" if fits else "no_candidate"
+        else:
+            sale["replacement"] = replacement_row(inp, names, club, sold, best[2], best[3])
+
+
 def funds(buys: list[Doc], sells: list[Doc]) -> None:
     for sale in sells:
         sale["for"] = [b["name"] for b in buys
@@ -371,6 +400,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     buys = buy_lines(inp, names, club, got)
     sells = offer_lines(inp, names, offered, known, offers)
     funds(buys, sells)
+    replacement_rows(inp, names, club, got, sells)
     _, cells = decision.cells_of(inp)
     owed = cover_lines(club, cells, decision.window_of(decision.lock_times(inp), cells, None).season, sells) if locks else []
     return {
@@ -515,40 +545,43 @@ def _selftest_world() -> None:
     assert market_at(None) is None and market_at("2026-10-30T1809Z") == "2026-10-30T18:09Z"
 
 
+def _inp_of(squad: dict[str, str], market: dict[str, str] | None = None) -> decision.Inputs:
+    ks = sorted(squad) + sorted(market or {})
+    pos = squad | (market or {})
+    return decision.Inputs(decision.Money(0.0, 0.0, 0.0, 0, 0),
+                           players=[decision.Player(k, pos[k], int(k in squad), None if k in squad else 1e6) for k in ks],
+                           cells=[decision.Cell(k, j, 1.0 + i % 7 + j / 10) for i, k in enumerate(ks) for j in range(1, 11)])
+
+
 def _sells_of(squad: dict[str, str], offered: Iterable[str]) -> list[Doc]:
-    ks = sorted(squad)
-    inp = decision.Inputs(decision.Money(0.0, 0.0, 0.0, 0, 0), players=[decision.Player(k, squad[k], 1, None) for k in ks],
-                          cells=[decision.Cell(k, j, 1.0 + i % 7 + j / 10) for i, k in enumerate(ks) for j in range(1, 11)])
-    names = {k: k for k in ks}
-    return offer_lines(inp, names, [decision.Offer(k, 5e6, 5e6 + 1e5 * i) for i, k in enumerate(offered)], {})
+    names = {k: k for k in squad}
+    return offer_lines(_inp_of(squad), names, [decision.Offer(k, 5e6, 5e6 + 1e5 * i) for i, k in enumerate(offered)], {})
 
 
 def _selftest_sells() -> None:
     shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
     squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
     bare = _sells_of(squad, squad)
-    whole = eleven.total(frozenset(squad), {k: sum(1.0 + i % 7 + j / 10 for j in range(1, 11)) for i, k in enumerate(sorted(squad))})
-    assert len(bare) == len(squad) and all(r["lost"] is None and r["gain"] is None and r["per_million"] is None for r in bare), \
+    assert len(bare) == len(squad) and all(r["gain"] is None and r["per_million"] is None for r in bare), \
         "eleven players only: no row carries a number"
-    assert all("no legal eleven without him" in r["note"] and "bench" not in r["note"] for r in bare)
-    assert all(v is None for r in bare for f in r["facts"] if f[0] in ("points lost, next 4", "season") for v in [f[1]])
-    assert all(r["lost"] != dict.fromkeys(READERS, whole) for r in bare), "never the whole eleven as one player's loss"
-    assert [r["key"] for r in bare] == sorted(squad), "rows with no figure: in key order"
     assert all(r["delta"]["points"] is None and set(r["delta"]["window"]) == set(READERS) and set(r["delta"]["window"].values()) == {None}
                and not r["feasible"] and r["why_infeasible"] == "no_eleven" for r in bare), \
         "a squad of exactly 11: every sale says no legal eleven, with no number and so never two equal ones"
-    rows = [{"what": "sell", "key": r["key"], "lost": r["lost"], "offer": r["offer"], "facts": r["facts"], "ratio": r["ratio"],
-             "offer_percentile": None, "offers_seen": 0, "trend": None, "for": []} for r in bare]
+    assert all(f[1] is None for r in bare for f in r["facts"] if f[2] == "points"), "no points in the facts of a sale with no Delta"
+    assert not any(k in r for r in bare for k in ("note", "lost")), "the page reads fields, never prose"
+    assert [r["key"] for r in bare] == sorted(squad), "rows with no figure: in key order"
+    rows = [{"what": "sell", "key": r["key"], "delta": r["delta"], "feasible": r["feasible"], "offer": r["offer"], "facts": r["facts"],
+             "ratio": r["ratio"], "offer_percentile": None, "offers_seen": 0, "trend": None, "for": []} for r in bare]
     made = offer_rows("cut", rows, [Stood(r["key"], r["offer"], "id" + r["key"], "c") for r in rows])
-    assert all(m["lost4"] is None and m["lost8"] is None and m["lost_season"] is None and not m["bench"] for m in made), \
-        "the record states no number and no bench for a sale with no legal eleven"
+    assert all(m["delta_next4"] is None and m["delta_season"] is None and m["fields"] is False and m["gap"] for m in made), \
+        "the record states no number and no legal eleven for a sale with none, and the jornadas it leaves without"
     backed = {**squad, "DEF9": "DEF", "MED9": "MED"}
     rows = _sells_of(backed, backed)
-    figures = [r for r in rows if r["lost"] is not None]
-    assert figures and rows[:len(figures)] == figures and all(r["lost"] is None for r in rows[len(figures):]), "figures first"
-    assert all(r["per"] == "season" and r["gain"] == -r["lost"]["season"] for r in figures), "one window in a row"
-    assert len({tuple(r["lost"].values()) for r in figures}) > 1, "the figures differ per player"
-    assert next(r for r in rows if r["key"] == "POR0")["lost"] is None, "the only keeper with no bench keeper"
+    figures = [r for r in rows if r["feasible"]]
+    assert figures and rows[:len(figures)] == figures and not any(r["feasible"] for r in rows[len(figures):]), "figures first"
+    assert all(r["per"] == "season" and r["gain"] == r["delta"]["points"] for r in figures), "one window in a row"
+    assert len({tuple(r["delta"]["window"].values()) for r in figures}) > 1, "the figures differ per player"
+    assert not next(r for r in rows if r["key"] == "POR0")["feasible"], "the only keeper with no bench keeper"
     for r in rows:
         d = r["delta"]
         assert r["feasible"] == (d["points"] is not None) and (r["why_infeasible"] is None) == r["feasible"], "typed and untyped agree"
@@ -556,7 +589,43 @@ def _selftest_sells() -> None:
             assert d["gap"] and set(d["window"].values()) == {None}
             continue
         assert d["points"] == d["window"]["season"] == r["gain"] and d["gap"] == [] and all(v <= 1e-9 for v in d["window"].values())
-        assert (not any(d["window"].values())) == (not any(r["lost"].values())), "a bench sale is 0 in every window"
+    made = offer_rows("cut", [{**r, "for": []} for r in rows], [Stood(r["key"], r["offer"], "id" + r["key"], "c") for r in rows])
+    assert [m["delta_season"] for m in made] == [r["delta"]["points"] for r in rows]
+    assert [m["fields"] for m in made] == [r["feasible"] for r in rows]
+    assert all(set(m) == set(rec.DecOffer._fields) for m in made)
+
+
+def _selftest_replacements() -> None:
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
+    market = {"%s%d" % (p, i): p for p in shape for i in range(10, 12)}
+    inp = _inp_of(squad, market)
+    names = {k: k for k in squad | market}
+    pos, cells = decision.cells_of(inp)
+    got: list[dict[str, Any]] = [{"player": k, "pos": p, "status": "market", "asking": 1e6, "bid": 1.2e6, "win": 0.5 + 0.1 * (i % 4), "close_at": None}
+           for i, (k, p) in enumerate(sorted(market.items()))]
+    offers = {k: 5e6 + 1e5 * i for i, k in enumerate(sorted(squad))}
+    for cash, why in ((50e6, None), (-50e6, "no_cash")):
+        club = Club(frozenset(squad), pos, {k: 4e6 for k in squad}, offers, cash, 1e8)
+        rows = offer_lines(inp, names, [decision.Offer(k, 4e6, offers[k]) for k in sorted(squad)], {})
+        replacement_rows(inp, names, club, got, rows)
+        for r in rows:
+            assert r["feasible"] or r["replacement"] is not None or r["replacement_why_not"], "a number, a replacement or the reason why not"
+            assert r["replacement_why_not"] == why and (r["replacement"] is None) == (why is not None)
+            if why is not None:
+                continue
+            pair = r["replacement"]
+            assert pair["sell"] == r["name"] and pair["feasible"] and pair["why_infeasible"] is None
+            bought = pair["key"]
+            assert eleven.points((frozenset(squad) - {r["key"]}) | {bought}, pos, {}) is not None, "the pair leaves a legal eleven"
+            best = max((replacement(club, r["key"], g["player"], g["bid"], g["win"], Rounds(cells, decision.window_of({}, cells, None),
+                                                                                      decision.window_of({}, cells, None))).net
+                        for g in got if eleven.points((frozenset(squad) - {r["key"]}) | {g["player"]}, pos, {}) is not None))
+            assert abs(pair["net"] - best) < 1e-9, "the pair is the best net of the candidates"
+            assert pair["delta"]["points"] is not None and pair["funding"]["feasible"] and pair["cash_after"] >= -1e-6
+    none = offer_lines(inp, names, [decision.Offer("POR0", 4e6, 4e6)], {})
+    replacement_rows(inp, names, Club(frozenset(squad), pos, {k: 4e6 for k in squad}, {"POR0": 4e6}, 5e7, 1e8), [], none)
+    assert none[0]["replacement"] is None and none[0]["replacement_why_not"] == "no_candidate", "no player of the market fits"
 
 
 def _selftest_one_meaning() -> None:
@@ -590,6 +659,7 @@ def _selftest() -> None:
     _selftest_params()
     _selftest_alerts()
     _selftest_sells()
+    _selftest_replacements()
     _selftest_one_meaning()
     _selftest_world()
     assert stamped("2026-10-30T1809Z") == "2026-10-30T18:09Z"
@@ -622,25 +692,15 @@ def _selftest() -> None:
     assert later_sale(decision.Inputs(money), "p", 10.0) == rules.SALE_ESTIMATE * 10.0, "no price row: the estimate"
     priced = decision.Inputs(money, prices=[decision.Price("p", 1, 10.5, 10.0), decision.Price("p", 3, 11.0, 10.0)])
     assert abs(later_sale(priced, "p", 10.0) - rules.SALE_ESTIMATE * 10.0 * 1.1) < 1e-9, "the price row furthest ahead: 10% above"
-    seen = worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.05, 1.1])
-    bench_note = offer_note(1.05, seen, {"lock": 0.0, "next4": 0.0, "season": 0.0})
-    field_note = offer_note(1.05, seen, {"lock": 3.2, "next4": 3.2, "season": 9.8})
-    bare_note = offer_note(1.05, worth.NO_OFFERS, {"lock": 0.0, "next4": 0.0, "season": 0.0})
-    assert "1.05" in bench_note and "80%" in bench_note and "5 nightly offers" in bench_note and bench_note.endswith("0 points (bench)")
-    assert "bench" not in field_note and "3.2" in field_note and "9.8" in field_note and "80%" in field_note
-    assert "nightly" not in bare_note and "bench" in bare_note, "no offers seen: no percentile clause"
-    assert offer_note(None, seen, {"lock": 0.0, "next4": 0.0, "season": 0.0}) == "the eleven loses 0 points (bench)", "no value: no ratio clause"
-    none_note = offer_note(1.05, seen, None)
-    assert "no legal eleven without him" in none_note and "bench" not in none_note and "loses" not in none_note, "no legal eleven: said so, no number"
-    assert not is_bench(None) and is_bench({"lock": 0.0, "next4": 0.0, "season": 0.0}) and not is_bench({"next4": 0.0, "season": 0.1})
-    for text in (bench_note, field_note, bare_note, none_note):
-        assert not any(w in text.lower() for w in ("take", "hold", "sell", "accept", "should", "reserve")), "facts, no advice"
     asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
-              "lost": {"next4": 0.0, "season": 0.0}, "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},
+              "feasible": True, "delta": {"points": 0.0, "window": {"lock": 0.0, "next4": 0.0, "season": 0.0}, "gap": []},
+              "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},
              {"key": "p", "offer": 2.0, "ratio": None, "offer_percentile": None, "offers_seen": 0, "trend": 0.5, "for": [],
-              "lost": {"next4": 1.0, "season": 3.0}, "facts": [["value", 0.0, "money"]]},
+              "feasible": True, "delta": {"points": -3.0, "window": {"lock": -0.5, "next4": -1.0, "season": -3.0}, "gap": []},
+              "facts": [["value", 0.0, "money"]]},
              {"key": "q", "offer": 3.0, "ratio": 1.0, "offer_percentile": 0.5, "offers_seen": 5, "trend": 1.0, "for": [],
-              "lost": {"next4": 0.0, "season": 0.5}, "facts": [["value", 3.0, "money"]]}]
+              "feasible": False, "delta": {"points": None, "window": {"lock": None, "next4": None, "season": None}, "gap": [3, 4]},
+              "facts": [["value", 3.0, "money"]]}]
     held = [decision.Held("p", "t1", None, 1.8), decision.Held("q", "t2", None, 3.0), decision.Held("r", "t3", None, 1.0)]
     standing = [current.Offer("20", "t1", "pending", 2.0, "c20", "", ""), current.Offer("10", "t1", "pending", 2.0, "c10", "", ""),
                 current.Offer("30", "t2", "pending", 3.0, "c30", "", ""), current.Offer("40", "t3", "declined", 9.0, "c40", "", ""),
@@ -650,7 +710,8 @@ def _selftest() -> None:
     made = offer_rows("cut", asked, stood)
     assert [(m["player"], m["offer_id"], m["created_at"]) for m in made] == [("p", "10", "c10"), ("p", "20", "c20"), ("q", "30", "c30")]
     assert [m["offer_id"] for m in offer_rows("cut", asked, stood[::-1])] == ["10", "20", "30"], "the order of the standing offers does not matter"
-    assert [(m["value"], m["funds"], m["bench"]) for m in made] == [(1.8, "A;B", True), (0.0, "", False), (3.0, "", False)]
+    assert [(m["value"], m["funds"], m["delta_next4"], m["delta_season"], m["fields"], m["gap"]) for m in made] == [
+        (1.8, "A;B", 0.0, 0.0, True, ""), (0.0, "", -1.0, -3.0, True, ""), (3.0, "", None, None, False, "3;4")]
     assert all(set(m) == set(rec.DecOffer._fields) for m in made), "a field for each field of the kind, no more"
     assert advice((("c", "b", 2.0), ("d", "c", 1.0), ("e", "x", 0.5)), {"d": "D"}) == [
         {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"

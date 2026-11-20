@@ -17,7 +17,7 @@ import decision
 import salegrade
 import valuation
 import worth
-from board import context, later_sale
+from board import context, later_sale, stamped
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
 from ffcore.clock import run_now
@@ -26,7 +26,7 @@ from ffcore.store import RunRecords
 from ffcore.parse import snapshot_stamp, stamp
 from salegrade import HORIZONS
 
-__all__ = ["backtest", "graded", "latest_values", "record_grades", "scored_at", "standing_grades"]
+__all__ = ["FABRICATED_FROM", "backtest", "fabricated", "graded", "latest_values", "record_grades", "scored_at", "sound_offers", "standing_grades"]
 
 T = TypeVar("T")
 
@@ -50,6 +50,7 @@ MOMENT_FOLDS = folds_of(("price", "latest_api_lineup", "latest_api_players_all",
 GRADE_AHEAD = valuation.NEXT_JORNADAS  # jornadas past the lock each replayed forecast is scored on
 RATE = 0.6
 SALES_FROM = "2026-08-25"
+FABRICATED_FROM = "2026-11-20T19:40Z"
 
 
 class GradeCell(NamedTuple):
@@ -584,6 +585,22 @@ def sale_scores(sold: Sequence[Sold], season: Season, fielded: dict[int, set[str
     """The Scores of my sales (known_scores, group miguel) then of the league's (league_scores): the sale_score records."""
     mine = [s for s in sold if s.who == ME]
     return [*known_scores(ME, mine, season, fielded, facts), *league_scores(sold, season, fielded, facts)]
+
+
+def fabricated(cut: str, first_fielded: str | None) -> bool:
+    """Whether a dec_offer row of the cut (a stamp, 2026-11-20T1940Z) with no `fields` states a made-up loss: the cut is at or after
+    FABRICATED_FROM and before first_fielded, the first cut of a row that carries `fields` (None: no row does yet)."""
+    return stamped(cut) >= FABRICATED_FROM and (first_fielded is None or cut < first_fielded)
+
+
+def sound_offers(rows: Iterable[rec.DecOffer]) -> tuple[list[rec.DecOffer], int]:
+    """The dec_offer rows to grade on and the number left out: a row without `fields` that `fabricated` says is made up, by its
+    cut, the first row with `fields` being the earliest of the rows given. A row with `fields` is always kept. The store is not
+    edited."""
+    held = list(rows)
+    first = min((r.cut for r in held if r.fields is not None), default=None)
+    kept = [r for r in held if r.fields is not None or not fabricated(r.cut, first)]
+    return kept, len(held) - len(kept)
 
 
 def read_storage(obs: ob.Observations | None = None) -> tuple[loader.Loaded, list[str]]:
@@ -1127,6 +1144,25 @@ def _selftest_league() -> None:
         "the position's mean over the players who scored; a player with no position counts nowhere"
 
 
+def _selftest_fabricated() -> None:
+    def row(cut: str, fields: bool | None) -> rec.DecOffer:
+        return rec.DecOffer(cut, "p", "1", "c", 1.0, 1.0, None, None, 0, 0.0, 0.0, fields, None if fields is None else "", "", None)
+    assert stamped("2026-11-20T1940Z") == FABRICATED_FROM
+    for first in (None, "2026-11-21T0900Z"):
+        assert not fabricated("2026-11-20T1939Z", first) and fabricated("2026-11-20T1940Z", first), "from FABRICATED_FROM on"
+        assert not fabricated("2026-10-01T0900Z", first), "before it nothing is excluded"
+    assert fabricated("2026-11-21T0859Z", "2026-11-21T0900Z") and not fabricated("2026-11-21T0900Z", "2026-11-21T0900Z"), \
+        "up to the first cut that carries fields"
+    rows = [row("2026-11-19T1000Z", None), row("2026-11-20T1940Z", None), row("2026-11-20T2100Z", None), row("2026-11-21T0900Z", True),
+            row("2026-11-21T0930Z", None), row("2026-11-21T1000Z", False)]
+    kept, left = sound_offers(rows)
+    assert left == 2 and kept == [rows[0], rows[3], rows[4], rows[5]], "the made-up rows between the two bounds are left out, those with fields never"
+    assert sound_offers(rows[::-1])[0] == kept[::-1] and sound_offers([])[1] == 0, "the order of the rows does not matter"
+    again, more = sound_offers(kept)
+    assert again == kept and more == 0, "a second pass leaves nothing out"
+    assert sound_offers(rows[:3])[1] == 2 and sound_offers(rows[:1])[1] == 0, "no row with fields yet: all from the bound on"
+
+
 def _selftest_horizons() -> None:
     """A sale's horizons are the done jornadas from its next lock on: the lock is inside next4, next4 inside season,
     each inside done; a sale with no jornada after it, or none done at its lock, has no lock jornada."""
@@ -1403,6 +1439,7 @@ def _selftest() -> None:
     _selftest_rule_scores()
     _selftest_measure_log()
     _selftest_horizons()
+    _selftest_fabricated()
     _selftest_points()
     _selftest_cover()
     _selftest_moment_facts()
