@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-21T09:02Z",
- "market_at": "2026-11-21T09:02Z",
+ "generated_at": "2026-11-21T09:47Z",
+ "market_at": "2026-11-21T09:47Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-21T09:02Z",
+   "at": "2026-11-21T09:47Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -142,36 +142,6 @@
    "why": "cash -3550435 is below 0: these offers bring it to 17538571 at the lock, losing 47.5 points",
    "set_points_lost": 47.48699295502547,
    "set_cash_after": 17538571.0
-  },
-  {
-   "name": "Aitor Paredes",
-   "pos": "",
-   "what": "list",
-   "label": "list Aitor Paredes",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
-   ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "113276669",
-     "player": "2315",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 21780402.0
-    }
-   ]
   }
  ],
  "lineup": {
