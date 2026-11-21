@@ -57,6 +57,7 @@ class Approach(NamedTuple):
     cost_won: float
     cost_lost: float
     net: float
+    base: float = 0.0
 
 
 class Round:
@@ -191,13 +192,15 @@ def settle(club: Club, cells: valuation.Cells, window: Iterable[int]) -> Settlem
     return Settlement(True, got[1], sum(club.offers[k] for k in got[1]), got[0], 0.0)
 
 
-def approach(club: Club, player: str, bid: float, win: float, rounds: Rounds) -> Approach | None:
+def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0) -> Approach | None:
     """How to fund a bid on `player` (see Approach): the sales tonight, those after the result, their cost in points and the
     net. Costs are over `rounds`: a sale made tonight is gone from the squad in every jornada of `rounds.now`, the player
-    bought plays only in `rounds.arrives`, and the sales after the result count only there. None when the squad fields
-    no eleven."""
+    bought plays only in `rounds.arrives`, and the sales after the result count only there. `base` is the cost of the
+    cheapest plan with no buy (the cost of `approach` with player None, bid 0, win 1 and `rounds.arrives` = `rounds.now`:
+    the gain 0, both costs the cost of the sales that bring cash to 0 or more), and the net is measured against it. None when
+    the squad fields no eleven."""
     lost_side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
-    won_side = Side(club.squad | {player}, club.pos, rounds.cells, rounds.arrives)
+    won_side = lost_side if player is None else Side(club.squad | {player}, club.pos, rounds.cells, rounds.arrives)
     before = Side(club.squad, club.pos, rounds.cells, rounds.before)
     if not lost_side.fields:
         return None
@@ -224,7 +227,7 @@ def approach(club: Club, player: str, bid: float, win: float, rounds: Rounds) ->
             need_lost = -(club.cash + raised)
             won = cover(won_side, a, club.squad - a, price, need_won)
             lost = cover(lost_side, a, club.squad - a, price, need_lost)
-            if won and lost and len(club.squad) + 1 - len(a) - len(won[1]) + pend_n <= club.squad_max:
+            if won and lost and len(club.squad) + (player is not None) - len(a) - len(won[1]) + pend_n <= club.squad_max:
                 ev = win * won[0] + (1 - win) * lost[0] + early
                 if best is None or ev < best[0]:
                     best = (ev, a, won[1], lost[1], won[0] + early, lost[0] + early)
@@ -233,9 +236,9 @@ def approach(club: Club, player: str, bid: float, win: float, rounds: Rounds) ->
         for j in range(i, len(offered)):
             stack.append((j + 1, a | {offered[j]}))
     if best is None:
-        return unfunded(club, max(0.0, -ceiling), ceiling, gain)
+        return unfunded(club, max(0.0, -ceiling), ceiling, gain)._replace(base=base)
     _, a, b, ell, cost_won, cost_lost = best
-    return funded(club, a, b, ell, bid, win, (gain, cost_won, cost_lost))
+    return funded(club, a, b, ell, bid, win, (gain, cost_won, cost_lost), base)
 
 
 def unfunded(club: Club, short: float, margin: float, gain: float) -> Approach:
@@ -245,10 +248,11 @@ def unfunded(club: Club, short: float, margin: float, gain: float) -> Approach:
 
 
 def funded(club: Club, tonight: frozenset[str], if_won: frozenset[str], if_lost: frozenset[str], bid: float, win: float,
-           points: tuple[float, float, float]) -> Approach:
+           points: tuple[float, float, float], base: float = 0.0) -> Approach:
     """The feasible Approach that sells `tonight` to their offers, then `if_won` or `if_lost` at their proceeds once the result is
-    known; `points` the gain of the buy and the costs of the sales if it is won and if it is lost; the net is
-    win * (gain - cost_won) - (1 - win) * cost_lost."""
+    known; `points` the gain of the buy and the costs of the sales if it is won and if it is lost; `base` the cost of the plan
+    with no buy; the net is win * (gain - (cost_won - base)) - (1 - win) * (cost_lost - base): the points the bid adds
+    to doing nothing."""
     gain, cost_won, cost_lost = points
     price = {k: proceeds(club, k) for k in club.squad}
     raised = sum(club.offers[k] for k in tonight)
@@ -259,7 +263,7 @@ def funded(club: Club, tonight: frozenset[str], if_won: frozenset[str], if_lost:
         cash_at_lock(club.cash, raised, bid, later),
         cash_at_lock(club.cash, raised, bid, later * (1 - SALE_SD)),
         club.cash + raised + sum(price[k] for k in if_lost),
-        gain, cost_won, cost_lost, win * (gain - cost_won) - (1 - win) * cost_lost)
+        gain, cost_won, cost_lost, win * (gain - (cost_won - base)) - (1 - win) * (cost_lost - base), base)
 
 
 def replacement(club: Club, sold: str, player: str, bid: float, win: float, rounds: Rounds) -> Approach:
@@ -443,6 +447,48 @@ def _selftest() -> None:
         assert abs(got.gain - (played(squad | {"new"}, rounds.arrives) - played(squad, rounds.arrives))) < 1e-9
         short = replacement(club._replace(cash=-20e6), leaver, "new", bid, win, rounds)
         assert not short.feasible and short.short > 0 and short.tonight == frozenset(), "the offer does not cover the bid"
+    rng = random.Random(33)
+    seen_base = seen_free = 0
+    for case in range(24):
+        own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+        places = own | {"star": rng.choice(["DEF", "MED", "DEL"])}
+        window = valuation.Window((1, 2, 3))
+        forecast = _cells(rng, places, window, [0, 1, 2, 3, 5])
+        rounds = Rounds(forecast, window, valuation.Window(window[case % 3:]))
+        flat = Rounds(forecast, window, window)
+        worth = {k: rng.choice([2e6, 4e6, 6e6]) for k in own}
+        offers = {k: worth[k] * rng.choice([0.9, 1.0, 1.05]) for k in rng.sample(sorted(own), 5)}
+        cash = rng.choice([-9e6, -5e6, -1e6, 0.0, 3e6, 30e6, 80e6])
+        club = Club(frozenset(own), places, worth, offers, cash, 5e6 * len(own))
+        none = approach(club, None, 0.0, 1.0, flat)
+        assert none is not None and none.gain == 0.0
+        if cash >= 0:
+            assert none.feasible and none.cost_won == none.cost_lost == 0.0 and not none.tonight and not none.if_lost, \
+                "cash 0 or more: the plan with no buy sells nothing and costs nothing"
+        elif none.feasible:
+            assert none.cost_won == none.cost_lost >= 0.0 and club.cash + none.raised + sum(proceeds(club, k) for k in none.if_lost) >= -1e-6
+            full = Side(club.squad, places, forecast, window)
+            price = {k: proceeds(club, k) for k in own}
+            rest = sorted(own)
+            owed = [c for n in range(5) for b in combinations(rest, n)
+                    if sum(price[k] for k in b) >= -cash - 1e-6 and (c := full.cost(frozenset(b))) is not None]
+            assert abs(none.cost_lost - min(owed)) < 1e-9, "the baseline is the cheapest set of sales that brings cash to 0 or more"
+            seen_base += 1
+        c0 = none.cost_lost if none.feasible else 0.0
+        bid, win = rng.choice([8e6, 12e6, 16e6]), rng.choice([0.3, 0.7, 0.95])
+        gross = approach(club, "star", bid, win, rounds)
+        net = approach(club, "star", bid, win, rounds, c0)
+        assert gross is not None and net is not None and gross.feasible == net.feasible
+        if not net.feasible:
+            continue
+        assert abs(net.net - (gross.net + c0)) < 1e-9 and (net.gain, net.cost_won, net.cost_lost) == (gross.gain, gross.cost_won, gross.cost_lost), \
+            "the net is measured against the plan with no buy: the same plan, the gross net plus its cost"
+        assert net.net <= net.gain + c0 + 1e-9, "a buy adds at most its gain to doing nothing, less what it costs to fund"
+        if cash >= bid and not net.tonight and not net.if_won and not net.if_lost:
+            assert abs(net.net - win * net.gain) < 1e-9, "no funding needed: the net is the chance of winning times the gain"
+            seen_free += 1
+    assert seen_base >= 3, "the cases with cash below 0 and a baseline were seen"
+    assert seen_free >= 3, "the cases with no funding needed were seen"
     nothing = Club(frozenset({"a"}), {"a": "POR", "s": "DEL"}, {"a": 1e6}, {"a": 1e6}, 0.0, 1e6)
     day = {1: {"a": 1.0, "s": 5.0}}
     assert approach(nothing, "s", 1e6, 0.5, Rounds(day, valuation.Window((1,)), valuation.Window((1,)))) is None, "no eleven: nothing to say"

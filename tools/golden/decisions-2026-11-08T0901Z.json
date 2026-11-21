@@ -4,465 +4,63 @@
   "brier": [],
   "drift": []
  },
- "buys": [
-  {
-   "accepts": [],
-   "act": [],
-   "advised": 183126989.85,
-   "advised_win": 0.9,
-   "amount": 183126989.85,
-   "asking": 174406657.0,
-   "auction": {
-    "cell": "0/3",
-    "listings": 102,
-    "thin": false,
-    "yours": false
-   },
-   "bids": 0,
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "asking",
-     174406657.0,
-     "money"
-    ],
-    [
-     "bid",
-     183126989.85,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.9,
-     "chance"
-    ],
-    [
-     "points added",
-     119.26606103569618,
-     "points"
-    ]
-   ],
-   "flip": null,
-   "funding": {
-    "cash_if_lost": 133232992.0,
-    "feasible": true,
-    "gain": 119.26606103569634,
-    "held": [
-     "Arnau Ortiz",
-     "Gerard Martin",
-     "Miguel Roman",
-     "Roger Hinojo",
-     "Mathew Ryan",
-     "Pablo Fornals",
-     "Marcos Alonso",
-     "Adria Pedrosa",
-     "Robin Le Normand",
-     "Iñigo Vicente",
-     "German Valera",
-     "Guido Rodriguez",
-     "Martin Satriano"
-    ],
-    "if_lost": [],
-    "if_won": [
-     "Thomas Lemar",
-     "Ferran Jutgla",
-     "Aitor Paredes"
-    ],
-    "lock_margin": 128397.40800000727,
-    "lock_margin_low": -2722879.121705994,
-    "margin": 5304316.550000012,
-    "net": -25.921066099383914,
-    "points_lost_if_lost": 127.48565389566193,
-    "points_lost_if_won": 133.9021729354938,
-    "raises": 182805699.0,
-    "short": 0.0,
-    "tonight": [
-     {
-      "name": "Natan",
-      "offer": 49571725.0,
-      "ratio": 0.9736207836390577
-     },
-     {
-      "name": "Georges Mikautadze",
-      "offer": 47188627.0,
-      "ratio": 1.0458380507121436
-     },
-     {
-      "name": "Fernando Niño",
-      "offer": 46035874.0,
-      "ratio": 0.9573894399963531
-     },
-     {
-      "name": "Pepelu",
-      "offer": 40009473.0,
-      "ratio": 0.9055025587290986
-     }
-    ]
-   },
-   "gain": 119.26606103569618,
-   "key": "4288",
-   "label": "buy Raphinha",
-   "more": false,
-   "move": "bid",
-   "name": "Raphinha",
-   "per": "season",
-   "per_million": 0.6838389261465874,
-   "plan": false,
-   "pos": "DEL",
-   "price": 174406657.0,
-   "price_lock": -0.0009202847799932856,
-   "price_next": -0.0009202847799932856,
-   "replaces": "Martin Satriano",
-   "step": "bid",
-   "trace": null,
-   "what": "buy",
-   "win": 0.9
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "advised": 62988235.800000004,
-   "advised_win": 0.9,
-   "amount": 62988235.800000004,
-   "asking": 59988796.0,
-   "auction": {
-    "cell": "0/3",
-    "listings": 102,
-    "thin": false,
-    "yours": false
-   },
-   "bids": 0,
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "asking",
-     59988796.0,
-     "money"
-    ],
-    [
-     "bid",
-     62988235.800000004,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.9,
-     "chance"
-    ],
-    [
-     "points added",
-     12.77230703453791,
-     "points"
-    ]
-   ],
-   "flip": null,
-   "funding": {
-    "cash_if_lost": 1591835.4360000007,
-    "feasible": true,
-    "gain": 12.772307034538017,
-    "held": [
-     "Natan",
-     "Georges Mikautadze",
-     "Gerard Martin",
-     "Miguel Roman",
-     "Mathew Ryan",
-     "Pablo Fornals",
-     "Pepelu",
-     "Marcos Alonso",
-     "Adria Pedrosa",
-     "Robin Le Normand",
-     "Fernando Niño",
-     "German Valera",
-     "Guido Rodriguez",
-     "Martin Satriano"
-    ],
-    "if_lost": [
-     "Thomas Lemar",
-     "Robin Le Normand",
-     "Ferran Jutgla"
-    ],
-    "if_won": [
-     "Georges Mikautadze",
-     "Ferran Jutgla",
-     "Aitor Paredes"
-    ],
-    "lock_margin": 2438417.419999987,
-    "lock_margin_low": -2690279.2875400186,
-    "margin": 208489.80000000447,
-    "net": -31.884088577689955,
-    "points_lost_if_lost": 18.00412381592446,
-    "points_lost_if_won": 46.1986139190908,
-    "raises": 25022225.0,
-    "short": 0.0,
-    "tonight": [
-     {
-      "name": "Iñigo Vicente",
-      "offer": 22801375.0,
-      "ratio": 0.976677574954734
-     },
-     {
-      "name": "Roger Hinojo",
-      "offer": 1576701.0,
-      "ratio": 1.015893991944759
-     },
-     {
-      "name": "Arnau Ortiz",
-      "offer": 644149.0,
-      "ratio": 0.9723326661413662
-     }
-    ]
-   },
-   "gain": 12.77230703453791,
-   "key": "9573",
-   "label": "buy Jonathan David",
-   "more": false,
-   "move": "bid",
-   "name": "Jonathan David",
-   "per": "season",
-   "per_million": 0.21291154159083156,
-   "plan": false,
-   "pos": "DEL",
-   "price": 59988796.0,
-   "price_lock": -0.020037177865728673,
-   "price_next": -0.020037177865728673,
-   "replaces": "Martin Satriano",
-   "step": "bid",
-   "trace": null,
-   "what": "buy",
-   "win": 0.9
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "advised": 23669422.400000002,
-   "advised_win": 0.9,
-   "amount": 23669422.400000002,
-   "asking": 22759060.0,
-   "auction": {
-    "cell": "0/2",
-    "listings": 170,
-    "thin": false,
-    "yours": false
-   },
-   "bids": 0,
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "asking",
-     22759060.0,
-     "money"
-    ],
-    [
-     "bid",
-     23669422.400000002,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.9,
-     "chance"
-    ],
-    [
-     "points added",
-     6.474053026234877,
-     "points"
-    ]
-   ],
-   "flip": null,
-   "funding": {
-    "cash_if_lost": 3281999.3549999967,
-    "feasible": true,
-    "gain": 6.474053026234969,
-    "held": [
-     "Arnau Ortiz",
-     "Natan",
-     "Georges Mikautadze",
-     "Gerard Martin",
-     "Miguel Roman",
-     "Roger Hinojo",
-     "Mathew Ryan",
-     "Pablo Fornals",
-     "Pepelu",
-     "Marcos Alonso",
-     "Adria Pedrosa",
-     "Robin Le Normand",
-     "Iñigo Vicente",
-     "Fernando Niño",
-     "German Valera",
-     "Guido Rodriguez",
-     "Martin Satriano"
-    ],
-    "if_lost": [
-     "Arnau Ortiz",
-     "Dani Martinez",
-     "Roger Hinojo",
-     "Thomas Lemar",
-     "Ferran Jutgla",
-     "Aitor Paredes"
-    ],
-    "if_won": [
-     "Arnau Ortiz",
-     "Dani Martinez",
-     "Roger Hinojo",
-     "Thomas Lemar",
-     "Iñigo Vicente",
-     "Ferran Jutgla",
-     "Aitor Paredes"
-    ],
-    "lock_margin": 2413951.954999998,
-    "lock_margin_low": -1898444.6822350025,
-    "margin": 19617151.8,
-    "net": -19.373962300657467,
-    "points_lost_if_lost": 17.536850568041928,
-    "points_lost_if_won": 26.052138852738608,
-    "raises": 0,
-    "short": 0.0,
-    "tonight": []
-   },
-   "gain": 6.474053026234877,
-   "key": "8413",
-   "label": "buy Pape Gueye",
-   "more": false,
-   "move": "bid",
-   "name": "Pape Gueye",
-   "per": "season",
-   "per_million": 0.28446047535508395,
-   "plan": false,
-   "pos": "MED",
-   "price": 22759060.0,
-   "price_lock": -0.007349746432289694,
-   "price_next": -0.007349746432289694,
-   "replaces": "Guido Rodriguez",
-   "step": "bid",
-   "trace": null,
-   "what": "buy",
-   "win": 0.9
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "advised": 5877862.0,
-   "advised_win": 0.9090909090909091,
-   "amount": 5877862.0,
-   "asking": 5877862.0,
-   "auction": {
-    "cell": "0/1/1",
-    "listings": 33,
-    "thin": false,
-    "yours": false
-   },
-   "bids": 0,
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "asking",
-     5877862.0,
-     "money"
-    ],
-    [
-     "bid",
-     5877862.0,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.9090909090909091,
-     "chance"
-    ],
-    [
-     "points added",
-     0.6087914652974291,
-     "points"
-    ]
-   ],
-   "flip": null,
-   "funding": null,
-   "gain": 0.6087914652974291,
-   "key": "6957",
-   "label": "buy Isi Palazon",
-   "more": false,
-   "move": "bid",
-   "name": "Isi Palazon",
-   "per": "season",
-   "per_million": 0.10357362341909848,
-   "plan": false,
-   "pos": "MED",
-   "price": 5877862.0,
-   "price_lock": -0.012952098930434808,
-   "price_next": -0.012952098930434808,
-   "replaces": "Guido Rodriguez",
-   "step": "bid",
-   "trace": null,
-   "what": "buy",
-   "win": 0.9090909090909091
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "advised": 5829233.04,
-   "advised_win": 0.905982905982906,
-   "amount": 5829233.04,
-   "asking": 5397438.0,
-   "auction": {
-    "cell": "0/1/2",
-    "listings": 118,
-    "thin": false,
-    "yours": false
-   },
-   "bids": 0,
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "asking",
-     5397438.0,
-     "money"
-    ],
-    [
-     "bid",
-     5829233.04,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.905982905982906,
-     "chance"
-    ],
-    [
-     "points added",
-     0.45204262536280737,
-     "points"
-    ]
-   ],
-   "flip": null,
-   "funding": null,
-   "gain": 0.45204262536280737,
-   "key": "6563",
-   "label": "buy Ivan Martin",
-   "more": false,
-   "move": "bid",
-   "name": "Ivan Martin",
-   "per": "season",
-   "per_million": 0.08375133264389649,
-   "plan": false,
-   "pos": "MED",
-   "price": 5397438.0,
-   "price_lock": 0.0016473178363001217,
-   "price_next": 0.0016473178363001217,
-   "replaces": "Guido Rodriguez",
-   "step": "bid",
-   "trace": null,
-   "what": "buy",
-   "win": 0.905982905982906
-  }
- ],
+ "base": {
+  "base": 0.0,
+  "cash": -49572707.0,
+  "cash_if_lost": 3281999.3549999967,
+  "cost": 17.536850568041928,
+  "feasible": true,
+  "gain": 0.0,
+  "held": [
+   "Arnau Ortiz",
+   "Natan",
+   "Georges Mikautadze",
+   "Gerard Martin",
+   "Miguel Roman",
+   "Roger Hinojo",
+   "Mathew Ryan",
+   "Pablo Fornals",
+   "Pepelu",
+   "Marcos Alonso",
+   "Adria Pedrosa",
+   "Robin Le Normand",
+   "Iñigo Vicente",
+   "Fernando Niño",
+   "German Valera",
+   "Guido Rodriguez",
+   "Martin Satriano"
+  ],
+  "if_lost": [
+   "Arnau Ortiz",
+   "Dani Martinez",
+   "Roger Hinojo",
+   "Thomas Lemar",
+   "Ferran Jutgla",
+   "Aitor Paredes"
+  ],
+  "if_won": [
+   "Arnau Ortiz",
+   "Dani Martinez",
+   "Roger Hinojo",
+   "Thomas Lemar",
+   "Ferran Jutgla",
+   "Aitor Paredes"
+  ],
+  "lock_margin": 3281999.3549999967,
+  "lock_margin_low": 269281.092764996,
+  "margin": 43286574.2,
+  "net": -17.536850568041928,
+  "points_lost_if_lost": 17.536850568041928,
+  "points_lost_if_won": 17.536850568041928,
+  "raises": 0,
+  "short": 0.0,
+  "tonight": []
+ },
+ "buys": [],
  "can_bid": 43286574.2,
  "cash": -49572707.0,
  "cash_locked": 0,
+ "considered": 5,
  "do": [
   {
    "accepts": [],
@@ -523,9 +121,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Jonathan David"
-   ],
+   "for": [],
    "gain": 0.0,
    "key": "11579",
    "label": "sell Arnau Ortiz",
@@ -611,9 +207,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Jonathan David"
-   ],
+   "for": [],
    "gain": 0.0,
    "key": "15316",
    "label": "sell Roger Hinojo",
@@ -699,9 +293,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Raphinha"
-   ],
+   "for": [],
    "gain": -21.40752526653864,
    "key": "12139",
    "label": "sell Georges Mikautadze",
@@ -956,9 +548,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Jonathan David"
-   ],
+   "for": [],
    "gain": 0.0,
    "key": "11579",
    "label": "sell Arnau Ortiz",
@@ -1040,9 +630,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Jonathan David"
-   ],
+   "for": [],
    "gain": 0.0,
    "key": "15316",
    "label": "sell Roger Hinojo",
@@ -1124,9 +712,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Jonathan David"
-   ],
+   "for": [],
    "gain": -8.55637184828447,
    "key": "6442",
    "label": "sell Iñigo Vicente",
@@ -1208,9 +794,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Raphinha"
-   ],
+   "for": [],
    "gain": -21.40752526653864,
    "key": "12139",
    "label": "sell Georges Mikautadze",
@@ -1374,9 +958,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Raphinha"
-   ],
+   "for": [],
    "gain": -23.525489968173588,
    "key": "7081",
    "label": "sell Fernando Niño",
@@ -1458,9 +1040,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Raphinha"
-   ],
+   "for": [],
    "gain": -22.090227111081504,
    "key": "2715",
    "label": "sell Pepelu",
@@ -1542,9 +1122,7 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [
-    "Raphinha"
-   ],
+   "for": [],
    "gain": -38.89927200620991,
    "key": "11813",
    "label": "sell Natan",

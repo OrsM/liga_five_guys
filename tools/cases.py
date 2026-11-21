@@ -132,10 +132,6 @@ def checks() -> list[Check]:
         got: Seen = s["cases"][name]
         return got
 
-    def funding(s: Seen) -> dict[str, Any]:
-        got: dict[str, Any] = c(s, "raphinha")["buy"]["funding"]
-        return got
-
     return [
         ("context", "tables", "cash is the pre-sale debt (about -49.5M)", lambda s: -50e6 < s["money"].cash < -49e6, lambda s: s["money"].cash),
         ("context", "tables", "team value about 464M", lambda s: 460e6 < s["money"].team_value < 470e6, lambda s: s["money"].team_value),
@@ -165,13 +161,9 @@ def checks() -> list[Check]:
          lambda s: all(c(s, "raphinha")["swaps"][w] and c(s, "raphinha")["swaps"][w].improves for w in ("next4", "season")),
          lambda s: {w: (round(v.gain, 1), v.replaces) for w, v in c(s, "raphinha")["swaps"].items() if v}),
         ("raphinha", "opportunities", "he is the opportunity", lambda s: c(s, "raphinha")["id"] in s["opportunities"], lambda s: sorted(s["opportunities"])),
-        ("raphinha", "board", "a buy line with a chance to win",
-         lambda s: c(s, "raphinha")["buy"] is not None and c(s, "raphinha")["buy"]["win"] > 0, lambda s: c(s, "raphinha")["buy"] and (c(s, "raphinha")["buy"]["amount"], c(s, "raphinha")["buy"]["win"])),
-        ("raphinha", "board", "funding exists tonight: sales raise cash, the bid is allowed (margin >= 0)",
-         lambda s: funding(s)["feasible"] and len(funding(s)["tonight"]) > 0 and funding(s)["margin"] >= 0,
-         lambda s: {k: funding(s).get(k) for k in ("feasible", "raises", "margin", "lock_margin", "lock_margin_low")}),
-        ("raphinha", "board", "if the bid is lost cash is left to reuse (the net gain at the honest bid is reported, not asserted)",
-         lambda s: funding(s)["cash_if_lost"] > 0, lambda s: (funding(s)["cash_if_lost"], funding(s)["net"])),
+        ("raphinha", "board", "no buy line: against the cheapest plan with no buy his net is 0 or less, so he is hidden and counted",
+         lambda s: c(s, "raphinha")["buy"] is None and s["board"]["considered"] >= 1 and s["board"]["base"]["cost"] > 0,
+         lambda s: (c(s, "raphinha")["buy"], s["board"]["considered"], s["board"]["base"]["cost"])),
         ("garcia", "tables", "price 40-70M, 8+ games", lambda s: 40e6 < c(s, "garcia")["value"] < 70e6 and c(s, "garcia")["points"].games >= 8,
          lambda s: (c(s, "garcia")["value"], c(s, "garcia")["points"])),
         ("garcia", "crosswalk", "has his slug", lambda s: bool(c(s, "garcia")["crosswalk"].ff_slug), lambda s: c(s, "garcia")["crosswalk"]),

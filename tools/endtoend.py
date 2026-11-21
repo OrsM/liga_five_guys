@@ -74,8 +74,10 @@ def _selftest() -> None:
         assert all(b["advised"] is None or b["advised"] >= b["asking"] for b in doc["buys"]), "never a bid advised below the asking price"
         assert {t["status"] for t in doc["targets"]} >= {"rival"} or not doc["targets"], doc["targets"]
         assert len(doc["targets"]) == min(TOP_TARGETS, sum(1 for r in got if r["gain"] > 0)), "the targets: those with a gain"
-        assert len(doc["buys"]) == min(TOP_BUYS, sum(1 for r in got if r["gain"] > 0 and r["status"] == "market")), \
-            "the buys: those on the market with a gain"
+        for_sale = sum(1 for r in got if r["gain"] > 0 and r["status"] == "market" and r["asking"] is not None)
+        assert len(doc["buys"]) + doc["considered"] == min(TOP_BUYS + doc["considered"], for_sale), \
+            "the buys: those on sale with a gain, less the evaluated ones that add nothing to doing nothing"
+        assert all(b["net"] is None or b["net"] > 0 for b in doc["buys"]), "no buy that adds nothing to doing nothing is shown"
         (listing,) = doc["do"]
         assert listing["what"] == "list" and listing["accepts"] == [None] and len(listing["act"]) == len(mine), \
             "no one of yours is listed yet: one line lists them all, each with his place in your team"

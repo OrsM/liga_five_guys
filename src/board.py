@@ -1,6 +1,6 @@
 """The board stage: decisions.json, the phone's copy of the board, from the league at t. Your cash and what you can
 bid, your squad with its eleven, the players on the market who would add points to it (buys, most first, each with
-the bid to make and, for the first few, the sales that fund it: approach.approach), and each standing offer on your
+the bid to make, the sales that fund it and the net points it adds to doing nothing: approach.approach), and each standing offer on your
 players ranked by what taking it costs your eleven (valuation.read). The one line act.py takes is do: list your unlisted players at
 their value."""
 from __future__ import annotations
@@ -33,7 +33,9 @@ __all__ = ["board", "main"]
 
 Doc = dict[str, Any]
 TOP_BUYS = 10
-TOP_FUNDED = 3
+EVALUATED_BUYS = 10
+GAIN_ONLY = "gain before sales"
+UNFUNDED = "cannot be funded"
 TOP_TARGETS = 10
 TOP_REPLACEMENTS = 8
 EXAMINED_REPLACEMENTS = 40
@@ -197,7 +199,30 @@ def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: 
             "lock_margin_low": found.lock_margin_low,
             "if_won": [names.get(k, k) for k in sorted(found.if_won)], "if_lost": [names.get(k, k) for k in sorted(found.if_lost)],
             "held": [names.get(k, k) for k in sorted(found.held)], "cash_if_lost": found.cash_if_lost,
-            "gain": found.gain, "points_lost_if_won": found.cost_won, "points_lost_if_lost": found.cost_lost, "net": found.net}
+            "gain": found.gain, "points_lost_if_won": found.cost_won, "points_lost_if_lost": found.cost_lost, "net": found.net,
+            "base": found.base}
+
+
+def base_cost(found: Approach | None) -> float:
+    """The points of the cheapest plan with no buy (`found` the approach with no player): what it sells to bring cash to 0
+    or more costs; 0 when there is no such plan or no eleven."""
+    return found.cost_lost if found is not None and found.feasible else 0.0
+
+
+def base_doc(club: Club, names: dict[str, str], found: Approach | None) -> Doc:
+    """The funding document of the plan with no buy (`cash_if_lost` the cash it leaves), with its cost in points, `cost`,
+    and the cash it starts from."""
+    return {**funding_doc(club, names, found, 0.0), "cost": base_cost(found), "cash": club.cash}
+
+
+def ranked(lines: Sequence[Doc]) -> tuple[list[Doc], int]:
+    """The buys to show and the count of those considered and left out: the lines with a net above 0, by net then gain then
+    name, then those with no net (not evaluated, or unfundable) by gain, at most TOP_BUYS; the count is of the lines with a net of 0 or
+    less, which are not shown."""
+    valued = [b for b in lines if b["net"] is not None]
+    kept = sorted((b for b in valued if b["net"] > 0), key=lambda b: (-b["net"], -b["gain"], b["name"]))
+    rest = sorted((b for b in lines if b["net"] is None), key=lambda b: (-b["gain"], b["name"]))
+    return (kept + rest)[:TOP_BUYS], len(valued) - len(kept)
 
 
 class Stance(NamedTuple):
@@ -221,28 +246,36 @@ def stance(r: dict[str, Any], curve: Curve | None) -> Stance:
     return Stance(placed, chance(curve, placed / r["asking"]), advised, advised_win, "raise" if advised > placed else "hold")
 
 
-def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]]) -> list[Doc]:
+def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], base: Approach | None
+              ) -> tuple[list[Doc], int]:
+    """The buys of the board (ranked) and the count considered and left out. The players on the market with an asking price and a
+    gain, best gain first: the first EVALUATED_BUYS with a bid get an Approach and a net against the plan with no buy (base);
+    the others a net None, labelled GAIN_ONLY (UNFUNDED when no sales fund the bid)."""
     pos, cells = decision.cells_of(inp)
     locks = decision.lock_times(inp)
     curves = decision.curves_of(inp)
     seen = {a.player: a for a in inp.auctions}
     bids = {b.player: b.amount for b in inp.bids}
+    cost0 = base_cost(base)
     out = []
-    for i, r in enumerate([r for r in got if r["status"] == "market" and r["gain"] > 0][:TOP_BUYS]):
+    for i, r in enumerate([r for r in got if r["status"] == "market" and r["asking"] is not None and r["gain"] > 0]):
         k, placed = r["player"], r["placed"]
         at = stance(r, curves.get(k))
         amount, win = at.amount, at.win
         auction = seen.get(k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]))
-        funding = funding_doc(club, names, approach(club._replace(pending=others), k, amount, win, rounds), amount) \
-            if i < TOP_FUNDED and amount is not None and win is not None else None
+        found = approach(club._replace(pending=others), k, amount, win, rounds, cost0) \
+            if i < EVALUATED_BUYS and amount is not None and win is not None else None
+        funding = None if found is None or amount is None else funding_doc(club, names, found, amount)
+        net = found.net if found is not None and found.feasible else None
+        label = None if net is not None else UNFUNDED if found is not None else GAIN_ONLY
         name = names.get(k, k)
         out.append({
             "name": name, "pos": r["pos"], "what": "buy", "label": "buy " + name, "step": "placed" if placed is not None else "bid",
             "price": r["asking"], "asking": r["asking"], "amount": amount, "win": win, "advised": at.advised, "advised_win": at.advised_win,
             "move": at.move, "plan": False, "done": placed is not None,
-            "key": k, "gain": r["gain"], "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
+            "key": k, "gain": r["gain"], "net": net, "net_label": label, "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
             "replaces": names.get(r["replaces"], r["replaces"]), "per_million": r["per_million"],
             "price_next": r["price_next"], "price_lock": r["price_lock"],
             "facts": [["asking", r["asking"], "money"], ["bid", amount, "money"], ["chance to win", win, "chance"]]
@@ -252,7 +285,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
             "auction": {"yours": bool(auction.mine), "listings": auction.n, "thin": bool(auction.thin), "cell": auction.cell}
             if auction else {"yours": False, "listings": 0, "thin": True, "cell": ""},
             "funding": funding, "accepts": [], "act": []})
-    return out
+    return ranked(out)
 
 
 def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
@@ -397,18 +430,21 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
                 {o.player: o.money for o in offered}, cash, team_value, (len(inp.bids), bids), debt=debt)
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
                "win": r["win"], "placed": r["placed"]} for r in arrival_rows(got, arrivals)]
-    buys = buy_lines(inp, names, club, got)
+    _, cells = decision.cells_of(inp)
+    window = decision.window_of(decision.lock_times(inp), cells, None)
+    base = approach(club, None, 0.0, 1.0, Rounds(cells, window, window))
+    buys, considered = buy_lines(inp, names, club, got, base)
     sells = offer_lines(inp, names, offered, known, offers)
     funds(buys, sells)
     replacement_rows(inp, names, club, got, sells)
-    _, cells = decision.cells_of(inp)
     owed = cover_lines(club, cells, decision.window_of(decision.lock_times(inp), cells, None).season, sells) if locks else []
     return {
         "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(health),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, team_value, debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
-        "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names), "buys": buys, "targets": target_lines(names, got),
+        "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names), "buys": buys, "considered": considered,
+        "base": base_doc(club, names, base), "targets": target_lines(names, got),
         "alerts": alerts, "auction": auction_card(),
         "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
@@ -655,7 +691,25 @@ def _selftest_alerts() -> None:
     assert {r["player"] for r in arrival_rows(rows, ["new", "r2"])} <= {"new", "r2"}, "a non-arrival never alerts"
 
 
+def _selftest_buys() -> None:
+    rng = random.Random(8)
+    for _ in range(60):
+        lines: list[Doc] = [{"name": "p%02d" % i, "gain": rng.choice([0.5, 2.0, 9.0, 40.0]),
+                             "net": rng.choice([None, -3.0, 0.0, 0.4, 2.0, 7.5, 30.0])} for i in range(rng.randint(0, 14))]
+        shown, considered = ranked(lines)
+        valued = [b for b in lines if b["net"] is not None]
+        assert considered == sum(1 for b in valued if b["net"] <= 0), "the count is of the evaluated buys left out"
+        assert all(b["net"] is None or b["net"] > 0 for b in shown), "no buy with a net of 0 or less is shown"
+        have = [b for b in shown if b["net"] is not None]
+        assert [(-b["net"], -b["gain"], b["name"]) for b in have] == sorted((-b["net"], -b["gain"], b["name"]) for b in have), "ranked by net"
+        assert shown[:len(have)] == have and not any(b["net"] is not None for b in shown[len(have):]), "those with no net come after"
+        assert len(shown) <= TOP_BUYS and {b["name"] for b in shown} <= {b["name"] for b in lines}
+        if len(lines) <= TOP_BUYS:
+            assert len(shown) + considered == len(lines), "every line is shown or counted"
+
+
 def _selftest() -> None:
+    _selftest_buys()
     _selftest_params()
     _selftest_alerts()
     _selftest_sells()
