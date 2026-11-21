@@ -12,7 +12,7 @@ import eleven
 import valuation
 from ffcore.rules import DEBT_SHARE, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
 
-__all__ = ["Club", "Rounds", "Approach", "Settlement", "approach", "replacement", "settle"]
+__all__ = ["Club", "Rounds", "Approach", "Plan", "approach", "replacement", "plan", "prices"]
 
 
 class Club(NamedTuple):
@@ -133,8 +133,11 @@ def per_unit(cost: float | None, price: float) -> tuple[bool, float]:
     return cost is None, 0.0 if cost is None else cost / price
 
 
-def proceeds(club: Club, k: str) -> float:
-    return club.offers.get(k, SALE_ESTIMATE * club.worth[k])
+def prices(club: Club, bought: bool) -> dict[str, float]:
+    """What each player of the squad raises when sold after the result of a bid (`bought`): the expected draw SALE_ESTIMATE times
+    his worth, since a standing offer expires at the close and is redrawn. With no bid (`bought` False) the standing offer where
+    there is one, else the expected draw."""
+    return {k: SALE_ESTIMATE * club.worth[k] if bought else club.offers.get(k, SALE_ESTIMATE * club.worth[k]) for k in club.squad}
 
 
 def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mapping[str, float], need: float
@@ -169,27 +172,33 @@ def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mappin
     return None if best is None else (best[0], side.players(best[1]))
 
 
-class Settlement(NamedTuple):
+class Plan(NamedTuple):
+    """The sales that bring cash to 0 or more at the lock with no buy: `sells` the players, `raised` what they
+    raise at `prices`, `cost` the points the eleven loses. Infeasible (`short` the money the pool lacks, 0 when it suffices but
+    would leave no eleven) when no set does it."""
     feasible: bool
     sells: frozenset[str]
     raised: float
-    lost: float
+    cost: float
     short: float
 
 
-def settle(club: Club, cells: valuation.Cells, window: Iterable[int]) -> Settlement | None:
-    """The cheapest standing offers to take so that cash is 0 or more at the lock with no buy: the players, the money
-    they raise and the points the eleven loses (over the window, the eleven picked in each jornada from `cells`), by `cover`. Nothing to sell (empty set, 0 lost) when
-    cash is 0 or more. Infeasible, with the sells empty and `short` the money the offers lack (0 when they suffice but
-    would leave no eleven), when no set of them does it. None when the squad fields no eleven."""
-    side = Side(club.squad, club.pos, cells, window)
-    if not side.fields:
+def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int) -> Plan | None:
+    """The cheapest Plan with no buy, by `cover`. With closes still to come (`n_closes` 1 or more) it is `found`, the Approach with
+    no player, whose sales are every player of the squad at his standing offer or the expected draw; with none to come (0) only
+    the players with a standing offer are sold, at it. Empty and free when cash is 0 or more. None when the squad fields no eleven."""
+    side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
+    if not side.fields or found is None:
         return None
-    offered = frozenset(club.offers) & club.squad
-    got = cover(side, frozenset(), offered, club.offers, -club.cash)
+    price = prices(club, False)
+    if n_closes > 0 and found.feasible:
+        sells = found.tonight | found.if_lost
+        return Plan(True, sells, sum(price[k] for k in sells), found.cost_lost, 0.0)
+    pool = club.squad if n_closes > 0 else frozenset(club.offers) & club.squad
+    got = None if n_closes > 0 else cover(side, frozenset(), pool, price, -club.cash)
     if got is None:
-        return Settlement(False, frozenset(), 0.0, 0.0, max(0.0, -club.cash - sum(club.offers[k] for k in offered)))
-    return Settlement(True, got[1], sum(club.offers[k] for k in got[1]), got[0], 0.0)
+        return Plan(False, frozenset(), 0.0, 0.0, max(0.0, -club.cash - sum(price[k] for k in pool)))
+    return Plan(True, got[1], sum(price[k] for k in got[1]), got[0], 0.0)
 
 
 def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0) -> Approach | None:
@@ -206,7 +215,7 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
         return None
     gain = won_side.points - lost_side.points
     pend_n, pend_amount = club.pending
-    price = {k: proceeds(club, k) for k in club.squad}
+    price = prices(club, player is not None)
     offered = sorted((k for k in club.squad if k in club.offers),
                      key=lambda k: (per_unit(won_side.cost(frozenset({k})), max(club.offers[k], 1.0)), k))
     reach = [sum(club.offers[k] - club.debt * club.worth[k] for k in offered[i:]) for i in range(len(offered) + 1)]
@@ -238,7 +247,7 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
     if best is None:
         return unfunded(club, max(0.0, -ceiling), ceiling, gain)._replace(base=base)
     _, a, b, ell, cost_won, cost_lost = best
-    return funded(club, a, b, ell, bid, win, (gain, cost_won, cost_lost), base)
+    return funded(club, a, b, ell, bid, win, (gain, cost_won, cost_lost), base, price)
 
 
 def unfunded(club: Club, short: float, margin: float, gain: float) -> Approach:
@@ -248,13 +257,12 @@ def unfunded(club: Club, short: float, margin: float, gain: float) -> Approach:
 
 
 def funded(club: Club, tonight: frozenset[str], if_won: frozenset[str], if_lost: frozenset[str], bid: float, win: float,
-           points: tuple[float, float, float], base: float = 0.0) -> Approach:
-    """The feasible Approach that sells `tonight` to their offers, then `if_won` or `if_lost` at their proceeds once the result is
+           points: tuple[float, float, float], base: float, price: Mapping[str, float]) -> Approach:
+    """The feasible Approach that sells `tonight` to their offers, then `if_won` or `if_lost` at `price` once the result is
     known; `points` the gain of the buy and the costs of the sales if it is won and if it is lost; `base` the cost of the plan
     with no buy; the net is win * (gain - (cost_won - base)) - (1 - win) * (cost_lost - base): the points the bid adds
     to doing nothing."""
     gain, cost_won, cost_lost = points
-    price = {k: proceeds(club, k) for k in club.squad}
     raised = sum(club.offers[k] for k in tonight)
     later = sum(price[k] for k in if_won)
     return Approach(
@@ -282,13 +290,13 @@ def replacement(club: Club, sold: str, player: str, bid: float, win: float, roun
     lost_side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
     before = Side(club.squad, club.pos, rounds.cells, rounds.before)
     gain = won_side.points - lost_side.points
-    price = {k: proceeds(club, k) for k in club.squad}
+    price = prices(club, True)
     won = cover(won_side, tonight, club.squad - tonight, price, -cash_at_lock(club.cash, raised, bid, 0.0))
     if won is None or len(club.squad) - len(tonight) - len(won[1]) + pend_n + 1 > club.squad_max:
         return unfunded(club, 0.0, margin, gain)
     early = before.forgone(tonight)
     return funded(club, tonight, won[1], frozenset(), bid, win,
-                  (gain, won_side.forgone(tonight | won[1]) + early, lost_side.forgone(tonight) + early))
+                  (gain, won_side.forgone(tonight | won[1]) + early, lost_side.forgone(tonight) + early), 0.0, price)
 
 
 def _cells(rng: random.Random, players: Iterable[str], jornadas: Iterable[int], pick: Iterable[float]) -> dict[int, dict[str, float]]:
@@ -315,7 +323,7 @@ def _selftest() -> None:
         got = approach(club, "star", bid, win, rounds)
         assert got is not None
         squad, here = club.squad, club.squad | {"star"}
-        price = {k: proceeds(club, k) for k in squad}
+        price = {k: SALE_ESTIMATE * worth[k] for k in squad}
 
         @lru_cache(maxsize=None)
         def points(sq: frozenset[str], js: tuple[int, ...]) -> float | None:
@@ -407,21 +415,29 @@ def _selftest() -> None:
         offers = {k: worth[k] * rng.choice([0.2, 0.9, 1.1]) for k in rng.sample(sorted(own), 6)}
         cash = rng.choice([-9e6, -5e6, -1e6, 0.0, 2e6])
         club = Club(frozenset(own), own, worth, offers, cash, 5e6 * len(own))
-        settled = settle(club, cells, window)
-        assert settled is not None
+        flat = Rounds(cells, valuation.Window(window), valuation.Window(window))
+        found = approach(club, None, 0.0, 1.0, flat)
+        planned = plan(club, found, flat, 0)
+        assert planned is not None and found is not None
         if cash >= 0:
-            assert settled == Settlement(True, frozenset(), 0.0, 0.0, 0.0), "cash 0 or more: nothing to sell"
+            assert planned == Plan(True, frozenset(), 0.0, 0.0, 0.0), "cash 0 or more: nothing to sell"
+            assert plan(club, found, flat, 3) == planned
             continue
         rest = sorted(offers)
         owed = [(total(club.squad, own, cells, window) or 0.0) - left for m in range(len(rest) + 1) for b in combinations(rest, m)
-                  if sum(offers[k] for k in b) >= -cash - 1e-6
-                  and (left := total(club.squad - frozenset(b), own, cells, window)) is not None]
-        assert settled.feasible == bool(owed)
-        if not settled.feasible:
-            assert settled.sells == frozenset() and settled.short >= 0
-            continue
-        assert settled.sells <= frozenset(offers) and club.cash + settled.raised >= -1e-6, "the sales bring cash to 0 or more"
-        assert abs(settled.lost - min(owed)) < 1e-9, "no cheaper set"
+                if sum(offers[k] for k in b) >= -cash - 1e-6
+                and (left := total(club.squad - frozenset(b), own, cells, window)) is not None]
+        assert planned.feasible == bool(owed)
+        if planned.feasible:
+            assert planned.sells <= frozenset(offers) and club.cash + planned.raised >= -1e-6, "the sales bring cash to 0 or more"
+            assert abs(planned.cost - min(owed)) < 1e-9, "no close left: the cheapest set of the standing offers"
+        else:
+            assert planned.sells == frozenset() and planned.short >= 0
+        later = plan(club, found, flat, 3)
+        assert later is not None and (later.feasible == found.feasible)
+        if later.feasible:
+            assert later.sells == found.tonight | found.if_lost and abs(later.cost - found.cost_lost) < 1e-9
+            assert later.cost <= (planned.cost if planned.feasible else later.cost) + 1e-9, "more closes to come never cost more points"
     rng = random.Random(21)
     for case in range(30):
         squad_pos = {"m%02d" % i: p for i, p in enumerate(["POR"] + ["DEF"] * 4 + ["MED"] * 4 + ["DEL"] * 2)}
@@ -466,9 +482,9 @@ def _selftest() -> None:
             assert none.feasible and none.cost_won == none.cost_lost == 0.0 and not none.tonight and not none.if_lost, \
                 "cash 0 or more: the plan with no buy sells nothing and costs nothing"
         elif none.feasible:
-            assert none.cost_won == none.cost_lost >= 0.0 and club.cash + none.raised + sum(proceeds(club, k) for k in none.if_lost) >= -1e-6
+            assert none.cost_won == none.cost_lost >= 0.0 and club.cash + none.raised + sum(prices(club, False)[k] for k in none.if_lost) >= -1e-6
             full = Side(club.squad, places, forecast, window)
-            price = {k: proceeds(club, k) for k in own}
+            price = prices(club, False)
             rest = sorted(own)
             owed = [c for n in range(5) for b in combinations(rest, n)
                     if sum(price[k] for k in b) >= -cash - 1e-6 and (c := full.cost(frozenset(b))) is not None]

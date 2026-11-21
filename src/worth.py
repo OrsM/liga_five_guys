@@ -160,6 +160,15 @@ def drift_cost(standing: Standing) -> float:
     return (1 - standing.later / (SALE_ESTIMATE * standing.value)) / FORECAST_NIGHTS
 
 
+def waiting_reserve(standing: Standing, dist: OfferDistribution, m: int) -> float:
+    """The offer, in money, at which taking it now and waiting for a draw of dist at each of the m closes left are worth the
+    same: value times offer_reserve_ratio with the drift_cost of the standing and hold = later over value, never below later;
+    later when dist is empty or the value is not positive."""
+    if not dist.ratios or standing.value <= 0:
+        return standing.later
+    return max(standing.later, standing.value * offer_reserve_ratio(m, drift_cost(standing), dist, standing.later / standing.value))
+
+
 def bench_option(standing: Standing, ctx: Context) -> Verdict:
     """The reserve of the offers' option value. A player the eleven loses points without in any window (the most over
     the readers) gets reserve_price at ctx.rate of that most; no verdict of the board reads it. A bench player (loses
@@ -173,11 +182,8 @@ def bench_option(standing: Standing, ctx: Context) -> Verdict:
     most = max((0.0 - v for v in sale.window.values() if v is not None), default=0.0)
     if most > NO_LOSS:
         reserve = reserve_price(most, ctx.rate, standing.later)
-    elif not ctx.offers.ratios or standing.value <= 0:
-        reserve = standing.later
     else:
-        ratio = offer_reserve_ratio(MAX_NIGHTS, drift_cost(standing), ctx.offers, standing.later / standing.value)
-        reserve = max(standing.later, standing.value * ratio)
+        reserve = waiting_reserve(standing, ctx.offers, MAX_NIGHTS)
     key = None if standing.offer is None else reserve - standing.offer
     return Verdict(key, sale, reserve)
 
@@ -244,6 +250,11 @@ def _selftest_option() -> None:
         pass
     else:
         raise AssertionError("no offers, no reserve")
+
+    shelf = Standing("p", 1e7, None, 9.5e6)
+    reserves = [waiting_reserve(shelf, study, m) for m in range(0, 8)]
+    assert reserves[0] == shelf.later and all(a <= b + 1e-9 for a, b in zip(reserves, reserves[1:])), "more closes left never lowers the reserve"
+    assert all(r >= shelf.later for r in reserves) and waiting_reserve(shelf, NO_OFFERS, 5) == shelf.later, "never below later; no offers seen: later"
 
     for m in (1, 3, 5):
         base = _waiting_payoff(m, 0.0017, study, 0.9, 0.0, 7, 20000)
