@@ -1,0 +1,12 @@
+[Unit]
+Description=Check every 5 minutes, and at 22:19, that every player of the squad is listed
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+OnCalendar=*-*-* 22:19:00 Europe/Madrid
+Persistent=false
+
+[Install]
+WantedBy=timers.target

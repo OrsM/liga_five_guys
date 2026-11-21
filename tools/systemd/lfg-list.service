@@ -1,0 +1,9 @@
+[Unit]
+Description=liga_five_guys — list every player of the squad that has no listing
+After=network-online.target
+
+[Service]
+Type=oneshot
+NoNewPrivileges=yes
+ExecStart=%h/claude_projects/liga_five_guys/tools/lfg-list
+TimeoutStartSec=120

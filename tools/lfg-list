@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Put on the market every player of the squad that has no listing, so each has an offer at the 22:24 close.
+#
+# Its own unit (lfg-list.timer). Silent when there was nothing to do; the result
+# is appended to ~/.local/state/lfg/list.log only when it listed or refused something.
+
+set -uo pipefail
+
+STATE="$HOME/.local/state/lfg"
+mkdir -p "$STATE"
+REPO="${LFG_REPO:-$HOME/claude_projects/liga_five_guys}"
+
+OUT=$(cd "$REPO" && PYTHONPATH=src "$HOME/.local/bin/uv" run --frozen python src/act.py ensure 2> "$STATE/list.err")
+RC=$?
+if [ "$RC" -ne 0 ]; then
+    OUT=$(python3 -c '
+import json, sys
+err = open(sys.argv[1], encoding="utf-8").read().strip().splitlines()[-1:] or ["no output"]
+print(json.dumps({"listed": [], "refused": [{"name": "the box", "why": err[0][:200]}], "already": 0}))' "$STATE/list.err")
+fi
+if printf '%s' "$OUT" | python3 -c '
+import json, sys
+got = json.load(sys.stdin)
+sys.exit(0 if got["listed"] or got["refused"] else 1)'; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $OUT" | tee -a "$STATE/list.log"
+fi
+[ "$RC" -eq 0 ]

@@ -172,6 +172,7 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   (the Window of a buy at its close), `window_value` and `opportunity_rows`
   (each market player by `valuation.Buyer`); `decision_at`, `replay` and `decisions` run it at one cut or over many. Nothing else of the old decision survives.
 - **Taps:** only `list` is done from the phone (`act.py`; an already-listed player, error 030.01.52, counts as listed).
+- **Listing is automatic:** `lfg-list` (timer: every 5 min and 22:19 Madrid) runs `act.py ensure`, which lists every squad player without a listing (read from the app's `teams` and `market`; one POST `market/sell` each, at max(value, the app's now)) and logs to `~/.local/state/lfg/list.log` only when it listed or refused something; the board's `list` line then appears only when that has failed.
 - **`dec_offer`** (the record of each standing offer at a run's cut, version 2): `delta_next4`, `delta_season` (the
   sale's Delta, 0 for a bench player, null when no eleven remains), `fields` (the squad after the sale fields a legal eleven),
   `gap`; version 1 rows (`lost4`, `lost_season`) are read as v2 through `records`. Grading leaves out, by
