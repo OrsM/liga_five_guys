@@ -8,6 +8,7 @@ import bisect
 import random
 import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from functools import lru_cache
 from typing import NamedTuple
 
 import eleven
@@ -284,6 +285,10 @@ def _selftest() -> None:
             cells = _cells_of(random.Random(seed), value)
             ctx = _context(squad, pos, cells)
             played = _played(squad, pos, cells)
+
+            @lru_cache(maxsize=None)
+            def oracle(sq: frozenset[str], j: int) -> float | None:
+                return eleven.best_total(sq, pos, cells[j])
             for p in squad:
                 got = _lost(p, ctx)
                 if p not in played:
@@ -293,7 +298,7 @@ def _selftest() -> None:
                     continue
                 for n in valuation.READERS:
                     w = getattr(ctx.window, n)
-                    lose = sum((eleven.best_total(squad, pos, cells[j]) or 0.0) - (eleven.best_total(squad - {p}, pos, cells[j]) or 0.0) for j in w)
+                    lose = sum((oracle(squad, j) or 0.0) - (oracle(squad - {p}, j) or 0.0) for j in w)
                     assert abs(got[n] - lose) < 1e-9, "the loss is V(S) less V(S-p) in each jornada, summed"
                     assert got[n] >= -1e-9, "selling never gains points"
                 assert got["lock"] <= got["next4"] + 1e-9 <= got["season"] + 2e-9, "a longer window loses at least as much"

@@ -97,6 +97,28 @@ def tree_sources() -> dict[str, Path]:
             if f.stem != "__init__"}
 
 
+def import_graph(files: Mapping[str, Path]) -> dict[str, set[str]]:
+    """For each key of files (a path under ROOT, as a string) the keys it imports, by `imported`, over the whole file
+    (self-tests and lazy imports included). A module stem shared by several files stands for all of them, so the graph
+    may name too many dependencies, never too few."""
+    by_stem: dict[str, list[str]] = {}
+    for key in files:
+        by_stem.setdefault(Path(key).stem, []).append(key)
+    return {key: {k for _, stem in imported(ast.parse(f.read_text()), set(by_stem)) for k in by_stem[stem]} - {key}
+            for key, f in files.items()}
+
+
+def dependents(graph: Mapping[str, set[str]], changed: set[str]) -> set[str]:
+    """The keys of graph that import, directly or through others, a key of changed, and the changed keys themselves."""
+    out = set(changed)
+    grew = True
+    while grew:
+        more = {k for k, uses in graph.items() if uses & out} - out
+        out |= more
+        grew = bool(more)
+    return out
+
+
 def table() -> str:
     rows = ["| Layer | Modules |", "|---|---|"]
     rows += [f"| {m} | {', '.join(sorted(s for s, o in OWNS.items() if o == m))} |" for m in ORDER]
@@ -123,6 +145,11 @@ def _selftest() -> None:
     assert positional_reads("def _selftest():\n    for a, b in inp.bids:\n        pass\n\nX = 1\n") == []
     assert [c.what for c in crossings({"board": "for a, b in inp.bids:\n    pass\n"})] == ["unpacks an Inputs row by position"]
     assert prod("x\ndef _selftest():\n    import a\n\ny = 1\n").count("\n") == 5
+    graph = {"a": {"b"}, "b": {"c"}, "c": set(), "d": {"c"}, "e": set()}
+    assert dependents(graph, {"c"}) == {"a", "b", "c", "d"} and dependents(graph, {"e"}) == {"e"}, "importers, transitively, and the module itself"
+    assert dependents(graph, set()) == set()
+    graph = import_graph({key: ROOT / key for key in ("tools/frontiers.py", "src/ffcore/rules.py", "src/eleven.py")})
+    assert graph["src/eleven.py"] == {"src/ffcore/rules.py"} and graph["src/ffcore/rules.py"] == set(), "real imports, by file"
     assert main() == 0, "the tree has crossings (listed above)"
     print("frontiers selftest ok")
 
