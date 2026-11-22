@@ -1,36 +1,47 @@
 #!/usr/bin/env bash
-# src/run.py on a scratch copy: data/raw linked in read-only, the parse cache
-# (data/tidy/parsed.jsonl and snapindex.json) copied so a copy does not reparse every snapshot,
-# the record store (SCRATCH/store) copied from the tracked tree's store/ (cp -r, never opened), everything written
-# (store, reports) under the scratch dir, nothing published or sent.
-# For checking and timing a change; the tracked repo is never touched.
+# src/run.py on a persistent scratch copy: data/raw linked in read-only, the parse cache (data/tidy/parsed.jsonl and
+# snapindex.json) and the record store (store/) of the tracked tree refreshed into the scratch by rsync (only what
+# changed since the last run, made writable so repeated runs and rm work), everything written (store, reports) under the
+# scratch dir, nothing published or sent, the tracked tree's data/ and store/ never written.
+# The scratch store is reset to the tracked tree's every run (a run adds a run to it, which a later run would read).
+# For checking and timing a change; the tracked repo is never touched. The scratch is kept: rm -rf it when done.
 #
-#     tools/lfg-dry-run              every stage
-#     tools/lfg-dry-run board grade  just those, as run.py takes them
+#     tools/lfg-dry-run                        every stage
+#     tools/lfg-dry-run board grade            just those, as run.py takes them
+#     tools/lfg-dry-run --compare CUT...       this tree against main on each pinned cut (tools/baseline.py)
+#
+# LFG_SCRATCH: the scratch (default ~/.cache/lfg-dry-run; one each when several run at once).
+# LFG_CODE: the tree whose src/ runs (default this one), for the baseline of main. LFG_NOW pins the time: a pinned run
+# of a clean tree records its decisions.json and board time in the baseline cache (tools/baseline.py).
 
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$REPO"
-SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-dry-run}"     # not /tmp: a tmpfs too small for the parse cache and the store; LFG_SCRATCH: one each when several run at once
-mkdir -p "$SCRATCH/data/tidy" "$SCRATCH/reports"
-ln -sfn "$REPO/data/raw" "$SCRATCH/data/raw"
-for f in parsed.jsonl snapindex.json; do
-    if [ ! -e "$SCRATCH/data/tidy/$f" ] && [ -e "$REPO/data/tidy/$f" ]; then
-        cp "$REPO/data/tidy/$f" "$SCRATCH/data/tidy/$f"
-    fi
-done
-
-TREE="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"     # the tracked tree that holds store/, also from a worktree
-if [ ! -e "$SCRATCH/store" ]; then
-    if [ -d "$TREE/store" ]; then
-        cp -r "$TREE/store" "$SCRATCH/store"
-    else
-        echo "lfg-dry-run: no store: seed $SCRATCH/store (cp -r of the tracked tree's store/)" >&2
-        exit 1
-    fi
+CODE="${LFG_CODE:-$REPO}"
+if [ "${1:-}" = "--compare" ]; then
+    shift
+    cd "$REPO"
+    PYTHONPATH=src exec python3 tools/baseline.py compare "$@"
 fi
 
+SCRATCH="${LFG_SCRATCH:-$HOME/.cache/lfg-dry-run}"     # not /tmp: a tmpfs too small for the parse cache and the store
+TREE="$(cd "$(git -C "$REPO" rev-parse --git-common-dir)/.." && pwd)"     # the tracked tree that holds data/ and store/, also from a worktree
+if [ ! -d "$TREE/store" ]; then
+    echo "lfg-dry-run: no store in $TREE" >&2
+    exit 1
+fi
+mkdir -p "$SCRATCH/data/tidy" "$SCRATCH/store" "$SCRATCH/reports"
+ln -sfn "$TREE/data/raw" "$SCRATCH/data/raw"
+chmod -R u+w "$SCRATCH/store" "$SCRATCH/data/tidy"
+rsync -a --chmod=u+w "$TREE/data/tidy/parsed.jsonl" "$TREE/data/tidy/snapindex.json" "$SCRATCH/data/tidy/"
+rsync -a --delete --chmod=u+w "$TREE/store/" "$SCRATCH/store/"
+rm -f "$SCRATCH/reports/decisions.json"
+
+trap 'chmod -R u+w "$SCRATCH" 2>/dev/null || true' EXIT
 export PYTHONPATH=src FF_ROOT="$SCRATCH/data" LFG_REPORTS="$SCRATCH/reports" LFG_NO_PUBLISH=1
 echo "lfg-dry-run: scratch=$SCRATCH"
-"$REPO/tools/capped" "$HOME/.local/bin/uv" run --frozen python src/run.py "$@"
+cd "$CODE"
+"$REPO/tools/capped" "$HOME/.local/bin/uv" run --frozen python src/run.py "$@" | tee "$SCRATCH/last-run.log"
+if [ -n "${LFG_NOW:-}" ] && [ -z "${LFG_CODE:-}" ]; then
+    python3 "$REPO/tools/baseline.py" record "$SCRATCH" "$LFG_NOW" || true
+fi

@@ -6,6 +6,9 @@ the key per-cut features the sweep makes at pinned cuts, stored under tools/gold
     python tools/golden.py bless                   # regenerate the fixture goldens: the only way a golden file changes
     python tools/golden.py --live [check|bless] [TIDY]   # the 5 live cuts from the parse cache in TIDY (default FF_ROOT/tidy), no database
 
+--selftest and --live check end with their run time and the wait for the shared lock when started by tools/locked-run
+(LFG_LOCK_WAIT_S), so a slow number says whether it ran slowly or waited.
+
 Fixture goldens (decisions-<stamp>.json, features-<stamp>.json): the two latest api_teams snapshots of the real-data
 fixture tools/cases/league.json.xz, each decided CUT_AFTER_MINUTES later, through loader.load, state.sweep,
 decision.decision_at, decision.opportunity_rows and board.board. Live goldens (live-<stamp>.json): the features only
@@ -243,6 +246,12 @@ def render_live(paths: parsed.Paths) -> Rendered:
             for r in replayed(loaded, [Cut(c, c) for c in LIVE_CUTS], with_document=False)}
 
 
+def timing(run_s: float) -> str:
+    """The wall time of a run split as 'R s run, W s lock wait' (the wait is 'unknown' outside tools/locked-run)."""
+    waited = os.environ.get("LFG_LOCK_WAIT_S")
+    return "%.1f s run, %s lock wait" % (run_s, "unknown" if waited is None else "%s s" % waited)
+
+
 def report(found: list[str], what: str, first: int = 20) -> int:
     for line in found[:first]:
         print("  " + line)
@@ -253,9 +262,9 @@ def report(found: list[str], what: str, first: int = 20) -> int:
 
 
 def _selftest() -> None:
+    t0 = time.monotonic()
     doc = cases.load()
     cuts = fixture_cuts(doc)
-    t0 = time.monotonic()
     loaded = fixture_loaded(doc)
     made = rendered(loaded, cuts)
     last = cuts[-1]
@@ -294,7 +303,7 @@ def _selftest() -> None:
     assert differences({"a": [1, 2], "b": "x"}, {"a": [1, 3], "c": 1}) == [
         "/b: only in the golden", "/c: only in what was made", "/a[1]: 2 != 3"]
     assert plain({"s": frozenset({"b", "a"}), 2: (cases.Market("p", 1.0),)}) == {"2": [{"player": "p", "value": 1.0}], "s": ["a", "b"]}
-    print("golden self-test OK (%d cuts in %.1f s)" % (len(cuts), time.monotonic() - t0))
+    print("golden self-test OK (%d cuts, %s)" % (len(cuts), timing(time.monotonic() - t0)))
 
 
 def main() -> int:
@@ -304,6 +313,7 @@ def main() -> int:
     p.add_argument("command", nargs="?", choices=("check", "bless"), default="check")
     p.add_argument("tidy", nargs="?", type=Path)
     args = p.parse_args()
+    t0 = time.monotonic()
     if args.selftest:
         _selftest()
         return 0
@@ -313,7 +323,9 @@ def main() -> int:
         bless(GOLDEN, made, kinds)
         print("golden bless: wrote %d files to %s" % (len(made), GOLDEN))
         return 0
-    return report(check(GOLDEN, made, kinds), "live check" if args.live else "check")
+    status = report(check(GOLDEN, made, kinds), "live check" if args.live else "check")
+    print("golden %s: %s" % ("live check" if args.live else "check", timing(time.monotonic() - t0)))
+    return status
 
 
 if __name__ == "__main__":

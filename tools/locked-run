@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# A heavy job behind the shared lock and the memory cap, with the wait for the lock timed apart from the run:
+# flock ~/.cache/lfg-heavy.lock tools/capped CMD..., then one line "locked-run: waited W s for the lock, ran R s (exit N)".
+# The wait is exported as LFG_LOCK_WAIT_S for CMD to report (tools/golden.py does). Exits with CMD's status.
+#
+#     tools/locked-run env PYTHONPATH=src ~/.local/bin/uv run --frozen python tools/golden.py --selftest
+
+set -uo pipefail
+
+LOCK="${LFG_LOCK:-$HOME/.cache/lfg-heavy.lock}"
+exec 9>"$LOCK"
+asked=$(date +%s.%N)
+flock 9
+got=$(date +%s.%N)
+LFG_LOCK_WAIT_S=$(awk -v a="$asked" -v g="$got" 'BEGIN { printf "%.1f", g - a }') "$(dirname "$0")/capped" "$@"
+status=$?
+done_at=$(date +%s.%N)
+awk -v a="$asked" -v g="$got" -v d="$done_at" -v s="$status" \
+    'BEGIN { printf "locked-run: waited %.1f s for the lock, ran %.1f s (exit %d)\n", g - a, d - g, s }' >&2
+exit "$status"
