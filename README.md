@@ -149,7 +149,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
 
 ## Checking it
     python src/grading.py accuracy                # the forecast at each past lock against what was scored: the star group (e >= 4) and all players
-    tools/capped bash tools/selftests.sh          # every module's self-test, mypy, ruff (every heavy job goes through tools/capped)
+    tools/gate --changed | --full                 # ruff, frontiers, mypy and the self-tests (changed modules only, or all); run bare: it takes the lock and cap
     python tools/frontiers.py                     # the layer check: crossings 0
     python tools/golden.py --selftest             # decisions.json and key features at pinned cuts, against tools/golden/
     python tools/golden.py --live [check|bless]   # the same at the 5 live cuts, over the parse cache
@@ -157,7 +157,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     tools/lfg-rules                               # the sale rules over every replay cut, on a scratch copy (~3 min)
     python tools/cases.py report                  # seven real players end to end (tools/cases/league.json.xz, a
                                                   # slice of the league as ingest stored it): expected vs actual by stage
-    tools/lfg-dry-run [stage ...]      # the full run against a scratch copy; nothing published
+    tools/lfg-dry-run [stage ... | --compare CUT...]  # the full run against a scratch copy, or a pinned before/after vs main; nothing published
     uv run mypy src tools                         # strict: every function annotated, no bare
                                                   # dict/list; gates selftests (pyproject [tool.mypy])
     python tools/peek.py params                   # the latest run's rows of a kind in the store (peek.py -i: a REPL)
@@ -187,8 +187,8 @@ rather than reaching through them; ruff flags reads of private members.
                     rules (positions, formations, the debt), names (Name,
                     PlayerKey, AppId), source, futbolfantasy, footballdata,
                     laliga_api, parse, text, auth, league
-    tools/          selftests.sh, frontiers.py, golden.py (and golden/),
-                    auction_table.py, lfg-rules, lfg-dry-run, capped, peek.py,
+    tools/          gate, selftests.sh, frontiers.py, golden.py (and golden/),
+                    auction_table.py, lfg-rules, lfg-dry-run, capped, locked-run, peek.py,
                     cases.py (and cases/)
     inputs/         league.ini
     data/raw/       archived pages, append-only

@@ -38,9 +38,11 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 - Scopes of agents running together do not overlap. Each has its own worktree, `TMPDIR` under `~/.cache` (`/tmp` is a small tmpfs) and its own `LFG_SCRATCH`.
 - Agent worktrees start from `origin/main`: push main before spawning.
 - Pin the time with `LFG_NOW` so `decisions.json` can be compared byte for byte.
-- `tools/lfg-dry-run` copies the parse cache and the tracked tree's `store/` (`cp -r`) into the scratch; delete the scratch afterwards.
+- `tools/lfg-dry-run` keeps a persistent scratch under `~/.cache` (the parse cache and the tracked tree's `store/` refreshed by rsync); `rm -rf` it when done.
+- The brief names these commands: `tools/gate --changed` per commit, `tools/gate --full` before the merge, `tools/lfg-dry-run --compare <LFG_NOW>...` for the pinned before/after (one cut per argument), `golden.py --selftest` and `golden.py --live check`.
 - On a copy run `tools/lfg-dry-run board grade health`, not `parse`: a copy reparses every snapshot (9 minutes).
-- Every heavy or long job that is not `lfg.service` runs through `tools/capped` (`LFG_CAP`, default 1500M; `tools/lfg-dry-run` already does). The box has 3.8 GB: on 2026-11-17 an uncapped sweep run made the OOM killer take down the Remote Control server and archive the phone session. Run at most two such jobs at once.
+- Every heavy or long job that is not `lfg.service` runs bare through `tools/gate` or `tools/locked-run CMD` (the shared lock and `tools/capped`, `LFG_CAP`, default 1500M; `tools/lfg-dry-run` already caps itself): never an uncapped job, and never your own `flock` or `capped` chain around the gate. The box has 3.8 GB: on 2026-11-17 an uncapped sweep run made the OOM killer take down the Remote Control server and archive the phone session. Run at most two heavy jobs at once.
+- Report the lock wait apart from the run time (the gate, `tools/locked-run` and `golden.py` print both): a slow run behind another job is not a slow change.
 - Read-only agents look at a scratch store with `tools/peek.py`, never at the live `data/` or `store/`.
 - Never run a tool against the live `data/` or `store/`: agents run on scratch copies of `store/` and the tidy files, with `FF_ROOT` and `LFG_SCRATCH` under `~/.cache`. (2026-11-17: a tool that migrated the old SQLite schema dropped live tables; no code opens a database now.)
 - Three levels. Small models do the issues, in swarms. A mid-size pickup agent reads their reports and diffs against the brief and the principles and sorts each issue: good, another small-model turn (it writes the corrected brief), or blocked. The main session writes the briefs, merges what is good, and takes what is blocked to Miguel.
@@ -53,15 +55,17 @@ A forecasting-and-decision system for a LaLiga Fantasy league. State and open wo
 ## Checks
 
 ```
-tools/capped bash tools/selftests.sh                 # 49 suites, mypy, ruff
-tools/capped ~/.local/bin/uv run --frozen python tools/frontiers.py   # 0 crossings
-tools/capped env PYTHONPATH=src ~/.local/bin/uv run --frozen python tools/golden.py --selftest   # decisions.json and key features at pinned cuts
+tools/gate --changed                                 # per commit: ruff, frontiers, mypy and the suites of the changed modules (full when it cannot map)
+tools/gate --full                                    # before a merge: ruff, frontiers, mypy and every suite
+tools/locked-run env PYTHONPATH=src ~/.local/bin/uv run --frozen python tools/golden.py --selftest   # decisions.json and key features at pinned cuts (not in the gate)
+tools/lfg-dry-run --compare <LFG_NOW>...             # pinned before/after: this tree against a cached baseline of main, field diff of decisions.json, one cut per argument
 tools/lfg-rules                                      # the sale-rule table over every replay cut (~3 min, scratch copy of the parse cache)
-tools/lfg-dry-run board                              # timing and decisions.json on a copy
 ```
 
-Every heavy job (selftests, sweeps, replays, dry runs) goes through `tools/capped`, one at a time: the box has 3.8 GB and an uncapped sweep took down Remote Control. Pin `PYTHONHASHSEED=0`.
-Before a merge that changes a fact: `golden.py --live` on a scratch copy of the parse cache; a change to a golden file is `golden.py bless` with the reason in the commit.
+Run the gate and `tools/lfg-dry-run` bare: they take the shared lock and the memory cap themselves, and print the flock wait, the run time and the peak memory. Any other heavy job (sweeps, replays, `golden.py`) goes through `tools/locked-run CMD`, at most two heavy jobs at once: the box has 3.8 GB and an uncapped sweep took down Remote Control. Pin `PYTHONHASHSEED=0`.
+The suite count is whatever the gate prints. The lock wait is reported apart from the run: a slow run behind another job is not a slow change.
+Timing: one run per cut (`--compare` prints both board times); repeat only if the difference is above 0.3 s.
+Before a merge that changes a fact: `golden.py --live check` on a scratch copy of the parse cache (via `tools/locked-run`; not in the gate); a change to a golden file is `golden.py bless` with the reason in the commit.
 `oracle-sql` (git tag) is the last SQL-view implementation, kept as the historic proof; it is not run any more.
 Replay cuts are the app snapshot stamps (`loader.replay_cuts(obs, since)`).
 

@@ -100,21 +100,25 @@ computes one, and a fact is never stored twice.
 
 **Rules.** A layer reads ingest's facts, the cut and earlier layers' exports; never a later layer, never a raw table.
 A test seeds its module's inputs as rows (no Python mirror of a table). A change is judged by its layer's measure; old
-output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/selftests.sh`) checks the import graph:
+output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/gate`) checks the import graph:
 a module may not import a later layer; `python tools/frontiers.py --table` prints the layers.
 
 **The auction table.** The win chance of a bid is a fixed `Model` in `ffcore/auction_table.py`, fitted once over every
 closed auction with the fixed cuts `auction.FIXED_CUTS`. It is regenerated only by `tools/auction_table.py`, and the
 goldens are blessed in the same commit (it is an input of every golden decision).
 
-**Checks.** `tools/selftests.sh` (50 suites at 2026-11-20, one per module with a top-level `_selftest`, then mypy and ruff; it prints
-`selftests: N suites pass`, the count is the number of such modules under `src` and `tools`); `tools/frontiers.py`; `tools/golden.py` (`--selftest` on the fixture
-cuts, `--live` on the 5 live cuts of a parse cache; a change to a golden file is `golden.py bless`, with the
-reason in the commit); `tools/lfg-rules` (the sale-rule table over every cut, on a scratch copy of the parse cache,
-about 3 min); `tools/lfg-dry-run board` (the stages on a copy; with `LFG_NOW` pinned `decisions.json` can be diffed byte for
-byte). The board must not get slower: it took 10.1 s before the one valuation (V per jornada) and about 10.6 s after it, on a
-busier box, which was accepted; a slowdown past that is a regression to profile before commit. Every heavy job goes through `tools/capped` (a memory-capped
-systemd scope, `LFG_CAP` to change the 1500M default). The git tag `oracle-sql` is the last SQL-view implementation,
+**Checks.** `tools/gate --changed [BASE]` per commit (ruff, frontiers, mypy and the suites that import a changed module; full when it
+cannot map) and `tools/gate --full` before a merge (ruff, frontiers, mypy and one suite per module with a top-level `_selftest`
+under `src` and `tools`, in one 4-wide pool; the count is whatever it prints); run it bare, it takes the lock and the memory cap and prints the flock wait,
+the run time and the peak memory. `tools/golden.py` (`--selftest` on the fixture cuts, `--live check` on the 5 live cuts of a parse
+cache; neither is in the gate; a change to a golden file is `golden.py bless`, with the reason in the commit);
+`tools/lfg-rules` (the sale-rule table over every cut, on a scratch copy of the parse cache, about 3 min);
+`tools/lfg-dry-run --compare <LFG_NOW>...` (this tree against a cached baseline of main on each pinned cut: field diff of
+`decisions.json` and both board times, about 25 s for two cuts). The board must not get slower: it took 10.1 s before the one valuation (V per
+jornada) and about 10.6 s after it, on a busier box, which was accepted; a slowdown past that is a regression to profile before
+commit. Time one run per cut and repeat only if the difference is above 0.3 s; the lock wait is reported apart from the run, a slow run
+behind another job is not a slow change. Every other heavy job goes through `tools/locked-run CMD` (the lock and a memory-capped
+systemd scope, `LFG_CAP` to change the 1500M default), at most two at once. The git tag `oracle-sql` is the last SQL-view implementation,
 kept as the historic proof; it is not run any more.
 
 **The dictionary:** each concept has one home; a concept with two homes, a layer reaching past the one below, or a
