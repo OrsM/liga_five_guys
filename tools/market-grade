@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""The graded replacement level (market.replacement_level), the measurement the board cannot afford: replays the last cut of each day
+since grading.SALES_FROM, and per position grades the best player listed at most market.FILLER_MAX by forecast over the next H
+jornadas against what he scored. Prints the table for H = 4 and 8 and writes the H = 4 Levels to market.grade_path() (the file
+the board reads into decisions.json). Reads the parse cache under FF_ROOT; run it on a scratch copy, through tools/capped:
+
+    PYTHONPATH=src FF_ROOT=SCRATCH/data tools/capped ~/.local/bin/uv run --frozen python tools/market-grade
+"""
+from __future__ import annotations
+
+import decision
+import grading
+import market
+
+
+def main() -> None:
+    loaded, cuts = grading.read_storage()
+    now = grading.season(loaded)
+    listings: list[market.Listing] = []
+
+    def keep(cut: str, decided: decision.Decided | decision.Stale) -> None:
+        if isinstance(decided, decision.Decided):
+            listings.append(market.listing_of(cut, decided.inputs))
+
+    decision.replay(loaded, market.daily(cuts), keep)
+    for ahead in market.LEVEL_HORIZONS:
+        print("H = %d (%d cuts replayed, %d jornadas done)" % (ahead, len(listings), len(now.done)))
+        for p, lv in market.replacement_level(listings, now.scored, now.done, ahead).items():
+            print("  %s forecast %.2f realised %.2f per jornada, n %d cuts, %.1f listed per day" % (p, lv.forecast, lv.realised, lv.n, lv.listed_per_day))
+    market.write_grade(market.replacement_level(listings, now.scored, now.done, market.LEVEL_AHEAD))
+    print("wrote %s" % market.grade_path())
+
+
+if __name__ == "__main__":
+    main()

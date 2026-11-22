@@ -229,6 +229,41 @@
   "unmapped": []
  },
  "lock_at": "2026-11-20T20:00:00+00:00",
+ "market": {
+  "kappa": {
+   "average": 1.5566960599116941,
+   "n": 98,
+   "ols": 1.1943891220838427,
+   "resid_sd": 16.138144904876913,
+   "reverse": 1.5494611199309871,
+   "slope": 1.2752490924584357
+  },
+  "par": {
+   "Adria Pedrosa": 2.5679789707853615,
+   "Aitor Paredes": 13.545906587258742,
+   "Arnau Ortiz": 0.0,
+   "Augusto Batalla": 5.449782492659324,
+   "Dani Martinez": 0.0,
+   "Fernando Niño": 23.525489968173588,
+   "Ferran Jutgla": 2.0861378439742566,
+   "Georges Mikautadze": 21.40752526653864,
+   "Gerard Martin": 33.03027273484645,
+   "German Valera": 23.785714984886226,
+   "Guido Rodriguez": 14.948599674733487,
+   "Iñigo Vicente": 8.55637184828447,
+   "Marcos Alonso": 29.477109409646573,
+   "Martin Satriano": 21.335344258039413,
+   "Mathew Ryan": 82.28561775407661,
+   "Miguel Roman": 8.00931144696142,
+   "Natan": 38.89927200620991,
+   "Pablo Fornals": 46.126677635758824,
+   "Pepelu": 22.090227111081504,
+   "Robin Le Normand": 2.5358789345268633,
+   "Roger Hinojo": 0.0,
+   "Thomas Lemar": 1.7402411617686084
+  },
+  "replacement": {}
+ },
  "market_at": "2026-11-08T09:01Z",
  "ping": "",
  "sells": [

@@ -14,6 +14,7 @@ from typing import Any, NamedTuple
 
 import decision
 import eleven
+import market
 import worth
 from approach import Approach, Club, Plan, Rounds, Side, approach, plan, prices, replacement
 from ffcore import current, league, loader, price_fold, state
@@ -487,10 +488,24 @@ def arrival_rows(got: Sequence[dict[str, Any]], arrivals: Sequence[str]) -> list
     return [row[p] for p in arrivals if p in row][:TOP_TARGETS]
 
 
+def market_doc(inp: decision.Inputs, names: dict[str, str], held: Iterable[decision.Held], shown: Iterable[str],
+               levels: dict[str, dict[str, Any]]) -> Doc:
+    """The record-only market block (nothing reads it): `kappa` (market.Kappa as a document, None when the prices fix none),
+    `replacement` (levels, the graded replacement level by position as market.read_grade gives it) and `par` (market.par over
+    the one Window, by shown name, of my squad and of the players in shown, the keys of the buys)."""
+    values = {c.player: c.value for c in inp.universe if c.value} | {h.player: h.value for h in held if h.value}
+    found = market.assess(inp, values)
+    who = decision.squad_of(inp) | frozenset(shown)
+    return {"kappa": found.kappa._asdict() if found.kappa is not None else None, "replacement": levels,
+            "par": {names.get(k, k): found.par.get(k) for k in sorted(who, key=lambda k: names.get(k, k))}}
+
+
 def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
-          extras: decision.Extras, health: Iterable[Health], offers: worth.OfferDistribution = worth.NO_OFFERS) -> Doc:
+          extras: decision.Extras, health: Iterable[Health], offers: worth.OfferDistribution = worth.NO_OFFERS,
+          levels: dict[str, dict[str, Any]] | None = None) -> Doc:
     """The decisions document of the cut; extras are what the World gives beside the inputs, health the status of each
-    source (health.parser_health over the loaded snapshots) and offers the nightly offers seen by the cut (offers_at)."""
+    source (health.parser_health over the loaded snapshots), offers the nightly offers seen by the cut (offers_at) and
+    levels the graded replacement levels by position (market.read_grade; none when not graded)."""
     cash, team_value, debt = inp.money.cash, inp.money.team_value, inp.money.debt
     locks = [x.lock for x in inp.locks]
     bids = sum(b.amount for b in inp.bids)
@@ -525,7 +540,8 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
         "base": base_doc(club, names, base), "targets": target_lines(names, got),
         "alerts": alerts, "auction": auction_card(),
         "sells": sells,
-        "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
+        "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad],
+        "market": market_doc(inp, names, extras.held, (b["key"] for b in buys), levels or {})}
 
 
 # The constants a run is built with, by module: what params records as such.
@@ -604,7 +620,7 @@ def main(records: RunRecords | None = None, obs: ob.Observations | None = None) 
     records.add("params", rows)
     got = decision.opportunity_rows(d.inputs)
     records.add("dec_opportunity", [{"cut": cut(), **r} for r in got])
-    doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras, loader.health_at(loaded, cut()), offers)
+    doc = board(d.inputs, got, decision.arrivals(got, loaded.previous), d.extras, loader.health_at(loaded, cut()), offers, market.read_grade())
     records.add("dec_offer", offer_rows(cut(), doc["sells"], stood_offers(d.extras.held, standing)))
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / "decisions.json").write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
