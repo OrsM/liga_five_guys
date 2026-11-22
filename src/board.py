@@ -97,7 +97,7 @@ def lineup_doc(inp: decision.Inputs, names: dict[str, str], sold: frozenset[str]
             "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
 
 
-def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = worth.STOPGAP_RATE) -> worth.Context:
+def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = hurdle.FALLBACK_LAMBDA) -> worth.Context:
     pos, cells = decision.cells_of(inp)
     locks = decision.lock_times(inp)
     return worth.Context(pos, decision.window_of(locks, cells, None), inp.money.cash, offers, rate,
@@ -109,6 +109,14 @@ def later_sale(inp: decision.Inputs, player: str, value: float) -> float:
     if not rows:
         return rules.SALE_ESTIMATE * value
     return rules.SALE_ESTIMATE * value * (1 + decision.rise(max(rows, key=lambda x: x.h)))
+
+
+def standing(inp: decision.Inputs, player: str, value: float, offer: float | None) -> worth.Standing:
+    """The offer on a player as the sale rules read it: later_sale, and the price forecast's rise at its furthest horizon
+    within hurdle.TREND_NIGHTS (None with no such row)."""
+    near = [x for x in inp.prices if x.player == player and x.h <= hurdle.TREND_NIGHTS and x.value]
+    return worth.Standing(player, value, offer, later_sale(inp, player, value),
+                          decision.rise(max(near, key=lambda x: x.h)) if near else None)
 
 
 def offers_at(world: state.World) -> worth.OfferDistribution:
@@ -123,14 +131,20 @@ def delta_doc(sale: valuation.Reading) -> Doc:
 
 
 def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.Offer], known: dict[str, decision.Fact],
-                offers: worth.OfferDistribution = worth.NO_OFFERS) -> list[Doc]:
-    ctx = context(inp)
+                offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = hurdle.FALLBACK_LAMBDA) -> list[Doc]:
+    """A sells row for each standing offer, judged by worth.LIVE at rate: verdict sell (the offer reaches the reserve),
+    hold, or needs_replacement (no legal eleven without him), before settle; lost the points the sale loses (None: no
+    Delta) as points_lost, reserve, rent the points the money earns at rate over the jornadas of the sale; by per_million (points lost per
+    million raised), lowest first."""
+    ctx = context(inp, offers, rate)
+    n = ctx.jornadas()
     out = []
     for offer in got:
         k, value, money = offer.player, offer.value, offer.money
         fact = known.get(k, decision.UNKNOWN)
-        verdict = worth.LIVE(worth.Standing(k, value, money, later_sale(inp, k, value)), ctx)
+        verdict = worth.LIVE(standing(inp, k, value, money), ctx)
         sale = verdict.sale
+        lost = None if sale.points is None else 0.0 - sale.points
         ratio = money / value if value else None
         share = None if ratio is None else worth.offer_percentile(offers, ratio)
         name = names.get(k, k)
@@ -142,9 +156,12 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
             "feasible": sale.points is not None, "why_infeasible": None if sale.points is not None else "no_eleven",
             "replacement": None, "replacement_why_not": None,
             "offer_percentile": share, "offers_seen": len(offers.ratios),
-            "per_million": verdict.key,
+            "per_million": None if lost is None or not money else lost / (money / 1e6),
+            "verdict": "needs_replacement" if verdict.key is None else "sell" if verdict.key <= 0 else "hold",
+            "points_lost": lost, "reserve": verdict.reserve, "rent": rate * n * money / 1e6,
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
                       ["offer percentile", share, "chance"], ["offers seen", len(offers.ratios), "count"],
+                      ["sale price", verdict.reserve, "money"],
                       *[["points, " + name, sale.window[name], "points"] for name in READERS]],
             "accepts": [], "act": []})
     return sorted(out, key=lambda d: (d["per_million"] is None, d["per_million"], d["key"]))
@@ -413,13 +430,25 @@ def funds(buys: list[Doc], sells: list[Doc]) -> None:
                        if any(t["name"] == sale["name"] for t in (b.get("funding") or {}).get("tonight", []))]
 
 
+def settle(sells: list[Doc], cover: frozenset[str]) -> None:
+    """The verdicts of the sells rows once the cash's uses are known (rows with "for" set by funds; cover the sales of the
+    plan that brings cash to 0 at the lock): a sale that loses points is a sell only when its cash has a use (it funds a
+    buy tonight or is in cover), else hold; a sell not taken tonight (worth.take_now) is wait. Then sells first, by
+    per_million."""
+    for sale in sells:
+        if sale["verdict"] == "sell" and (sale["points_lost"] or 0.0) > worth.NO_LOSS and not sale["for"] and sale["key"] not in cover:
+            sale["verdict"] = "hold"
+        if sale["verdict"] == "sell" and not worth.take_now(sale["ratio"], sale["offer_percentile"], bool(sale["for"])):
+            sale["verdict"] = "wait"
+    sells.sort(key=lambda d: (d["verdict"] != "sell", d["per_million"] is None, d["per_million"], d["key"]))
+
+
 def takes(inp: decision.Inputs, club: Club, clock: Clock, sale: Doc, dist: worth.OfferDistribution) -> bool:
     """Whether the offer of the row `sale`, a sale of the plan, is taken now: when no close is left before the lock, when he funds a bid
     tonight, else when it is at or above worth.waiting_reserve with the clock's closes left."""
     k = sale["key"]
-    standing = worth.Standing(k, club.worth[k], sale["offer"], later_sale(inp, k, club.worth[k]))
     return clock.n_closes == 0 or bool(sale["for"]) \
-        or sale["offer"] >= worth.waiting_reserve(standing, dist, clock.n_closes)
+        or sale["offer"] >= worth.waiting_reserve(standing(inp, k, club.worth[k], sale["offer"]), dist, clock.n_closes)
 
 
 def credit_line(club: Club) -> Doc:
@@ -543,11 +572,12 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     window = decision.window_of(decision.lock_times(inp), cells, None)
     base = approach(club, None, 0.0, 1.0, Rounds(cells, window, window))
     buys, considered = buy_lines(inp, names, club, got, base, rate)
-    sells = offer_lines(inp, names, offered, known, offers)
+    sells = offer_lines(inp, names, offered, known, offers, rate)
     funds(buys, sells)
     replacement_rows(inp, names, club, got, sells)
     clock = clock_at(snapshot_stamp(cut()) or run_now(), locks)
     found = plan(club, base, Rounds(cells, window, window), clock.n_closes)
+    settle(sells, found.sells if found is not None and found.feasible else frozenset())
     owed = cover_lines(inp, names, club, found, clock, sells, extras.listed, offers) if locks else []
     sold = found.sells if found is not None and found.feasible else frozenset()
     return {
@@ -747,6 +777,24 @@ def _selftest_sells() -> None:
     assert all(set(m) == set(rec.DecOffer._fields) for m in made)
 
 
+def _selftest_settle() -> None:
+    rng = random.Random(21)
+    for _ in range(400):
+        rows: list[Doc] = [{"key": "p%d" % i, "verdict": rng.choice(["sell", "hold", "needs_replacement"]), "points_lost": rng.choice([0.0, 2.0, None]),
+                            "for": rng.choice([[], ["B"]]), "ratio": rng.choice([0.9, 1.0, 1.1, None]), "offer_percentile": rng.choice([0.1, 0.5, None]),
+                            "per_million": rng.choice([None, 0.0, 1.0, 2.0])} for i in range(rng.randint(0, 8))]
+        before = {r["key"]: r["verdict"] for r in rows}
+        cover = frozenset(r["key"] for r in rows if rng.random() < 0.3)
+        settle(rows, cover)
+        for r in rows:
+            assert r["verdict"] == before[r["key"]] or before[r["key"]] == "sell", "only a sell is settled"
+            if r["verdict"] in ("sell", "wait") and (r["points_lost"] or 0.0) > 0:
+                assert r["for"] or r["key"] in cover, "a sale that loses points is made only when its cash has a use"
+            if r["verdict"] == "sell":
+                assert worth.take_now(r["ratio"], r["offer_percentile"], bool(r["for"])), "a sell is taken tonight"
+        assert [r["verdict"] == "sell" for r in rows] == sorted((r["verdict"] == "sell" for r in rows), reverse=True), "sells first"
+
+
 def _selftest_replacements() -> None:
     shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
     squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
@@ -874,7 +922,7 @@ def _selftest_cover() -> None:
             "a take is a sale of the plan with a standing offer and leaves cash 0 or more"
         assert all(r["set_points_lost"] == found.cost for r in takes_)
         if n_closes >= 1:
-            assert all(r["for"] or r["offer"] >= worth.waiting_reserve(worth.Standing(r["key"], value[r["key"]], r["offer"], later_sale(inp, r["key"], value[r["key"]])),
+            assert all(r["for"] or r["offer"] >= worth.waiting_reserve(standing(inp, r["key"], value[r["key"]], r["offer"]),
                                                                      dist, n_closes) for r in takes_), "with closes left an offer is taken only at or above the reserve, or to fund a bid"
         if n_closes == 0:
             assert not waits and {r["key"] for r in takes_} == found.sells <= frozenset(offers), "no close left: every sale of the plan is taken"
@@ -916,6 +964,7 @@ def _selftest() -> None:
     _selftest_params()
     _selftest_alerts()
     _selftest_sells()
+    _selftest_settle()
     _selftest_replacements()
     _selftest_one_meaning()
     _selftest_world()

@@ -14,10 +14,11 @@ import numpy as np
 import numpy.typing as npt
 
 import decision
+import hurdle
 import salegrade
 import valuation
 import worth
-from board import context, later_sale, stamped
+from board import context, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
 from ffcore.clock import run_now
@@ -665,13 +666,13 @@ def first_sales(cuts: Sequence[Cut], rules: Mapping[str, worth.Rule]) -> dict[st
     for cut in cuts:
         for name, rule in rules.items():
             gone = {c.player for c in out[name]}
-            for standing in cut.standings:
-                if standing.player in gone or standing.offer is None:
+            for stood in cut.standings:
+                if stood.player in gone or stood.offer is None:
                     continue
-                reserve = rule(standing, cut.ctx).reserve
-                if reserve is not None and standing.offer >= reserve:
-                    out[name].append(Choice(standing.player, cut.at, standing.offer))
-                    gone.add(standing.player)
+                reserve = rule(stood, cut.ctx).reserve
+                if reserve is not None and stood.offer >= reserve:
+                    out[name].append(Choice(stood.player, cut.at, stood.offer))
+                    gone.add(stood.player)
     return out
 
 
@@ -681,39 +682,31 @@ def offers_at(world: state.World) -> worth.OfferDistribution:
     return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
 
 
-def buys_at(decided: decision.Decided, at: dt.datetime) -> worth.CutBuys:
-    """The buys of the decision at the moment at: each market opportunity with a bid, its gain and its bid."""
-    return worth.CutBuys(at, [worth.Buy(r["gain"], r["bid"]) for r in decision.opportunity_rows(decided.inputs)
-                              if r["status"] == "market" and r["bid"] is not None])
-
-
 def replayed_cut(decided: decision.Decided | decision.Stale, offers: worth.OfferDistribution = worth.NO_OFFERS,
-                 rate: float = worth.STOPGAP_RATE) -> Cut | None:
+                 rate: float = hurdle.FALLBACK_LAMBDA) -> Cut | None:
     """The Cut of a decision that has standing offers on my players (rule replayed_cut_needs_offers: its extras'
     offers), so the context (with the offers distribution and exchange rate given) and the later sale prices are those of
     the cut; None for a Stale cut or one with no offer."""
     at = None if isinstance(decided, decision.Stale) else snapshot_stamp(decided.cut)
     if isinstance(decided, decision.Stale) or at is None or not decided.extras.offers:
         return None
-    standings = [worth.Standing(o.player, o.value, o.money, later_sale(decided.inputs, o.player, o.value))
-                 for o in decided.extras.offers]
+    standings = [standing(decided.inputs, o.player, o.value, o.money) for o in decided.extras.offers]
     return Cut(at + MINUTE, context(decided.inputs, offers, rate), standings)
 
 
 def replayed_cuts(loaded: loader.Loaded, cuts: Sequence[str]) -> list[Cut]:
     """The Cut (replayed_cut) of each cut that has one, ascending, from one streamed replay, each with the offers seen by
-    its cut (offers_at) and the exchange rate at it (worth.r_estimate over the buys of the cuts up to it, carrying the
-    rate of the Cut before it); only the Cuts and the buys are kept."""
+    its cut (offers_at) and the exchange rate at it (hurdle.lam over the opportunity records kept before it); only the
+    Cuts are kept."""
     out: list[Cut] = []
-    seen: list[worth.CutBuys] = []
+    history = loader.daily_opportunities(hurdle.SINCE, max(cuts, default=hurdle.SINCE))
 
     def keep(world: state.World) -> None:
         decided = decision.decision_at(loaded, world)
-        at = None if isinstance(decided, decision.Stale) else snapshot_stamp(world.cut)
-        if isinstance(decided, decision.Stale) or at is None:
+        if isinstance(decided, decision.Stale):
             return
-        seen.append(buys_at(decided, at))
-        cut = replayed_cut(decided, offers_at(world), worth.r_estimate(seen, at + MINUTE, out[-1].ctx.rate if out else worth.STOPGAP_RATE))
+        _, cells = decision.cells_of(decided.inputs)
+        cut = replayed_cut(decided, offers_at(world), hurdle.lam(history, world.cut, max(cells, default=0)))
         if cut is not None:
             out.append(cut)
     state.sweep(loaded.obs, cuts, keep)
@@ -745,7 +738,7 @@ def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> Rul
                       {group: graded_sales(members, now, fielded, facts) for group, members in groups.items()})
 
 
-PAIRED_RULE = "bench_option"
+PAIRED_RULE = "rent"
 PAIRED_CASE = "bench"
 
 

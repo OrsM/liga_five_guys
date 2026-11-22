@@ -141,7 +141,12 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
 - **`board.py`** (stage `board`): `decisions.json` from the league at t: `cash`, `can_bid` (cash plus 20% of team
   value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada, `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
-  offer on your players ranked by the points the sale loses per million it raises, each row typed: `delta`
+  offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (his yield, the points the sale loses plus
+  S x LAMBDA x n x his expected price change over at most 7 nights capped at +-3%, per million of the offer per jornada, is
+  under LAMBDA/1.15: the offer reaches `reserve`, `hurdle.sale_price`; a sale that loses points also needs a use for the
+  cash, a buy it funds tonight or the lock cover), wait (a sell whose offer is under 1.0 of value and the 0.5 percentile
+  and funds nothing tonight: waiting is free), hold, or needs_replacement; `points_lost`, `rent` (the points the money
+  earns at LAMBDA over n), sells first, then by the points the sale loses per million it raises; each row typed: `delta`
   (`points` over the season, `window` over lock, next4 and season, `gap` the jornadas left without a legal eleven; all
   null when the squad after the sale has no legal eleven), `feasible`, `why_infeasible` (`"no_eleven"`), `facts` (a list of
   `[label, value, kind]`, the page reads fields never prose), and `replacement` for a sale that leaves no eleven: the best

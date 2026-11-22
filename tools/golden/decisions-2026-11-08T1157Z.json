@@ -110,6 +110,11 @@
      "count"
     ],
     [
+     "sale price",
+     -30734.672773720882,
+     "money"
+    ],
+    [
      "points, lock",
      0.0,
      "points"
@@ -140,10 +145,13 @@
    "per": "season",
    "per_million": 0.0,
    "plan": false,
+   "points_lost": 0.0,
    "pos": "DEF",
    "ratio": 1.015893991944759,
+   "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": -30734.672773720882,
    "risk": {
     "below_points": 30.34434467,
     "low_inflow": 4039992.2266826527,
@@ -155,6 +163,7 @@
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
+   "verdict": "sell",
    "waiting": null,
    "what": "sell",
    "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, bringing it to 2543478 at the lock (the credit due, 5577912 expected, counted), losing 14.1 points; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand",
@@ -252,88 +261,6 @@
   {
    "accepts": [],
    "act": [],
-   "amount": 644149.0,
-   "delta": {
-    "gap": [],
-    "points": 0.0,
-    "window": {
-     "lock": 0.0,
-     "next4": 0.0,
-     "season": 0.0
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     662478.0,
-     "money"
-    ],
-    [
-     "offer",
-     644149.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9723326661413662,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "points, lock",
-     0.0,
-     "points"
-    ],
-    [
-     "points, next4",
-     0.0,
-     "points"
-    ],
-    [
-     "points, season",
-     0.0,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [],
-   "gain": 0.0,
-   "key": "11579",
-   "label": "sell Arnau Ortiz",
-   "more": false,
-   "name": "Arnau Ortiz",
-   "offer": 644149.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.0,
-   "plan": false,
-   "pos": "DEL",
-   "ratio": 0.9723326661413662,
-   "replacement": null,
-   "replacement_why_not": null,
-   "step": "take offer",
-   "trace": null,
-   "trend": 0.18561000848040757,
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
    "amount": 1576701.0,
    "delta": {
     "gap": [],
@@ -373,6 +300,11 @@
      "count"
     ],
     [
+     "sale price",
+     -30734.672773720882,
+     "money"
+    ],
+    [
      "points, lock",
      0.0,
      "points"
@@ -402,13 +334,108 @@
    "per": "season",
    "per_million": 0.0,
    "plan": false,
+   "points_lost": 0.0,
    "pos": "DEF",
    "ratio": 1.015893991944759,
+   "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": -30734.672773720882,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "amount": 644149.0,
+   "delta": {
+    "gap": [],
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     662478.0,
+     "money"
+    ],
+    [
+     "offer",
+     644149.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9723326661413662,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "sale price",
+     1201.9588988612684,
+     "money"
+    ],
+    [
+     "points, lock",
+     0.0,
+     "points"
+    ],
+    [
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
+     0.0,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [],
+   "gain": 0.0,
+   "key": "11579",
+   "label": "sell Arnau Ortiz",
+   "more": false,
+   "name": "Arnau Ortiz",
+   "offer": 644149.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.0,
+   "plan": false,
+   "points_lost": 0.0,
+   "pos": "DEL",
+   "ratio": 0.9723326661413662,
+   "rent": 0.7536543299999999,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserve": 1201.9588988612684,
+   "step": "take offer",
+   "trace": null,
+   "trend": 0.18561000848040757,
+   "verdict": "wait",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -455,6 +482,11 @@
      "count"
     ],
     [
+     "sale price",
+     8086277.628148169,
+     "money"
+    ],
+    [
      "points, lock",
      -0.7693931315254829,
      "points"
@@ -484,13 +516,17 @@
    "per": "season",
    "per_million": 0.3705824541157356,
    "plan": false,
+   "points_lost": 8.44978950471318,
    "pos": "DEL",
    "ratio": 0.976677574954734,
+   "rent": 26.67760875,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 8086277.628148169,
    "step": "take offer",
    "trace": null,
    "trend": -0.9599715530509632,
+   "verdict": "wait",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -537,6 +573,11 @@
      "count"
     ],
     [
+     "sale price",
+     21623319.361850277,
+     "money"
+    ],
+    [
      "points, lock",
      0.0,
      "points"
@@ -566,13 +607,17 @@
    "per": "season",
    "per_million": 0.4536585746929794,
    "plan": false,
+   "points_lost": 21.40752526653864,
    "pos": "DEL",
    "ratio": 1.0458380507121436,
+   "rent": 55.21069359,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 21623319.361850277,
    "step": "take offer",
    "trace": null,
    "trend": 1.3189711608554608,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -619,6 +664,11 @@
      "count"
     ],
     [
+     "sale price",
+     2417433.6015728926,
+     "money"
+    ],
+    [
      "points, lock",
      0.0,
      "points"
@@ -648,13 +698,17 @@
    "per": "season",
    "per_million": 0.47508556248471323,
    "plan": false,
+   "points_lost": 2.5358789345270907,
    "pos": "DEF",
    "ratio": 0.9368184337529981,
+   "rent": 6.245145269999999,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 2417433.6015728926,
    "step": "take offer",
    "trace": null,
    "trend": -1.348355535307556,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -701,6 +755,11 @@
      "count"
     ],
     [
+     "sale price",
+     22415626.46634041,
+     "money"
+    ],
+    [
      "points, lock",
      -2.0251324513698776,
      "points"
@@ -730,13 +789,17 @@
    "per": "season",
    "per_million": 0.5087099600759681,
    "plan": false,
+   "points_lost": 23.418907624602298,
    "pos": "DEL",
    "ratio": 0.9573894399963531,
+   "rent": 53.86197258,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 22415626.46634041,
    "step": "take offer",
    "trace": null,
    "trend": -1.2828104837476024,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -783,6 +846,11 @@
      "count"
     ],
     [
+     "sale price",
+     22294459.076251302,
+     "money"
+    ],
+    [
      "points, lock",
      -0.900003188958415,
      "points"
@@ -812,13 +880,17 @@
    "per": "season",
    "per_million": 0.5452762359566229,
    "plan": false,
+   "points_lost": 21.816214840048133,
    "pos": "MED",
    "ratio": 0.9055025587290986,
+   "rent": 46.811083409999995,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 22294459.076251302,
    "step": "take offer",
    "trace": null,
    "trend": 1.9707289480553332,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -865,6 +937,11 @@
      "count"
     ],
     [
+     "sale price",
+     7551373.795481831,
+     "money"
+    ],
+    [
      "points, lock",
      0.0,
      "points"
@@ -894,13 +971,17 @@
    "per": "season",
    "per_million": 0.8574477128312984,
    "plan": false,
+   "points_lost": 7.8418815194993385,
    "pos": "MED",
    "ratio": 1.035674780139017,
+   "rent": 10.70036253,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 7551373.795481831,
    "step": "take offer",
    "trace": null,
    "trend": -1.812562856210546,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -947,6 +1028,11 @@
      "count"
     ],
     [
+     "sale price",
+     2528733.6127964347,
+     "money"
+    ],
+    [
      "points, lock",
      -0.3788409456838906,
      "points"
@@ -976,13 +1062,17 @@
    "per": "season",
    "per_million": 0.8693240749512403,
    "plan": false,
+   "points_lost": 2.567978970785589,
    "pos": "DEF",
    "ratio": 0.9224949877895684,
+   "rent": 3.45617415,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 2528733.6127964347,
    "step": "take offer",
    "trace": null,
    "trend": 0.1486109849343848,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1029,6 +1119,11 @@
      "count"
     ],
     [
+     "sale price",
+     31826560.20867677,
+     "money"
+    ],
+    [
      "points, lock",
      -0.02587325995741452,
      "points"
@@ -1058,13 +1153,17 @@
    "per": "season",
    "per_million": 0.8904354102732777,
    "plan": false,
+   "points_lost": 32.810527141930606,
    "pos": "DEF",
    "ratio": 0.9940102948032778,
+   "rent": 43.111848779999995,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 31826560.20867677,
    "step": "take offer",
    "trace": null,
    "trend": -1.167641877951558,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1111,6 +1210,11 @@
      "count"
     ],
     [
+     "sale price",
+     49510121.96432015,
+     "money"
+    ],
+    [
      "points, lock",
      -2.9558587848953763,
      "points"
@@ -1140,13 +1244,17 @@
    "per": "season",
    "per_million": 1.020393598607843,
    "plan": false,
+   "points_lost": 50.58267086194837,
    "pos": "DEF",
    "ratio": 0.9736207836390577,
+   "rent": 57.99891825,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 49510121.96432015,
    "step": "take offer",
    "trace": null,
    "trend": -0.41770354506100393,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1193,6 +1301,11 @@
      "count"
     ],
     [
+     "sale price",
+     23245342.569159728,
+     "money"
+    ],
+    [
      "points, lock",
      -2.1705803250185696,
      "points"
@@ -1222,13 +1335,17 @@
    "per": "season",
    "per_million": 1.1044056918691167,
    "plan": false,
+   "points_lost": 23.511702713852856,
    "pos": "MED",
    "ratio": 1.0760606059074382,
+   "rent": 24.908140529999997,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 23245342.569159728,
    "step": "take offer",
    "trace": null,
    "trend": 0.7009092811851191,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1275,6 +1392,11 @@
      "count"
     ],
     [
+     "sale price",
+     21249980.011011694,
+     "money"
+    ],
+    [
      "points, lock",
      -0.012976736738458783,
      "points"
@@ -1304,13 +1426,17 @@
    "per": "season",
    "per_million": 1.1242492253967895,
    "plan": false,
+   "points_lost": 21.228761914468123,
    "pos": "DEL",
    "ratio": 0.9507571395735427,
+   "rent": 22.092656039999998,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 21249980.011011694,
    "step": "take offer",
    "trace": null,
    "trend": 1.9785105195726127,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1357,6 +1483,11 @@
      "count"
     ],
     [
+     "sale price",
+     51302111.74154793,
+     "money"
+    ],
+    [
      "points, lock",
      -3.2064426778817676,
      "points"
@@ -1386,13 +1517,17 @@
    "per": "season",
    "per_million": 1.151152946864309,
    "plan": false,
+   "points_lost": 51.257809738158585,
    "pos": "MED",
    "ratio": 0.942703305364462,
+   "rent": 52.09701938999999,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 51302111.74154793,
    "step": "take offer",
    "trace": null,
    "trend": 1.9936865166470912,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1439,6 +1574,11 @@
      "count"
     ],
     [
+     "sale price",
+     28573921.90132202,
+     "money"
+    ],
+    [
      "points, lock",
      0.0,
      "points"
@@ -1468,13 +1608,17 @@
    "per": "season",
    "per_million": 1.157154416266046,
    "plan": false,
+   "points_lost": 29.257363816730503,
    "pos": "DEF",
    "ratio": 1.0821252993094936,
+   "rent": 29.58215013,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 28573921.90132202,
    "step": "take offer",
    "trace": null,
    "trend": -0.802633666539891,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1521,6 +1665,11 @@
      "count"
     ],
     [
+     "sale price",
+     14494592.382523905,
+     "money"
+    ],
+    [
      "points, lock",
      -0.49278167433939757,
      "points"
@@ -1550,13 +1699,17 @@
    "per": "season",
    "per_million": 1.3570049179703403,
    "plan": false,
+   "points_lost": 14.674587403700116,
    "pos": "MED",
    "ratio": 0.8980726317529102,
+   "rent": 12.65232501,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 14494592.382523905,
    "step": "take offer",
    "trace": null,
    "trend": 0.6019579764866829,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1603,6 +1756,11 @@
      "count"
     ],
     [
+     "sale price",
+     81847261.29565616,
+     "money"
+    ],
+    [
      "points, lock",
      -6.523988901787966,
      "points"
@@ -1632,13 +1790,17 @@
    "per": "season",
    "per_million": 4.570126474689432,
    "plan": false,
+   "points_lost": 83.45508412443019,
    "pos": "POR",
    "ratio": 0.9908845786385786,
+   "rent": 21.36537117,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 81847261.29565616,
    "step": "take offer",
    "trace": null,
    "trend": -1.0060886321197136,
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
