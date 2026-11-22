@@ -289,25 +289,57 @@ def ranked(lines: Sequence[Doc]) -> tuple[list[Doc], int]:
 
 class Stance(NamedTuple):
     """Where a buy's bid stands: the bid the line is on (yours once one is placed, else the advised) and its chance,
-    the bid advised and its chance, and the move: bid (none placed), pass (none placed and none advised: not a buy),
-    over (yours is above the walk-away price), raise (the advised is over yours) or hold. A bid placed is never replaced
-    by a lower one: lowering it is not advised. With no curve for his auction nothing is advised and no chance is known
-    (None): the move is hold on a bid placed, else unknown."""
+    the bid advised and its chance, the move and `to`, the amount a lower or a raise moves a placed bid to (else None).
+    The move of a listing with no bid placed is bid, or pass (none advised: not a buy). The move of a bid placed is
+    hurdle.stand's: hold, lower, withdraw or raise, read at the walk-away price cap (0 when the player has none). With no
+    curve for his auction no chance is known (None) and nothing is advised: a bid placed is lower above cap, else hold,
+    and a listing with none placed is unknown."""
     amount: float | None
     win: float | None
     advised: float | None
     advised_win: float | None
     move: str
+    to: float | None = None
 
 
 def stance(r: dict[str, Any], curve: Curve | None, cap: float | None) -> Stance:
     placed, advised, advised_win = r["placed"], r["bid"], r["win"]
     if curve is None:
-        return Stance(placed, None, None, None, "unknown" if placed is None else "hold")
+        move = "unknown" if placed is None else "lower" if cap is not None and placed > cap else "hold"
+        return Stance(placed, None, None, None, move)
     if placed is None:
         return Stance(advised, advised_win, advised, advised_win, "pass" if advised is None else "bid")
-    move = "over" if cap is not None and placed > cap else "raise" if advised is not None and advised > placed else "hold"
-    return Stance(placed, chance(curve, placed / r["asking"]), advised, advised_win, move)
+    got = hurdle.stand(curve, r["asking"], placed, cap or 0.0)
+    return Stance(placed, chance(curve, placed / r["asking"]), advised, advised_win, got.move, got.to)
+
+
+def millions(x: float) -> str:
+    """An amount in euros in words, in millions to one decimal."""
+    return "%.1f million" % (x / 1e6)
+
+
+def stance_why(at: Stance, cap: float | None, rate_yield: float | None, curve: Curve | None, asking: float) -> str | None:
+    """The words for a bid placed, with the numbers: the amount and its chance, the walk-away price and the yield, then
+    the move (hold, lower to an amount, raise to an amount or withdraw) with the expected surplus (chance x (walk-away
+    price - amount)) behind it; None for a listing with no bid placed."""
+    if at.amount is None or at.move in ("bid", "pass", "unknown"):
+        return None
+    away = "no walk-away price" if cap is None else "a walk-away price of " + millions(cap)
+    yld = "" if rate_yield is None else " and a yield of %.3f points per million per jornada" % rate_yield
+    base = "Your bid of %s has %s" % (millions(at.amount), "an unknown chance" if at.win is None else "a %.0f%% chance" % (100 * at.win))
+    base += ", against %s%s. " % (away, yld)
+    if cap is None or curve is None or at.win is None:
+        return base + ("Lower it: it is above the walk-away price." if at.move == "lower" else "Keep it: no chance is known for this auction.")
+    surplus = at.win * (cap - at.amount)
+    own = "an expected surplus of %s" % millions(surplus)
+    if at.move == "hold":
+        return base + "It leaves %s: keep it." % own
+    if at.move == "withdraw":
+        return base + "No bid of %s up has a positive expected surplus under that price (yours leaves %s): withdraw it." % (millions(asking), own)
+    assert at.to is not None
+    there = chance(curve, at.to / asking)
+    other = "a bid of %s has a %.0f%% chance and an expected surplus of %s" % (millions(at.to), 100 * there, millions(there * (cap - at.to)))
+    return base + "Yours leaves %s; %s: %s it to %s." % (own, other, at.move, millions(at.to))
 
 
 def priced(r: dict[str, Any], rate: float, last: int) -> Doc:
@@ -320,10 +352,12 @@ def priced(r: dict[str, Any], rate: float, last: int) -> Doc:
 
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], base: Approach | None,
               rate: float = hurdle.FALLBACK_LAMBDA) -> tuple[list[Doc], int]:
-    """The buys of the board (ranked) and the count considered and left out. The players on the market with an asking price and a
+    """The buys of the board and the count considered and left out. The players on the market with an asking price and a
     gain, best gain first, each read at rate (priced); those the rate passes (move pass: no bid advised and none placed) are
-    counted, not shown. Of the others the first EVALUATED_BUYS with a bid get an Approach and a net against the plan with no
-    buy (base); the rest a net None, labelled GAIN_ONLY (UNFUNDED when no sales fund the bid)."""
+    counted, not shown. A bid placed is never counted out: its line (a move of hold, lower, withdraw or raise, a `why` in
+    words) is first, whatever its gain or net, even on a player with no gain. Of the lines the first EVALUATED_BUYS with a
+    bid get an Approach and a net against the plan with no buy (base); the rest a net None, labelled GAIN_ONLY (UNFUNDED
+    when no sales fund the bid). The others are ranked."""
     pos, cells = decision.cells_of(inp)
     locks = decision.lock_times(inp)
     curves = decision.curves_of(inp)
@@ -331,11 +365,13 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     bids = {b.player: b.amount for b in inp.bids}
     cost0 = base_cost(base)
     last = max(cells, default=0)
-    read = {r["player"]: priced(r, rate, last) for r in got if r["status"] == "market" and r["asking"] is not None and r["gain"] > 0}
+    read = {r["player"]: priced(r, rate, last) for r in got
+            if r["status"] == "market" and r["asking"] is not None and (r["gain"] > 0 or r["placed"] is not None)}
     stood = {k: stance(r, curves.get(k), read[k]["walk_away"]) for r in got if (k := r["player"]) in read}
     passed = sum(1 for at in stood.values() if at.move == "pass")
     out = []
-    for i, r in enumerate([r for r in got if r["player"] in read and stood[r["player"]].move != "pass"]):
+    mine = [r for r in got if r["player"] in read and r["placed"] is not None]
+    for i, r in enumerate(mine + [r for r in got if r["player"] in read and r["placed"] is None and stood[r["player"]].move != "pass"]):
         k, placed = r["player"], r["placed"]
         at = stood[k]
         amount, win = at.amount, at.win
@@ -351,7 +387,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         out.append({
             "name": name, "pos": r["pos"], "what": "buy", "label": "buy " + name, "step": "placed" if placed is not None else "bid",
             "price": r["asking"], "asking": r["asking"], "amount": amount, "win": win, "advised": at.advised, "advised_win": at.advised_win,
-            "move": at.move, "plan": False, "done": placed is not None,
+            "move": at.move, "to": at.to, "why": stance_why(at, read[k]["walk_away"], read[k]["yield"], curves.get(k), r["asking"]), "plan": False, "done": placed is not None,
             "key": k, "gain": r["gain"], "net": net, "net_label": label, "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
             "replaces": names.get(r["replaces"], r["replaces"]), "per_million": r["per_million"], **read[k],
             "price_next": r["price_next"], "price_lock": r["price_lock"],
@@ -363,8 +399,9 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
             "auction": {"yours": bool(auction.mine), "listings": auction.n, "thin": bool(auction.thin), "cell": auction.cell}
             if auction else {"yours": False, "listings": 0, "thin": True, "cell": ""},
             "funding": funding, "accepts": [], "act": []})
-    shown, left = ranked(out)
-    return shown, left + passed
+    placed_lines = [b for b in out if b["done"]]
+    shown, left = ranked([b for b in out if not b["done"]])
+    return placed_lines + shown, left + passed
 
 
 def target_lines(names: dict[str, str], got: list[dict[str, Any]], rate: float = hurdle.FALLBACK_LAMBDA, last: int = 0) -> list[Doc]:
@@ -878,6 +915,43 @@ def _selftest_buys() -> None:
             assert len(shown) + considered == len(lines), "every line is shown or counted"
 
 
+def _selftest_placed() -> None:
+    rng = random.Random(21)
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
+    market = {"%s%d" % (p, i): p for p in shape for i in range(10, 14)}
+    names = {k: k for k in squad | market}
+    ratios = (0.9, 1.0, 1.02, 1.05, 1.1, 1.2, 1.3, 1.5)
+    moves: set[str] = set()
+    for _ in range(40):
+        keys = sorted(market)
+        curves = [decision.CurvePoint(k, r, min(1.0, rng.choice([0.0, 0.1, 0.3]) + (r - 1.0) * rng.choice([0.5, 2.0, 5.0]))) for k in keys for r in ratios]
+        mine = {k: rng.choice([10e6, 10.4e6, 13e6, 25e6]) for k in rng.sample(keys, rng.randint(0, len(keys)))}
+        inp = _inp_of(squad, market)._replace(curves=curves, bids=[decision.Bid(k, a) for k, a in sorted(mine.items())])
+        pos, cells = decision.cells_of(inp)
+        club = Club(frozenset(squad), pos, {k: 4e6 for k in squad}, {}, 5e7, 1e8)
+        rate = rng.choice([0.045, 0.1, 0.3])
+        got = [{"player": k, "pos": market[k], "status": "market", "asking": 10e6, "bid": None, "win": None, "close_at": None, "replaces": "POR0",
+                "gain": rng.choice([0.0, 0.5, 3.0, 20.0, 60.0]), "per_million": None, "from_j": 1, "price_next": None, "price_lock": None,
+                "placed": mine.get(k)} for k in keys]
+        shown, considered = buy_lines(inp, names, club, got, None, rate)
+        assert [b["key"] for b in shown if b["done"]] == [b["key"] for b in shown[:len(mine)]], "a bid placed comes before the ranked rows"
+        assert {b["key"] for b in shown if b["done"]} == set(mine), "a bid placed is always a row of the buys"
+        curve_of = decision.curves_of(inp)
+        last = max(cells)
+        for b in shown[:len(mine)]:
+            n = hurdle.remaining(1, last)
+            cap = hurdle.walk_away(b["gain"], n, rate)
+            want = hurdle.stand(curve_of[b["key"]], 10e6, mine[b["key"]], cap)
+            assert (b["amount"], b["move"], b["to"], b["walk_away"]) == (mine[b["key"]], want.move, want.to, cap)
+            assert b["win"] == chance(curve_of[b["key"]], mine[b["key"]] / 10e6) and b["why"] and b["yield"] is None
+            assert not any(w in b["why"].lower() for w in ("take", "sell it")), "no verdict word the page forbids"
+            moves.add(b["move"])
+        assert all(b["why"] is None for b in shown[len(mine):]), "no words for a bid not placed"
+        assert considered + len(shown) - len(mine) <= len(market) - len(mine), "the count has no bid placed in it"
+    assert moves >= {"hold", "lower", "withdraw"}, moves
+
+
 def _selftest_cover() -> None:
     inp = decision.Inputs(decision.Money(0.0, 0.0, 0.0, 0, 0))
     rng = random.Random(14)
@@ -1034,21 +1108,20 @@ def _selftest() -> None:
     for placed in (None, 10e6, 10.5e6, 11e6, 12e6, 13e6):
         blind = stance({**row(placed), "bid": None, "win": None}, None, cap)
         assert (blind.amount, blind.win, blind.advised, blind.advised_win) == (placed, None, None, None), "no curve: no chance, nothing advised"
-        assert blind.move == ("unknown" if placed is None else "hold")
+        assert blind.move == ("unknown" if placed is None else "lower" if placed > cap else "hold")
         at = stance(row(placed), curve, cap)
         none = stance({**row(placed), "bid": None, "win": None}, curve, cap)
-        assert none.move == ("pass" if placed is None else "over" if placed > cap else "hold"), "no bid advised: pass, or keep yours"
         assert (at.advised, at.advised_win) == (advised, chance(curve, advised / asking)), "the advised bid is always said"
         if placed is None:
+            assert none.move == "pass" and none.to is None
             assert (at.amount, at.win, at.move) == (advised, at.advised_win, "bid"), "no bid placed: the advised one"
             continue
         assert at.amount == placed and at.win == chance(curve, placed / asking), "a bid placed is the line's, at its own chance"
-        assert at.move == ("over" if placed > cap else "raise" if advised > placed else "hold"), \
-            "a bid placed above the walk-away price is flagged, never lowered; otherwise the only move is up"
-        assert at.win is not None and at.advised_win is not None
-        assert at.move != "raise" or at.advised_win >= at.win, "a raise never lowers the chance"
+        assert at.move in ("hold", "lower", "withdraw", "raise") and none.move == at.move, "a bid placed is judged by the grid, not by the advice"
+        assert (at.to is None) == (at.move in ("hold", "withdraw"))
         (line,) = target_lines({}, [row(placed)], 0.045, 26)
         assert line["placed"] == placed, "a target with your bid on him says it beside the advised one"
+    _selftest_placed()
     print("board self-test OK")
 
 

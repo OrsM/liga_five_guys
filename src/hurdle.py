@@ -3,7 +3,8 @@ points per million per jornada remaining. A move's P is the points above the nex
 (Buyer.gain for a buy, the sale's lost points for a sale); its yield is P / (n x price in millions). A listing is bought
 iff its yield reaches margin(price) x LAMBDA; a sale is taken iff the player's yield, his expected price change
 counted at the rate, is under LAMBDA / MARGIN (sale_price); the walk-away price is S x P / (n x LAMBDA) and the bid
-the win-weighted surplus under it at its best (bid)."""
+the win-weighted surplus under it at its best (bid); a bid already placed is held, lowered, withdrawn or raised
+by the same surplus (stand)."""
 from __future__ import annotations
 
 import random
@@ -13,7 +14,7 @@ from collections.abc import Iterable
 from datetime import timedelta
 from typing import NamedTuple
 
-from ffcore.auction import Curve
+from ffcore.auction import Curve, chance
 from ffcore.loader import Opportunity
 from ffcore.parse import snapshot_stamp, stamp
 
@@ -89,14 +90,9 @@ class Bid(NamedTuple):
     win: float
 
 
-def bid(curve: Curve, asking: float, points: float, n: int, rate: float) -> Bid | None:
-    """The bid on a listing at asking whose P is points over n jornadas, at rate: over the curve's points (ratio over
-    asking, chance) with a ratio of 1 or more, the one with the most chance x (walk_away - asking x ratio), the lowest
-    ratio on ties; None when the listing is not bought (buys), when that most is not positive or when its chance is
-    under WIN_FLOOR. A bid is never above the walk-away price nor under the asking price."""
-    if not buys(points, n, asking, rate):
-        return None
-    cap = walk_away(points, n, rate)
+def best_on_grid(curve: Curve, asking: float, cap: float) -> tuple[float, float, float] | None:
+    """The (surplus, ratio, chance) of the curve's point with a ratio of 1 or more that has the most chance x
+    (cap - asking x ratio), the lowest ratio on ties; None when the curve has no such point."""
     best: tuple[float, float, float] | None = None
     for r, p in curve:
         if r < 1.0:
@@ -104,9 +100,50 @@ def bid(curve: Curve, asking: float, points: float, n: int, rate: float) -> Bid 
         score = p * (cap - asking * r)
         if best is None or score > best[0]:
             best = (score, r, p)
+    return best
+
+
+def bid(curve: Curve, asking: float, points: float, n: int, rate: float) -> Bid | None:
+    """The bid on a listing at asking whose P is points over n jornadas, at rate: the best_on_grid point under the
+    walk-away price; None when the listing is not bought (buys), when its surplus is not positive or when its chance is
+    under WIN_FLOOR. A bid is never above the walk-away price nor under the asking price."""
+    if not buys(points, n, asking, rate):
+        return None
+    best = best_on_grid(curve, asking, walk_away(points, n, rate))
     if best is None or best[0] <= 0 or best[2] < WIN_FLOOR:
         return None
     return Bid(asking * best[1], best[2])
+
+
+class Stand(NamedTuple):
+    """What to do with a bid placed: move (hold, lower, withdraw or raise), to (the amount to move it to: the
+    best_on_grid amount for lower and raise, None otherwise), surplus (chance x (walk-away - placed) at the placed
+    amount) and to_surplus and to_win (at `to`; None without one)."""
+    move: str
+    to: float | None
+    surplus: float
+    to_surplus: float | None
+    to_win: float | None
+
+
+def stand(curve: Curve, asking: float, placed: float, cap: float) -> Stand:
+    """The move for a bid placed at `placed` on a listing at asking with walk-away price cap. withdraw iff no point of
+    the grid has a positive surplus. Otherwise lower (to the best_on_grid amount) when placed is above cap, and raise
+    (to it) when the placed surplus is not positive and the best amount is above placed, or when that amount is above
+    the grid point at or over placed and has a surplus strictly above the placed one; else hold: a placed bid at or
+    under cap with a positive surplus is never lowered. The surplus is read at the placed amount's own chance."""
+    here = chance(curve, placed / asking) * (cap - placed)
+    best = best_on_grid(curve, asking, cap)
+    if best is None or best[0] <= 0:
+        return Stand("withdraw", None, here, None, None)
+    top, ratio, win = best
+    to = asking * ratio
+    over = [r for r, _ in curve if r >= 1.0 and asking * r >= placed]
+    if placed > cap or (here <= 0 and to <= placed):
+        return Stand("lower", to, here, top, win)
+    if here <= 0 or (top > here and over and to > asking * min(over)):
+        return Stand("raise", to, here, top, win)
+    return Stand("hold", None, here, None, None)
 
 
 def drift(rise: float | None) -> float:
@@ -205,7 +242,43 @@ def _selftest_sale() -> None:
     assert sale_price(0.0, 5, 1e6, None, 0.045) == 0.0, "no points, no trend: any offer"
 
 
+def _selftest_stand() -> None:
+    rng = random.Random(12)
+    seen: dict[str, int] = {}
+    for _ in range(4000):
+        grid = (1.0, 1.02, 1.05, 1.1, 1.2, 1.3, 1.5)
+        curve = tuple((r, min(1.0, rng.choice([0.0, 0.1, 0.3]) + (r - 1.0) * rng.choice([0.5, 2.0, 5.0]))) for r in (0.9, *grid))
+        asking = rng.choice([0.6e6, 8e6, 40e6])
+        cap = asking * rng.uniform(0.7, 1.8)
+        placed = asking * rng.choice([1.0, 1.05, 1.07, 1.2, 1.4, 1.6, 2.0])
+        got = stand(curve, asking, placed, cap)
+        seen[got.move] = seen.get(got.move, 0) + 1
+        scores = [(p * (cap - asking * r), asking * r) for r, p in curve if r >= 1.0]
+        top = max(s for s, _ in scores)
+        assert (got.move == "withdraw") == (top <= 0), "withdraw iff no bid of the grid has a positive surplus"
+        assert abs(got.surplus - chance(curve, placed / asking) * (cap - placed)) < 1e-6
+        if got.move == "withdraw":
+            assert got.to is None and got.to_surplus is None
+            continue
+        if got.move in ("lower", "raise"):
+            assert got.to is not None and got.to_surplus is not None and abs(got.to_surplus - top) < 1e-6, "to is the grid's own argmax"
+            assert got.to <= cap + 1e-6 and (got.to < placed) == (got.move == "lower")
+        if got.move == "raise":
+            assert got.to_surplus is not None and got.to_surplus > got.surplus, "a raise is to a strictly higher surplus"
+        if got.move == "hold":
+            assert placed <= cap + 1e-6 and got.surplus > 0 and got.to is None, "a hold is at or under the walk-away with a positive surplus"
+        if placed > cap:
+            assert got.move == "lower", "above the walk-away price with a bid worth making: lower"
+        if got.surplus > 0 and any(abs(placed - a) < 1e-6 and s >= top - 1e-9 for s, a in scores):
+            assert got.move == "hold", "at the best amount: hold"
+    assert all(seen.get(m, 0) > 50 for m in ("hold", "lower", "withdraw", "raise")), seen
+    flat = ((1.0, 0.5), (1.1, 1.0))
+    assert stand(flat, 10e6, 10e6, 10e6) == Stand("withdraw", None, 0.0, None, None)
+    assert stand(flat, 10e6, 13e6, 12e6).move == "lower" and stand(flat, 10e6, 13e6, 12e6).to == 10e6
+
+
 def _selftest() -> None:
+    _selftest_stand()
     _selftest_lam()
     _selftest_buy()
     _selftest_sale()
