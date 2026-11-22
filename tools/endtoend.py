@@ -62,6 +62,7 @@ def _selftest() -> None:
         doc = board(inp, got, decision.arrivals(got, loaded.previous), d.extras, health_at(loaded, cut()))
         assert len(doc["squad"]) == len(mine) and sum(r["xi"] for r in doc["squad"]) == 11, "your squad and its eleven"
         assert {"generated_at", "market_at", "sources", "cash", "can_bid", "lock_at", "do", "buys", "sells"} <= set(doc), doc
+        assert "market" not in doc, "the market block is gone: one exchange rate, `lambda`"
         (line,) = doc["sells"]
         assert (line["label"], line["step"], line["offer"]) == ("sell A0", "take offer", 3.3e6), line
         assert abs(line["ratio"] - 1.1) < 1e-9, "the standing offer on one of yours, over his value"

@@ -203,7 +203,10 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   exposed and unconsumed.
 - **Not true any more:** the horizon of 8 jornadas (`board.AHEAD`, `worth.PER_MILLION_AHEAD`), the sale note strings
   (`offer_note`), the `INF` cost, `eleven.remove*`, `worth.lost_points`, the recommender, `plan_rows`, `worth_on`, the ledger and sale due times, `sim_*` and
-  `decision_*` tables, the hold, the line-up reminder (`remind.py`, `lock_due`, `lineup_alert`).
+  `decision_*` tables, the hold, the line-up reminder (`remind.py`, `lock_due`, `lineup_alert`); since 2026-11-22 (one
+  exchange rate, `hurdle.py`): `rules.BID_TARGET` and `auction.bid_for` (the 0.90-chance bid), `worth.points_per_million`,
+  the r06 rules, `bench_option`, `STOPGAP_RATE`, `r_estimate`, `best_yield`, `grading.buys_at`, `market.py` (PAR, kappa,
+  the graded replacement level), `tools/market-grade` and the `market` key of decisions.json.
 
 Sections 5, 7 and 8 describe the planner removed on 2026-11-08; they are kept as the record of why it was built.
 
