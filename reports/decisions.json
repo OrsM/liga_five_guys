@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-22T21:30Z",
- "market_at": "2026-11-22T21:30Z",
+ "generated_at": "2026-11-22T21:39Z",
+ "market_at": "2026-11-22T21:39Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-22T21:30Z",
+   "at": "2026-11-22T21:39Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -55,7 +55,7 @@
  "cash": -35998765.0,
  "cash_locked": 0,
  "can_bid": 57864998.400000006,
- "ping": "on the market: Marc Bartra (+47 points), Cristian Romero (+45 points), Mario Soriano (+42 points), Yuri Berchiche (+37 points), Orri Steinn Oskarsson (+4 points), Roger Hinojo (+4 points), Andreas Christensen (+1 points)",
+ "ping": "",
  "do": [
   {
    "what": "wait",
@@ -449,64 +449,7 @@
   }
  ],
  "lambda": 0.045,
- "alerts": [
-  {
-   "name": "Marc Bartra",
-   "gain": 46.82868031883398,
-   "asking": 38094239.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Cristian Romero",
-   "gain": 44.909467055646886,
-   "asking": 37144244.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Mario Soriano",
-   "gain": 41.94809723306555,
-   "asking": 60452153.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Yuri Berchiche",
-   "gain": 36.826349732474334,
-   "asking": 31718724.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Orri Steinn Oskarsson",
-   "gain": 4.458309976585802,
-   "asking": 6321163.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Roger Hinojo",
-   "gain": 3.7032180096019403,
-   "asking": 1207865.0,
-   "bid": 1207865.0,
-   "win": 1.0,
-   "placed": null
-  },
-  {
-   "name": "Andreas Christensen",
-   "gain": 1.2956466075020359,
-   "asking": 3141847.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  }
- ],
+ "alerts": [],
  "auction": {
   "brier": [
    {
