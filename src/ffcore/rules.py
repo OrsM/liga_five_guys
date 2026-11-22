@@ -61,9 +61,10 @@ def bid_margin(cash: float, raised: float, team_value: float, sold_worth: float,
     return bid_limit(cash + raised, team_value - sold_worth, debt) - pending - bid
 
 
-def cash_at_lock(cash: float, raised: float, bid: float, later: float) -> float:
-    """Cash at the lock after tonight's sales (raised), the bid won (bid) and the sales made by then (later): 0 or more."""
-    return cash + raised - bid + later
+def cash_at_lock(cash: float, raised: float, bid: float, later: float, inflow: float = 0.0) -> float:
+    """Cash at the lock after tonight's sales (raised), the bid won (bid), the sales made by then (later) and the bonuses
+    credited by then (inflow, 0 when none): 0 or more. Nondecreasing in raised, later and inflow."""
+    return cash + raised - bid + later + inflow
 
 
 def in_force(locks: dict[int, str], jornada: int, due: str | None) -> bool:
@@ -99,6 +100,7 @@ def _selftest() -> None:
     assert bid_margin(-50e6, 100e6, 400e6, 100e6, 150e6) == bid_limit(50e6, 300e6) - 150e6 and bid_margin(0.0, 0.0, 0.0, 0.0, 5.0) == -5.0
     assert bid_margin(10e6, 0.0, 100e6, 0.0, 5e6, pending=3e6) == 10e6 + DEBT_SHARE * 100e6 - 8e6, "pending bids count against the limit"
     assert cash_at_lock(-5.0, 20.0, 12.0, 0.0) == 3.0 and cash_at_lock(-5.0, 20.0, 12.0, 4.0) == 7.0
+    assert cash_at_lock(-5.0, 20.0, 12.0, 4.0, 6.0) == 13.0 and cash_at_lock(-5.0, 20.0, 12.0, 4.0, 0.0) == cash_at_lock(-5.0, 20.0, 12.0, 4.0)
     print("ffcore.rules self-test OK")
 
 

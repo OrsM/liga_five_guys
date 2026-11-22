@@ -39,7 +39,7 @@ jornada; the **lock** is the checkpoint.
 | field | the lock | at the lock |
 
 Not established: whether the game ever buys an unlisted player itself, a bid's tie-breaks, whether a line-up edit
-after the lock is possible, what the 100k cash bumps are, bonus income.
+after the lock is possible, what the 100k cash bumps are.
 
 ## 2. What the machine models, and the measured facts [model, plan-datasette]
 
@@ -121,6 +121,17 @@ kept as the historic proof; it is not run any more.
 concept held as mutable state is a fault. Layers: facts -> forecast -> decision -> board/grading. The parse cache
 rebuilt from `data/raw`, the record store beside `data/`; `tools/peek.py` looks things up. Money is whole euros as INTEGER. Pages stay one renderer
 (`Fantasy.jsx`).
+
+## 3b. The bonus credit (#139, #140, 2026-11-22)
+
+After each jornada the game pays every manager `inflow.BONUS_PER_POINT` (100,000) times the points of his eleven's jornada score, at
+04:40 Madrid on the morning after the jornada's last match (10 of the 12 credits seen fit; jornadas 1 and 6, with postponed matches, were
+paid earlier than their last kickoff, so the rule undercounts there), and it is part of cash once credited. `inflow.Inflow` is the
+credit due after the cut and by the next lock: its expected (points so far from the standings' `fixture_points` plus the forecast of the
+fielded eleven's players whose club kicks off after the cut), its low case (10th percentile; spread `JORNADA_SD` = 12 points over a whole
+jornada, scaled by the square root of the eleven's share still to play) and `inflow.risk_of`. `Club.inflow` enters `rules.cash_at_lock`:
+a plan is feasible when cash at the lock is 0 or more at the EXPECTED credit; the board flags the risk (`risk` on `base` and the `do`
+lines: low_inflow, p_short, shortfall_if_low, below_points) and says it in the `why`.
 
 ## 4. The board: cash, offers, funding a buy (2026-11-08)
 

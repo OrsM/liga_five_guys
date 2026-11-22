@@ -33,6 +33,7 @@ from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve, bid_for
 from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
 import valuation
+from inflow import Credit, credit_at
 from valuation import Window, window_at
 
 __all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "arrival", "window_value", "curves_of", "opportunity_rows",
@@ -121,7 +122,7 @@ class Price(NamedTuple):
 class Inputs(NamedTuple):
     """The league at t as the decision reads it: your money, a sequence of named rows a dec_* table, the cells
     (player, jornada, e), every player who is not yours with his status (market, rival, unlisted), and each player's
-    price forecast."""
+    price forecast, and the bonus credits that land before the next lock (inflow.Credit)."""
     money: Money
     players: Sequence[Player] = ()
     curves: Sequence[CurvePoint] = ()
@@ -133,6 +134,7 @@ class Inputs(NamedTuple):
     cells: Sequence[Cell] = ()
     universe: Sequence[Candidate] = ()
     prices: Sequence[Price] = ()
+    credits: Sequence[Credit] = ()
 
 
 def julian_stamp(t: float) -> str:
@@ -208,16 +210,52 @@ def prices_of(expected: Iterable[Expected]) -> list[Price]:
     return [Price(e.ff_id, e.h, e.expected_value, e.value) for e in expected]
 
 
+def credits_from(cut: str, lock: str, started: Mapping[int, str], last: Mapping[int, str], unknown: Iterable[int],
+                 later: Mapping[int, frozenset[str]], scored: float) -> list[Credit]:
+    """The Credits of the jornadas whose credit lands after the cut and by the lock: of the `started` jornadas (each its lock, at or
+    before the cut) those with a `last` kickoff known and not in `unknown` (a fixture left with no kickoff), at inflow.credit_at that
+    kickoff, strictly after the cut (a stamp, as colon_stamp writes it) and at most the lock. `scored` is the points the team has in
+    the jornada with the latest lock (0 for any other); `later[j]` the players with a match in j to kick off."""
+    now, held = colon_stamp(cut), set(unknown)
+    latest = max(started, key=lambda j: (started[j], j), default=None)
+    ahead = ((j, credit_at(last[j])) for j in sorted(started) if j in last and j not in held)
+    return [Credit(j, at, scored if j == latest else 0.0, tuple(sorted(later.get(j, ())))) for j, at in ahead if now < at <= lock]
+
+
+def credits_of(world: state.World, league: League, fc: forecast_facts.Inputs, squad: frozenset[str], locks: Sequence[Lock]) -> list[Credit]:
+    """The bonus credits that land after the cut and by the first of `locks` (none when there is none), credits_from the World's
+    calendar, kickoffs and standings: `scored` the fixture points of your team in the standings (0 when the app has none), `later`
+    the players of `squad` whose club has a match in the jornada that kicks off after the cut (the results of matches played are not in
+    the data for hours; the points of a match under way are in `scored`)."""
+    if not locks:
+        return []
+    last: dict[int, str] = {}
+    for kick in season_facts.kickoffs(world):
+        last[kick.jornada] = max(last.get(kick.jornada, kick.kick), kick.kick)
+    club = {c.player: c.club for c in fc.clubs}
+    coming: dict[int, set[str]] = {}
+    for k in squad:
+        for f in fc.fixtures.get(club.get(k) or "", ()):
+            if f.kick is not None and f.kick > world.cut:
+                coming.setdefault(f.jornada, set()).add(k)
+    started = {c.jornada: c.lock for c in season_facts.jornada_calendar(world) if c.lock is not None and c.lock <= world.cut}
+    points = [s.fixture_points for s in current.standings(world) if s.manager == league.me and s.fixture_points is not None]
+    return credits_from(world.cut, min(x.lock for x in locks), started, last, {f.jornada for fs in fc.fixtures.values() for f in fs if f.kick is None},
+                        {j: frozenset(ks) for j, ks in coming.items()}, points[0] if points else 0.0)
+
+
 def inputs_at(world: state.World, identity: Identity, league: League, seen: Seen, fc: forecast_facts.Inputs) -> Inputs:
     """The decision's inputs at the world's cut: a pure function of the world, the seen facts and the forecast inputs,
     each fact computed once."""
     cells = [Cell(c.player, c.jornada, c.e) for c in forecast_facts.cell(fc)]
+    locks = locks_of(season_facts.round_locks(world), world.cut)
     return Inputs(
         money_of(seen, league), players=players_of(seen, league), curves=curve_points_of(seen), auctions=auctions_of(seen),
         bids=bids_of(seen), closes=closes_of(season_facts.listing_close(world, identity)),
-        locks=locks_of(season_facts.round_locks(world), world.cut), lineup=slots_of(current.app_lineup(world, identity)),
+        locks=locks, lineup=slots_of(current.app_lineup(world, identity)),
         cells=cells, universe=universe_of(seen, fc.clubs, league),
-        prices=prices_of(price_fold.price_forecast(price_fold.price_state(world), season_facts.next_lock(world).t)))
+        prices=prices_of(price_fold.price_forecast(price_fold.price_state(world), season_facts.next_lock(world).t)),
+        credits=credits_of(world, league, fc, frozenset(m.player for m in my_squad(seen, league)), locks))
 
 
 def squad_of(inp: Inputs) -> frozenset[str]:
@@ -706,8 +744,30 @@ def _selftest_arrivals_at() -> None:
         "b", "c", "old"], "market then, not an arrival; rival or older then, an arrival"
 
 
+def _selftest_credits() -> None:
+    cut, lock = "2026-11-21T2037Z", "2026-11-27T20:00Z"
+    started = {12: "2026-11-06T2000Z", 13: "2026-11-20T2000Z"}
+    last = {12: "2026-11-08T2000Z", 13: "2026-11-23T2000Z", 14: "2026-11-30T2000Z"}
+    later = {13: frozenset({"a", "b"})}
+    got = credits_from(cut, lock, started, last, (), later, 21.0)
+    assert [(c.jornada, c.at, c.scored, c.left) for c in got] == [(13, "2026-11-24T03:40Z", 21.0, ("a", "b"))], \
+        "a credit after the cut and by the lock: the jornada in progress, with its points so far and the players still to play"
+    assert credits_from(cut, lock, started, last, (13,), later, 21.0) == [], "a fixture left with no kickoff: the end is unknown, no credit"
+    assert credits_from(cut, "2026-11-24T03:39Z", started, last, (), later, 21.0) == [], "a credit after the lock is not counted"
+    assert len(credits_from(cut, "2026-11-24T03:40Z", started, last, (), later, 21.0)) == 1, "one landing at the lock is"
+    assert credits_from("2026-11-24T0340Z", lock, started, last, (), later, 21.0) == [], "one landed by the cut is in the cash already"
+    assert credits_from(cut, lock, {}, last, (), later, 21.0) == [] and credits_from(cut, lock, started, {}, (), later, 21.0) == []
+    ends_after = credits_from("2026-11-26T2000Z", lock, {**started, 14: "2026-11-27T2000Z"}, {**last, 14: "2026-11-27T2000Z"}, (), {}, 0.0)
+    assert ends_after == [], "a jornada that has not started has no credit; one that starts at the lock ends after it"
+    both = credits_from(cut, "2026-12-30T20:00Z", {**started, 14: "2026-11-27T2000Z"}, last, (), {}, 9.0)
+    assert [(c.jornada, c.scored) for c in both] == [(13, 0.0), (14, 9.0)], "the points so far are those of the jornada with the latest lock"
+    for wide in ("2026-12-01T00:00Z", "2027-01-01T00:00Z"):
+        assert 13 in [c.jornada for c in credits_from(cut, wide, started, last, (), later, 1.0)], "a later lock never drops a credit"
+
+
 def _selftest() -> None:
     _selftest_builders()
+    _selftest_credits()
     _selftest_inputs_at()
     _selftest_opportunities()
     _selftest_gain_is_value()

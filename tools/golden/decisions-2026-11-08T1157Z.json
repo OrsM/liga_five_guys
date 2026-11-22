@@ -7,8 +7,8 @@
  "base": {
   "base": 0.0,
   "cash": -49472707.0,
-  "cash_if_lost": 3381999.3549999967,
-  "cost": 17.210522631554568,
+  "cash_if_lost": 2543477.7596826525,
+  "cost": 14.121198033019482,
   "feasible": true,
   "gain": 0.0,
   "held": [
@@ -35,24 +35,30 @@
    "Dani Martinez",
    "Roger Hinojo",
    "Thomas Lemar",
-   "Ferran Jutgla",
-   "Aitor Paredes"
+   "Iñigo Vicente",
+   "Ferran Jutgla"
   ],
   "if_won": [
    "Arnau Ortiz",
    "Dani Martinez",
    "Roger Hinojo",
    "Thomas Lemar",
-   "Ferran Jutgla",
-   "Aitor Paredes"
+   "Iñigo Vicente",
+   "Ferran Jutgla"
   ],
-  "lock_margin": 3381999.3549999967,
-  "lock_margin_low": 369281.092764996,
+  "lock_margin": 2543477.7596826525,
+  "lock_margin_low": -1641423.7746983496,
   "margin": 43386574.2,
-  "net": -17.210522631554568,
-  "points_lost_if_lost": 17.210522631554568,
-  "points_lost_if_won": 17.210522631554568,
+  "net": -14.121198033019482,
+  "points_lost_if_lost": 14.121198033019482,
+  "points_lost_if_won": 14.121198033019482,
   "raises": 0,
+  "risk": {
+   "below_points": 30.34434467,
+   "low_inflow": 4039992.2266826527,
+   "p_short": 0.017021381815961745,
+   "shortfall_if_low": 0.0
+  },
   "short": 0.0,
   "tonight": []
  },
@@ -138,42 +144,54 @@
    "ratio": 1.015893991944759,
    "replacement": null,
    "replacement_why_not": null,
-   "set_cash_after": 3381999.3549999967,
-   "set_points_lost": 17.210522631554568,
+   "risk": {
+    "below_points": 30.34434467,
+    "low_inflow": 4039992.2266826527,
+    "p_short": 0.017021381815961745,
+    "shortfall_if_low": 0.0
+   },
+   "set_cash_after": 2543477.7596826525,
+   "set_points_lost": 14.121198033019482,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Ferran Jutgla, Aitor Paredes, bringing it to 3381999 at the lock, losing 17.2 points",
+   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, bringing it to 2543478 at the lock (the credit due, 5577912 expected, counted), losing 14.1 points; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
-   "cost_points": 17.210522631554568,
+   "cost_points": 14.121198033019482,
    "expected_cover": [
     "Arnau Ortiz",
     "Dani Martinez",
     "Thomas Lemar",
-    "Ferran Jutgla",
-    "Aitor Paredes"
+    "Iñigo Vicente",
+    "Ferran Jutgla"
    ],
-   "expected_raised": 51278005.355,
-   "label": "wait for the offers of Arnau Ortiz, Dani Martinez, Thomas Lemar, Ferran Jutgla, Aitor Paredes",
+   "expected_raised": 44861571.533,
+   "label": "wait for the offers of Arnau Ortiz, Dani Martinez, Thomas Lemar, Iñigo Vicente, Ferran Jutgla",
    "last_close": "2026-11-19T21:24Z",
    "n_closes": 12,
-   "need": 47896006.0,
+   "need": 42318093.773317344,
    "needed": true,
+   "risk": {
+    "below_points": 30.34434467,
+    "low_inflow": 4039992.2266826527,
+    "p_short": 0.017021381815961745,
+    "shortfall_if_low": 0.0
+   },
    "step": "wait",
    "what": "wait",
-   "why": "cash -49472707 is below 0 and the lock is 12 closes away (the last 2026-11-19 22:24 CET): the cheapest plan (17.2 points) sells Arnau Ortiz, Dani Martinez, Thomas Lemar, Ferran Jutgla, Aitor Paredes to the offers still to come; nothing is taken now"
+   "why": "cash -49472707 is below 0 and the lock is 12 closes away (the last 2026-11-19 22:24 CET): the cheapest plan (14.1 points) sells Arnau Ortiz, Dani Martinez, Thomas Lemar, Iñigo Vicente, Ferran Jutgla to the offers still to come; nothing is taken now; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand"
   }
  ],
  "generated_at": "2026-11-08T12:07Z",
  "lineup": {
   "advice": [],
-  "best": 55.3121555304112,
+  "best": 54.54276239888571,
   "eleven": [
    "Mathew Ryan",
    "Natan",

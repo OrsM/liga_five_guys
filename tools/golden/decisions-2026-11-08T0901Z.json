@@ -7,8 +7,8 @@
  "base": {
   "base": 0.0,
   "cash": -49572707.0,
-  "cash_if_lost": 3281999.3549999967,
-  "cost": 17.536850568041928,
+  "cash_if_lost": 2233558.8421292836,
+  "cost": 14.260008320920178,
   "feasible": true,
   "gain": 0.0,
   "held": [
@@ -35,24 +35,30 @@
    "Dani Martinez",
    "Roger Hinojo",
    "Thomas Lemar",
-   "Ferran Jutgla",
-   "Aitor Paredes"
+   "Iñigo Vicente",
+   "Ferran Jutgla"
   ],
   "if_won": [
    "Arnau Ortiz",
    "Dani Martinez",
    "Roger Hinojo",
    "Thomas Lemar",
-   "Ferran Jutgla",
-   "Aitor Paredes"
+   "Iñigo Vicente",
+   "Ferran Jutgla"
   ],
-  "lock_margin": 3281999.3549999967,
-  "lock_margin_low": 269281.092764996,
+  "lock_margin": 2233558.8421292836,
+  "lock_margin_low": -1951342.6922517186,
   "margin": 43286574.2,
-  "net": -17.536850568041928,
-  "points_lost_if_lost": 17.536850568041928,
-  "points_lost_if_won": 17.536850568041928,
+  "net": -14.260008320920178,
+  "points_lost_if_lost": 14.260008320920178,
+  "points_lost_if_won": 14.260008320920178,
   "raises": 0,
+  "risk": {
+   "below_points": 31.34434467,
+   "low_inflow": 3830073.3091292838,
+   "p_short": 0.03135097968024808,
+   "shortfall_if_low": 0.0
+  },
   "short": 0.0,
   "tonight": []
  },
@@ -138,14 +144,20 @@
    "ratio": 1.015893991944759,
    "replacement": null,
    "replacement_why_not": null,
-   "set_cash_after": 3281999.3549999967,
-   "set_points_lost": 17.536850568041928,
+   "risk": {
+    "below_points": 31.34434467,
+    "low_inflow": 3830073.3091292838,
+    "p_short": 0.03135097968024808,
+    "shortfall_if_low": 0.0
+   },
+   "set_cash_after": 2233558.8421292836,
+   "set_points_lost": 14.260008320920178,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
    "waiting": null,
    "what": "sell",
-   "why": "cash -49572707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Ferran Jutgla, Aitor Paredes, bringing it to 3281999 at the lock, losing 17.5 points",
+   "why": "cash -49572707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, bringing it to 2233559 at the lock (the credit due, 5367993 expected, counted), losing 14.3 points; if the eleven scores under 31 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
@@ -198,7 +210,7 @@
  "generated_at": "2026-11-08T09:11Z",
  "lineup": {
   "advice": [],
-  "best": 53.34596442837564,
+  "best": 52.57657129685016,
   "eleven": [
    "Mathew Ryan",
    "Natan",
