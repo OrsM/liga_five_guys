@@ -18,7 +18,7 @@ OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas
         "parsed": "ingest", "identity": "ingest", "state": "ingest", "current": "ingest", "season_facts": "ingest", "ledger": "ingest",
         "store": "ingest", "records": "ingest", "auction_facts": "ingest",
         "forecast": "forecast", "forecast_facts": "forecast", "price_fold": "forecast",
-        "auction": "decision", "inflow": "decision", "decision": "decision", "valuation": "decision", "market": "decision", "decision_facts": "decision", "loader": "decision",
+        "auction": "decision", "inflow": "decision", "decision": "decision", "hurdle": "decision", "valuation": "decision", "market": "decision", "decision_facts": "decision", "loader": "decision",
         "board": "board",
         "grading": "grading", "salegrade": "grading"}
 
