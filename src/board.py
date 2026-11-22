@@ -44,6 +44,7 @@ UNFUNDED = "cannot be funded"
 TOP_TARGETS = 10
 TOP_REPLACEMENTS = 8
 EXAMINED_REPLACEMENTS = 40
+SOLD_VALUE = -1e-6
 
 
 def stamped(t: str) -> str:
@@ -55,17 +56,36 @@ def next_value(inp: decision.Inputs) -> dict[str, float]:
     return cells.get(min((x.jornada for x in inp.locks), default=min(cells, default=0)), {})
 
 
-def squad_rows(inp: decision.Inputs, names: dict[str, str]) -> list[Doc]:
+def squad_without(inp: decision.Inputs, sold: frozenset[str]) -> frozenset[str]:
+    """Your squad less the players of sold (the sales the board makes before the lock): the squad that plays it."""
+    return decision.squad_of(inp) - sold
+
+
+def best_without(inp: decision.Inputs, sold: frozenset[str]) -> eleven.Settled | None:
+    """The best eleven of squad_without(sold) for the next jornada and the swaps that reach it from the app's eleven
+    (eleven.best_eleven; a player of sold the app fields is valued SOLD_VALUE, under any player's forecast, so the swaps
+    take him out first); from eleven.build when the app has no legal eleven. None when no legal eleven is reached."""
+    pos, _ = decision.cells_of(inp)
+    e = next_value(inp)
+    fielded = decision.lineup_of(inp, pos).eleven
+    if fielded is None:
+        return eleven.best_eleven(squad_without(inp, sold), pos, e)
+    gone = fielded & sold
+    return eleven.best_eleven(squad_without(inp, sold) | gone, pos, {**e, **{k: SOLD_VALUE for k in gone}}, fielded)
+
+
+def squad_rows(inp: decision.Inputs, names: dict[str, str], sold: frozenset[str] = frozenset()) -> list[Doc]:
+    """Your squad, a row each: xi in the app's lineup, best in the best eleven of squad_without(sold), sold in sold."""
     pos, _ = decision.cells_of(inp)
     mine = decision.squad_of(inp)
     e = next_value(inp)
     fielded = decision.lineup_of(inp, pos).eleven
-    settled = eleven.best_eleven(mine, pos, e, fielded)
+    settled = best_without(inp, sold)
     best = settled.eleven if settled else frozenset()
     xi = fielded if fielded is not None else best
     order = sorted(mine, key=lambda k: (k not in xi, POSITIONS.index(pos[k]) if k in pos else len(POSITIONS), -e.get(k, 0.0), k))
     return [{"name": names.get(k, k), "pos": pos.get(k, ""), "next": e.get(k, 0.0), "xi": k in xi, "best": k in best,
-             "sold": False, "key": k} for k in order]
+             "sold": k in sold, "key": k} for k in order]
 
 
 def advice(swaps: tuple[tuple[str, str, float], ...], names: dict[str, str]) -> list[Doc]:
@@ -81,20 +101,21 @@ def advice(swaps: tuple[tuple[str, str, float], ...], names: dict[str, str]) -> 
 
 
 def lineup_doc(inp: decision.Inputs, names: dict[str, str], sold: frozenset[str] = frozenset()) -> Doc:
-    """The lineup of the squad as the app has it and the swaps that improve it among the squad that plays the lock: the players
-    of `sold` (the sales of the plan) are not in it, so no advice brings one in."""
+    """The lineup of the squad as the app has it and the swaps that improve it among the squad that plays the lock
+    (squad_without(sold)), so no advice brings in a player sold; points those of the app's eleven, a player sold scoring
+    none; stale when the app's eleven is not that best eleven."""
     pos, _ = decision.cells_of(inp)
-    mine = decision.squad_of(inp) - sold
     e = next_value(inp)
     got = decision.lineup_of(inp, pos)
-    settled = eleven.best_eleven(mine, pos, e, got.eleven)
+    settled = best_without(inp, sold)
     if got.eleven is None or settled is None:
         return {"eleven": None, "message": got.message or "the squad cannot field a legal eleven", "unmapped": list(got.unmapped),
-                "points": None, "best": eleven.total(settled.eleven, e) if settled else None, "advice": []}
+                "points": None, "best": eleven.total(settled.eleven, e) if settled else None, "advice": [], "stale": True}
     slots = {s.player: s.slot for s in inp.lineup}
     order = sorted(got.eleven, key=lambda k: (POSITIONS.index(slots[k]) if slots[k] in POSITIONS else len(POSITIONS), -e.get(k, 0.0), k))
     return {"eleven": [names.get(k, k) for k in order], "message": "", "unmapped": list(got.unmapped),
-            "points": eleven.total(got.eleven, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names)}
+            "points": eleven.total(got.eleven - sold, e), "best": eleven.total(settled.eleven, e), "advice": advice(settled.swaps, names),
+            "stale": got.eleven != settled.eleven}
 
 
 def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = hurdle.FALLBACK_LAMBDA) -> worth.Context:
@@ -559,7 +580,6 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     bids = sum(b.amount for b in inp.bids)
     known = extras.known
     names = {k: fact.name for k, fact in known.items()}
-    squad = squad_rows(inp, names)
     mine = decision.squad_of(inp)
     offered = extras.offers
     pos = {p.player: p.pos for p in inp.players if p.pos in POSITIONS}
@@ -579,7 +599,8 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     found = plan(club, base, Rounds(cells, window, window), clock.n_closes)
     settle(sells, found.sells if found is not None and found.feasible else frozenset())
     owed = cover_lines(inp, names, club, found, clock, sells, extras.listed, offers) if locks else []
-    sold = found.sells if found is not None and found.feasible else frozenset()
+    sold = (found.sells if found is not None and found.feasible else frozenset()) | {s["key"] for s in sells if s["verdict"] == "sell"}
+    squad = squad_rows(inp, names, sold)
     return {
         "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(health),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
@@ -952,9 +973,21 @@ def _selftest_cover() -> None:
     inp = _inp_of(squad)
     names = {k: k for k in squad}
     for case in range(20):
-        sold = frozenset(random.Random(case).sample(sorted(squad), 3))
+        rng = random.Random(case)
+        sold = frozenset(rng.sample(sorted(squad), 3))
+        formation = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+        fielded = [k for p, n in formation.items() for k in rng.sample(sorted(k for k in squad if squad[k] == p), n)]
+        inp = inp._replace(lineup=[decision.Slot(k, k, squad[k], k) for k in fielded]) if case % 2 else _inp_of(squad)
         doc = lineup_doc(inp, names, sold)
+        rows = squad_rows(inp, names, sold)
         assert not {a["in"] for a in doc["advice"]} & sold, "no advice brings in a player the plan sells"
+        best = {r["key"] for r in rows if r["best"]}
+        xi = {r["key"] for r in rows if r["xi"]}
+        assert {r["key"] for r in rows if r["sold"]} == sold
+        if eleven.points(squad_without(inp, sold), squad, {}) is not None:
+            assert not best & sold, "a player sold is never in the best eleven"
+        assert (xi - {a["out"] for a in doc["advice"]}) | {a["in"] for a in doc["advice"]} == best, "the advice takes the app's eleven to the best"
+        assert doc["stale"] == (doc["eleven"] is None or xi != best), "stale iff the app has no eleven or not the best"
     assert lineup_doc(inp, names) == lineup_doc(inp, names, frozenset()), "no sales: the lineup of the squad"
 
 

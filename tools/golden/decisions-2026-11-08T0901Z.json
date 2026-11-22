@@ -219,7 +219,23 @@
  "generated_at": "2026-11-08T09:11Z",
  "lambda": 0.045,
  "lineup": {
-  "advice": [],
+  "advice": [
+   {
+    "gain": 5.963734272696613,
+    "in": "Fernando Niño",
+    "out": "Iñigo Vicente"
+   },
+   {
+    "gain": 3.9386018213267313,
+    "in": "Georges Mikautadze",
+    "out": "Ferran Jutgla"
+   },
+   {
+    "gain": 1.0872460159281587,
+    "in": "Adria Pedrosa",
+    "out": "Marcos Alonso"
+   }
+  ],
   "best": 52.57657129685016,
   "eleven": [
    "Mathew Ryan",
@@ -235,7 +251,8 @@
    "Ferran Jutgla"
   ],
   "message": "",
-  "points": 48.9530202130885,
+  "points": 41.58699118689866,
+  "stale": true,
   "unmapped": []
  },
  "lock_at": "2026-11-20T20:00:00+00:00",
@@ -1899,11 +1916,11 @@
    "xi": true
   },
   {
-   "best": true,
+   "best": false,
    "name": "Iñigo Vicente",
    "next": 4.707993952852213,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": true
   },
   {
@@ -1919,7 +1936,7 @@
    "name": "Ferran Jutgla",
    "next": 2.658035073337629,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": true
   },
   {
@@ -1951,7 +1968,7 @@
    "name": "Roger Hinojo",
    "next": 1.901482031996563,
    "pos": "DEF",
-   "sold": false,
+   "sold": true,
    "xi": false
   },
   {
@@ -1967,7 +1984,7 @@
    "name": "Dani Martinez",
    "next": 1.0174878308668722,
    "pos": "DEF",
-   "sold": false,
+   "sold": true,
    "xi": false
   },
   {
@@ -1983,7 +2000,7 @@
    "name": "Thomas Lemar",
    "next": 0.0,
    "pos": "MED",
-   "sold": false,
+   "sold": true,
    "xi": false
   },
   {
@@ -1995,7 +2012,7 @@
    "xi": false
   },
   {
-   "best": false,
+   "best": true,
    "name": "Georges Mikautadze",
    "next": 3.938600821326731,
    "pos": "DEL",
@@ -2007,7 +2024,7 @@
    "name": "Arnau Ortiz",
    "next": 0.45231122593904205,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": false
   }
  ],

@@ -139,7 +139,9 @@ The long-horizon planner, the season simulation (`sim.py`, p_win, standings), th
 were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is what a decision needs:
 
 - **`board.py`** (stage `board`): `decisions.json` from the league at t: `cash`, `can_bid` (cash plus 20% of team
-  value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada, `do`
+  value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada (`board.best_without`:
+  the squad less the plan's sales and the rule's sells, reached by swaps from the app's eleven; the `lineup` advice is those
+  swaps, never naming a sold player, and `lineup.stale` says the app's eleven is not that best), `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
   offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (his yield, the points the sale loses plus
   S x LAMBDA x n x his expected price change over at most 7 nights capped at +-3%, per million of the offer per jornada, is
