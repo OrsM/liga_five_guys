@@ -11,7 +11,7 @@ from ffcore import observations as ob
 from ffcore import state as st
 from ffcore.season_facts import julian_day, stamp_jd
 
-__all__ = ["Look", "Sample", "Model", "Forecast", "RATIOS", "sample", "curve", "fit", "predict", "forecast", "chance", "bid_for",
+__all__ = ["Look", "Sample", "Model", "Forecast", "RATIOS", "sample", "curve", "fit", "predict", "forecast", "chance",
            "looks_of", "open_looks_of", "FIXED_CUTS", "Record", "backtest_records", "points", "backtest", "live_points", "calibration", "briers"]
 
 RATIOS = (0.5, 0.6, 0.7, 0.8, 0.9) + tuple(round(0.95 + 0.01 * i, 2) for i in range(51))
@@ -168,10 +168,6 @@ def chance(cv: Curve, ratio: float) -> float:
     i = bisect_right([r for r, _ in cv], ratio)
     (r0, p0), (r1, p1) = cv[i - 1], cv[i]
     return p0 + (p1 - p0) * (ratio - r0) / (r1 - r0)
-
-
-def bid_for(cv: Curve, target: float) -> tuple[float, float]:
-    return next(((r, p) for r, p in cv if r >= 1.0 - EPS and p >= target - EPS), cv[-1])
 
 
 def looks_of(world: st.World, identity: current.Identity, league: ledger.League) -> list[Look]:
@@ -336,7 +332,6 @@ def _selftest() -> None:
     flat = tuple((r, min(1.0, max(0.0, (r - 0.95) / 0.5))) for r in RATIOS)
     assert chance(flat, 0.5) == 0.0 and chance(flat, 2.0) == 1.0 and abs(chance(flat, 1.0) - 0.1) < 1e-9 \
         and abs(chance(flat, 1.005) - 0.11) < 1e-9, "the chance is read off the curve, linear between its points"
-    assert bid_for(flat, 0.5) == (1.2, 0.5) and bid_for(flat, 2.0) == flat[-1], "the least bid that reaches the target; else the likeliest"
 
     c = curve([Sample("none", None)] * 3 + [Sample("rival", 1.1), Sample("rival", 0.98), Sample("me", 1.05), Sample("me", 0.99)])
     at = dict(c)

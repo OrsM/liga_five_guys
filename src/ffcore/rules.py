@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "BID_TARGET", "SALE_ESTIMATE", "SALE_SD", "bid_limit", "bid_margin", "cash_at_lock", "SQUAD_MAX", "Squad", "POSITIONS", "slot", "position", "FREE_FORMATIONS", "SHAPES", "MATCH_LEN"]
+__all__ = ["XI_SIZE", "DEBT_SHARE", "SALE_ESTIMATE", "SALE_SD", "bid_limit", "bid_margin", "cash_at_lock", "SQUAD_MAX", "Squad", "POSITIONS", "slot", "position", "FREE_FORMATIONS", "SHAPES", "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
 
@@ -45,9 +45,6 @@ DEBT_SHARE = 0.2  # bids may take you this share of your squad's value into debt
 def bid_limit(cash: float, team_value: float, debt: float = DEBT_SHARE) -> float:
     """What bids can total: your cash and the debt the game allows (debt, a share of your team's value)."""
     return cash + debt * team_value
-
-
-BID_TARGET = 0.90
 
 
 SALE_ESTIMATE = 0.997  # what a player with no standing offer is expected to sell at, over his value (the nightly offers' mean)

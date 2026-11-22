@@ -30,8 +30,9 @@ from ffcore.tidy import APP_FRESH_HOURS
 from ffcore.price_fold import Expected
 from ffcore.records import AuctionBrier, AuctionCalibration
 from ffcore.season_facts import ListingClose, RoundLock
-from ffcore.auction import Curve, bid_for
-from ffcore.rules import BID_TARGET, DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
+from ffcore.auction import Curve
+from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
+import hurdle
 import valuation
 from inflow import Credit, credit_at
 from valuation import Window, window_at
@@ -326,8 +327,12 @@ def rise(x: Price) -> float:
     return x.expected_value / x.value - 1
 
 
-def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
+def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[dict[str, Any]]:
+    """Each player of the universe who would play in the eleven of his window (Buyer.gain the points he adds, most first),
+    with his yield per million over the season (per_million) and, for a listing with an auction curve, the bid
+    hurdle.bid makes at rate (bid and win None when there is none)."""
     pos, cells = cells_of(inp)
+    last = max(cells, default=0)
     mine = squad_of(inp)
     curves = curves_of(inp)
     locks = lock_times(inp)
@@ -363,8 +368,8 @@ def opportunity_rows(inp: Inputs) -> list[dict[str, Any]]:
         bid: float | None = None
         win: float | None = None
         if status == "market" and asking is not None and k in curves:
-            ratio, win = bid_for(curves[k], BID_TARGET)
-            bid = asking * ratio
+            made = hurdle.bid(curves[k], asking, gain, hurdle.remaining(where.lock[0], last), rate)
+            bid, win = (made.amount, made.win) if made is not None else (None, None)
         out.append({
             "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": where.lock[0],
             "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
@@ -530,9 +535,16 @@ def _selftest_opportunities() -> None:
         closes=[Close("late", "2026-11-06T21:24Z")])
     got = {r["player"]: r for r in opportunity_rows(inp)}
     assert got["star"]["gain"] == 12.0 and got["star"]["replaces"] == "m4", "star for m4 is 6 a jornada"
-    assert (got["star"]["bid"], got["star"]["win"]) == (10e6, 1.0), "the least bid that reaches the target chance"
+    assert (got["star"]["bid"], got["star"]["win"]) == (10e6, 1.0), "the best win-weighted surplus under the walk-away price"
     assert got["good"]["gain"] == 6.0 and got["good"]["placed"] == 5.5e6, "a bid placed is kept"
-    assert (got["good"]["bid"], got["good"]["win"]) == (6e6, 0.7), "none reaches the target: the likeliest"
+    assert (got["good"]["bid"], got["good"]["win"]) == (6e6, 0.7), "a surer win is worth the dearer bid"
+    for rate in (0.01, 0.1, 0.5, 1.0):
+        for r in opportunity_rows(inp, rate):
+            n = hurdle.remaining(r["from_j"], 2)
+            if r["bid"] is not None:
+                assert r["asking"] <= r["bid"] <= hurdle.walk_away(r["gain"], n, rate) and hurdle.buys(r["gain"], n, r["asking"], rate), \
+                    "a bid only on a buy, never above the walk-away price"
+    assert all(r["bid"] is None for r in opportunity_rows(inp, 1.0)), "at a dear enough rate nothing is bought"
     assert got["late"]["gain"] > 0 and (got["late"]["bid"], got["late"]["win"]) == (None, None), \
         "on the market with no curve: his gain is said, no bid or chance is made up"
     assert got["keeper"]["gain"] == 0.0 and got["keeper"]["replaces"] == "k", "a worse keeper would replace the keeper and adds nothing"

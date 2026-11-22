@@ -1285,11 +1285,11 @@
    "win": null
   },
   {
-   "bid": 183126989.85,
+   "bid": null,
    "gain": 119.26606103569618,
    "player": "4288",
    "status": "market",
-   "win": 0.9
+   "win": null
   },
   {
    "bid": null,

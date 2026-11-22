@@ -147,8 +147,11 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   `[label, value, kind]`, the page reads fields never prose), and `replacement` for a sale that leaves no eleven: the best
   pair (sell him, buy a player of the market) by `Approach.net`, funded by `approach.replacement`, or null with
   `replacement_why_not` (`no_cash`, `no_candidate`); a sale's Delta is 0 or less), and
-  `buys` (`decision.opportunity_rows`: the players on the market who add points to your best eleven, most first; the bid is
-  `auction.bid_for`, the least bid as likely to win as any; the first three carry `funding` from `approach.approach`:
+  `buys` (`decision.opportunity_rows`: the players on the market who add points to your best eleven, most first; a listing is
+  a buy iff its yield (points per million per jornada of its window) reaches 1.15 x LAMBDA (1.5 x under 5M), and the bid is
+  `hurdle.bid`, the most win-weighted surplus under the walk-away price S x P / (n x LAMBDA) (`walk_away`, `yield`, `n` on
+  each row; a listing with no bid and none placed is counted in `considered`; a placed bid above the walk-away is `over`);
+  LAMBDA is `hurdle.lam`, stated as `lambda`; the first evaluated buys carry `funding` from `approach.approach`:
   the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.
 - **`eleven.py`** (pure, no database): the eleven is fixed, never searched by formation. `points(squad, pos, value)` is V,

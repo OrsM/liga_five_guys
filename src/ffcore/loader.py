@@ -31,7 +31,7 @@ from ffcore import forecast_facts, identity, league, ledger, parsed, store
 from ffcore import observations as ob
 from ffcore.current import Identity
 
-__all__ = ["SNAPSHOT_FOLDED", "Opportunity", "Loaded", "identity_in", "handles_once", "folded", "previous_opportunities", "snapshots_in", "health_at", "load",
+__all__ = ["SNAPSHOT_FOLDED", "Opportunity", "Loaded", "identity_in", "handles_once", "folded", "previous_opportunities", "daily_opportunities", "snapshots_in", "health_at", "load",
            "loaded", "replay_cuts"]
 
 SNAPSHOT_FOLDED = ("lineups", "api_lineup", "api_standings")
@@ -80,6 +80,18 @@ def previous_opportunities() -> tuple[Opportunity, ...]:
         if o.cut == newest:
             kept[o.player] = Opportunity(**o._asdict())
     return tuple(kept[p] for p in sorted(kept))
+
+
+def daily_opportunities(since: str, until: str) -> tuple[Opportunity, ...]:
+    """The opportunity records of the newest run of each day (the date of its as_of) among the runs with since <= as_of <
+    until that kept some, by day; none with no record."""
+    kept: dict[str, tuple[Opportunity, ...]] = {}
+    for r in sorted((r for r in store.runs() if since <= r.as_of < until), key=lambda r: r.as_of, reverse=True):
+        if r.as_of[:10] not in kept:
+            rows = tuple(Opportunity(**o._asdict()) for o in store.records("dec_opportunity", r.run_id))
+            if rows:
+                kept[r.as_of[:10]] = rows
+    return tuple(o for day in sorted(kept) for o in kept[day])
 
 
 def identity_in(obs: ob.Observations, cut: str | None = None) -> Identity:
@@ -266,6 +278,13 @@ def _selftest_previous() -> None:
             store.publish(run(3), dec_opportunity=[record("2026-08-01T0000Z", "z", 5.0)])
             assert [(o.cut[:10], o.player) for o in previous_opportunities()] == [("2026-08-02", "b"), ("2026-08-02", "c")], \
                 "the newest cut, not the newest run's"
+            store.publish(Run(4, "t", "2026-08-03T0900Z", "service", "c", "f", 1, 1.0), dec_opportunity=[record("2026-08-03T0900Z", "d", 1.0)])
+            store.publish(Run(5, "t", "2026-08-03T2100Z", "service", "c", "f", 1, 1.0), dec_opportunity=[record("2026-08-03T2100Z", "e", 1.0)])
+            store.publish(Run(6, "t", "2026-08-03T2200Z", "service", "c", "f", 1, 1.0))
+            store.publish(Run(7, "t", "2026-08-04T0900Z", "service", "c", "f", 1, 1.0), dec_opportunity=[record("2026-08-04T0900Z", "f", 1.0)])
+            assert [o.player for o in daily_opportunities("2026-08-03T0000Z", "2026-08-05T0000Z")] == ["e", "f"], \
+                "a day is its newest run that kept rows"
+            assert [o.player for o in daily_opportunities("2026-08-03T0000Z", "2026-08-04T0900Z")] == ["e"], "until is excluded"
         finally:
             store.clear()
             if kept is None:

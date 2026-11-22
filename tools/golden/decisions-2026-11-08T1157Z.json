@@ -189,6 +189,7 @@
   }
  ],
  "generated_at": "2026-11-08T12:07Z",
+ "lambda": 0.045,
  "lineup": {
   "advice": [],
   "best": 54.54276239888571,
@@ -1877,6 +1878,7 @@
    "available": false,
    "bid": null,
    "gain": 149.83272123329937,
+   "n": 26,
    "name": "Lamine Yamal",
    "per_million": 0.8024788483651627,
    "placed": null,
@@ -1885,13 +1887,16 @@
    "price_next": -0.004630732542218352,
    "replaces": "Martin Satriano",
    "status": "rival",
-   "win": null
+   "walk_away": 108852831.6652175,
+   "win": null,
+   "yield": 0.030864571090967796
   },
   {
    "asking": null,
    "available": false,
    "bid": null,
    "gain": 128.24430100768754,
+   "n": 26,
    "name": "Kylian Mbappe",
    "per_million": 0.7100265890485966,
    "placed": null,
@@ -1900,13 +1905,16 @@
    "price_next": 0.0006879267303117054,
    "replaces": "Martin Satriano",
    "status": "unlisted",
-   "win": null
+   "walk_away": 93168936.62951659,
+   "win": null,
+   "yield": 0.027308714963407563
   },
   {
    "asking": 174406657.0,
    "available": true,
-   "bid": 183126989.85,
+   "bid": null,
    "gain": 119.26606103569618,
+   "n": 26,
    "name": "Raphinha",
    "per_million": 0.6838389261465874,
    "placed": null,
@@ -1915,13 +1923,16 @@
    "price_next": -0.0009202847799932856,
    "replaces": "Martin Satriano",
    "status": "market",
-   "win": 0.9
+   "walk_away": 86646283.65841176,
+   "win": null,
+   "yield": 0.02630149715948413
   },
   {
    "asking": null,
    "available": false,
    "bid": null,
    "gain": 83.2313352348297,
+   "n": 26,
    "name": "Arda Guler",
    "per_million": 0.6372653932407225,
    "placed": null,
@@ -1930,13 +1941,16 @@
    "price_next": 0.009225488536053428,
    "replaces": "Guido Rodriguez",
    "status": "unlisted",
-   "win": null
+   "walk_away": 60467209.35863696,
+   "win": null,
+   "yield": 0.024510207432335483
   },
   {
    "asking": null,
    "available": false,
    "bid": null,
    "gain": 82.19781630004572,
+   "n": 26,
    "name": "Alex Grimaldo",
    "per_million": 0.8383513920419116,
    "placed": null,
@@ -1945,13 +1959,16 @@
    "price_next": 0.003257687210259652,
    "replaces": "Guido Rodriguez",
    "status": "unlisted",
-   "win": null
+   "walk_away": 59716362.26926398,
+   "win": null,
+   "yield": 0.03224428430930429
   },
   {
    "asking": null,
    "available": false,
    "bid": null,
    "gain": 78.92921041807246,
+   "n": 26,
    "name": "Jude Bellingham",
    "per_million": 0.5589423327065425,
    "placed": null,
@@ -1960,13 +1977,16 @@
    "price_next": 0.008604170226873764,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "win": null
+   "walk_away": 57341734.06441162,
+   "win": null,
+   "yield": 0.02149778202717471
   },
   {
    "asking": null,
    "available": false,
    "bid": null,
    "gain": 61.40232645003027,
+   "n": 26,
    "name": "Fermin Lopez",
    "per_million": 0.5443303282800998,
    "placed": null,
@@ -1975,13 +1995,16 @@
    "price_next": 0.012567982163317337,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "win": null
+   "walk_away": 44608527.762842506,
+   "win": null,
+   "yield": 0.020935781856926912
   },
   {
    "asking": 60726258.0,
    "available": false,
    "bid": null,
    "gain": 49.34131313221577,
+   "n": 26,
    "name": "David Hancko",
    "per_million": 0.8125202302472806,
    "placed": null,
@@ -1990,13 +2013,16 @@
    "price_next": 0.007095968810904907,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "win": null
+   "walk_away": 35846253.13024222,
+   "win": null,
+   "yield": 0.03125077808643387
   },
   {
    "asking": 61988507.0,
    "available": false,
    "bid": null,
    "gain": 47.12386313157918,
+   "n": 26,
    "name": "Marcos Llorente",
    "per_million": 0.7602032281819464,
    "placed": null,
@@ -2005,13 +2031,16 @@
    "price_next": -0.004147853243746447,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "win": null
+   "walk_away": 34235285.1810618,
+   "win": null,
+   "yield": 0.02923858569930563
   },
   {
    "asking": 86641768.0,
    "available": false,
    "bid": null,
    "gain": 44.140245860887816,
+   "n": 26,
    "name": "Pedri Gonzalez",
    "per_million": 0.5094568922103231,
    "placed": null,
@@ -2020,7 +2049,9 @@
    "price_next": -0.004939596190610351,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "win": null
+   "walk_away": 32067699.98440568,
+   "win": null,
+   "yield": 0.019594495854243197
   }
  ]
 }
