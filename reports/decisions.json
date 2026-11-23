@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-23T11:27Z",
- "market_at": "2026-11-23T11:27Z",
+ "generated_at": "2026-11-23T12:26Z",
+ "market_at": "2026-11-23T12:26Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-23T11:27Z",
+   "at": "2026-11-23T12:26Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-27T20:00:00+00:00",
- "cash": -35998765.0,
+ "cash": -35798765.0,
  "cash_locked": 0,
- "can_bid": 58840444.400000006,
+ "can_bid": 59040444.400000006,
  "ping": "",
  "do": [
   {
@@ -68,16 +68,16 @@
     "Aymeric Laporte"
    ],
    "expected_raised": 33389576.778,
-   "need": 30905303.187599733,
+   "need": 30705303.187599733,
    "cost_points": 33.42045717642759,
    "last_close": "2026-11-26T21:24Z",
    "risk": {
     "low_inflow": 3555541.8124002656,
-    "p_short": 0.019215499559982974,
+    "p_short": 0.0126466128733006,
     "shortfall_if_low": 0.0,
-    "below_points": 26.09188221999999
+    "below_points": 24.09188221999999
    },
-   "why": "cash -35998765 is below 0 and the lock is 4 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (33.4 points) sells Dani Martinez, Aymeric Laporte to the offers still to come; nothing is taken now; if the eleven scores under 26 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -35798765 is below 0 and the lock is 4 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (33.4 points) sells Dani Martinez, Aymeric Laporte to the offers still to come; nothing is taken now; if the eleven scores under 24 points the lock cash stays below 0; there is time to fix by hand",
    "accepts": [],
    "act": []
   }
@@ -116,9 +116,9 @@
   "short": 0.0,
   "tonight": [],
   "raises": 0,
-  "margin": 58840444.400000006,
-  "lock_margin": 2484273.5904002665,
-  "lock_margin_low": -956852.2859457368,
+  "margin": 59040444.400000006,
+  "lock_margin": 2684273.5904002665,
+  "lock_margin_low": -756852.2859457368,
   "if_won": [
    "Dani Martinez",
    "Aymeric Laporte"
@@ -142,19 +142,19 @@
    "Aitor Paredes",
    "Martin Satriano"
   ],
-  "cash_if_lost": 2484273.5904002665,
+  "cash_if_lost": 2684273.5904002665,
   "gain": 0.0,
   "points_lost_if_won": 33.42045717642759,
   "points_lost_if_lost": 33.42045717642759,
   "net": -33.42045717642759,
   "base": 0.0,
   "cost": 33.42045717642759,
-  "cash": -35998765.0,
+  "cash": -35798765.0,
   "risk": {
    "low_inflow": 3555541.8124002656,
-   "p_short": 0.019215499559982974,
+   "p_short": 0.0126466128733006,
    "shortfall_if_low": 0.0,
-   "below_points": 26.09188221999999
+   "below_points": 24.09188221999999
   }
  },
  "targets": [
