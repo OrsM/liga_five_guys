@@ -691,7 +691,7 @@ def replayed_cut(decided: decision.Decided | decision.Stale, offers: worth.Offer
     if isinstance(decided, decision.Stale) or at is None or not decided.extras.offers:
         return None
     standings = [standing(decided.inputs, o.player, o.value, o.money) for o in decided.extras.offers]
-    return Cut(at + MINUTE, context(decided.inputs, offers, rate), standings)
+    return Cut(at + MINUTE, context(decided.inputs, offers, rate, decision.clock_of(decided.inputs, decided.cut).n_closes), standings)
 
 
 def replayed_cuts(loaded: loader.Loaded, cuts: Sequence[str]) -> list[Cut]:

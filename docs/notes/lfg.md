@@ -147,10 +147,11 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   the squad less the plan's sales and the rule's sells, reached by swaps from the app's eleven; the `lineup` advice is those
   swaps, never naming a sold player, and `lineup.stale` says the app's eleven is not that best), `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
-  offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (his yield, the points the sale loses plus
-  LAMBDA x n x his expected price change over his Exit's horizon (the price forecast's furthest row, capped at +-3%), per
-  million of the offer per jornada, is under K x LAMBDA, K = 0.85: the offer reaches `reserve` = (W + rise x value) / K,
-  `hurdle.sale_price`; a sale that loses points also needs a use for the
+  offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (the offer reaches `reserve`, `hurdle.reserve` of
+  the player's `hurdle.Stake`: (W + rise x value) / K, K = 0.85, his yield, the points the sale loses plus LAMBDA x n x his
+  expected price change over his Exit's horizon (the price forecast's furthest row, capped at +-3%), per million of the offer
+  per jornada, being under K x LAMBDA; and for a sale that loses no points at least the proceeds of his Exit stopped at the
+  closes left (`worth.stopped`: what waiting for the best offer is worth); a sale that loses points also needs a use for the
   cash, a buy it funds tonight or the lock cover), wait (a sell whose offer is under 1.0 of value and the 0.5 percentile
   and funds nothing tonight: waiting is free), hold, or needs_replacement; `points_lost`, `rent` (the points the money
   earns at LAMBDA over n), sells first, then by the points the sale loses per million it raises; each row typed: `delta`
@@ -160,7 +161,7 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   pair (sell him, buy a player of the market) by `Approach.net`, funded by `approach.replacement`, or null with
   `replacement_why_not` (`no_cash`, `no_candidate`); a sale's Delta is 0 or less), and
   `buys` (`decision.opportunity_rows`: the players on the market who add points to your best eleven, most first; a listing is
-  bought by `hurdle.bid`, the most win-weighted surplus under the walk-away price K x P / (n x LAMBDA), K = 0.85 (no surplus,
+  bought by `hurdle.bid`, the most win-weighted surplus under the walk-away price `hurdle.cap` of the row's `stake`, K x P / (n x LAMBDA), K = 0.85 (no surplus,
   no bid: the same band K as the sale's) (`walk_away`, `yield`, `n` on
   each row; a listing with no bid and none placed is counted in `considered`; a placed bid above the walk-away is `over`);
   LAMBDA is `hurdle.lam`, stated as `lambda`; the first evaluated buys carry `funding` from `approach.approach`:

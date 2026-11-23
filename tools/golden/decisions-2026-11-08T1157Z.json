@@ -111,7 +111,7 @@
     ],
     [
      "sale price",
-     -36990.7299819117,
+     1516029.106876829,
      "money"
     ],
     [
@@ -151,7 +151,7 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": -36990.7299819117,
+   "reserve": 1516029.106876829,
    "risk": {
     "below_points": 30.34434467,
     "low_inflow": 4039992.2266826527,
@@ -283,7 +283,7 @@
     ],
     [
      "sale price",
-     -36990.7299819117,
+     1516029.106876829,
      "money"
     ],
     [
@@ -322,7 +322,7 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": -36990.7299819117,
+   "reserve": 1516029.106876829,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
@@ -374,7 +374,7 @@
     ],
     [
      "sale price",
-     1446.6182023303966,
+     661716.5025955649,
      "money"
     ],
     [
@@ -413,11 +413,11 @@
    "rent": 0.7536543299999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 1446.6182023303966,
+   "reserve": 661716.5025955649,
    "step": "take offer",
    "trace": null,
    "trend": 0.18561000848040757,
-   "verdict": "wait",
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null

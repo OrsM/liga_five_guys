@@ -204,17 +204,25 @@ def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int) -> P
     return Plan(True, got[1], sum(price[k] for k in got[1]), got[0], 0.0)
 
 
-def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0) -> Approach | None:
+def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0,
+             sides: dict[tuple[frozenset[str], tuple[int, ...]], Side] | None = None) -> Approach | None:
     """How to fund a bid on `player` (see Approach): the sales tonight, those after the result, their cost in points and the
     net. Costs are over `rounds`: a sale made tonight is gone from the squad in every jornada of `rounds.now`, the player
     bought plays only in `rounds.arrives`, and the sales after the result count only there. `base` is the cost of the
     cheapest plan with no buy (the cost of `approach` with player None, bid 0, win 1 and `rounds.arrives` = `rounds.now`:
-    the gain 0, both costs the cost of the sales that bring cash to 0 or more), and the net is measured against it. None when
+    the gain 0, both costs the cost of the sales that bring cash to 0 or more), and the net is measured against it. `sides` shares the Side of a squad and window (and its memo of costs)
+    between calls over one club's positions and cells. None when
     the squad fields no eleven. Cash at the lock includes `club.inflow`: the sales must make it 0 or more at its expected, and
     `lock_margin` is shown at its expected, `lock_margin_low` at its low (with the sales that follow low too)."""
-    lost_side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
-    won_side = lost_side if player is None else Side(club.squad | {player}, club.pos, rounds.cells, rounds.arrives)
-    before = Side(club.squad, club.pos, rounds.cells, rounds.before)
+    shared = {} if sides is None else sides
+
+    def side(squad: frozenset[str], window: tuple[int, ...]) -> Side:
+        if (squad, window) not in shared:
+            shared[(squad, window)] = Side(squad, club.pos, rounds.cells, window)
+        return shared[(squad, window)]
+    lost_side = side(club.squad, tuple(rounds.arrives))
+    won_side = lost_side if player is None else side(club.squad | {player}, tuple(rounds.arrives))
+    before = side(club.squad, rounds.before)
     if not lost_side.fields:
         return None
     gain = won_side.points - lost_side.points
@@ -373,6 +381,8 @@ def _selftest() -> None:
         assert got.held == frozenset(offers) - got.tonight
         assert eleven.best_eleven(here - got.tonight - got.if_won, pos, cells[arrives[0]]) is not None, "an eleven remains"
         made += 1
+        shared: dict[tuple[frozenset[str], tuple[int, ...]], Side] = {}
+        assert approach(club, "star", bid, win, rounds, sides=shared) == got == approach(club, "star", bid, win, rounds, sides=shared), "shared Sides change nothing"
     assert made >= 4, "the leagues are not all infeasible"
     assert seen_early >= 1, "a sale tonight with the buy arriving after a lock was costed"
     rng = random.Random(9)

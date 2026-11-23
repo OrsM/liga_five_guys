@@ -5,6 +5,7 @@ price (None when the rule states none). LIVE is the rule the board runs (rent)."
 from __future__ import annotations
 
 import bisect
+import itertools
 import random
 import sys
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -40,6 +41,7 @@ class Standing(NamedTuple):
 
 
 class OfferDistribution(NamedTuple):
+    """The offers over value seen, ascending (offer_ratio_distribution)."""
     ratios: tuple[float, ...]
 
 
@@ -48,7 +50,8 @@ NO_OFFERS = OfferDistribution(())
 
 class Context(NamedTuple):
     """What a rule reads: the positions, the Window a sale made now counts for, your cash, the offers seen and the
-    rate (LAMBDA, hurdle.lam), and what the points are made of: your squad, each jornada's forecast per player and the locks."""
+    rate (LAMBDA, hurdle.lam), and what the points are made of: your squad, each jornada's forecast per player and the locks,
+    and the closes left before the next lock (a draw of the offers each)."""
     pos: Mapping[str, str]
     window: Window
     cash: float
@@ -57,6 +60,7 @@ class Context(NamedTuple):
     squad: frozenset[str] = frozenset()
     cells: valuation.Cells = {}
     locks: Mapping[int, str] = {}
+    closes: int = 0
 
     def sale(self, player: str) -> Reading:
         """The Reading of selling the player now, over the window of the context."""
@@ -90,6 +94,12 @@ def offer_percentile(dist: OfferDistribution, ratio: float) -> float | None:
     return bisect.bisect_right(dist.ratios, ratio) / len(dist.ratios)
 
 
+@lru_cache(maxsize=4)
+def _tails(ratios: tuple[float, ...]) -> tuple[float, ...]:
+    """The sums of ratios[i:] for each i from 0 to len(ratios), the last 0: ratios sorted ascending."""
+    return tuple(itertools.accumulate(reversed(ratios), initial=0.0))[::-1]
+
+
 def offer_reserve_ratio(m: int, c: float, dist: OfferDistribution, hold: float) -> float:
     """The offer over value at which selling tonight and waiting are worth the same, with m nights left to wait, a cost c
     (a fraction of value) for each night waited and one offer a night drawn from dist, i.i.d. and expiring at the next
@@ -99,32 +109,41 @@ def offer_reserve_ratio(m: int, c: float, dist: OfferDistribution, hold: float) 
     if m < 0 or not dist.ratios:
         raise ValueError("m must be >= 0 and dist non-empty")
     rho = hold
+    tail = _tails(dist.ratios)
     for _ in range(m):
-        rho = sum(max(x, rho) for x in dist.ratios) / len(dist.ratios) - c
+        i = bisect.bisect_left(dist.ratios, rho)
+        rho = (rho * i + tail[i]) / len(dist.ratios) - c
     return rho
 
 
+def stopped(exit: hurdle.Exit, dist: OfferDistribution, m: int) -> hurdle.Exit:
+    """The exit with its reserve set to the offer, in money, at which taking it now and waiting for a draw of dist at each of
+    the m closes left are worth the same: value times offer_reserve_ratio with the hurdle.wait_cost of the exit and hold =
+    later over value, never below the later price; the later price when dist is empty or the value is not positive."""
+    later = hurdle.later(exit)
+    if not dist.ratios or exit.value <= 0:
+        return exit._replace(reserve=later)
+    return exit._replace(reserve=max(later, exit.value * offer_reserve_ratio(m, hurdle.wait_cost(exit), dist, later / exit.value)))
+
+
 def waiting_reserve(standing: Standing, dist: OfferDistribution, m: int) -> float:
-    """The offer, in money, at which taking it now and waiting for a draw of dist at each of the m closes left are worth the
-    same: value times offer_reserve_ratio with the hurdle.wait_cost of the exit and hold = later over value, never below later;
-    later when dist is empty or the value is not positive."""
-    if not dist.ratios or standing.value <= 0:
-        return standing.later
-    return max(standing.later, standing.value * offer_reserve_ratio(m, hurdle.wait_cost(standing.exit), dist, standing.later / standing.value))
+    """The reserve of stopped(standing.exit, dist, m): what the standing player is worth waiting for, in money."""
+    return stopped(standing.exit, dist, m).reserve
 
 
 def rent(standing: Standing, ctx: Context) -> Verdict:
-    """The one sale rule: money and points at one rate. The reserve is hurdle.sale_price of the points the sale loses (over
-    the season of ctx.window) over ctx.jornadas() at ctx.rate, with his exit: the offer above which his
-    yield is under the rate's bar (a bench player, who loses nothing, is under it at any offer his price trend allows).
-    The key is reserve minus offer (0 or less sells); with no offer it is None. Where the sale has no Delta, key and
-    reserve are None."""
+    """The one sale rule: money and points at one rate. The reserve is hurdle.reserve of the Stake of the points the sale
+    loses (over the season of ctx.window) over ctx.jornadas() at ctx.rate, with his exit stopped at the ctx.closes left
+    (stopped). A sale that loses points (more than NO_LOSS) is taken at (W + drift) / K: the offer above which his yield,
+    drift included, is under the rate's bar. One that loses none is taken at that or at what waiting for the best offer
+    nets, whichever is more. The key is reserve minus offer (0 or less sells);
+    with no offer it is None. Where the sale has no Delta, key and reserve are None."""
     sale = ctx.sale(standing.player)
     if sale.points is None:
         return Verdict(None, sale, None)
-    reserve = hurdle.sale_price(0.0 - sale.points, ctx.jornadas(), standing.exit, ctx.rate)
-    key = None if standing.offer is None else reserve - standing.offer
-    return Verdict(key, sale, reserve)
+    got = hurdle.stake(0.0 - sale.points, ctx.jornadas(), ctx.rate, stopped(standing.exit, ctx.offers, ctx.closes))
+    reserve = hurdle.reserve(got._replace(proceeds=0.0) if got.points > NO_LOSS else got)
+    return Verdict(None if standing.offer is None else reserve - standing.offer, sale, reserve)
 
 
 LIVE: Rule = rent
@@ -169,6 +188,14 @@ def _selftest_option() -> None:
     for m in (1, 3, 5, 7):
         costs = [offer_reserve_ratio(m, c, study, 0.0) for c in (0.0, 0.0017, 0.007, 0.02)]
         assert all(a >= b for a, b in zip(costs, costs[1:])), "a dearer night never raises the reserve"
+    wild = random.Random(2)
+    for _ in range(50):
+        dist = offer_ratio_distribution(wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 60)))
+        c, hold, m = wild.uniform(-0.03, 0.03), wild.uniform(0.0, 1.5), wild.randint(0, 8)
+        rho = hold
+        for _ in range(m):
+            rho = sum(max(x, rho) for x in dist.ratios) / len(dist.ratios) - c
+        assert abs(offer_reserve_ratio(m, c, dist, hold) - rho) < 1e-12, "the reserve is the plain recursion rho_k = mean max(X, rho_k-1) less c"
     hand = offer_ratio_distribution([1.0, 0.9, 1.1, 1.0, 0.95])
     assert offer_percentile(NO_OFFERS, 1.0) is None, "no offers seen: no percentile"
     assert [offer_percentile(hand, x) for x in (0.8, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2)] == [0.0, 0.2, 0.4, 0.8, 0.8, 1.0, 1.0], "the empirical distribution function"
@@ -218,10 +245,17 @@ def _selftest_option() -> None:
     for drift in (-0.2, 0.0, 0.2):
         s = Standing("p", hurdle.Exit(value, 10, drift), 0.0)
         assert waiting_reserve(s, bench_ctx.offers, MAX_NIGHTS) >= s.later, "a waiting reserve is never below the later price"
-    for rise in (-0.1, 0.0, 0.1):
-        bench = rent(stand._replace(exit=stand.exit._replace(rise=rise), offer=0.9 * value), bench_ctx)
-        assert bench.key is not None and bench.key <= 0, "a bench player is sold at any offer near his value"
-    assert Context({}, Window(), 0.0) == Context({}, Window(), 0.0, NO_OFFERS, hurdle.FALLBACK_LAMBDA), "the new fields default"
+    waits = bench_ctx._replace(closes=MAX_NIGHTS)
+    for rise in (-0.03, 0.0, 0.03):
+        e = stand.exit._replace(rise=rise)
+        for offer in (0.9 * value, 1.0 * value, 1.2 * value):
+            sold = rent(stand._replace(exit=e, offer=offer), waits)
+            assert sold.reserve == waiting_reserve(stand._replace(exit=e), waits.offers, MAX_NIGHTS), "a bench player's reserve is his waiting reserve"
+            assert sold.key is not None and (sold.key <= 0) == (offer >= waiting_reserve(stand._replace(exit=e), waits.offers, MAX_NIGHTS)), "sold at or above it"
+        idle = rent(stand._replace(exit=e, offer=1.0), bench_ctx)
+        assert idle.reserve == hurdle.later(e) and waiting_reserve(stand._replace(exit=e), waits.offers, 0) == hurdle.later(e), "no closes left: the later price"
+        assert hurdle.reserve(hurdle.stake(0.0, 1, waits.rate, stopped(e, waits.offers, MAX_NIGHTS))) == waiting_reserve(stand._replace(exit=e), waits.offers, MAX_NIGHTS), "sale reserve and buy proceeds read one exit"
+    assert Context({}, Window(), 0.0) == Context({}, Window(), 0.0, NO_OFFERS, hurdle.FALLBACK_LAMBDA, closes=0), "the new fields default"
     for ratio, share, funds in [(1.0, None, False), (0.9, 0.5, False), (0.9, 0.1, True), (None, None, True)]:
         assert take_now(ratio, share, funds), "a high ratio, a high percentile or a buy to fund: taken tonight"
     assert not take_now(0.99, 0.49, False) and not take_now(None, None, False), "else left listed"
@@ -274,6 +308,7 @@ def _played(squad: frozenset[str], pos: Mapping[str, str], cells: valuation.Cell
 
 
 def _selftest() -> None:
+    seen_plays = 0
     for seed in range(40):
         for ties in (False, True):
             fielded, bench, pos, value = eleven.random_league(random.Random(seed), ties)
@@ -313,14 +348,19 @@ def _selftest() -> None:
                             continue
                         assert v.reserve is not None and v.key == v.reserve - (s.offer or 0.0), "the key is reserve less offer"
                         lost = got["season"]
-                        assert v.reserve == hurdle.sale_price(lost, left, s.exit, rate), "a starter is sold iff his yield is under the bar"
+                        waits = stopped(s.exit, rated.offers, rated.closes)
+                        plays = lost > NO_LOSS
+                        seen_plays += plays
+                        assert v.reserve == hurdle.reserve(hurdle.stake(lost, left, rate, waits)._replace(proceeds=0.0 if plays else hurdle.proceeds(waits))), \
+                            "a sale that loses points is taken at W plus drift over K, one that loses none also over his waiting reserve"
+                        bar = max((lost * 1e6 / (left * rate) + rise * value[p]) / hurdle.K, 0.0 if plays else hurdle.proceeds(waits))
                         for offer in (x for x in (0.5 * v.reserve, v.reserve, 2 * v.reserve) if x > 0):
-                            own = (lost + rate * left * rise * value[p] / 1e6) / (left * offer / 1e6)
-                            assert (v.reserve - offer <= 0) == (own <= rate * hurdle.K + 1e-9), "sell iff the cash out-yields him at the rate"
+                            assert (v.reserve - offer <= 0) == (offer >= bar - 1e-9), "sell iff the offer is at the bar"
                         if seed < 8 and rise == 0.0:
                             assert LIVE(s._replace(offer=None), rated).key is None, "no offer, no key"
                             doubled = LIVE(Standing(p, hurdle.Exit(2 * value[p], 10, rise), 2 * (s.offer or 0.0)), doubled_ctx._replace(rate=rate))
                             assert doubled.key is not None and abs(doubled.key - 2 * v.key) < 1e-3, "doubling prices and points doubles the key"
+    assert seen_plays > 50, seen_plays
     assert set(CHALLENGERS) == {"rent"} and LIVE is rent
 
     def stub(standing: Standing, ctx: Context) -> Verdict:
