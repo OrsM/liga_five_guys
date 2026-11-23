@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-23T21:28Z",
- "market_at": "2026-11-23T21:28Z",
+ "generated_at": "2026-11-23T21:39Z",
+ "market_at": "2026-11-23T21:39Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-23T21:28Z",
+   "at": "2026-11-23T21:39Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -55,7 +55,7 @@
  "cash": -36998547.0,
  "cash_locked": 0,
  "can_bid": 58080618.80000001,
- "ping": "on the market: Nico Williams (+36 points), Antonio Sivera (+13 points), Marko Dmitrovic (+2 points), Pedro Diaz (+1 points), Hector Fort (+1 points), Enes Unal (+1 points)",
+ "ping": "",
  "do": [
   {
    "name": "Dani Martinez",
@@ -148,69 +148,40 @@
    "act": [],
    "for": [],
    "needed": true,
-   "why": "cash -36998547 is below 0: the cheapest plan sells Dani Martinez, Roger Hinojo, Fernando Calero, Aymeric Laporte, bringing it to 255945 at the lock (the credit due, 4400000 expected, counted), losing 37.0 points",
+   "why": "cash -36998547 is below 0: the cheapest plan sells Dani Martinez, Roger Hinojo, Fernando Calero, Aymeric Laporte, bringing it to 355945 at the lock (the credit due, 4500000 expected, counted), losing 37.0 points",
    "set_points_lost": 37.04627356025185,
-   "set_cash_after": 255944.65399999917,
+   "set_cash_after": 355944.65399999917,
    "risk": {
-    "low_inflow": 4400000.0,
+    "low_inflow": 4500000.0,
     "p_short": 0.0,
     "shortfall_if_low": 0.0,
     "below_points": 41.44055346000001
    }
   },
   {
-   "name": "Dani Martinez, Fernando Calero, Roger Hinojo, Sergio Carreira",
-   "pos": "",
-   "what": "list",
-   "label": "list Dani Martinez, Fernando Calero, Roger Hinojo, Sergio Carreira",
-   "step": "list",
-   "amount": null,
-   "done": false,
-   "accepts": [
-    null
+   "what": "wait",
+   "label": "wait for the offers of Roger Hinojo, Fernando Calero, Aymeric Laporte",
+   "step": "wait",
+   "needed": true,
+   "n_closes": 3,
+   "expected_cover": [
+    "Roger Hinojo",
+    "Fernando Calero",
+    "Aymeric Laporte"
    ],
-   "gain": null,
-   "per": null,
-   "facts": [],
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "plan": false,
-   "act": [
-    {
-     "player_team": "109094611",
-     "player": "2881",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 678501.0
-    },
-    {
-     "player_team": "117924195",
-     "player": "2398",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 718303.0
-    },
-    {
-     "player_team": "118848268",
-     "player": "3162",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 1199782.0
-    },
-    {
-     "player_team": "117924193",
-     "player": "2604",
-     "market": null,
-     "bid": null,
-     "pos": "DEF",
-     "value": 5335305.0
-    }
-   ]
+   "expected_raised": 32122782.654,
+   "need": 31766838.0,
+   "cost_points": 37.04627356025185,
+   "last_close": "2026-11-26T21:24Z",
+   "risk": {
+    "low_inflow": 4500000.0,
+    "p_short": 0.0,
+    "shortfall_if_low": 0.0,
+    "below_points": 41.44055346000001
+   },
+   "why": "cash -36998547 is below 0 and the lock is 3 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (37.0 points) sells Roger Hinojo, Fernando Calero, Aymeric Laporte to the offers still to come; nothing is taken now",
+   "accepts": [],
+   "act": []
   }
  ],
  "lineup": {
@@ -248,8 +219,8 @@
   "tonight": [],
   "raises": 0,
   "margin": 58080618.80000001,
-  "lock_margin": 255944.65399999917,
-  "lock_margin_low": -1616761.3702780008,
+  "lock_margin": 355944.65399999917,
+  "lock_margin_low": -1516761.3702780008,
   "if_won": [
    "Dani Martinez",
    "Roger Hinojo",
@@ -278,7 +249,7 @@
    "Aitor Paredes",
    "Martin Satriano"
   ],
-  "cash_if_lost": 255944.65399999917,
+  "cash_if_lost": 355944.65399999917,
   "gain": 0.0,
   "points_lost_if_won": 37.04627356025185,
   "points_lost_if_lost": 37.04627356025185,
@@ -287,7 +258,7 @@
   "cost": 37.04627356025185,
   "cash": -36998547.0,
   "risk": {
-   "low_inflow": 4400000.0,
+   "low_inflow": 4500000.0,
    "p_short": 0.0,
    "shortfall_if_low": 0.0,
    "below_points": 41.44055346000001
@@ -476,56 +447,7 @@
   }
  ],
  "lambda": 0.045,
- "alerts": [
-  {
-   "name": "Nico Williams",
-   "gain": 35.74464641880346,
-   "asking": 80094116.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Antonio Sivera",
-   "gain": 12.599688966577276,
-   "asking": 28242237.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Marko Dmitrovic",
-   "gain": 2.2849127514459937,
-   "asking": 12934830.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Pedro Diaz",
-   "gain": 0.6411755203441203,
-   "asking": 773199.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Hector Fort",
-   "gain": 0.6292118309321566,
-   "asking": 1789999.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  },
-  {
-   "name": "Enes Unal",
-   "gain": 0.5769231687305805,
-   "asking": 6007024.0,
-   "bid": null,
-   "win": null,
-   "placed": null
-  }
- ],
+ "alerts": [],
  "auction": {
   "brier": [
    {
