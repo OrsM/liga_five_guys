@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-23T12:26Z",
- "market_at": "2026-11-23T12:26Z",
+ "generated_at": "2026-11-23T20:46Z",
+ "market_at": "2026-11-23T20:45Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-23T12:26Z",
+   "at": "2026-11-23T20:45Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -68,16 +68,16 @@
     "Aymeric Laporte"
    ],
    "expected_raised": 33389576.778,
-   "need": 30705303.187599733,
-   "cost_points": 33.42045717642759,
+   "need": 31398765.0,
+   "cost_points": 33.718793315370704,
    "last_close": "2026-11-26T21:24Z",
    "risk": {
-    "low_inflow": 3555541.8124002656,
-    "p_short": 0.0126466128733006,
+    "low_inflow": 4400000.0,
+    "p_short": 0.0,
     "shortfall_if_low": 0.0,
     "below_points": 24.09188221999999
    },
-   "why": "cash -35798765 is below 0 and the lock is 4 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (33.4 points) sells Dani Martinez, Aymeric Laporte to the offers still to come; nothing is taken now; if the eleven scores under 24 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -35798765 is below 0 and the lock is 4 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (33.7 points) sells Dani Martinez, Aymeric Laporte to the offers still to come; nothing is taken now",
    "accepts": [],
    "act": []
   }
@@ -90,35 +90,144 @@
    "Aitor Paredes",
    "Dani Martinez",
    "Pepelu",
-   "Guido Rodriguez",
    "Pablo Fornals",
+   "Guido Rodriguez",
    "Mikel Oyarzabal",
    "Martin Satriano",
    "Vinicius Junior"
   ],
   "message": "",
   "unmapped": [],
-  "points": 54.73288005242674,
-  "best": 57.056958633120765,
+  "points": 54.67965746078193,
+  "best": 57.00103855240934,
   "advice": [
    {
     "in": "Sergio Carreira",
     "out": "Dani Martinez",
-    "gain": 2.3240795806940304
+    "gain": 2.321382091627411
    }
   ],
   "stale": true
  },
- "buys": [],
- "considered": 7,
+ "buys": [
+  {
+   "name": "Roger Hinojo",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Roger Hinojo",
+   "step": "bid",
+   "price": 1207865.0,
+   "asking": 1207865.0,
+   "amount": 1207865.0,
+   "win": 1.0,
+   "advised": 1207865.0,
+   "advised_win": 1.0,
+   "move": "bid",
+   "to": null,
+   "why": null,
+   "plan": false,
+   "done": false,
+   "key": "15316",
+   "gain": 2.1535218636852917,
+   "net": 7.321135472600872,
+   "net_label": null,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "replaces": "Aitor Paredes",
+   "per_million": 1.7829160242951752,
+   "n": 25,
+   "yield": 0.07131664097180701,
+   "walk_away": 1627105.4081177758,
+   "price_next": -0.008216324698726463,
+   "price_lock": -0.03847917569122283,
+   "facts": [
+    [
+     "asking",
+     1207865.0,
+     "money"
+    ],
+    [
+     "walk-away price",
+     1627105.4081177758,
+     "money"
+    ],
+    [
+     "bid",
+     1207865.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points added",
+     2.1535218636852917,
+     "points"
+    ]
+   ],
+   "bids": 0,
+   "auction": {
+    "yours": false,
+    "listings": 191,
+    "thin": false,
+    "cell": "0/0/0"
+   },
+   "funding": {
+    "feasible": true,
+    "short": 0.0,
+    "tonight": [],
+    "raises": 0,
+    "margin": 57832579.400000006,
+    "lock_margin": 769515.2750000022,
+    "lock_margin_low": -1132925.0056749992,
+    "if_won": [
+     "Dani Martinez",
+     "Aymeric Laporte"
+    ],
+    "if_lost": [
+     "Dani Martinez",
+     "Aymeric Laporte"
+    ],
+    "held": [
+     "Natan",
+     "Dean Huijsen",
+     "Dani Martinez",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Mikel Oyarzabal",
+     "Pepelu",
+     "Fernando Calero",
+     "Vinicius Junior",
+     "Sergio Carreira",
+     "Guido Rodriguez",
+     "Aitor Paredes",
+     "Martin Satriano"
+    ],
+    "cash_if_lost": 1977380.2750000022,
+    "gain": 2.153521863685228,
+    "points_lost_if_won": 28.55117970645506,
+    "points_lost_if_lost": 33.718793315370704,
+    "net": 7.321135472600872,
+    "base": 33.718793315370704
+   },
+   "accepts": [],
+   "act": []
+  }
+ ],
+ "considered": 6,
  "base": {
   "feasible": true,
   "short": 0.0,
   "tonight": [],
   "raises": 0,
   "margin": 59040444.400000006,
-  "lock_margin": 2684273.5904002665,
-  "lock_margin_low": -756852.2859457368,
+  "lock_margin": 1990811.7780000009,
+  "lock_margin_low": 87605.9016539976,
   "if_won": [
    "Dani Martinez",
    "Aymeric Laporte"
@@ -142,17 +251,17 @@
    "Aitor Paredes",
    "Martin Satriano"
   ],
-  "cash_if_lost": 2684273.5904002665,
+  "cash_if_lost": 1990811.7780000009,
   "gain": 0.0,
-  "points_lost_if_won": 33.42045717642759,
-  "points_lost_if_lost": 33.42045717642759,
-  "net": -33.42045717642759,
+  "points_lost_if_won": 33.718793315370704,
+  "points_lost_if_lost": 33.718793315370704,
+  "net": -33.718793315370704,
   "base": 0.0,
-  "cost": 33.42045717642759,
+  "cost": 33.718793315370704,
   "cash": -35798765.0,
   "risk": {
-   "low_inflow": 3555541.8124002656,
-   "p_short": 0.0126466128733006,
+   "low_inflow": 4400000.0,
+   "p_short": 0.0,
    "shortfall_if_low": 0.0,
    "below_points": 24.09188221999999
   }
@@ -162,180 +271,180 @@
    "name": "Lamine Yamal",
    "pos": "DEL",
    "status": "rival",
-   "gain": 147.55850843625305,
+   "gain": 147.26088931699573,
    "asking": 178610452.0,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Martin Satriano",
-   "per_million": 0.8261471083240585,
+   "per_million": 0.824480805395396,
    "price_next": 0.0023546397220368664,
    "price_lock": 0.01102738741177478,
    "n": 25,
-   "yield": 0.033045884332962336,
-   "walk_away": 111488650.8185023,
+   "yield": 0.03297923221581584,
+   "walk_away": 111263783.03950788,
    "available": false
   },
   {
    "name": "Kylian Mbappe",
    "pos": "DEL",
    "status": "unlisted",
-   "gain": 129.48649576454778,
+   "gain": 129.45819959852477,
    "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Martin Satriano",
-   "per_million": 0.7047022033941289,
+   "per_million": 0.7045482076401602,
    "price_next": 0.0029679358968255354,
    "price_lock": 0.01389961217476432,
    "n": 25,
-   "yield": 0.028188088135765156,
-   "walk_away": 97834241.24432498,
+   "yield": 0.02818192830560641,
+   "walk_away": 97812861.9188854,
    "available": false
   },
   {
    "name": "Raphinha",
    "pos": "DEL",
    "status": "rival",
-   "gain": 105.53590073579804,
+   "gain": 105.13992108507662,
    "asking": 165792528.0,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Martin Satriano",
-   "per_million": 0.6365540233260575,
+   "per_million": 0.6341656186404047,
    "price_next": 0.00043690283874897595,
    "price_lock": 0.0020461291037858764,
    "n": 25,
-   "yield": 0.0254621609330423,
-   "walk_away": 79738236.11149186,
+   "yield": 0.025366624745616188,
+   "walk_away": 79439051.48650233,
    "available": false
   },
   {
    "name": "Jude Bellingham",
    "pos": "MED",
    "status": "rival",
-   "gain": 94.08416385548298,
+   "gain": 94.79915263330017,
    "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
-   "replaces": "Aitor Paredes",
-   "per_million": 0.6008561083333617,
+   "replaces": "Guido Rodriguez",
+   "per_million": 0.6054222898982119,
    "price_next": 0.0039590158161020295,
    "price_lock": 0.018541096017753,
    "n": 25,
-   "yield": 0.024034244333334467,
-   "walk_away": 71085812.69080935,
+   "yield": 0.024216891595928478,
+   "walk_away": 71626026.43404903,
    "available": false
   },
   {
    "name": "Arda Guler",
    "pos": "MED",
    "status": "unlisted",
-   "gain": 88.65148237007833,
+   "gain": 89.34869858612745,
    "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
-   "replaces": "Aitor Paredes",
-   "per_million": 0.5840265831679958,
+   "replaces": "Guido Rodriguez",
+   "per_million": 0.5886197698074324,
    "price_next": 0.001257248166878222,
    "price_lock": 0.0058880186548950775,
    "n": 25,
-   "yield": 0.023361063326719833,
-   "walk_away": 66981120.012948066,
+   "yield": 0.023544790792297293,
+   "walk_away": 67507905.59840742,
    "available": false
   },
   {
    "name": "Alex Grimaldo",
    "pos": "DEF",
    "status": "rival",
-   "gain": 69.60358279767608,
+   "gain": 82.30656770431237,
    "asking": 85212787.0,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Aitor Paredes",
-   "per_million": 0.8168208698264507,
+   "per_million": 0.9658945635038596,
    "price_next": -0.0016902692047444656,
    "price_lock": -0.007915968280185703,
    "n": 25,
-   "yield": 0.03267283479305803,
-   "walk_away": 52589373.66935526,
+   "yield": 0.03863578254015439,
+   "walk_away": 62187184.487702675,
    "available": false
   },
   {
    "name": "Federico Valverde",
    "pos": "MED",
    "status": "unlisted",
-   "gain": 57.25625301844473,
+   "gain": 57.846848373468184,
    "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
-   "replaces": "Aitor Paredes",
-   "per_million": 0.5940240241530736,
+   "replaces": "Guido Rodriguez",
+   "per_million": 0.6001513519285069,
    "price_next": 0.00926098252274099,
    "price_lock": 0.04337157873290032,
    "n": 25,
-   "yield": 0.023760960966122947,
-   "walk_away": 43260280.05838046,
+   "yield": 0.024006054077140276,
+   "walk_away": 43706507.659953736,
+   "available": false
+  },
+  {
+   "name": "Alex Baena",
+   "pos": "MED",
+   "status": "unlisted",
+   "gain": 54.935437876955476,
+   "asking": null,
+   "bid": null,
+   "win": null,
+   "placed": null,
+   "replaces": "Guido Rodriguez",
+   "per_million": 0.623976452814035,
+   "price_next": -5.883585289756521e-05,
+   "price_lock": -0.0002755435311529997,
+   "n": 25,
+   "yield": 0.0249590581125614,
+   "walk_away": 41506775.284810804,
    "available": false
   },
   {
    "name": "Kike Salas",
    "pos": "DEF",
    "status": "rival",
-   "gain": 52.84477656706055,
+   "gain": 52.84149578739296,
    "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Aitor Paredes",
-   "per_million": 1.4197600475028695,
+   "per_million": 1.4196719040722545,
    "price_next": 0.025841335741705773,
    "price_lock": 0.1210216653505789,
    "n": 25,
-   "yield": 0.05679040190011478,
-   "walk_away": 39927164.51733464,
+   "yield": 0.05678687616289018,
+   "walk_away": 39924685.70603023,
    "available": false
   },
   {
    "name": "Pedri Gonzalez",
    "pos": "MED",
    "status": "rival",
-   "gain": 51.993228869921325,
+   "gain": 52.343742891383116,
    "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
-   "replaces": "Aitor Paredes",
-   "per_million": 0.6302498787389361,
+   "replaces": "Guido Rodriguez",
+   "per_million": 0.6344987285281131,
    "price_next": 0.01593830804112306,
    "price_lock": 0.07464322283055158,
    "n": 25,
-   "yield": 0.025209995149557445,
-   "walk_away": 39283772.923940554,
-   "available": false
-  },
-  {
-   "name": "Zaid Romero",
-   "pos": "DEF",
-   "status": "rival",
-   "gain": 50.99579906264561,
-   "asking": 14392831.0,
-   "bid": null,
-   "win": null,
-   "placed": null,
-   "replaces": "Aitor Paredes",
-   "per_million": 3.5431388767536847,
-   "price_next": -0.010456201056164627,
-   "price_lock": -0.04896909655545478,
-   "n": 25,
-   "yield": 0.1417255550701474,
-   "walk_away": 38530159.29177669,
+   "yield": 0.025379949141124524,
+   "walk_away": 39548605.74015614,
    "available": false
   }
  ],
@@ -471,97 +580,6 @@
  },
  "sells": [
   {
-   "name": "Dani Martinez",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Dani Martinez",
-   "step": "take offer",
-   "offer": 689897.0,
-   "waiting": null,
-   "trend": 11.989432108303886,
-   "plan": false,
-   "amount": 689897.0,
-   "done": false,
-   "key": "11861",
-   "gain": 0.0,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.0167958484954334,
-   "delta": {
-    "points": 0.0,
-    "window": {
-     "lock": 0.0,
-     "next4": 0.0,
-     "season": 0.0
-    },
-    "gap": []
-   },
-   "feasible": true,
-   "why_infeasible": null,
-   "replacement": null,
-   "replacement_why_not": null,
-   "offer_percentile": 0.5899632802937577,
-   "offers_seen": 817,
-   "per_million": 0.0,
-   "verdict": "sell",
-   "points_lost": 0.0,
-   "reserve": 19897.041824999997,
-   "rent": 0.776134125,
-   "facts": [
-    [
-     "value",
-     678501.0,
-     "money"
-    ],
-    [
-     "offer",
-     689897.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0167958484954334,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     0.5899632802937577,
-     "chance"
-    ],
-    [
-     "offers seen",
-     817,
-     "count"
-    ],
-    [
-     "sale price",
-     19897.041824999997,
-     "money"
-    ],
-    [
-     "points, lock",
-     0.0,
-     "points"
-    ],
-    [
-     "points, next4",
-     0.0,
-     "points"
-    ],
-    [
-     "points, season",
-     0.0,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
    "name": "Fernando Calero",
    "pos": "DEF",
    "what": "sell",
@@ -599,7 +617,7 @@
    "per_million": 0.0,
    "verdict": "sell",
    "points_lost": 0.0,
-   "reserve": 15753.698050115247,
+   "reserve": 768050.3597078834,
    "rent": 0.871149375,
    "facts": [
     [
@@ -629,7 +647,98 @@
     ],
     [
      "sale price",
-     15753.698050115247,
+     768050.3597078834,
+     "money"
+    ],
+    [
+     "points, lock",
+     0.0,
+     "points"
+    ],
+    [
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
+     0.0,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
+   "name": "Dani Martinez",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Dani Martinez",
+   "step": "take offer",
+   "offer": 689897.0,
+   "waiting": null,
+   "trend": 11.989432108303886,
+   "plan": false,
+   "amount": 689897.0,
+   "done": false,
+   "key": "11861",
+   "gain": 0.0,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 1.0167958484954334,
+   "delta": {
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    },
+    "gap": []
+   },
+   "feasible": true,
+   "why_infeasible": null,
+   "replacement": null,
+   "replacement_why_not": null,
+   "offer_percentile": 0.5899632802937577,
+   "offers_seen": 817,
+   "per_million": 0.0,
+   "verdict": "hold",
+   "points_lost": 0.0,
+   "reserve": 730128.318942828,
+   "rent": 0.776134125,
+   "facts": [
+    [
+     "value",
+     678501.0,
+     "money"
+    ],
+    [
+     "offer",
+     689897.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     1.0167958484954334,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     0.5899632802937577,
+     "chance"
+    ],
+    [
+     "offers seen",
+     817,
+     "count"
+    ],
+    [
+     "sale price",
+     730128.318942828,
      "money"
     ],
     [
@@ -665,7 +774,7 @@
    "amount": 74130613.0,
    "done": false,
    "key": "5565",
-   "gain": -60.71213041783949,
+   "gain": -61.22359856999037,
    "per": "season",
    "more": false,
    "detail": null,
@@ -673,11 +782,11 @@
    "flip": null,
    "ratio": 0.8870771600928048,
    "delta": {
-    "points": -60.71213041783949,
+    "points": -61.22359856999037,
     "window": {
-     "lock": -2.2308233566516975,
-     "next4": -7.98116172762596,
-     "season": -60.71213041783949
+     "lock": -2.2260491857154037,
+     "next4": -8.185384081519658,
+     "season": -61.22359856999037
     },
     "gap": []
    },
@@ -687,10 +796,10 @@
    "replacement_why_not": null,
    "offer_percentile": 0.0,
    "offers_seen": 817,
-   "per_million": 0.8189886466720502,
+   "per_million": 0.8258882004657155,
    "verdict": "hold",
-   "points_lost": 60.71213041783949,
-   "reserve": 64511898.94701925,
+   "points_lost": 61.22359856999037,
+   "reserve": 66974111.16077424,
    "rent": 83.396939625,
    "facts": [
     [
@@ -720,22 +829,22 @@
     ],
     [
      "sale price",
-     64511898.94701925,
+     66974111.16077424,
      "money"
     ],
     [
      "points, lock",
-     -2.2308233566516975,
+     -2.2260491857154037,
      "points"
     ],
     [
      "points, next4",
-     -7.98116172762596,
+     -8.185384081519658,
      "points"
     ],
     [
      "points, season",
-     -60.71213041783949,
+     -61.22359856999037,
      "points"
     ]
    ],
@@ -756,7 +865,7 @@
    "amount": 56742995.0,
    "done": false,
    "key": "11813",
-   "gain": -58.86113235906009,
+   "gain": -58.8450948692805,
    "per": "season",
    "more": false,
    "detail": null,
@@ -764,11 +873,11 @@
    "flip": null,
    "ratio": 0.9726174807708641,
    "delta": {
-    "points": -58.86113235906009,
+    "points": -58.8450948692805,
     "window": {
-     "lock": -4.712208716608437,
-     "next4": -11.045666802301213,
-     "season": -58.86113235906009
+     "lock": -4.765563519358494,
+     "next4": -10.85104831977685,
+     "season": -58.8450948692805
     },
     "gap": []
    },
@@ -778,10 +887,10 @@
    "replacement_why_not": null,
    "offer_percentile": 0.37576499388004897,
    "offers_seen": 817,
-   "per_million": 1.0373286140264555,
+   "per_million": 1.0370459802003842,
    "verdict": "hold",
-   "points_lost": 58.86113235906009,
-   "reserve": 61446622.52540011,
+   "points_lost": 58.8450948692805,
+   "reserve": 63074847.721180364,
    "rent": 63.835869375,
    "facts": [
     [
@@ -811,22 +920,22 @@
     ],
     [
      "sale price",
-     61446622.52540011,
+     63074847.721180364,
      "money"
     ],
     [
      "points, lock",
-     -4.712208716608437,
+     -4.765563519358494,
      "points"
     ],
     [
      "points, next4",
-     -11.045666802301213,
+     -10.85104831977685,
      "points"
     ],
     [
      "points, season",
-     -58.86113235906009,
+     -58.8450948692805,
      "points"
     ]
    ],
@@ -847,7 +956,7 @@
    "amount": 58678318.0,
    "done": false,
    "key": "11830",
-   "gain": -62.494283897671494,
+   "gain": -62.79786380565156,
    "per": "season",
    "more": false,
    "detail": null,
@@ -855,11 +964,11 @@
    "flip": null,
    "ratio": 0.9494439299588016,
    "delta": {
-    "points": -62.494283897671494,
+    "points": -62.79786380565156,
     "window": {
-     "lock": -4.016087689098406,
-     "next4": -11.956435642166014,
-     "season": -62.494283897671494
+     "lock": -3.9373513255572092,
+     "next4": -11.948741271600966,
+     "season": -62.79786380565156
     },
     "gap": []
    },
@@ -869,10 +978,10 @@
    "replacement_why_not": null,
    "offer_percentile": 0.25091799265605874,
    "offers_seen": 817,
-   "per_million": 1.065031957761153,
+   "per_million": 1.0702055877888585,
    "verdict": "hold",
-   "points_lost": 62.494283897671494,
-   "reserve": 65695413.63451419,
+   "points_lost": 62.79786380565156,
+   "reserve": 67852244.8974134,
    "rent": 66.01310775,
    "facts": [
     [
@@ -902,22 +1011,22 @@
     ],
     [
      "sale price",
-     65695413.63451419,
+     67852244.8974134,
      "money"
     ],
     [
      "points, lock",
-     -4.016087689098406,
+     -3.9373513255572092,
      "points"
     ],
     [
      "points, next4",
-     -11.956435642166014,
+     -11.948741271600966,
      "points"
     ],
     [
      "points, season",
-     -62.494283897671494,
+     -62.79786380565156,
      "points"
     ]
    ],
@@ -938,7 +1047,7 @@
    "amount": 46650067.0,
    "done": false,
    "key": "2675",
-   "gain": -52.40967621774644,
+   "gain": -52.62621490164952,
    "per": "season",
    "more": false,
    "detail": null,
@@ -946,11 +1055,11 @@
    "flip": null,
    "ratio": 1.0753287325926368,
    "delta": {
-    "points": -52.40967621774644,
+    "points": -52.62621490164952,
     "window": {
-     "lock": -3.615232097282451,
-     "next4": -10.065486606509097,
-     "season": -52.40967621774644
+     "lock": -3.6046759946508686,
+     "next4": -10.158716599778785,
+     "season": -52.62621490164952
     },
     "gap": []
    },
@@ -960,10 +1069,10 @@
    "replacement_why_not": null,
    "offer_percentile": 0.8886168910648715,
    "offers_seen": 817,
-   "per_million": 1.1234641145905844,
+   "per_million": 1.1281058803548882,
    "verdict": "hold",
-   "points_lost": 52.40967621774644,
-   "reserve": 52871318.56483187,
+   "points_lost": 52.62621490164952,
+   "reserve": 54187833.63069306,
    "rent": 52.481325375,
    "facts": [
     [
@@ -993,22 +1102,22 @@
     ],
     [
      "sale price",
-     52871318.56483187,
+     54187833.63069306,
      "money"
     ],
     [
      "points, lock",
-     -3.615232097282451,
+     -3.6046759946508686,
      "points"
     ],
     [
      "points, next4",
-     -10.065486606509097,
+     -10.158716599778785,
      "points"
     ],
     [
      "points, season",
-     -52.40967621774644,
+     -52.62621490164952,
      "points"
     ]
    ],
@@ -1029,7 +1138,7 @@
    "amount": 5507468.0,
    "done": false,
    "key": "7199",
-   "gain": -6.364186995788941,
+   "gain": -6.556410793785744,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1037,11 +1146,11 @@
    "flip": null,
    "ratio": 1.0322686331896678,
    "delta": {
-    "points": -6.364186995788941,
+    "points": -6.556410793785744,
     "window": {
      "lock": 0.0,
      "next4": 0.0,
-     "season": -6.364186995788941
+     "season": -6.556410793785744
     },
     "gap": []
    },
@@ -1051,10 +1160,10 @@
    "replacement_why_not": null,
    "offer_percentile": 0.6756425948592412,
    "offers_seen": 817,
-   "per_million": 1.1555558735500489,
+   "per_million": 1.190458263903802,
    "verdict": "hold",
-   "points_lost": 6.364186995788941,
-   "reserve": 6473532.595396767,
+   "points_lost": 6.556410793785744,
+   "reserve": 6817766.465034141,
    "rent": 6.1959015,
    "facts": [
     [
@@ -1084,7 +1193,7 @@
     ],
     [
      "sale price",
-     6473532.595396767,
+     6817766.465034141,
      "money"
     ],
     [
@@ -1099,7 +1208,7 @@
     ],
     [
      "points, season",
-     -6.364186995788941,
+     -6.556410793785744,
      "points"
     ]
    ],
@@ -1120,7 +1229,7 @@
    "amount": 22225150.0,
    "done": false,
    "key": "7916",
-   "gain": -29.922585763019015,
+   "gain": -30.203861459482596,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1128,11 +1237,11 @@
    "flip": null,
    "ratio": 1.046749618286312,
    "delta": {
-    "points": -29.922585763019015,
+    "points": -30.203861459482596,
     "window": {
-     "lock": -3.029637229041292,
-     "next4": -5.497150027103402,
-     "season": -29.922585763019015
+     "lock": -3.2647372001334745,
+     "next4": -5.758631615401384,
+     "season": -30.203861459482596
     },
     "gap": []
    },
@@ -1142,10 +1251,10 @@
    "replacement_why_not": null,
    "offer_percentile": 0.7637698898408812,
    "offers_seen": 817,
-   "per_million": 1.3463389791753493,
+   "per_million": 1.3589947181226043,
    "verdict": "hold",
-   "points_lost": 29.922585763019015,
-   "reserve": 29964887.965783324,
+   "points_lost": 30.203861459482596,
+   "reserve": 30836353.8151452,
    "rent": 25.00329375,
    "facts": [
     [
@@ -1175,22 +1284,22 @@
     ],
     [
      "sale price",
-     29964887.965783324,
+     30836353.8151452,
      "money"
     ],
     [
      "points, lock",
-     -3.029637229041292,
+     -3.2647372001334745,
      "points"
     ],
     [
      "points, next4",
-     -5.497150027103402,
+     -5.758631615401384,
      "points"
     ],
     [
      "points, season",
-     -29.922585763019015,
+     -30.203861459482596,
      "points"
     ]
    ],
@@ -1211,7 +1320,7 @@
    "amount": 19091913.0,
    "done": false,
    "key": "8496",
-   "gain": -40.99426691339022,
+   "gain": -42.63407137616127,
    "per": "season",
    "more": false,
    "detail": null,
@@ -1219,11 +1328,11 @@
    "flip": null,
    "ratio": 0.9700360040878678,
    "delta": {
-    "points": -40.99426691339022,
+    "points": -42.63407137616127,
     "window": {
-     "lock": -2.454432387737917,
-     "next4": -9.430937733559716,
-     "season": -40.99426691339022
+     "lock": -2.468645623443514,
+     "next4": -9.62095319150643,
+     "season": -42.63407137616127
     },
     "gap": []
    },
@@ -1233,10 +1342,10 @@
    "replacement_why_not": null,
    "offer_percentile": 0.3659730722154223,
    "offers_seen": 817,
-   "per_million": 2.1472058307300173,
+   "per_million": 2.233095833621349,
    "verdict": "hold",
-   "points_lost": 40.99426691339022,
-   "reserve": 41328086.11902666,
+   "points_lost": 42.63407137616127,
+   "reserve": 43890003.19337127,
    "rent": 21.478402125,
    "facts": [
     [
@@ -1266,22 +1375,22 @@
     ],
     [
      "sale price",
-     41328086.11902666,
+     43890003.19337127,
      "money"
     ],
     [
      "points, lock",
-     -2.454432387737917,
+     -2.468645623443514,
      "points"
     ],
     [
      "points, next4",
-     -9.430937733559716,
+     -9.62095319150643,
      "points"
     ],
     [
      "points, season",
-     -40.99426691339022,
+     -42.63407137616127,
      "points"
     ]
    ],
@@ -1762,7 +1871,7 @@
   {
    "name": "Mathew Ryan",
    "pos": "POR",
-   "next": 6.259234769313621,
+   "next": 6.08986202877393,
    "xi": true,
    "best": true,
    "sold": false
@@ -1770,7 +1879,7 @@
   {
    "name": "Natan",
    "pos": "DEF",
-   "next": 7.036287297302465,
+   "next": 7.086944610985903,
    "xi": true,
    "best": true,
    "sold": false
@@ -1778,7 +1887,7 @@
   {
    "name": "Dean Huijsen",
    "pos": "DEF",
-   "next": 6.340166269792438,
+   "next": 6.258732417184619,
    "xi": true,
    "best": true,
    "sold": false
@@ -1786,7 +1895,7 @@
   {
    "name": "Aitor Paredes",
    "pos": "DEF",
-   "next": 5.353715809735322,
+   "next": 5.5861182917608785,
    "xi": true,
    "best": true,
    "sold": false
@@ -1794,7 +1903,7 @@
   {
    "name": "Dani Martinez",
    "pos": "DEF",
-   "next": 1.0572174524356996,
+   "next": 1.057070824107543,
    "xi": true,
    "best": false,
    "sold": true
@@ -1802,15 +1911,7 @@
   {
    "name": "Pepelu",
    "pos": "MED",
-   "next": 4.988009032076799,
-   "xi": true,
-   "best": true,
-   "sold": false
-  },
-  {
-   "name": "Guido Rodriguez",
-   "pos": "MED",
-   "next": 4.754732276166189,
+   "next": 4.95237813694161,
    "xi": true,
    "best": true,
    "sold": false
@@ -1818,7 +1919,15 @@
   {
    "name": "Pablo Fornals",
    "pos": "MED",
-   "next": 4.728011014285748,
+   "next": 4.7213401472129926,
+   "xi": true,
+   "best": true,
+   "sold": false
+  },
+  {
+   "name": "Guido Rodriguez",
+   "pos": "MED",
+   "next": 4.720767749229992,
    "xi": true,
    "best": true,
    "sold": false
@@ -1826,7 +1935,7 @@
   {
    "name": "Mikel Oyarzabal",
    "pos": "DEL",
-   "next": 5.939310677976478,
+   "next": 5.926057086278277,
    "xi": true,
    "best": true,
    "sold": false
@@ -1834,7 +1943,7 @@
   {
    "name": "Martin Satriano",
    "pos": "DEL",
-   "next": 4.778510968431944,
+   "next": 4.79002671507092,
    "xi": true,
    "best": true,
    "sold": false
@@ -1842,7 +1951,7 @@
   {
    "name": "Vinicius Junior",
    "pos": "DEL",
-   "next": 4.554901937345728,
+   "next": 4.547430277342808,
    "xi": true,
    "best": true,
    "sold": false
@@ -1850,7 +1959,7 @@
   {
    "name": "Aymeric Laporte",
    "pos": "DEF",
-   "next": 5.908599809874839,
+   "next": 6.165089565758712,
    "xi": false,
    "best": false,
    "sold": true
@@ -1858,7 +1967,7 @@
   {
    "name": "Sergio Carreira",
    "pos": "DEF",
-   "next": 2.3240785806940303,
+   "next": 2.3213810916274107,
    "xi": false,
    "best": true,
    "sold": false
@@ -1866,7 +1975,7 @@
   {
    "name": "Fernando Calero",
    "pos": "DEF",
-   "next": 1.156925217712623,
+   "next": 1.1653125677193128,
    "xi": false,
    "best": false,
    "sold": true
