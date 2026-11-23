@@ -105,7 +105,7 @@ Every forecast is the same product, for every player and jornada
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more
-  (`board.later_sale`: each later night's offer, at
+  (`hurdle.later`, read from `decision.exit_of`: each later night's offer, at
   his value then (`price_fold.price_carry`), the last before the lock always); with no offer yet, his value.
 - **Assembly** (`ffcore/loader.py`, `ffcore/state.py`): the one place that reads storage;
   the model's selectors read the World, never a table.

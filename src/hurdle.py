@@ -2,7 +2,7 @@
 points per million per jornada remaining. A move's P is the points above the next man up over its window of n jornadas
 (Buyer.gain for a buy, the sale's lost points for a sale); its yield is P / (n x price in millions). A listing is bought
 iff its yield reaches margin(price) x LAMBDA; a sale is taken iff the player's yield, his expected price change
-counted at the rate, is under LAMBDA / MARGIN (sale_price); the walk-away price is S x P / (n x LAMBDA) and the bid
+counted at the rate, is under LAMBDA / MARGIN (sale_price, from the player's Exit); the walk-away price is S x P / (n x LAMBDA) and the bid
 the win-weighted surplus under it at its best (bid); a bid already placed is held, lowered, withdrawn or raised
 by the same surplus (stand)."""
 from __future__ import annotations
@@ -17,6 +17,7 @@ from typing import NamedTuple
 from ffcore.auction import Curve, chance
 from ffcore.loader import Opportunity
 from ffcore.parse import snapshot_stamp, stamp
+from ffcore.rules import SALE_ESTIMATE
 
 POOL_DAYS = 28
 MIN_DAYS = 5
@@ -30,6 +31,7 @@ CHEAP_MARGIN = 1.5
 WIN_FLOOR = 0.25
 TREND_NIGHTS = 7
 TREND_CAP = 0.03
+FORECAST_NIGHTS = 10
 
 
 def remaining(first: int, last: int) -> int:
@@ -146,16 +148,44 @@ def stand(curve: Curve, asking: float, placed: float, cap: float) -> Stand:
     return Stand("hold", None, here, None, None)
 
 
+class Exit(NamedTuple):
+    """What a player fetches when sold later, read from the price forecast: his value, the forecast's rise at its furthest
+    horizon within TREND_NIGHTS (None: no such horizon) and its rise at its furthest horizon (0 with no forecast), each a
+    fraction of value."""
+    value: float
+    rise: float | None = None
+    far: float = 0.0
+
+
+def draw(value: float) -> float:
+    """The expected offer, in euros, drawn for a player of this value on a night: SALE_ESTIMATE times value."""
+    return SALE_ESTIMATE * value
+
+
+def later(exit: Exit) -> float:
+    """The expected sale price of the exit after its furthest horizon: draw(value) x (1 + far)."""
+    return draw(exit.value) * (1 + exit.far)
+
+
+def wait_cost(exit: Exit) -> float:
+    """The cost of a night of waiting, as a fraction of value: the price forecast's rise at its furthest horizon
+    (later over draw, less 1) spread over FORECAST_NIGHTS and negated, so a falling price costs and a rising one pays.
+    0 for a value that is not positive."""
+    if exit.value <= 0:
+        return 0.0
+    return (1 - later(exit) / draw(exit.value)) / FORECAST_NIGHTS
+
+
 def drift(rise: float | None) -> float:
     """The expected price change over value TREND_NIGHTS nights ahead at most, held within +-TREND_CAP; 0 with none."""
     return 0.0 if rise is None else max(-TREND_CAP, min(TREND_CAP, rise))
 
 
-def sale_price(points: float, n: int, value: float, rise: float | None, rate: float) -> float:
+def sale_price(points: float, n: int, exit: Exit, rate: float) -> float:
     """The offer, in euros, at and above which selling a player whose sale loses points over n jornadas beats keeping him at
-    rate: his yield, the points plus S x rate x n x his expected price change (drift(rise) x value, in millions),
+    rate: his yield, the points plus S x rate x n x his expected price change (drift(exit.rise) x exit.value, in millions),
     over n x the offer, is under rate / MARGIN. Nondecreasing in points and rise, nonincreasing in rate."""
-    return MARGIN * (points * 1e6 / (n * rate) + S * drift(rise) * value)
+    return MARGIN * (points * 1e6 / (n * rate) + S * drift(exit.rise) * exit.value)
 
 
 def _row(cut: str, player: str, gain: float, per_million: float | None, from_j: int = 13) -> Opportunity:
@@ -230,16 +260,32 @@ def _selftest_sale() -> None:
     for _ in range(2000):
         n, rate, value = rng.choice([1, 13, 26]), rng.choice([0.02, 0.045]), rng.choice([1e6, 2e7])
         points, rise = rng.uniform(0, 50), rng.choice([None, -0.2, -0.01, 0.0, 0.01, 0.2])
-        at = sale_price(points, n, value, rise, rate)
+        at = sale_price(points, n, Exit(value, rise), rate)
         for offer in (0.5 * at, 0.99 * at, 1.01 * at, 2 * at):
             if offer <= 0:
                 continue
             own = (points + S * rate * n * drift(rise) * value / 1e6) / (n * offer / 1e6)
             assert (offer >= at) == (own <= rate / MARGIN + 1e-12), "sell iff his yield is under the rate's bar"
-        assert sale_price(points + 1, n, value, rise, rate) > at and sale_price(points + 1, n, value, rise, 2 * rate) < sale_price(points + 1, n, value, rise, rate)
-        assert abs(sale_price(2 * points, n, 2 * value, rise, rate) - 2 * at) < 1e-3, "scale-invariant"
+        assert sale_price(points + 1, n, Exit(value, rise), rate) > at
+        assert sale_price(points + 1, n, Exit(value, rise), 2 * rate) < sale_price(points + 1, n, Exit(value, rise), rate)
+        assert abs(sale_price(2 * points, n, Exit(2 * value, rise), rate) - 2 * at) < 1e-3, "scale-invariant"
         assert abs(drift(rise)) <= TREND_CAP
-    assert sale_price(0.0, 5, 1e6, None, 0.045) == 0.0, "no points, no trend: any offer"
+    assert sale_price(0.0, 5, Exit(1e6), 0.045) == 0.0, "no points, no trend: any offer"
+
+
+def _selftest_exit() -> None:
+    rng = random.Random(21)
+    for _ in range(2000):
+        value, far = rng.uniform(1e5, 5e7), rng.uniform(-0.3, 0.3)
+        e = Exit(value, rng.choice([None, rng.uniform(-0.3, 0.3)]), far)
+        assert abs(later(e) / draw(value) - 1 - far) < 1e-9, "the later price reads the exit's far rise"
+        assert abs(wait_cost(e) + far / FORECAST_NIGHTS) < 1e-9, "the night's cost reads the same far rise"
+        assert abs(later(e._replace(value=2 * value)) - 2 * later(e)) < 1e-3 and abs(wait_cost(e._replace(value=2 * value)) - wait_cost(e)) < 1e-12
+        flat = Exit(value, e.rise)
+        assert later(flat) == draw(value) and wait_cost(flat) == 0.0, "no far rise: the draw, and waiting is free"
+        points, n, rate = rng.uniform(0, 30), rng.choice([1, 8, 26]), rng.choice([0.02, 0.045])
+        assert abs(sale_price(points, n, flat, rate) - sale_price(points, n, Exit(value), rate) - MARGIN * S * drift(e.rise) * value) < 1e-6
+    assert wait_cost(Exit(0.0, None, 0.5)) == 0.0
 
 
 def _selftest_stand() -> None:
@@ -282,6 +328,7 @@ def _selftest() -> None:
     _selftest_lam()
     _selftest_buy()
     _selftest_sale()
+    _selftest_exit()
     print("hurdle self-test OK")
 
 

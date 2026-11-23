@@ -124,19 +124,9 @@ def context(inp: decision.Inputs, offers: worth.OfferDistribution = worth.NO_OFF
                          decision.squad_of(inp), cells, locks)
 
 
-def later_sale(inp: decision.Inputs, player: str, value: float) -> float:
-    rows = [x for x in inp.prices if x.player == player]
-    if not rows:
-        return rules.SALE_ESTIMATE * value
-    return rules.SALE_ESTIMATE * value * (1 + decision.rise(max(rows, key=lambda x: x.h)))
-
-
 def standing(inp: decision.Inputs, player: str, value: float, offer: float | None) -> worth.Standing:
-    """The offer on a player as the sale rules read it: later_sale, and the price forecast's rise at its furthest horizon
-    within hurdle.TREND_NIGHTS (None with no such row)."""
-    near = [x for x in inp.prices if x.player == player and x.h <= hurdle.TREND_NIGHTS and x.value]
-    return worth.Standing(player, value, offer, later_sale(inp, player, value),
-                          decision.rise(max(near, key=lambda x: x.h)) if near else None)
+    """The offer on a player as the sale rules read it: his decision.exit_of."""
+    return worth.Standing(player, decision.exit_of(inp, player, value), offer)
 
 
 def offers_at(world: state.World) -> worth.OfferDistribution:
@@ -559,7 +549,7 @@ def cover_lines(inp: decision.Inputs, names: dict[str, str], club: Club, plan: P
         out.append({
             "what": "wait", "label": "wait for the offers of " + ", ".join(names_waiting), "step": "wait", "needed": True,
             "n_closes": clock.n_closes, "expected_cover": names_waiting,
-            "expected_raised": sum(club.offers.get(k, rules.SALE_ESTIMATE * club.worth[k]) for k in waiting), "need": need,
+            "expected_raised": sum(club.offers.get(k, hurdle.draw(club.worth[k])) for k in waiting), "need": need,
             "cost_points": plan.cost, "last_close": stamped(clock.last_close), **risk_doc(club, before),
             "why": "cash %.0f is below 0 and the lock is %d closes away (the last %s): the cheapest plan (%.1f points) sells %s to the offers "
                    "still to come; nothing is taken now%s" % (club.cash, clock.n_closes, shown(close) if close else "", plan.cost,
@@ -1015,7 +1005,7 @@ def _selftest_cover() -> None:
             assert w["cost_points"] == found.cost and w["need"] >= 0
             members = {k for k in own if k in w["expected_cover"]}
             assert members <= listed and members <= found.sells - {r["key"] for r in takes_}, "a wait names members that are listed"
-            assert abs(w["expected_raised"] - sum(offers.get(k, rules.SALE_ESTIMATE * value[k]) for k in members)) < 1e-6
+            assert abs(w["expected_raised"] - sum(offers.get(k, hurdle.draw(value[k])) for k in members)) < 1e-6
             seen_wait += 1
         if n_closes >= 1 and found.sells - listed:
             assert not waits, "a plan member not listed is not counted as a cover"
@@ -1071,9 +1061,24 @@ def _selftest() -> None:
     funds(buys, sells)
     assert [s["for"] for s in sells] == [["Raphinha"], []], "an offer is taken tonight when a funded buy sells him tonight"
     money = decision.Money(0.0, 0.0, 0.0, 0, 0)
-    assert later_sale(decision.Inputs(money), "p", 10.0) == rules.SALE_ESTIMATE * 10.0, "no price row: the estimate"
+    assert standing(decision.Inputs(money), "p", 10.0, None).later == rules.SALE_ESTIMATE * 10.0, "no price row: the estimate"
     priced = decision.Inputs(money, prices=[decision.Price("p", 1, 10.5, 10.0), decision.Price("p", 3, 11.0, 10.0)])
-    assert abs(later_sale(priced, "p", 10.0) - rules.SALE_ESTIMATE * 10.0 * 1.1) < 1e-9, "the price row furthest ahead: 10% above"
+    assert abs(standing(priced, "p", 10.0, None).later - rules.SALE_ESTIMATE * 10.0 * 1.1) < 1e-9, "the price row furthest ahead: 10% above"
+    rng = random.Random(14)
+    dist = worth.offer_ratio_distribution(rng.uniform(0.9, 1.1) for _ in range(40))
+    for _ in range(300):
+        value, rate, n = rng.uniform(1e6, 4e7), rng.choice([0.02, 0.045]), rng.choice([1, 9, 26])
+        rows = [decision.Price("p", h, value * (1 + rng.uniform(-0.1, 0.1) * rng.choice([0, 1])), value) for h in rng.sample(range(1, 12), rng.randint(0, 5))]
+        s = standing(decision.Inputs(money, prices=rows), "p", value, None)
+        e = s.exit
+        assert abs(s.later / hurdle.draw(value) - 1 - e.far) < 1e-9 and abs(hurdle.wait_cost(e) + e.far / hurdle.FORECAST_NIGHTS) < 1e-12, \
+            "the buy side's later price and the sale side's waiting cost read one rise"
+        points = rng.uniform(0, 20)
+        assert hurdle.sale_price(points, n, e, rate) == hurdle.sale_price(points, n, hurdle.Exit(value, e.rise), rate), "the sale reserve reads the exit's drift only"
+        assert worth.waiting_reserve(s, dist, 3) >= s.later
+        flat = standing(decision.Inputs(money, prices=[decision.Price("p", h, value, value) for h in range(1, 6)]), "p", value, None)
+        assert flat.exit == hurdle.Exit(value, 0.0, 0.0) and flat.later == hurdle.draw(value) and hurdle.wait_cost(flat.exit) == 0.0, "no rise: today's draw"
+        assert hurdle.sale_price(points, n, flat.exit, rate) == hurdle.MARGIN * (points * 1e6 / (n * rate)), "no rise: no drift in the sale price"
     asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
               "feasible": True, "delta": {"points": 0.0, "window": {"lock": 0.0, "next4": 0.0, "season": 0.0}, "gap": []},
               "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},
@@ -1084,10 +1089,10 @@ def _selftest() -> None:
               "feasible": False, "delta": {"points": None, "window": {"lock": None, "next4": None, "season": None}, "gap": [3, 4]},
               "facts": [["value", 3.0, "money"]]}]
     held = [decision.Held("p", "t1", None, 1.8), decision.Held("q", "t2", None, 3.0), decision.Held("r", "t3", None, 1.0)]
-    standing = [current.Offer("20", "t1", "pending", 2.0, "c20", "", ""), current.Offer("10", "t1", "pending", 2.0, "c10", "", ""),
+    pending = [current.Offer("20", "t1", "pending", 2.0, "c20", "", ""), current.Offer("10", "t1", "pending", 2.0, "c10", "", ""),
                 current.Offer("30", "t2", "pending", 3.0, "c30", "", ""), current.Offer("40", "t3", "declined", 9.0, "c40", "", ""),
                 current.Offer("50", "tx", "pending", 9.0, "c50", "", ""), current.Offer("60", "t3", "pending", None, "c60", "", "")]
-    stood = stood_offers(held, standing)
+    stood = stood_offers(held, pending)
     assert sorted(x.offer_id for x in stood) == ["10", "20", "30"], "pending, with money, on a player held"
     made = offer_rows("cut", asked, stood)
     assert [(m["player"], m["offer_id"], m["created_at"]) for m in made] == [("p", "10", "c10"), ("p", "20", "c20"), ("q", "30", "c30")]

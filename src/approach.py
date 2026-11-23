@@ -9,9 +9,10 @@ from operator import or_
 from typing import NamedTuple
 
 import eleven
+import hurdle
 import valuation
 from inflow import NONE, Inflow
-from ffcore.rules import DEBT_SHARE, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
+from ffcore.rules import DEBT_SHARE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
 
 __all__ = ["Club", "Rounds", "Approach", "Plan", "approach", "replacement", "plan", "prices"]
 
@@ -136,10 +137,10 @@ def per_unit(cost: float | None, price: float) -> tuple[bool, float]:
 
 
 def prices(club: Club, bought: bool) -> dict[str, float]:
-    """What each player of the squad raises when sold after the result of a bid (`bought`): the expected draw SALE_ESTIMATE times
-    his worth, since a standing offer expires at the close and is redrawn. With no bid (`bought` False) the standing offer where
+    """What each player of the squad raises when sold after the result of a bid (`bought`): the expected draw (hurdle.draw of
+    his worth), since a standing offer expires at the close and is redrawn. With no bid (`bought` False) the standing offer where
     there is one, else the expected draw."""
-    return {k: SALE_ESTIMATE * club.worth[k] if bought else club.offers.get(k, SALE_ESTIMATE * club.worth[k]) for k in club.squad}
+    return {k: hurdle.draw(club.worth[k]) if bought else club.offers.get(k, hurdle.draw(club.worth[k])) for k in club.squad}
 
 
 def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mapping[str, float], need: float
@@ -326,7 +327,7 @@ def _selftest() -> None:
         got = approach(club, "star", bid, win, rounds)
         assert got is not None
         squad, here = club.squad, club.squad | {"star"}
-        price = {k: SALE_ESTIMATE * worth[k] for k in squad}
+        price = {k: hurdle.draw(worth[k]) for k in squad}
 
         @lru_cache(maxsize=None)
         def points(sq: frozenset[str], js: tuple[int, ...]) -> float | None:

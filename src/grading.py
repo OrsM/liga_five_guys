@@ -1186,7 +1186,7 @@ def _selftest_rule_scores() -> None:
         return lambda standing, ctx: worth.Verdict(None, valuation.Reading(None, {}, ()), reserve)
     cases: list[list[list[str]]] = [[["a"], ["a", "b"], ["b", "a", "c"]], [["x"]], [[]]]
     for offers in cases:
-        cuts = [Cut(at + dt.timedelta(days=i), ctx, [worth.Standing(p, 1e6, 1e6 * (1 + i), 1e6) for p in ps])
+        cuts = [Cut(at + dt.timedelta(days=i), ctx, [worth.Standing(p, hurdle.Exit(1e6), 1e6 * (1 + i)) for p in ps])
                 for i, ps in enumerate(offers)]
         got = first_sales(cuts, {"all": rule(0.0), "none": rule(None), "high": rule(1e12)})
         every = sorted(set(itertools.chain.from_iterable(offers)))

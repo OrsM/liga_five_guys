@@ -18,20 +18,25 @@ import valuation
 from valuation import Reading, Window
 
 MAX_NIGHTS = 5
-FORECAST_NIGHTS = 10
 NO_LOSS = 1e-9
 TAKE_RATIO = 1.0
 TAKE_PERCENTILE = 0.5
 
 
 class Standing(NamedTuple):
-    """An offer on a player: his value, the offer (None: none), the later sale price (SALE_ESTIMATE x value x the price
-    forecast's rise at its furthest horizon) and rise, the price forecast's rise at most hurdle.TREND_NIGHTS ahead (None: none)."""
+    """An offer on a player: the player, his hurdle.Exit and the offer (None: none); value and later (hurdle.later) are
+    the exit's."""
     player: str
-    value: float
-    offer: float | None
-    later: float
-    rise: float | None = None
+    exit: hurdle.Exit
+    offer: float | None = None
+
+    @property
+    def value(self) -> float:
+        return self.exit.value
+
+    @property
+    def later(self) -> float:
+        return hurdle.later(self.exit)
 
 
 class OfferDistribution(NamedTuple):
@@ -99,34 +104,25 @@ def offer_reserve_ratio(m: int, c: float, dist: OfferDistribution, hold: float) 
     return rho
 
 
-def drift_cost(standing: Standing) -> float:
-    """The cost of a night of waiting, as a fraction of value: the price forecast's rise (later over SALE_ESTIMATE times
-    value, less 1) spread over FORECAST_NIGHTS and negated, so a falling price costs and a rising one pays. 0 for a value
-    that is not positive."""
-    if standing.value <= 0:
-        return 0.0
-    return (1 - standing.later / (SALE_ESTIMATE * standing.value)) / FORECAST_NIGHTS
-
-
 def waiting_reserve(standing: Standing, dist: OfferDistribution, m: int) -> float:
     """The offer, in money, at which taking it now and waiting for a draw of dist at each of the m closes left are worth the
-    same: value times offer_reserve_ratio with the drift_cost of the standing and hold = later over value, never below later;
+    same: value times offer_reserve_ratio with the hurdle.wait_cost of the exit and hold = later over value, never below later;
     later when dist is empty or the value is not positive."""
     if not dist.ratios or standing.value <= 0:
         return standing.later
-    return max(standing.later, standing.value * offer_reserve_ratio(m, drift_cost(standing), dist, standing.later / standing.value))
+    return max(standing.later, standing.value * offer_reserve_ratio(m, hurdle.wait_cost(standing.exit), dist, standing.later / standing.value))
 
 
 def rent(standing: Standing, ctx: Context) -> Verdict:
     """The one sale rule: money and points at one rate. The reserve is hurdle.sale_price of the points the sale loses (over
-    the season of ctx.window) over ctx.jornadas() at ctx.rate, with his value and his rise: the offer above which his
+    the season of ctx.window) over ctx.jornadas() at ctx.rate, with his exit: the offer above which his
     yield is under the rate's bar (a bench player, who loses nothing, is under it at any offer his price trend allows).
     The key is reserve minus offer (0 or less sells); with no offer it is None. Where the sale has no Delta, key and
     reserve are None."""
     sale = ctx.sale(standing.player)
     if sale.points is None:
         return Verdict(None, sale, None)
-    reserve = hurdle.sale_price(0.0 - sale.points, ctx.jornadas(), standing.value, standing.rise, ctx.rate)
+    reserve = hurdle.sale_price(0.0 - sale.points, ctx.jornadas(), standing.exit, ctx.rate)
     key = None if standing.offer is None else reserve - standing.offer
     return Verdict(key, sale, reserve)
 
@@ -198,7 +194,7 @@ def _selftest_option() -> None:
     else:
         raise AssertionError("no offers, no reserve")
 
-    shelf = Standing("p", 1e7, None, 9.5e6)
+    shelf = Standing("p", hurdle.Exit(1e7, None, 9.5e6 / hurdle.draw(1e7) - 1))
     reserves = [waiting_reserve(shelf, study, m) for m in range(0, 8)]
     assert reserves[0] == shelf.later and all(a <= b + 1e-9 for a, b in zip(reserves, reserves[1:])), "more closes left never lowers the reserve"
     assert all(r >= shelf.later for r in reserves) and waiting_reserve(shelf, NO_OFFERS, 5) == shelf.later, "never below later; no offers seen: later"
@@ -215,15 +211,15 @@ def _selftest_option() -> None:
     squad = {"%s%d" % (q, i): q for q, n in shape.items() for i in range(n)} | {"p": "DEF"}
     still = {1: {k: 1.0 for k in squad} | {"p": 0.0}}
     bench_ctx = Context(squad, Window((1,)), 0.0, study, squad=frozenset(squad), cells=still)
-    stand = Standing("p", value, None, SALE_ESTIMATE * value)
+    stand = Standing("p", hurdle.Exit(value))
     reserve = waiting_reserve(stand, bench_ctx.offers, MAX_NIGHTS)
     assert abs(reserve / value - held) < 0.003, "the waiting reserve is the Monte Carlo waiting value"
     assert waiting_reserve(stand, NO_OFFERS, MAX_NIGHTS) == stand.later, "no offers seen: the later price"
     for drift in (-0.2, 0.0, 0.2):
-        s = Standing("p", value, 0.0, SALE_ESTIMATE * value * (1 + drift))
+        s = Standing("p", hurdle.Exit(value, None, drift), 0.0)
         assert waiting_reserve(s, bench_ctx.offers, MAX_NIGHTS) >= s.later, "a waiting reserve is never below the later price"
     for rise in (None, -0.1, 0.0, 0.1):
-        bench = rent(stand._replace(offer=0.9 * value, rise=rise), bench_ctx)
+        bench = rent(stand._replace(exit=stand.exit._replace(rise=rise), offer=0.9 * value), bench_ctx)
         assert bench.key is not None and bench.key <= 0, "a bench player is sold at any offer near his value"
     assert Context({}, Window(), 0.0) == Context({}, Window(), 0.0, NO_OFFERS, hurdle.FALLBACK_LAMBDA), "the new fields default"
     for ratio, share, funds in [(1.0, None, False), (0.9, 0.5, False), (0.9, 0.1, True), (None, None, True)]:
@@ -254,7 +250,7 @@ def _selftest_no_legal_eleven() -> None:
 
     bare = _context(pos, pos, cells)
     for p in pos:
-        v = LIVE(Standing(p, value[p], 1e6, value[p]), bare)
+        v = LIVE(Standing(p, hurdle.Exit(value[p]), 1e6), bare)
         assert _lost(p, bare) is None and v == Verdict(None, bare.sale(p), None) and bare.sale(p).points is None, "eleven players only: nobody has a quotable loss"
     extra = "DEF9"
     pos[extra], value[extra] = "DEF", 0.5
@@ -309,7 +305,7 @@ def _selftest() -> None:
                 for p in squad:
                     got = _lost(p, ctx)
                     for rise in (None, -0.1, 0.02)[:1 + 2 * (seed < 8)]:
-                        s = Standing(p, value[p], 1e6 * (1 + seed), SALE_ESTIMATE * value[p], rise)
+                        s = Standing(p, hurdle.Exit(value[p], rise), 1e6 * (1 + seed))
                         v = LIVE(s, rated)
                         assert v.sale == ctx.sale(p)
                         if got is None:
@@ -317,20 +313,20 @@ def _selftest() -> None:
                             continue
                         assert v.reserve is not None and v.key == v.reserve - (s.offer or 0.0), "the key is reserve less offer"
                         lost = got["season"]
-                        assert v.reserve == hurdle.sale_price(lost, left, value[p], rise, rate), "a starter is sold iff his yield is under the bar"
+                        assert v.reserve == hurdle.sale_price(lost, left, s.exit, rate), "a starter is sold iff his yield is under the bar"
                         for offer in (x for x in (0.5 * v.reserve, v.reserve, 2 * v.reserve) if x > 0):
                             own = (lost + hurdle.S * rate * left * hurdle.drift(rise) * value[p] / 1e6) / (left * offer / 1e6)
                             assert (v.reserve - offer <= 0) == (own <= rate / hurdle.MARGIN + 1e-9), "sell iff the cash out-yields him at the rate"
                         if seed < 8 and rise is None:
                             assert LIVE(s._replace(offer=None), rated).key is None, "no offer, no key"
-                            doubled = LIVE(Standing(p, 2 * value[p], 2 * (s.offer or 0.0), 2 * s.later, rise), doubled_ctx._replace(rate=rate))
+                            doubled = LIVE(Standing(p, hurdle.Exit(2 * value[p], rise), 2 * (s.offer or 0.0)), doubled_ctx._replace(rate=rate))
                             assert doubled.key is not None and abs(doubled.key - 2 * v.key) < 1e-3, "doubling prices and points doubles the key"
     assert set(CHALLENGERS) == {"rent"} and LIVE is rent
 
     def stub(standing: Standing, ctx: Context) -> Verdict:
         return Verdict(1.0, Reading(None, {}, ()), 2.0)
     rule: Rule = stub
-    assert rule(Standing("x", 1.0, 1.0, 1.0), Context({}, Window(), 0.0)) == Verdict(1.0, Reading(None, {}, ()), 2.0)
+    assert rule(Standing("x", hurdle.Exit(1.0), 1.0), Context({}, Window(), 0.0)) == Verdict(1.0, Reading(None, {}, ()), 2.0)
     _selftest_option()
     _selftest_no_legal_eleven()
     print("worth self-test OK")

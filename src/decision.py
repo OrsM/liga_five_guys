@@ -323,8 +323,22 @@ def curves_of(inp: Inputs) -> dict[str, Curve]:
     return {k: tuple(v) for k, v in out.items()}
 
 
-def rise(x: Price) -> float:
-    return x.expected_value / x.value - 1
+def rises_of(inp: Inputs) -> dict[str, dict[int, float]]:
+    """The price forecast's rise (expected value over value, less 1), as a fraction, by player and horizon in nights, of the
+    rows with a value. The one place inp.prices is read."""
+    out: dict[str, dict[int, float]] = {}
+    for x in inp.prices:
+        if x.value:
+            out.setdefault(x.player, {})[x.h] = x.expected_value / x.value - 1
+    return out
+
+
+def exit_of(inp: Inputs, player: str, value: float) -> hurdle.Exit:
+    """The hurdle.Exit of a player of this value: the forecast's rise at its furthest horizon within hurdle.TREND_NIGHTS
+    (None with none) and at its furthest horizon (0 with no forecast). The only reader of the price forecast."""
+    steps = rises_of(inp).get(player, {})
+    near = [h for h in steps if h <= hurdle.TREND_NIGHTS]
+    return hurdle.Exit(value, steps[max(near)] if near else None, steps[max(steps)] if steps else 0.0)
 
 
 def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[dict[str, Any]]:
@@ -338,10 +352,7 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
     locks = lock_times(inp)
     closes = {x.player: x.close for x in inp.closes}
     placed = {x.player: x.amount for x in inp.bids}
-    ahead: dict[str, dict[int, Price]] = {}
-    for x in inp.prices:
-        if x.value:
-            ahead.setdefault(x.player, {})[x.h] = x
+    ahead = rises_of(inp)
     fielded = lineup_of(inp, pos).eleven
     seen: dict[Window, tuple[dict[str, float], eleven.Settled | None, valuation.Buyer]] = {}
     out = []
@@ -373,8 +384,8 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
         out.append({
             "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": where.lock[0],
             "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
-            "price_next": rise(steps[1]) if 1 in steps else None,
-            "price_lock": rise(steps[max(steps)]) if steps else None,
+            "price_next": steps[1] if 1 in steps else None,
+            "price_lock": steps[max(steps)] if steps else None,
             "bid": bid, "win": win, "placed": placed.get(k)})
     return sorted(out, key=lambda o: (-o["gain"], o["player"]))
 
@@ -777,7 +788,31 @@ def _selftest_credits() -> None:
         assert 13 in [c.jornada for c in credits_from(cut, wide, started, last, (), later, 1.0)], "a later lock never drops a credit"
 
 
+def _selftest_one_reader() -> None:
+    import ast
+    from pathlib import Path
+    src = Path(__file__).resolve().parent
+    reads: dict[str, int] = {}
+    for f in sorted(src.rglob("*.py")):
+        for n in ast.walk(ast.parse(f.read_text())):
+            if isinstance(n, ast.Attribute) and n.attr == "prices" and isinstance(n.ctx, ast.Load):
+                base = n.value.id if isinstance(n.value, ast.Name) else n.value.attr if isinstance(n.value, ast.Attribute) else ""
+                if base in ("inp", "inputs"):
+                    reads[f.name] = reads.get(f.name, 0) + 1
+    assert reads == {"decision.py": 1}, "the price forecast is read in one place: %s" % reads
+    rng = random.Random(8)
+    for _ in range(300):
+        value = rng.uniform(1e5, 5e7)
+        rows = [Price("p", h, value * (1 + rng.uniform(-0.2, 0.2)), value) for h in rng.sample(range(1, 12), rng.randint(0, 6))]
+        e = exit_of(Inputs(Money(0.0, 0.0, 0.0, 0, 0), prices=rows + [Price("q", 1, 2.0, 1.0)]), "p", value)
+        by = {x.h: x.expected_value / x.value - 1 for x in rows}
+        assert e.value == value and e.far == (by[max(by)] if by else 0.0), "the far rise is the furthest horizon's"
+        near = [h for h in by if h <= hurdle.TREND_NIGHTS]
+        assert e.rise == (by[max(near)] if near else None), "the rise is the furthest horizon within TREND_NIGHTS"
+
+
 def _selftest() -> None:
+    _selftest_one_reader()
     _selftest_builders()
     _selftest_credits()
     _selftest_inputs_at()
