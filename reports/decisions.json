@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-23T21:39Z",
- "market_at": "2026-11-23T21:39Z",
+ "generated_at": "2026-11-23T22:17Z",
+ "market_at": "2026-11-23T22:17Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-23T21:39Z",
+   "at": "2026-11-23T22:17Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -148,11 +148,11 @@
    "act": [],
    "for": [],
    "needed": true,
-   "why": "cash -36998547 is below 0: the cheapest plan sells Dani Martinez, Roger Hinojo, Fernando Calero, Aymeric Laporte, bringing it to 355945 at the lock (the credit due, 4500000 expected, counted), losing 37.0 points",
+   "why": "cash -36998547 is below 0: the cheapest plan sells Dani Martinez, Roger Hinojo, Fernando Calero, Aymeric Laporte, bringing it to 655945 at the lock (the credit due, 4800000 expected, counted), losing 37.0 points",
    "set_points_lost": 37.04627356025185,
-   "set_cash_after": 355944.65399999917,
+   "set_cash_after": 655944.6539999992,
    "risk": {
-    "low_inflow": 4500000.0,
+    "low_inflow": 4800000.0,
     "p_short": 0.0,
     "shortfall_if_low": 0.0,
     "below_points": 41.44055346000001
@@ -170,11 +170,11 @@
     "Aymeric Laporte"
    ],
    "expected_raised": 32122782.654,
-   "need": 31766838.0,
+   "need": 31466838.0,
    "cost_points": 37.04627356025185,
    "last_close": "2026-11-26T21:24Z",
    "risk": {
-    "low_inflow": 4500000.0,
+    "low_inflow": 4800000.0,
     "p_short": 0.0,
     "shortfall_if_low": 0.0,
     "below_points": 41.44055346000001
@@ -219,8 +219,8 @@
   "tonight": [],
   "raises": 0,
   "margin": 58080618.80000001,
-  "lock_margin": 355944.65399999917,
-  "lock_margin_low": -1516761.3702780008,
+  "lock_margin": 655944.6539999992,
+  "lock_margin_low": -1216761.3702780008,
   "if_won": [
    "Dani Martinez",
    "Roger Hinojo",
@@ -249,7 +249,7 @@
    "Aitor Paredes",
    "Martin Satriano"
   ],
-  "cash_if_lost": 355944.65399999917,
+  "cash_if_lost": 655944.6539999992,
   "gain": 0.0,
   "points_lost_if_won": 37.04627356025185,
   "points_lost_if_lost": 37.04627356025185,
@@ -258,7 +258,7 @@
   "cost": 37.04627356025185,
   "cash": -36998547.0,
   "risk": {
-   "low_inflow": 4500000.0,
+   "low_inflow": 4800000.0,
    "p_short": 0.0,
    "shortfall_if_low": 0.0,
    "below_points": 41.44055346000001
