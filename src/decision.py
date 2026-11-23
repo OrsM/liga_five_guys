@@ -334,11 +334,13 @@ def rises_of(inp: Inputs) -> dict[str, dict[int, float]]:
 
 
 def exit_of(inp: Inputs, player: str, value: float) -> hurdle.Exit:
-    """The hurdle.Exit of a player of this value: the forecast's rise at its furthest horizon within hurdle.TREND_NIGHTS
-    (None with none) and at its furthest horizon (0 with no forecast). The only reader of the price forecast."""
+    """The hurdle.Exit of a player of this value: the forecast's furthest horizon in nights and its rise there held within
+    +-hurdle.TREND_CAP (a flat Exit of one night with no forecast). The only reader of the price forecast."""
     steps = rises_of(inp).get(player, {})
-    near = [h for h in steps if h <= hurdle.TREND_NIGHTS]
-    return hurdle.Exit(value, steps[max(near)] if near else None, steps[max(steps)] if steps else 0.0)
+    if not steps:
+        return hurdle.Exit(value)
+    far = max(steps)
+    return hurdle.Exit(value, far, max(-hurdle.TREND_CAP, min(hurdle.TREND_CAP, steps[far])))
 
 
 def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[dict[str, Any]]:
@@ -553,7 +555,7 @@ def _selftest_opportunities() -> None:
         for r in opportunity_rows(inp, rate):
             n = hurdle.remaining(r["from_j"], 2)
             if r["bid"] is not None:
-                assert r["asking"] <= r["bid"] <= hurdle.walk_away(r["gain"], n, rate) and hurdle.buys(r["gain"], n, r["asking"], rate), \
+                assert r["asking"] <= r["bid"] <= hurdle.walk_away(r["gain"], n, rate), \
                     "a bid only on a buy, never above the walk-away price"
     assert all(r["bid"] is None for r in opportunity_rows(inp, 1.0)), "at a dear enough rate nothing is bought"
     assert got["late"]["gain"] > 0 and (got["late"]["bid"], got["late"]["win"]) == (None, None), \
@@ -806,9 +808,8 @@ def _selftest_one_reader() -> None:
         rows = [Price("p", h, value * (1 + rng.uniform(-0.2, 0.2)), value) for h in rng.sample(range(1, 12), rng.randint(0, 6))]
         e = exit_of(Inputs(Money(0.0, 0.0, 0.0, 0, 0), prices=rows + [Price("q", 1, 2.0, 1.0)]), "p", value)
         by = {x.h: x.expected_value / x.value - 1 for x in rows}
-        assert e.value == value and e.far == (by[max(by)] if by else 0.0), "the far rise is the furthest horizon's"
-        near = [h for h in by if h <= hurdle.TREND_NIGHTS]
-        assert e.rise == (by[max(near)] if near else None), "the rise is the furthest horizon within TREND_NIGHTS"
+        assert e.value == value and (e.nights, e.rise) == ((max(by), max(-hurdle.TREND_CAP, min(hurdle.TREND_CAP, by[max(by)]))) if by else (1, 0.0)), \
+            "one horizon: the furthest row's, its rise held within TREND_CAP"
 
 
 def _selftest() -> None:

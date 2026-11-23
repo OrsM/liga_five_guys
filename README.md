@@ -98,10 +98,9 @@ Every forecast is the same product, for every player and jornada
   chance of winning is read off the 30 past auctions of the players nearest
   in price trend (the fixed table `ffcore/auction_table.py`, fitted over every closed
   auction: what the winner paid, or asking if nobody bought): rising players draw rivals'
-  bids, falling ones almost never. A listing is bought when its points per
-  million per jornada reach 1.15 times the exchange rate LAMBDA (1.5 under 5M),
-  and the bid is the level whose chance times the surplus under the walk-away
-  price is greatest (`hurdle.bid`).
+  bids, falling ones almost never. A listing is bid on at the level whose chance
+  times the surplus under the walk-away price K x W is greatest (`hurdle.bid`; W the
+  points' worth in millions at the exchange rate LAMBDA, K = 0.85; no surplus, no bid).
   The game offers for each listed player every night, centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more

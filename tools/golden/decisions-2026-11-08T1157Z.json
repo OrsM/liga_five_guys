@@ -111,7 +111,7 @@
     ],
     [
      "sale price",
-     -30734.672773720882,
+     -36990.7299819117,
      "money"
     ],
     [
@@ -151,7 +151,7 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": -30734.672773720882,
+   "reserve": -36990.7299819117,
    "risk": {
     "below_points": 30.34434467,
     "low_inflow": 4039992.2266826527,
@@ -283,7 +283,7 @@
     ],
     [
      "sale price",
-     -30734.672773720882,
+     -36990.7299819117,
      "money"
     ],
     [
@@ -322,7 +322,7 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": -30734.672773720882,
+   "reserve": -36990.7299819117,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
@@ -374,7 +374,7 @@
     ],
     [
      "sale price",
-     1201.9588988612684,
+     1446.6182023303966,
      "money"
     ],
     [
@@ -413,7 +413,7 @@
    "rent": 0.7536543299999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 1201.9588988612684,
+   "reserve": 1446.6182023303966,
    "step": "take offer",
    "trace": null,
    "trend": 0.18561000848040757,
@@ -465,7 +465,7 @@
     ],
     [
      "sale price",
-     8086277.628148169,
+     8232857.324358484,
      "money"
     ],
     [
@@ -504,7 +504,7 @@
    "rent": 26.67760875,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 8086277.628148169,
+   "reserve": 8232857.324358484,
    "step": "take offer",
    "trace": null,
    "trend": -0.9599715530509632,
@@ -556,7 +556,7 @@
     ],
     [
      "sale price",
-     21623319.361850277,
+     22226064.886170004,
      "money"
     ],
     [
@@ -595,7 +595,7 @@
    "rent": 55.21069359,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 21623319.361850277,
+   "reserve": 22226064.886170004,
    "step": "take offer",
    "trace": null,
    "trend": 1.3189711608554608,
@@ -647,7 +647,7 @@
     ],
     [
      "sale price",
-     2417433.6015728926,
+     2459520.403276189,
      "money"
     ],
     [
@@ -686,7 +686,7 @@
    "rent": 6.245145269999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 2417433.6015728926,
+   "reserve": 2459520.403276189,
    "step": "take offer",
    "trace": null,
    "trend": -1.348355535307556,
@@ -738,7 +738,7 @@
     ],
     [
      "sale price",
-     22415626.46634041,
+     22822733.628691193,
      "money"
     ],
     [
@@ -777,7 +777,7 @@
    "rent": 53.86197258,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 22415626.46634041,
+   "reserve": 22822733.628691193,
    "step": "take offer",
    "trace": null,
    "trend": -1.2828104837476024,
@@ -829,7 +829,7 @@
     ],
     [
      "sale price",
-     22294459.076251302,
+     22961294.85500763,
      "money"
     ],
     [
@@ -868,7 +868,7 @@
    "rent": 46.811083409999995,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 22294459.076251302,
+   "reserve": 22961294.85500763,
    "step": "take offer",
    "trace": null,
    "trend": 1.9707289480553332,
@@ -920,7 +920,7 @@
     ],
     [
      "sale price",
-     7551373.795481831,
+     7696944.734248194,
      "money"
     ],
     [
@@ -959,7 +959,7 @@
    "rent": 10.70036253,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 7551373.795481831,
+   "reserve": 7696944.734248194,
    "step": "take offer",
    "trace": null,
    "trend": -1.812562856210546,
@@ -1011,7 +1011,7 @@
     ],
     [
      "sale price",
-     2528733.6127964347,
+     2587779.544025454,
      "money"
     ],
     [
@@ -1050,7 +1050,7 @@
    "rent": 3.45617415,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 2528733.6127964347,
+   "reserve": 2587779.544025454,
    "step": "take offer",
    "trace": null,
    "trend": 0.1486109849343848,
@@ -1102,7 +1102,7 @@
     ],
     [
      "sale price",
-     31826560.20867677,
+     32482756.96604346,
      "money"
     ],
     [
@@ -1141,7 +1141,7 @@
    "rent": 43.111848779999995,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 31826560.20867677,
+   "reserve": 32482756.96604346,
    "step": "take offer",
    "trace": null,
    "trend": -1.167641877951558,
@@ -1193,7 +1193,7 @@
     ],
     [
      "sale price",
-     49510121.96432015,
+     50612210.61060228,
      "money"
     ],
     [
@@ -1232,7 +1232,7 @@
    "rent": 57.99891825,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 49510121.96432015,
+   "reserve": 50612210.61060228,
    "step": "take offer",
    "trace": null,
    "trend": -0.41770354506100393,
@@ -1284,7 +1284,7 @@
     ],
     [
      "sale price",
-     23245342.569159728,
+     23804872.669531286,
      "money"
     ],
     [
@@ -1323,7 +1323,7 @@
    "rent": 24.908140529999997,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 23245342.569159728,
+   "reserve": 23804872.669531286,
    "step": "take offer",
    "trace": null,
    "trend": 0.7009092811851191,
@@ -1375,7 +1375,7 @@
     ],
     [
      "sale price",
-     21249980.011011694,
+     21808453.072603088,
      "money"
     ],
     [
@@ -1414,7 +1414,7 @@
    "rent": 22.092656039999998,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 21249980.011011694,
+   "reserve": 21808453.072603088,
    "step": "take offer",
    "trace": null,
    "trend": 1.9785105195726127,
@@ -1466,7 +1466,7 @@
     ],
     [
      "sale price",
-     51302111.74154793,
+     52649159.6957473,
      "money"
     ],
     [
@@ -1505,7 +1505,7 @@
    "rent": 52.09701938999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 51302111.74154793,
+   "reserve": 52649159.6957473,
    "step": "take offer",
    "trace": null,
    "trend": 1.9936865166470912,
@@ -1557,7 +1557,7 @@
     ],
     [
      "sale price",
-     28573921.90132202,
+     29198539.142944254,
      "money"
     ],
     [
@@ -1596,7 +1596,7 @@
    "rent": 29.58215013,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 28573921.90132202,
+   "reserve": 29198539.142944254,
    "step": "take offer",
    "trace": null,
    "trend": -0.802633666539891,
@@ -1648,7 +1648,7 @@
     ],
     [
      "sale price",
-     14494592.382523905,
+     14841018.708178563,
      "money"
     ],
     [
@@ -1687,7 +1687,7 @@
    "rent": 12.65232501,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 14494592.382523905,
+   "reserve": 14841018.708178563,
    "step": "take offer",
    "trace": null,
    "trend": 0.6019579764866829,
@@ -1739,7 +1739,7 @@
     ],
     [
      "sale price",
-     81847261.29565616,
+     83698493.84345719,
      "money"
     ],
     [
@@ -1778,7 +1778,7 @@
    "rent": 21.36537117,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 81847261.29565616,
+   "reserve": 83698493.84345719,
    "step": "take offer",
    "trace": null,
    "trend": -1.0060886321197136,

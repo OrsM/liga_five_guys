@@ -632,7 +632,7 @@ NAMES: dict[str, tuple[str, ...]] = {
     "forecast": ("ABSENT_START", "FIXTURE_K", "MIN_POOL", "NEUTRAL_START", "PERSISTENT_SHARE", "PICK_K", "P_DECAY", "P_LIFT", "P_LISTING", "SHRINK_K"),
     "pricing": ("AUCTION_MIN", "CLIP", "PRICE_FOCUS", "PRICE_W0", "PRICE_W1", "PRICE_W2", "PRICE_WINDOW"),
     "rules": ("DEBT_SHARE", "MATCH_LEN"),
-    "hurdle": ("FALLBACK_LAMBDA", "S", "MARGIN", "CHEAP", "CHEAP_MARGIN", "WIN_FLOOR", "POOL_DAYS", "MIN_DAYS", "TREND_NIGHTS", "TREND_CAP"),
+    "hurdle": ("FALLBACK_LAMBDA", "K", "WIN_FLOOR", "POOL_DAYS", "MIN_DAYS", "TREND_CAP"),
 }
 MODULES: dict[str, Any] = {"tidy": tidy, "forecast": model, "pricing": pricing,
                            "rules": rules, "hurdle": hurdle}
@@ -1063,7 +1063,7 @@ def _selftest() -> None:
     money = decision.Money(0.0, 0.0, 0.0, 0, 0)
     assert standing(decision.Inputs(money), "p", 10.0, None).later == rules.SALE_ESTIMATE * 10.0, "no price row: the estimate"
     priced = decision.Inputs(money, prices=[decision.Price("p", 1, 10.5, 10.0), decision.Price("p", 3, 11.0, 10.0)])
-    assert abs(standing(priced, "p", 10.0, None).later - rules.SALE_ESTIMATE * 10.0 * 1.1) < 1e-9, "the price row furthest ahead: 10% above"
+    assert abs(standing(priced, "p", 10.0, None).later - rules.SALE_ESTIMATE * 10.0 * (1 + hurdle.TREND_CAP)) < 1e-9, "the price row furthest ahead, held within the cap"
     rng = random.Random(14)
     dist = worth.offer_ratio_distribution(rng.uniform(0.9, 1.1) for _ in range(40))
     for _ in range(300):
@@ -1071,14 +1071,13 @@ def _selftest() -> None:
         rows = [decision.Price("p", h, value * (1 + rng.uniform(-0.1, 0.1) * rng.choice([0, 1])), value) for h in rng.sample(range(1, 12), rng.randint(0, 5))]
         s = standing(decision.Inputs(money, prices=rows), "p", value, None)
         e = s.exit
-        assert abs(s.later / hurdle.draw(value) - 1 - e.far) < 1e-9 and abs(hurdle.wait_cost(e) + e.far / hurdle.FORECAST_NIGHTS) < 1e-12, \
-            "the buy side's later price and the sale side's waiting cost read one rise"
+        assert abs(s.later / hurdle.draw(value) - 1 - e.rise) < 1e-9 and abs(hurdle.wait_cost(e) * e.nights + e.rise) < 1e-12 and abs(e.rise) <= hurdle.TREND_CAP + 1e-12, \
+            "the buy side's later price, the waiting cost and the sale reserve read one capped rise over one horizon"
         points = rng.uniform(0, 20)
-        assert hurdle.sale_price(points, n, e, rate) == hurdle.sale_price(points, n, hurdle.Exit(value, e.rise), rate), "the sale reserve reads the exit's drift only"
         assert worth.waiting_reserve(s, dist, 3) >= s.later
         flat = standing(decision.Inputs(money, prices=[decision.Price("p", h, value, value) for h in range(1, 6)]), "p", value, None)
-        assert flat.exit == hurdle.Exit(value, 0.0, 0.0) and flat.later == hurdle.draw(value) and hurdle.wait_cost(flat.exit) == 0.0, "no rise: today's draw"
-        assert hurdle.sale_price(points, n, flat.exit, rate) == hurdle.MARGIN * (points * 1e6 / (n * rate)), "no rise: no drift in the sale price"
+        assert flat.exit == hurdle.Exit(value, 5, 0.0) and flat.later == hurdle.draw(value) and hurdle.wait_cost(flat.exit) == 0.0, "no rise: today's draw"
+        assert hurdle.sale_price(points, n, flat.exit, rate) == points * 1e6 / (n * rate) / hurdle.K, "no rise: no drift in the sale price"
     asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
               "feasible": True, "delta": {"points": 0.0, "window": {"lock": 0.0, "next4": 0.0, "season": 0.0}, "gap": []},
               "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},

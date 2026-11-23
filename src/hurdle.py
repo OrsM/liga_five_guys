@@ -1,10 +1,9 @@
 """The one exchange rate between forecast points and money, and the tests that read it. A rate (LAMBDA, `lam`) is
 points per million per jornada remaining. A move's P is the points above the next man up over its window of n jornadas
-(Buyer.gain for a buy, the sale's lost points for a sale); its yield is P / (n x price in millions). A listing is bought
-iff its yield reaches margin(price) x LAMBDA; a sale is taken iff the player's yield, his expected price change
-counted at the rate, is under LAMBDA / MARGIN (sale_price, from the player's Exit); the walk-away price is S x P / (n x LAMBDA) and the bid
-the win-weighted surplus under it at its best (bid); a bid already placed is held, lowered, withdrawn or raised
-by the same surplus (stand)."""
+(Buyer.gain for a buy, the sale's lost points for a sale); W = P / (n x LAMBDA) is its worth in millions. One band K
+around W: a buy pays at most K x W (walk_away, and the bid the win-weighted surplus under it at its best, bid), a sale
+is taken at W / K or more, the player's expected price change (his Exit's rise) added to W (sale_price); a bid already
+placed is held, lowered, withdrawn or raised by the same surplus (stand)."""
 from __future__ import annotations
 
 import random
@@ -24,14 +23,9 @@ MIN_DAYS = 5
 BAND = (8, 14)
 SINCE = "2026-11-21T0517Z"
 FALLBACK_LAMBDA = 0.045
-S = 0.85
-MARGIN = 1.15
-CHEAP = 5e6
-CHEAP_MARGIN = 1.5
+K = 0.85
 WIN_FLOOR = 0.25
-TREND_NIGHTS = 7
 TREND_CAP = 0.03
-FORECAST_NIGHTS = 10
 
 
 def remaining(first: int, last: int) -> int:
@@ -66,25 +60,9 @@ def lam(history: Iterable[Opportunity], now: str, last: int) -> float:
     return statistics.median((r.per_million or 0.0) / remaining(r.from_j, last) for r in band)
 
 
-def yield_of(points: float, n: int, price: float) -> float:
-    """Points per million per jornada: points over n jornadas, price in euros. n and price positive."""
-    return points / (n * price / 1e6)
-
-
-def margin(price: float) -> float:
-    """The factor of LAMBDA a buy's yield must reach: CHEAP_MARGIN under CHEAP euros, MARGIN otherwise."""
-    return CHEAP_MARGIN if price < CHEAP else MARGIN
-
-
-def buys(points: float, n: int, price: float, rate: float) -> bool:
-    """Whether a listing at price whose P is points over n jornadas is bought at rate: its yield reaches margin(price)
-    times rate."""
-    return yield_of(points, n, price) >= margin(price) * rate
-
-
 def walk_away(points: float, n: int, rate: float) -> float:
-    """The most worth paying, in euros, for P points over n jornadas at rate: S x points / (n x rate) millions."""
-    return S * points * 1e6 / (n * rate)
+    """The most worth paying, in euros, for P points over n jornadas at rate: K x points / (n x rate) millions."""
+    return K * points * 1e6 / (n * rate)
 
 
 class Bid(NamedTuple):
@@ -107,10 +85,9 @@ def best_on_grid(curve: Curve, asking: float, cap: float) -> tuple[float, float,
 
 def bid(curve: Curve, asking: float, points: float, n: int, rate: float) -> Bid | None:
     """The bid on a listing at asking whose P is points over n jornadas, at rate: the best_on_grid point under the
-    walk-away price; None when the listing is not bought (buys), when its surplus is not positive or when its chance is
-    under WIN_FLOOR. A bid is never above the walk-away price nor under the asking price."""
-    if not buys(points, n, asking, rate):
-        return None
+    walk-away price; None when its surplus is not positive (a listing whose walk-away price is under its asking price, as
+    one of a player with no points) or when its chance is under WIN_FLOOR. A bid is never above the walk-away price nor
+    under the asking price."""
     best = best_on_grid(curve, asking, walk_away(points, n, rate))
     if best is None or best[0] <= 0 or best[2] < WIN_FLOOR:
         return None
@@ -149,12 +126,12 @@ def stand(curve: Curve, asking: float, placed: float, cap: float) -> Stand:
 
 
 class Exit(NamedTuple):
-    """What a player fetches when sold later, read from the price forecast: his value, the forecast's rise at its furthest
-    horizon within TREND_NIGHTS (None: no such horizon) and its rise at its furthest horizon (0 with no forecast), each a
-    fraction of value."""
+    """What a player fetches when sold later, read from the price forecast: his value, the horizon in nights of its
+    furthest row (1 with none) and the rise at that horizon, a fraction of value (0 with none). One horizon and one
+    rise: a night's rise is rise / nights."""
     value: float
-    rise: float | None = None
-    far: float = 0.0
+    nights: int = 1
+    rise: float = 0.0
 
 
 def draw(value: float) -> float:
@@ -163,29 +140,20 @@ def draw(value: float) -> float:
 
 
 def later(exit: Exit) -> float:
-    """The expected sale price of the exit after its furthest horizon: draw(value) x (1 + far)."""
-    return draw(exit.value) * (1 + exit.far)
+    """The expected sale price of the exit after its horizon: draw(value) x (1 + rise)."""
+    return draw(exit.value) * (1 + exit.rise)
 
 
 def wait_cost(exit: Exit) -> float:
-    """The cost of a night of waiting, as a fraction of value: the price forecast's rise at its furthest horizon
-    (later over draw, less 1) spread over FORECAST_NIGHTS and negated, so a falling price costs and a rising one pays.
-    0 for a value that is not positive."""
-    if exit.value <= 0:
-        return 0.0
-    return (1 - later(exit) / draw(exit.value)) / FORECAST_NIGHTS
-
-
-def drift(rise: float | None) -> float:
-    """The expected price change over value TREND_NIGHTS nights ahead at most, held within +-TREND_CAP; 0 with none."""
-    return 0.0 if rise is None else max(-TREND_CAP, min(TREND_CAP, rise))
+    """The cost of a night of waiting, as a fraction of value: the exit's rise spread over its nights and negated, so a
+    falling price costs and a rising one pays. 0 for a value that is not positive."""
+    return 0.0 if exit.value <= 0 else -exit.rise / exit.nights
 
 
 def sale_price(points: float, n: int, exit: Exit, rate: float) -> float:
     """The offer, in euros, at and above which selling a player whose sale loses points over n jornadas beats keeping him at
-    rate: his yield, the points plus S x rate x n x his expected price change (drift(exit.rise) x exit.value, in millions),
-    over n x the offer, is under rate / MARGIN. Nondecreasing in points and rise, nonincreasing in rate."""
-    return MARGIN * (points * 1e6 / (n * rate) + S * drift(exit.rise) * exit.value)
+    rate: (W + rise x value) / K, W = points x 1e6 / (n x rate). Nondecreasing in points and rise, nonincreasing in rate."""
+    return (points * 1e6 / (n * rate) + exit.rise * exit.value) / K
 
 
 def _row(cut: str, player: str, gain: float, per_million: float | None, from_j: int = 13) -> Opportunity:
@@ -228,9 +196,8 @@ def _selftest_buy() -> None:
         points = rng.uniform(0, 3) * n * rate * asking / 1e6
         got = bid(curve, asking, points, n, rate)
         cap = walk_away(points, n, rate)
-        if not buys(points, n, asking, rate):
-            assert got is None, "no buy under the margin"
-            assert yield_of(points, n, asking) < margin(asking) * rate
+        if points <= 0:
+            assert got is None, "no points: never bought"
         if got is None:
             seen_none += 1
         else:
@@ -239,11 +206,12 @@ def _selftest_buy() -> None:
             assert got.win >= WIN_FLOOR and got.amount / asking in ratios
             mine = got.win * (cap - got.amount)
             assert all(mine >= p * (cap - asking * r) - 1e-6 for r, p in curve if r >= 1.0), "the best surplus of the grid"
+            dearer = bid(curve, asking, points, n, 2 * rate)
+            assert dearer is None or dearer.amount <= got.amount + 1e-6, "a dearer rate never raises the bid"
             more = bid(curve, asking, points * 1.5, n, rate)
             assert more is not None and more.amount >= got.amount - 1e-6, "more points never lower the bid"
             twice = bid(curve, 2 * asking, 2 * points, n, rate)
             assert twice is not None and abs(twice.amount - 2 * got.amount) < 1e-3 and twice.win == got.win, "scale-invariant"
-        assert buys(2 * points, n, 2 * asking, rate) == buys(points, n, asking, rate)
         assert abs(walk_away(2 * points, n, rate) - 2 * cap) < 1e-3, "the walk-away price scales with the points"
         assert walk_away(points + 1, n, rate) > cap and walk_away(points + 1, n, 2 * rate) < walk_away(points + 1, n, rate)
     assert seen_bid > 100 and seen_none > 100, (seen_bid, seen_none)
@@ -251,41 +219,41 @@ def _selftest_buy() -> None:
     one = bid(flat, 1e7, 10.0, 25, 0.02)
     assert one == Bid(1e7, 1.0), "a sure win at the asking price bids the asking price"
     assert bid(((1.0, 0.1), (1.1, 0.2)), 1e7, 10.0, 25, 0.02) is None, "a chance under WIN_FLOOR: no bid"
-    assert walk_away(25 * 0.02 * 10, 25, 0.02) == S * 10e6, "P worth exactly the rate on 10M: S x 10M"
-    assert margin(4.9e6) == CHEAP_MARGIN and margin(5e6) == MARGIN
+    assert walk_away(25 * 0.02 * 10, 25, 0.02) == K * 10e6, "P worth exactly the rate on 10M: K x 10M"
+    assert bid(flat, 1e7, 0.0, 25, 0.02) is None, "no points: never bought"
 
 
 def _selftest_sale() -> None:
     rng = random.Random(5)
     for _ in range(2000):
         n, rate, value = rng.choice([1, 13, 26]), rng.choice([0.02, 0.045]), rng.choice([1e6, 2e7])
-        points, rise = rng.uniform(0, 50), rng.choice([None, -0.2, -0.01, 0.0, 0.01, 0.2])
-        at = sale_price(points, n, Exit(value, rise), rate)
-        for offer in (0.5 * at, 0.99 * at, 1.01 * at, 2 * at):
-            if offer <= 0:
-                continue
-            own = (points + S * rate * n * drift(rise) * value / 1e6) / (n * offer / 1e6)
-            assert (offer >= at) == (own <= rate / MARGIN + 1e-12), "sell iff his yield is under the rate's bar"
-        assert sale_price(points + 1, n, Exit(value, rise), rate) > at
-        assert sale_price(points + 1, n, Exit(value, rise), 2 * rate) < sale_price(points + 1, n, Exit(value, rise), rate)
-        assert abs(sale_price(2 * points, n, Exit(2 * value, rise), rate) - 2 * at) < 1e-3, "scale-invariant"
-        assert abs(drift(rise)) <= TREND_CAP
+        points, nights, rise = rng.uniform(0, 50), rng.choice([1, 7, 10]), rng.choice([0.0, -0.2, -0.01, 0.01, 0.2])
+        e = Exit(value, nights, rise)
+        at = sale_price(points, n, e, rate)
+        worth = points * 1e6 / (n * rate)
+        assert abs(at * K - worth - rise * value) < 1e-6, "the band: W plus the drift, over K"
+        assert walk_away(points, n, rate) * sale_price(points, n, Exit(value), rate) - worth * worth < 1e-3 * (1 + worth * worth), "buy edge x sell edge is W squared"
+        assert walk_away(points, n, rate) <= sale_price(points, n, Exit(value), rate) + 1e-6, "a buy's edge is never over a sale's"
+        assert sale_price(points + 1, n, e, rate) > at and sale_price(points, n, e._replace(rise=rise + 0.01), rate) > at, "monotone in points and drift"
+        assert sale_price(points + 1, n, e, 2 * rate) < sale_price(points + 1, n, e, rate), "non-increasing in the rate"
+        assert abs(sale_price(2 * points, n, Exit(2 * value, nights, rise), rate) - 2 * at) < 1e-3, "scale-invariant"
+        assert sale_price(points, n, e._replace(nights=2 * nights), rate) == at, "the nights do not enter the lump"
     assert sale_price(0.0, 5, Exit(1e6), 0.045) == 0.0, "no points, no trend: any offer"
 
 
 def _selftest_exit() -> None:
     rng = random.Random(21)
     for _ in range(2000):
-        value, far = rng.uniform(1e5, 5e7), rng.uniform(-0.3, 0.3)
-        e = Exit(value, rng.choice([None, rng.uniform(-0.3, 0.3)]), far)
-        assert abs(later(e) / draw(value) - 1 - far) < 1e-9, "the later price reads the exit's far rise"
-        assert abs(wait_cost(e) + far / FORECAST_NIGHTS) < 1e-9, "the night's cost reads the same far rise"
+        value, nights, rise = rng.uniform(1e5, 5e7), rng.randint(1, 12), rng.uniform(-0.3, 0.3)
+        e = Exit(value, nights, rise)
+        assert abs(later(e) / draw(value) - 1 - rise) < 1e-9, "the later price reads the exit's rise"
+        assert abs(wait_cost(e) * nights + rise) < 1e-12, "the night's cost is the same rise spread over the same nights"
         assert abs(later(e._replace(value=2 * value)) - 2 * later(e)) < 1e-3 and abs(wait_cost(e._replace(value=2 * value)) - wait_cost(e)) < 1e-12
-        flat = Exit(value, e.rise)
-        assert later(flat) == draw(value) and wait_cost(flat) == 0.0, "no far rise: the draw, and waiting is free"
+        flat = Exit(value, nights)
+        assert later(flat) == draw(value) and wait_cost(flat) == 0.0, "no rise: the draw, and waiting is free"
         points, n, rate = rng.uniform(0, 30), rng.choice([1, 8, 26]), rng.choice([0.02, 0.045])
-        assert abs(sale_price(points, n, flat, rate) - sale_price(points, n, Exit(value), rate) - MARGIN * S * drift(e.rise) * value) < 1e-6
-    assert wait_cost(Exit(0.0, None, 0.5)) == 0.0
+        assert abs(sale_price(points, n, e, rate) - sale_price(points, n, flat, rate) - rise * value / K) < 1e-6
+    assert wait_cost(Exit(0.0, 10, 0.5)) == 0.0
 
 
 def _selftest_stand() -> None:
