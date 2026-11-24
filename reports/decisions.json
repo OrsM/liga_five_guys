@@ -1,157 +1,62 @@
 {
- "generated_at": "2026-11-24T20:45Z",
- "market_at": "2026-11-24T20:45Z",
+ "generated_at": "2026-11-24T20:48Z",
+ "market_at": "2026-11-24T20:48Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-24T20:45Z",
+   "at": "2026-11-24T20:48Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-27T20:00:00+00:00",
- "cash": -31998547.0,
+ "cash": -31266838.0,
  "cash_locked": 0,
- "can_bid": 63998181.0,
+ "can_bid": 64593699.60000001,
  "ping": "",
  "do": [
-  {
-   "name": "Dani Martinez",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Dani Martinez",
-   "step": "take offer",
-   "offer": 731709.0,
-   "waiting": null,
-   "trend": 8.98610352757927,
-   "plan": false,
-   "amount": 731709.0,
-   "done": false,
-   "key": "11861",
-   "gain": 0.0,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.0745382934479963,
-   "delta": {
-    "points": 0.0,
-    "window": {
-     "lock": 0.0,
-     "next4": 0.0,
-     "season": 0.0
-    },
-    "gap": []
-   },
-   "feasible": true,
-   "why_infeasible": null,
-   "replacement": null,
-   "replacement_why_not": null,
-   "offer_percentile": 0.8868832731648616,
-   "offers_seen": 831,
-   "per_million": 0.0,
-   "verdict": "sell",
-   "points_lost": 0.0,
-   "reserve": 723491.1333733386,
-   "rent": 0.823172625,
-   "facts": [
-    [
-     "value",
-     680952.0,
-     "money"
-    ],
-    [
-     "offer",
-     731709.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0745382934479963,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     0.8868832731648616,
-     "chance"
-    ],
-    [
-     "offers seen",
-     831,
-     "count"
-    ],
-    [
-     "sale price",
-     723491.1333733386,
-     "money"
-    ],
-    [
-     "points, lock",
-     0.0,
-     "points"
-    ],
-    [
-     "points, next4",
-     0.0,
-     "points"
-    ],
-    [
-     "points, season",
-     0.0,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": [],
-   "needed": true,
-   "why": "cash -31998547 is below 0: the cheapest plan sells Dani Martinez, Roger Hinojo, Aymeric Laporte, bringing it to 97517 at the lock, losing 35.9 points",
-   "set_points_lost": 35.86658434060655,
-   "set_cash_after": 97517.04199999943
-  },
   {
    "what": "wait",
    "label": "wait for the offers of Roger Hinojo, Aymeric Laporte",
@@ -166,36 +71,18 @@
    "need": 31266838.0,
    "cost_points": 35.86658434060655,
    "last_close": "2026-11-26T21:24Z",
-   "why": "cash -31998547 is below 0 and the lock is 3 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (35.9 points) sells Roger Hinojo, Aymeric Laporte to the offers still to come; nothing is taken now",
+   "why": "cash -31266838 is below 0 and the lock is 3 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (35.9 points) sells Roger Hinojo, Aymeric Laporte to the offers still to come; nothing is taken now",
    "accepts": [],
    "act": []
   }
  ],
  "lineup": {
-  "eleven": [
-   "Mathew Ryan",
-   "Natan",
-   "Dean Huijsen",
-   "Aitor Paredes",
-   "Dani Martinez",
-   "Pepelu",
-   "Guido Rodriguez",
-   "Pablo Fornals",
-   "Mikel Oyarzabal",
-   "Martin Satriano",
-   "Vinicius Junior"
-  ],
-  "message": "",
+  "eleven": null,
+  "message": "the app's line-up is not a legal eleven (10 players)",
   "unmapped": [],
-  "points": 54.505517883306275,
+  "points": null,
   "best": 56.826122215307635,
-  "advice": [
-   {
-    "in": "Sergio Carreira",
-    "out": "Dani Martinez",
-    "gain": 2.320605332001363
-   }
-  ],
+  "advice": [],
   "stale": true
  },
  "buys": [],
@@ -205,23 +92,20 @@
   "short": 0.0,
   "tonight": [],
   "raises": 0,
-  "margin": 63998181.0,
+  "margin": 64593699.60000001,
   "lock_margin": 97517.04199999943,
-  "lock_margin_low": -1731958.6083940007,
+  "lock_margin_low": -1690251.195394002,
   "if_won": [
-   "Dani Martinez",
    "Roger Hinojo",
    "Aymeric Laporte"
   ],
   "if_lost": [
-   "Dani Martinez",
    "Roger Hinojo",
    "Aymeric Laporte"
   ],
   "held": [
    "Natan",
    "Dean Huijsen",
-   "Dani Martinez",
    "Mathew Ryan",
    "Pablo Fornals",
    "Mikel Oyarzabal",
@@ -241,7 +125,7 @@
   "net": -35.86658434060655,
   "base": 0.0,
   "cost": 35.86658434060655,
-  "cash": -31998547.0
+  "cash": -31266838.0
  },
  "targets": [
   {
@@ -549,97 +433,6 @@
   ]
  },
  "sells": [
-  {
-   "name": "Dani Martinez",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Dani Martinez",
-   "step": "take offer",
-   "offer": 731709.0,
-   "waiting": null,
-   "trend": 8.98610352757927,
-   "plan": false,
-   "amount": 731709.0,
-   "done": false,
-   "key": "11861",
-   "gain": 0.0,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.0745382934479963,
-   "delta": {
-    "points": 0.0,
-    "window": {
-     "lock": 0.0,
-     "next4": 0.0,
-     "season": 0.0
-    },
-    "gap": []
-   },
-   "feasible": true,
-   "why_infeasible": null,
-   "replacement": null,
-   "replacement_why_not": null,
-   "offer_percentile": 0.8868832731648616,
-   "offers_seen": 831,
-   "per_million": 0.0,
-   "verdict": "sell",
-   "points_lost": 0.0,
-   "reserve": 723491.1333733386,
-   "rent": 0.823172625,
-   "facts": [
-    [
-     "value",
-     680952.0,
-     "money"
-    ],
-    [
-     "offer",
-     731709.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0745382934479963,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     0.8868832731648616,
-     "chance"
-    ],
-    [
-     "offers seen",
-     831,
-     "count"
-    ],
-    [
-     "sale price",
-     723491.1333733386,
-     "money"
-    ],
-    [
-     "points, lock",
-     0.0,
-     "points"
-    ],
-    [
-     "points, next4",
-     0.0,
-     "points"
-    ],
-    [
-     "points, season",
-     0.0,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
   {
    "name": "Fernando Calero",
    "pos": "DEF",
@@ -1962,12 +1755,12 @@
    "sold": false
   },
   {
-   "name": "Dani Martinez",
+   "name": "Sergio Carreira",
    "pos": "DEF",
-   "next": 1.0621526913847597,
+   "next": 2.3206043320013627,
    "xi": true,
-   "best": false,
-   "sold": true
+   "best": true,
+   "sold": false
   },
   {
    "name": "Pepelu",
@@ -2032,14 +1825,6 @@
    "xi": false,
    "best": false,
    "sold": true
-  },
-  {
-   "name": "Sergio Carreira",
-   "pos": "DEF",
-   "next": 2.3206043320013627,
-   "xi": false,
-   "best": true,
-   "sold": false
   },
   {
    "name": "Fernando Calero",
