@@ -2,8 +2,7 @@
 
 ## Status (2026-11-20)
 
-Steps 1-5 are merged; step 6 (lfg.md rewritten for V and the strict rule) is this commit. The rest of the note is the design as agreed,
-before the corrections below.
+Steps 1-6 are merged. The rest of the note is the design as agreed, before the corrections below.
 
 - Step 1: `ea340384` (`eleven.points`, `valuation` with Move, squad_at, Value, Delta).
 - Step 2: `6c215187` (`approach.Side` is a memo of `eleven.points`; no eleven is None, not INF).
@@ -11,7 +10,7 @@ before the corrections below.
   sales costed from the moment of the sale).
 - Step 4: `0155fc81` (`valuation.read` is the one sale reading; `eleven.remove*`, `worth.lost_points`, INF gone; typed Delta on sells).
 - Step 5: `c1eb8652` (facts and replacement pairs on sells; `dec_offer` v2; grading leaves out the made-up rows).
-- Step 6: this commit (docs only).
+- Step 6: lfg.md rewritten for V and the strict rule.
 
 Corrections found while implementing:
 - Sign: a sale's Delta is 0 or less (the points it loses are `-Delta`); a bench sale is 0.
@@ -22,7 +21,7 @@ Corrections found while implementing:
 - The board time moved from 10.1 s to about 10.6 s on a busier box, not 10.4 as written in section 5; accepted.
 - `dec_offer` is not read by grading, so `grading.sound_offers` is exposed (and `health` prints its excluded count) but unconsumed.
 
-No code follows until section 7 is answered (CLAUDE.md principle 1). Every name was checked against `src/` on main (2026-11-20).
+Every name was checked against `src/` on main (2026-11-20).
 
 ## 0. Root cause
 
@@ -38,7 +37,8 @@ the page strips phrases from it (a string contract; the page is not in this repo
 Issue 140 item 3 (funding sales costed in the buy's window, so a sale before the lock loses j13 unseen) and item 4 (eight buys each
 against the same player, not additive) are the same defect: the thing valued is a transaction, not a row.
 
-Rule (Miguel): fewer than 11 players, or an illegal shape, scores nothing. Code agrees (`eleven.legal`; `approach.Side.fields`).
+Rule (Miguel): everything freezes at the jornada's first kickoff, for every player (`Calendar.lock`); a player who joins after it cannot play
+that jornada. Fewer than 11 players, or an illegal shape, scores nothing. Code agrees (`eleven.legal`; `approach.Side.fields`).
 `docs/notes/lfg.md` section 1 says "an empty slot scores nothing": contradicted it, fixed in step 6.
 
 ## 1. One valuation

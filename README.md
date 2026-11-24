@@ -101,7 +101,7 @@ Every forecast is the same product, for every player and jornada
   bids, falling ones almost never. A listing is bid on at the level whose chance
   times the surplus under the walk-away price K x W is greatest (`hurdle.bid`; W the
   points' worth in millions at the exchange rate LAMBDA, K = 0.85; no surplus, no bid).
-  The game offers for each listed player every night, centred on value
+  The game offers for each listed player every night (an offer expires at the next close; a rival's direct offer lasts 48 h), centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more
   (`hurdle.later`, read from `decision.exit_of`: each later night's offer, at
@@ -119,17 +119,17 @@ which move wins.
   owner.** The board never pays one; it does not list the players a rival can take now. The feed records any move between
   two managers alike, clause or accepted offer ("transfer"); every raid
   in it paid exactly the clause the feed showed.
-- **A clause defaults to purchase price +50%, market value if higher, 1M
-  minimum** (the help pages). So a raid costs only market value once a
-  player's value has outgrown 1.5x what his owner paid (Raphinha: bought
-  for 80.0M, raided at his 141.4M value). Not needed by the model: the
-  feed gives each clause, and a raid pays exactly that.
+- **A clause is whatever the feed shows** (the help pages' default of
+  purchase price +50% does not hold here: the feed's median is 1.00 of value).
+  A raid pays exactly that. Clause buys of rivals' players are not used.
 - **No protection after a transfer in this league.** The feed's
   `buyoutClauseLockedEndTime` is not one: Luismi Cruz was taken 6 days and
   Yamal 13 days before it. Every clause counts as payable.
 - **Clause buys close before the matchday** (24h by default; 24–72h per
   league). Not modelled: ours paid one 9h before kickoff, and the app
   refuses a closed one anyway.
+- **Everything freezes at the jornada's first kickoff, for every player; a player who joins after it cannot play that jornada.**
+  Each jornada pays 100,000 x the team's points about 04:40 Madrid after its last match.
 - **A negative balance at the matchday's start scores 0 points; debt is
   capped at 20% of team value.** Enforced by `rules.bid_limit` and `rules.cash_at_lock` in the board's funding (`approach.py`) and by
   the app (bids). Not modelled for rivals: the standings ignore every
@@ -137,9 +137,9 @@ which move wins.
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:
   the board lists who is at risk, not what protecting them would cost.
 - **Blindaje:** one player per matchday is shielded from clauses for 24h
-  (48h in premium leagues). Turned on between matchdays, free. Not modelled,
-  and the feed does not show shields: a player listed at risk may be
-  shielded.
+  (48h in premium leagues). Turned on between matchdays, free. Not modelled:
+  the feed has `playerTeam.isShielded`, the parser drops it, and it was never
+  true in 302 sampled rows.
 
 Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-us/articles/360025683593-How-are-release-clauses-set),
 [rulebook](https://laligafantasy.zendesk.com/hc/en-us/articles/360025679853-Rulebook),
@@ -173,7 +173,7 @@ rather than reaching through them; ruff flags reads of private members.
 ## Layout
 
     src/            run, ingest, sources, crosswalk, decision (the
-                    inputs and the opportunities), board, approach, eleven, worth,
+                    inputs and the opportunities), board, approach, eleven, valuation, worth,
                     publish, grading, salegrade, act, health, stats
     src/ffcore/     parsed (the parse cache), store and records (the record store),
                     tidy (paths, rows with their numbers parsed), clock (now, t, stamps),

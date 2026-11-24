@@ -14,16 +14,21 @@ shows it. You act on the account; the tool never does.
 - Points go to the owner only if **cash ≥ 0 at the lock** and with a **full legal eleven** (one of `rules.SHAPES`: one
   keeper, 3–5 defenders, 3–5 midfielders, 1–3 forwards). Fewer than 11 players, or a shape that is not legal, scores
   nothing for that jornada: there is no partial eleven (`eleven.legal`, `eleven.points` is `None` then).
-- **The eleven is frozen at the jornada's lock, for every player.** A move counts for the jornadas that lock after it
-  is made (`rules.in_force`). Cash must be ≥ 0 at each lock, counting the moves made by it. [simplify, memory]
+- **Everything freezes at the start of the jornada: its first kickoff of any match, the same moment for every player**
+  (`season_facts.jornada_calendar`'s `lock`, the one owner). A move counts for the jornadas that lock after it is made
+  (`rules.in_force`); a player who joins after the lock cannot play that jornada, one sold after it still scores it. Cash
+  must be ≥ 0 at each lock, counting the moves made by it; if not, the whole jornada scores 0. [simplify, memory]
+- The objective is expected points (not the chance of finishing first). Placed bids can be raised, lowered or withdrawn.
 - A bid may total cash plus `DEBT_SHARE` (20%) of team value (`rules.bid_limit`): a second check, on a value that
   moves daily. Bids are checked against it when placed.
 - The squad holds `SQUAD_MAX` = 24, **bids counted** (the app refuses more).
-- The game offers only for **listed** players, one offer at each daily close; an offer expires at the next close.
+- The game offers only for **listed** players, one offer at each daily close; a game offer expires at the next close; a rival's direct offer lasts 48 h, and every pending offer counts
+  (`decision_facts` takes the highest).
   Unlisted players have no sale until listed (list before the last close before the lock, or there is none).
-- A buy whose auction closes after his club's kickoff plays none of that jornada (`late_arrivals`).
-- Clauses are paid at once; no protection after a transfer; one shield a matchday. Not modelled: rivals taking your
-  players (exposure), `buyout_until`, `shielded`.
+- A buy whose auction closes after the jornada's first kickoff plays none of that jornada (`late_arrivals`, from the same lock).
+- Clauses are paid at once; no protection after a transfer; one shield a matchday. Clause buys of rivals' players are
+  not used and not priced for now. Not modelled: rivals taking your players (exposure), `buyout_until`; the shield flag
+  (`playerTeam.isShielded`) is dropped by the parser and was never true in 302 sampled rows.
 
 **Clocks.** Price changes once a day at the first morning snapshot (verified on 20,498 of 20,498 player-days).
 Offers are created at the daily close, 22:24 CET; auctions close 22:24:00. Forecast, fieldable and points change per
@@ -39,7 +44,8 @@ jornada; the **lock** is the checkpoint.
 | field | the lock | at the lock |
 
 Not established: whether the game ever buys an unlisted player itself, a bid's tie-breaks, whether a line-up edit
-after the lock is possible, what the 100k cash bumps are.
+after the lock is possible. Each jornada pays 100,000 x the team's points about 04:40 Madrid after its last match (section 3b);
+the further +100k or +200k credits on most days are a daily bonus claimed by hand in the app, not a model input.
 
 ## 2. What the machine models, and the measured facts [model, plan-datasette]
 
@@ -245,7 +251,7 @@ Kept because it explains why the code is shaped this way; the code that implemen
 
 1. A sale to an offer cannot follow the auctions the same night. A funding sale is on tonight's standing offer (known
    amount, but a player gone for nobody if the bid is lost) or on the next close's offer (certain to come, amount ≈
-   value, sd 0.057, so the lock's cash check rests on that ratio). `approach.proceeds` takes the standing offer, else `SALE_ESTIMATE` of his worth.
+   value, sd 0.057, so the lock's cash check rests on that ratio). `approach.prices` takes the standing offer, else `SALE_ESTIMATE` of his worth.
    Open: price the lock's risk from the offer ratio's spread, as a constraint, not a second objective.
 2. Unlisted players have no sale until listed.
 
