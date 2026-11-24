@@ -22,7 +22,7 @@ from approach import Club, Option, Plan, Rounds, Side, approach, cover, plan, se
 from board import club_at, context, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
-from ffcore.clock import CLOSE, MADRID, Clock, closes_between, run_now
+from ffcore.clock import CLOSE, MADRID, Clock, run_now
 from ffcore import records as rec
 from ffcore.store import RunRecords
 from ffcore.parse import snapshot_stamp, stamp
@@ -844,23 +844,27 @@ class CoverGrade(NamedTuple):
 
 
 def closing_offers(day: CoverDay, later: Mapping[dt.date, CoverDay]) -> list[Mapping[str, float]]:
-    """The standing offers at each close before the day's lock, the first the day's own (its cut is before that close), the others those of
-    the later daily cuts of the same Madrid days; an empty Mapping where no cut was kept."""
-    now, lock = snapshot_stamp(day.cut), snapshot_stamp(day.clock.lock) if day.clock.lock else None
-    if now is None or lock is None:
-        return []
+    """The offer drawn at each close before the day's lock, as the market shows it: created at the close, it stands on the cut of the next
+    Madrid day (the later daily cut of that day); an empty Mapping where no cut was kept. Today's standing offers are the day's own
+    (`day.club.offers`), not a draw."""
     out: list[Mapping[str, float]] = []
-    for close in closes_between(now, lock):
-        seen = later.get(close.astimezone(MADRID).date())
-        out.append(day.club.offers if close.astimezone(MADRID).date() == now.astimezone(MADRID).date() else seen.club.offers if seen else {})
+    for close in day.clock.closes:
+        seen = later.get(local_date(close) + dt.timedelta(days=1))
+        out.append(seen.club.offers if seen else {})
     return out
 
 
+def local_date(stamp_text: str) -> dt.date:
+    """The Madrid day of a stamp."""
+    when = snapshot_stamp(stamp_text)
+    assert when is not None, stamp_text
+    return when.astimezone(MADRID).date()
+
+
 def follow(day: CoverDay, side: Side, option: Option, offers: Sequence[Mapping[str, float]]) -> Realised:
-    """The Realised of `option` over the offers at each close (closing_offers): the players of `now` sold at the standing offers, each
-    waiting player at the first close whose offer is at or above his reserve there (any at the last; at the last close a missing offer is
-    his expected draw), then for cash still below 0 the cheapest fallback (approach.cover) at the last close's offers (a missing one
-    at the draw that approach counts)."""
+    """The Realised of `option` over the offers drawn at each close (closing_offers): the players of `now` sold at the day's standing offers,
+    each waiting player at the first draw at or above his reserve (any at the last; a missing last offer is his expected price), then for
+    cash still below 0 the cheapest fallback (approach.cover) at the last draw's offers (a missing one at his expected price)."""
     club = day.club
     money = sum(club.offers[k] for k in option.now)
     unseen = 0
@@ -884,15 +888,15 @@ def follow(day: CoverDay, side: Side, option: Option, offers: Sequence[Mapping[s
 
 
 def follow_plan(day: CoverDay, side: Side, found: Plan, offers: Sequence[Mapping[str, float]]) -> Realised:
-    """The Realised of the plan taking its sales at their standing offers now and the rest at the first close with an offer (the last
-    close's expected draw when none): no fallback, so cash at the lock may stay below 0."""
+    """The Realised of the plan taking its sales at their standing offers now and the rest at the first draw with an offer (his expected
+    price when none): no fallback, so cash at the lock may stay below 0."""
     club = day.club
     money, unseen = 0.0, 0
     for k in found.sells:
         if k in club.offers:
             money += club.offers[k]
             continue
-        later = [seen[k] for seen in offers[1:] if k in seen]
+        later = [seen[k] for seen in offers if k in seen]
         money += later[0] if later else hurdle.draw(club.worth[k])
         unseen += not later
     cost = side.cost(found.sells)
@@ -2043,7 +2047,7 @@ def _selftest_cover_grades() -> None:
     window = valuation.Window((1,))
     big = sorted(own)[-1]
     club = Club(frozenset(own), own, values, {big: 0.9 * values[big]}, -0.9 * values[big] - 1e6, 5e7)
-    day = CoverDay("2026-11-24T0901Z", club, Rounds(cells, window, window), Clock(3, "2026-11-27T2000Z", "2026-11-26T2124Z"), worth.NO_OFFERS)
+    day = CoverDay("2026-11-24T0901Z", club, Rounds(cells, window, window), Clock("2026-11-27T2000Z", ("2026-11-24T2124Z", "2026-11-25T2124Z", "2026-11-26T2124Z")), worth.NO_OFFERS)
     side = Side(club.squad, own, cells, window)
     found = plan(club, approach(club, None, 0.0, 1.0, day.rounds), day.rounds, 3, side)
     assert found is not None and found.feasible
@@ -2060,6 +2064,10 @@ def _selftest_cover_grades() -> None:
     sold = side.cost(best.now | {r.player for r in best.wait})
     assert sold is not None and follow(day, side, best, rich).points <= sold + 1e-9, "offers above every reserve: no fallback"
     assert follow(day, side, best, []).unseen == len(best.wait), "no offer seen: the expected draws"
+    cuts = {dt.date(2026, 11, d): day._replace(cut="2026-11-%02dT2045Z" % d, club=club._replace(offers={big: 1e6 * d})) for d in (24, 25, 26, 27)}
+    arrived = closing_offers(day, cuts)
+    assert [x[big] for x in arrived] == [25e6, 26e6, 27e6], "the offer drawn at a close is the one standing on the next day's cut"
+    assert closing_offers(day, {}) == [{}, {}, {}], "no cut kept: no offer seen"
     assert cover_grades([day._replace(club=club._replace(cash=1e6))]) == [], "cash 0 or more: nothing to grade"
     assert len(cover_grades([day])) == 1 and "cuts 1" in cover_report(cover_grades([day]))
 

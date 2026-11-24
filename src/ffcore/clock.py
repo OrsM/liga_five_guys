@@ -63,11 +63,18 @@ def closes_between(start: datetime, end: datetime) -> list[datetime]:
 
 
 class Clock(NamedTuple):
-    """The closes left before the next lock: `n_closes` of them (the draws of an offer still to come), `lock` that lock and
-    `last_close` the latest of them, both as stamps (None when no lock is ahead, and last_close None when no close is left)."""
-    n_closes: int
+    """The closes left before the next lock: `closes` their stamps, earliest first (the draws of an offer still to come), `lock` that lock
+    as a stamp (None when no lock is ahead). `n_closes` counts the closes and `last_close` is the latest (None when none is left)."""
     lock: str | None
-    last_close: str | None
+    closes: tuple[str, ...] = ()
+
+    @property
+    def n_closes(self) -> int:
+        return len(self.closes)
+
+    @property
+    def last_close(self) -> str | None:
+        return self.closes[-1] if self.closes else None
 
 
 def clock_at(now: datetime, locks: Iterable[str]) -> Clock:
@@ -75,10 +82,10 @@ def clock_at(now: datetime, locks: Iterable[str]) -> Clock:
     0 on the lock's day once the last close has passed (and when no lock is ahead)."""
     ahead = sorted((when, s) for s in locks if (when := snapshot_stamp(s)) is not None and when > now)
     if not ahead:
-        return Clock(0, None, None)
+        return Clock(None)
     lock, name = ahead[0]
     closes = closes_between(now, lock)
-    return Clock(len(closes), name, stamp(closes[-1]) if closes else None)
+    return Clock(name, tuple(stamp(c) for c in closes))
 
 
 def _selftest() -> None:
@@ -103,11 +110,11 @@ def _selftest() -> None:
     now = snapshot_stamp("2026-11-21T0629Z")
     assert now is not None
     got = clock_at(now, ["2026-11-27T2000Z", "2026-12-04T2000Z"])
-    assert got == Clock(6, "2026-11-27T2000Z", "2026-11-26T2124Z"), got
-    assert clock_at(now, ["2026-11-21T2100Z"]) == Clock(0, "2026-11-21T2100Z", None), "the lock before tonight's close: none left"
+    assert got.lock == "2026-11-27T2000Z" and got.n_closes == 6 and got.last_close == "2026-11-26T2124Z" and got.closes[0] == "2026-11-21T2124Z", got
+    assert clock_at(now, ["2026-11-21T2100Z"]) == Clock("2026-11-21T2100Z"), "the lock before tonight's close: none left"
     assert clock_at(now, ["2026-11-21T2130Z"]).n_closes == 1, "a lock after the close counts it"
     assert clock_at(now, ["2026-11-21T2124Z"]).n_closes == 0, "a close at the lock is not before it"
-    assert clock_at(now, []) == Clock(0, None, None) and clock_at(now, ["2026-11-01T2000Z"]) == Clock(0, None, None)
+    assert clock_at(now, []) == Clock(None) and clock_at(now, ["2026-11-01T2000Z"]) == Clock(None)
     for step in range(0, 24 * 40, 7):
         t = datetime(2026, 3, 1, tzinfo=timezone.utc) + timedelta(hours=step)
         cs = closes_between(t, t + timedelta(days=9))

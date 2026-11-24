@@ -146,16 +146,22 @@ lines: low_inflow, p_short, shortfall_if_low, below_points) and says it in the `
 ### The cash cover under a lock (#146, #139)
 
 With cash below 0 and a lock ahead the first `do` line is the `cover`: the recommended of the OPTIONS `approach.secure` finds on the cheapest
-plan `approach.plan`. An option sells `now` at standing offers, waits for the offers of others (each at the next closes, iid from the
-nightly offers seen, the normal of SALE_ESTIMATE and SALE_SD when none) and, for cash still below 0 after the last close, sells the
-cheapest fallback among the squad (every player is listed; counted at the 1 / 10 quantile of his offers) sized after seeing the offers.
-Cash above the deficit is worth no points, so a waiting player's offer is valued by the points the sale then saves, and the reserve at
-each close is `worth.waiting_values` over those payoffs: the one stopping rule, also behind `worth.offer_reserve_ratio` and
-`waiting_reserve` (payoff = the offer's ratio) for ordinary sales. Each option states what to take now, the reserve at each close
-left, the expected points lost and cash at the lock, the worst case with its chance and the fallback. Every sells row has `reserves`
-(its waiting reserve at each close left) and, with cash below 0, `action` (accept, wait with the reserve per close, keep and why). The
-grade of the advice is `grading.cover_replay` (`tools/lfg-rules cover`): at each past daily cut with cash below 0 the option and the plan
-taking its offers now are followed over the offers that came. With cash 0 or more the cover lines are absent.
+plan `approach.plan`. An option sells `now` at standing offers, waits for the offers of others and, for cash still below 0 after the last
+close, sells the cheapest fallback among the squad (every player is listed; priced at the 1/10 quantile of the offers) sized after seeing the
+offers. The offers a waiting player gets are draws created at the closes left and standing on the next day's cut (the offers on a cut are
+constant through the day and differ on every next one: 568 of 568 player-days in the replay); they are taken as independent draws of the
+nightly offers seen (the lag-1 correlation of a player's offer ratios is about 0.18, ignored), the normal of SALE_ESTIMATE and SALE_SD when
+none were seen. Cash above the deficit is worth no points, so a waiting player's offer is valued by the points the sale then saves, and the
+reserve at each close is `worth.waiting_values` over those payoffs: the one stopping rule, also behind `worth.offer_reserve_ratio` and
+`waiting_reserve` (payoff = the offer's ratio) for ordinary sales. The sets of players are searched best-first by the least points any
+cover with them can lose (A*), at most EVALUATIONS options judged; against the exhaustive search on 400 random towns it found the optimum in
+all, on the 22 real cuts since 2026-08-25 within 0.01 points on average (a ladder of sale rates, tried first, missed the optimum on the
+real cuts: lumpy sales make points per million a poor shadow price). Each option states what to take now, the reserve for each offer still to
+come, the expected points lost and cash at the lock, the worst case with its chance and the fallback. Every sells row has one `reserves`
+(until each close left, then the lock): the cover's for the players it sells, else `worth.waiting_reserve`; with cash below 0 an `action`
+(accept, wait, fallback, keep). The grade of the advice is `grading.cover_replay` (`tools/lfg-rules cover`): at each past daily cut with
+cash below 0 the option and the plan taking its offers now are followed over the offers drawn at the closes after it. With cash 0 or more the
+cover lines are absent.
 
 ## 4. The board: cash, offers, funding a buy (2026-11-08)
 

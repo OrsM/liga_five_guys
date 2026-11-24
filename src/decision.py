@@ -348,7 +348,7 @@ def clock_of(inp: Inputs, at: str | None = None) -> Clock:
     """The Clock (ffcore.clock.clock_at) at the stamp `at` (the cut when None) over the locks of the inputs: the closes strictly
     after it and before the next lock."""
     when = snapshot_stamp(at or cut())
-    return clock_at(when, lock_times(inp).values()) if when is not None else Clock(0, None, None)
+    return clock_at(when, lock_times(inp).values()) if when is not None else Clock(None)
 
 
 def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[dict[str, Any]]:

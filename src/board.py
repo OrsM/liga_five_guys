@@ -5,9 +5,9 @@ players ranked by what taking it costs your eleven (valuation.read). The one lin
 their value."""
 from __future__ import annotations
 
+import datetime as dt
 import json
 import random
-from math import ceil
 from itertools import combinations
 import sys
 from collections.abc import Iterable, Sequence
@@ -17,14 +17,14 @@ import decision
 import eleven
 import hurdle
 import worth
-from approach import Approach, Club, Option, Plan, Rounds, Side, approach, plan, replacement, secure
+from approach import Approach, Club, Option, Plan, Rounds, Side, approach, plan, pricing_of, replacement, secure
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
 from ffcore import records as rec
 from ffcore.auction import Curve, chance
-from ffcore.clock import Clock, closes_between, cut, shown
-from ffcore.parse import snapshot_stamp, stamp
+from ffcore.clock import MADRID, Clock, cut, shown
+from ffcore.parse import snapshot_stamp
 from ffcore.store import RunRecords
 from ffcore.rules import POSITIONS, bid_limit
 from health import Health
@@ -48,7 +48,8 @@ SOLD_VALUE = -1e-6
 
 
 def stamped(t: str) -> str:
-    return t[:13] + ":" + t[13:]
+    """A stamp with its colon (YYYY-MM-DDTHH:MMZ), from either form."""
+    return t if ":" in t[11:] else t[:13] + ":" + t[13:]
 
 
 def next_value(inp: decision.Inputs) -> dict[str, float]:
@@ -148,8 +149,8 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
     """A sells row for each standing offer, judged by worth.LIVE at rate with `closes` left before the lock: verdict sell (the offer reaches the reserve),
     hold, or needs_replacement (no legal eleven without him), before settle; lost the points the sale loses (None: no
     Delta) as points_lost, reserve, rent the points the money earns at rate over the jornadas of the sale; by per_million (points lost per
-    million raised), lowest first. `reserves` the least offer worth.waiting_reserve accepts at each of the closes `at` (stamps, the last of
-    them with no draw after it)."""
+    million raised), lowest first. `reserves` the least offer worth.waiting_reserve accepts until each of the moments `at` (untils_of: the closes, then the lock; the
+    last with no draw after it)."""
     ctx = context(inp, offers, rate, closes)
     n = ctx.jornadas()
     out = []
@@ -173,7 +174,7 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
             "per_million": None if lost is None or not money else lost / (money / 1e6),
             "verdict": "needs_replacement" if verdict.key is None else "sell" if verdict.key <= 0 else "hold",
             "points_lost": lost, "reserve": verdict.reserve, "rent": rate * n * money / 1e6,
-            "reserves": [{"close": c, "least": worth.waiting_reserve(standing(inp, k, value, money), offers, len(at) - 1 - j)} for j, c in enumerate(at)],
+            "reserves": reserves_doc(at, [worth.waiting_reserve(standing(inp, k, value, money), offers, len(at) - 1 - j) for j in range(len(at))]),
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
                       ["offer percentile", share, "chance"], ["offers seen", len(offers.ratios), "count"],
                       ["sale price", verdict.reserve, "money"],
@@ -248,6 +249,12 @@ def base_cost(found: Approach | None) -> float:
     return found.cost_lost if found is not None and found.feasible else 0.0
 
 
+def plan_cost(base: Approach | None, found: Plan | None, club: Club) -> float:
+    """The points of the plan with no buy a buy is netted against: the expected points of the secured plan (approach.secure) when cash is
+    below 0 and it has options, else base_cost."""
+    return found.cost if found is not None and club.cash < 0 and found.feasible and found.options else base_cost(base)
+
+
 def risk_doc(club: Club, cash: float) -> Doc:
     """The risk the credit due before the lock leaves for `cash` at the lock before it lands (inflow.risk_of): low_inflow, p_short,
     shortfall_if_low and below_points; {} when no credit is due."""
@@ -265,11 +272,21 @@ def risk_clause(club: Club, cash: float) -> str:
         risk_of(club.inflow, cash).below_points)
 
 
-def base_doc(club: Club, names: dict[str, str], found: Approach | None) -> Doc:
-    """The funding document of the plan with no buy (`cash_if_lost` the cash it leaves), with its cost in points, `cost`, the cash it
-    starts from and, when a credit is due before the lock, its `risk` (risk_doc) on the cash the plan leaves before it."""
-    before = club.cash if found is None or not found.feasible else found.cash_if_lost - club.inflow.expected
-    return {**funding_doc(club, names, found, 0.0), "cost": base_cost(found), "cash": club.cash, **risk_doc(club, before)}
+def base_doc(club: Club, names: dict[str, str], base: Approach | None, found: Plan | None) -> Doc:
+    """The funding document of the plan with no buy, with its cost in points, `cost`, the cash it starts from and, when a credit is due
+    before the lock, its `risk` (risk_doc) on the cash the plan leaves before it. With cash below 0 and a secured plan (approach.secure)
+    its sales, cost and cash replace the approach's: one plan in the document."""
+    secured = found is not None and club.cash < 0 and found.feasible and bool(found.options)
+    before = club.cash + found.raised if secured and found is not None else \
+        club.cash if base is None or not base.feasible else base.cash_if_lost - club.inflow.expected
+    doc = {**funding_doc(club, names, base, 0.0), "cost": plan_cost(base, found, club), "cash": club.cash, **risk_doc(club, before)}
+    if secured and found is not None and base is not None and base.feasible:
+        waiting = [names.get(k, k) for k in sorted(found.sells - found.now)]
+        doc |= {"tonight": [{"name": names.get(k, k), "offer": club.offers[k], "ratio": club.offers[k] / club.worth[k] if club.worth[k] else None}
+                            for k in sorted(found.now, key=lambda k: (-club.offers[k], k))],
+                "raises": sum(club.offers[k] for k in found.now), "if_won": waiting, "if_lost": waiting, "cash_if_lost": found.options[0].cash,
+                "lock_margin": found.options[0].cash, "points_lost_if_won": found.cost, "points_lost_if_lost": found.cost, "net": -found.cost}
+    return doc
 
 
 def ranked(lines: Sequence[Doc]) -> tuple[list[Doc], int]:
@@ -313,11 +330,6 @@ def millions(x: float) -> str:
     return "%.1f million" % (x / 1e6)
 
 
-def euros(x: float) -> str:
-    """An amount in whole euros, rounded up (so a least offer is never shown below what it is), with thousands separators."""
-    return "{:,} euros".format(ceil(x))
-
-
 def stance_why(at: Stance, cap: float | None, rate_yield: float | None, curve: Curve | None, asking: float) -> str | None:
     """The words for a bid placed, with the numbers: the amount and its chance, the walk-away price and the yield, then
     the move (hold, lower to an amount, raise to an amount or withdraw) with the expected surplus (chance x (walk-away
@@ -349,20 +361,19 @@ def priced(r: dict[str, Any]) -> Doc:
     return {"n": stake.n, "yield": r["per_million"] / stake.n if r["per_million"] is not None else None, "walk_away": hurdle.cap(stake)}
 
 
-def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], base: Approach | None
+def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], cost0: float
               ) -> tuple[list[Doc], int]:
     """The buys of the board and the count considered and left out. The players on the market with an asking price and a
     gain, best gain first, each read at its Stake (priced); those the Stake passes (move pass: no
     bid advised and none placed) are counted, not shown. A bid placed is never counted out: its line (a move of hold, lower, withdraw or raise, a `why` in
     words) is first, whatever its gain or net, even on a player with no gain. Of the lines the first EVALUATED_BUYS with a
-    bid get an Approach and a net against the plan with no buy (base); the rest a net None, labelled GAIN_ONLY (UNFUNDED
+    bid get an Approach and a net against the plan with no buy (`cost0` its points); the rest a net None, labelled GAIN_ONLY (UNFUNDED
     when no sales fund the bid). The others are ranked."""
     pos, cells = decision.cells_of(inp)
     locks = decision.lock_times(inp)
     curves = decision.curves_of(inp)
     seen = {a.player: a for a in inp.auctions}
     bids = {b.player: b.amount for b in inp.bids}
-    cost0 = base_cost(base)
     sides: dict[tuple[frozenset[str], tuple[int, ...]], Side] = {}
     read = {r["player"]: priced(r) for r in got
             if r["status"] == "market" and r["asking"] is not None and (r["gain"] > 0 or r["placed"] is not None)}
@@ -517,78 +528,152 @@ def credit_line(club: Club) -> Doc:
         "accepts": [], "act": []}
 
 
-def closes_left(clock: Clock) -> list[str]:
-    """The closes before the clock's lock, earliest first, as stamps (YYYY-MM-DDTHH:MMZ); none when no lock is ahead."""
-    lock, now = snapshot_stamp(clock.lock) if clock.lock else None, snapshot_stamp(cut())
-    return [] if lock is None or now is None else [stamped(stamp(c)) for c in closes_between(now, lock)]
+WEEKDAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
-def reserves_of(least: Sequence[float], closes: Sequence[str]) -> list[Doc]:
-    """The reserve at each of the `closes` (stamps): the least offer accepted there, 0 for any."""
-    return [{"close": c, "least": x} for c, x in zip(closes, least)]
+def untils_of(clock: Clock) -> list[str]:
+    """The moments an offer can be accepted until, as stamps (YYYY-MM-DDTHH:MMZ): each close left, then the lock (the offer created at the
+    last close is shown on the lock's day); none when no lock is ahead."""
+    return [stamped(c) for c in clock.closes] + ([stamped(clock.lock)] if clock.lock else [])
 
 
-def terms(club: Club, option: Option, names: dict[str, str], closes: Sequence[str]) -> list[Doc]:
-    """What `option` asks of each sale, by name: accept now (kind "accept", `least` the standing offer, `close` the first close, by which
-    the offer expires) or wait (kind "wait", `least` the reserve at each close before the last, `reserve` the reserve at each close,
-    `close` the last close, at which any offer is accepted)."""
-    out = [{"name": names.get(k, k), "key": k, "kind": "accept", "least": club.offers[k], "close": closes[0] if closes else None}
-           for k in sorted(option.now)]
-    return out + [{"name": names.get(r.player, r.player), "key": r.player, "kind": "wait", "least": r.least[0], "reserve": reserves_of(r.least, closes),
-                   "close": closes[-1] if closes else None} for r in option.wait]
+def reserves_doc(untils: Sequence[str], leasts: Sequence[float | None]) -> list[Doc]:
+    """The reserve of a sells row: the least offer accepted until each moment (None: the offer is not taken)."""
+    return [{"until": u, "least": x} for u, x in zip(untils, leasts)]
 
 
-def close_shown(close: str | None) -> str:
-    """A close (a stamp) in Madrid time for people; "tonight" when there is none."""
-    when = snapshot_stamp(close) if close else None
-    return shown(when) if when is not None else "tonight"
+def local(stamp_text: str) -> dt.datetime:
+    """A stamp as Madrid time."""
+    when = snapshot_stamp(stamp_text)
+    assert when is not None, stamp_text
+    return when.astimezone(MADRID)
 
 
-def option_doc(club: Club, option: Option, names: dict[str, str], closes: Sequence[str]) -> Doc:
+def day_text(when: dt.datetime) -> str:
+    """The day as '25 Nov'."""
+    return "%d %s" % (when.day, MONTHS[when.month - 1])
+
+
+def clock_text(when: dt.datetime) -> str:
+    """The time as '22:24'."""
+    return when.strftime("%H:%M")
+
+
+def lock_text(when: dt.datetime) -> str:
+    """The lock as 'Fri 27 Nov 21:00'."""
+    return "%s %s %s" % (WEEKDAYS[when.weekday()], day_text(when), clock_text(when))
+
+
+def price_text(x: float) -> str:
+    """An amount in millions to two decimals, as '30.62M'."""
+    return "%.2fM" % (x / 1e6)
+
+
+def terms(club: Club, option: Option, names: dict[str, str], untils: Sequence[str]) -> list[Doc]:
+    """What `option` asks of each sale, by name: accept now (kind "accept", `least` the standing offer, `until` the first moment, when the
+    offer expires) or wait (kind "wait", `reserves` the least offer accepted until each moment, none for today's standing offer)."""
+    out = [{"name": names.get(k, k), "key": k, "kind": "accept", "least": club.offers[k], "until": untils[0] if untils else None}
+           for k in sorted(option.now, key=lambda k: (-club.offers[k], k))]
+    return out + [{"name": names.get(r.player, r.player), "key": r.player, "kind": "wait", "least": r.least[0],
+                   "reserves": reserves_doc(untils, [None, *r.least]), "until": untils[-1] if untils else None} for r in option.wait]
+
+
+def option_doc(club: Club, option: Option, names: dict[str, str], untils: Sequence[str]) -> Doc:
     """An Option as a document: `take_now` and `wait` (terms), `fallback` the names of the cheapest players sold for any cash still missing,
-    points_lost and cash_at_lock the expectations, `worst` its points and chance, `switch` the condition on which the wait ends in sales."""
-    moves = terms(club, option, names, closes)
-    waits = [t for t in moves if t["kind"] == "wait"]
-    fallback = [names.get(k, k) for k in option.fallback]
-    switch = "; ".join("%s: if no offer reaches %s by the close before the last, sell him at the last close whatever it is" % (
-        t["name"], euros(t["least"])) for t in waits)
-    if waits:
-        switch += "; then sell the cheapest of %s for any cash still missing" % ", ".join(fallback)
-    return {"take_now": [t for t in moves if t["kind"] == "accept"], "wait": waits, "fallback": fallback, "points_lost": option.points,
-            "cash_at_lock": option.cash, "worst": {"points": option.worst, "p": option.p_worst}, "switch": switch}
+    points_lost and cash_at_lock the expectations, `worst` its points and chance."""
+    moves = terms(club, option, names, untils)
+    return {"take_now": [t for t in moves if t["kind"] == "accept"], "wait": [t for t in moves if t["kind"] == "wait"],
+            "fallback": [names.get(k, k) for k in option.fallback], "points_lost": option.points, "cash_at_lock": option.cash,
+            "worst": {"points": option.worst, "p": option.p_worst}}
 
 
-def act_rows(club: Club, plan: Plan, sells: Sequence[Doc], names: dict[str, str], closes: Sequence[str]) -> None:
-    """Set `action` on each sells row, for a lock ahead with cash below 0: what the user does with the offer by the recommended option
-    (kind accept, with `least` and the `close` by which it expires; wait, with the `reserve` at each close; keep, with why)."""
-    by = {t["key"]: t for t in terms(club, plan.options[0], names, closes)} if plan.feasible and plan.options else {}
+def waiting_text(name: str, standing: float | None, least: Sequence[float], closes: Sequence[str], lock: str) -> str:
+    """The sentence of a player waited for: his standing offer is not taken, each day from the first offer's day to the last the new offer
+    is accepted at its least (flat, or day by day), and at the lock whatever it is."""
+    days = [local(c) + dt.timedelta(days=1) for c in closes]
+    end = local(lock)
+    first = "Do NOT take %s's offer of %s today. " % (name, price_text(standing)) if standing is not None else "Wait for the offers of %s. " % name
+    body = least[:-1]
+    if not body:
+        return first + "On %s, before %s, accept whatever it is." % (day_text(days[-1]), clock_text(end))
+    same = max(body) - min(body) < 1.0
+    if same:
+        span = "Each day from %s to %s" % (days[0].day if days[0].month == days[-1].month else day_text(days[0]), day_text(days[-1])) if len(days) > 1 \
+            else "On %s" % day_text(days[0])
+        got = "%s, accept his new offer if it is %s or more" % (span, price_text(body[0]))
+    else:
+        got = "; ".join("on %s accept his new offer if it is %s or more" % (day_text(d), price_text(x)) for d, x in zip(days, body))
+    return first + "%s; on %s, before %s, accept whatever it is." % (got, day_text(days[-1]), clock_text(end))
+
+
+def advice_text(club: Club, names: dict[str, str], best: Option, second: Option | None, clock: Clock, at: dt.datetime,
+                listed: frozenset[str]) -> str:
+    """The cover in words for a reader: cash and lock, what to accept now (before which close), for each player waited for what to refuse
+    and accept day by day, the fallback if cash is still short, the points expected and the worst case; players not listed are named,
+    their offers depending on the list line."""
+    lock = local(clock.lock) if clock.lock else None
+    today = at.astimezone(MADRID).date()
+    out = ["Cash %.1fM%s." % (club.cash / 1e6, "; lock " + lock_text(lock) if lock else "")]
+    step = 0
+    for k in sorted(best.now, key=lambda k: (-club.offers[k], k)):
+        step += 1
+        close = local(clock.closes[0]) if clock.closes else None
+        when = "tonight" if close is None or close.date() == today else "on " + day_text(close)
+        out.append("%d) Accept %s's offer of %s before %s %s." % (step, names.get(k, k), price_text(club.offers[k]), clock_text(close) if close else "the close", when))
+    for r in best.wait:
+        step += 1
+        out.append("%d) %s" % (step, waiting_text(names.get(r.player, r.player), club.offers.get(r.player), r.least, clock.closes, clock.lock or "")))
+    if best.wait and best.fallback:
+        step += 1
+        first = best.fallback[0]
+        out.append("%d) If cash is still below 0 after that, sell %s (%s), then the next cheapest player." % (
+            step, names.get(first, first), price_text(pricing_of(club)[first].now)))
+    instead = ""
+    if second is not None and second.now - best.now:
+        instead = " (selling %s today instead: %.1f)" % (" and ".join(names.get(k, k) for k in sorted(second.now - best.now)), second.points)
+    out.append("Expected: %.1f points lost%s. Worst case %.1f points, chance %.1f%%." % (best.points, instead, best.worst, 100.0 * best.p_worst))
+    unlisted = sorted((frozenset(r.player for r in best.wait) | frozenset(best.fallback)) - listed)
+    if unlisted:
+        out.append("Not listed: %s; offers for them depend on the list line." % ", ".join(names.get(k, k) for k in unlisted))
+    return " ".join(out)
+
+
+def act_rows(club: Club, plan: Plan, sells: Sequence[Doc], names: dict[str, str], untils: Sequence[str]) -> None:
+    """Set `action` on each sells row, for a lock ahead with cash below 0: what the user does with the offer by the recommended option (kind
+    accept, `until` when the offer expires; wait, until the lock, the reserves in the row's `reserves`; fallback, sell him if the offers fall
+    short; keep), and with it the row's `reserves`: the option's for the players it sells, the least each moment for a player accepted now."""
+    best = plan.options[0] if plan.feasible and plan.options else None
+    by = {t["key"]: t for t in terms(club, best, names, untils)} if best else {}
     for r in sells:
         t = by.get(r["key"])
-        if t is not None and t["kind"] == "accept":
-            r["action"] = {"kind": "accept", "least": t["least"], "close": t["close"], "reserve": [],
-                           "why": "in the cover of the cash at the lock: accept the offer of %s before the close" % euros(t["least"])}
-        elif t is not None:
-            r["action"] = {"kind": "wait", "least": t["least"], "close": t["close"], "reserve": t["reserve"],
-                           "why": "in the cover of the cash at the lock: accept an offer of %s or more at any close, any offer at the last" % euros(t["least"])}
+        if t is not None:
+            r["reserves"] = t["reserves"] if t["kind"] == "wait" else reserves_doc(untils[:1], [t["least"]])
+            r["action"] = {"kind": t["kind"], "until": t["until"],
+                           "why": "in the cover of the cash at the lock: accept the offer of %s before the close" % price_text(t["least"]) if t["kind"] == "accept"
+                           else "in the cover of the cash at the lock: do not take today's offer; accept a new one at the reserves, whatever it is at the lock"}
         elif r["verdict"] == "sell":
-            r["action"] = {"kind": "accept", "least": r["offer"], "close": closes[0] if closes else None, "reserve": [],
-                           "why": "loses no points; his sale is not needed for cash"}
+            r["action"] = {"kind": "accept", "until": untils[0] if untils else None, "why": "loses no points; his sale is not needed for cash"}
+        elif best is not None and names.get(r["key"], r["key"]) in [names.get(k, k) for k in best.fallback]:
+            r["action"] = {"kind": "fallback", "until": untils[-1] if untils else None,
+                           "why": "sell him if the offers fall short of the deficit: the cheapest next (%s points lost)" % ("none" if r["points_lost"] is None else "%.1f" % r["points_lost"])}
         else:
             lost = r["points_lost"]
-            r["action"] = {"kind": "keep", "least": None, "close": None, "reserve": [],
+            r["action"] = {"kind": "keep", "until": None,
                            "why": "no legal eleven without him; a replacement must be bought first" if lost is None
                            else "keeping him protects %.1f points and the cash at the lock is covered without him" % lost}
 
 
-def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clock, sells: Sequence[Doc], closes: Sequence[str]) -> list[Doc]:
+def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clock, sells: Sequence[Doc], listed: frozenset[str],
+                at: dt.datetime) -> list[Doc]:
     """The lines of do that bring cash to 0 or more at the lock when it is below 0, from the plan (approach.plan, then approach.secure): one
-    "cover" line first for the recommended option (`sells` its terms, `options` all the options, points_lost and cash_after its
-    expectations, `worst` its worst case with its chance); a "sell" line for each of its sales taken now (plan.now), a copy of its row of
-    sells marked "needed" with the points it loses (set_points_lost) and the cash after (set_cash_after), the largest offer first; then
-    one "wait" line (n_closes, expected_cover the names waited for, least the reserve of each, need the money they must raise, cost_points,
-    last_close the latest close before the lock, why) when some sale waits for offers. One "short" line with the money the pool lacks
-    when no plan exists. When the credit due before the lock (club.inflow, at its expected) brings cash to 0 or more with no sale, one
-    "wait" line for the credit (credit_line). No lines when cash is 0 or more or no eleven is fielded."""
+    "cover" line first for the recommended option (`why` the advice in words, advice_text; `sells` its terms, `options` all the options,
+    points_lost and cash_after its expectations, `worst` its worst case with its chance); a "sell" line for each of its sales taken now
+    (plan.now), a copy of its row of sells marked "needed" with the points it loses (set_points_lost) and the cash after (set_cash_after), the
+    largest offer first; then one "wait" line (n_closes, expected_cover the names waited for, need the money they must raise, cost_points,
+    until the lock) when some sale waits for offers. One "short" line with the money the pool lacks when no plan exists. When the credit due
+    before the lock (club.inflow, at its expected) brings cash to 0 or more with no sale, one "wait" line for the credit (credit_line). No
+    lines when cash is 0 or more or no eleven is fielded."""
     if plan is None or club.cash >= 0:
         return []
     if plan.feasible and not plan.sells and club.inflow.jornadas:
@@ -599,38 +684,29 @@ def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clo
         return [{"what": "short", "label": "short of cash at the lock", "step": "list", "needed": True, "short": plan.short,
                  "why": why, "accepts": [], "act": []}]
     rows = {r["key"]: r for r in sells}
+    untils = untils_of(clock)
     taken = sorted((r for k in plan.sells if k in plan.now and (r := rows.get(k)) is not None), key=lambda r: (-r["offer"], r["key"]))
     best = plan.options[0] if plan.options else Option(plan.now, (), (), plan.cost, club.cash + plan.raised + club.inflow.expected, plan.cost, 1.0)
-    cash_after = best.cash
+    second = plan.options[1] if len(plan.options) > 1 else None
     before = club.cash + plan.raised
     why = "cash %.0f is below 0: the cheapest plan sells %s, expecting %.0f at the lock, losing %.1f points in expectation%s" % (
-        club.cash, ", ".join(names.get(k, k) for k in sorted(plan.sells)), cash_after, plan.cost, risk_clause(club, before))
-    moves = terms(club, best, names, closes)
-    sentence = "; ".join("%s: accept %s before the close of %s" % (t["name"], euros(t["least"]), close_shown(t["close"])) if t["kind"] == "accept" else
-                         "%s: wait, accept %s or more at any close, any offer at the last (%s)" % (t["name"], euros(t["least"]), close_shown(t["close"]))
-                         for t in moves)
-    docs = [option_doc(club, o, names, closes) for o in plan.options]
+        club.cash, ", ".join(names.get(k, k) for k in sorted(plan.sells)), best.cash, plan.cost, risk_clause(club, before))
+    moves = terms(club, best, names, untils)
     head = {"what": "cover", "label": "cover the cash: " + ", ".join(t["name"] for t in moves), "step": "plan", "needed": True,
-            "sells": moves, "options": docs, "points_lost": best.points, "cash": club.cash, "cash_after": cash_after,
-            "worst": {"points": best.worst, "p": best.p_worst}, "lock": clock.lock,
-            "why": "%s. Expected cash at the lock %s, %.1f points lost in expectation, at worst %.1f points (chance %.1f%%)" % (
-                sentence, millions(cash_after), best.points, best.worst, 100.0 * best.p_worst),
-            "accepts": [], "act": []}
-    out = [head] + [{**r, "needed": True, "why": why, "set_points_lost": plan.cost, "set_cash_after": cash_after, **risk_doc(club, before)} for r in taken]
+            "sells": moves, "options": [option_doc(club, o, names, untils) for o in plan.options], "points_lost": best.points, "cash": club.cash,
+            "cash_after": best.cash, "worst": {"points": best.worst, "p": best.p_worst}, "lock": clock.lock,
+            "why": advice_text(club, names, best, second, clock, at, listed), "accepts": [], "act": []}
+    out = [head] + [{**r, "needed": True, "why": why, "set_points_lost": plan.cost, "set_cash_after": best.cash, **risk_doc(club, before)} for r in taken]
     waiting = sorted(plan.sells - plan.now)
-    if waiting and clock.last_close:
-        close = snapshot_stamp(clock.last_close)
+    if waiting and clock.lock:
         names_waiting = [names.get(k, k) for k in waiting]
         out.append({
             "what": "wait", "label": "wait for the offers of " + ", ".join(names_waiting), "step": "wait", "needed": True,
-            "n_closes": clock.n_closes, "expected_cover": names_waiting,
-            "least": {names.get(r.player, r.player): r.least for r in best.wait},
-            "expected_raised": sum(club.offers.get(k, hurdle.draw(club.worth[k])) for k in waiting),
+            "n_closes": clock.n_closes, "expected_cover": names_waiting, "until": stamped(clock.lock),
             "need": max(0.0, -(club.cash + club.inflow.expected + sum(club.offers[k] for k in plan.now))),
-            "cost_points": plan.cost, "last_close": stamped(clock.last_close), **risk_doc(club, before),
-            "why": "cash %.0f is below 0 and the lock is %d closes away (the last %s): sell %s to the offers still to come, each at its "
-                   "reserve or more, at the last close whatever it is%s" % (club.cash, clock.n_closes, shown(close) if close else "", ", ".join(names_waiting),
-                                                                           risk_clause(club, before)),
+            "cost_points": plan.cost, **risk_doc(club, before),
+            "why": "cash %.0f is below 0 and the lock is %d closes away: sell %s to the offers still to come, each at its reserve or more, "
+                   "whatever it is at the lock%s" % (club.cash, clock.n_closes, ", ".join(names_waiting), risk_clause(club, before)),
             "accepts": [], "act": []})
     return out
 
@@ -689,18 +765,20 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
                "win": r["win"], "placed": r["placed"]} for r in arrival_rows(got, arrivals)]
     base = approach(club, None, 0.0, 1.0, rounds)
     clock = decision.clock_of(inp)
-    buys, considered = buy_lines(inp, names, club, got, base)
-    sells = offer_lines(inp, names, offered, known, offers, rate, clock.n_closes, closes_left(clock))
-    funds(buys, sells)
-    replacement_rows(inp, names, club, got, sells)
     side = Side(club.squad, pos, cells, rounds.arrives)
     found = plan(club, base, rounds, clock.n_closes, side)
     if found is not None and club.cash < 0:
         found = secure(club, found, side, offers, clock.n_closes)
+    buys, considered = buy_lines(inp, names, club, got, plan_cost(base, found, club))
+    sells = offer_lines(inp, names, offered, known, offers, rate, clock.n_closes, untils_of(clock))
+    funds(buys, sells)
+    replacement_rows(inp, names, club, got, sells)
     settle(sells, found.sells if found is not None and found.feasible else frozenset(), found.now if found is not None else frozenset())
-    owed = cover_lines(names, club, found, clock, sells, closes_left(clock)) if locks else []
+    at = snapshot_stamp(cut())
+    assert at is not None
+    owed = cover_lines(names, club, found, clock, sells, extras.listed, at) if locks else []
     if locks and club.cash < 0 and found is not None:
-        act_rows(club, found, sells, names, closes_left(clock))
+        act_rows(club, found, sells, names, untils_of(clock))
     sold = (found.sells if found is not None and found.feasible else frozenset()) | {s["key"] for s in sells if s["verdict"] == "sell"}
     squad = squad_rows(inp, names, sold)
     return {
@@ -709,7 +787,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, club.team_value, club.debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
         "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names, sold), "buys": buys, "considered": considered,
-        "base": base_doc(club, names, base), "targets": target_lines(names, got), "lambda": rate,
+        "base": base_doc(club, names, base, found), "targets": target_lines(names, got), "lambda": rate,
         "alerts": alerts, "auction": auction_card(),
         "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
@@ -1016,7 +1094,7 @@ def _selftest_placed() -> None:
                 "placed": mine.get(k)} for k in keys]
         for r in got:
             r["stake"] = hurdle.stake(r["gain"], hurdle.remaining(1, max(cells)), rate, hurdle.Exit(r["asking"]), 1)
-        shown, considered = buy_lines(inp, names, club, got, None)
+        shown, considered = buy_lines(inp, names, club, got, 0.0)
         assert [b["key"] for b in shown if b["done"]] == [b["key"] for b in shown[:len(mine)]], "a bid placed comes before the ranked rows"
         assert {b["key"] for b in shown if b["done"]} == set(mine), "a bid placed is always a row of the buys"
         curve_of = decision.curves_of(inp)
@@ -1050,7 +1128,7 @@ def _selftest_cover() -> None:
                     inflow=rng.choice([NONE, Inflow(due, max(0.0, due - spread), "2026-11-24T03:40Z", (13,), spread / 1.2816)]))
         low = club.inflow.expected
         n_closes = rng.choice([0, 1, 3, 6])
-        clock = Clock(n_closes, "2026-11-27T2000Z", "2026-11-26T2124Z" if n_closes else None)
+        clock = Clock("2026-11-27T2000Z", tuple("2026-11-%02dT2124Z" % (26 - n_closes + 1 + i) for i in range(n_closes)))
         dist = rng.choice([worth.NO_OFFERS, worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.0, 1.05, 1.1])])
         rounds = Rounds({1: points}, valuation.Window((1,)), valuation.Window((1,)))
         base_plan = plan(club, approach(club, None, 0.0, 1.0, rounds), rounds, n_closes)
@@ -1058,8 +1136,9 @@ def _selftest_cover() -> None:
         sells = [{"what": "sell", "key": k, "name": k, "offer": offers[k], "verdict": "sell", "points_lost": 0.0,
                   "for": [k] if rng.random() < 0.15 else []} for k in sorted(offers)]
         found = secure(club, base_plan, Side(club.squad, own, {1: points}, (1,)), dist, n_closes) if cash < 0 else base_plan
-        closes = ["2026-11-24T21:24Z", "2026-11-25T21:24Z"][:max(1, min(n_closes, 2))] if n_closes else []
-        rows = cover_lines({k: k for k in own}, club, found, clock, sells, closes)
+        listed = frozenset(offers) | frozenset(rng.sample(sorted(own), rng.randint(0, len(own))))
+        at = dt.datetime(2026, 11, 26 - n_closes, 9, 0, tzinfo=dt.timezone.utc)
+        rows = cover_lines({k: k for k in own}, club, found, clock, sells, listed, at)
         if cash >= 0:
             assert rows == [], "cash 0 or more: no line, the board is unchanged"
             seen_empty += 1
@@ -1085,12 +1164,17 @@ def _selftest_cover() -> None:
         assert len(head["options"]) == len(found.options) and all(a["points_lost"] == b.points for a, b in zip(head["options"], found.options))
         assert found.sells >= found.now and found.now <= frozenset(offers)
         assert all(o["cash_at_lock"] >= -1e-6 for o in head["options"]), "every option leaves cash 0 or more at the lock in expectation"
-        assert all(len(w["reserve"]) == len(closes) for o in head["options"] for w in o["wait"]), "a reserve at each close left"
+        assert all(len(w["reserves"]) == n_closes + 1 and w["reserves"][0]["least"] is None and w["reserves"][-1]["until"] == "2026-11-27T20:00Z"
+                   for o in head["options"] for w in o["wait"]), "a reserve for each offer still to come, none for today's, the last until the lock"
+        assert head["why"].startswith("Cash ") and "Expected: " in head["why"], "the advice in words"
+        if found.options:
+            unlisted = (frozenset(r.player for r in found.options[0].wait) | frozenset(found.options[0].fallback)) - listed
+            assert ("Not listed" in head["why"]) == bool(unlisted), "the advice names what is not listed"
         assert {r["key"] for r in takes_} == found.now and all(r["set_points_lost"] == found.cost for r in takes_)
         assert [r["offer"] for r in takes_] == sorted((r["offer"] for r in takes_), reverse=True), "the largest offer first"
         assert all(r["offer"] > 0 for r in takes_), "a sale that raises no cash is not in the cover"
-        assert {t["key"] for t in head["sells"]} == found.sells and all(t["least"] >= 0 for t in head["sells"])
-        assert all(t["close"] == ((closes[0] if t["kind"] == "accept" else closes[-1]) if closes else None) for t in head["sells"])
+        assert {t["key"] for t in head["sells"]} == (found.sells if found.options else found.now) and all(t["least"] >= 0 for t in head["sells"])
+        assert all(t["until"] == (untils_of(clock)[0] if t["kind"] == "accept" else untils_of(clock)[-1]) for t in head["sells"])
         if n_closes == 0:
             assert not waits and {r["key"] for r in takes_} == found.sells <= frozenset(offers), "no close left: every sale of the plan is taken"
             pool = sorted(offers)
@@ -1098,7 +1182,7 @@ def _selftest_cover() -> None:
                     if sum(offers[k] for k in b) >= -(cash + low) - 1e-6 and (c := side.cost(frozenset(b))) is not None]
             assert abs(base_plan.cost - min(owed)) < 1e-9, "at n_closes 0 the chosen set is the cheapest over the standing offers"
         for w in waits:
-            assert n_closes >= 1 and w["n_closes"] == n_closes and w["last_close"] == "2026-11-26T21:24Z"
+            assert n_closes >= 1 and w["n_closes"] == n_closes and w["until"] == "2026-11-27T20:00Z"
             assert w["cost_points"] == found.cost and w["need"] >= 0
             assert set(w["expected_cover"]) == found.sells - found.now
             seen_wait += 1
