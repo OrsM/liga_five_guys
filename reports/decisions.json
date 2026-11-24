@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-24T09:03Z",
- "market_at": "2026-11-24T09:01Z",
+ "generated_at": "2026-11-24T20:15Z",
+ "market_at": "2026-11-24T20:14Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-24T09:01Z",
+   "at": "2026-11-24T20:14Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -249,7 +249,7 @@
    "pos": "DEL",
    "status": "rival",
    "gain": 147.14550894528125,
-   "asking": 179002891.0,
+   "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
@@ -285,16 +285,16 @@
    "pos": "DEL",
    "status": "rival",
    "gain": 105.01204722810627,
-   "asking": 165504852.0,
+   "asking": null,
    "bid": null,
    "win": null,
    "placed": null,
    "replaces": "Martin Satriano",
-   "per_million": 0.6344952788943388,
+   "per_million": 0.6356784165047004,
    "price_next": -0.0007670867494383726,
    "price_lock": -0.002923499665242635,
    "n": 25,
-   "yield": 0.02537981115577355,
+   "yield": 0.025427136660188015,
    "walk_away": 79342435.68345806,
    "available": false
   },
@@ -432,25 +432,25 @@
    {
     "scope": "backtest:all",
     "n": 3489,
-    "model": 0.03182682519828728,
+    "model": 0.03178328040893025,
     "pooled": 0.04271618279183192
    },
    {
     "scope": "backtest:big",
     "n": 318,
-    "model": 0.10090206157800248,
+    "model": 0.10103403932294587,
     "pooled": 0.12078525589631639
    },
    {
     "scope": "backtest:norival",
     "n": 3257,
-    "model": 0.02002498105920172,
+    "model": 0.01997833452249104,
     "pooled": 0.024528245491084073
    },
    {
     "scope": "backtest:ours",
     "n": 276,
-    "model": 0.1784890911489243,
+    "model": 0.17828650314995323,
     "pooled": 0.24779924085775454
    },
    {
@@ -462,7 +462,7 @@
    {
     "scope": "backtest:small",
     "n": 3171,
-    "model": 0.02489969647903486,
+    "model": 0.024838549619066806,
     "pooled": 0.034887117750133374
    },
    {
@@ -508,21 +508,21 @@
     "scope": "backtest:ours",
     "bin": "0.80-0.90",
     "n": 56,
-    "stated": 0.8436528796306124,
+    "stated": 0.843797000443726,
     "observed": 0.6607142857142857
    },
    {
     "scope": "backtest:ours",
     "bin": "0.90-0.95",
     "n": 38,
-    "stated": 0.9326836702726913,
+    "stated": 0.9332714128038174,
     "observed": 0.7894736842105263
    },
    {
     "scope": "backtest:ours",
     "bin": "0.95-0.99",
     "n": 54,
-    "stated": 0.9693221295122504,
+    "stated": 0.9698317543762095,
     "observed": 0.8333333333333334
    },
    {
@@ -2044,7 +2044,7 @@
   {
    "name": "Fernando Calero",
    "pos": "DEF",
-   "next": 1.165430451789255,
+   "next": 1.484884162490841,
    "xi": false,
    "best": false,
    "sold": false
