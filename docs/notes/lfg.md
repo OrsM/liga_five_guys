@@ -143,6 +143,17 @@ jornada, scaled by the square root of the eleven's share still to play) and `inf
 a plan is feasible when cash at the lock is 0 or more at the EXPECTED credit; the board flags the risk (`risk` on `base` and the `do`
 lines: low_inflow, p_short, shortfall_if_low, below_points) and says it in the `why`.
 
+### The cash cover under a lock (#146, #139)
+
+With cash below 0 and a lock ahead the first `do` line is the `cover` (`approach.secure` on the cheapest plan `approach.plan`): the
+sales, each with its terms (accept now at the standing offer before the next close, or wait and accept at least `floor` by the last
+close), `p_ok` the chance cash at the lock is 0 or more and `at_stake` the points the eleven scores in the jornada that locks, all of
+which a lock with cash below 0 loses. A sale waiting for an offer is drawn once at SALE_ESTIMATE times worth with SALE_SD of worth for
+spread, the offers independent (a lower bound: the closes before the last give more draws); a standing offer taken now is certain; the
+credit is normal with its own spread. A standing offer is taken now when that raises the chance. The set grows by the cheapest cover of
+0 to 3 spreads of margin when that lowers points lost plus `at_stake` times the chance of failing. Every sells row then carries an
+`action` (accept, wait or keep, with why). With cash 0 or more nothing changes.
+
 ## 4. The board: cash, offers, funding a buy (2026-11-08)
 
 The long-horizon planner, the season simulation (`sim.py`, p_win, standings), the plan board and the line-up reminder

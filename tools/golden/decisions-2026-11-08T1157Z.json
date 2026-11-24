@@ -71,6 +71,166 @@
   {
    "accepts": [],
    "act": [],
+   "at_stake": 55.3121555304112,
+   "cash": -49472707.0,
+   "cash_after": 2559819.325682652,
+   "label": "cover the cash: sell Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla",
+   "lock": "2026-11-20T20:00Z",
+   "needed": true,
+   "p_ok": 0.9572588665094135,
+   "points_lost": 14.121198033019482,
+   "sells": [
+    {
+     "close": "2026-11-19T21:24Z",
+     "key": "11579",
+     "kind": "wait",
+     "least": 0.0,
+     "name": "Arnau Ortiz"
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "key": "11861",
+     "kind": "wait",
+     "least": 0.0,
+     "name": "Dani Martinez"
+    },
+    {
+     "close": "2026-11-08T21:24Z",
+     "key": "15316",
+     "kind": "accept",
+     "least": 1576701.0,
+     "name": "Roger Hinojo"
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "key": "3427",
+     "kind": "wait",
+     "least": 4674067.7123173475,
+     "name": "Thomas Lemar"
+    },
+    {
+     "close": "2026-11-08T21:24Z",
+     "key": "6442",
+     "kind": "accept",
+     "least": 22801375.0,
+     "name": "Iñigo Vicente"
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "key": "7842",
+     "kind": "wait",
+     "least": 11010880.072317343,
+     "name": "Ferran Jutgla"
+    }
+   ],
+   "step": "plan",
+   "what": "cover",
+   "why": "Arnau Ortiz: accept 0 euros or more, at the latest at the close of 2026-11-19 22:24 CET; Dani Martinez: accept 0 euros or more, at the latest at the close of 2026-11-19 22:24 CET; Roger Hinojo: accept 1,576,701 euros before the close of 2026-11-08 22:24 CET; Thomas Lemar: accept 4,674,068 euros or more, at the latest at the close of 2026-11-19 22:24 CET; Iñigo Vicente: accept 22,801,375 euros before the close of 2026-11-08 22:24 CET; Ferran Jutgla: accept 11,010,881 euros or more, at the latest at the close of 2026-11-19 22:24 CET. Cash at the lock 2.6 million, chance of 0 or more 96%; if it is below 0 the whole jornada scores 0 (55.3 points at stake)"
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "amount": 22801375.0,
+   "delta": {
+    "gap": [],
+    "points": -8.44978950471318,
+    "window": {
+     "lock": -0.7693931315254829,
+     "next4": -2.375248948950059,
+     "season": -8.44978950471318
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     23345857.0,
+     "money"
+    ],
+    [
+     "offer",
+     22801375.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.976677574954734,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "sale price",
+     8232857.324358484,
+     "money"
+    ],
+    [
+     "points, lock",
+     -0.7693931315254829,
+     "points"
+    ],
+    [
+     "points, next4",
+     -2.375248948950059,
+     "points"
+    ],
+    [
+     "points, season",
+     -8.44978950471318,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [],
+   "gain": -8.44978950471318,
+   "key": "6442",
+   "label": "sell Iñigo Vicente",
+   "more": false,
+   "name": "Iñigo Vicente",
+   "needed": true,
+   "offer": 22801375.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.3705824541157356,
+   "plan": false,
+   "points_lost": 8.44978950471318,
+   "pos": "DEL",
+   "ratio": 0.976677574954734,
+   "rent": 26.67760875,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserve": 8232857.324358484,
+   "risk": {
+    "below_points": 30.180929010000007,
+    "low_inflow": 4039992.2266826527,
+    "p_short": 0.016454867934327932,
+    "shortfall_if_low": 0.0
+   },
+   "set_cash_after": 2559819.325682652,
+   "set_points_lost": 14.121198033019482,
+   "step": "take offer",
+   "trace": null,
+   "trend": -0.9599715530509632,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, bringing it to 2559819 at the lock (the credit due, 5577912 expected, counted), losing 14.1 points; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
    "amount": 1576701.0,
    "delta": {
     "gap": [],
@@ -153,12 +313,12 @@
    "replacement_why_not": null,
    "reserve": 1516029.106876829,
    "risk": {
-    "below_points": 30.34434467,
+    "below_points": 30.180929010000007,
     "low_inflow": 4039992.2266826527,
-    "p_short": 0.017021381815961745,
+    "p_short": 0.016454867934327932,
     "shortfall_if_low": 0.0
    },
-   "set_cash_after": 2543477.7596826525,
+   "set_cash_after": 2559819.325682652,
    "set_points_lost": 14.121198033019482,
    "step": "take offer",
    "trace": null,
@@ -166,7 +326,7 @@
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, bringing it to 2543478 at the lock (the credit due, 5577912 expected, counted), losing 14.1 points; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, bringing it to 2559819 at the lock (the credit due, 5577912 expected, counted), losing 14.1 points; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
@@ -177,24 +337,29 @@
     "Arnau Ortiz",
     "Dani Martinez",
     "Thomas Lemar",
-    "Iñigo Vicente",
     "Ferran Jutgla"
    ],
-   "expected_raised": 44861571.533,
-   "label": "wait for the offers of Arnau Ortiz, Dani Martinez, Thomas Lemar, Iñigo Vicente, Ferran Jutgla",
+   "expected_raised": 22060196.533,
+   "label": "wait for the offers of Arnau Ortiz, Dani Martinez, Thomas Lemar, Ferran Jutgla",
    "last_close": "2026-11-19T21:24Z",
+   "least": {
+    "Arnau Ortiz": 0.0,
+    "Dani Martinez": 0.0,
+    "Ferran Jutgla": 11010880.072317343,
+    "Thomas Lemar": 4674067.7123173475
+   },
    "n_closes": 12,
-   "need": 42318093.773317344,
+   "need": 19516718.773317344,
    "needed": true,
    "risk": {
-    "below_points": 30.34434467,
+    "below_points": 30.180929010000007,
     "low_inflow": 4039992.2266826527,
-    "p_short": 0.017021381815961745,
+    "p_short": 0.016454867934327932,
     "shortfall_if_low": 0.0
    },
    "step": "wait",
    "what": "wait",
-   "why": "cash -49472707 is below 0 and the lock is 12 closes away (the last 2026-11-19 22:24 CET): the cheapest plan (14.1 points) sells Arnau Ortiz, Dani Martinez, Thomas Lemar, Iñigo Vicente, Ferran Jutgla to the offers still to come; nothing is taken now; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand"
+   "why": "cash -49472707 is below 0 and the lock is 12 closes away (the last 2026-11-19 22:24 CET): the cheapest plan (14.1 points) sells Arnau Ortiz, Dani Martinez, Thomas Lemar, Ferran Jutgla to the offers still to come; nothing is taken now; if the eleven scores under 30 points the lock cash stays below 0; there is time to fix by hand"
   }
  ],
  "generated_at": "2026-11-08T12:07Z",
@@ -243,6 +408,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": "2026-11-08T21:24Z",
+    "kind": "accept",
+    "least": 1576701.0,
+    "why": "in the cover of the cash at the lock: accept the offer of 1,576,701 euros before the close"
+   },
    "amount": 1576701.0,
    "delta": {
     "gap": [],
@@ -334,6 +505,109 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": "2026-11-08T21:24Z",
+    "kind": "accept",
+    "least": 22801375.0,
+    "why": "in the cover of the cash at the lock: accept the offer of 22,801,375 euros before the close"
+   },
+   "amount": 22801375.0,
+   "delta": {
+    "gap": [],
+    "points": -8.44978950471318,
+    "window": {
+     "lock": -0.7693931315254829,
+     "next4": -2.375248948950059,
+     "season": -8.44978950471318
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     23345857.0,
+     "money"
+    ],
+    [
+     "offer",
+     22801375.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.976677574954734,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "sale price",
+     8232857.324358484,
+     "money"
+    ],
+    [
+     "points, lock",
+     -0.7693931315254829,
+     "points"
+    ],
+    [
+     "points, next4",
+     -2.375248948950059,
+     "points"
+    ],
+    [
+     "points, season",
+     -8.44978950471318,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [],
+   "gain": -8.44978950471318,
+   "key": "6442",
+   "label": "sell Iñigo Vicente",
+   "more": false,
+   "name": "Iñigo Vicente",
+   "offer": 22801375.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.3705824541157356,
+   "plan": false,
+   "points_lost": 8.44978950471318,
+   "pos": "DEL",
+   "ratio": 0.976677574954734,
+   "rent": 26.67760875,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserve": 8232857.324358484,
+   "step": "take offer",
+   "trace": null,
+   "trend": -0.9599715530509632,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "close": "2026-11-19T21:24Z",
+    "kind": "wait",
+    "least": 0.0,
+    "why": "in the cover of the cash at the lock: accept an offer of 0 euros or more, at the last close whatever it is"
+   },
    "amount": 644149.0,
    "delta": {
     "gap": [],
@@ -425,97 +699,12 @@
   {
    "accepts": [],
    "act": [],
-   "amount": 22801375.0,
-   "delta": {
-    "gap": [],
-    "points": -8.44978950471318,
-    "window": {
-     "lock": -0.7693931315254829,
-     "next4": -2.375248948950059,
-     "season": -8.44978950471318
-    }
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 21.4 points and the cash at the lock is covered without him"
    },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     23345857.0,
-     "money"
-    ],
-    [
-     "offer",
-     22801375.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.976677574954734,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "sale price",
-     8232857.324358484,
-     "money"
-    ],
-    [
-     "points, lock",
-     -0.7693931315254829,
-     "points"
-    ],
-    [
-     "points, next4",
-     -2.375248948950059,
-     "points"
-    ],
-    [
-     "points, season",
-     -8.44978950471318,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [],
-   "gain": -8.44978950471318,
-   "key": "6442",
-   "label": "sell Iñigo Vicente",
-   "more": false,
-   "name": "Iñigo Vicente",
-   "offer": 22801375.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.3705824541157356,
-   "plan": false,
-   "points_lost": 8.44978950471318,
-   "pos": "DEL",
-   "ratio": 0.976677574954734,
-   "rent": 26.67760875,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserve": 8232857.324358484,
-   "step": "take offer",
-   "trace": null,
-   "trend": -0.9599715530509632,
-   "verdict": "wait",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
    "amount": 47188627.0,
    "delta": {
     "gap": [],
@@ -607,6 +796,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 2.5 points and the cash at the lock is covered without him"
+   },
    "amount": 5337731.0,
    "delta": {
     "gap": [],
@@ -698,6 +893,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 23.4 points and the cash at the lock is covered without him"
+   },
    "amount": 46035874.0,
    "delta": {
     "gap": [],
@@ -789,6 +990,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 21.8 points and the cash at the lock is covered without him"
+   },
    "amount": 40009473.0,
    "delta": {
     "gap": [],
@@ -880,6 +1087,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 7.8 points and the cash at the lock is covered without him"
+   },
    "amount": 9145609.0,
    "delta": {
     "gap": [],
@@ -971,6 +1184,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 2.6 points and the cash at the lock is covered without him"
+   },
    "amount": 2953995.0,
    "delta": {
     "gap": [],
@@ -1062,6 +1281,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 32.8 points and the cash at the lock is covered without him"
+   },
    "amount": 36847734.0,
    "delta": {
     "gap": [],
@@ -1153,6 +1378,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 50.6 points and the cash at the lock is covered without him"
+   },
    "amount": 49571725.0,
    "delta": {
     "gap": [],
@@ -1244,6 +1475,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 23.5 points and the cash at the lock is covered without him"
+   },
    "amount": 21289009.0,
    "delta": {
     "gap": [],
@@ -1335,6 +1572,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 21.2 points and the cash at the lock is covered without him"
+   },
    "amount": 18882612.0,
    "delta": {
     "gap": [],
@@ -1426,6 +1669,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 51.3 points and the cash at the lock is covered without him"
+   },
    "amount": 44527367.0,
    "delta": {
     "gap": [],
@@ -1517,6 +1766,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 29.3 points and the cash at the lock is covered without him"
+   },
    "amount": 25283889.0,
    "delta": {
     "gap": [],
@@ -1608,6 +1863,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 14.7 points and the cash at the lock is covered without him"
+   },
    "amount": 10813953.0,
    "delta": {
     "gap": [],
@@ -1699,6 +1960,12 @@
   {
    "accepts": [],
    "act": [],
+   "action": {
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "why": "keeping him protects 83.5 points and the cash at the lock is covered without him"
+   },
    "amount": 18261001.0,
    "delta": {
     "gap": [],
