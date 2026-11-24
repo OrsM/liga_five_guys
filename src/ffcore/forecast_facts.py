@@ -845,7 +845,11 @@ def _selftest() -> None:
     t5 = _tables(q1_expires="2026-08-14T12:00:00+00:00")
     w5 = state.world_at(ob.of(t5), D1)
     assert late_arrivals(_inp(w5)) == (), "a close before the kickoff is not late"
-    jd = stamp_jd
+
+    def jd(stamp: str) -> float:
+        found = stamp_jd(stamp)
+        assert found is not None
+        return found
     cal = tuple(Calendar(j, lock, None, "ahead") for j, lock in ((1, "2026-08-15T1800Z"), (2, "2026-08-22T1900Z")))
     kicks = (Kickoff("A", "B", 1, "2026-08-15T1800Z", jd("2026-08-15T1800Z")), Kickoff("E", "F", 1, "2026-08-16T1800Z", jd("2026-08-16T1800Z")),
              Kickoff("E", "A", 2, "2026-08-22T2100Z", jd("2026-08-22T2100Z")), Kickoff("C", "D", 2, "2026-08-22T1900Z", jd("2026-08-22T1900Z")))
