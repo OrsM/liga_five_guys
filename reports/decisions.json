@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-24T20:48Z",
- "market_at": "2026-11-24T20:48Z",
+ "generated_at": "2026-11-24T21:38Z",
+ "market_at": "2026-11-24T21:38Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-24T20:48Z",
+   "at": "2026-11-24T21:38Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -55,57 +55,290 @@
  "cash": -31266838.0,
  "cash_locked": 0,
  "can_bid": 64593699.60000001,
- "ping": "",
+ "ping": "on the market: Abde Ezzalzouli (+34 points), Alvaro Garcia (+14 points), Aissa Mandi (+11 points), Alex Freeman (+8 points), Iñigo Ruiz de Galarreta (+6 points), Gabriel Jesus (+1 points), Kiko Femenia (+0 points)",
  "do": [
   {
    "what": "wait",
-   "label": "wait for the offers of Roger Hinojo, Aymeric Laporte",
+   "label": "wait for the offers of Aymeric Laporte",
    "step": "wait",
    "needed": true,
-   "n_closes": 3,
+   "n_closes": 2,
    "expected_cover": [
-    "Roger Hinojo",
     "Aymeric Laporte"
    ],
-   "expected_raised": 31364355.042,
+   "expected_raised": 31892562.0,
    "need": 31266838.0,
-   "cost_points": 35.86658434060655,
+   "cost_points": 28.542312394722558,
    "last_close": "2026-11-26T21:24Z",
-   "why": "cash -31266838 is below 0 and the lock is 3 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (35.9 points) sells Roger Hinojo, Aymeric Laporte to the offers still to come; nothing is taken now",
+   "why": "cash -31266838 is below 0 and the lock is 2 closes away (the last 2026-11-26 22:24 CET): the cheapest plan (28.5 points) sells Aymeric Laporte to the offers still to come; nothing is taken now",
    "accepts": [],
    "act": []
   }
  ],
  "lineup": {
-  "eleven": null,
-  "message": "the app's line-up is not a legal eleven (10 players)",
+  "eleven": [
+   "Mathew Ryan",
+   "Natan",
+   "Dean Huijsen",
+   "Aymeric Laporte",
+   "Aitor Paredes",
+   "Pepelu",
+   "Guido Rodriguez",
+   "Pablo Fornals",
+   "Mikel Oyarzabal",
+   "Martin Satriano",
+   "Vinicius Junior"
+  ],
+  "message": "",
   "unmapped": [],
-  "points": null,
-  "best": 56.826122215307635,
-  "advice": [],
+  "points": 54.505517883306275,
+  "best": 58.37530011823502,
+  "advice": [
+   {
+    "in": "Roger Hinojo",
+    "out": "Aymeric Laporte",
+    "gain": 3.8697832349287427
+   }
+  ],
   "stale": true
  },
- "buys": [],
- "considered": 6,
+ "buys": [
+  {
+   "name": "Alvaro Garcia",
+   "pos": "MED",
+   "what": "buy",
+   "label": "buy Alvaro Garcia",
+   "step": "bid",
+   "price": 7353836.0,
+   "asking": 7353836.0,
+   "amount": 7353836.0,
+   "win": 1.0,
+   "advised": 7353836.0,
+   "advised_win": 1.0,
+   "move": "bid",
+   "to": null,
+   "why": null,
+   "plan": false,
+   "done": false,
+   "key": "867",
+   "gain": 13.756979240845844,
+   "net": 10.597638991982876,
+   "net_label": null,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "replaces": "Guido Rodriguez",
+   "per_million": 1.8707215174292497,
+   "n": 25,
+   "yield": 0.07482886069716999,
+   "walk_away": 10394162.093083525,
+   "price_next": -0.013851846945546198,
+   "price_lock": -0.05279177347014208,
+   "facts": [
+    [
+     "asking",
+     7353836.0,
+     "money"
+    ],
+    [
+     "walk-away price",
+     10394162.093083525,
+     "money"
+    ],
+    [
+     "bid",
+     7353836.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     1.0,
+     "chance"
+    ],
+    [
+     "points added",
+     13.756979240845844,
+     "points"
+    ]
+   ],
+   "bids": 0,
+   "auction": {
+    "yours": false,
+    "listings": 168,
+    "thin": false,
+    "cell": "0/1/0"
+   },
+   "funding": {
+    "feasible": true,
+    "short": 0.0,
+    "tonight": [],
+    "raises": 0,
+    "margin": 57239863.60000001,
+    "lock_margin": 21820295.486,
+    "lock_margin_low": 18375160.225297995,
+    "if_won": [
+     "Pepelu",
+     "Fernando Calero"
+    ],
+    "if_lost": [
+     "Aymeric Laporte"
+    ],
+    "held": [
+     "Natan",
+     "Dean Huijsen",
+     "Roger Hinojo",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Mikel Oyarzabal",
+     "Pepelu",
+     "Fernando Calero",
+     "Vinicius Junior",
+     "Aymeric Laporte",
+     "Sergio Carreira",
+     "Guido Rodriguez",
+     "Aitor Paredes",
+     "Martin Satriano"
+    ],
+    "cash_if_lost": 1311193.8200000003,
+    "gain": 13.756979240846022,
+    "points_lost_if_won": 31.701652643585703,
+    "points_lost_if_lost": 28.542312394722558,
+    "net": 10.597638991982876,
+    "base": 28.542312394722558
+   },
+   "accepts": [],
+   "act": []
+  },
+  {
+   "name": "Aissa Mandi",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Aissa Mandi",
+   "step": "bid",
+   "price": 4967547.0,
+   "asking": 4967547.0,
+   "amount": 5215924.350000001,
+   "win": 0.8706896551724138,
+   "advised": 5215924.350000001,
+   "advised_win": 0.8706896551724138,
+   "move": "bid",
+   "to": null,
+   "why": null,
+   "plan": false,
+   "done": false,
+   "key": "1566",
+   "gain": 10.617241457765928,
+   "net": 5.795773918002628,
+   "net_label": null,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "replaces": "Aitor Paredes",
+   "per_million": 2.1373207858457963,
+   "n": 25,
+   "yield": 0.08549283143383185,
+   "walk_away": 8021915.768089812,
+   "price_next": 0.0022238179548803583,
+   "price_lock": 0.00847535308283387,
+   "facts": [
+    [
+     "asking",
+     4967547.0,
+     "money"
+    ],
+    [
+     "walk-away price",
+     8021915.768089812,
+     "money"
+    ],
+    [
+     "bid",
+     5215924.350000001,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.8706896551724138,
+     "chance"
+    ],
+    [
+     "points added",
+     10.617241457765928,
+     "points"
+    ]
+   ],
+   "bids": 0,
+   "auction": {
+    "yours": false,
+    "listings": 118,
+    "thin": false,
+    "cell": "0/1/2"
+   },
+   "funding": {
+    "feasible": true,
+    "short": 0.0,
+    "tonight": [],
+    "raises": 0,
+    "margin": 59377775.25000001,
+    "lock_margin": 1381217.9079999998,
+    "lock_margin_low": -777028.9667060003,
+    "if_won": [
+     "Aymeric Laporte",
+     "Sergio Carreira"
+    ],
+    "if_lost": [
+     "Aymeric Laporte"
+    ],
+    "held": [
+     "Natan",
+     "Dean Huijsen",
+     "Roger Hinojo",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Mikel Oyarzabal",
+     "Pepelu",
+     "Fernando Calero",
+     "Vinicius Junior",
+     "Aymeric Laporte",
+     "Sergio Carreira",
+     "Guido Rodriguez",
+     "Aitor Paredes",
+     "Martin Satriano"
+    ],
+    "cash_if_lost": 1311193.8200000003,
+    "gain": 10.617241457766113,
+    "points_lost_if_won": 32.503021431812385,
+    "points_lost_if_lost": 28.542312394722558,
+    "net": 5.795773918002628,
+    "base": 28.542312394722558
+   },
+   "accepts": [],
+   "act": []
+  }
+ ],
+ "considered": 5,
  "base": {
   "feasible": true,
   "short": 0.0,
   "tonight": [],
   "raises": 0,
   "margin": 64593699.60000001,
-  "lock_margin": 97517.04199999943,
-  "lock_margin_low": -1690251.195394002,
+  "lock_margin": 625724.0,
+  "lock_margin_low": -1192152.0340000018,
   "if_won": [
-   "Roger Hinojo",
    "Aymeric Laporte"
   ],
   "if_lost": [
-   "Roger Hinojo",
    "Aymeric Laporte"
   ],
   "held": [
    "Natan",
    "Dean Huijsen",
+   "Roger Hinojo",
    "Mathew Ryan",
    "Pablo Fornals",
    "Mikel Oyarzabal",
@@ -118,13 +351,13 @@
    "Aitor Paredes",
    "Martin Satriano"
   ],
-  "cash_if_lost": 97517.04199999943,
+  "cash_if_lost": 625724.0,
   "gain": 0.0,
-  "points_lost_if_won": 35.86658434060655,
-  "points_lost_if_lost": 35.86658434060655,
-  "net": -35.86658434060655,
+  "points_lost_if_won": 28.542312394722558,
+  "points_lost_if_lost": 28.542312394722558,
+  "net": -28.542312394722558,
   "base": 0.0,
-  "cost": 35.86658434060655,
+  "cost": 28.542312394722558,
   "cash": -31266838.0
  },
  "targets": [
@@ -310,7 +543,64 @@
   }
  ],
  "lambda": 0.045,
- "alerts": [],
+ "alerts": [
+  {
+   "name": "Abde Ezzalzouli",
+   "gain": 33.943495471671504,
+   "asking": 61469081.0,
+   "bid": null,
+   "win": null,
+   "placed": null
+  },
+  {
+   "name": "Alvaro Garcia",
+   "gain": 13.756979240845844,
+   "asking": 7353836.0,
+   "bid": 7353836.0,
+   "win": 1.0,
+   "placed": null
+  },
+  {
+   "name": "Aissa Mandi",
+   "gain": 10.617241457765928,
+   "asking": 4967547.0,
+   "bid": 5215924.350000001,
+   "win": 0.8706896551724138,
+   "placed": null
+  },
+  {
+   "name": "Alex Freeman",
+   "gain": 7.899203899379032,
+   "asking": 13072319.0,
+   "bid": null,
+   "win": null,
+   "placed": null
+  },
+  {
+   "name": "Iñigo Ruiz de Galarreta",
+   "gain": 5.501020243478472,
+   "asking": 9324785.0,
+   "bid": null,
+   "win": null,
+   "placed": null
+  },
+  {
+   "name": "Gabriel Jesus",
+   "gain": 0.9255334926773671,
+   "asking": 19332221.0,
+   "bid": null,
+   "win": null,
+   "placed": null
+  },
+  {
+   "name": "Kiko Femenia",
+   "gain": 0.21196801625232808,
+   "asking": 774005.0,
+   "bid": null,
+   "win": null,
+   "placed": null
+  }
+ ],
  "auction": {
   "brier": [
    {
@@ -439,11 +729,11 @@
    "what": "sell",
    "label": "sell Fernando Calero",
    "step": "take offer",
-   "offer": 752649.0,
+   "offer": 663737.0,
    "waiting": null,
    "trend": 5.102596294597233,
    "plan": false,
-   "amount": 752649.0,
+   "amount": 663737.0,
    "done": false,
    "key": "5553",
    "gain": 0.0,
@@ -452,7 +742,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0465639174483634,
+   "ratio": 0.9229311337362096,
    "delta": {
     "points": 0.0,
     "window": {
@@ -466,13 +756,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.7617328519855595,
-   "offers_seen": 831,
+   "offer_percentile": 0.11952662721893491,
+   "offers_seen": 845,
    "per_million": 0.0,
    "verdict": "hold",
    "points_lost": 0.0,
-   "reserve": 758478.9155898342,
-   "rent": 0.846730125,
+   "reserve": 751422.8669892177,
+   "rent": 0.746704125,
    "facts": [
     [
      "value",
@@ -481,27 +771,27 @@
     ],
     [
      "offer",
-     752649.0,
+     663737.0,
      "money"
     ],
     [
      "offer over value",
-     1.0465639174483634,
+     0.9229311337362096,
      "ratio"
     ],
     [
      "offer percentile",
-     0.7617328519855595,
+     0.11952662721893491,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
      "sale price",
-     758478.9155898342,
+     751422.8669892177,
      "money"
     ],
     [
@@ -530,11 +820,11 @@
    "what": "sell",
    "label": "sell Vinicius Junior",
    "step": "take offer",
-   "offer": 83180609.0,
+   "offer": 88264731.0,
    "waiting": null,
    "trend": 44.337610783815435,
    "plan": false,
-   "amount": 83180609.0,
+   "amount": 88264731.0,
    "done": false,
    "key": "5565",
    "gain": -56.205844370524574,
@@ -543,7 +833,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9697006327104581,
+   "ratio": 1.0289701713619144,
    "delta": {
     "points": -56.205844370524574,
     "window": {
@@ -557,13 +847,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.3622141997593261,
-   "offers_seen": 831,
-   "per_million": 0.6757084980049205,
+   "offer_percentile": 0.6627218934911243,
+   "offers_seen": 845,
+   "per_million": 0.6367871258852482,
    "verdict": "hold",
    "points_lost": 56.205844370524574,
    "reserve": 61804871.67244399,
-   "rent": 93.578185125,
+   "rent": 99.297822375,
    "facts": [
     [
      "value",
@@ -572,22 +862,22 @@
     ],
     [
      "offer",
-     83180609.0,
+     88264731.0,
      "money"
     ],
     [
      "offer over value",
-     0.9697006327104581,
+     1.0289701713619144,
      "ratio"
     ],
     [
      "offer percentile",
-     0.3622141997593261,
+     0.6627218934911243,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -616,107 +906,16 @@
    "for": []
   },
   {
-   "name": "Dean Huijsen",
-   "pos": "DEF",
-   "what": "sell",
-   "label": "sell Dean Huijsen",
-   "step": "take offer",
-   "offer": 66219385.0,
-   "waiting": null,
-   "trend": 27.396719215778162,
-   "plan": false,
-   "amount": 66219385.0,
-   "done": false,
-   "key": "11830",
-   "gain": -57.69426590254716,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "ratio": 1.0527255041400938,
-   "delta": {
-    "points": -57.69426590254716,
-    "window": {
-     "lock": -2.3891642873273966,
-     "next4": -8.887454328062063,
-     "season": -57.69426590254716
-    },
-    "gap": []
-   },
-   "feasible": true,
-   "why_infeasible": null,
-   "replacement": null,
-   "replacement_why_not": null,
-   "offer_percentile": 0.7833935018050542,
-   "offers_seen": 831,
-   "per_million": 0.8712594643176942,
-   "verdict": "hold",
-   "points_lost": 57.69426590254716,
-   "reserve": 62553971.768676765,
-   "rent": 74.496808125,
-   "facts": [
-    [
-     "value",
-     62902803.0,
-     "money"
-    ],
-    [
-     "offer",
-     66219385.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0527255041400938,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     0.7833935018050542,
-     "chance"
-    ],
-    [
-     "offers seen",
-     831,
-     "count"
-    ],
-    [
-     "sale price",
-     62553971.768676765,
-     "money"
-    ],
-    [
-     "points, lock",
-     -2.3891642873273966,
-     "points"
-    ],
-    [
-     "points, next4",
-     -8.887454328062063,
-     "points"
-    ],
-    [
-     "points, season",
-     -57.69426590254716,
-     "points"
-    ]
-   ],
-   "accepts": [],
-   "act": [],
-   "for": []
-  },
-  {
    "name": "Natan",
    "pos": "DEF",
    "what": "sell",
    "label": "sell Natan",
    "step": "take offer",
-   "offer": 58312083.0,
+   "offer": 64115813.0,
    "waiting": null,
    "trend": 10.491190171663577,
    "plan": false,
-   "amount": 58312083.0,
+   "amount": 64115813.0,
    "done": false,
    "key": "11813",
    "gain": -53.69571709334423,
@@ -725,7 +924,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9905832550048531,
+   "ratio": 1.089174789705634,
    "delta": {
     "points": -53.69571709334423,
     "window": {
@@ -739,13 +938,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.4608904933814681,
-   "offers_seen": 831,
-   "per_million": 0.9208334590507464,
+   "offer_percentile": 0.9550295857988166,
+   "offers_seen": 845,
+   "per_million": 0.8374800939254131,
    "verdict": "hold",
    "points_lost": 53.69571709334423,
    "reserve": 57816224.208843805,
-   "rent": 65.601093375,
+   "rent": 72.130289625,
    "facts": [
     [
      "value",
@@ -754,22 +953,22 @@
     ],
     [
      "offer",
-     58312083.0,
+     64115813.0,
      "money"
     ],
     [
      "offer over value",
-     0.9905832550048531,
+     1.089174789705634,
      "ratio"
     ],
     [
      "offer percentile",
-     0.4608904933814681,
+     0.9550295857988166,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -803,11 +1002,11 @@
    "what": "sell",
    "label": "sell Aymeric Laporte",
    "step": "take offer",
-   "offer": 30173951.0,
+   "offer": 31892562.0,
    "waiting": null,
    "trend": -2.920091105017666,
    "plan": false,
-   "amount": 30173951.0,
+   "amount": 31892562.0,
    "done": false,
    "key": "697",
    "gain": -28.542312394722558,
@@ -816,7 +1015,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9234268452194053,
+   "ratio": 0.9760222621699189,
    "delta": {
     "points": -28.542312394722558,
     "window": {
@@ -830,13 +1029,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.12033694344163658,
-   "offers_seen": 831,
-   "per_million": 0.9459255897486729,
+   "offer_percentile": 0.3857988165680473,
+   "offers_seen": 845,
+   "per_million": 0.894952007766656,
    "verdict": "wait",
    "points_lost": 28.542312394722558,
    "reserve": 29591103.375707977,
-   "rent": 33.945694875,
+   "rent": 35.87913225,
    "facts": [
     [
      "value",
@@ -845,22 +1044,22 @@
     ],
     [
      "offer",
-     30173951.0,
+     31892562.0,
      "money"
     ],
     [
      "offer over value",
-     0.9234268452194053,
+     0.9760222621699189,
      "ratio"
     ],
     [
      "offer percentile",
-     0.12033694344163658,
+     0.3857988165680473,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -889,16 +1088,107 @@
    "for": []
   },
   {
+   "name": "Dean Huijsen",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Dean Huijsen",
+   "step": "take offer",
+   "offer": 63212672.0,
+   "waiting": null,
+   "trend": 27.396719215778162,
+   "plan": false,
+   "amount": 63212672.0,
+   "done": false,
+   "key": "11830",
+   "gain": -57.69426590254716,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 1.0049261556754474,
+   "delta": {
+    "points": -57.69426590254716,
+    "window": {
+     "lock": -2.3891642873273966,
+     "next4": -8.887454328062063,
+     "season": -57.69426590254716
+    },
+    "gap": []
+   },
+   "feasible": true,
+   "why_infeasible": null,
+   "replacement": null,
+   "replacement_why_not": null,
+   "offer_percentile": 0.5408284023668639,
+   "offers_seen": 845,
+   "per_million": 0.9127009518367957,
+   "verdict": "hold",
+   "points_lost": 57.69426590254716,
+   "reserve": 62553971.768676765,
+   "rent": 71.114256,
+   "facts": [
+    [
+     "value",
+     62902803.0,
+     "money"
+    ],
+    [
+     "offer",
+     63212672.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     1.0049261556754474,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     0.5408284023668639,
+     "chance"
+    ],
+    [
+     "offers seen",
+     845,
+     "count"
+    ],
+    [
+     "sale price",
+     62553971.768676765,
+     "money"
+    ],
+    [
+     "points, lock",
+     -2.3891642873273966,
+     "points"
+    ],
+    [
+     "points, next4",
+     -8.887454328062063,
+     "points"
+    ],
+    [
+     "points, season",
+     -57.69426590254716,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
    "name": "Mikel Oyarzabal",
    "pos": "DEL",
    "what": "sell",
    "label": "sell Mikel Oyarzabal",
    "step": "take offer",
-   "offer": 47223595.0,
+   "offer": 39647820.0,
    "waiting": null,
    "trend": 1.8902252449099246,
    "plan": false,
-   "amount": 47223595.0,
+   "amount": 39647820.0,
    "done": false,
    "key": "2675",
    "gain": -47.60227756545328,
@@ -907,7 +1197,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0790451693634915,
+   "ratio": 0.9059409527545124,
    "delta": {
     "points": -47.60227756545328,
     "window": {
@@ -921,13 +1211,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.9061371841155235,
-   "offers_seen": 831,
-   "per_million": 1.0080189270946711,
+   "offer_percentile": 0.029585798816568046,
+   "offers_seen": 845,
+   "per_million": 1.2006278671930328,
    "verdict": "hold",
    "points_lost": 47.60227756545328,
    "reserve": 50003029.8938925,
-   "rent": 53.126544375,
+   "rent": 44.6037975,
    "facts": [
     [
      "value",
@@ -936,22 +1226,22 @@
     ],
     [
      "offer",
-     47223595.0,
+     39647820.0,
      "money"
     ],
     [
      "offer over value",
-     1.0790451693634915,
+     0.9059409527545124,
      "ratio"
     ],
     [
      "offer percentile",
-     0.9061371841155235,
+     0.029585798816568046,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -985,11 +1275,11 @@
    "what": "sell",
    "label": "sell Aitor Paredes",
    "step": "take offer",
-   "offer": 22008057.0,
+   "offer": 20967808.0,
    "waiting": null,
    "trend": -18.613727050507084,
    "plan": false,
-   "amount": 22008057.0,
+   "amount": 20967808.0,
    "done": false,
    "key": "7916",
    "gain": -25.17943783498299,
@@ -998,7 +1288,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0504556783597814,
+   "ratio": 1.0008040680900476,
    "delta": {
     "points": -25.17943783498299,
     "window": {
@@ -1012,13 +1302,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.7749699157641395,
-   "offers_seen": 831,
-   "per_million": 1.1441009006375706,
+   "offer_percentile": 0.514792899408284,
+   "offers_seen": 845,
+   "per_million": 1.2008617131072066,
    "verdict": "hold",
    "points_lost": 25.17943783498299,
    "reserve": 25591992.541158687,
-   "rent": 24.759064125,
+   "rent": 23.588784,
    "facts": [
     [
      "value",
@@ -1027,22 +1317,22 @@
     ],
     [
      "offer",
-     22008057.0,
+     20967808.0,
      "money"
     ],
     [
      "offer over value",
-     1.0504556783597814,
+     1.0008040680900476,
      "ratio"
     ],
     [
      "offer percentile",
-     0.7749699157641395,
+     0.514792899408284,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -1076,11 +1366,11 @@
    "what": "sell",
    "label": "sell Sergio Carreira",
    "step": "take offer",
-   "offer": 4972398.0,
+   "offer": 5005213.0,
    "waiting": null,
    "trend": -7.472164105574348,
    "plan": false,
-   "amount": 4972398.0,
+   "amount": 5005213.0,
    "done": false,
    "key": "7199",
    "gain": -6.22810397795115,
@@ -1089,7 +1379,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9378602277618358,
+   "ratio": 0.9440495720930829,
    "delta": {
     "points": -6.22810397795115,
     "window": {
@@ -1103,13 +1393,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.19133574007220217,
-   "offers_seen": 831,
-   "per_million": 1.252535291412946,
+   "offer_percentile": 0.22248520710059172,
+   "offers_seen": 845,
+   "per_million": 1.244323463946719,
    "verdict": "hold",
    "points_lost": 6.22810397795115,
    "reserve": 6406318.199124385,
-   "rent": 5.59394775,
+   "rent": 5.630864625,
    "facts": [
     [
      "value",
@@ -1118,22 +1408,22 @@
     ],
     [
      "offer",
-     4972398.0,
+     5005213.0,
      "money"
     ],
     [
      "offer over value",
-     0.9378602277618358,
+     0.9440495720930829,
      "ratio"
     ],
     [
      "offer percentile",
-     0.19133574007220217,
+     0.22248520710059172,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -1162,16 +1452,107 @@
    "for": []
   },
   {
+   "name": "Roger Hinojo",
+   "pos": "DEF",
+   "what": "sell",
+   "label": "sell Roger Hinojo",
+   "step": "take offer",
+   "offer": 1301984.0,
+   "waiting": null,
+   "trend": -9.614185753388636,
+   "plan": false,
+   "amount": 1301984.0,
+   "done": false,
+   "key": "15316",
+   "gain": -2.1596349089131763,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "ratio": 1.09045164683673,
+   "delta": {
+    "points": -2.1596349089131763,
+    "window": {
+     "lock": 0.0,
+     "next4": -0.7937452191177954,
+     "season": -2.1596349089131763
+    },
+    "gap": []
+   },
+   "feasible": true,
+   "why_infeasible": null,
+   "replacement": null,
+   "replacement_why_not": null,
+   "offer_percentile": 0.9621301775147929,
+   "offers_seen": 845,
+   "per_million": 1.6587261509459228,
+   "verdict": "hold",
+   "points_lost": 2.1596349089131763,
+   "reserve": 2227515.2147114985,
+   "rent": 1.464732,
+   "facts": [
+    [
+     "value",
+     1193986.0,
+     "money"
+    ],
+    [
+     "offer",
+     1301984.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     1.09045164683673,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     0.9621301775147929,
+     "chance"
+    ],
+    [
+     "offers seen",
+     845,
+     "count"
+    ],
+    [
+     "sale price",
+     2227515.2147114985,
+     "money"
+    ],
+    [
+     "points, lock",
+     0.0,
+     "points"
+    ],
+    [
+     "points, next4",
+     -0.7937452191177954,
+     "points"
+    ],
+    [
+     "points, season",
+     -2.1596349089131763,
+     "points"
+    ]
+   ],
+   "accepts": [],
+   "act": [],
+   "for": []
+  },
+  {
    "name": "Martin Satriano",
    "pos": "DEL",
    "what": "sell",
    "label": "sell Martin Satriano",
    "step": "take offer",
-   "offer": 19058121.0,
+   "offer": 19261265.0,
    "waiting": null,
    "trend": -14.567278595113995,
    "plan": false,
-   "amount": 19058121.0,
+   "amount": 19261265.0,
    "done": false,
    "key": "8496",
    "gain": -37.47093317245594,
@@ -1180,7 +1561,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9795130024668584,
+   "ratio": 0.9899538108431473,
    "delta": {
     "points": -37.47093317245594,
     "window": {
@@ -1194,13 +1575,13 @@
    "why_infeasible": null,
    "replacement": null,
    "replacement_why_not": null,
-   "offer_percentile": 0.40312876052948254,
-   "offers_seen": 831,
-   "per_million": 1.9661399553741916,
+   "offer_percentile": 0.4544378698224852,
+   "offers_seen": 845,
+   "per_million": 1.9454035429373897,
    "verdict": "hold",
    "points_lost": 37.47093317245594,
    "reserve": 38498581.439169616,
-   "rent": 21.440386125,
+   "rent": 21.668923125,
    "facts": [
     [
      "value",
@@ -1209,22 +1590,22 @@
     ],
     [
      "offer",
-     19058121.0,
+     19261265.0,
      "money"
     ],
     [
      "offer over value",
-     0.9795130024668584,
+     0.9899538108431473,
      "ratio"
     ],
     [
      "offer percentile",
-     0.40312876052948254,
+     0.4544378698224852,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -1258,11 +1639,11 @@
    "what": "sell",
    "label": "sell Mathew Ryan",
    "step": "take offer",
-   "offer": 17938064.0,
+   "offer": 17529038.0,
    "waiting": null,
    "trend": -11.926073816552671,
    "plan": false,
-   "amount": 17938064.0,
+   "amount": 17529038.0,
    "done": false,
    "key": "1743",
    "gain": null,
@@ -1271,7 +1652,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0362270931692383,
+   "ratio": 1.0125989121676184,
    "delta": {
     "points": null,
     "window": {
@@ -1311,13 +1692,13 @@
    "why_infeasible": "no_eleven",
    "replacement": null,
    "replacement_why_not": "no_candidate",
-   "offer_percentile": 0.6967509025270758,
-   "offers_seen": 831,
+   "offer_percentile": 0.5739644970414202,
+   "offers_seen": 845,
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
    "reserve": null,
-   "rent": 20.180322,
+   "rent": 19.72016775,
    "facts": [
     [
      "value",
@@ -1326,22 +1707,22 @@
     ],
     [
      "offer",
-     17938064.0,
+     17529038.0,
      "money"
     ],
     [
      "offer over value",
-     1.0362270931692383,
+     1.0125989121676184,
      "ratio"
     ],
     [
      "offer percentile",
-     0.6967509025270758,
+     0.5739644970414202,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -1375,11 +1756,11 @@
    "what": "sell",
    "label": "sell Pablo Fornals",
    "step": "take offer",
-   "offer": 60752251.0,
+   "offer": 60032399.0,
    "waiting": null,
    "trend": 0.6192394139386209,
    "plan": false,
-   "amount": 60752251.0,
+   "amount": 60032399.0,
    "done": false,
    "key": "2632",
    "gain": null,
@@ -1388,7 +1769,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.0114414344415197,
+   "ratio": 0.9994568885608148,
    "delta": {
     "points": null,
     "window": {
@@ -1426,15 +1807,98 @@
    },
    "feasible": false,
    "why_infeasible": "no_eleven",
-   "replacement": null,
-   "replacement_why_not": "no_candidate",
-   "offer_percentile": 0.5679903730445247,
-   "offers_seen": 831,
+   "replacement": {
+    "what": "replace",
+    "name": "Alvaro Garcia",
+    "key": "867",
+    "pos": "MED",
+    "sell": "Pablo Fornals",
+    "asking": 7353836.0,
+    "bid": 7353836.0,
+    "win": 1.0,
+    "gain": 13.756979240846022,
+    "net": -33.5977986524681,
+    "delta": {
+     "points": -33.5977986524681,
+     "window": {
+      "lock": -1.2855306088659333,
+      "next4": -3.8798424267135374,
+      "season": -33.5977986524681
+     },
+     "gap": []
+    },
+    "cash_after": 21411725.0,
+    "feasible": true,
+    "why_infeasible": null,
+    "facts": [
+     [
+      "asking",
+      7353836.0,
+      "money"
+     ],
+     [
+      "bid",
+      7353836.0,
+      "money"
+     ],
+     [
+      "chance to win",
+      1.0,
+      "chance"
+     ],
+     [
+      "net points",
+      -33.5977986524681,
+      "points"
+     ]
+    ],
+    "funding": {
+     "feasible": true,
+     "short": 0.0,
+     "tonight": [
+      {
+       "name": "Pablo Fornals",
+       "offer": 60032399.0,
+       "ratio": 0.9994568885608148
+      }
+     ],
+     "raises": 60032399.0,
+     "margin": 105259258.4,
+     "lock_margin": 21411725.0,
+     "lock_margin_low": 21411725.0,
+     "if_won": [],
+     "if_lost": [],
+     "held": [
+      "Natan",
+      "Dean Huijsen",
+      "Roger Hinojo",
+      "Mathew Ryan",
+      "Mikel Oyarzabal",
+      "Pepelu",
+      "Fernando Calero",
+      "Vinicius Junior",
+      "Aymeric Laporte",
+      "Sergio Carreira",
+      "Guido Rodriguez",
+      "Aitor Paredes",
+      "Martin Satriano"
+     ],
+     "cash_if_lost": 28765561.0,
+     "gain": 13.756979240846022,
+     "points_lost_if_won": 47.35477789331412,
+     "points_lost_if_lost": 1458.943309335013,
+     "net": -33.5977986524681,
+     "base": 0.0
+    }
+   },
+   "replacement_why_not": null,
+   "offer_percentile": 0.5088757396449705,
+   "offers_seen": 845,
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
    "reserve": null,
-   "rent": 68.346282375,
+   "rent": 67.536448875,
    "facts": [
     [
      "value",
@@ -1443,22 +1907,22 @@
     ],
     [
      "offer",
-     60752251.0,
+     60032399.0,
      "money"
     ],
     [
      "offer over value",
-     1.0114414344415197,
+     0.9994568885608148,
      "ratio"
     ],
     [
      "offer percentile",
-     0.5679903730445247,
+     0.5088757396449705,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -1492,11 +1956,11 @@
    "what": "sell",
    "label": "sell Pepelu",
    "step": "take offer",
-   "offer": 60926805.0,
+   "offer": 57476341.0,
    "waiting": null,
    "trend": 33.23693608996122,
    "plan": false,
-   "amount": 60926805.0,
+   "amount": 57476341.0,
    "done": false,
    "key": "2715",
    "gain": null,
@@ -1505,7 +1969,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 1.017079569540941,
+   "ratio": 0.9594793648389791,
    "delta": {
     "points": null,
     "window": {
@@ -1543,15 +2007,98 @@
    },
    "feasible": false,
    "why_infeasible": "no_eleven",
-   "replacement": null,
-   "replacement_why_not": "no_candidate",
-   "offer_percentile": 0.592057761732852,
-   "offers_seen": 831,
+   "replacement": {
+    "what": "replace",
+    "name": "Alvaro Garcia",
+    "key": "867",
+    "pos": "MED",
+    "sell": "Pepelu",
+    "asking": 7353836.0,
+    "bid": 7353836.0,
+    "win": 1.0,
+    "gain": 13.756979240846022,
+    "net": -17.94467340273968,
+    "delta": {
+     "points": -17.94467340273968,
+     "window": {
+      "lock": -1.5194855810362924,
+      "next4": -0.9457144376139297,
+      "season": -17.94467340273968
+     },
+     "gap": []
+    },
+    "cash_after": 18855667.0,
+    "feasible": true,
+    "why_infeasible": null,
+    "facts": [
+     [
+      "asking",
+      7353836.0,
+      "money"
+     ],
+     [
+      "bid",
+      7353836.0,
+      "money"
+     ],
+     [
+      "chance to win",
+      1.0,
+      "chance"
+     ],
+     [
+      "net points",
+      -17.94467340273968,
+      "points"
+     ]
+    ],
+    "funding": {
+     "feasible": true,
+     "short": 0.0,
+     "tonight": [
+      {
+       "name": "Pepelu",
+       "offer": 57476341.0,
+       "ratio": 0.9594793648389791
+      }
+     ],
+     "raises": 57476341.0,
+     "margin": 102735469.4,
+     "lock_margin": 18855667.0,
+     "lock_margin_low": 18855667.0,
+     "if_won": [],
+     "if_lost": [],
+     "held": [
+      "Natan",
+      "Dean Huijsen",
+      "Roger Hinojo",
+      "Mathew Ryan",
+      "Pablo Fornals",
+      "Mikel Oyarzabal",
+      "Fernando Calero",
+      "Vinicius Junior",
+      "Aymeric Laporte",
+      "Sergio Carreira",
+      "Guido Rodriguez",
+      "Aitor Paredes",
+      "Martin Satriano"
+     ],
+     "cash_if_lost": 26209503.0,
+     "gain": 13.756979240846022,
+     "points_lost_if_won": 31.701652643585703,
+     "points_lost_if_lost": 1458.943309335013,
+     "net": -17.94467340273968,
+     "base": 0.0
+    }
+   },
+   "replacement_why_not": null,
+   "offer_percentile": 0.3076923076923077,
+   "offers_seen": 845,
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
    "reserve": null,
-   "rent": 68.542655625,
+   "rent": 64.660883625,
    "facts": [
     [
      "value",
@@ -1560,22 +2107,22 @@
     ],
     [
      "offer",
-     60926805.0,
+     57476341.0,
      "money"
     ],
     [
      "offer over value",
-     1.017079569540941,
+     0.9594793648389791,
      "ratio"
     ],
     [
      "offer percentile",
-     0.592057761732852,
+     0.3076923076923077,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -1609,11 +2156,11 @@
    "what": "sell",
    "label": "sell Guido Rodriguez",
    "step": "take offer",
-   "offer": 9605886.0,
+   "offer": 10073496.0,
    "waiting": null,
    "trend": -2.504418497655665,
    "plan": false,
-   "amount": 9605886.0,
+   "amount": 10073496.0,
    "done": false,
    "key": "7676",
    "gain": null,
@@ -1622,7 +2169,7 @@
    "detail": null,
    "trace": null,
    "flip": null,
-   "ratio": 0.9226528958015145,
+   "ratio": 0.9675672036129696,
    "delta": {
     "points": null,
     "window": {
@@ -1661,14 +2208,14 @@
    "feasible": false,
    "why_infeasible": "no_eleven",
    "replacement": null,
-   "replacement_why_not": "no_candidate",
-   "offer_percentile": 0.11552346570397112,
-   "offers_seen": 831,
+   "replacement_why_not": "no_cash",
+   "offer_percentile": 0.3514792899408284,
+   "offers_seen": 845,
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
    "reserve": null,
-   "rent": 10.80662175,
+   "rent": 11.332683,
    "facts": [
     [
      "value",
@@ -1677,22 +2224,22 @@
     ],
     [
      "offer",
-     9605886.0,
+     10073496.0,
      "money"
     ],
     [
      "offer over value",
-     0.9226528958015145,
+     0.9675672036129696,
      "ratio"
     ],
     [
      "offer percentile",
-     0.11552346570397112,
+     0.3514792899408284,
      "chance"
     ],
     [
      "offers seen",
-     831,
+     845,
      "count"
     ],
     [
@@ -1747,17 +2294,17 @@
    "sold": false
   },
   {
+   "name": "Aymeric Laporte",
+   "pos": "DEF",
+   "next": 6.163827066267071,
+   "xi": true,
+   "best": false,
+   "sold": true
+  },
+  {
    "name": "Aitor Paredes",
    "pos": "DEF",
    "next": 5.583670088430873,
-   "xi": true,
-   "best": true,
-   "sold": false
-  },
-  {
-   "name": "Sergio Carreira",
-   "pos": "DEF",
-   "next": 2.3206043320013627,
    "xi": true,
    "best": true,
    "sold": false
@@ -1811,20 +2358,20 @@
    "sold": false
   },
   {
-   "name": "Aymeric Laporte",
-   "pos": "DEF",
-   "next": 6.163827066267071,
-   "xi": false,
-   "best": false,
-   "sold": true
-  },
-  {
    "name": "Roger Hinojo",
    "pos": "DEF",
    "next": 3.8697822349287425,
    "xi": false,
+   "best": true,
+   "sold": false
+  },
+  {
+   "name": "Sergio Carreira",
+   "pos": "DEF",
+   "next": 2.3206043320013627,
+   "xi": false,
    "best": false,
-   "sold": true
+   "sold": false
   },
   {
    "name": "Fernando Calero",
