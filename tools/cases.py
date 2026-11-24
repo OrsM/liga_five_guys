@@ -154,7 +154,7 @@ def checks() -> list[Check]:
         ("raphinha", "forecast", "plays (p 0.9+) and e 9-14 a jornada over the next 4",
          lambda s: mean_p(c(s, "raphinha"), s["first"]) >= 0.9 and 9 <= mean_e(c(s, "raphinha"), s["first"]) <= 14,
          lambda s: (round(mean_p(c(s, "raphinha"), s["first"]), 2), round(mean_e(c(s, "raphinha"), s["first"]), 1))),
-        ("raphinha", "forecast", "jornada 12 is zero: his auction closes after Barcelona's kickoff (late arrival)",
+        ("raphinha", "forecast", "jornada 12 is zero: his auction closes after the jornada's first kickoff (late arrival)",
          lambda s: c(s, "raphinha")["cells"][s["first"] - 1][1] == 0.0 and s["first"] - 1 in c(s, "raphinha")["late"],
          lambda s: (c(s, "raphinha")["cells"][s["first"] - 1], c(s, "raphinha")["late"])),
         ("raphinha", "eleven", "he improves my settled eleven, over the next 4 and the season",

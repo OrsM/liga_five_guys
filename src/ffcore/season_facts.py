@@ -572,6 +572,13 @@ def _selftest() -> None:
     later = ob.of({t: list(ob.rows_of(obs, t)) + [_m("2026-09-01T0000Z", "m9", 9, "A", "B", "", "2026-09-05T20:00:00Z")]
                    if t == "matches" else list(ob.rows_of(obs, t)) for t in ob.TABLES if t in obs.tables})
     assert all(_view(st.world_at(later, c)) == views[c] for c in cuts)
+    for seed in range(12):
+        gen = random.Random(seed)
+        fixtures = [_m("2026-08-01T0000Z", "x%d" % i, gen.randint(1, 4), "H%d" % i, "V%d" % i, "",
+                       "2026-08-%02dT%02d:00:00Z" % (gen.randint(2, 28), gen.randint(10, 22))) for i in range(gen.randint(2, 20))]
+        w = st.world_at(ob.of({"matches": fixtures}), "2026-08-01T0000Z")
+        first = {j: min(utc_stamp(m.kickoff) or "" for m in fixtures if m.jornada == j) for j in {m.jornada for m in fixtures}}
+        assert {c.jornada: c.lock for c in jornada_calendar(w)} == first, "a jornada's lock is its earliest kickoff, whatever the fixtures"
 
     kicks = {k.home + k.away: k for k in views[cuts[1]][1]}
     assert sorted(kicks) == ["AB", "AC", "AD", "BD"] and kicks["AB"].kick == "2026-08-15T1800Z"

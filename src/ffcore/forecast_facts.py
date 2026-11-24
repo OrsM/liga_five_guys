@@ -50,10 +50,10 @@ Named rules, each tested:
   p_blends_listing_and_record         q = w * picked * (1 if his listing gives a start %, else fit) + (1 - w) * record * fit, with
                                       w = P_LISTING * P_DECAY ** (jornada - his club's first jornada left); p = min(1, q + P_LIFT * q * (1 - q)).
   coach_has_no_now                    a player with an empty position (a coach) has no NowRow.
-  late_means_after_kickoff            a (player, jornada) is late when his listing close (listing_close) is strictly after
-                                      the kickoff of a fixture of his club in a jornada whose calendar state is "under way"
-                                      or "ahead"; a player with no club is never late; one Late per pair, so a club with
-                                      two fixtures in one jornada gives one.
+  late_means_after_lock               a (player, jornada) is late when his listing close (listing_close) is strictly after
+                                      the jornada's lock (its first kickoff, Calendar.lock, the freeze moment of rules.in_force),
+                                      the jornada's calendar state is "under way" or "ahead" and his club has a fixture in it;
+                                      a player with no club, or a jornada with no lock, is never late; one Late per pair.
   late_zeroes_p_and_e_not_pts         every Used row of a late pair (all its fixtures) has p 0.0 and e 0.0, pts unchanged;
                                       every other row has p as in NowRow and e = pts * p.
   pool_is_seed_until_enough           fewer than knobs.min_pool played rows (a row whose sum is None counts toward the size)
@@ -86,7 +86,8 @@ from ffcore.current import (LIST_SOURCE, ClubRating, Identity, Listing, PlayerCl
                             player_club, player_status, player_value, squads)
 from ffcore.parse import snapshot_stamp, year_for
 from ffcore.season_facts import (Calendar, Fixture, Kickoff, LastSeason, ListingClose, PlayedPoints, SeasonRecord, club_fixture,
-                                 jornada_calendar, kickoffs, last_season, listing_close, pick, played_points, season_record)
+                                 jornada_calendar, kickoffs, last_season, listing_close, pick, played_points, season_record,
+                                 stamp_jd)
 from stats import shrink
 
 MIN_MATCHES = 10
@@ -413,22 +414,14 @@ class Used(NamedTuple):
 
 def _late(clubs: tuple[PlayerClub, ...], close: tuple[ListingClose, ...], kicks: tuple[Kickoff, ...],
           calendar: tuple[Calendar, ...]) -> frozenset[Late]:
-    """The Late pairs: a player whose listing close is after a kickoff of his club in an open jornada (rule
-    late_means_after_kickoff)."""
-    open_jornadas = {c.jornada for c in calendar if c.state in ("under way", "ahead")}
-    by_club: dict[str, list[Kickoff]] = defaultdict(list)
-    for k in kicks:
-        if k.jornada in open_jornadas:
-            by_club[k.home].append(k)
-            by_club[k.away].append(k)
+    """The Late pairs: a player whose listing close is after the lock (the jornada's first kickoff, Calendar.lock) of an
+    open jornada in which his club has a fixture (rule late_means_after_lock)."""
+    locks = {c.jornada: jd for c in calendar if c.state in ("under way", "ahead") and (jd := stamp_jd(c.lock)) is not None}
+    playing = {(club, k.jornada) for k in kicks for club in (k.home, k.away)}
     closes = {c.player: c.t for c in close}
-    out: set[Late] = set()
-    for c in clubs:
-        t = closes.get(c.player)
-        if c.club is None or t is None:
-            continue
-        out.update(Late(c.player, k.jornada) for k in by_club.get(c.club, ()) if k.t < t)
-    return frozenset(out)
+    return frozenset(Late(c.player, jornada) for c in clubs
+                     if c.club is not None and (t := closes.get(c.player)) is not None
+                     for jornada, lock in locks.items() if (c.club, jornada) in playing and t > lock)
 
 
 def _used(now: tuple[NowRow, ...], late: frozenset[Late]) -> tuple[Used, ...]:
@@ -441,7 +434,7 @@ def _used(now: tuple[NowRow, ...], late: frozenset[Late]) -> tuple[Used, ...]:
 
 
 def late_arrivals(inp: Inputs) -> tuple[Late, ...]:
-    """One Late per pair of inp.late, no particular order (rule late_means_after_kickoff)."""
+    """One Late per pair of inp.late, no particular order (rule late_means_after_lock)."""
     return tuple(inp.late)
 
 
@@ -834,7 +827,7 @@ def _selftest() -> None:
 
     late1 = {(x.player, x.jornada) for x in late_arrivals(inp1)}
     assert len(late_arrivals(inp1)) == len(late1), "one_per_pair: a club with two fixtures in a jornada gives one Late"
-    assert late1 == {("q1", 1), ("q1", 2)}, "late_means_after_kickoff: q1 closes after A's kickoffs in jornadas 1 and 2"
+    assert late1 == {("q1", 1), ("q1", 2)}, "late_means_after_lock: q1 closes after both jornadas' first kickoffs"
     used1 = forecast_used(inp1)
     assert len(used1) == len(now) and sorted((u.player, u.jornada, u.pts) for u in used1) == sorted(
         (n.player, n.jornada, n.pts) for n in now), "forecast_used has one row per now row"
@@ -852,6 +845,21 @@ def _selftest() -> None:
     t5 = _tables(q1_expires="2026-08-14T12:00:00+00:00")
     w5 = state.world_at(ob.of(t5), D1)
     assert late_arrivals(_inp(w5)) == (), "a close before the kickoff is not late"
+    jd = stamp_jd
+    cal = tuple(Calendar(j, lock, None, "ahead") for j, lock in ((1, "2026-08-15T1800Z"), (2, "2026-08-22T1900Z")))
+    kicks = (Kickoff("A", "B", 1, "2026-08-15T1800Z", jd("2026-08-15T1800Z")), Kickoff("E", "F", 1, "2026-08-16T1800Z", jd("2026-08-16T1800Z")),
+             Kickoff("E", "A", 2, "2026-08-22T2100Z", jd("2026-08-22T2100Z")), Kickoff("C", "D", 2, "2026-08-22T1900Z", jd("2026-08-22T1900Z")))
+    pcs = tuple(PlayerClub(p, c, "DEL") for p, c in (("a", "A"), ("e", "E"), ("n", None)))
+
+    def late_at(stamp: str, calendar: tuple[Calendar, ...] = cal) -> set[Late]:
+        return set(_late(pcs, tuple(ListingClose(p, jd(stamp)) for p in ("a", "e", "n")), kicks, calendar))
+    assert late_at("2026-08-16T1000Z") == {Late("a", 1), Late("e", 1)}, \
+        "late_means_after_lock: after a jornada's first kickoff is late even before his own club's kickoff; a player with no club never"
+    assert late_at("2026-08-15T1800Z") == set(), "a close at the lock is not late"
+    assert late_at("2026-08-15T1000Z") == set(), "before every lock: not late"
+    assert late_at("2026-08-22T2000Z") == {Late("a", 1), Late("e", 1), Late("a", 2), Late("e", 2)}
+    assert late_at("2026-08-16T1000Z", (cal[0]._replace(state="behind"), cal[1]._replace(lock=None))) == set(), \
+        "a jornada not open, or with no lock, is never late"
     assert [u for u in used1 if u.player != "q1"] == [u for u in forecast_used(_inp(w5)) if u.player != "q1"], \
         "a player's used rows do not change when another player's listing row changes"
 
