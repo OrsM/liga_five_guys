@@ -8,7 +8,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
-from typing import Any, NamedTuple, TypeVar
+from typing import Any, Generic, NamedTuple, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -21,10 +21,11 @@ import worth
 from board import context, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
-from ffcore.clock import run_now
+from ffcore.clock import CLOSE, MADRID, run_now
 from ffcore import records as rec
 from ffcore.store import RunRecords
 from ffcore.parse import snapshot_stamp, stamp
+from ffcore.rules import SQUAD_MAX, bid_margin, cash_at_lock
 from salegrade import HORIZONS
 
 __all__ = ["FABRICATED_FROM", "backtest", "fabricated", "graded", "latest_values", "record_grades", "scored_at", "sound_offers", "standing_grades"]
@@ -738,6 +739,419 @@ def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> Rul
                       {group: graded_sales(members, now, fielded, facts) for group, members in groups.items()})
 
 
+REPLAY_DAYS = 58
+REPLAY_WINDOW_MINS = 180.0
+CLOSE_TOLERANCE = dt.timedelta(hours=1)
+MOMENTUM_DAYS = 3
+
+
+class Replay(NamedTuple, Generic[T]):
+    """The canonical auction replay: what `read` gave at each daily cut (by cut, none for a cut it skipped) and the looks
+    of every listing as the last world has them (auction.looks_of), by player, ascending by look. Nothing after a daily cut is
+    read to build its entry of `days`."""
+    days: dict[str, T]
+    looks: dict[str, list[auction.Look]]
+
+
+def daily_cuts(cuts: Sequence[str], since: str) -> list[str]:
+    """For each Madrid day from since, the last cut at least auction.DECISION_MINS before that day's close and at most
+    REPLAY_WINDOW_MINS before it: the cut a decision is taken at. Ascending."""
+    out: dict[str, str] = {}
+    for c in cuts:
+        at = snapshot_stamp(c)
+        if at is None or c < since:
+            continue
+        day = at.astimezone(MADRID).date()
+        close = dt.datetime.combine(day, CLOSE, tzinfo=MADRID)
+        mins = (close - at).total_seconds() / 60
+        if auction.DECISION_MINS <= mins <= REPLAY_WINDOW_MINS:
+            out[str(day)] = c
+    return sorted(out.values())
+
+
+def replayed_days(loaded: loader.Loaded, cuts: Sequence[str], since: str, read: Callable[[state.World], T | None],
+                  folds: Mapping[str, state.Fold] | None = None) -> Replay[T]:
+    """The Replay of the daily cuts (daily_cuts) from since, `read` run over them in one sweep (the folds given, all by default)
+    and the looks of the last of cuts."""
+    chosen = daily_cuts(cuts, since)
+    seen = dict(zip(chosen, state.sweep(loaded.obs, chosen, read, folds)))
+    looks = state.sweep(loaded.obs, [max(cuts)], lambda w: auction.looks_of(w, loaded.identity, loaded.league))[0]
+    by_player: dict[str, list[auction.Look]] = {}
+    for x in looks:
+        by_player.setdefault(x.player, []).append(x)
+    return Replay({c: d for c, d in seen.items() if d is not None}, by_player)
+
+
+def look_close(look: auction.Look) -> dt.datetime:
+    """The close of the look's auction as an aware instant."""
+    at = dt.datetime.fromisoformat(look.close)
+    return at if at.tzinfo else at.replace(tzinfo=dt.timezone.utc)
+
+
+def closing_at(replay: Replay[T], player: str, close: dt.datetime) -> list[auction.Look]:
+    """The player's looks of the auction that closes within CLOSE_TOLERANCE of close, ascending by look."""
+    return [x for x in replay.looks.get(player, []) if abs(look_close(x) - close) < CLOSE_TOLERANCE]
+
+
+def settled_look(looks: Sequence[auction.Look]) -> auction.Look | None:
+    """The last of the looks of one auction when it has closed and was not withdrawn: its `won` is the price the winner paid
+    (None when nobody bought); None when there is no look, the auction is open or it was withdrawn."""
+    closed = [x for x in looks if not x.is_open]
+    return closed[-1] if closed and not closed[-1].withdrawn else None
+
+
+class HoldDay(NamedTuple):
+    """What the hold replay knows at one daily cut: the cut, each player's newest market value above 0 and my squad."""
+    cut: str
+    values: Mapping[str, float]
+    squad: frozenset[str]
+
+
+Panel = Mapping[dt.date, HoldDay]
+
+
+class Listing(NamedTuple):
+    """An auction a hold policy can bid on: the player, its close, the Madrid day of the close, the asking price at the day's
+    cut and the price the winner paid (None when nobody bought)."""
+    player: str
+    close: dt.datetime
+    day: dt.date
+    ask: float
+    won: float | None
+
+
+class HoldPolicy(NamedTuple):
+    """Buy a listing whose price has moved by at least `momentum` over MOMENTUM_DAYS (None: whatever it did) and whose value is
+    at most `value`, bidding ask x (1 + premium); sell when the MOMENTUM_DAYS change is 0 or less, after `hold` days at most."""
+    momentum: float | None
+    value: float
+    premium: float
+    hold: int
+
+
+class Position(NamedTuple):
+    """A won hold: the listing, the bid paid, the value at entry, the day of the exit, its value and whether it was sold
+    (False: still open, marked at the last value)."""
+    listing: Listing
+    bid: float
+    value_in: float
+    day_out: dt.date
+    value_out: float
+    closed: bool
+
+
+class Constraint(NamedTuple):
+    """What a hold run must respect: the squad maximum with the bids pending counted at their cap and the bid limit
+    (cash `cash`, None: unconstrained by it), and either `liquidate` (every position sold before the lock after its close) or,
+    when `cash` is given, cash at each lock of 0 or more after the positions that cross it."""
+    cash: float | None = None
+    liquidate: bool = False
+
+
+def day_of(cut: str) -> dt.date:
+    """The Madrid day of a cut."""
+    at = snapshot_stamp(cut)
+    assert at is not None
+    return at.astimezone(MADRID).date()
+
+
+def cut_at(panel: Panel, day: dt.date) -> dt.datetime:
+    """The instant of the day's cut."""
+    at = snapshot_stamp(panel[day].cut)
+    assert at is not None
+    return at
+
+
+def hold_panel(replay: Replay[HoldDay]) -> dict[dt.date, HoldDay]:
+    """The days of the replay by Madrid day."""
+    return {day_of(c): d for c, d in replay.days.items()}
+
+
+def hold_day(loaded: loader.Loaded, world: state.World) -> HoldDay:
+    """The HoldDay of the world: every player's newest value above 0 (market_values) and my squad (facts_at)."""
+    history = price_fold.price_history(price_fold.price_state(world))
+    facts = facts_at(loaded, world, ())
+    return HoldDay(world.cut, market_values(history, {m.ff_id for m in history}), facts.squad)
+
+
+def change(panel: Panel, player: str, day: dt.date, back: int = MOMENTUM_DAYS) -> float | None:
+    """The player's value at the day's cut over his value `back` days before, less 1 (None when either is missing). Reads no
+    day after `day`."""
+    now, then = panel.get(day), panel.get(day - dt.timedelta(days=back))
+    a = None if now is None else now.values.get(player)
+    b = None if then is None else then.values.get(player)
+    return None if a is None or b is None or b <= 0 else a / b - 1
+
+
+def hold_listings(replay: Replay[HoldDay], panel: Panel) -> list[Listing]:
+    """The settled auctions (settled_look) closing on a day of the panel, each with the asking price of the last look at or
+    before that day's cut (none when it had no look by then or asked 0), ascending by day, then player."""
+    out = []
+    for player, looks in replay.looks.items():
+        for close in sorted({look_close(x) for x in looks}):
+            day = close.astimezone(MADRID).date()
+            mine = closing_at(replay, player, close)
+            final = settled_look(mine)
+            seen = [x for x in mine if x.look <= panel[day].cut] if day in panel else []
+            if final is not None and seen and seen[-1].ask > 0:
+                out.append(Listing(player, close, day, seen[-1].ask, final.won))
+    return sorted(out, key=lambda x: (x.day, x.player))
+
+
+def hold_bid(policy: HoldPolicy, listing: Listing, panel: Panel) -> float | None:
+    """The bid of the policy on the listing, ask x (1 + premium), or None when the player's value at the listing's day is
+    missing or above policy.value or his momentum is under policy.momentum. Reads no day after the listing's."""
+    day = panel.get(listing.day)
+    value = None if day is None else day.values.get(listing.player)
+    moved = change(panel, listing.player, listing.day)
+    if value is None or value > policy.value or policy.momentum is not None and (moved is None or moved < policy.momentum):
+        return None
+    return listing.ask * (1 + policy.premium)
+
+
+def bid_wins(bid: float, listing: Listing) -> bool:
+    """Whether the bid beats the real winning price; an auction nobody bought is won at its asking price."""
+    return bid >= listing.ask if listing.won is None else bid > listing.won
+
+
+class HoldExit(NamedTuple):
+    """The day a hold ends, the value then and whether it was sold (False: still open, marked at the last value)."""
+    day: dt.date
+    value: float
+    closed: bool
+
+
+def hold_exit(policy: HoldPolicy, listing: Listing, panel: Panel, deadline: dt.date | None = None) -> HoldExit | None:
+    """The HoldExit of a hold bought on the listing: the first later day whose change is 0 or less, else
+    the last day within policy.hold days (or by the deadline); still open when the panel ends before either (marked at the last
+    value, sold False). None when the player has no value after the listing's day. Reads each day only up to itself."""
+    limit = listing.day + dt.timedelta(days=policy.hold)
+    if deadline is not None:
+        limit = min(limit, deadline)
+    seen: HoldExit | None = None
+    for day in sorted(d for d in panel if d > listing.day):
+        value = panel[day].values.get(listing.player)
+        if value is None:
+            continue
+        if day > limit and seen is not None:
+            return seen._replace(closed=True)
+        seen = HoldExit(day, value, False)
+        moved = change(panel, listing.player, day)
+        if day >= limit or moved is not None and moved <= 0:
+            return HoldExit(day, value, True)
+    return seen
+
+
+def gain_of(position: Position) -> float:
+    """What the position made: the sale at hurdle.draw of the value (the value when still open) less the bid."""
+    return (hurdle.draw(position.value_out) if position.closed else position.value_out) - position.bid
+
+
+def days_held(position: Position) -> int:
+    """The days the bid's money was tied, at least one."""
+    return max(1, (position.day_out - position.listing.day).days)
+
+
+def hold_gain(position: Position, edge: float = 1.0) -> float:
+    """The gain with the appreciation (value out less the ask) scaled by edge; the premium and the sale haircut stay."""
+    haircut = position.value_out - hurdle.draw(position.value_out) if position.closed else 0.0
+    return edge * (position.value_out - position.listing.ask) - (position.bid - position.listing.ask) - haircut
+
+
+def crossing(position: Position, lock: dt.datetime, panel: Panel) -> bool:
+    """Whether the position is held at the lock: bought before it and not yet sold at its day's cut."""
+    return position.listing.close < lock <= cut_at(panel, position.day_out)
+
+
+def held_open(held: Sequence[Position], day: dt.date) -> list[Position]:
+    """The positions still held when day's bids are placed."""
+    return [p for p in held if p.day_out > day or not p.closed]
+
+
+def admitted(policy: HoldPolicy, listing: Listing, bid: float, held: Sequence[Position], today: Sequence[float], panel: Panel,
+             locks: Sequence[dt.datetime], rule: Constraint | None) -> Position | None:
+    """The Position the listing would be if won, with its exit, or None when it has no exit (the player has no later value) or
+    the rule refuses it: no room in the squad (rules.SQUAD_MAX, my squad, the open positions and today's bids counted), the bid
+    over rules.bid_margin (the open positions and today's bids pending, at their cap), or, with rule.cash, cash_at_lock under 0
+    at a lock the position crosses (the positions already crossing it tie their bids). With rule.liquidate the exit is by the
+    last cut before the lock after the close, and none such refuses it."""
+    after = lock_after(listing.close, locks)
+    deadline = None
+    if rule is not None and rule.liquidate:
+        deadline = max((d for d in panel if after is not None and cut_at(panel, d) < after), default=None)
+        if deadline is None or deadline <= listing.day:
+            return None
+    got = hold_exit(policy, listing, panel, deadline)
+    if got is None:
+        return None
+    day = panel[listing.day]
+    position = Position(listing, bid, day.values[listing.player], got.day, got.value, got.closed)
+    if rule is None:
+        return position
+    open_now = held_open(held, listing.day)
+    pending = sum(p.bid for p in open_now) + sum(today)
+    if len(day.squad) + len(open_now) + len(today) + 1 > SQUAD_MAX or bid_margin(
+            rule.cash or 0.0, 0.0, sum(day.values.get(k, 0.0) for k in day.squad), 0.0, bid, pending) < 0:
+        return None
+    if rule.cash is not None and any(crossing(position, lock, panel) and cash_at_lock(
+            rule.cash, 0.0, bid + sum(p.bid for p in held if crossing(p, lock, panel)), 0.0) < 0 for lock in locks):
+        return None
+    return position
+
+
+class Held(NamedTuple):
+    """The positions a policy took and how many bids it placed."""
+    positions: list[Position]
+    bids: int
+
+
+def holds_of(policy: HoldPolicy, listings: Sequence[Listing], panel: Panel, locks: Sequence[dt.datetime] = (),
+             rule: Constraint | None = None) -> Held:
+    """The policy run over the listings in day order, best momentum first within a day: a player already held is not bid on,
+    each bid that wins (bid_wins) is a Position (admitted when a rule is given). The control has policy.momentum None. A
+    position never read after its day's data."""
+    held: list[Position] = []
+    bids = 0
+    by_day: dict[dt.date, list[Listing]] = {}
+    for x in listings:
+        by_day.setdefault(x.day, []).append(x)
+    for day in sorted(by_day):
+        today: list[float] = []
+        ranked = sorted(by_day[day], key=lambda x: (-(change(panel, x.player, day) or 0.0), x.player))
+        for x in ranked:
+            bid = hold_bid(policy, x, panel)
+            if bid is None or any(p.listing.player == x.player for p in held_open(held, day)):
+                continue
+            position = admitted(policy, x, bid, held, today, panel, locks, rule)
+            if position is None:
+                continue
+            today.append(bid)
+            bids += 1
+            if bid_wins(bid, x):
+                held.append(position)
+    return Held(held, bids)
+
+
+class HoldStats(NamedTuple):
+    """What a policy did over the replay: bids and trades, the sum of gains (euros), the average capital tied, the mean return
+    per trade and per capital-day, hit rate, the weeks with a loss, the independent players, the gain of each half of the days,
+    and the points (gross, above the position mean) valued in euros."""
+    bids: int
+    trades: int
+    gain: float
+    capital: float
+    per_trade: float
+    per_capital_day: float
+    hit: float
+    loss_weeks: int
+    players: int
+    first_half: float
+    second_half: float
+    points: float
+    above_mean: float
+
+
+class Worth(NamedTuple):
+    """Points valued in euros: gross and above the mean of the player's position."""
+    gross: float
+    above: float
+
+
+def hold_points(position: Position, season: Season, panel: Panel) -> Worth:
+    """The realised points of the player over the jornadas whose lock falls in the hold (after the close, up to the cut of the
+    exit day), valued at 1 / (hurdle.FALLBACK_LAMBDA x jornadas left at the buy) million per point: gross, and above the mean of
+    his position over the jornadas he scored in. Zero when no jornada is left."""
+    player, after, until = position.listing.player, position.listing.close, cut_at(panel, position.day_out)
+    inside = [j for j, lock in season.locks.items() if after < lock <= until]
+    left = sum(1 for lock in season.locks.values() if lock > after)
+    scored = season.scored.get(player, {})
+    where = season.positions.get(player)
+    if not left or where is None:
+        return Worth(0.0, 0.0)
+    unit = 1e6 / (hurdle.FALLBACK_LAMBDA * left)
+    return Worth(unit * points(season.scored, player, inside), unit * sum(scored[j] - season.means.get((where, j), 0.0) for j in inside if j in scored))
+
+
+def hold_stats(got: Held, panel: Panel, days: Sequence[dt.date], season: Season, edge: float = 1.0) -> HoldStats:
+    """The HoldStats of the positions over the days of the window (the capital averaged over them, the halves split at the
+    middle day by the day of the buy); the gain at appreciation scaled by edge. Positions still open are in, marked."""
+    held = got.positions
+    gains = [hold_gain(p, edge) for p in held]
+    tied = [p.bid * days_held(p) for p in held]
+    middle = days[len(days) // 2] if days else dt.date.min
+    weeks: dict[str, float] = {}
+    for p, g in zip(held, gains):
+        week = "%d-%d" % (p.day_out.isocalendar().year, p.day_out.isocalendar().week)
+        weeks[week] = weeks.get(week, 0.0) + g
+    pts = [hold_points(p, season, panel) for p in held]
+    return HoldStats(
+        got.bids, len(held), sum(gains), sum(tied) / max(1, len(days)),
+        sum(g / p.bid for g, p in zip(gains, held)) / len(held) if held else 0.0,
+        sum(gains) / sum(tied) if tied else 0.0,
+        sum(g > 0 for g in gains) / len(held) if held else 0.0,
+        sum(1 for w in weeks.values() if w < 0), len({p.listing.player for p in held}),
+        sum(g for p, g in zip(held, gains) if p.listing.day < middle), sum(g for p, g in zip(held, gains) if p.listing.day >= middle),
+        sum(x.gross for x in pts), sum(x.above for x in pts))
+
+
+HOLD_MOMENTA = (0.0, 0.04, 0.08)
+HOLD_VALUES = (10e6, 30e6, math.inf)
+HOLD_PREMIA = (0.0, 0.03, 0.06, 0.09, 0.12, 0.15, 0.20, 0.30)
+HOLD_MAXES = (7, 14, 28)
+HOLD_SCENARIOS = {"squad24": Constraint(), "cash0": Constraint(0.0), "cash30": Constraint(30e6), "cash100": Constraint(100e6),
+                  "debt": Constraint(0.0, True)}
+HEADLINE = HoldPolicy(0.08, 30e6, 0.09, 28)
+
+
+def hold_grid() -> list[HoldPolicy]:
+    """Every policy of the grid: momentum, value, premium, hold, the first varying slowest."""
+    return [HoldPolicy(m, v, p, h) for m in HOLD_MOMENTA for v in HOLD_VALUES for p in HOLD_PREMIA for h in HOLD_MAXES]
+
+
+def hold_report(replay: Replay[HoldDay], season: Season, since: dt.date) -> str:
+    """The hold replay in a table, a row per policy of hold_grid over the listings closing from since on: bids placed, trades,
+    win rate, mean return per trade, return per capital-day, M per week at the average capital (M), the average capital (M), hit
+    rate, weeks with a loss, independent players, the gain (M) of each half, then the gain in M split into price, points gross and
+    points above the position mean; then the M per week at half the appreciation, of the control (no momentum filter) and under
+    each HOLD_SCENARIOS constraint (squad 24 and the bid limit with the bids pending at their cap; cash at the lock 0, 30M,
+    100M; debt only, positions sold before each lock). Positions still open are marked at the last value."""
+    panel = hold_panel(replay)
+    days = sorted(d for d in panel if d >= since)
+    listings = [x for x in hold_listings(replay, panel) if x.day >= since]
+    locks = sorted(season.locks.values())
+    weeks = max(1, len(days)) / 7
+
+    def week(policy: HoldPolicy, rule: Constraint | None = None, edge: float = 1.0) -> float:
+        return hold_stats(holds_of(policy, listings, panel, locks, rule), panel, days, season, edge).gain / 1e6 / weeks
+    lines = ["hold replay: %d days from %s, %d listings, %d daily cuts; M per week = gain / %.1f weeks" % (
+        len(days), since, len(listings), len(replay.days), weeks),
+        "  M     V      p    H  bids won win%  ret/trade ret/capday  M/wk  cap M  hit% lossw ind  half1  half2  price  pts+  pts>mean |"
+        "  half-edge  control" + "".join("  %7s" % k for k in HOLD_SCENARIOS)]
+    for policy in hold_grid():
+        got = holds_of(policy, listings, panel, locks)
+        s = hold_stats(got, panel, days, season)
+        control = policy._replace(momentum=None)
+        lines.append("%4.0f%% %5s %4.0f%% %3d %5d %4d %4.0f%% %8.1f%% %8.2f%% %6.1f %6.1f %4.0f%% %5d %3d %6.1f %6.1f %6.1f %6.1f %7.1f | %9.1f %8.1f%s" % (
+            100 * (policy.momentum or 0), "all" if math.isinf(policy.value) else "%dM" % (policy.value / 1e6), 100 * policy.premium,
+            policy.hold, s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day,
+            s.gain / 1e6 / weeks, s.capital / 1e6, 100 * s.hit, s.loss_weeks, s.players, s.first_half / 1e6, s.second_half / 1e6,
+            s.gain / 1e6, s.points / 1e6, s.above_mean / 1e6, week(policy, None, 0.5), week(control),
+            "".join("  %7.1f" % week(policy, rule) for rule in HOLD_SCENARIOS.values())))
+    return "\n".join(lines)
+
+
+def hold_replay(loaded: loader.Loaded, cuts: Sequence[str]) -> str:
+    """The hold back-test over the last REPLAY_DAYS days of cuts (the momentum of the first days read from MOMENTUM_DAYS before
+    them), as hold_report prints it, on the canonical replay (replayed_days)."""
+    last = snapshot_stamp(max(cuts))
+    assert last is not None
+    first = last - dt.timedelta(days=REPLAY_DAYS)
+    lead = stamp(first - dt.timedelta(days=MOMENTUM_DAYS + 1))
+    replay = replayed_days(loaded, cuts, lead, lambda world: hold_day(loaded, world), MOMENT_FOLDS)
+    now = state.sweep(loaded.obs, [max(cuts)], lambda world: season_at(loaded, world), SEASON_FOLDS)[0]
+    return hold_report(replay, now, first.astimezone(MADRID).date())
+
+
 PAIRED_RULE = "rent"
 PAIRED_CASE = "bench"
 
@@ -1427,7 +1841,62 @@ def _selftest_standing() -> None:
         assert scored_at("a") == "2026-11-05T0000Z", "the latest of the runs that scored"
 
 
+def _hold_panel(values: Mapping[str, Sequence[float]]) -> dict[dt.date, HoldDay]:
+    first = dt.date(2026, 10, 1)
+    n = max(len(v) for v in values.values())
+    return {first + dt.timedelta(days=i): HoldDay("%sT1800Z" % (first + dt.timedelta(days=i)).strftime("%Y-%m-%d"),
+                                                  {k: v[i] for k, v in values.items() if i < len(v)}, frozenset()) for i in range(n)}
+
+
+def _hold_listing(player: str, day: dt.date, ask: float, won: float | None) -> Listing:
+    return Listing(player, dt.datetime.combine(day, CLOSE, tzinfo=MADRID), day, ask, won)
+
+
+def _selftest_holds() -> None:
+    """A bid at or over the highest winning premium wins every contested listing; on a flat panel the control and the policy
+    gain 0 less the sale haircut; no day after a decision's changes it; a position still open is marked, never dropped."""
+    import random
+    rng = random.Random(7)
+    season = Season((), "me", {}, set(), {}, {}, {})
+    nobody = Listing("p", dt.datetime(2026, 10, 5, tzinfo=dt.timezone.utc), dt.date(2026, 10, 5), 10.0, 10.0)
+    assert bid_wins(10.0, nobody._replace(won=None)) and not bid_wins(10.0, nobody) and bid_wins(10.01, nobody)
+    names = ["p%d" % i for i in range(12)]
+    rates = {k: rng.uniform(0.001, 0.05) for k in names}
+    rising = {k: [100.0 * (1 + rates[k]) ** i for i in range(40)] for k in names}
+    panel = _hold_panel(rising)
+    days = sorted(panel)
+    listings = [_hold_listing(k, days[rng.randrange(4, 30)], 100.0, 100.0 * (1 + rng.uniform(0.0, 0.3)) if rng.random() < 0.7 else None) for k in names]
+    top = max(x.won / x.ask - 1 for x in listings if x.won is not None)
+    for momentum in (None, 0.0):
+        got = holds_of(HoldPolicy(momentum, math.inf, top + 1e-9, 7), listings, panel)
+        assert got.bids == len(got.positions) > 0
+        assert all(bid_wins(x.ask * (1 + top + 1e-9), x) for x in listings)
+        short = holds_of(HoldPolicy(momentum, math.inf, 0.0, 7), listings, panel)
+        assert len(short.positions) <= got.bids
+    flat = _hold_panel({k: [50e6] * 30 for k in names})
+    flats = [_hold_listing(k, days[rng.randrange(4, 20)], 50e6, None) for k in names]
+    for momentum in (None, 0.0):
+        got = holds_of(HoldPolicy(momentum, math.inf, 0.0, 7), flats, flat)
+        assert got.positions and all(abs(gain_of(p) + (1 - hurdle.draw(1.0)) * p.value_out) < 1e-6 for p in got.positions)
+        assert abs(hold_stats(got, flat, sorted(flat), season).gain - sum(gain_of(p) for p in got.positions)) < 1e-6
+    policy = HoldPolicy(0.0, math.inf, 0.05, 14)
+    for listing in listings:
+        later = {d: HoldDay(v.cut, {k: x * (3.0 if d > listing.day else 1.0) for k, x in v.values.items()}, v.squad) for d, v in panel.items()}
+        assert hold_bid(policy, listing, later) == hold_bid(policy, listing, panel)
+        left = hold_exit(policy, listing, panel)
+        if left is not None and left.closed:
+            cut = {d: v for d, v in panel.items() if d <= left.day}
+            assert hold_exit(policy, listing, cut) == left
+    open_panel = _hold_panel({k: v[:12] for k, v in rising.items()})
+    late = [x._replace(day=days[10], close=dt.datetime.combine(days[10], CLOSE, tzinfo=MADRID), won=None) for x in listings]
+    held = holds_of(HoldPolicy(None, math.inf, 0.01, 28), late, open_panel)
+    assert len(held.positions) == held.bids and held.positions and all(not p.closed for p in held.positions)
+    assert all(abs(gain_of(p) - (p.value_out - p.bid)) < 1e-9 and p.day_out == days[11] for p in held.positions)
+    assert abs(hold_stats(held, open_panel, sorted(open_panel), season).gain - sum(gain_of(p) for p in held.positions)) < 1e-6
+
+
 def _selftest() -> None:
+    _selftest_holds()
     _selftest_replayed_cuts()
     _selftest_rule_scores()
     _selftest_measure_log()
@@ -1489,10 +1958,14 @@ if __name__ == "__main__":
         loaded, cuts = read_storage()
         print(opportunity_report(opportunity_grade(loaded, season(loaded), [c for c in cuts if snapshot_stamp(c) is not None])), flush=True)
         os._exit(0)
+    if sys.argv[1:2] == ["holds"]:
+        loaded, cuts = read_storage()
+        print(hold_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None]), flush=True)
+        os._exit(0)
     if sys.argv[1:2] == ["rules"]:
         got = rule_scores(worth.CHALLENGERS)
         print(rule_report(got.scores), flush=True)
         print(paired_report(got.graded), flush=True)
         os._exit(0)
-    print("grading.py --selftest | accuracy | price | opportunities | rules")
+    print("grading.py --selftest | accuracy | price | opportunities | rules | holds")
     raise SystemExit(2)

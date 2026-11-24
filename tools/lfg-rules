@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# grading.py rules on a scratch copy: the parse cache (data/tidy/parsed.jsonl, snapindex.json) copied as plain files, data/raw linked in, the replay and scoring run under tools/capped
+# grading.py rules (or holds: the hold back-test of #145) on a scratch copy: the parse cache (data/tidy/parsed.jsonl, snapindex.json) copied as plain files, data/raw linked in, the replay and scoring run under tools/capped
 # (LFG_CAP, 1500M by default; LFG_CAPPED names another wrapper), the scratch deleted after
 # (LFG_KEEP=1 keeps it). Prints rule_report's table and `seconds S peak_mb M`.
 # For re-checking a change over every past cutoff; the tracked repo is never touched.
 #
-#     tools/lfg-rules
+#     tools/lfg-rules [rules|holds]
 
 set -euo pipefail
 
@@ -25,7 +25,7 @@ ln -sfn "$TREE/data/raw" "$SCRATCH/data/raw"
 export PYTHONPATH=src FF_ROOT="$SCRATCH/data"
 start=$SECONDS
 status=0
-/usr/bin/time -v -o "$SCRATCH/time" "$CAPPED" "$HOME/.local/bin/uv" run --frozen python src/grading.py rules \
+/usr/bin/time -v -o "$SCRATCH/time" "$CAPPED" "$HOME/.local/bin/uv" run --frozen python src/grading.py "${1:-rules}" \
     > "$SCRATCH/out" 2> "$SCRATCH/err" || status=$?
 if [ "$status" -ne 0 ]; then
     case "$status" in
