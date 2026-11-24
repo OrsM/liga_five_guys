@@ -71,28 +71,172 @@
   {
    "accepts": [],
    "act": [],
-   "at_stake": 53.34596442837564,
    "cash": -49572707.0,
-   "cash_after": 5442473.868129284,
-   "label": "cover the cash: sell Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Adria Pedrosa, Iñigo Vicente, Ferran Jutgla",
+   "cash_after": 1658915.7157483655,
+   "label": "cover the cash: Arnau Ortiz, Roger Hinojo, Iñigo Vicente, Thomas Lemar, Ferran Jutgla",
    "lock": "2026-11-20T20:00Z",
    "needed": true,
-   "p_ok": 0.9998578246746126,
-   "points_lost": 17.21398938949551,
+   "options": [
+    {
+     "cash_at_lock": 1658915.7157483655,
+     "fallback": [
+      "Dani Martinez"
+     ],
+     "points_lost": 14.27232890651173,
+     "switch": "Thomas Lemar: if no offer reaches 6,072,976 euros by the close before the last, sell him at the last close whatever it is; Ferran Jutgla: if no offer reaches 11,683,521 euros by the close before the last, sell him at the last close whatever it is; then sell the cheapest of Dani Martinez for any cash still missing",
+     "take_now": [
+      {
+       "close": "2026-11-08T21:24Z",
+       "key": "11579",
+       "kind": "accept",
+       "least": 644149.0,
+       "name": "Arnau Ortiz"
+      },
+      {
+       "close": "2026-11-08T21:24Z",
+       "key": "15316",
+       "kind": "accept",
+       "least": 1576701.0,
+       "name": "Roger Hinojo"
+      },
+      {
+       "close": "2026-11-08T21:24Z",
+       "key": "6442",
+       "kind": "accept",
+       "least": 22801375.0,
+       "name": "Iñigo Vicente"
+      }
+     ],
+     "wait": [
+      {
+       "close": "2026-11-19T21:24Z",
+       "key": "3427",
+       "kind": "wait",
+       "least": 6072975.688003129,
+       "name": "Thomas Lemar",
+       "reserve": [
+        {
+         "close": "2026-11-08T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-09T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-10T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-11T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-12T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-13T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-14T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-15T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-16T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-17T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-18T21:24Z",
+         "least": 6072975.688003129
+        },
+        {
+         "close": "2026-11-19T21:24Z",
+         "least": 0.0
+        }
+       ]
+      },
+      {
+       "close": "2026-11-19T21:24Z",
+       "key": "7842",
+       "kind": "wait",
+       "least": 11683520.01336182,
+       "name": "Ferran Jutgla",
+       "reserve": [
+        {
+         "close": "2026-11-08T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-09T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-10T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-11T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-12T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-13T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-14T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-15T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-16T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-17T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-18T21:24Z",
+         "least": 11683520.01336182
+        },
+        {
+         "close": "2026-11-19T21:24Z",
+         "least": 0.0
+        }
+       ]
+      }
+     ],
+     "worst": {
+      "p": 0.004170841080402008,
+      "points": 17.21398938949551
+     }
+    }
+   ],
+   "points_lost": 14.27232890651173,
    "sells": [
     {
-     "close": "2026-11-19T21:24Z",
+     "close": "2026-11-08T21:24Z",
      "key": "11579",
-     "kind": "wait",
-     "least": 0.0,
+     "kind": "accept",
+     "least": 644149.0,
      "name": "Arnau Ortiz"
-    },
-    {
-     "close": "2026-11-19T21:24Z",
-     "key": "11861",
-     "kind": "wait",
-     "least": 0.0,
-     "name": "Dani Martinez"
     },
     {
      "close": "2026-11-08T21:24Z",
@@ -100,20 +244,6 @@
      "kind": "accept",
      "least": 1576701.0,
      "name": "Roger Hinojo"
-    },
-    {
-     "close": "2026-11-19T21:24Z",
-     "key": "3427",
-     "kind": "wait",
-     "least": 1791413.1698707193,
-     "name": "Thomas Lemar"
-    },
-    {
-     "close": "2026-11-19T21:24Z",
-     "key": "5587",
-     "kind": "wait",
-     "least": 0.0,
-     "name": "Adria Pedrosa"
     },
     {
      "close": "2026-11-08T21:24Z",
@@ -124,15 +254,126 @@
     },
     {
      "close": "2026-11-19T21:24Z",
+     "key": "3427",
+     "kind": "wait",
+     "least": 6072975.688003129,
+     "name": "Thomas Lemar",
+     "reserve": [
+      {
+       "close": "2026-11-08T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-09T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-10T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-11T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-12T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-13T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-14T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-15T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-16T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-17T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-18T21:24Z",
+       "least": 6072975.688003129
+      },
+      {
+       "close": "2026-11-19T21:24Z",
+       "least": 0.0
+      }
+     ]
+    },
+    {
+     "close": "2026-11-19T21:24Z",
      "key": "7842",
      "kind": "wait",
-     "least": 8128225.529870719,
-     "name": "Ferran Jutgla"
+     "least": 11683520.01336182,
+     "name": "Ferran Jutgla",
+     "reserve": [
+      {
+       "close": "2026-11-08T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-09T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-10T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-11T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-12T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-13T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-14T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-15T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-16T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-17T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-18T21:24Z",
+       "least": 11683520.01336182
+      },
+      {
+       "close": "2026-11-19T21:24Z",
+       "least": 0.0
+      }
+     ]
     }
    ],
    "step": "plan",
    "what": "cover",
-   "why": "Arnau Ortiz: accept 0 euros or more, at the latest at the close of 2026-11-19 22:24 CET; Dani Martinez: accept 0 euros or more, at the latest at the close of 2026-11-19 22:24 CET; Roger Hinojo: accept 1,576,701 euros before the close of 2026-11-08 22:24 CET; Thomas Lemar: accept 1,791,414 euros or more, at the latest at the close of 2026-11-19 22:24 CET; Adria Pedrosa: accept 0 euros or more, at the latest at the close of 2026-11-19 22:24 CET; Iñigo Vicente: accept 22,801,375 euros before the close of 2026-11-08 22:24 CET; Ferran Jutgla: accept 8,128,226 euros or more, at the latest at the close of 2026-11-19 22:24 CET. Cash at the lock 5.4 million, chance of 0 or more 100%; if it is below 0 the whole jornada scores 0 (53.3 points at stake)"
+   "why": "Arnau Ortiz: accept 644,149 euros before the close of 2026-11-08 22:24 CET; Roger Hinojo: accept 1,576,701 euros before the close of 2026-11-08 22:24 CET; Iñigo Vicente: accept 22,801,375 euros before the close of 2026-11-08 22:24 CET; Thomas Lemar: wait, accept 6,072,976 euros or more at any close, any offer at the last (2026-11-19 22:24 CET); Ferran Jutgla: wait, accept 11,683,521 euros or more at any close, any offer at the last (2026-11-19 22:24 CET). Expected cash at the lock 1.7 million, 14.3 points lost in expectation, at worst 17.2 points (chance 0.4%)",
+   "worst": {
+    "p": 0.004170841080402008,
+    "points": 17.21398938949551
+   }
   },
   {
    "accepts": [],
@@ -218,21 +459,71 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 8340029.1127660135,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 23052378.18374209
+    }
+   ],
    "risk": {
-    "below_points": 0.0,
+    "below_points": 37.45895564000003,
     "low_inflow": 3830073.3091292838,
-    "p_short": 2.874790352713763e-06,
+    "p_short": 0.08822795269753281,
     "shortfall_if_low": 0.0
    },
-   "set_cash_after": 5442473.868129284,
-   "set_points_lost": 17.21398938949551,
+   "set_cash_after": 1658915.7157483655,
+   "set_points_lost": 14.27232890651173,
    "step": "take offer",
    "trace": null,
    "trend": -0.9599715530509632,
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49572707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Adria Pedrosa, Iñigo Vicente, Ferran Jutgla, bringing it to 5442474 at the lock (the credit due, 5367993 expected, counted), losing 17.2 points; if the eleven scores under 0 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49572707 is below 0: the cheapest plan sells Arnau Ortiz, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, expecting 1658916 at the lock, losing 14.3 points in expectation; if the eleven scores under 37 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
@@ -319,22 +610,277 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 1516029.106876829,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 1516029.106876829
+    }
+   ],
    "risk": {
-    "below_points": 0.0,
+    "below_points": 37.45895564000003,
     "low_inflow": 3830073.3091292838,
-    "p_short": 2.874790352713763e-06,
+    "p_short": 0.08822795269753281,
     "shortfall_if_low": 0.0
    },
-   "set_cash_after": 5442473.868129284,
-   "set_points_lost": 17.21398938949551,
+   "set_cash_after": 1658915.7157483655,
+   "set_points_lost": 14.27232890651173,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49572707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Thomas Lemar, Adria Pedrosa, Iñigo Vicente, Ferran Jutgla, bringing it to 5442474 at the lock (the credit due, 5367993 expected, counted), losing 17.2 points; if the eleven scores under 0 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49572707 is below 0: the cheapest plan sells Arnau Ortiz, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, expecting 1658916 at the lock, losing 14.3 points in expectation; if the eleven scores under 37 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "amount": 644149.0,
+   "delta": {
+    "gap": [],
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     662478.0,
+     "money"
+    ],
+    [
+     "offer",
+     644149.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9723326661413662,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "sale price",
+     661716.5025955649,
+     "money"
+    ],
+    [
+     "points, lock",
+     0.0,
+     "points"
+    ],
+    [
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
+     0.0,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [],
+   "gain": 0.0,
+   "key": "11579",
+   "label": "sell Arnau Ortiz",
+   "more": false,
+   "name": "Arnau Ortiz",
+   "needed": true,
+   "offer": 644149.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.0,
+   "plan": false,
+   "points_lost": 0.0,
+   "pos": "DEL",
+   "ratio": 0.9723326661413662,
+   "rent": 0.7536543299999999,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserve": 661716.5025955649,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 661716.5025955649
+    }
+   ],
+   "risk": {
+    "below_points": 37.45895564000003,
+    "low_inflow": 3830073.3091292838,
+    "p_short": 0.08822795269753281,
+    "shortfall_if_low": 0.0
+   },
+   "set_cash_after": 1658915.7157483655,
+   "set_points_lost": 14.27232890651173,
+   "step": "take offer",
+   "trace": null,
+   "trend": 0.18561000848040757,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why": "cash -49572707 is below 0: the cheapest plan sells Arnau Ortiz, Roger Hinojo, Thomas Lemar, Iñigo Vicente, Ferran Jutgla, expecting 1658916 at the lock, losing 14.3 points in expectation; if the eleven scores under 37 points the lock cash stays below 0; there is time to fix by hand",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "cost_points": 14.27232890651173,
+   "expected_cover": [
+    "Thomas Lemar",
+    "Ferran Jutgla"
+   ],
+   "expected_raised": 20804586.436,
+   "label": "wait for the offers of Thomas Lemar, Ferran Jutgla",
+   "last_close": "2026-11-19T21:24Z",
+   "least": {
+    "Ferran Jutgla": [
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     11683520.01336182,
+     0.0
+    ],
+    "Thomas Lemar": [
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     6072975.688003129,
+     0.0
+    ]
+   },
+   "n_closes": 12,
+   "need": 19182488.690870717,
+   "needed": true,
+   "risk": {
+    "below_points": 37.45895564000003,
+    "low_inflow": 3830073.3091292838,
+    "p_short": 0.08822795269753281,
+    "shortfall_if_low": 0.0
+   },
+   "step": "wait",
+   "what": "wait",
+   "why": "cash -49572707 is below 0 and the lock is 12 closes away (the last 2026-11-19 22:24 CET): sell Thomas Lemar, Ferran Jutgla to the offers still to come, each at its reserve or more, at the last close whatever it is; if the eleven scores under 37 points the lock cash stays below 0; there is time to fix by hand"
   },
   {
    "accepts": [
@@ -398,12 +944,12 @@
     "out": "Ferran Jutgla"
    },
    {
-    "gain": 0.7084050702442659,
-    "in": "Robin Le Normand",
+    "gain": 1.0872460159281587,
+    "in": "Adria Pedrosa",
     "out": "Marcos Alonso"
    }
   ],
-  "best": 52.197730351166264,
+  "best": 52.57657129685016,
   "eleven": [
    "Mathew Ryan",
    "Natan",
@@ -432,7 +978,156 @@
    "action": {
     "close": "2026-11-08T21:24Z",
     "kind": "accept",
+    "least": 644149.0,
+    "reserve": [],
+    "why": "in the cover of the cash at the lock: accept the offer of 644,149 euros before the close"
+   },
+   "amount": 644149.0,
+   "delta": {
+    "gap": [],
+    "points": 0.0,
+    "window": {
+     "lock": 0.0,
+     "next4": 0.0,
+     "season": 0.0
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     662478.0,
+     "money"
+    ],
+    [
+     "offer",
+     644149.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9723326661413662,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "sale price",
+     661716.5025955649,
+     "money"
+    ],
+    [
+     "points, lock",
+     0.0,
+     "points"
+    ],
+    [
+     "points, next4",
+     0.0,
+     "points"
+    ],
+    [
+     "points, season",
+     0.0,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [],
+   "gain": 0.0,
+   "key": "11579",
+   "label": "sell Arnau Ortiz",
+   "more": false,
+   "name": "Arnau Ortiz",
+   "offer": 644149.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.0,
+   "plan": false,
+   "points_lost": 0.0,
+   "pos": "DEL",
+   "ratio": 0.9723326661413662,
+   "rent": 0.7536543299999999,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserve": 661716.5025955649,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 661716.5025955649
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 661716.5025955649
+    }
+   ],
+   "step": "take offer",
+   "trace": null,
+   "trend": 0.18561000848040757,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "close": "2026-11-08T21:24Z",
+    "kind": "accept",
     "least": 1576701.0,
+    "reserve": [],
     "why": "in the cover of the cash at the lock: accept the offer of 1,576,701 euros before the close"
    },
    "amount": 1576701.0,
@@ -515,6 +1210,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 1516029.106876829,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 1516029.106876829
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 1516029.106876829
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
@@ -530,6 +1275,7 @@
     "close": "2026-11-08T21:24Z",
     "kind": "accept",
     "least": 22801375.0,
+    "reserve": [],
     "why": "in the cover of the cash at the lock: accept the offer of 22,801,375 euros before the close"
    },
    "amount": 22801375.0,
@@ -612,6 +1358,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 8340029.1127660135,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 23052378.18374209
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 23052378.18374209
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -0.9599715530509632,
@@ -624,106 +1420,10 @@
    "accepts": [],
    "act": [],
    "action": {
-    "close": "2026-11-19T21:24Z",
-    "kind": "wait",
-    "least": 0.0,
-    "why": "in the cover of the cash at the lock: accept an offer of 0 euros or more, at the last close whatever it is"
-   },
-   "amount": 644149.0,
-   "delta": {
-    "gap": [],
-    "points": 0.0,
-    "window": {
-     "lock": 0.0,
-     "next4": 0.0,
-     "season": 0.0
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     662478.0,
-     "money"
-    ],
-    [
-     "offer",
-     644149.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9723326661413662,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "sale price",
-     661716.5025955649,
-     "money"
-    ],
-    [
-     "points, lock",
-     0.0,
-     "points"
-    ],
-    [
-     "points, next4",
-     0.0,
-     "points"
-    ],
-    [
-     "points, season",
-     0.0,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [],
-   "gain": 0.0,
-   "key": "11579",
-   "label": "sell Arnau Ortiz",
-   "more": false,
-   "name": "Arnau Ortiz",
-   "offer": 644149.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.0,
-   "plan": false,
-   "points_lost": 0.0,
-   "pos": "DEL",
-   "ratio": 0.9723326661413662,
-   "rent": 0.7536543299999999,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserve": 661716.5025955649,
-   "step": "take offer",
-   "trace": null,
-   "trend": 0.18561000848040757,
-   "verdict": "hold",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "action": {
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 21.4 points and the cash at the lock is covered without him"
    },
    "amount": 47188627.0,
@@ -806,6 +1506,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 22226064.886170004,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 45578374.44787107
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 45578374.44787107
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": 1.3189711608554608,
@@ -821,6 +1571,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 2.5 points and the cash at the lock is covered without him"
    },
    "amount": 5337731.0,
@@ -903,6 +1654,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 2459520.4032759606,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 5604033.760676484
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 5604033.760676484
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -1.348355535307556,
@@ -918,6 +1719,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 23.5 points and the cash at the lock is covered without him"
    },
    "amount": 46035874.0,
@@ -1000,6 +1802,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 22929905.417098723,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 47325553.34981512
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 47325553.34981512
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -1.2828104837476024,
@@ -1015,6 +1867,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 22.1 points and the cash at the lock is covered without him"
    },
    "amount": 40009473.0,
@@ -1097,6 +1950,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 23236822.528243802,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 44920422.389159985
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 44920422.389159985
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": 1.9707289480553332,
@@ -1112,6 +2015,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 38.9 points and the cash at the lock is covered without him"
    },
    "amount": 49571725.0,
@@ -1194,6 +2098,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 38864197.68376622,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 50550038.56525188
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 50550038.56525188
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -0.41770354506100393,
@@ -1206,10 +2160,11 @@
    "accepts": [],
    "act": [],
    "action": {
-    "close": "2026-11-19T21:24Z",
-    "kind": "wait",
-    "least": 0.0,
-    "why": "in the cover of the cash at the lock: accept an offer of 0 euros or more, at the last close whatever it is"
+    "close": null,
+    "kind": "keep",
+    "least": null,
+    "reserve": [],
+    "why": "keeping him protects 2.6 points and the cash at the lock is covered without him"
    },
    "amount": 2953995.0,
    "delta": {
@@ -1291,10 +2246,60 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 2587779.5440252256,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 3197317.97486366
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 3197317.97486366
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": 0.1486109849343848,
-   "verdict": "wait",
+   "verdict": "hold",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -1306,6 +2311,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 8.0 points and the cash at the lock is covered without him"
    },
    "amount": 9145609.0,
@@ -1388,6 +2394,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 7865300.619076832,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 8644508.626371246
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 8644508.626371246
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -1.812562856210546,
@@ -1403,6 +2459,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 33.0 points and the cash at the lock is covered without him"
    },
    "amount": 36847734.0,
@@ -1485,6 +2542,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 32703717.843786895,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 36527018.04325403
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 36527018.04325403
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -1.167641877951558,
@@ -1500,6 +2607,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 46.1 points and the cash at the lock is covered without him"
    },
    "amount": 44527367.0,
@@ -1582,6 +2690,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 47489650.29162487,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 48030867.766243
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 48030867.766243
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": 1.9936865166470912,
@@ -1597,6 +2755,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 23.8 points and the cash at the lock is covered without him"
    },
    "amount": 21289009.0,
@@ -1679,6 +2838,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 24080400.34276746,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 19863110.726006858
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 19863110.726006858
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": 0.7009092811851191,
@@ -1694,6 +2903,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 21.3 points and the cash at the lock is covered without him"
    },
    "amount": 18882612.0,
@@ -1776,6 +2986,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 21915624.861010622,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 20192788.511698235
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 20192788.511698235
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": 1.9785105195726127,
@@ -1791,6 +3051,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 29.5 points and the cash at the lock is covered without him"
    },
    "amount": 25283889.0,
@@ -1873,6 +3134,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 29419500.020687915,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 23107960.930816043
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 23107960.930816043
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -0.802633666539891,
@@ -1888,6 +3199,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 14.9 points and the cash at the lock is covered without him"
    },
    "amount": 10813953.0,
@@ -1970,6 +3282,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 15116546.381414732,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 12077432.185110012
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 12077432.185110012
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": 0.6019579764866829,
@@ -1985,6 +3347,7 @@
     "close": null,
     "kind": "keep",
     "least": null,
+    "reserve": [],
     "why": "keeping him protects 83.5 points and the cash at the lock is covered without him"
    },
    "amount": 18261001.0,
@@ -2067,6 +3430,56 @@
    "replacement": null,
    "replacement_why_not": null,
    "reserve": 83698493.84345719,
+   "reserves": [
+    {
+     "close": "2026-11-08T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-09T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-10T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-11T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-12T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-13T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-14T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-15T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-16T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-17T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-18T21:24Z",
+     "least": 18188846.305546436
+    },
+    {
+     "close": "2026-11-19T21:24Z",
+     "least": 18188846.305546436
+    }
+   ],
    "step": "take offer",
    "trace": null,
    "trend": -1.0060886321197136,
@@ -2182,15 +3595,15 @@
    "xi": false
   },
   {
-   "best": false,
+   "best": true,
    "name": "Adria Pedrosa",
    "next": 3.8123382297230894,
    "pos": "DEF",
-   "sold": true,
+   "sold": false,
    "xi": false
   },
   {
-   "best": true,
+   "best": false,
    "name": "Robin Le Normand",
    "next": 3.4334972840391966,
    "pos": "DEF",
@@ -2218,7 +3631,7 @@
    "name": "Dani Martinez",
    "next": 1.0174878308668722,
    "pos": "DEF",
-   "sold": true,
+   "sold": false,
    "xi": false
   },
   {

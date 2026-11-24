@@ -145,14 +145,17 @@ lines: low_inflow, p_short, shortfall_if_low, below_points) and says it in the `
 
 ### The cash cover under a lock (#146, #139)
 
-With cash below 0 and a lock ahead the first `do` line is the `cover` (`approach.secure` on the cheapest plan `approach.plan`): the
-sales, each with its terms (accept now at the standing offer before the next close, or wait and accept at least `floor` by the last
-close), `p_ok` the chance cash at the lock is 0 or more and `at_stake` the points the eleven scores in the jornada that locks, all of
-which a lock with cash below 0 loses. A sale waiting for an offer is drawn once at SALE_ESTIMATE times worth with SALE_SD of worth for
-spread, the offers independent (a lower bound: the closes before the last give more draws); a standing offer taken now is certain; the
-credit is normal with its own spread. A standing offer is taken now when that raises the chance. The set grows by the cheapest cover of
-0 to 3 spreads of margin when that lowers points lost plus `at_stake` times the chance of failing. Every sells row then carries an
-`action` (accept, wait or keep, with why). With cash 0 or more nothing changes.
+With cash below 0 and a lock ahead the first `do` line is the `cover`: the recommended of the OPTIONS `approach.secure` finds on the cheapest
+plan `approach.plan`. An option sells `now` at standing offers, waits for the offers of others (each at the next closes, iid from the
+nightly offers seen, the normal of SALE_ESTIMATE and SALE_SD when none) and, for cash still below 0 after the last close, sells the
+cheapest fallback among the squad (every player is listed; counted at the 1 / 10 quantile of his offers) sized after seeing the offers.
+Cash above the deficit is worth no points, so a waiting player's offer is valued by the points the sale then saves, and the reserve at
+each close is `worth.waiting_values` over those payoffs: the one stopping rule, also behind `worth.offer_reserve_ratio` and
+`waiting_reserve` (payoff = the offer's ratio) for ordinary sales. Each option states what to take now, the reserve at each close
+left, the expected points lost and cash at the lock, the worst case with its chance and the fallback. Every sells row has `reserves`
+(its waiting reserve at each close left) and, with cash below 0, `action` (accept, wait with the reserve per close, keep and why). The
+grade of the advice is `grading.cover_replay` (`tools/lfg-rules cover`): at each past daily cut with cash below 0 the option and the plan
+taking its offers now are followed over the offers that came. With cash 0 or more the cover lines are absent.
 
 ## 4. The board: cash, offers, funding a buy (2026-11-08)
 

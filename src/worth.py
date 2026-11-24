@@ -100,20 +100,34 @@ def _tails(ratios: tuple[float, ...]) -> tuple[float, ...]:
     return tuple(itertools.accumulate(reversed(ratios), initial=0.0))[::-1]
 
 
+def waiting_values(m: int, payoffs: tuple[float, ...], c: float, hold: float) -> tuple[float, ...]:
+    """The value of waiting with k draws still to come, for k = 0 to m: rho_0 = hold and rho_k = mean of max(u, rho_(k-1)) over the
+    `payoffs` u of the offers of a distribution (ascending, one per offer, not empty), less c, the cost of a night waited. An offer is
+    taken at the close with k draws after it when its payoff is at least rho_k; with the payoffs the offers' ratios it is the
+    reserve ratio (offer_reserve_ratio), with those of a cover (the points a sale saves) the cover's. Nondecreasing in k when c is
+    0 and hold is at most the mean payoff; hold at most the lowest payoff makes the last close accept any offer."""
+    if m < 0 or not payoffs:
+        raise ValueError("m must be >= 0 and payoffs non-empty")
+    tail = _tails(payoffs)
+    rho = hold
+    out = [rho]
+    for _ in range(m):
+        i = bisect.bisect_left(payoffs, rho)
+        rho = (rho * i + tail[i]) / len(payoffs) - c
+        out.append(rho)
+    return tuple(out)
+
+
 def offer_reserve_ratio(m: int, c: float, dist: OfferDistribution, hold: float) -> float:
     """The offer over value at which selling tonight and waiting are worth the same, with m nights left to wait, a cost c
     (a fraction of value) for each night waited and one offer a night drawn from dist, i.i.d. and expiring at the next
     close. hold is what the player is worth if no offer is taken (rho_0); rho_k = mean of max(X, rho_{k-1}) over dist
-    minus c. m >= 0 and dist non-empty. Nondecreasing in m and nonincreasing in c when hold is at most the mean of dist
-    less c; with hold 0, rho_1 is the mean of dist less c, and with every ratio 1.0 rho_m is 1 - c."""
-    if m < 0 or not dist.ratios:
+    minus c (waiting_values with the ratios as payoffs). m >= 0 and dist non-empty. Nondecreasing in m and nonincreasing in c
+    when hold is at most the mean of dist less c; with hold 0, rho_1 is the mean of dist less c, and with every ratio 1.0 rho_m
+    is 1 - c."""
+    if not dist.ratios:
         raise ValueError("m must be >= 0 and dist non-empty")
-    rho = hold
-    tail = _tails(dist.ratios)
-    for _ in range(m):
-        i = bisect.bisect_left(dist.ratios, rho)
-        rho = (rho * i + tail[i]) / len(dist.ratios) - c
-    return rho
+    return waiting_values(m, dist.ratios, c, hold)[m]
 
 
 def stopped(exit: hurdle.Exit, dist: OfferDistribution, m: int) -> hurdle.Exit:

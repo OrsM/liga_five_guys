@@ -1,21 +1,26 @@
 from __future__ import annotations
 
+import bisect
+import heapq
+import math
 import random
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from functools import lru_cache, reduce
 from itertools import combinations
-from math import erf, sqrt
+from statistics import NormalDist
 from operator import or_
 from typing import NamedTuple
 
 import eleven
 import hurdle
 import valuation
+import worth
+from worth import NO_OFFERS, offer_ratio_distribution
 from inflow import NONE, Inflow
-from ffcore.rules import DEBT_SHARE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
+from ffcore.rules import DEBT_SHARE, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
 
-__all__ = ["Club", "Rounds", "Approach", "Plan", "Cash", "approach", "replacement", "plan", "secure", "odds", "lock_cash", "floor", "prices"]
+__all__ = ["Club", "Rounds", "Approach", "Plan", "Option", "Reserve", "Atom", "Closer", "approach", "replacement", "plan", "secure", "prices", "ratios_of", "sold_at"]
 
 
 class Club(NamedTuple):
@@ -176,28 +181,55 @@ def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mappin
     return None if best is None else (best[0], side.players(best[1]))
 
 
+class Atom(NamedTuple):
+    """One outcome of money: its probability `p` and the `money`."""
+    p: float
+    money: float
+
+
+class Reserve(NamedTuple):
+    """What a waiting player is to be sold for: at the j-th of the closes left an offer of `least[j]` or more is accepted (the last is
+    the lowest, 0 when any offer is)."""
+    player: str
+    least: tuple[float, ...]
+
+
+class Option(NamedTuple):
+    """A way to bring cash to 0 or more at the lock: sell `now` at their standing offers, wait for the offers of `wait` (each
+    sold at the first close whose offer is at or above its Reserve, at the last close whatever it is) and, when cash would still be
+    below 0, sell the cheapest of the `fallback` players (cheapest per money first) after seeing the last close's offers. `points`
+    and `cash` the expectations (points lost; cash at the lock, the credit at its expected), `worst` the most points it can lose and
+    `p_worst` the chance of that."""
+    now: frozenset[str]
+    wait: tuple[Reserve, ...]
+    fallback: tuple[str, ...]
+    points: float
+    cash: float
+    worst: float
+    p_worst: float
+
+
 class Plan(NamedTuple):
     """The sales that bring cash to 0 or more at the lock with no buy: `sells` the players, `raised` what they
     raise at `prices`, `cost` the points the eleven loses. Infeasible (`short` the money the pool lacks, 0 when it suffices but
     would leave no eleven) when no set does it. Cash is counted at the lock with the Club's inflow at its expected. `secure` fills the
-    rest: `now` the sales taken at their standing offer (the others wait for the offers still to come), `raised` what the sales bring
-    that way, `p_ok` the chance cash is 0 or more at the lock, `at_stake` the points the eleven scores in the jornada that locks, all
-    of which a lock with cash below 0 loses."""
+    rest: `now` the sales taken at their standing offer (the others wait for the offers still to come), `options` the ways to cover
+    the cash, the recommended first (`secure`), with `sells`, `cost` and `raised` those of it before any fallback."""
     feasible: bool
     sells: frozenset[str]
     raised: float
     cost: float
     short: float
-    p_ok: float = 1.0
     now: frozenset[str] = frozenset()
-    at_stake: float = 0.0
+    options: tuple[Option, ...] = ()
 
 
-def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int) -> Plan | None:
+def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int, side: Side | None = None) -> Plan | None:
     """The cheapest Plan with no buy, by `cover`. With closes still to come (`n_closes` 1 or more) it is `found`, the Approach with
     no player, whose sales are every player of the squad at his standing offer or the expected draw; with none to come (0) only
-    the players with a standing offer are sold, at it. Empty and free when cash is 0 or more. None when the squad fields no eleven."""
-    side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
+    the players with a standing offer are sold, at it. Empty and free when cash is 0 or more. None when the squad fields no eleven.
+    `side` is the Side of the squad over rounds.arrives when the caller has it."""
+    side = side or Side(club.squad, club.pos, rounds.cells, rounds.arrives)
     if not side.fields or found is None:
         return None
     price = prices(club, False)
@@ -211,77 +243,192 @@ def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int) -> P
     return Plan(True, got[1], sum(price[k] for k in got[1]), got[0], 0.0)
 
 
-class Cash(NamedTuple):
-    """Cash at the lock as a normal: its `mean` and `sd`."""
-    mean: float
-    sd: float
+SPREAD = 200
+PAIR = 60
+BUCKET = 50_000.0
+KEPT = 8
+FALLBACK_LOW = 10
+UNFILLED = 1e6
+WAITERS = 2
 
 
-def odds(cash: Cash) -> float:
-    """The chance a normal cash is 0 or more: 1 or 0 when the sd is 0 (by the sign of the mean). Nondecreasing in the mean,
-    nonincreasing in the sd when the mean is 0 or more."""
-    if cash.sd <= 0:
-        return 1.0 if cash.mean >= -1e-6 else 0.0
-    return 0.5 * (1.0 + erf(cash.mean / (cash.sd * sqrt(2.0))))
+def ratios_of(offers: worth.OfferDistribution) -> tuple[float, ...]:
+    """The offer ratios a player's offer is drawn from, iid: those of `offers` thinned to SPREAD evenly spaced ones, or when none were seen
+    SPREAD quantiles of a normal of mean SALE_ESTIMATE and spread SALE_SD."""
+    seen = offers.ratios
+    if not seen:
+        return tuple(NormalDist(SALE_ESTIMATE, SALE_SD).inv_cdf((i + 0.5) / SPREAD) for i in range(SPREAD))
+    return seen if len(seen) <= SPREAD else tuple(seen[int((i + 0.5) * len(seen) / SPREAD)] for i in range(SPREAD))
 
 
-def lock_cash(club: Club, sells: Iterable[str], now: frozenset[str]) -> Cash:
-    """Cash at the lock if `sells` are sold, those of `now` at their standing offer and the rest at one offer each still to come
-    (hurdle.draw of his worth, the offers independent with SALE_SD of his worth for spread), with the credit due at its expected
-    and its spread."""
-    gone = list(sells)
-    mean = club.cash + club.inflow.expected + sum(club.offers[k] if k in now else hurdle.draw(club.worth[k]) for k in gone)
-    var = club.inflow.sd ** 2 + sum((SALE_SD * club.worth[k]) ** 2 for k in gone if k not in now)
-    return Cash(mean, sqrt(var))
+def sold_at(value: float, ratios: Sequence[float], least: Sequence[float]) -> list[Atom]:
+    """The money one waiting player of `value` raises over the closes `least` names (the least offer accepted at each, one or more):
+    his first offer at or above that close's least, an offer being value times a ratio of `ratios` drawn afresh at each; the last
+    close's least is 0 or less. The Atoms' probabilities sum to 1."""
+    n = len(ratios)
+    out: list[Atom] = []
+    reach = 1.0
+    for need in least:
+        taken = [r for r in ratios if r * value >= need]
+        out += [Atom(reach / n, r * value) for r in taken]
+        reach *= 1.0 - len(taken) / n
+    return out
 
 
-def floor(club: Club, sells: frozenset[str], now: frozenset[str], player: str) -> float:
-    """The least `player` of `sells` must raise for cash at the lock to be 0 or more, the others of `sells` at lock_cash's means:
-    0 or more."""
-    rest = sells - {player}
-    return max(0.0, -lock_cash(club, rest, now & rest).mean)
+def thinned(atoms: Sequence[Atom], n: int) -> list[Atom]:
+    """The Atoms merged, neighbours in order of money, into at most n: the same probability and the same mean money."""
+    ordered = sorted(atoms, key=lambda x: x.money)
+    if len(ordered) <= n:
+        return ordered
+    step = len(ordered) / n
+    groups = [ordered[int(i * step):int((i + 1) * step)] for i in range(n)]
+    return [Atom(w, sum(x.p * x.money for x in g) / w) for g in groups if (w := sum(x.p for x in g)) > 0]
 
 
-def best_now(club: Club, sells: frozenset[str], taking: frozenset[str]) -> frozenset[str]:
-    """The sales to take at their standing offer: `taking` and the subset of the other sold players with an offer that gives the
-    greatest chance of cash 0 or more at the lock (odds of lock_cash), the larger set on a tie."""
-    free = sorted(k for k in sells if k in club.offers and k not in taking)
-    options = (taking | frozenset(b) for m in range(len(free) + 1) for b in combinations(free, m))
-    return max(options, key=lambda now: (odds(lock_cash(club, sells, now)), len(now), sorted(now)))
+def together(first: Sequence[Atom], second: Sequence[Atom]) -> list[Atom]:
+    """The Atoms of the sum of two independent moneys, each thinned to PAIR first (the unit, one Atom of money 0, is left as it is)."""
+    if len(first) == 1 and first[0] == Atom(1.0, 0.0):
+        return list(second)
+    one, other = thinned(first, PAIR), thinned(second, PAIR)
+    return thinned([Atom(a.p * b.p, a.money + b.money) for a in one for b in other], SPREAD * 4)
 
 
-MARGINS = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0)
-GAIN_MIN = 1e-3
+def bucket_of(gap: float) -> int:
+    """The number of BUCKET steps that cover a gap in money: 0 when it is 0 or less."""
+    return 0 if gap <= 0 else int(gap // BUCKET) + 1
 
 
-def secure(club: Club, found: Plan, rounds: Rounds, taking: frozenset[str], n_closes: int) -> Plan:
-    """`found` with its chance of cash 0 or more at the lock, `now` the sales taken at their standing offer (those of `taking`, a
-    subset of the sales with an offer, and any other whose offer raises the chance, best_now) and `at_stake` set; its sales may grow
-    by the cheapest cover (`cover`) of a margin of 0 to 3 spreads of the cash, the set that loses the fewest points plus `at_stake`
-    times the chance of failing being the result (a larger set only when it lowers that by GAIN_MIN). `found` unchanged when infeasible or when it sells nothing. With no close left
-    (`n_closes` 0) only the players with a standing offer are added."""
+class Closer:
+    """The Options of a Club, judged over `closes` closes (1 or more): sales `fixed` and then the cheapest fallback for what cash still
+    lacks. `outcome` gives an Option's expectations and worst case, memoised on the fallback's gap in steps of BUCKET."""
+
+    def __init__(self, club: Club, side: Side, ratios: Sequence[float], closes: int):
+        self.club, self.side, self.ratios, self.closes = club, side, ratios, closes
+        self.price = {k: ratios[len(ratios) // FALLBACK_LOW] * club.worth[k] for k in club.squad}
+        self.filled: dict[tuple[int, int], tuple[float, float, frozenset[str]] | None] = {}
+
+    def fill(self, fixed: frozenset[str], mask: int, gap: float) -> tuple[float, float, frozenset[str]] | None:
+        """The points lost and the money raised by the cheapest fallback that closes `gap` on top of `fixed` (`mask` its bitmask); None
+        when none does."""
+        return self.fill_bucket(fixed, mask, bucket_of(gap))
+
+    def fill_bucket(self, fixed: frozenset[str], mask: int, step: int) -> tuple[float, float, frozenset[str]] | None:
+        """fill for a gap given by its bucket (bucket_of); also the players it sells."""
+        key = (mask, step)
+        if key not in self.filled:
+            got = cover(self.side, fixed, self.club.squad - fixed, self.price, step * BUCKET)
+            self.filled[key] = None if got is None else (got[0], sum(self.price[k] for k in got[1]), got[1])
+        return self.filled[key]
+
+    def least(self, player: str, payoffs: Sequence[float], rho: float) -> float:
+        """The least offer to `player` whose payoff (ascending, one per ratio) reaches `rho`; infinite when none does."""
+        i = bisect.bisect_left(payoffs, rho - 1e-9)
+        return math.inf if i == len(payoffs) else self.ratios[i] * self.club.worth[player]
+
+    def money(self, now: frozenset[str], wait: frozenset[str]) -> tuple[list[Atom], tuple[Reserve, ...]]:
+        """The Atoms of the money the waiting players raise and their Reserves. Each is sold by worth.waiting_values over the points the
+        sale then saves (the payoff of an offer: minus the points lost with the cheapest fallback for what cash would still lack, the
+        others of the plan at their standing offer or their expected draw, cash above what is lacking worth nothing) with no cost of
+        waiting, the last close taking any offer."""
+        club = self.club
+        base = club.cash + club.inflow.expected + sum(club.offers[k] for k in now)
+        sells = now | wait
+        mask = self.side.mask(sells)
+        atoms = [Atom(1.0, 0.0)]
+        reserves = []
+        for k in sorted(wait):
+            rest = base + sum(hurdle.draw(club.worth[j]) for j in wait if j != k)
+            payoffs = []
+            for r in self.ratios:
+                filled = self.fill(sells, mask, -(rest + r * club.worth[k]))
+                payoffs.append(-UNFILLED if filled is None else -filled[0])
+            rho = worth.waiting_values(self.closes - 1, tuple(payoffs), 0.0, payoffs[0])
+            leasts = (*(self.least(k, payoffs, rho[self.closes - 1 - j]) for j in range(self.closes - 1)), 0.0)
+            reserves.append(Reserve(k, leasts))
+            atoms = together(atoms, sold_at(club.worth[k], self.ratios, leasts))
+        return atoms, tuple(reserves)
+
+    def outcome(self, now: frozenset[str], wait: frozenset[str]) -> Option | None:
+        """The Option that sells `now` and waits for `wait`: None when some outcome leaves no eleven or no fallback closes the gap."""
+        club = self.club
+        fixed = now | wait
+        atoms, reserves = self.money(now, wait)
+        base = club.cash + club.inflow.expected + sum(club.offers[k] for k in now)
+        mask = self.side.mask(fixed)
+        steps: dict[int, tuple[float, float]] = {}
+        for a in atoms:
+            gap = -(base + a.money)
+            at = bucket_of(gap)
+            p, m = steps.get(at, (0.0, 0.0))
+            steps[at] = (p + a.p, m + a.p * a.money)
+        points = cash = worst = p_worst = 0.0
+        for at, (p, m) in steps.items():
+            filled = self.fill_bucket(fixed, mask, at)
+            if filled is None:
+                return None
+            cost, raised, _ = filled
+            points += p * cost
+            cash += p * (base + raised) + m
+            if cost > worst + 1e-9:
+                worst, p_worst = cost, p
+            elif cost > worst - 1e-9:
+                p_worst += p
+        short = [(p, at) for at, (p, _) in steps.items() if at > 0]
+        gap = sum(p * at for p, at in short) / sum(p for p, _ in short) if short else 0.0
+        likely = self.fill_bucket(fixed, mask, max(1, round(gap))) if short else None
+        order = tuple(sorted(likely[2], key=lambda k: (per_unit(self.side.cost(fixed | {k}), self.price[k]), k))) if likely else ()
+        return Option(now, reserves, order, points, cash, worst, p_worst)
+
+
+def secure(club: Club, found: Plan, side: Side, offers: worth.OfferDistribution, n_closes: int) -> Plan:
+    """`found` with its `options` for covering the cash when it is below 0 at the lock and `n_closes` closes (1 or more) are left; `found`
+    itself when infeasible, when it sells nothing, or with no close left (then `now` is its sales). An option sells `now` at standing
+    offers and waits for the offers of others (the offers iid from `offers`, SPREAD of them, the normal of SALE_ESTIMATE and SALE_SD
+    when none were seen), each at the Reserve that closes the gap without a fallback, and sells the cheapest fallback among the squad
+    (every player of it is listed, an offer drawn at the last close, counted at its 1 / FALLBACK_LOW quantile) for any gap left. Searched over sets of KEPT players, the
+    cheapest per money, and the plan's own sales, that can raise the deficit, at most WAITERS waiting, by the points lost in expectation. The result is the best
+    option, then the plan taking its sales that have a standing offer now (waiting for the rest), if different; `sells`,
+    `now`, `cost` (the expected points) and `raised` are the best's, before its fallback. The best never loses more points in
+    expectation than the plan taking its sales with standing offers now and waiting for the rest."""
     if not found.feasible or not found.sells:
         return found
-    side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
-    at_stake = Side(club.squad, club.pos, rounds.cells, valuation.Window(rounds.now[:1])).points
+    if n_closes < 1:
+        return found._replace(now=found.sells)
+    judge = Closer(club, side, ratios_of(offers), n_closes)
     price = prices(club, False)
-    pool = (club.squad if n_closes > 0 else frozenset(club.offers) & club.squad) - found.sells
-
-    def judged(sells: frozenset[str], cost: float) -> tuple[float, float, Plan, float]:
-        now = best_now(club, sells, taking & sells)
-        cash = lock_cash(club, sells, now)
-        p = odds(cash)
-        made = Plan(True, sells, sum(club.offers[k] if k in now else hurdle.draw(club.worth[k]) for k in sells), cost, 0.0, p, now, at_stake)
-        return cost + (1.0 - p) * at_stake, cost, made, cash.sd
-
-    best = first = judged(found.sells, found.cost)
-    for z in MARGINS[1:]:
-        got = cover(side, found.sells, pool, price, z * first[3])
-        if got is not None and got[1]:
-            tried = judged(found.sells | got[1], got[0])
-            if tried[0] < best[0] - GAIN_MIN:
-                best = tried
-    return best[2]
+    ranked = sorted((k for k in club.squad if price[k] > 0), key=lambda k: (per_unit(side.cost(frozenset({k})), price[k]), k))
+    kept = sorted(set(ranked[:KEPT]) | found.sells)
+    need = -(club.cash + club.inflow.expected)
+    potential = {k: max(club.offers.get(k, 0.0), hurdle.draw(club.worth[k])) for k in kept}
+    own = frozenset(club.offers)
+    now_all = judge.outcome(found.sells & own, found.sells - own) if len(found.sells - own) <= WAITERS else None
+    best = now_all
+    queue: list[tuple[float, tuple[int, ...]]] = []
+    for i, k in enumerate(kept):
+        if (c := side.cost(frozenset({k}))) is not None:
+            heapq.heappush(queue, (c, (i,)))
+    while queue:
+        cost, members = heapq.heappop(queue)
+        if best is not None and cost >= best.points - 1e-9:
+            break
+        chosen = frozenset(kept[i] for i in members)
+        for i in range(members[-1] + 1, len(kept)):
+            if (c := side.cost(chosen | {kept[i]})) is not None:
+                heapq.heappush(queue, (c, (*members, i)))
+        if sum(potential[k] for k in chosen) < need - 1e-6:
+            continue
+        offered = sorted(chosen & own)
+        for m in range(min(len(offered), WAITERS - len(chosen - own)) + 1):
+            for held in combinations(offered, m):
+                tried = judge.outcome(frozenset(offered) - frozenset(held), (chosen - own) | frozenset(held))
+                if tried is not None and (best is None or tried.points < best.points - 1e-9):
+                    best = tried
+    if best is None:
+        return found
+    ways = tuple(dict.fromkeys(x for x in (best, now_all) if x is not None))
+    sells = best.now | frozenset(r.player for r in best.wait)
+    return found._replace(sells=sells, now=best.now, cost=best.points, raised=sum(club.offers[k] if k in best.now else hurdle.draw(club.worth[k]) for k in sells),
+                          options=ways)
 
 
 def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0,
@@ -533,47 +680,64 @@ def _selftest() -> None:
             assert later.sells == found.tonight | found.if_lost and abs(later.cost - found.cost_lost) < 1e-9
             assert later.cost <= (planned.cost if planned.feasible else later.cost) + 1e-9, "more closes to come never cost more points"
     rng = random.Random(31)
-    for _ in range(60):
+    seen_wait = seen_options = 0
+    for _ in range(40):
         town = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
         tcells = _cells(rng, town, (1, 2, 3), [0, 0, 1, 3, 5])
         tworth = {k: rng.choice([2e6, 4e6, 6e6]) for k in town}
         toffers = {k: tworth[k] * rng.choice([0.9, 1.0, 1.1]) for k in rng.sample(sorted(town), rng.randint(0, 6))}
         tcash = rng.choice([-12e6, -5e6, -1e6, 0.0, 2e6])
-        spread = rng.choice([0.0, 1e6])
-        tclub = Club(frozenset(town), town, tworth, toffers, tcash, 5e7, inflow=Inflow(spread, 0.0, "x", (1,) if spread else (), spread / 2))
+        tclub = Club(frozenset(town), town, tworth, toffers, tcash, 5e7)
         tflat = Rounds(tcells, valuation.Window((1, 2, 3)), valuation.Window((1, 2, 3)))
-        n = rng.choice([0, 3])
+        n = rng.choice([1, 3])
         tfound = plan(tclub, approach(tclub, None, 0.0, 1.0, tflat), tflat, n)
         assert tfound is not None
-        taking = frozenset(k for k in tfound.sells if k in toffers and rng.random() < 0.5)
-        secured = secure(tclub, tfound, tflat, taking, n)
-        if tcash + tclub.inflow.expected >= 0 or not tfound.feasible:
+        tside = Side(tclub.squad, town, tcells, tflat.arrives)
+        dist = rng.choice([NO_OFFERS, offer_ratio_distribution([0.85, 0.9, 0.95, 1.0, 1.0, 1.05, 1.1])])
+        secured = secure(tclub, tfound, tside, dist, n)
+        if tcash >= 0 or not tfound.feasible:
             assert secured == tfound, "no deficit, or no plan: nothing to secure"
             continue
-        assert secured.feasible and secured.sells >= tfound.sells and secured.now <= secured.sells & frozenset(toffers) and taking <= secured.now
-        assert 0.0 <= secured.p_ok <= 1.0 and abs(secured.p_ok - odds(lock_cash(tclub, secured.sells, secured.now))) < 1e-12
-        assert tclub.cash + secured.raised + tclub.inflow.expected >= -1e-6, "the plan's expected tcash at the lock is 0 or more"
-        assert secured.cost >= tfound.cost - 1e-9 and (n > 0 or secured.sells <= frozenset(toffers)), "no close left: only standing toffers are sold"
-        others = secured.sells - secured.now
-        for k in others:
-            low = floor(tclub, secured.sells, secured.now, k)
-            at = lock_cash(tclub, secured.sells - {k}, secured.now & (secured.sells - {k}))
-            assert low >= 0 and (low == 0 or abs(at.mean + low) < 1e-6), "at his floor tcash at the lock is 0"
-        alone = [odds(lock_cash(tclub, secured.sells, secured.now | frozenset(b))) for m in range(len(others) & 3 + 1)
-                 for b in combinations(sorted(frozenset(toffers) & others), m)]
-        assert all(secured.p_ok >= x - 1e-12 for x in alone), "no set of standing toffers taken now gives a better chance"
-    assert odds(Cash(1.0, 0.0)) == 1.0 and odds(Cash(-1.0, 0.0)) == 0.0 and abs(odds(Cash(0.0, 3.0)) - 0.5) < 1e-12
-    assert odds(Cash(2.0, 1.0)) > odds(Cash(1.0, 1.0)) > odds(Cash(1.0, 2.0)) > 0.5, "more tcash is surer, more spread is less sure"
-    town = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
-    tcells = {1: {k: 1.0 + 0.37 * i for i, k in enumerate(sorted(town))}}
-    tworth = {k: 4e6 for k in town}
-    tclub = Club(frozenset(town), town, tworth, {}, -3e6, 5e7)
-    tflat = Rounds(tcells, valuation.Window((1,)), valuation.Window((1,)))
+        if not secured.options:
+            continue
+        seen_options += 1
+        best = secured.options[0]
+        assert secured.now == best.now and secured.sells == best.now | {r.player for r in best.wait} and abs(secured.cost - best.points) < 1e-9
+        assert best.now <= frozenset(toffers) and not best.now & {r.player for r in best.wait}
+        assert best.cash >= -1e-6, "the expected cash at the lock is 0 or more"
+        assert best.worst >= best.points - 1e-9 and 0.0 < best.p_worst <= 1.0 + 1e-9
+        for r in best.wait:
+            assert len(r.least) == n and r.least[-1] == 0.0 and all(a >= b - 1e-9 for a, b in zip(r.least, r.least[1:])), \
+                "the reserve never rises as the lock nears, and the last close takes any offer"
+            seen_wait += 1
+        assert len(set(secured.options)) == len(secured.options)
+        judge = Closer(tclub, tside, ratios_of(dist), n)
+        everything = judge.outcome(tfound.sells & frozenset(toffers), tfound.sells - frozenset(toffers)) if len(tfound.sells - frozenset(toffers)) <= WAITERS else None
+        if everything is not None:
+            assert best.points <= everything.points + 1e-9, "the policy loses no more points in expectation than taking the plan's offers now"
+    assert seen_options >= 8 and seen_wait >= 3, (seen_options, seen_wait)
+    free = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+    fcells = {1: {k: (0.0 if i >= 13 else 3.0) for i, k in enumerate(sorted(free))}}
+    fclub = Club(frozenset(free), free, {k: 4e6 for k in free}, {"m13": 4.2e6}, -4e6, 5e7)
+    fflat = Rounds(fcells, valuation.Window((1,)), valuation.Window((1,)))
+    fside = Side(fclub.squad, free, fcells, fflat.arrives)
+    fjudge = Closer(fclub, fside, ratios_of(NO_OFFERS), 3)
+    taken, waited = fjudge.outcome(frozenset({"m13"}), frozenset()), fjudge.outcome(frozenset(), frozenset({"m13"}))
+    assert taken is not None and waited is not None and waited.points <= taken.points + 1e-9, "with a fallback that costs nothing, waiting is never worse than taking now"
+    assert waited.wait[0].least[0] >= waited.wait[0].least[-1], "a reserve for a player who is not needed is any offer"
+    drawn = sold_at(4e6, (0.9, 1.0, 1.1), (4.4e6, 0.0))
+    assert abs(sum(a.p for a in drawn) - 1.0) < 1e-12 and drawn[0] == Atom(1 / 3, 4.4e6) and sorted(a.money for a in drawn)[0] < 4.4e6, "the Atoms are a distribution"
+    assert all(a.money >= 4.4e6 for a in sold_at(4e6, (0.9, 1.0, 1.1), (4.4e6,))), "the only close left takes offers at or above its least"
+    own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+    cells = {1: {k: 1.0 + 0.37 * i for i, k in enumerate(sorted(own))}}
+    worth_of = {k: 4e6 for k in own}
+    tclub = Club(frozenset(own), own, worth_of, {}, -3e6, 5e7)
+    tflat = Rounds(cells, valuation.Window((1,)), valuation.Window((1,)))
     cheapest = plan(tclub, approach(tclub, None, 0.0, 1.0, tflat), tflat, 3)
     assert cheapest is not None
-    bench = secure(tclub, cheapest, tflat, frozenset(), 3)
-    assert bench.feasible and bench.cost < 1e-9 and len(bench.sells) == 1, "a player of the same money who costs no points is sold, not a starter"
-    broke = Club(frozenset(town), town, tworth, {}, -3e8, 5e7)
+    bench = secure(tclub, cheapest, Side(tclub.squad, own, cells, tflat.arrives), NO_OFFERS, 3)
+    assert bench.feasible and bench.cost < 1e-6 and len(bench.sells) == 1, "a player of the same money who costs no points is sold, not a starter"
+    broke = Club(frozenset(own), own, worth_of, {}, -3e8, 5e7)
     lacking = plan(broke, approach(broke, None, 0.0, 1.0, tflat), tflat, 3)
     assert lacking is not None and not lacking.feasible and cheapest.feasible, "a plan exists exactly when what can be sold covers the deficit"
     rng = random.Random(21)

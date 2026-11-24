@@ -4,7 +4,7 @@
 # (LFG_KEEP=1 keeps it). Prints rule_report's table and `seconds S peak_mb M`.
 # For re-checking a change over every past cutoff; the tracked repo is never touched.
 #
-#     tools/lfg-rules [rules|holds]
+#     tools/lfg-rules [rules|holds|cover]
 
 set -euo pipefail
 

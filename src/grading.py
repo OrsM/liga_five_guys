@@ -18,10 +18,11 @@ import hurdle
 import salegrade
 import valuation
 import worth
-from board import context, stamped, standing
+from approach import Club, Option, Plan, Rounds, Side, approach, cover, plan, secure
+from board import club_at, context, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
-from ffcore.clock import CLOSE, MADRID, run_now
+from ffcore.clock import CLOSE, MADRID, Clock, closes_between, run_now
 from ffcore import records as rec
 from ffcore.store import RunRecords
 from ffcore.parse import snapshot_stamp, stamp
@@ -798,6 +799,143 @@ def settled_look(looks: Sequence[auction.Look]) -> auction.Look | None:
     (None when nobody bought); None when there is no look, the auction is open or it was withdrawn."""
     closed = [x for x in looks if not x.is_open]
     return closed[-1] if closed and not closed[-1].withdrawn else None
+
+
+class CoverDay(NamedTuple):
+    """What the cover replay knows at one daily cut: the cut, my Club and Rounds (board.club_at), the Clock to the next lock and the
+    offers seen (offers_at)."""
+    cut: str
+    club: Club
+    rounds: Rounds
+    clock: Clock
+    offers: worth.OfferDistribution
+
+
+def cover_day(loaded: loader.Loaded, world: state.World) -> CoverDay | None:
+    """The CoverDay of the world; None for a Stale cut."""
+    decided = decision.decision_at(loaded, world)
+    if isinstance(decided, decision.Stale):
+        return None
+    club, rounds = club_at(decided.inputs, decided.extras)
+    return CoverDay(world.cut, club, rounds, decision.clock_of(decided.inputs, decided.cut), offers_at(world))
+
+
+class Realised(NamedTuple):
+    """What a policy did over the offers that followed: `points` the points its sales lose, `cash` cash at the lock after them,
+    `unseen` the offers a close lacked, counted at the expected draw."""
+    points: float
+    cash: float
+    unseen: int
+
+    @property
+    def held(self) -> bool:
+        """Whether cash at the lock is 0 or more."""
+        return self.cash >= -1e-6
+
+
+class CoverGrade(NamedTuple):
+    """The grade of the cover at one cut with cash below 0 and a close left: the deficit, the expected points of the recommended option
+    and of the plan taking its offers now (`now`), what each did over the realised offers."""
+    cut: str
+    deficit: float
+    expected: float
+    cover: Realised
+    now: Realised
+
+
+def closing_offers(day: CoverDay, later: Mapping[dt.date, CoverDay]) -> list[Mapping[str, float]]:
+    """The standing offers at each close before the day's lock, the first the day's own (its cut is before that close), the others those of
+    the later daily cuts of the same Madrid days; an empty Mapping where no cut was kept."""
+    now, lock = snapshot_stamp(day.cut), snapshot_stamp(day.clock.lock) if day.clock.lock else None
+    if now is None or lock is None:
+        return []
+    out: list[Mapping[str, float]] = []
+    for close in closes_between(now, lock):
+        seen = later.get(close.astimezone(MADRID).date())
+        out.append(day.club.offers if close.astimezone(MADRID).date() == now.astimezone(MADRID).date() else seen.club.offers if seen else {})
+    return out
+
+
+def follow(day: CoverDay, side: Side, option: Option, offers: Sequence[Mapping[str, float]]) -> Realised:
+    """The Realised of `option` over the offers at each close (closing_offers): the players of `now` sold at the standing offers, each
+    waiting player at the first close whose offer is at or above his reserve there (any at the last; at the last close a missing offer is
+    his expected draw), then for cash still below 0 the cheapest fallback (approach.cover) at the last close's offers (a missing one
+    at the draw that approach counts)."""
+    club = day.club
+    money = sum(club.offers[k] for k in option.now)
+    unseen = 0
+    offers = list(offers) or [{}]
+    for r in option.wait:
+        for j, seen in enumerate(offers):
+            offer = seen.get(r.player)
+            if offer is None and j == len(offers) - 1:
+                offer, unseen = hurdle.draw(club.worth[r.player]), unseen + 1
+            if offer is not None and offer >= r.least[j] - 1e-9:
+                money += offer
+                break
+    fixed = option.now | frozenset(r.player for r in option.wait)
+    cash = club.cash + club.inflow.expected + money
+    final = offers[-1]
+    price = {k: final.get(k, hurdle.draw(club.worth[k])) for k in club.squad}
+    covered = cover(side, fixed, club.squad - fixed, price, -cash if cash < 0 else 0.0)
+    if covered is None:
+        return Realised(math.inf, cash, unseen)
+    return Realised(covered[0], cash + sum(price[k] for k in covered[1]), unseen)
+
+
+def follow_plan(day: CoverDay, side: Side, found: Plan, offers: Sequence[Mapping[str, float]]) -> Realised:
+    """The Realised of the plan taking its sales at their standing offers now and the rest at the first close with an offer (the last
+    close's expected draw when none): no fallback, so cash at the lock may stay below 0."""
+    club = day.club
+    money, unseen = 0.0, 0
+    for k in found.sells:
+        if k in club.offers:
+            money += club.offers[k]
+            continue
+        later = [seen[k] for seen in offers[1:] if k in seen]
+        money += later[0] if later else hurdle.draw(club.worth[k])
+        unseen += not later
+    cost = side.cost(found.sells)
+    return Realised(math.inf if cost is None else cost, club.cash + club.inflow.expected + money, unseen)
+
+
+def cover_grades(days: Sequence[CoverDay]) -> list[CoverGrade]:
+    """The CoverGrade of each daily cut (ascending) with cash below 0, a close left, and a plan with options (secure): the recommended
+    option and the plan taking its offers now, each followed over the offers that came (follow, follow_plan)."""
+    later = {day_of(d.cut): d for d in days}
+    out = []
+    for d in days:
+        if d.club.cash >= 0 or d.clock.n_closes < 1:
+            continue
+        side = Side(d.club.squad, d.club.pos, d.rounds.cells, d.rounds.arrives)
+        base = plan(d.club, approach(d.club, None, 0.0, 1.0, d.rounds), d.rounds, d.clock.n_closes, side)
+        if base is None or not base.feasible:
+            continue
+        secured = secure(d.club, base, side, d.offers, d.clock.n_closes)
+        if not secured.options:
+            continue
+        seen = closing_offers(d, later)
+        out.append(CoverGrade(d.cut, -d.club.cash, secured.options[0].points, follow(d, side, secured.options[0], seen), follow_plan(d, side, base, seen)))
+    return out
+
+
+def cover_report(grades: Sequence[CoverGrade]) -> str:
+    """One line per graded cut and the totals: points lost and how often cash at the lock held, the cover against the plan taking its offers
+    now, over the realised offers."""
+    rows = ["%s  deficit %5.1fM  expected %5.1f  cover %5.1f pts cash %+6.1fM %s  now %5.1f pts cash %+6.1fM %s" % (
+        g.cut, g.deficit / 1e6, g.expected, g.cover.points, g.cover.cash / 1e6, "held" if g.cover.held else "SHORT",
+        g.now.points, g.now.cash / 1e6, "held" if g.now.held else "SHORT") for g in grades]
+    n = len(grades)
+    rows.append("cuts %d  cover: %.1f pts, held %d  now: %.1f pts, held %d" % (
+        n, sum(g.cover.points for g in grades if g.cover.points < math.inf), sum(g.cover.held for g in grades),
+        sum(g.now.points for g in grades if g.now.points < math.inf), sum(g.now.held for g in grades)))
+    return "\n".join(rows)
+
+
+def cover_replay(loaded: loader.Loaded, cuts: Sequence[str], since: str = SALES_FROM) -> str:
+    """The cover_report over every daily cut from since (replayed_days): the grade of the cover advice, re-runnable every week."""
+    got = replayed_days(loaded, cuts, since, lambda w: cover_day(loaded, w))
+    return cover_report(cover_grades([got.days[c] for c in sorted(got.days)]))
 
 
 class HoldDay(NamedTuple):
@@ -1895,8 +2033,40 @@ def _selftest_holds() -> None:
     assert abs(hold_stats(held, open_panel, sorted(open_panel), season).gain - sum(gain_of(p) for p in held.positions)) < 1e-6
 
 
+def _selftest_cover_grades() -> None:
+    """The cover over realised offers: a waiting player sold at the first close that meets his reserve (any offer at the last), the
+    fallback closing what is still short, cash at the lock 0 or more whenever a fallback closes it; the plan taking its offers now never
+    loses fewer points than the cover on rich offers and may leave cash short on poor ones."""
+    own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+    cells = {1: {k: 1.0 + 0.37 * i for i, k in enumerate(sorted(own))}}
+    values = {k: 4e6 + 1e6 * (i % 3) for i, k in enumerate(sorted(own))}
+    window = valuation.Window((1,))
+    big = sorted(own)[-1]
+    club = Club(frozenset(own), own, values, {big: 0.9 * values[big]}, -0.9 * values[big] - 1e6, 5e7)
+    day = CoverDay("2026-11-24T0901Z", club, Rounds(cells, window, window), Clock(3, "2026-11-27T2000Z", "2026-11-26T2124Z"), worth.NO_OFFERS)
+    side = Side(club.squad, own, cells, window)
+    found = plan(club, approach(club, None, 0.0, 1.0, day.rounds), day.rounds, 3, side)
+    assert found is not None and found.feasible
+    got = secure(club, found, side, worth.NO_OFFERS, 3)
+    assert got.options
+    best = got.options[0]
+    for ratio in (0.7, 0.9, 1.0, 1.2):
+        offers = [{k: ratio * v for k, v in values.items()} for _ in range(3)]
+        done = follow(day, side, best, offers)
+        sold = side.cost(best.now | {r.player for r in best.wait})
+        assert sold is not None and done.held and done.points >= sold - 1e-9 and done.unseen == 0
+        assert follow_plan(day, side, found, offers).points >= 0.0
+    rich = [{k: 1.5 * v for k, v in values.items()} for _ in range(3)]
+    sold = side.cost(best.now | {r.player for r in best.wait})
+    assert sold is not None and follow(day, side, best, rich).points <= sold + 1e-9, "offers above every reserve: no fallback"
+    assert follow(day, side, best, []).unseen == len(best.wait), "no offer seen: the expected draws"
+    assert cover_grades([day._replace(club=club._replace(cash=1e6))]) == [], "cash 0 or more: nothing to grade"
+    assert len(cover_grades([day])) == 1 and "cuts 1" in cover_report(cover_grades([day]))
+
+
 def _selftest() -> None:
     _selftest_holds()
+    _selftest_cover_grades()
     _selftest_replayed_cuts()
     _selftest_rule_scores()
     _selftest_measure_log()
@@ -1962,10 +2132,14 @@ if __name__ == "__main__":
         loaded, cuts = read_storage()
         print(hold_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None]), flush=True)
         os._exit(0)
+    if sys.argv[1:2] == ["cover"]:
+        loaded, cuts = read_storage()
+        print(cover_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None]), flush=True)
+        os._exit(0)
     if sys.argv[1:2] == ["rules"]:
         got = rule_scores(worth.CHALLENGERS)
         print(rule_report(got.scores), flush=True)
         print(paired_report(got.graded), flush=True)
         os._exit(0)
-    print("grading.py --selftest | accuracy | price | opportunities | rules | holds")
+    print("grading.py --selftest | accuracy | price | opportunities | rules | holds | cover")
     raise SystemExit(2)
