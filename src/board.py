@@ -339,18 +339,29 @@ def millions(x: float) -> str:
     return "%.1f million" % (x / 1e6)
 
 
-def stance_why(at: Stance, cap: float | None, rate_yield: float | None, curve: Curve | None, asking: float, net: float | None = None) -> str | None:
+def over_walk_away(amount: float | None, cap: float | None) -> bool:
+    """Whether a bid is above the walk-away price (False with no bid or no price)."""
+    return amount is not None and cap is not None and amount > cap
+
+
+def net_words(net: float | None, label: str | None) -> str:
+    """The net of a bid in words: the expected points against the plan with no buy, the chance of winning counted, or its
+    label (cannot be funded, gain only) when it has none."""
+    return " Counting its chance of winning it nets %+.1f points against the plan with no buy." % net if net is not None else " Its net is not known (%s)." % label
+
+
+def stance_why(at: Stance, cap: float | None, rate_yield: float | None, curve: Curve | None, asking: float, net: float | None = None,
+               label: str | None = None) -> str | None:
     """The words for a bid placed, with the numbers: the amount and its chance, the walk-away price and the yield, then
     the move (hold, lower to an amount, raise to an amount or withdraw) with the expected surplus (chance x (walk-away
-    price - amount)) behind it; a bid above the walk-away price, with a `net` (points against the plan with no buy), ends
-    with that net said; None for a listing with no bid placed."""
+    price - amount)) behind it; a bid above the walk-away price ends with its `net` (or `label`) said; None for a listing with no bid placed."""
     if at.amount is None or at.move in ("bid", "pass", "unknown"):
         return None
     away = "no walk-away price" if cap is None else "a walk-away price of " + millions(cap)
     yld = "" if rate_yield is None else " and a yield of %.3f points per million per jornada" % rate_yield
     base = "Your bid of %s has %s" % (millions(at.amount), "an unknown chance" if at.win is None else "a %.0f%% chance" % (100 * at.win))
     base += ", against %s%s. " % (away, yld)
-    tail = " Won, it nets %+.1f points against the plan with no buy." % net if net is not None and cap is not None and at.amount > cap else ""
+    tail = net_words(net, label) if over_walk_away(at.amount, cap) else ""
     if cap is None or curve is None or at.win is None:
         return base + ("Lower it: it is above the walk-away price." if at.move == "lower" else "Keep it: no chance is known for this auction.") + tail
     surplus = at.win * (cap - at.amount)
@@ -409,7 +420,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         out.append({
             "name": name, "pos": r["pos"], "what": "buy", "label": "buy " + name, "step": "placed" if placed is not None else "bid",
             "price": r["asking"], "asking": r["asking"], "amount": amount, "win": win, "advised": at.advised, "advised_win": at.advised_win,
-            "move": at.move, "to": at.to, "why": stance_why(at, read[k]["walk_away"], read[k]["yield"], curves.get(k), r["asking"], net), "plan": False, "done": placed is not None,
+            "move": at.move, "to": at.to, "why": stance_why(at, read[k]["walk_away"], read[k]["yield"], curves.get(k), r["asking"], net, label), "plan": False, "done": placed is not None,
             "key": k, "gain": r["gain"], "net": net, "net_label": label, "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
             "replaces": names.get(r["replaces"], r["replaces"]), "per_million": r["per_million"], **read[k],
             "price_next": r["price_next"], "price_lock": r["price_lock"],
@@ -1110,7 +1121,7 @@ def _selftest_placed() -> None:
     names = {k: k for k in squad | market}
     ratios = (0.9, 1.0, 1.02, 1.05, 1.1, 1.2, 1.3, 1.5)
     moves: set[str] = set()
-    overs = 0
+    overs = nolabel = 0
     for _ in range(40):
         keys = sorted(market)
         curves = [decision.CurvePoint(k, r, min(1.0, rng.choice([0.0, 0.1, 0.3]) + (r - 1.0) * rng.choice([0.5, 2.0, 5.0]))) for k in keys for r in ratios]
@@ -1135,13 +1146,16 @@ def _selftest_placed() -> None:
             assert (b["amount"], b["move"], b["to"], b["walk_away"]) == (mine[b["key"]], want.move, want.to, cap)
             assert b["win"] == chance(curve_of[b["key"]], mine[b["key"]] / 10e6) and b["why"] and b["yield"] is None
             assert not any(w in b["why"].lower() for w in ("take", "sell it")), "no verdict word the page forbids"
-            assert (b["net"] is not None and b["amount"] > b["walk_away"]) == ("against the plan with no buy" in b["why"]), "a bid over the walk-away says its net, when it has one"
-            overs += b["net"] is not None and b["amount"] > b["walk_away"]
+            over = over_walk_away(b["amount"], b["walk_away"])
+            assert over == (("%+.1f" % b["net"] in b["why"]) if b["net"] is not None else ("(%s)" % b["net_label"] in b["why"])), "a bid over the walk-away says its net or why it has none"
+            overs += over and b["net"] is not None
+            nolabel += over and b["net"] is None
             moves.add(b["move"])
         assert all(b["why"] is None for b in shown[len(mine):]), "no words for a bid not placed"
         assert considered + len(shown) - len(mine) <= len(market) - len(mine), "the count has no bid placed in it"
     assert moves >= {"hold", "lower", "withdraw"}, moves
     assert overs > 0, "the net of a bid over the walk-away was exercised"
+    assert nolabel > 0, "a bid over the walk-away with no net was exercised"
 
 
 def _selftest_cover() -> None:
