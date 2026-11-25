@@ -12,19 +12,16 @@
   "feasible": true,
   "gain": 0.0,
   "held": [
-   "Arnau Ortiz",
    "Natan",
    "Georges Mikautadze",
    "Gerard Martin",
    "Miguel Roman",
-   "Roger Hinojo",
    "Mathew Ryan",
    "Pablo Fornals",
    "Pepelu",
    "Marcos Alonso",
    "Adria Pedrosa",
    "Robin Le Normand",
-   "Iñigo Vicente",
    "Fernando Niño",
    "German Valera",
    "Guido Rodriguez",
@@ -269,7 +266,7 @@
    ],
    "step": "plan",
    "what": "cover",
-   "why": "Cash -49.5M; lock Fri 20 Nov 21:00. 1) Accept Iñigo Vicente's offer of 22.80M before 22:24 tonight. 2) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 3) Accept Arnau Ortiz's offer of 0.64M before 22:24 tonight. 4) Wait for the offers of Dani Martinez. Each day from 9 to 20 Nov, accept his new offer if it is 0.00M or more; on 20 Nov, before 21:00, accept whatever it is. 5) If cash is still below 0 after that, sell Ferran Jutgla (13.57M), then the next cheapest player. Expected: 14.1 points lost. Worst case 14.1 points, chance 100.0%.",
+   "why": "Cash -49.5M; lock Fri 20 Nov 21:00. 1) Accept Iñigo Vicente's offer of 22.80M before 22:24 tonight. 2) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 3) Accept Arnau Ortiz's offer of 0.64M before 22:24 tonight. 4) Wait for the offers of Dani Martinez. On 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 Nov accept his new offer if it is 0.00M or more; on 20 Nov, before 21:00, accept whatever it is. 5) If cash is still below 0 after that, sell Ferran Jutgla (offer 13.57M), then, if still short, the cheapest other player. Expected: 14.1 points lost. Worst case 14.1 points, chance 100.0%.",
    "worst": {
     "p": 1.0000000000000004,
     "points": 14.121198033019482
@@ -317,11 +314,6 @@
      "count"
     ],
     [
-     "sale price",
-     8232857.324358484,
-     "money"
-    ],
-    [
      "points, lock",
      -0.7693931315254829,
      "points"
@@ -358,7 +350,6 @@
    "rent": 26.67760875,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 8232857.324358484,
    "reserves": [
     {
      "least": 23052378.18374209,
@@ -427,7 +418,7 @@
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Iñigo Vicente, expecting 1052450 at the lock, losing 14.1 points in expectation; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49.5M; sells Arnau Ortiz now, Roger Hinojo now, Iñigo Vicente now, Dani Martinez later; expects +1.05M at the lock; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
@@ -472,11 +463,6 @@
      "count"
     ],
     [
-     "sale price",
-     1516029.106876829,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -513,7 +499,6 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 1516029.106876829,
    "reserves": [
     {
      "least": 1516029.106876829,
@@ -582,7 +567,7 @@
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Iñigo Vicente, expecting 1052450 at the lock, losing 14.1 points in expectation; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49.5M; sells Arnau Ortiz now, Roger Hinojo now, Iñigo Vicente now, Dani Martinez later; expects +1.05M at the lock; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
@@ -627,11 +612,6 @@
      "count"
     ],
     [
-     "sale price",
-     661716.5025955649,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -668,7 +648,6 @@
    "rent": 0.7536543299999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 661716.5025955649,
    "reserves": [
     {
      "least": 661716.5025955649,
@@ -737,7 +716,7 @@
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49472707 is below 0: the cheapest plan sells Arnau Ortiz, Dani Martinez, Roger Hinojo, Iñigo Vicente, expecting 1052450 at the lock, losing 14.1 points in expectation; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49.5M; sells Arnau Ortiz now, Roger Hinojo now, Iñigo Vicente now, Dani Martinez later; expects +1.05M at the lock; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
@@ -760,7 +739,7 @@
    "step": "wait",
    "until": "2026-11-20T20:00Z",
    "what": "wait",
-   "why": "cash -49472707 is below 0 and the lock is 12 closes away: sell Dani Martinez to the offers still to come, each at its reserve or more, whatever it is at the lock; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand"
+   "why": "cash -49.5M; Dani Martinez waits for the offers still to come (12 closes), each at its reserve or more, whatever it is at the lock; if the eleven scores under 238 points the lock cash stays below 0; there is time to fix by hand"
   }
  ],
  "generated_at": "2026-11-08T12:07Z",
@@ -853,11 +832,6 @@
      "count"
     ],
     [
-     "sale price",
-     661716.5025955649,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -893,7 +867,6 @@
    "rent": 0.7536543299999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 661716.5025955649,
    "reserves": [
     {
      "least": 644149.0,
@@ -955,11 +928,6 @@
      "count"
     ],
     [
-     "sale price",
-     1516029.106876829,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -995,7 +963,6 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 1516029.106876829,
    "reserves": [
     {
      "least": 1576701.0,
@@ -1057,11 +1024,6 @@
      "count"
     ],
     [
-     "sale price",
-     8232857.324358484,
-     "money"
-    ],
-    [
      "points, lock",
      -0.7693931315254829,
      "points"
@@ -1097,7 +1059,6 @@
    "rent": 26.67760875,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 8232857.324358484,
    "reserves": [
     {
      "least": 22801375.0,
@@ -1159,11 +1120,6 @@
      "count"
     ],
     [
-     "sale price",
-     22226064.886170004,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -1199,7 +1155,6 @@
    "rent": 55.21069359,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 22226064.886170004,
    "reserves": [
     {
      "least": 45578374.44787107,
@@ -1309,11 +1264,6 @@
      "count"
     ],
     [
-     "sale price",
-     2459520.403276189,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -1349,7 +1299,6 @@
    "rent": 6.245145269999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 2459520.403276189,
    "reserves": [
     {
      "least": 5604033.760676484,
@@ -1459,11 +1408,6 @@
      "count"
     ],
     [
-     "sale price",
-     22822733.628691193,
-     "money"
-    ],
-    [
      "points, lock",
      -2.0251324513698776,
      "points"
@@ -1499,7 +1443,6 @@
    "rent": 53.86197258,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 22822733.628691193,
    "reserves": [
     {
      "least": 47325553.34981512,
@@ -1609,11 +1552,6 @@
      "count"
     ],
     [
-     "sale price",
-     22961294.85500763,
-     "money"
-    ],
-    [
      "points, lock",
      -0.900003188958415,
      "points"
@@ -1649,7 +1587,6 @@
    "rent": 46.811083409999995,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 22961294.85500763,
    "reserves": [
     {
      "least": 44920422.389159985,
@@ -1759,11 +1696,6 @@
      "count"
     ],
     [
-     "sale price",
-     7696944.734248194,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -1799,7 +1731,6 @@
    "rent": 10.70036253,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 7696944.734248194,
    "reserves": [
     {
      "least": 8644508.626371246,
@@ -1909,11 +1840,6 @@
      "count"
     ],
     [
-     "sale price",
-     2587779.544025454,
-     "money"
-    ],
-    [
      "points, lock",
      -0.3788409456838906,
      "points"
@@ -1949,7 +1875,6 @@
    "rent": 3.45617415,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 2587779.544025454,
    "reserves": [
     {
      "least": 3197317.97486366,
@@ -2059,11 +1984,6 @@
      "count"
     ],
     [
-     "sale price",
-     32482756.96604346,
-     "money"
-    ],
-    [
      "points, lock",
      -0.02587325995741452,
      "points"
@@ -2099,7 +2019,6 @@
    "rent": 43.111848779999995,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 32482756.96604346,
    "reserves": [
     {
      "least": 36527018.04325403,
@@ -2209,11 +2128,6 @@
      "count"
     ],
     [
-     "sale price",
-     50612210.61060228,
-     "money"
-    ],
-    [
      "points, lock",
      -2.9558587848953763,
      "points"
@@ -2249,7 +2163,6 @@
    "rent": 57.99891825,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 50612210.61060228,
    "reserves": [
     {
      "least": 50550038.56525188,
@@ -2359,11 +2272,6 @@
      "count"
     ],
     [
-     "sale price",
-     23804872.669531286,
-     "money"
-    ],
-    [
      "points, lock",
      -2.1705803250185696,
      "points"
@@ -2399,7 +2307,6 @@
    "rent": 24.908140529999997,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 23804872.669531286,
    "reserves": [
     {
      "least": 19863110.726006858,
@@ -2509,11 +2416,6 @@
      "count"
     ],
     [
-     "sale price",
-     21808453.072603088,
-     "money"
-    ],
-    [
      "points, lock",
      -0.012976736738458783,
      "points"
@@ -2549,7 +2451,6 @@
    "rent": 22.092656039999998,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 21808453.072603088,
    "reserves": [
     {
      "least": 20192788.511698235,
@@ -2659,11 +2560,6 @@
      "count"
     ],
     [
-     "sale price",
-     52649159.6957473,
-     "money"
-    ],
-    [
      "points, lock",
      -3.2064426778817676,
      "points"
@@ -2699,7 +2595,6 @@
    "rent": 52.09701938999999,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 52649159.6957473,
    "reserves": [
     {
      "least": 48030867.766243,
@@ -2809,11 +2704,6 @@
      "count"
     ],
     [
-     "sale price",
-     29198539.142944254,
-     "money"
-    ],
-    [
      "points, lock",
      0.0,
      "points"
@@ -2849,7 +2739,6 @@
    "rent": 29.58215013,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 29198539.142944254,
    "reserves": [
     {
      "least": 23107960.930816043,
@@ -2959,11 +2848,6 @@
      "count"
     ],
     [
-     "sale price",
-     14841018.708178563,
-     "money"
-    ],
-    [
      "points, lock",
      -0.49278167433939757,
      "points"
@@ -2999,7 +2883,6 @@
    "rent": 12.65232501,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 14841018.708178563,
    "reserves": [
     {
      "least": 12077432.185110012,
@@ -3109,11 +2992,6 @@
      "count"
     ],
     [
-     "sale price",
-     83698493.84345719,
-     "money"
-    ],
-    [
      "points, lock",
      -6.523988901787966,
      "points"
@@ -3149,7 +3027,6 @@
    "rent": 21.36537117,
    "replacement": null,
    "replacement_why_not": null,
-   "reserve": 83698493.84345719,
    "reserves": [
     {
      "least": 18188846.305546436,

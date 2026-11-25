@@ -666,7 +666,7 @@ def act_rows(club: Club, plan: Plan, sells: Sequence[Doc], names: dict[str, str]
             r["reserves"] = t["reserves"] if t["kind"] == "wait" else reserves_doc(untils[:1], [t["least"]])
             r["action"] = {"kind": t["kind"], "until": t["until"],
                            "why": "in the cover of the cash at the lock: accept the offer of %s before the close" % price_text(t["least"]) if t["kind"] == "accept"
-                           else waiting_why(best.wait[[w.player for w in best.wait].index(r["key"])].least, clock_closes)}
+                           else waiting_why(next(w.least for w in (best.wait if best else ()) if w.player == r["key"]), clock_closes)}
         elif r["verdict"] == "sell":
             r["action"] = {"kind": "accept", "until": untils[0] if untils else None, "why": "loses no points; his sale is not needed for cash"}
         elif best is not None and r["key"] in best.fallback:
