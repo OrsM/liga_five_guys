@@ -943,10 +943,12 @@ def cover_replay(loaded: loader.Loaded, cuts: Sequence[str], since: str = SALES_
 
 
 class HoldDay(NamedTuple):
-    """What the hold replay knows at one daily cut: the cut, each player's newest market value above 0 and my squad."""
+    """What the hold replay knows at one daily cut: the cut, each player's newest market value above 0, my squad and the bids the
+    decision advised at the cut on the listings it would hold (by player; none for the grid's replay)."""
     cut: str
     values: Mapping[str, float]
     squad: frozenset[str]
+    advised: Mapping[str, float] = {}
 
 
 Panel = Mapping[dt.date, HoldDay]
@@ -964,10 +966,11 @@ class Listing(NamedTuple):
 
 class HoldPolicy(NamedTuple):
     """Buy a listing whose price has moved by at least `momentum` over MOMENTUM_DAYS (None: whatever it did) and whose value is
-    at most `value`, bidding ask x (1 + premium); sell when the MOMENTUM_DAYS change is 0 or less, after `hold` days at most."""
+    at most `value`, bidding ask x (1 + premium) (premium None: the bid the decision advised that day, HoldDay.advised); sell
+    when the MOMENTUM_DAYS change is 0 or less, after `hold` days at most."""
     momentum: float | None
     value: float
-    premium: float
+    premium: float | None
     hold: int
 
 
@@ -1041,14 +1044,16 @@ def hold_listings(replay: Replay[HoldDay], panel: Panel) -> list[Listing]:
 
 
 def hold_bid(policy: HoldPolicy, listing: Listing, panel: Panel) -> float | None:
-    """The bid of the policy on the listing, ask x (1 + premium), or None when the player's value at the listing's day is
-    missing or above policy.value or his momentum is under policy.momentum. Reads no day after the listing's."""
+    """The bid of the policy on the listing, ask x (1 + premium) (the day's advised bid with no premium), or None when the player's
+    value at the listing's day is missing or above policy.value or his momentum is under policy.momentum. Reads no day after the
+    listing's."""
     day = panel.get(listing.day)
     value = None if day is None else day.values.get(listing.player)
     moved = change(panel, listing.player, listing.day)
     if value is None or value > policy.value or policy.momentum is not None and (moved is None or moved < policy.momentum):
         return None
-    return listing.ask * (1 + policy.premium)
+    assert day is not None
+    return day.advised.get(listing.player) if policy.premium is None else listing.ask * (1 + policy.premium)
 
 
 def bid_wins(bid: float, listing: Listing) -> bool:
@@ -1274,12 +1279,64 @@ def hold_report(replay: Replay[HoldDay], season: Season, since: dt.date) -> str:
         s = hold_stats(got, panel, days, season)
         control = policy._replace(momentum=None)
         lines.append("%4.0f%% %5s %4.0f%% %3d %5d %4d %4.0f%% %8.1f%% %8.2f%% %6.1f %6.1f %4.0f%% %5d %3d %6.1f %6.1f %6.1f %6.1f %7.1f | %9.1f %8.1f%s" % (
-            100 * (policy.momentum or 0), "all" if math.isinf(policy.value) else "%dM" % (policy.value / 1e6), 100 * policy.premium,
+            100 * (policy.momentum or 0), "all" if math.isinf(policy.value) else "%dM" % (policy.value / 1e6), 100 * (policy.premium or 0),
             policy.hold, s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day,
             s.gain / 1e6 / weeks, s.capital / 1e6, 100 * s.hit, s.loss_weeks, s.players, s.first_half / 1e6, s.second_half / 1e6,
             s.gain / 1e6, s.points / 1e6, s.above_mean / 1e6, week(policy, None, 0.5), week(control),
             "".join("  %7.1f" % week(policy, rule) for rule in HOLD_SCENARIOS.values())))
     return "\n".join(lines)
+
+
+def decided_day(loaded: loader.Loaded, world: state.World, cash: float, history: Sequence[loader.Opportunity]) -> HoldDay | None:
+    """The HoldDay of the world with the bids its decision advises on the holds it funds (opportunity_rows with profit, at the
+    exchange rate of the cut), the cash `cash` and no bid placed; None for a Stale cut."""
+    decided = decision.decision_at(loaded, world)
+    if isinstance(decided, decision.Stale):
+        return None
+    inp = decided.inputs._replace(money=decided.inputs.money._replace(cash=cash), bids=())
+    _, cells = decision.cells_of(inp)
+    rows = decision.opportunity_rows(inp, hurdle.lam(history, world.cut, max(cells, default=0)))
+    return hold_day(loaded, world)._replace(advised={r["player"]: r["bid"] for r in rows if r["profit"] > 0 and r["bid"] is not None})
+
+
+DECIDED = HoldPolicy(None, math.inf, None, 28)
+
+
+def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash: float) -> str:
+    """The hold replay of the decision's own bids (HoldDay.advised: the holds it funds with cash `cash` at each daily cut) on the
+    real winning prices, exit and constraints as the grid's (DECIDED, HOLD_SCENARIOS): a line of the HoldStats as hold_report
+    prints them and the M per week at half the appreciation and under each constraint."""
+    panel = hold_panel(replay)
+    days = sorted(d for d in panel if d >= since)
+    listings = [x for x in hold_listings(replay, panel) if x.day >= since]
+    locks = sorted(season.locks.values())
+    weeks = max(1, len(days)) / 7
+    advised = sum(1 for x in listings if hold_bid(DECIDED, x, panel) is not None)
+
+    def week(rule: Constraint | None = None, edge: float = 1.0) -> float:
+        return hold_stats(holds_of(DECIDED, listings, panel, locks, rule), panel, days, season, edge).gain / 1e6 / weeks
+    s = hold_stats(holds_of(DECIDED, listings, panel, locks), panel, days, season)
+    return "\n".join([
+        "decided holds: %d days from %s, cash %.0fM at each cut, %d listings, %d with an advised bid; M per week = gain / %.1f weeks" % (
+            len(days), since, cash / 1e6, len(listings), advised, weeks),
+        "  bids won win%  ret/trade ret/capday  M/wk  cap M  hit% lossw ind  half1  half2  price  pts+  pts>mean |  half-edge" + "".join("  %7s" % k for k in HOLD_SCENARIOS),
+        "%6d %4d %4.0f%% %8.1f%% %8.2f%% %6.1f %6.1f %4.0f%% %5d %3d %6.1f %6.1f %6.1f %6.1f %7.1f | %9.1f%s" % (
+            s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day, s.gain / 1e6 / weeks, s.capital / 1e6,
+            100 * s.hit, s.loss_weeks, s.players, s.first_half / 1e6, s.second_half / 1e6, s.gain / 1e6, s.points / 1e6, s.above_mean / 1e6,
+            week(None, 0.5), "".join("  %7.1f" % week(rule) for rule in HOLD_SCENARIOS.values()))])
+
+
+def decided_replay(loaded: loader.Loaded, cuts: Sequence[str], cash: float = 30e6) -> str:
+    """The decided_report over the last REPLAY_DAYS days of cuts: the decision of each daily cut run as a live run does (the exchange
+    rate of its cut), its holds funded by `cash`."""
+    last = snapshot_stamp(max(cuts))
+    assert last is not None
+    first = last - dt.timedelta(days=REPLAY_DAYS)
+    lead = stamp(first - dt.timedelta(days=MOMENTUM_DAYS + 1))
+    history = loader.daily_opportunities(hurdle.SINCE, max(cuts, default=hurdle.SINCE))
+    replay = replayed_days(loaded, cuts, lead, lambda world: decided_day(loaded, world, cash, history))
+    now = state.sweep(loaded.obs, [max(cuts)], lambda world: season_at(loaded, world), SEASON_FOLDS)[0]
+    return decided_report(replay, now, first.astimezone(MADRID).date(), cash)
 
 
 def hold_replay(loaded: loader.Loaded, cuts: Sequence[str]) -> str:
@@ -2035,6 +2092,16 @@ def _selftest_holds() -> None:
     assert len(held.positions) == held.bids and held.positions and all(not p.closed for p in held.positions)
     assert all(abs(gain_of(p) - (p.value_out - p.bid)) < 1e-9 and p.day_out == days[11] for p in held.positions)
     assert abs(hold_stats(held, open_panel, sorted(open_panel), season).gain - sum(gain_of(p) for p in held.positions)) < 1e-6
+    advice = {d: v._replace(advised={x.player: x.ask * (1 + rng.uniform(0.0, 0.4)) for x in listings if rng.random() < 0.5}) for d, v in panel.items()}
+    for listing in listings:
+        said = advice[listing.day].advised.get(listing.player)
+        assert hold_bid(DECIDED, listing, advice) == said, "the advised bid of the listing's day, none when none was advised"
+        later = {d: v._replace(advised={}) if d > listing.day else v for d, v in advice.items()}
+        assert hold_bid(DECIDED, listing, later) == said, "no day after the listing's is read"
+    bought = holds_of(DECIDED, listings, advice)
+    assert bought.bids == sum(hold_bid(DECIDED, x, advice) is not None for x in listings)
+    assert all(p.bid == advice[p.listing.day].advised[p.listing.player] and bid_wins(p.bid, p.listing) for p in bought.positions), "each position is a won advised bid, paid at its amount"
+    assert holds_of(DECIDED, listings, panel).bids == 0, "a day with no advised bid buys nothing"
 
 
 def _selftest_cover_grades() -> None:
@@ -2140,6 +2207,10 @@ if __name__ == "__main__":
         loaded, cuts = read_storage()
         print(hold_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None]), flush=True)
         os._exit(0)
+    if sys.argv[1:2] == ["decided"]:
+        loaded, cuts = read_storage()
+        print(decided_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None]), flush=True)
+        os._exit(0)
     if sys.argv[1:2] == ["cover"]:
         loaded, cuts = read_storage()
         print(cover_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None]), flush=True)
@@ -2149,5 +2220,5 @@ if __name__ == "__main__":
         print(rule_report(got.scores), flush=True)
         print(paired_report(got.graded), flush=True)
         os._exit(0)
-    print("grading.py --selftest | accuracy | price | opportunities | rules | holds | cover")
+    print("grading.py --selftest | accuracy | price | opportunities | rules | holds | decided | cover")
     raise SystemExit(2)

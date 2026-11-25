@@ -526,7 +526,7 @@ class Points(NamedTuple):
 
 
 def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0,
-             sides: dict[tuple[frozenset[str], tuple[int, ...]], Side] | None = None) -> Approach | None:
+             sides: dict[tuple[frozenset[str], tuple[int, ...]], Side] | None = None, extra: float = 0.0) -> Approach | None:
     """How to fund a bid on `player` (see Approach): the sales tonight, those after the result, their cost in points and the
     net. Costs are over `rounds`: a sale made tonight is gone from the squad in every jornada of `rounds.now`, the player
     bought plays only in `rounds.arrives`, and the sales after the result count only there. `base` is the cost of the
@@ -546,7 +546,7 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
     before = side(club.squad, rounds.before)
     if not lost_side.fields:
         return None
-    gain = won_side.points - lost_side.points
+    gain = won_side.points - lost_side.points + extra
     pend_n, pend_amount = club.pending
     price = prices(club, player is not None)
     offered = sorted((k for k in club.squad if k in club.offers),

@@ -28,6 +28,10 @@ FALLBACK_LAMBDA = 0.045
 K = 0.85
 WIN_FLOOR = 0.25
 TREND_CAP = 0.03
+HOLD_NIGHTS = 14
+HOLD_BOUND = 0.5
+HOLD_EDGE = 0.5
+HOLD_VALUE = 30e6
 
 
 def remaining(first: int, last: int) -> int:
@@ -123,13 +127,22 @@ def stand(curve: Curve, asking: float, placed: float, cap: float) -> Stand:
 
 class Exit(NamedTuple):
     """What a player fetches when sold later, read from the price forecast: his value, the horizon in nights of its
-    furthest row (1 with none), the rise at that horizon, a fraction of value (0 with none), and the reserve, in euros:
-    the value of waiting for the best offer of the closes left (worth.stopped; 0 until it is set). One horizon and one
-    rise: a night's rise is rise / nights."""
+    furthest row (1 with none), the rise at that horizon, a fraction of value (0 with none), the reserve, in euros: the
+    value of waiting for the best offer of the closes left (worth.stopped; 0 until it is set), and the hold, the rise
+    credited to holding him (0 when none is: see held_rise). One horizon and one rise for a sale: a night's rise is rise /
+    nights; a hold has its own, over HOLD_NIGHTS."""
     value: float
     nights: int = 1
     rise: float = 0.0
     reserve: float = 0.0
+    hold: float = 0.0
+
+
+def held_rise(value: float, fitted: float) -> float:
+    """The rise credited to holding a player of this value whose price fold fits `fitted` (a fraction) over HOLD_NIGHTS: HOLD_EDGE
+    of the fitted rise within 0 and HOLD_BOUND (the fit is calibrated up to that), 0 above HOLD_VALUE (nothing measured there).
+    Nondecreasing in the fitted rise, never negative, never above HOLD_EDGE x HOLD_BOUND."""
+    return 0.0 if value > HOLD_VALUE else HOLD_EDGE * max(0.0, min(HOLD_BOUND, fitted))
 
 
 def draw(value: float) -> float:
@@ -140,6 +153,17 @@ def draw(value: float) -> float:
 def later(exit: Exit) -> float:
     """The expected sale price of the exit after its horizon: draw(value) x (1 + rise)."""
     return draw(exit.value) * (1 + exit.rise)
+
+
+def held(exit: Exit) -> float:
+    """What holding the exit's player is expected to fetch, in euros: draw(value) x (1 + hold). Nondecreasing in the hold."""
+    return draw(exit.value) * (1 + exit.hold)
+
+
+def in_points(money: float, n: int, rate: float) -> float:
+    """The points a sum of money is worth over n jornadas at rate: money x n x rate in millions (W = P / (n x rate) read the
+    other way). Linear in money, zero at zero."""
+    return money / 1e6 * n * rate
 
 
 def wait_cost(exit: Exit) -> float:
@@ -169,6 +193,19 @@ class Stake(NamedTuple):
 def stake(points: float, n: int, rate: float, exit: Exit, k: int = 0) -> Stake:
     """The Stake of a move of P points over n jornadas at rate, of a player with this exit, held across k jornadas."""
     return Stake(points, rate, n, proceeds(exit), exit.rise * exit.value, k)
+
+
+def hold_stake(points: float, n: int, rate: float, exit: Exit, k: int) -> Stake:
+    """The Stake of a buy to hold, whose player fetches held(exit) after the hold: as stake, with that for the proceeds, the
+    drift 0 (a buy reads no sale reserve) and k the jornadas the hold crosses a lock (at most n). Its cap is never under the cap
+    of stake(points, n, rate, exit, n), the points alone."""
+    return Stake(points, rate, n, held(exit), 0.0, min(k, n))
+
+
+def profit(stake: Stake, amount: float) -> float:
+    """The points the proceeds of a hold earn over a bid of amount, in_points of their difference at the stake's rate over its n:
+    0 for a stake whose capital is tied the whole window (k = n: the points alone), never negative, nonincreasing in amount."""
+    return 0.0 if stake.k >= stake.n else in_points(max(0.0, stake.proceeds - amount), stake.n, stake.rate)
 
 
 def cap(stake: Stake) -> float:
@@ -278,6 +315,30 @@ def _selftest_stake() -> None:
     assert cap(stake(0.0, 5, 0.045, Exit(1e6), 0)) == draw(1e6), "free capital and nothing else: his draw"
 
 
+def _selftest_hold() -> None:
+    rng = random.Random(77)
+    for _ in range(3000):
+        value, n, rate = rng.uniform(1e5, 5e7), rng.choice([1, 2, 13, 26]), rng.choice([0.02, 0.045, 0.1])
+        fitted = rng.uniform(-0.5, 1.5)
+        h = held_rise(value, fitted)
+        assert 0.0 <= h <= HOLD_EDGE * HOLD_BOUND and (value > HOLD_VALUE or fitted <= 0) <= (h == 0.0), "never negative, never above the bound; none for a fall or a dear player"
+        assert held_rise(value, fitted + 0.1) >= h and held_rise(value, HOLD_BOUND + 1.0) == held_rise(value, HOLD_BOUND), "nondecreasing, flat above the bound"
+        e = Exit(value, rng.choice([1, 7]), rng.uniform(-TREND_CAP, TREND_CAP), rng.choice([0.0, value]), h)
+        assert abs(held(e) - draw(value) * (1 + h)) < 1e-6 and held(e._replace(hold=h + 0.1)) >= held(e) and held(e) >= draw(value)
+        points = rng.choice([0.0, rng.uniform(0, 3) * n * rate * value / 1e6])
+        k = rng.randint(0, 2 * n)
+        s = hold_stake(points, n, rate, e, k)
+        tied = stake(points, n, rate, e, n)
+        assert cap(s) >= cap(tied) - 1e-6, "a hold never lowers the cap of the points alone"
+        assert cap(hold_stake(points, n, rate, e, k + 1)) <= cap(s) + 1e-6 and cap(hold_stake(points, n, 2 * rate, e, k)) <= cap(s) + 1e-6, "nonincreasing in k and in the rate"
+        assert cap(hold_stake(2 * points, n, rate, Exit(2 * value, e.nights, e.rise, 2 * e.reserve, h), k)) - 2 * cap(s) < 1e-3, "scale-invariant"
+        amount = rng.uniform(0.5, 1.5) * value
+        assert profit(s, amount) >= 0 and profit(s, amount * 1.1) <= profit(s, amount) and profit(tied, amount) == 0.0, "never negative, falls with the bid, none when capital is tied"
+        assert abs(profit(s, 0.0) * 1e6 / (n * rate) - s.proceeds) < 1e-6 * max(1.0, s.proceeds) or s.k >= s.n
+        assert abs(in_points(2 * amount, n, rate) - 2 * in_points(amount, n, rate)) < 1e-9 and in_points(0.0, n, rate) == 0.0
+    assert cap(hold_stake(0.0, 25, 0.045, Exit(1e6, hold=0.1), 1)) == (1 - 1 / 25) * held(Exit(1e6, hold=0.1)), "no points: the hold's proceeds less the share of the window the capital was tied"
+
+
 def _selftest_sale() -> None:
     rng = random.Random(5)
     for _ in range(2000):
@@ -348,6 +409,7 @@ def _selftest() -> None:
     _selftest_buy()
     _selftest_stake()
     _selftest_sale()
+    _selftest_hold()
     _selftest_exit()
     print("hurdle self-test OK")
 

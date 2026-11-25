@@ -581,11 +581,17 @@ def _julian(day: str) -> float:
     return date.fromisoformat(day).toordinal() + 1721424.5
 
 
-def price_forecast(s: PriceState, next_lock: float | None) -> list[Expected]:
-    """Each player's expected value night by night from the cut's day to the next lock (a Julian day, None when
-    unknown), at most the longest horizon: h updates on, value, expected value and spread."""
+def price_nights(s: PriceState, next_lock: float | None) -> int:
+    """The nights from the cut's day to the next lock (a Julian day, None when unknown), within 1 and the longest horizon."""
     top = price_hmax(s)
-    nights = max(1, min(top, top if next_lock is None else math.ceil(next_lock - _julian(s.day))))
+    return max(1, min(top, top if next_lock is None else math.ceil(next_lock - _julian(s.day))))
+
+
+def price_forecast(s: PriceState, next_lock: float | None, floor: int = 1) -> list[Expected]:
+    """Each player's expected value night by night from the cut's day to the next lock (a Julian day, None when
+    unknown) or to `floor` nights when that is further, at most the longest horizon: h updates on, value, expected value
+    and spread."""
+    nights = max(price_nights(s, next_lock), min(price_hmax(s), floor))
     fits = [f for f in momentum(s) if f.h <= nights]
     out = []
     for c in _live_changes(s):
@@ -853,6 +859,11 @@ def _selftest() -> None:
     assert max(e.h for e in ahead) <= max(slope_of) and all(e.spread is not None and e.spread >= 0 for e in ahead), \
         "forecast_follows_slope: nights up to the horizon, each with a spread for a player worth the focus"
     assert all(e.spread is None for e in price_forecast(mixed, None)), "forecast_follows_slope: no spread under the focus"
+    soon = _julian(focused.day) + 1.5
+    near, held = price_forecast(focused, soon), price_forecast(focused, soon, 100)
+    assert price_nights(focused, soon) == min(2, price_hmax(focused)) and max(e.h for e in near) == price_nights(focused, soon), "forecast_stops_at_the_lock"
+    assert [e for e in held if e.h <= price_nights(focused, soon)] == near and max(e.h for e in held) == price_hmax(focused), \
+        "forecast_floor_reaches_past_the_lock: the rows to the lock are the same, then to the floor or the longest horizon"
 
     cuts_ = ["2026-%s-%02dT1200Z" % (("09", n) if n <= 30 else ("10", n - 30)) for n in range(2, 41)]
     swept = st.sweep(obs, cuts_, lambda w_: (price_hmax(price_state(w_)), price_state(w_).level,

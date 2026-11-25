@@ -385,7 +385,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     bids = {b.player: b.amount for b in inp.bids}
     sides: dict[tuple[frozenset[str], tuple[int, ...]], Side] = {}
     read = {r["player"]: priced(r) for r in got
-            if r["status"] == "market" and r["asking"] is not None and (r["gain"] > 0 or r["placed"] is not None)}
+            if r["status"] == "market" and r["asking"] is not None and (r["gain"] + r["profit"] > 0 or r["placed"] is not None)}
     stood = {k: stance(r, curves.get(k), read[k]["walk_away"]) for r in got if (k := r["player"]) in read}
     passed = sum(1 for at in stood.values() if at.move == "pass")
     out = []
@@ -397,7 +397,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         auction = seen.get(k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]))
-        found = approach(club._replace(pending=others), k, amount, win, rounds, cost0, sides) \
+        found = approach(club._replace(pending=others), k, amount, win, rounds, cost0, sides, hurdle.profit(r["stake"], amount) if amount else 0.0) \
             if i < EVALUATED_BUYS and amount is not None and win is not None else None
         funding = None if found is None or amount is None else funding_doc(club, names, found, amount)
         net = found.net if found is not None and found.feasible else None
@@ -413,7 +413,9 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
             "facts": [["asking", r["asking"], "money"], ["walk-away price", read[k]["walk_away"], "money"], ["bid", amount, "money"],
                       ["chance to win", win, "chance"]]
             + ([["advised bid", at.advised, "money"], ["chance at the advised bid", at.advised_win, "chance"]] if placed is not None else [])
-            + [["points added", r["gain"], "points"]],
+            + [["points added", r["gain"], "points"]]
+            + ([["price expected after the hold", r["stake"].proceeds, "money"], ["points the hold earns", hurdle.profit(r["stake"], amount), "points"]]
+               if r["stake"].k < r["stake"].n and amount else []),
             "bids": auction.bids if auction else None,
             "auction": {"yours": bool(auction.mine), "listings": auction.n, "thin": bool(auction.thin), "cell": auction.cell}
             if auction else {"yours": False, "listings": 0, "thin": True, "cell": ""},
@@ -1027,7 +1029,7 @@ def _selftest_replacements() -> None:
     names = {k: k for k in squad | market}
     pos, cells = decision.cells_of(inp)
     got: list[dict[str, Any]] = [{"player": k, "pos": p, "status": "market", "asking": 1e6, "bid": 1.2e6, "win": 0.5 + 0.1 * (i % 4), "close_at": None,
-           "stake": hurdle.stake(5.0, 26, 0.045, hurdle.Exit(1e6), 26)}
+           "stake": hurdle.stake(5.0, 26, 0.045, hurdle.Exit(1e6), 26), "profit": 0.0}
            for i, (k, p) in enumerate(sorted(market.items()))]
     offers = {k: 5e6 + 1e5 * i for i, k in enumerate(sorted(squad))}
     for cash, why in ((50e6, None), (-50e6, "no_cash")):
@@ -1115,7 +1117,7 @@ def _selftest_placed() -> None:
         rate = rng.choice([0.045, 0.1, 0.3])
         got: list[dict[str, Any]] = [{"player": k, "pos": market[k], "status": "market", "asking": 10e6, "bid": None, "win": None, "close_at": None, "replaces": "POR0",
                 "gain": rng.choice([0.0, 0.5, 3.0, 20.0, 60.0]), "per_million": None, "from_j": 1, "price_next": None, "price_lock": None,
-                "placed": mine.get(k)} for k in keys]
+                "placed": mine.get(k), "profit": 0.0} for k in keys]
         for r in got:
             r["stake"] = hurdle.stake(r["gain"], hurdle.remaining(1, max(cells)), rate, hurdle.Exit(r["asking"]), 1)
         shown, considered = buy_lines(inp, names, club, got, 0.0)
@@ -1328,7 +1330,7 @@ def _selftest() -> None:
     def row(placed: float | None) -> dict[str, Any]:
         return {"player": "p", "pos": "MED", "status": "market", "gain": 1.0, "asking": asking, "bid": advised,
                 "win": chance(curve, advised / asking), "placed": placed, "replaces": "x", "per_million": None,
-                "price_next": None, "price_lock": None, "from_j": 1, "stake": hurdle.stake(1.0, 26, 0.045, hurdle.Exit(asking), 26)}
+                "price_next": None, "price_lock": None, "from_j": 1, "stake": hurdle.stake(1.0, 26, 0.045, hurdle.Exit(asking), 26), "profit": 0.0}
     cap = 12.5e6
     for placed in (None, 10e6, 10.5e6, 11e6, 12e6, 13e6):
         blind = stance({**row(placed), "bid": None, "win": None}, None, cap)

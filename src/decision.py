@@ -15,7 +15,7 @@ Named rules, each tested:
 from __future__ import annotations
 
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence
 
 import eleven
@@ -32,10 +32,10 @@ from ffcore.price_fold import Expected
 from ffcore.records import AuctionBrier, AuctionCalibration
 from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve
-from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE
+from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, cash_at_lock
 import hurdle
 import valuation
-from inflow import Credit, credit_at
+from inflow import Credit, credit_at, inflow_of
 from valuation import Window, window_at
 
 __all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "arrival", "window_value", "curves_of", "clock_of", "opportunity_rows",
@@ -124,7 +124,8 @@ class Price(NamedTuple):
 class Inputs(NamedTuple):
     """The league at t as the decision reads it: your money, a sequence of named rows a dec_* table, the cells
     (player, jornada, e), every player who is not yours with his status (market, rival, unlisted), and each player's
-    price forecast, and the bonus credits that land before the next lock (inflow.Credit)."""
+    price forecast (rows up to the longer of the next lock and hurdle.HOLD_NIGHTS; `nights` the nights to that lock, None: every
+    row is a sale's), and the bonus credits that land before the next lock (inflow.Credit)."""
     money: Money
     players: Sequence[Player] = ()
     curves: Sequence[CurvePoint] = ()
@@ -137,6 +138,7 @@ class Inputs(NamedTuple):
     universe: Sequence[Candidate] = ()
     prices: Sequence[Price] = ()
     credits: Sequence[Credit] = ()
+    nights: int | None = None
 
 
 def julian_stamp(t: float) -> str:
@@ -256,8 +258,9 @@ def inputs_at(world: state.World, identity: Identity, league: League, seen: Seen
         bids=bids_of(seen), closes=closes_of(season_facts.listing_close(world, identity)),
         locks=locks, lineup=slots_of(current.app_lineup(world, identity)),
         cells=cells, universe=universe_of(seen, fc.clubs, league),
-        prices=prices_of(price_fold.price_forecast(price_fold.price_state(world), season_facts.next_lock(world).t)),
-        credits=credits_of(world, league, fc, frozenset(m.player for m in my_squad(seen, league)), locks))
+        prices=prices_of(price_fold.price_forecast(price_fold.price_state(world), season_facts.next_lock(world).t, hurdle.HOLD_NIGHTS)),
+        credits=credits_of(world, league, fc, frozenset(m.player for m in my_squad(seen, league)), locks),
+        nights=price_fold.price_nights(price_fold.price_state(world), season_facts.next_lock(world).t))
 
 
 def squad_of(inp: Inputs) -> frozenset[str]:
@@ -334,14 +337,72 @@ def rises_of(inp: Inputs) -> dict[str, dict[int, float]]:
     return out
 
 
+def sale_rises(inp: Inputs, steps: Mapping[int, float]) -> dict[int, float]:
+    """The rows of steps (one player's rise by horizon, rises_of) a sale reads: those up to the nights to the next lock (every
+    one when the inputs have none)."""
+    return {h: r for h, r in steps.items() if inp.nights is None or h <= inp.nights}
+
+
 def exit_of(inp: Inputs, player: str, value: float) -> hurdle.Exit:
-    """The hurdle.Exit of a player of this value: the forecast's furthest horizon in nights and its rise there held within
-    +-hurdle.TREND_CAP (a flat Exit of one night with no forecast). The only reader of the price forecast."""
+    """The hurdle.Exit of a player of this value: the sale's furthest horizon in nights (sale_rises) and its rise there held
+    within +-hurdle.TREND_CAP (a flat Exit of one night with no forecast), and the hold, hurdle.held_rise of the rise at
+    the furthest horizon within hurdle.HOLD_NIGHTS. The only reader of the price forecast."""
     steps = rises_of(inp).get(player, {})
-    if not steps:
-        return hurdle.Exit(value)
-    far = max(steps)
-    return hurdle.Exit(value, far, max(-hurdle.TREND_CAP, min(hurdle.TREND_CAP, steps[far])))
+    sale = sale_rises(inp, steps)
+    near = [h for h in steps if h <= hurdle.HOLD_NIGHTS]
+    hold = hurdle.held_rise(value, steps[max(near)]) if near else 0.0
+    if not sale:
+        return hurdle.Exit(value, hold=hold)
+    far = max(sale)
+    return hurdle.Exit(value, far, max(-hurdle.TREND_CAP, min(hurdle.TREND_CAP, sale[far])), hold=hold)
+
+
+def held_locks(inp: Inputs, at: str | None) -> int:
+    """The locks a hold bought at `at` (a stamp of the inputs, None: the cut) crosses: those after it and within
+    hurdle.HOLD_NIGHTS nights of it."""
+    start = snapshot_stamp(at or cut())
+    assert start is not None
+    end = start + timedelta(days=hurdle.HOLD_NIGHTS)
+    return sum(1 for x in inp.locks if (when := snapshot_stamp(x.lock)) is not None and start < when <= end)
+
+
+class Funds(NamedTuple):
+    """What a day's holds draw on: the cash that is left at the lock (rules.cash_at_lock of the bids placed and the expected
+    credit) and the squad slots left (the squad maximum less the squad and the bids pending)."""
+    cash: float
+    slots: int
+
+
+def funds_of(inp: Inputs) -> Funds:
+    """The Funds of the inputs: the cash at the lock after every bid placed is won, and the free slots, none counting
+    below 0."""
+    mine = squad_of(inp)
+    pos, cells = cells_of(inp)
+    credit = inflow_of(inp.credits, mine, pos, cells).expected
+    return Funds(cash_at_lock(inp.money.cash, 0.0, sum(b.amount for b in inp.bids), 0.0, credit),
+                 max(0, inp.money.squad_max - len(mine) - len(inp.bids)))
+
+
+class Hold(NamedTuple):
+    """A listing that may be bought to hold: its hurdle.hold_stake, the bid hurdle.bid makes under it and the money that bid is
+    expected to earn (the chance of winning x (the price expected after the hold - the bid))."""
+    stake: hurdle.Stake
+    bid: hurdle.Bid
+    expected: float
+
+
+def held_bids(funds: Funds, wanted: Mapping[str, tuple[float, float, bool]]) -> frozenset[str]:
+    """The players whose hold is funded: of `wanted` (player: the expected profit, the bid, whether it is already placed), best
+    profit first (then player), each that leaves cash at the lock 0 or more and a slot (a bid already placed took one and its
+    amount), cash and slots taken as they go."""
+    taken: set[str] = set()
+    cash, slots = funds
+    for k, (profit, amount, placed) in sorted(wanted.items(), key=lambda kv: (-kv[1][0], kv[0])):
+        claim = 0.0 if placed else amount
+        if cash_at_lock(cash, 0.0, claim, 0.0) >= 0 and (placed or slots > 0):
+            taken.add(k)
+            cash, slots = cash - claim, slots - (not placed)
+    return frozenset(taken)
 
 
 def clock_of(inp: Inputs, at: str | None = None) -> Clock:
@@ -352,10 +413,12 @@ def clock_of(inp: Inputs, at: str | None = None) -> Clock:
 
 
 def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[dict[str, Any]]:
-    """Each player of the universe who would play in the eleven of his window (Buyer.gain the points he adds, most first),
-    with his yield per million over the season (per_million), his hurdle.Stake over his window at rate (`stake`: a buy is
-    for his points alone, capital tied the whole window) and, for a listing with an auction curve, the bid hurdle.bid
-    makes on it (bid and win None when there is none)."""
+    """Each player of the universe who would play in the eleven of his window (Buyer.gain the points he adds), with his yield
+    per million over the season (per_million), his hurdle.Stake over his window at rate (`stake`) and, for a listing with an
+    auction curve, the bid hurdle.bid makes on it (bid and win None when there is none). A buy is for his points alone, capital
+    tied the whole window, unless the listing is a hold the cash funds (held_bids: his price forecast credits a rise, cash at the
+    lock and a squad slot are left): then his Stake is hurdle.hold_stake and `profit` the points his expected proceeds less the bid
+    are worth (0 for any other row). Most points plus profit first."""
     pos, cells = cells_of(inp)
     last = max(cells, default=0)
     mine = squad_of(inp)
@@ -367,6 +430,7 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
     fielded = lineup_of(inp, pos).eleven
     seen: dict[Window, tuple[dict[str, float], eleven.Settled | None, valuation.Buyer]] = {}
     out = []
+    holds: dict[str, Hold] = {}
     for c in inp.universe:
         k, status, asking, value = c.player, c.status, c.asking, c.value
         if k not in pos or not any(k in at for at in cells.values()):
@@ -386,12 +450,18 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
             continue
         gain = buyer.gain(k)
         price = asking if asking is not None else value
-        steps = ahead.get(k, {})
+        steps = sale_rises(inp, ahead.get(k, {}))
         bid: float | None = None
         win: float | None = None
         n = hurdle.remaining(where.lock[0], last)
         stake = hurdle.stake(gain, n, rate, hurdle.Exit(value or 0.0), n)
         if status == "market" and asking is not None and k in curves:
+            exit = exit_of(inp, k, value or 0.0)
+            if exit.hold > 0:
+                held = hurdle.hold_stake(gain, n, rate, exit, held_locks(inp, close))
+                free = hurdle.bid(curves[k], asking, held)
+                if free is not None:
+                    holds[k] = Hold(held, free, free.win * (held.proceeds - free.amount))
             made = hurdle.bid(curves[k], asking, stake)
             bid, win = (made.amount, made.win) if made is not None else (None, None)
         out.append({
@@ -399,8 +469,14 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
             "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
             "price_next": steps[1] if 1 in steps else None,
             "price_lock": steps[max(steps)] if steps else None,
-            "bid": bid, "win": win, "placed": placed.get(k), "stake": stake})
-    return sorted(out, key=lambda o: (-o["gain"], o["player"]))
+            "bid": bid, "win": win, "placed": placed.get(k), "stake": stake, "profit": 0.0})
+    funded = held_bids(funds_of(inp), {k: (h.expected, h.bid.amount, k in placed) for k, h in holds.items()})
+    for r in out:
+        if r["player"] in funded:
+            hold = holds[r["player"]]
+            r["stake"], r["bid"], r["win"] = hold.stake, hold.bid.amount, hold.bid.win
+            r["profit"] = hurdle.profit(hold.stake, hold.bid.amount)
+    return sorted(out, key=lambda o: (-(o["gain"] + o["profit"]), o["player"]))
 
 
 # What the board shows beside the decision: facts about players, the offers on your players, who is listed, how the
@@ -580,6 +656,72 @@ def _selftest_opportunities() -> None:
     assert [r["player"] for r in opportunity_rows(inp)][0] == "star", "most points first"
     short = inp._replace(players=[p for p in inp.players if p.player != "k"])
     assert opportunity_rows(short) == [], "no eleven: no opportunities"
+
+
+def _holds_inputs(cash: float, risers: Mapping[str, float], squad_max: int = SQUAD_MAX, rise: float = 0.02, placed: Mapping[str, float] | None = None) -> Inputs:
+    squad = {"k": "POR", "d1": "DEF", "d2": "DEF", "d3": "DEF", "m1": "MED", "m2": "MED", "m3": "MED", "m4": "MED", "f1": "DEL", "f2": "DEL", "f3": "DEL"}
+    jornadas = range(1, 27)
+    rows = [Candidate(k, "MED", "market", a, a) for k, a in risers.items()]
+    return Inputs(
+        Money(cash, 1e8, DEBT_SHARE, squad_max, XI_SIZE),
+        players=[Player(k, p, 1, None) for k, p in squad.items()] + [Player(k, "MED", 0, a) for k, a in risers.items()],
+        universe=rows,
+        curves=[CurvePoint(k, r, p) for k in risers for r, p in ((1.0, 0.4), (1.05, 0.8), (1.1, 1.0), (1.2, 1.0))],
+        bids=[Bid(k, a) for k, a in (placed or {}).items()],
+        cells=[Cell(k, j, 4.0) for k in squad for j in jornadas] + [Cell(k, j, 1.0) for k in risers for j in jornadas],
+        locks=[Lock(j, "2026-11-%02dT20:00Z" % (6 + 7 * (j - 1))) for j in jornadas if j < 4],
+        closes=[Close(k, "2026-11-06T21:24Z") for k in risers],
+        prices=[Price(k, h, a * (1 + rise * h), a) for k, a in risers.items() for h in range(1, hurdle.HOLD_NIGHTS + 1)], nights=2)
+
+
+def _selftest_holds() -> None:
+    risers = {"r1": 1e6, "r2": 2e6, "r3": 3e6}
+    got = {r["player"]: r for r in opportunity_rows(_holds_inputs(1e7, risers))}
+    for k, r in got.items():
+        e = exit_of(_holds_inputs(1e7, risers), k, risers[k])
+        assert r["gain"] == 0.0 and r["bid"] is not None and r["profit"] > 0 and r["asking"] <= r["bid"] <= hurdle.cap(r["stake"]) <= hurdle.held(e), \
+            "a riser the cash funds is bought to hold: a bid on no points, under the price he is expected to fetch"
+        assert r["stake"].k < r["stake"].n and r["profit"] == hurdle.profit(r["stake"], r["bid"])
+    ranked = [r["player"] for r in opportunity_rows(_holds_inputs(1e7, risers))]
+    assert ranked == sorted(risers, key=lambda k: (-got[k]["profit"], k)), "most points plus profit first"
+    for cash in (-1e6, 0.0):
+        broke = opportunity_rows(_holds_inputs(cash, risers))
+        assert all(r["bid"] is None and r["profit"] == 0.0 and r["stake"].k == r["stake"].n for r in broke), "no cash at the lock: capital is tied, no bid on no points"
+    for cash in (0.0, 2e6, 4e6, 6.5e6, 1e7):
+        spent = [r for r in opportunity_rows(_holds_inputs(cash, risers)) if r["profit"] > 0]
+        assert sum(r["bid"] for r in spent) <= cash + 1e-6, "the holds together leave cash at the lock 0 or more"
+    for room in (0, 1, 2, 3):
+        taken = [r for r in opportunity_rows(_holds_inputs(1e8, risers, 11 + room)) if r["profit"] > 0]
+        assert len(taken) == min(room, len(risers)), "a hold needs a free slot, and the slots are shared"
+    pending = opportunity_rows(_holds_inputs(1e7, risers, 12, placed={"r1": 1.1e6}))
+    assert sum(r["profit"] > 0 for r in pending) == 1, "a bid placed holds its slot: the one slot left is taken by a hold, not by two"
+    flat = opportunity_rows(_holds_inputs(1e7, risers, rise=0.0)) + opportunity_rows(_holds_inputs(1e7, risers, rise=-0.02))
+    assert all(r["bid"] is None and r["profit"] == 0.0 for r in flat), "no rise, no hold"
+    weak = opportunity_rows(_holds_inputs(1e7, risers, rise=0.004))
+    assert all(r["profit"] == 0.0 for r in weak), "a rise the premium and the haircut eat is not bought"
+    rich = opportunity_rows(_holds_inputs(1e7, {"big": 4e7}))
+    assert all(r["profit"] == 0.0 for r in rich), "a value above HOLD_VALUE has no measured rise"
+    rng = random.Random(8)
+    for _ in range(400):
+        wanted = {"p%d" % i: (rng.uniform(0, 5), rng.uniform(1, 9), rng.random() < 0.3) for i in range(rng.randint(0, 6))}
+        funds = Funds(rng.uniform(-3, 20), rng.randint(0, 4))
+        funded = held_bids(funds, wanted)
+        assert sum(wanted[k][1] for k in funded if not wanted[k][2]) <= max(0.0, funds.cash) + 1e-9, "the holds taken fit the cash"
+        assert sum(not wanted[k][2] for k in funded) <= funds.slots
+        assert held_bids(funds, {k: (2 * v[0], v[1], v[2]) for k, v in wanted.items()}) == funded, "only the order of profits counts"
+
+
+def _selftest_exit_reads() -> None:
+    rows = [Price("p", h, 100.0 * (1 + 0.03 * h), 100.0) for h in range(1, hurdle.HOLD_NIGHTS + 3)]
+    base = Inputs(Money(0.0, 0.0, 0.0, 0, 0), prices=rows)
+    wide = exit_of(base, "p", 100.0)
+    assert wide.nights == hurdle.HOLD_NIGHTS + 2 and wide.rise == hurdle.TREND_CAP and abs(wide.hold - hurdle.HOLD_EDGE * 0.03 * hurdle.HOLD_NIGHTS) < 1e-12, "no nights: every row is the sale's; the hold reads HOLD_NIGHTS"
+    near = exit_of(base._replace(nights=2), "p", 100.0)
+    assert near.nights == 2 and near.rise == hurdle.TREND_CAP and near.hold == wide.hold, "the sale stops at the lock, the hold does not"
+    assert sale_rises(base._replace(nights=2), rises_of(base)["p"]).keys() == {1, 2}
+    short = exit_of(Inputs(Money(0.0, 0.0, 0.0, 0, 0), prices=rows[:3]), "p", 100.0)
+    assert abs(short.hold - hurdle.HOLD_EDGE * 0.09) < 1e-12, "with fewer nights than HOLD_NIGHTS: the furthest row"
+    assert exit_of(base, "q", 100.0) == hurdle.Exit(100.0) and exit_of(base, "p", 5e7).hold == 0.0 and exit_of(base, "p", 5e7).rise == hurdle.TREND_CAP
 
 
 def _selftest_gain_is_value() -> None:
@@ -829,6 +971,8 @@ def _selftest() -> None:
     _selftest_credits()
     _selftest_inputs_at()
     _selftest_opportunities()
+    _selftest_holds()
+    _selftest_exit_reads()
     _selftest_gain_is_value()
     _selftest_lineup()
     _selftest_decision_at()
