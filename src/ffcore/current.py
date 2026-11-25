@@ -41,6 +41,7 @@ from typing import Any, NamedTuple
 from ffcore import observations as ob
 from ffcore import state
 from ffcore.rules import position, slot
+from ffcore.text import norm
 
 OFFERS_MADE = "offers_made"
 TEAM_VALUES = "team_values"
@@ -227,27 +228,36 @@ def player_roster(world: state.World, identity: Identity) -> tuple[RosterRow, ..
     return tuple(out)
 
 
-def played(world: state.World) -> tuple[ob.ResultsHistory, ...]:
-    """The latest results with goals, one per match (one_row_per_match)."""
+class Match(NamedTuple):
+    """One played match: its two sides' league clubs ("" for a club outside the league) and goals."""
+    home: str
+    away: str
+    home_goals: float
+    away_goals: float
+
+
+def matches(world: state.World) -> tuple[Match, ...]:
+    """The latest results with goals, one Match per season, day and pair of clubs, each club by its slug or else its
+    normalised name; of rows of one match the newest observed_at (one_row_per_match)."""
     newest: dict[tuple[str, str, str, str], ob.ResultsHistory] = {}
-    for r in sorted(state.latest(world, "results_history"), key=lambda r: r.observed_at):
+    for r in sorted(state.latest(world, "results_history"), key=lambda r: (r.observed_at, r.home_name, r.away_name)):
         if r.home_goals is not None and r.away_goals is not None:
-            newest[(r.season, r.date, r.home or r.home_name, r.away or r.away_name)] = r
-    return tuple(newest.values())
+            newest[(r.season, r.date, r.home or norm(r.home_name), r.away or norm(r.away_name))] = r
+    return tuple(Match(r.home, r.away, r.home_goals, r.away_goals) for r in newest.values()
+                 if r.home_goals is not None and r.away_goals is not None)
 
 
 def club_rating(world: state.World, fixture_k: float) -> tuple[ClubRating, ...]:
     """Each league club's goals for and against per match over the league's mean, pulled toward 1 by fixture_k matches
-    at that mean, over the latest results (no_league_mean_no_ratings, league_mean_is_every_team_game, one_row_per_match)."""
+    at that mean, over the latest matches (no_league_mean_no_ratings, league_mean_is_every_team_game)."""
     games: dict[str, list[tuple[float, float]]] = {}
     scored: list[float] = []
-    for r in played(world):
-        assert r.home_goals is not None and r.away_goals is not None
-        scored += (r.home_goals, r.away_goals)
-        if r.home != "":
-            games.setdefault(r.home, []).append((r.home_goals, r.away_goals))
-        if r.away != "":
-            games.setdefault(r.away, []).append((r.away_goals, r.home_goals))
+    for m in matches(world):
+        scored += (m.home_goals, m.away_goals)
+        if m.home != "":
+            games.setdefault(m.home, []).append((m.home_goals, m.away_goals))
+        if m.away != "":
+            games.setdefault(m.away, []).append((m.away_goals, m.home_goals))
     mu = sum(scored) / len(scored) if scored else 0.0
     if mu <= 0:
         return ()
@@ -492,16 +502,19 @@ def _selftest() -> None:
     def rated(rows: list[ob.ResultsHistory]) -> dict[str, ClubRating]:
         return {c.club: c for c in club_rating(state.world_at(ob.of({"results_history": rows}), "09", only), k)}
     away_side = ob.ResultsHistory("01", "fd", 3.0, 0.0, "s", "d1", "hX", "hA", "", "A")
-    alone = rated([res("01", "A", "B", 1.0, 1.0, "d0")])
+    single = rated([res("01", "A", "B", 1.0, 1.0, "d0")])
     mixed = rated([res("01", "A", "B", 1.0, 1.0, "d0"), away_side])
     assert set(mixed) == {"A", "B"}, "a blank club is no rating"
     assert mixed["A"].n == 2 and mixed["B"].n == 1, "its opponent's game still counts"
     assert mixed["A"].attack == (1.0 + 0.0 + k * 1.25) / ((2 + k) * 1.25), "the blank side's goals are in the league mean"
-    assert alone["B"].attack == 1.0, "a league of one match at its own mean is neutral"
+    assert single["B"].attack == 1.0, "a league of one match at its own mean is neutral"
     spelt = ob.ResultsHistory("02", "fd", 1.0, 1.0, "s", "d0", "hAA", "hB", "A", "B")
     once = rated([res("01", "A", "B", 1.0, 1.0, "d0"), spelt])
     assert once["A"].n == 1 and once["B"].n == 1, "one match under two spellings is one match"
     assert rated([res("01", "A", "B", 1.0, 1.0, "d0"), res("01", "A", "B", 1.0, 1.0, "d1")])["A"].n == 2, "two days, two matches"
+    renamed = rated([res("01", "A", "B", 1.0, 1.0, "d0"), ob.ResultsHistory("01", "fd", 2.0, 0.0, "s", "d1", "Sp Gijon", "hA", "", "A"),
+                     ob.ResultsHistory("02", "fd", 2.0, 0.0, "s", "d1", "sp gijon", "hA", "", "A")])
+    assert renamed["A"].n == 2, "a blank club's spelling (case, accents) is not a second match"
     blanks = rated([ob.ResultsHistory("01", "fd", 1.0, 1.0, "s", "d0", "hX", "hY", "", ""),
                     ob.ResultsHistory("01", "fd", 2.0, 0.0, "s", "d0", "hZ", "hW", "", "")])
     assert blanks == {}, "two matches between blank clubs on one day are two matches, and rate no one"
