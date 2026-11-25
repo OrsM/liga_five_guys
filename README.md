@@ -95,10 +95,10 @@ Every forecast is the same product, for every player and jornada
   updates move by a fitted multiple of the last one, h being the longest
   horizon the data can fit (a rise was still carrying there), not the
   lock: a buy pays its premium once and keeps rising after it. A bid's
-  chance of winning is read off the 30 past auctions of the players nearest
-  in price trend (the fixed table `ffcore/auction_table.py`, fitted over every closed
-  auction: what the winner paid, or asking if nobody bought): rising players draw rivals'
-  bids, falling ones almost never. A listing is bid on at the level whose chance
+  chance of winning is (1 - q) + q F(bid): q the chance some rival bids and F the
+  top rival bid given one does, both by the player's momentum (the fixed table
+  `ffcore/auction_table.py`, fitted over every closed auction, recent ones weighing more, our
+  wins as left-censored): rising players draw rivals' bids, falling ones almost never. A listing is bid on at the level whose chance
   times the surplus under the walk-away price K x W is greatest (`hurdle.bid`; W the
   points' worth in millions at the exchange rate LAMBDA, K = 0.85; no surplus, no bid).
   The game offers for each listed player every night (an offer expires at the next close; a rival's direct offer lasts 48 h), centred on value

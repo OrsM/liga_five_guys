@@ -28,6 +28,9 @@ Named rules, each tested:
   forecast_follows_slope: expected_value is value * (1 + slope * x / 100) for h up to the longest horizon, with a spread
     only for a player worth PRICE_FOCUS.
   grade_days: price_grade fits from the day a quarter through the distinct change days.
+  momentum_reads_no_later_row: price_change_at (player, stamp) is the newest value above 0 observed at or before the stamp
+    over the same MOMENTUM_DAYS earlier, less 1; None when either has none; a row after the stamp changes nothing, and
+    several snapshots on one day each count.
 Selectors: price_state; the selectors by their names (price_history .. price_grade) over a PriceState;
 price_momentum_of is the Prices of the state."""
 from __future__ import annotations
@@ -43,8 +46,10 @@ from typing import Any, NamedTuple, TypeVar, cast
 from ffcore import observations as ob
 from ffcore import pricing
 from ffcore import state as st
+from ffcore.parse import snapshot_stamp, stamp
 
 T = TypeVar("T")
+MOMENTUM_DAYS = 3
 GRADE_HORIZONS = (1, 2, 3, 5, 7, 10)
 
 
@@ -570,6 +575,37 @@ def price_trend_at(s: PriceState) -> Callable[[str, str], float | None]:
     return trend_at
 
 
+@_held
+def _value_series(s: PriceState) -> dict[str, tuple[list[str], list[float]]]:
+    """Each player's values above 0 of every row up to the cut, as (stamps, values) in the order the rows came."""
+    out: dict[str, tuple[list[str], list[float]]] = {}
+    for r in s.history:
+        if r.ff_id and r.value is not None and r.value > 0:
+            stamps, values = out.setdefault(r.ff_id, ([], []))
+            stamps.append(r.observed_at)
+            values.append(r.value)
+    return out
+
+
+def price_change_at(s: PriceState) -> Callable[[str, str], float | None]:
+    """The lookup (player, stamp) -> the player's value at the stamp over his value MOMENTUM_DAYS before, less 1: each value
+    the newest above 0 of a row observed at or before that moment; None when the player has none at either moment. The same
+    for a stamp whatever the cut, as long as the cut is not before it (rule momentum_reads_no_later_row)."""
+    series = _value_series(s)
+
+    def value_at(player: str, stamp: str) -> float | None:
+        stamps, values = series.get(player, ([], []))
+        i = bisect.bisect_right(stamps, stamp)
+        return values[i - 1] if i else None
+
+    def change_at(player: str, at: str) -> float | None:
+        moment = snapshot_stamp(at)
+        now = value_at(player, at)
+        then = value_at(player, stamp(moment - timedelta(days=MOMENTUM_DAYS))) if moment is not None else None
+        return None if now is None or then is None else now / then - 1
+    return change_at
+
+
 def price_trend(s: PriceState) -> list[PlayerTrend]:
     """The trend of each player whose last change is the cut's day."""
     fits = momentum(s)
@@ -751,6 +787,18 @@ def _selftest() -> None:
             lookup = price_trend_at(walked)
             assert all(lookup(p, d) == rebuilt(scratch, p, d) for p in [*players, "nobody"] for d in days), \
                 "price_trend_at equals the last entry on or before the day of a from-scratch rebuild, at any cut"
+    series = [ob.Market(at, "", v, "a", "DEL", "RMA") for at, v in (
+        ("2026-09-01T0800Z", 100.0), ("2026-09-02T0800Z", 0.0), ("2026-09-03T0800Z", 110.0), ("2026-09-04T0800Z", 120.0),
+        ("2026-09-04T1800Z", 125.0), ("2026-09-05T0800Z", 150.0), ("2026-09-06T0800Z", 90.0))]
+    expected = {"2026-09-04T0800Z": 1.2 - 1, "2026-09-04T0900Z": 1.2 - 1, "2026-09-04T1800Z": 1.25 - 1, "2026-09-05T0800Z": 1.5 - 1,
+                "2026-09-03T0800Z": None, "2026-09-02T0800Z": None}
+    for upto in (4, 5, 6, len(series)):
+        walked = FOLD.start()
+        for r in series[:upto]:
+            walked = FOLD.step(walked, r)
+        at = price_change_at(walked)
+        assert all(at("a", k) == v for k, v in expected.items() if k <= series[upto - 1].observed_at) and at("nobody", "2026-09-04T0800Z") is None, \
+            "momentum is the value at the stamp over the value 3 days before (a 0 is no value), the same whatever rows follow and the day's later snapshots"
     steady = [ob.Market("2026-09-%02dT0800Z" % (n + 1), "", v, "a", "DEL", "RMA")
               for n, v in enumerate([100.0, 100.0, 101.0, 103.0, 104.0, 108.0, 109.0])]
     early, final = trends_of(steady, [5])

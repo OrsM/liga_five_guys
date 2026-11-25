@@ -109,9 +109,18 @@ A test seeds its module's inputs as rows (no Python mirror of a table). A change
 output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/gate`) checks the import graph:
 a module may not import a later layer; `python tools/frontiers.py --table` prints the layers.
 
-**The auction table.** The win chance of a bid is a fixed `Model` in `ffcore/auction_table.py`, fitted once over every
-closed auction with the fixed cuts `auction.FIXED_CUTS`. It is regenerated only by `tools/auction_table.py`, and the
-goldens are blessed in the same commit (it is an input of every golden decision).
+**The auction table.** The win chance of a bid at ratio b over the ask is W(b | x) = (1 - q) + q F(b), a fixed `Model` in
+`ffcore/auction_table.py`: q is the chance some rival bids, by (rival bid visible at the look, momentum class, ask band) with
+fallbacks to fewer parts when a cell holds under `auction.DEMAND_MIN` listings; F is the distribution of the top rival bid over the
+ask given one bids, by momentum class (pooled below `pricing.AUCTION_MIN`). Momentum is the player's value at the look over his value
+`price_fold.MOMENTUM_DAYS` earlier, less 1 (`price_fold.price_change_at`), cut at 0, 4 and 8% (class `auction.RISER` is 8% and over).
+The fit (`auction.fit`) is a maximum-likelihood EM on the closed listings, each weighted exp(-age / 40 days): a rival win at R is q f(R),
+unsold 1 - q, our win at b is (1 - q) + q F(b) (q F(b) with a rival seen), so our wins are left-censored and never counted as won above
+b. Why: 59 risers in 100 days were stated .63 and realised .21 at the ask by the cell table (#49); the cells could not carry them,
+so momentum is a covariate of q and F. No correction on our own bids: conditioning on what rivals also see is the whole correction;
+the `ours` scope of the calibration is the monitor. The table is regenerated only by `tools/auction_table.py`, and the goldens are blessed
+in the same commit (it is an input of every golden decision). `grading.py decided` prices every bid the decision places on a riser as well
+as the funded holds, so a change of the curve can be graded.
 
 **Checks.** `tools/gate --changed [BASE]` per commit (ruff, frontiers, mypy and the suites that import a changed module; full when it
 cannot map) and `tools/gate --full` before a merge (ruff, frontiers, mypy and one suite per module with a top-level `_selftest`

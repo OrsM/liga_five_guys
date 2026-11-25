@@ -745,7 +745,7 @@ def rule_scores(rules: Mapping[str, worth.Rule], since: str = SALES_FROM) -> Rul
 REPLAY_DAYS = 58
 REPLAY_WINDOW_MINS = 180.0
 CLOSE_TOLERANCE = dt.timedelta(hours=1)
-MOMENTUM_DAYS = 3
+MOMENTUM_DAYS = price_fold.MOMENTUM_DAYS
 
 
 class Replay(NamedTuple, Generic[T]):
@@ -948,13 +948,16 @@ class HoldDay(NamedTuple):
     """What the hold replay knows at one daily cut: the cut, each player's newest market value above 0, my squad, the bids the
     decision advised at the cut on the listings it would hold (by player; none for the grid's replay), and what the sale rule reads
     there: `reserves` the least offer over value the rule (worth.sale_reserve, a sale that loses no points) takes for each player
-    and `offers` the offers seen (none for the grid's replay)."""
+    and `offers` the offers seen (none for the grid's replay); `stated` the win chance the decision gave each advised bid and `risers`
+    the players of them whose momentum is in the top class (auction.RISER) at the cut (none for the grid's replay)."""
     cut: str
     values: Mapping[str, float]
     squad: frozenset[str]
     advised: Mapping[str, float] = {}
     reserves: Mapping[str, float] = {}
     offers: worth.OfferDistribution = worth.NO_OFFERS
+    stated: Mapping[str, float] = {}
+    risers: frozenset[str] = frozenset()
 
 
 Panel = Mapping[dt.date, HoldDay]
@@ -1327,7 +1330,8 @@ def hold_report(replay: Replay[HoldDay], season: Season, since: dt.date) -> str:
 
 
 def decided_day(loaded: loader.Loaded, world: state.World, cash: float, history: Sequence[loader.Opportunity]) -> HoldDay | None:
-    """The HoldDay of the world with the bids its decision advises on the holds it funds (opportunity_rows with profit, at the
+    """The HoldDay of the world with the bids its decision advises on the holds it funds and on every riser (a player whose
+    momentum is in the top class, auction.RISER, at the cut) it bids on, funded as a hold or not (opportunity_rows with profit, at the
     exchange rate of the cut), the cash `cash` and no bid placed, and the reserve over value the sale rule takes for each player
     with a value (worth.sale_reserve of a sale that loses no points, the closes left before the lock) with the offers seen; None for
     a Stale cut."""
@@ -1341,7 +1345,12 @@ def decided_day(loaded: loader.Loaded, world: state.World, cash: float, history:
     day = hold_day(loaded, world)
     offers, closes, ahead = offers_at(world), decision.clock_of(inp, decided.cut).n_closes, decision.rises_of(inp)
     reserves = {k: worth.sale_reserve(0.0, 1, rate, decision.exit_of(inp, k, v, ahead.get(k, {})), offers, closes) / v for k, v in day.values.items()}
-    return day._replace(advised={r["player"]: r["bid"] for r in rows if r["profit"] > 0 and r["bid"] is not None}, reserves=reserves, offers=offers)
+    change = price_fold.price_change_at(price_fold.price_state(world))
+    bids = [r for r in rows if r["bid"] is not None]
+    risers = frozenset(r["player"] for r in bids if auction.momentum_class(auction.MOMENTUM_CUTS, change(r["player"], world.cut)) == auction.RISER)
+    placed = [r for r in bids if r["profit"] > 0 or r["player"] in risers]
+    return day._replace(advised={r["player"]: r["bid"] for r in placed}, reserves=reserves, offers=offers,
+                        stated={r["player"]: r["win"] for r in placed}, risers=risers)
 
 
 DECIDED = HoldPolicy(None, math.inf, None, 28)
@@ -1353,8 +1362,27 @@ def averaged(rows: Sequence[HoldStats]) -> HoldStats:
     return HoldStats(**{f: sum(getattr(r, f) for r in rows) / len(rows) for f in HoldStats._fields})
 
 
+class Priced(NamedTuple):
+    """A bid of the decision on a listing, with the HoldDay it was advised on."""
+    listing: Listing
+    bid: float
+    day: HoldDay
+
+    @property
+    def riser(self) -> bool:
+        return self.listing.player in self.day.risers
+
+
+def stated_and_won(rows: Sequence[Priced]) -> str:
+    """The bids as "N bids, stated win S%, won W%": the mean of the win chance the decision stated for each (HoldDay.stated)
+    against the share that beat the real winning price (bid_wins)."""
+    n = len(rows)
+    return "%d bids, stated win %.0f%%, won %.0f%%" % (n, 100 * sum(r.day.stated.get(r.listing.player, 0.0) for r in rows) / max(1, n),
+                                                         100 * sum(bid_wins(r.bid, r.listing) for r in rows) / max(1, n))
+
+
 def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash: float) -> str:
-    """The hold replay of the decision's own bids (HoldDay.advised: the holds it funds with cash `cash` at each daily cut) on the
+    """The hold replay of the decision's own bids (HoldDay.advised: the holds it funds with cash `cash` at each daily cut and every riser it bids on) on the
     real winning prices, constraints as the grid's (HOLD_SCENARIOS): two lines of the HoldStats as hold_report prints them and the M per
     week at half the appreciation and under each constraint; and the same two exits on the grid's HEADLINE buys (`hl`). `momentum` ends a hold as the grid does (the MOMENTUM_DAYS change 0 or
     less); `rule` sells it as the decision does (the debt column too, by the same reserve where the live cover lowers its own; no 28-day cap live): a night's offer (one of the day's, drawn by each of RULE_DRAWS seeds, the figures their
@@ -1364,7 +1392,9 @@ def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash
     listings = [x for x in hold_listings(replay, panel) if x.day >= since]
     locks = sorted(season.locks.values())
     weeks = max(1, len(days)) / 7
-    advised = sum(1 for x in listings if hold_bid(DECIDED, x, panel) is not None)
+    bids = [(x, hold_bid(DECIDED, x, panel)) for x in listings]
+    advised = sum(1 for _, b in bids if b is not None)
+    priced = [Priced(x, b, panel[x.day]) for x, b in bids if b is not None]
 
     def draws(policy: HoldPolicy, rule: Constraint | None = None, edge: float = 1.0) -> list[HoldStats]:
         return [hold_stats(holds_of(policy if policy.draw is None else policy._replace(draw=i), listings, panel, locks, rule), panel, days, season, edge)
@@ -1384,6 +1414,8 @@ def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash
     return "\n".join([
         "decided holds: %d days from %s, cash %.0fM at each cut, %d listings, %d with an advised bid; M per week = gain / %.1f weeks" % (
             len(days), since, cash / 1e6, len(listings), advised, weeks),
+        "priced: all %s; risers %s; others %s" % (
+            stated_and_won(priced), stated_and_won([r for r in priced if r.riser]), stated_and_won([r for r in priced if not r.riser])),
         "exit      bids  won win%  ret/trade ret/capday  M/wk   se  cap M  hit% lossw   ind  half1  half2  price  pts+  pts>mean |  half-edge" + "".join("  %7s" % k for k in HOLD_SCENARIOS),
         line("momentum", DECIDED), line("rule", DECIDED._replace(draw=0)), line("hl mom", HEADLINE), line("hl rule", HEADLINE._replace(draw=0))])
 
@@ -2164,6 +2196,9 @@ def _selftest_holds() -> None:
     assert bought.bids == sum(hold_bid(DECIDED, x, advice) is not None for x in listings)
     assert all(p.bid == advice[p.listing.day].advised[p.listing.player] and bid_wins(p.bid, p.listing) for p in bought.positions), "each position is a won advised bid, paid at its amount"
     assert holds_of(DECIDED, listings, panel).bids == 0, "a day with no advised bid buys nothing"
+    sure = [Priced(x, x.ask * 2, advice[x.day]._replace(stated={x.player: 1.0})) for x in listings]
+    assert stated_and_won(sure) == "%d bids, stated win 100%%, won 100%%" % len(sure) and stated_and_won([]) == "0 bids, stated win 0%, won 0%", \
+        "a bid at twice the ask beats every winning price (unsold: the ask); the line counts stated against won"
     ratios = worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.05, 1.1, 1.2])
     for reserve in (0.0, 1.0, 1.1, math.inf):
         night = {d: v._replace(offers=ratios, reserves={k: reserve for k in names}) for d, v in panel.items()}
