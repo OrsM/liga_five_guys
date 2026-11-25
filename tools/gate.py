@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -168,6 +169,11 @@ def pinned() -> str:
     return (ROOT / ".python-version").read_text().strip()
 
 
+def on_pin(version: str) -> bool:
+    """Whether a full version such as 3.14.4 is the pinned major.minor."""
+    return version.split(".")[:2] == pinned().split(".")[:2]
+
+
 def interpreter() -> str:
     """The version of the Python that `uv run --frozen` gives this tree (building its venv if absent)."""
     got = subprocess.run([*RUN, "python", "-c", "import platform; print(platform.python_version())"],
@@ -179,7 +185,11 @@ def gate(changed: Sequence[str] | None) -> int:
     waited = float(os.environ.get("LFG_GATE_WAIT", "0"))
     start = time.monotonic()
     checks = plan(changed)
-    print(f"gate: python {interpreter()} (pinned {pinned()})")
+    got = interpreter()
+    print(f"gate: python {got} (pinned {pinned()})")
+    if not on_pin(got):
+        print("gate: FAILED: uv run did not build the pinned interpreter (UV_PYTHON or --python set?)")
+        return 1
     times = json.loads(TIMES.read_text()) if TIMES.exists() else {}
     scratch = Path(tempfile.mkdtemp(prefix="selftests.", dir=Path.home() / ".cache"))
     try:
@@ -247,9 +257,9 @@ def _selftest() -> None:
     assert [r.name for r in got if not r.ok] == ["bad"], "a failure is reported as the check's own"
     mine = run_check(Check("x", [sys.executable, "-c", "import sys; print('out'); sys.exit(3)"]), {})
     assert not mine.ok and mine.output.strip() == "out", "a nonzero exit is a failure with its output"
-    floor = re.search(r'(?m)^requires-python = ">=([\d.]+)"', (ROOT / "pyproject.toml").read_text())
-    assert floor is not None and floor.group(1).startswith(pinned()), "the pin and requires-python name the same interpreter"
-    assert interpreter().startswith(pinned()), "uv run builds the pinned interpreter"
+    floor = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["requires-python"]
+    assert floor == ">=" + pinned(), "the pin and requires-python name the same interpreter"
+    assert on_pin(interpreter()) and not on_pin("3.12.3"), "uv run builds the pinned interpreter, not another"
     print("gate selftest ok")
 
 
