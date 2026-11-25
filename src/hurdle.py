@@ -195,11 +195,11 @@ def stake(points: float, n: int, rate: float, exit: Exit, k: int = 0) -> Stake:
     return Stake(points, rate, n, proceeds(exit), exit.rise * exit.value, k)
 
 
-def hold_stake(points: float, n: int, rate: float, exit: Exit, k: int) -> Stake:
-    """The Stake of a buy to hold, whose player fetches held(exit) after the hold: as stake, with that for the proceeds, the
-    drift 0 (a buy reads no sale reserve) and k the jornadas the hold crosses a lock (at most n). Its cap is never under the cap
-    of stake(points, n, rate, exit, n), the points alone."""
-    return Stake(points, rate, n, held(exit), 0.0, min(k, n))
+def hold_stake(points: float, n: int, rate: float, exit: Exit) -> Stake:
+    """The Stake of a buy to hold that cash funds, whose player fetches held(exit) after the hold: as stake with that for the proceeds, the
+    drift 0 (a buy reads no sale reserve) and the capital free (k = 0: cash that is left at the lock is worth nothing else). Its cap is
+    never under the cap of stake(points, n, rate, exit, n), the points alone."""
+    return Stake(points, rate, n, held(exit), 0.0, 0)
 
 
 def profit(stake: Stake, amount: float) -> float:
@@ -329,17 +329,16 @@ def _selftest_hold() -> None:
         e = Exit(value, rng.choice([1, 7]), rng.uniform(-TREND_CAP, TREND_CAP), rng.choice([0.0, value]), h)
         assert abs(held(e) - draw(value) * (1 + h)) < 1e-6 and held(e._replace(hold=h + 0.1)) >= held(e) and held(e) >= draw(value)
         points = rng.choice([0.0, rng.uniform(0, 3) * n * rate * value / 1e6])
-        k = rng.randint(0, 2 * n)
-        s = hold_stake(points, n, rate, e, k)
+        s = hold_stake(points, n, rate, e)
         tied = stake(points, n, rate, e, n)
         assert cap(s) >= cap(tied) - 1e-6, "a hold never lowers the cap of the points alone"
-        assert cap(hold_stake(points, n, rate, e, k + 1)) <= cap(s) + 1e-6 and cap(hold_stake(points, n, 2 * rate, e, k)) <= cap(s) + 1e-6, "nonincreasing in k and in the rate"
-        assert cap(hold_stake(2 * points, n, rate, Exit(2 * value, e.nights, e.rise, 2 * e.reserve, h), k)) - 2 * cap(s) < 1e-3, "scale-invariant"
+        assert cap(hold_stake(points, n, 2 * rate, e)) <= cap(s) + 1e-6, "nonincreasing in the rate"
+        assert abs(cap(hold_stake(2 * points, n, rate, Exit(2 * value, e.nights, e.rise, 2 * e.reserve, h))) - 2 * cap(s)) < 1e-3, "scale-invariant"
         amount = rng.uniform(0.5, 1.5) * value
         assert profit(s, amount) >= 0 and profit(s, amount * 1.1) <= profit(s, amount) and profit(tied, amount) == 0.0, "never negative, falls with the bid, none when capital is tied"
-        assert profit(s, max(cap(s), amount)) == 0.0 and profit(hold_stake(points, n, rate, e, k + 1), amount) <= profit(s, amount) + 1e-9, "nothing at or over the cap; nonincreasing in k"
+        assert profit(s, max(cap(s), amount)) == 0.0 and profit(s._replace(k=min(n, s.k + 1)), amount) <= profit(s, amount) + 1e-9, "nothing at or over the cap; nonincreasing in k"
         assert abs(in_points(2 * amount, n, rate) - 2 * in_points(amount, n, rate)) < 1e-9 and in_points(0.0, n, rate) == 0.0
-    assert cap(hold_stake(0.0, 25, 0.045, Exit(1e6, hold=0.1), 1)) == (1 - 1 / 25) * held(Exit(1e6, hold=0.1)), "no points: the hold's proceeds less the share of the window the capital was tied"
+    assert cap(hold_stake(0.0, 25, 0.045, Exit(1e6, hold=0.1))) == held(Exit(1e6, hold=0.1)), "no points: the hold's proceeds, the capital being free"
 
 
 def _selftest_sale() -> None:

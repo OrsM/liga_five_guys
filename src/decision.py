@@ -359,16 +359,6 @@ def exit_of(inp: Inputs, player: str, value: float, steps: Mapping[int, float] |
     return hurdle.Exit(value, far, max(-hurdle.TREND_CAP, min(hurdle.TREND_CAP, sale[far])), hold=hold)
 
 
-def held_locks(inp: Inputs, at: str | None) -> int:
-    """The locks a hold bought at `at` (a stamp of the inputs; None: no lock is ahead) crosses: those after it and within
-    hurdle.HOLD_NIGHTS nights of it; 0 for None."""
-    start = snapshot_stamp(at) if at else None
-    if start is None:
-        return 0
-    end = start + timedelta(days=hurdle.HOLD_NIGHTS)
-    return sum(1 for x in inp.locks if (when := snapshot_stamp(x.lock)) is not None and start < when <= end)
-
-
 class Funds(NamedTuple):
     """What a day's holds draw on: the cash that is left at the lock (rules.cash_at_lock of the bids placed and the expected
     credit) and the squad slots left (the squad maximum less the squad and the bids pending)."""
@@ -461,7 +451,7 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
         if status == "market" and asking is not None and k in curves:
             exit = exit_of(inp, k, value or 0.0, ahead.get(k, {}))
             if exit.hold > 0:
-                held = hurdle.hold_stake(gain, n, rate, exit, held_locks(inp, arrival(locks, close)))
+                held = hurdle.hold_stake(gain, n, rate, exit)
                 free = hurdle.bid(curves[k], asking, held)
                 if free is not None:
                     holds[k] = Hold(held, free, free.win * (held.proceeds - free.amount))
@@ -700,8 +690,8 @@ def _selftest_holds() -> None:
     assert sum(r["profit"] > 0 for r in pending) == 1, "a bid placed holds its slot: the one slot left is taken by a hold, not by two"
     flat = opportunity_rows(_holds_inputs(1e7, risers, rise=0.0)) + opportunity_rows(_holds_inputs(1e7, risers, rise=-0.02))
     assert all(r["bid"] is None and r["profit"] == 0.0 for r in flat), "no rise, no hold"
-    weak = opportunity_rows(_holds_inputs(1e7, risers, rise=0.004))
-    assert all(r["profit"] == 0.0 for r in weak), "a rise the premium and the haircut eat is not bought"
+    weak = opportunity_rows(_holds_inputs(1e7, risers, rise=0.0002))
+    assert all(r["profit"] == 0.0 for r in weak), "a rise the haircut eats is not bought"
     rich = opportunity_rows(_holds_inputs(1e7, {"big": 4e7}))
     assert all(r["profit"] == 0.0 for r in rich), "a value above HOLD_VALUE has no measured rise"
     rng = random.Random(8)
