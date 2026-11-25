@@ -180,6 +180,19 @@ class Covered(NamedTuple):
     sells: frozenset[str]
 
 
+class Branch(NamedTuple):
+    """A step of the search of `cover`: the players from index `i` of the order are still to decide, `gone` (a bitmask) are sold and raise `got`."""
+    i: int
+    gone: int
+    got: float
+
+
+class Chosen(NamedTuple):
+    """The best set `cover` has found: its `cost` in points and who is sold (`gone`, a bitmask)."""
+    cost: float
+    gone: int
+
+
 def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mapping[str, float], need: float
           ) -> Covered | None:
     """The cheapest set of `pool` to sell, on top of `fixed`, raising at least `need` at `price`, with the cost of `fixed` and it
@@ -194,22 +207,22 @@ def cover(side: Side, fixed: frozenset[str], pool: frozenset[str], price: Mappin
     bits = [side.bit[k] for k in order]
     worth = [price[k] for k in order]
     left = [sum(worth[i:]) for i in range(len(order) + 1)]
-    best: tuple[float, int] | None = None
-    stack: list[tuple[int, int, float]] = [(0, 0, 0.0)]
+    best: Chosen | None = None
+    stack = [Branch(0, 0, 0.0)]
     while stack:
-        i, gone, got = stack.pop()
-        m = held | gone
+        step = stack.pop()
+        m = held | step.gone
         c = memo[m] if m in memo else cost_of(m)
-        if c is None or best is not None and c >= best[0] - 1e-12:
+        if c is None or best is not None and c >= best.cost - 1e-12:
             continue
-        if got >= need - 1e-6:
-            best = (c, gone)
+        if step.got >= need - 1e-6:
+            best = Chosen(c, step.gone)
             continue
-        if i == len(order) or got + left[i] < need - 1e-6:
+        if step.i == len(order) or step.got + left[step.i] < need - 1e-6:
             continue
-        stack.append((i + 1, gone, got))
-        stack.append((i + 1, gone | bits[i], got + worth[i]))
-    return None if best is None else Covered(best[0], side.players(best[1]))
+        stack.append(Branch(step.i + 1, step.gone, step.got))
+        stack.append(Branch(step.i + 1, step.gone | bits[step.i], step.got + worth[step.i]))
+    return None if best is None else Covered(best.cost, side.players(best.gone))
 
 
 class Atom(NamedTuple):
@@ -485,6 +498,30 @@ def secure(club: Club, found: Plan, side: Side, offers: worth.OfferDistribution,
                           options=tuple(dict.fromkeys(x for x in (best, seed) if x is not None)))
 
 
+class Pick(NamedTuple):
+    """A step of the search of `approach`: the standing offers from index `i` of the order are still to decide, `sold` are taken tonight."""
+    i: int
+    sold: frozenset[str]
+
+
+class Choice(NamedTuple):
+    """The best funding `approach` has found: its expected points lost `value`, the sales `tonight`, those `if_won` and `if_lost` after the
+    result and the points the sales lose in each case."""
+    value: float
+    tonight: frozenset[str]
+    if_won: frozenset[str]
+    if_lost: frozenset[str]
+    cost_won: float
+    cost_lost: float
+
+
+class Points(NamedTuple):
+    """The points of a bid: the `gain` of the buy and the costs of the sales if it is won and if it is lost."""
+    gain: float
+    cost_won: float
+    cost_lost: float
+
+
 def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0,
              sides: dict[tuple[frozenset[str], tuple[int, ...]], Side] | None = None) -> Approach | None:
     """How to fund a bid on `player` (see Approach): the sales tonight, those after the result, their cost in points and the
@@ -512,15 +549,16 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
     offered = sorted((k for k in club.squad if k in club.offers),
                      key=lambda k: (per_unit(won_side.cost(frozenset({k})), max(club.offers[k], 1.0)), k))
     reach = [sum(club.offers[k] - club.debt * club.worth[k] for k in offered[i:]) for i in range(len(offered) + 1)]
-    best: tuple[float, frozenset[str], frozenset[str], frozenset[str], float, float] | None = None
+    best: Choice | None = None
     ceiling = bid_margin(club.cash, sum(club.offers[k] for k in offered), club.team_value,
                          sum(club.worth[k] for k in offered), bid, pend_amount, club.debt)
-    stack: list[tuple[int, frozenset[str]]] = [(0, frozenset())]
+    stack = [Pick(0, frozenset())]
     while stack:
-        i, a = stack.pop()
+        pick = stack.pop()
+        i, a = pick.i, pick.sold
         cw, cl = won_side.cost(a), lost_side.cost(a)
         early = before.cost(a)
-        if cw is None or cl is None or early is None or best is not None and win * cw + (1 - win) * cl + early >= best[0] - 1e-12:
+        if cw is None or cl is None or early is None or best is not None and win * cw + (1 - win) * cl + early >= best.value - 1e-12:
             continue
         raised, sold = sum(club.offers[k] for k in a), sum(club.worth[k] for k in a)
         margin = bid_margin(club.cash, raised, club.team_value, sold, bid, pend_amount, club.debt)
@@ -531,16 +569,15 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
             lost = cover(lost_side, a, club.squad - a, price, need_lost)
             if won and lost and len(club.squad) + (player is not None) - len(a) - len(won.sells) + pend_n <= club.squad_max:
                 ev = win * won.cost + (1 - win) * lost.cost + early
-                if best is None or ev < best[0]:
-                    best = (ev, a, won.sells, lost.sells, won.cost + early, lost.cost + early)
+                if best is None or ev < best.value:
+                    best = Choice(ev, a, won.sells, lost.sells, won.cost + early, lost.cost + early)
         elif margin + reach[i] < -1e-6:
             continue
         for j in range(i, len(offered)):
-            stack.append((j + 1, a | {offered[j]}))
+            stack.append(Pick(j + 1, a | {offered[j]}))
     if best is None:
         return unfunded(club, max(0.0, -ceiling), ceiling, gain)._replace(base=base)
-    _, a, b, ell, cost_won, cost_lost = best
-    return funded(club, a, b, ell, bid, win, (gain, cost_won, cost_lost), base, price)
+    return funded(club, best.tonight, best.if_won, best.if_lost, bid, win, Points(gain, best.cost_won, best.cost_lost), base, price)
 
 
 def unfunded(club: Club, short: float, margin: float, gain: float) -> Approach:
@@ -550,12 +587,12 @@ def unfunded(club: Club, short: float, margin: float, gain: float) -> Approach:
 
 
 def funded(club: Club, tonight: frozenset[str], if_won: frozenset[str], if_lost: frozenset[str], bid: float, win: float,
-           points: tuple[float, float, float], base: float, price: Mapping[str, float]) -> Approach:
+           points: Points, base: float, price: Mapping[str, float]) -> Approach:
     """The feasible Approach that sells `tonight` to their offers, then `if_won` or `if_lost` at `price` once the result is
     known; `points` the gain of the buy and the costs of the sales if it is won and if it is lost; `base` the cost of the plan
     with no buy; the net is win * (gain - (cost_won - base)) - (1 - win) * (cost_lost - base): the points the bid adds
     to doing nothing."""
-    gain, cost_won, cost_lost = points
+    gain, cost_won, cost_lost = points.gain, points.cost_won, points.cost_lost
     raised = sum(club.offers[k] for k in tonight)
     later = sum(price[k] for k in if_won)
     return Approach(
@@ -589,7 +626,7 @@ def replacement(club: Club, sold: str, player: str, bid: float, win: float, roun
         return unfunded(club, 0.0, margin, gain)
     early = before.forgone(tonight)
     return funded(club, tonight, won.sells, frozenset(), bid, win,
-                  (gain, won_side.forgone(tonight | won.sells) + early, lost_side.forgone(tonight) + early), 0.0, price)
+                  Points(gain, won_side.forgone(tonight | won.sells) + early, lost_side.forgone(tonight) + early), 0.0, price)
 
 
 def _cells(rng: random.Random, players: Iterable[str], jornadas: Iterable[int], pick: Iterable[float]) -> dict[int, dict[str, float]]:
@@ -796,7 +833,7 @@ def _selftest() -> None:
     assert lacking is not None and not lacking.feasible and cheapest.feasible, "a plan exists exactly when what can be sold covers the deficit"
     rng = random.Random(77)
     checked = 0
-    for _ in range(30):
+    for _ in range(70):
         shape = ["POR"] * 2 + ["DEF"] * 6 + ["MED"] * 5 + ["DEL"] * 3
         big = {"m%02d" % i: p for i, p in enumerate(shape)}
         sizes = {k: rng.choice([0.5e6, 1e6, 2e6, 4e6, 8e6, 16e6, 32e6]) for k in big}
@@ -811,10 +848,11 @@ def _selftest() -> None:
         assert first is not None
         if not first.feasible or not first.sells:
             continue
-        chosen = secure(crowd, first, wing, NO_OFFERS, closes)
+        seen = rng.choice([NO_OFFERS, offer_ratio_distribution([0.85, 0.9, 0.95, 1.0, 1.0, 1.05, 1.1, 1.2])])
+        chosen = secure(crowd, first, wing, seen, closes)
         if not chosen.options:
             continue
-        judge = Closer(crowd, wing, ratios_of(NO_OFFERS), closes)
+        judge = Closer(crowd, wing, ratios_of(seen), closes)
         floor = chosen.options[0].points
         owned = frozenset(quotes)
         for size in range(1, 5):

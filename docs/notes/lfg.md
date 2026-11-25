@@ -173,7 +173,7 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   the squad less the plan's sales and the rule's sells, reached by swaps from the app's eleven; the `lineup` advice is those
   swaps, never naming a sold player, and `lineup.stale` says the app's eleven is not that best), `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
-  offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (the offer reaches `reserve`, `hurdle.reserve` of
+  offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (the offer reaches the sale reserve, `hurdle.reserve` of
   the player's `hurdle.Stake`: (W + rise x value) / K, K = 0.85, his yield, the points the sale loses plus LAMBDA x n x his
   expected price change over his Exit's horizon (the price forecast's furthest row, capped at +-3%), per million of the offer
   per jornada, being under K x LAMBDA; and for a sale that loses no points at least the proceeds of his Exit stopped at the

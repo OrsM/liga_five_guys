@@ -884,7 +884,7 @@ def follow(day: CoverDay, side: Side, option: Option, offers: Sequence[Mapping[s
     covered = cover(side, fixed, club.squad - fixed, price, -cash if cash < 0 else 0.0)
     if covered is None:
         return Realised(math.inf, cash, unseen)
-    return Realised(covered[0], cash + sum(price[k] for k in covered[1]), unseen)
+    return Realised(covered.cost, cash + sum(price[k] for k in covered.sells), unseen)
 
 
 def follow_plan(day: CoverDay, side: Side, found: Plan, offers: Sequence[Mapping[str, float]]) -> Realised:
