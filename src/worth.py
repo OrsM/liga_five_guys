@@ -299,6 +299,16 @@ def _selftest_hold() -> None:
             assert r >= hurdle.held(held) - 1e-6, "a held player is not sold under what holding him fetches: the buy's price and the sale's agree"
             assert sale_reserve(0.0, n, rate, held, study, closes + 1) >= r - 1e-6, "more closes left never lowers it"
             assert sale_reserve(0.0, n, rate, held, NO_OFFERS, closes) == max(hurdle.held(held), h * value / hurdle.K), "no offers seen: held"
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    squad = {"%s%d" % (q, i): q for q, n in shape.items() for i in range(n)} | {"p": "DEF"}
+    bench = Context(squad, Window((1,)), 0.0, study, squad=frozenset(squad), cells={1: {k: 1.0 for k in squad} | {"p": 0.0}}, closes=3)
+    riser = hurdle.Exit(1e7, 3, hurdle.TREND_CAP, hold=0.15)
+    for offer in (1.0e7, hurdle.held(riser) * 0.99):
+        key = rent(Standing("p", riser, offer), bench).key
+        assert key is not None and key > 0, "a bench riser is held under what his hold fetches"
+    top = rent(Standing("p", riser, 0.0), bench).reserve
+    over = rent(Standing("p", riser, None if top is None else top * 1.01), bench).key
+    assert top is not None and top >= hurdle.held(riser) and rent(Standing("p", riser, top), bench).key == 0.0 and over is not None and over < 0, "and sold at his reserve or over it"
     pts = hurdle.Exit(1e7, 3, 0.02, hold=0.1)
     for lost in (0.5, 3.0):
         assert sale_reserve(lost, 10, 0.045, pts, study, 4) == sale_reserve(lost, 10, 0.045, pts._replace(hold=0.0), study, 0) == hurdle.reserve(
