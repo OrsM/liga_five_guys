@@ -397,7 +397,8 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         auction = seen.get(k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]))
-        found = approach(club._replace(pending=others), k, amount, win, rounds, cost0, sides, hurdle.profit(r["stake"], amount) if amount else 0.0) \
+        earns = hurdle.profit(r["stake"], amount) if amount else 0.0
+        found = approach(club._replace(pending=others), k, amount, win, rounds, cost0, sides, earns) \
             if i < EVALUATED_BUYS and amount is not None and win is not None else None
         funding = None if found is None or amount is None else funding_doc(club, names, found, amount)
         net = found.net if found is not None and found.feasible else None
@@ -414,7 +415,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
                       ["chance to win", win, "chance"]]
             + ([["advised bid", at.advised, "money"], ["chance at the advised bid", at.advised_win, "chance"]] if placed is not None else [])
             + [["points added", r["gain"], "points"]]
-            + ([["price expected after the hold", r["stake"].proceeds, "money"], ["points the hold earns", hurdle.profit(r["stake"], amount), "points"]]
+            + ([["price expected after the hold", r["stake"].proceeds, "money"], ["points the hold earns", earns, "points"]]
                if r["stake"].k < r["stake"].n and amount else []),
             "bids": auction.bids if auction else None,
             "auction": {"yours": bool(auction.mine), "listings": auction.n, "thin": bool(auction.thin), "cell": auction.cell}

@@ -253,14 +253,15 @@ def inputs_at(world: state.World, identity: Identity, league: League, seen: Seen
     each fact computed once."""
     cells = [Cell(c.player, c.jornada, c.e) for c in forecast_facts.cell(fc)]
     locks = locks_of(season_facts.round_locks(world), world.cut)
+    prices_at, next_lock = price_fold.price_state(world), season_facts.next_lock(world).t
     return Inputs(
         money_of(seen, league), players=players_of(seen, league), curves=curve_points_of(seen), auctions=auctions_of(seen),
         bids=bids_of(seen), closes=closes_of(season_facts.listing_close(world, identity)),
         locks=locks, lineup=slots_of(current.app_lineup(world, identity)),
         cells=cells, universe=universe_of(seen, fc.clubs, league),
-        prices=prices_of(price_fold.price_forecast(price_fold.price_state(world), season_facts.next_lock(world).t, hurdle.HOLD_NIGHTS)),
+        prices=prices_of(price_fold.price_forecast(prices_at, next_lock, hurdle.HOLD_NIGHTS)),
         credits=credits_of(world, league, fc, frozenset(m.player for m in my_squad(seen, league)), locks),
-        nights=price_fold.price_nights(price_fold.price_state(world), season_facts.next_lock(world).t))
+        nights=price_fold.price_nights(prices_at, next_lock))
 
 
 def squad_of(inp: Inputs) -> frozenset[str]:
@@ -343,11 +344,12 @@ def sale_rises(inp: Inputs, steps: Mapping[int, float]) -> dict[int, float]:
     return {h: r for h, r in steps.items() if inp.nights is None or h <= inp.nights}
 
 
-def exit_of(inp: Inputs, player: str, value: float) -> hurdle.Exit:
+def exit_of(inp: Inputs, player: str, value: float, steps: Mapping[int, float] | None = None) -> hurdle.Exit:
     """The hurdle.Exit of a player of this value: the sale's furthest horizon in nights (sale_rises) and its rise there held
     within +-hurdle.TREND_CAP (a flat Exit of one night with no forecast), and the hold, hurdle.held_rise of the rise at
-    the furthest horizon within hurdle.HOLD_NIGHTS. The only reader of the price forecast."""
-    steps = rises_of(inp).get(player, {})
+    the furthest horizon within hurdle.HOLD_NIGHTS. `steps` is the player's rises_of row when the caller has it. The only reader of the
+    price forecast."""
+    steps = rises_of(inp).get(player, {}) if steps is None else steps
     sale = sale_rises(inp, steps)
     near = [h for h in steps if h <= hurdle.HOLD_NIGHTS]
     hold = hurdle.held_rise(value, steps[max(near)]) if near else 0.0
@@ -358,10 +360,11 @@ def exit_of(inp: Inputs, player: str, value: float) -> hurdle.Exit:
 
 
 def held_locks(inp: Inputs, at: str | None) -> int:
-    """The locks a hold bought at `at` (a stamp of the inputs, None: the cut) crosses: those after it and within
-    hurdle.HOLD_NIGHTS nights of it."""
-    start = snapshot_stamp(at or cut())
-    assert start is not None
+    """The locks a hold bought at `at` (a stamp of the inputs; None: no lock is ahead) crosses: those after it and within
+    hurdle.HOLD_NIGHTS nights of it; 0 for None."""
+    start = snapshot_stamp(at) if at else None
+    if start is None:
+        return 0
     end = start + timedelta(days=hurdle.HOLD_NIGHTS)
     return sum(1 for x in inp.locks if (when := snapshot_stamp(x.lock)) is not None and start < when <= end)
 
@@ -456,9 +459,9 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
         n = hurdle.remaining(where.lock[0], last)
         stake = hurdle.stake(gain, n, rate, hurdle.Exit(value or 0.0), n)
         if status == "market" and asking is not None and k in curves:
-            exit = exit_of(inp, k, value or 0.0)
+            exit = exit_of(inp, k, value or 0.0, ahead.get(k, {}))
             if exit.hold > 0:
-                held = hurdle.hold_stake(gain, n, rate, exit, held_locks(inp, close))
+                held = hurdle.hold_stake(gain, n, rate, exit, held_locks(inp, arrival(locks, close)))
                 free = hurdle.bid(curves[k], asking, held)
                 if free is not None:
                     holds[k] = Hold(held, free, free.win * (held.proceeds - free.amount))

@@ -203,9 +203,12 @@ def hold_stake(points: float, n: int, rate: float, exit: Exit, k: int) -> Stake:
 
 
 def profit(stake: Stake, amount: float) -> float:
-    """The points the proceeds of a hold earn over a bid of amount, in_points of their difference at the stake's rate over its n:
-    0 for a stake whose capital is tied the whole window (k = n: the points alone), never negative, nonincreasing in amount."""
-    return 0.0 if stake.k >= stake.n else in_points(max(0.0, stake.proceeds - amount), stake.n, stake.rate)
+    """The points a hold earns beyond his own: in_points of the proceeds less the share k / n of them that tied the capital up, less
+    the bid of amount, less the stake's own points, never negative. 0 for a stake whose capital is tied the whole window (k = n:
+    the points alone); nonincreasing in amount and in k; 0 at any amount at or over cap(stake)."""
+    if stake.k >= stake.n:
+        return 0.0
+    return max(0.0, in_points(max(0.0, (1 - stake.k / stake.n) * stake.proceeds - amount), stake.n, stake.rate) - stake.points)
 
 
 def cap(stake: Stake) -> float:
@@ -334,7 +337,7 @@ def _selftest_hold() -> None:
         assert cap(hold_stake(2 * points, n, rate, Exit(2 * value, e.nights, e.rise, 2 * e.reserve, h), k)) - 2 * cap(s) < 1e-3, "scale-invariant"
         amount = rng.uniform(0.5, 1.5) * value
         assert profit(s, amount) >= 0 and profit(s, amount * 1.1) <= profit(s, amount) and profit(tied, amount) == 0.0, "never negative, falls with the bid, none when capital is tied"
-        assert abs(profit(s, 0.0) * 1e6 / (n * rate) - s.proceeds) < 1e-6 * max(1.0, s.proceeds) or s.k >= s.n
+        assert profit(s, max(cap(s), amount)) == 0.0 and profit(hold_stake(points, n, rate, e, k + 1), amount) <= profit(s, amount) + 1e-9, "nothing at or over the cap; nonincreasing in k"
         assert abs(in_points(2 * amount, n, rate) - 2 * in_points(amount, n, rate)) < 1e-9 and in_points(0.0, n, rate) == 0.0
     assert cap(hold_stake(0.0, 25, 0.045, Exit(1e6, hold=0.1), 1)) == (1 - 1 / 25) * held(Exit(1e6, hold=0.1)), "no points: the hold's proceeds less the share of the window the capital was tied"
 

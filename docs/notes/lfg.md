@@ -211,14 +211,14 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   lock), not once for the summed forecast. Checked against brute force.
 - **Holds (#145)**: a listing that rises is bought to hold. `decision.exit_of` is the one reader of the price forecast: the sale side reads the rows
   up to the next lock (`Inputs.nights`), the rise held within +-`TREND_CAP`; the hold reads the row at `HOLD_NIGHTS` (14, the fit is calibrated
-  there: fitted against realised rise over the 58-day panel agree up to a rise of 0.5, `HOLD_BOUND`) and credits `HOLD_EDGE` (0.5, the replay's
-  validated half) of it, for a player worth at most `HOLD_VALUE` (30M): `Exit.hold`, `hurdle.held_rise`. The price after the hold is
+  there: fitted against realised rise over the 58-day panel agree up to a rise of 0.5, `HOLD_BOUND`) and credits `HOLD_EDGE` (0.5: a conservative choice, the replay at half the
+  appreciation stays positive; at 0.75 and 1.0 the decided replay earns more) of it, for a player worth at most `HOLD_VALUE` (30M): `Exit.hold`, `hurdle.held_rise`. The price after the hold is
   `hurdle.held(exit)` = `draw(value)` x (1 + hold), and the buy's Stake is `hurdle.hold_stake` (cap = max(K x W, (1 - k / n) x held), k the locks
   the hold crosses) only when the hold is funded: `decision.held_bids` gives the cash at the lock (`rules.cash_at_lock` after the bids placed and
   the expected credit) and the free squad slots (`SQUAD_MAX`, bids pending counted) to the holds, best expected profit first; any other buy keeps
-  k = n (cap K x W: the points alone). `opportunity_rows` carries `profit` (`hurdle.profit`: the points of the proceeds over the bid, money x n x
+  k = n (cap K x W: the points alone). `opportunity_rows` carries `profit` (`hurdle.profit`: the points of the proceeds, net of the capital tied, over the bid and over his own points; money x n x
   LAMBDA) and orders by gain plus profit; the board adds it to the buy's gain in `approach(..., extra=)`, so the funding (bid margin, lock cash, the slot,
-  the sales) is `approach`'s as for every buy. Selling is not changed: a held riser is still sold by the rent rule at its reserve. Grade:
+  the sales) is `approach`'s as for every buy. A bid placed keeps its hold only while cash at the lock stays 0 or more (else k = n and the board lowers or withdraws it). Selling is not changed: a held riser is still sold by the rent rule at its reserve. Grade:
   `tools/lfg-rules holds` (the rules' grid) and `tools/lfg-rules decided` (the decision's own bids at the real winning prices, cash 30M at each cut).
 - **`approach.approach(club, player, bid, win, rounds)`**: how to get a buy: the sales tonight on the standing offers (they raise
   cash and the debt limit, `rules.bid_margin`), the sales after the auction by the lock (`rules.cash_at_lock`; the price of a
