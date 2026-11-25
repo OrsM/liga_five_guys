@@ -2,7 +2,7 @@
 name = "liga-five-guys"
 version = "0.1.0"
 description = "Data-driven decision system for LaLiga Fantasy -- one private league"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 
 # Four, and each earns it. The rule used to be "there is no fourth", which was
 # a rule this repo made up about itself rather than a constraint anybody
