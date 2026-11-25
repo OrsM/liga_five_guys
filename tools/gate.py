@@ -163,10 +163,23 @@ def environment(scratch: Path) -> dict[str, str]:
             "FF_ROOT": str(scratch / "data"), "MYPY_CACHE_DIR": str(cache)}
 
 
+def pinned() -> str:
+    """The interpreter version the repo pins (`.python-version`); every worktree's venv is built to it."""
+    return (ROOT / ".python-version").read_text().strip()
+
+
+def interpreter() -> str:
+    """The version of the Python that `uv run --frozen` gives this tree (building its venv if absent)."""
+    got = subprocess.run([*RUN, "python", "-c", "import platform; print(platform.python_version())"],
+                         cwd=ROOT, capture_output=True, text=True)
+    return got.stdout.strip() or "unknown"
+
+
 def gate(changed: Sequence[str] | None) -> int:
     waited = float(os.environ.get("LFG_GATE_WAIT", "0"))
     start = time.monotonic()
     checks = plan(changed)
+    print(f"gate: python {interpreter()} (pinned {pinned()})")
     times = json.loads(TIMES.read_text()) if TIMES.exists() else {}
     scratch = Path(tempfile.mkdtemp(prefix="selftests.", dir=Path.home() / ".cache"))
     try:
@@ -234,6 +247,9 @@ def _selftest() -> None:
     assert [r.name for r in got if not r.ok] == ["bad"], "a failure is reported as the check's own"
     mine = run_check(Check("x", [sys.executable, "-c", "import sys; print('out'); sys.exit(3)"]), {})
     assert not mine.ok and mine.output.strip() == "out", "a nonzero exit is a failure with its output"
+    floor = re.search(r'(?m)^requires-python = ">=([\d.]+)"', (ROOT / "pyproject.toml").read_text())
+    assert floor is not None and floor.group(1).startswith(pinned()), "the pin and requires-python name the same interpreter"
+    assert interpreter().startswith(pinned()), "uv run builds the pinned interpreter"
     print("gate selftest ok")
 
 
