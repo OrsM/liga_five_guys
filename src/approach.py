@@ -23,6 +23,8 @@ __all__ = ["Club", "Rounds", "Approach", "Plan", "Option", "Reserve", "Atom", "C
 
 
 class Club(NamedTuple):
+    """The squad with its positions, worths and standing offers, cash, team value, bids pending (count, money), the squad cap and debt
+    share, the credit due and `unlisted`: the players of the squad not on the market, who are drawn no offer at a close."""
     squad: frozenset[str]
     pos: Mapping[str, str]
     worth: Mapping[str, float]
@@ -33,6 +35,7 @@ class Club(NamedTuple):
     squad_max: int = SQUAD_MAX
     debt: float = DEBT_SHARE
     inflow: Inflow = NONE
+    unlisted: frozenset[str] = frozenset()
 
 
 class Rounds(NamedTuple):

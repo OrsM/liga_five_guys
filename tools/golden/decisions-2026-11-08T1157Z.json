@@ -38,6 +38,7 @@
   "lock_margin_low": -2381803.1635233983,
   "margin": 43386574.2,
   "net": -12.438045357299318,
+  "not_listed": [],
   "points_lost_if_lost": 12.438045357299318,
   "points_lost_if_won": 12.438045357299318,
   "raises": 2220850.0,

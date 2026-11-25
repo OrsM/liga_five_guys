@@ -40,6 +40,7 @@
   "lock_margin_low": -2688340.9719484644,
   "margin": 43286574.2,
   "net": -12.799961241190704,
+  "not_listed": [],
   "points_lost_if_lost": 12.799961241190704,
   "points_lost_if_won": 12.799961241190704,
   "raises": 2220850.0,
@@ -371,7 +372,7 @@
    ],
    "step": "plan",
    "what": "cover",
-   "why": "Cash -49.6M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Accept Arnau Ortiz's offer of 0.64M before 22:24 tonight. 3) Wait for the offers of Dani Martinez. On 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 Nov accept his new offer if it is 0.00M or more; on 20 Nov, before 21:00, accept whatever it is. 4) Wait for the offers of Ferran Jutgla. On 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 Nov accept his new offer if it is 14.24M or more; on 20 Nov, before 21:00, accept whatever it is. 5) If cash is still below 0 after that, sell Aitor Paredes (offer 29.22M), then, if still short, the cheapest other player. Expected: 12.8 points lost. Worst case 14.4 points, chance 9.3%. Not listed: Aitor Paredes; offers for them depend on the list line.",
+   "why": "Cash -49.6M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Accept Arnau Ortiz's offer of 0.64M before 22:24 tonight. 3) Wait for the offers of Dani Martinez. On 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 Nov accept his new offer if it is 0.00M or more; on 20 Nov, before 21:00, accept whatever it is. 4) Wait for the offers of Ferran Jutgla. On 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 Nov accept his new offer if it is 14.24M or more; on 20 Nov, before 21:00, accept whatever it is. 5) If cash is still below 0 after that, sell Aitor Paredes (offer 29.22M), then, if still short, the cheapest other player. Expected: 12.8 points lost. Worst case 14.4 points, chance 9.3%. Not listed, so no offer is drawn at the close for: Aitor Paredes.",
    "worst": {
     "p": 0.09258532576319792,
     "points": 14.422497478817377

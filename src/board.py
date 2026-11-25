@@ -225,7 +225,14 @@ def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[di
     return rows
 
 
+def not_listed_doc(club: Club, names: dict[str, str], sold: Iterable[str]) -> list[str]:
+    """The names of the players among `sold` who are not listed (club.unlisted), in name order."""
+    return sorted(names.get(k, k) for k in club.unlisted.intersection(sold))
+
+
 def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: float) -> Doc:
+    """The funding of a bid as a document: what is sold tonight and after its result, the room, the cash and points either way, and
+    `not_listed` the names sold after its result who are not listed (no offer is drawn for them)."""
     if found is None:
         return {"feasible": False, "short": None}
     if not found.feasible:
@@ -238,6 +245,7 @@ def funding_doc(club: Club, names: dict[str, str], found: Approach | None, bid: 
             "lock_margin_low": found.lock_margin_low,
             "if_won": [names.get(k, k) for k in sorted(found.if_won)], "if_lost": [names.get(k, k) for k in sorted(found.if_lost)],
             "held": [names.get(k, k) for k in sorted(found.held)], "cash_if_lost": found.cash_if_lost,
+            "not_listed": not_listed_doc(club, names, found.if_won | found.if_lost),
             "gain": found.gain, "points_lost_if_won": found.cost_won, "points_lost_if_lost": found.cost_lost, "net": found.net,
             "base": found.base}
 
@@ -284,6 +292,7 @@ def base_doc(club: Club, names: dict[str, str], base: Approach | None, found: Pl
         doc |= {"tonight": [{"name": names.get(k, k), "offer": club.offers[k], "ratio": club.offers[k] / club.worth[k] if club.worth[k] else None}
                             for k in sorted(found.now, key=lambda k: (-club.offers[k], k))],
                 "raises": sum(club.offers[k] for k in found.now), "if_won": waiting, "if_lost": waiting, "cash_if_lost": found.options[0].cash,
+                "not_listed": not_listed_doc(club, names, found.sells - found.now),
                 "held": [names.get(k, k) for k in sorted((frozenset(club.offers) & club.squad) - found.now)],
                 "lock_margin": found.options[0].cash, "points_lost_if_won": found.cost, "points_lost_if_lost": found.cost, "net": -found.cost}
     return doc
@@ -621,11 +630,10 @@ def waiting_why(least: Sequence[float], closes: Sequence[str]) -> str:
         price_text(max(body)), " or ".join(day_text(d) for d in days[:len(body)]), last)
 
 
-def advice_text(club: Club, names: dict[str, str], best: Option, second: Option | None, clock: Clock, at: dt.datetime,
-                listed: frozenset[str]) -> str:
+def advice_text(club: Club, names: dict[str, str], best: Option, second: Option | None, clock: Clock, at: dt.datetime) -> str:
     """The cover in words for a reader: cash and lock, what to accept now (before which close), for each player waited for what to refuse
-    and accept day by day, the fallback if cash is still short, the points expected and the worst case; players not listed are named,
-    their offers depending on the list line."""
+    and accept day by day, the fallback if cash is still short, the points expected and the worst case; the players of the plan not listed (club.unlisted) are named,
+    no offer being drawn for them."""
     lock = local(clock.lock) if clock.lock else None
     today = at.astimezone(MADRID).date()
     out = ["Cash %.1fM%s." % (club.cash / 1e6, "; lock " + lock_text(lock) if lock else "")]
@@ -647,9 +655,9 @@ def advice_text(club: Club, names: dict[str, str], best: Option, second: Option 
     if second is not None and second.now - best.now:
         instead = " (selling %s today instead: %.1f)" % (" and ".join(names.get(k, k) for k in sorted(second.now - best.now)), second.points)
     out.append("Expected: %.1f points lost%s. Worst case %.1f points, chance %.1f%%." % (best.points, instead, best.worst, 100.0 * best.p_worst))
-    unlisted = sorted((frozenset(r.player for r in best.wait) | frozenset(best.fallback)) - listed)
+    unlisted = sorted(club.unlisted & (frozenset(r.player for r in best.wait) | frozenset(best.fallback)))
     if unlisted:
-        out.append("Not listed: %s; offers for them depend on the list line." % ", ".join(names.get(k, k) for k in unlisted))
+        out.append("Not listed, so no offer is drawn at the close for: %s." % ", ".join(names.get(k, k) for k in unlisted))
     return " ".join(out)
 
 
@@ -679,8 +687,7 @@ def act_rows(club: Club, plan: Plan, sells: Sequence[Doc], names: dict[str, str]
                            else "keeping him protects %.1f points and the cash at the lock is covered without him" % lost}
 
 
-def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clock, sells: Sequence[Doc], listed: frozenset[str],
-                at: dt.datetime) -> list[Doc]:
+def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clock, sells: Sequence[Doc], at: dt.datetime) -> list[Doc]:
     """The lines of do that bring cash to 0 or more at the lock when it is below 0, from the plan (approach.plan, then approach.secure): one
     "cover" line first for the recommended option (`why` the advice in words, advice_text; `sells` its terms, `options` all the options,
     points_lost and cash_after its expectations, `worst` its worst case with its chance); a "sell" line for each of its sales taken now
@@ -711,7 +718,7 @@ def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clo
     head = {"what": "cover", "label": "cover the cash: " + ", ".join(t["name"] for t in moves), "step": "plan", "needed": True,
             "sells": moves, "options": [option_doc(club, o, names, untils) for o in plan.options], "points_lost": best.points, "cash": club.cash,
             "cash_after": best.cash, "worst": {"points": best.worst, "p": best.p_worst}, "lock": clock.lock,
-            "why": advice_text(club, names, best, second, clock, at, listed), "accepts": [], "act": []}
+            "why": advice_text(club, names, best, second, clock, at), "accepts": [], "act": []}
     out = [head] + [{**r, "needed": True, "why": why, "set_points_lost": plan.cost, "set_cash_after": best.cash, **risk_doc(club, before)} for r in taken]
     waiting = sorted(plan.sells - plan.now)
     if waiting and clock.lock:
@@ -752,13 +759,14 @@ def arrival_rows(got: Sequence[dict[str, Any]], arrivals: Sequence[str]) -> list
 
 
 def club_at(inp: decision.Inputs, extras: decision.Extras) -> tuple[Club, Rounds]:
-    """The Club of the inputs (squad, positions, worths, standing offers, cash, bids pending, the credit due) and the Rounds its sales
+    """The Club of the inputs (squad, positions, worths, standing offers, cash, bids pending, the credit due, who is not listed) and the Rounds its sales
     are valued over (the jornadas the next lock counts for, one window for the sales and the buys)."""
     mine = decision.squad_of(inp)
     pos = {p.player: p.pos for p in inp.players if p.pos in POSITIONS}
     _, cells = decision.cells_of(inp)
     club = Club(mine, pos, {h.player: h.value for h in extras.held}, {o.player: o.money for o in extras.offers}, inp.money.cash,
-                inp.money.team_value, (len(inp.bids), sum(b.amount for b in inp.bids)), debt=inp.money.debt, inflow=inflow_of(inp.credits, mine, pos, cells))
+                inp.money.team_value, (len(inp.bids), sum(b.amount for b in inp.bids)), debt=inp.money.debt, inflow=inflow_of(inp.credits, mine, pos, cells),
+                unlisted=mine - extras.listed)
     window = decision.window_of(decision.lock_times(inp), cells, None)
     return club, Rounds(cells, window, window)
 
@@ -792,7 +800,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     settle(sells, found.sells if found is not None and found.feasible else frozenset(), found.now if found is not None else frozenset())
     at = snapshot_stamp(cut())
     assert at is not None
-    owed = cover_lines(names, club, found, clock, sells, extras.listed, at) if locks else []
+    owed = cover_lines(names, club, found, clock, sells, at) if locks else []
     if locks and club.cash < 0 and found is not None:
         act_rows(club, found, sells, names, clock)
     sold = (found.sells if found is not None and found.feasible else frozenset()) | {s["key"] for s in sells if s["verdict"] == "sell"}
@@ -1153,8 +1161,9 @@ def _selftest_cover() -> None:
                   "for": [k] if rng.random() < 0.15 else []} for k in sorted(offers)]
         found = secure(club, base_plan, Side(club.squad, own, {1: points}, (1,)), dist, n_closes) if cash < 0 else base_plan
         listed = frozenset(offers) | frozenset(rng.sample(sorted(own), rng.randint(0, len(own))))
+        club = club._replace(unlisted=frozenset(own) - listed)
         at = dt.datetime(2026, 11, 26 - n_closes, 9, 0, tzinfo=dt.timezone.utc)
-        rows = cover_lines({k: k for k in own}, club, found, clock, sells, listed, at)
+        rows = cover_lines({k: k for k in own}, club, found, clock, sells, at)
         if cash >= 0:
             assert rows == [], "cash 0 or more: no line, the board is unchanged"
             seen_empty += 1
@@ -1226,8 +1235,34 @@ def _selftest_cover() -> None:
     assert lineup_doc(inp, names) == lineup_doc(inp, names, frozenset()), "no sales: the lineup of the squad"
 
 
+def _selftest_not_listed() -> None:
+    rng = random.Random(148)
+    seen = 0
+    for _ in range(40):
+        own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
+        pos = own | {"star": "DEL"}
+        cells = {j: {k: rng.choice([0, 1, 2, 3, 5]) * 1.0 for k in own} | {"star": 18.0} for j in (1, 2, 3)}
+        worth = {k: rng.choice([2e6, 4e6, 6e6]) for k in own} | {"star": 9e6}
+        offers = {k: worth[k] * 1.0 for k in rng.sample(sorted(own), 5)}
+        gone = frozenset(rng.sample(sorted(own), rng.randint(0, len(own))))
+        club = Club(frozenset(own), pos, worth, offers, rng.choice([-5e6, 0.0, 4e6]), 5e7, unlisted=gone)
+        rounds = Rounds(cells, valuation.Window((1, 2, 3)), valuation.Window((2, 3)))
+        found = approach(club, "star", 9e6, 0.6, rounds)
+        names = {k: k.upper() for k in own}
+        doc = funding_doc(club, names, found, 9e6)
+        if found is None or not found.feasible:
+            continue
+        sold_after = found.if_won | found.if_lost
+        assert doc["not_listed"] == sorted(names[k] for k in sold_after & gone), "the funding names every sale after the result who is not listed"
+        assert set(doc["not_listed"]) <= set(doc["if_won"]) | set(doc["if_lost"]), "and only those"
+        assert not_listed_doc(club._replace(unlisted=frozenset()), names, sold_after) == [], "everyone listed: nothing said"
+        seen += bool(doc["not_listed"])
+    assert seen > 0, "the cases include a sale of a player not listed"
+
+
 def _selftest() -> None:
     _selftest_cover()
+    _selftest_not_listed()
     _selftest_buys()
     _selftest_params()
     _selftest_alerts()
