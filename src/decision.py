@@ -15,7 +15,7 @@ Named rules, each tested:
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence
 
 import eleven
