@@ -38,7 +38,7 @@ import valuation
 from inflow import Credit, credit_at, inflow_of
 from valuation import Window, window_at
 
-__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "arrival", "window_value", "curves_of", "clock_of", "opportunity_rows",
+__all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "next_close", "arrival", "window_value", "curves_of", "clock_of", "opportunity_rows",
            "Fact", "UNKNOWN", "Offer", "Held",
            "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions",
            "latest_auction_run", "brier_by_scope", "drifting_bins"]
@@ -304,9 +304,14 @@ def lock_times(inp: Inputs) -> dict[int, str]:
 
 
 def arrival(locks: dict[int, str], close: str | None) -> str | None:
-    """The moment a player bought arrives: his auction's close, or for one with no auction (close None) the first lock
-    (None when no lock is ahead)."""
+    """The moment a player bought arrives: the close given, or when none (close None) the first lock (None when no lock is ahead)."""
     return close or min(locks.values(), default=None)
+
+
+def next_close(inp: Inputs) -> str | None:
+    """The earliest auction close ahead among the listings on the market (None when none is listed): no player who is
+    not on the market yet can arrive before it."""
+    return min((x.close for x in inp.closes), default=None)
 
 
 def window_of(locks: dict[int, str], cells: dict[int, dict[str, float]], close: str | None) -> Window:
@@ -411,13 +416,15 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
     auction curve, the bid hurdle.bid makes on it (bid and win None when there is none). A buy is for his points alone, capital
     tied the whole window, unless the listing is a hold the cash funds (held_bids: his price forecast credits a rise, cash at the
     lock and a squad slot are left): then his Stake is hurdle.hold_stake and `profit` the points his expected proceeds less the bid
-    are worth (0 for any other row). Most points plus profit first."""
+    are worth (0 for any other row). A row's `window` is read from his auction's close; a player not yet on the market arrives no sooner than the
+    next auction close (next_close). Most points plus profit first."""
     pos, cells = cells_of(inp)
     last = max(cells, default=0)
     mine = squad_of(inp)
     curves = curves_of(inp)
     locks = lock_times(inp)
     closes = {x.player: x.close for x in inp.closes}
+    soonest = next_close(inp)
     placed = {x.player: x.amount for x in inp.bids}
     ahead = rises_of(inp)
     fielded = lineup_of(inp, pos).eleven
@@ -429,7 +436,7 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
         if k not in pos or not any(k in at for at in cells.values()):
             continue
         close = closes.get(k) if status == "market" else None
-        where = window_of(locks, cells, close)
+        where = window_of(locks, cells, close if status == "market" else soonest)
         if not where:
             continue
         if where not in seen:
@@ -458,7 +465,7 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
             made = hurdle.bid(curves[k], asking, stake)
             bid, win = (made.amount, made.win) if made is not None else (None, None)
         out.append({
-            "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "from_j": where.lock[0],
+            "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "window": where, "from_j": where.lock[0],
             "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
             "price_next": steps[1] if 1 in steps else None,
             "price_lock": steps[max(steps)] if steps else None,
@@ -642,7 +649,14 @@ def _selftest_opportunities() -> None:
         "on the market with no curve: his gain is said, no bid or chance is made up"
     assert got["keeper"]["gain"] == 0.0 and got["keeper"]["replaces"] == "k", "a worse keeper would replace the keeper and adds nothing"
     assert got["late"]["gain"] == 7.0 and got["late"]["from_j"] == 2, "an auction closing after jornada 1's lock counts from jornada 2: your eleven is frozen at the lock"
-    assert got["rival"]["status"] == "rival" and got["rival"]["bid"] is None and got["rival"]["gain"] == 10.0, "a target is judged without being on sale"
+    assert got["rival"]["status"] == "rival" and got["rival"]["bid"] is None, "a target is judged without being on sale"
+    assert got["rival"]["gain"] == 5.0 and got["rival"]["from_j"] == 2, \
+        "a target arrives at the next auction close at the earliest, here after jornada 1's lock: it cannot score jornada 1"
+    early = {r["player"]: r for r in opportunity_rows(inp._replace(closes=[Close("late", "2026-11-05T21:24Z")]))}
+    unknown = {r["player"]: r for r in opportunity_rows(inp._replace(closes=[]))}
+    assert early["rival"]["gain"] == unknown["rival"]["gain"] == 10.0 and early["rival"]["from_j"] == unknown["rival"]["from_j"] == 1, \
+        "a next close before the lock, or none known (the next lock then): the jornada that locks counts"
+    assert got["rival"]["from_j"] == got["late"]["from_j"], "a target and a buy closing at the next close share a window"
     assert got["free"]["status"] == "unlisted" and got["free"]["gain"] == 0.0 and all(r["gain"] >= 0 for r in got.values()), "a gain is never negative"
     assert abs(got["star"]["price_next"] - 0.05) < 1e-12 and abs(got["star"]["price_lock"] - 0.10) < 1e-12 and got["good"]["price_next"] is None
     assert got["star"]["per_million"] == 12.0 / 8.0, "points a million of his asking price"

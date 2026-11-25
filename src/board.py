@@ -436,7 +436,24 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
             "funding": funding, "accepts": [], "act": []})
     placed_lines = [b for b in out if b["done"]]
     shown, left = ranked([b for b in out if not b["done"]])
-    return placed_lines + shown, left + passed
+    lines = placed_lines + shown
+    overlapped(inp, lines, {r["player"]: r for r in got})
+    return lines, left + passed
+
+
+def overlapped(inp: decision.Inputs, lines: list[Doc], got: dict[str, dict[str, Any]]) -> None:
+    """Sets `gain_with_better` on each buy line: the points he adds over his window to the squad plus the buys above him that are
+    not holds; adds a fact when it is below his `gain`. The first line's is its own gain."""
+    pos, cells = decision.cells_of(inp)
+    squad = decision.squad_of(inp)
+    above: frozenset[str] = frozenset()
+    for b in lines:
+        r = got[b["key"]]
+        b["gain_with_better"] = valuation.Buyer(squad | above, r["window"], pos, cells).gain(b["key"])
+        if b["gain_with_better"] < b["gain"]:
+            b["facts"].append(["points added if the buys above are won too", b["gain_with_better"], "points"])
+        if r["profit"] <= 0:
+            above = above | {b["key"]}
 
 
 def target_lines(names: dict[str, str], got: list[dict[str, Any]]) -> list[Doc]:
@@ -1113,6 +1130,41 @@ def _selftest_buys() -> None:
             assert len(shown) + considered == len(lines), "every line is shown or counted"
 
 
+def _selftest_overlap() -> None:
+    rng = random.Random(5)
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
+    market = {"%s%d" % (p, i): p for p in shape for i in range(10, 13)}
+    falls = 0
+    for _ in range(30):
+        inp = _inp_of(squad, market)
+        late = rng.choice(sorted(market))
+        inp = inp._replace(universe=[decision.Candidate(k, p, "market", 1e6, 1e6) for k, p in market.items()],
+                           locks=[decision.Lock(1, "2026-11-06T20:00Z"), decision.Lock(2, "2026-11-13T20:00Z")],
+                           closes=[decision.Close(late, "2026-11-06T21:24Z")],
+                           cells=[decision.Cell(c.player, c.jornada, rng.choice([0.0, 1.0, 3.0, 6.0, 9.0])) for c in inp.cells])
+        rows = decision.opportunity_rows(inp)
+        got = {r["player"]: r for r in rows}
+        lines: list[Doc] = [{"key": r["player"], "gain": r["gain"], "facts": []} for r in rows]
+        overlapped(inp, lines, got)
+        if not lines:
+            continue
+        assert lines[0]["gain_with_better"] == lines[0]["gain"] and not lines[0]["facts"], "the first line is its own gain"
+        pos, cells = decision.cells_of(inp)
+        mine = decision.squad_of(inp)
+        for i, b in enumerate(lines):
+            above = frozenset(x["key"] for x in lines[:i])
+            window = got[b["key"]]["window"]
+
+            def value(extra: frozenset[str]) -> float:
+                return sum(eleven.points(mine | extra, pos, cells[j]) or 0.0 for j in window)
+
+            assert abs(b["gain_with_better"] - (value(above | {b["key"]}) - value(above))) < 1e-9, "the gain over the squad with the buys above, over his own window"
+            assert b["gain_with_better"] >= -1e-9 and (b["gain_with_better"] < b["gain"]) == bool(b["facts"]), "a fact exactly when the gain falls"
+            falls += bool(b["facts"])
+    assert falls > 0, "an overlap was exercised"
+
+
 def _selftest_placed() -> None:
     rng = random.Random(21)
     shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
@@ -1132,7 +1184,7 @@ def _selftest_placed() -> None:
         rate = rng.choice([0.045, 0.1, 0.3])
         got: list[dict[str, Any]] = [{"player": k, "pos": market[k], "status": "market", "asking": 10e6, "bid": None, "win": None, "close_at": None, "replaces": "POR0",
                 "gain": rng.choice([0.0, 0.5, 3.0, 20.0, 60.0]), "per_million": None, "from_j": 1, "price_next": None, "price_lock": None,
-                "placed": mine.get(k), "profit": 0.0} for k in keys]
+                "placed": mine.get(k), "profit": 0.0, "window": decision.window_of({}, cells, None)} for k in keys]
         for r in got:
             r["stake"] = hurdle.stake(r["gain"], hurdle.remaining(1, max(cells)), rate, hurdle.Exit(r["asking"]), 1)
         shown, considered = buy_lines(inp, names, club, got, 0.0)
@@ -1369,6 +1421,7 @@ def _selftest() -> None:
         assert (at.to is None) == (at.move in ("hold", "withdraw"))
         (line,) = target_lines({}, [row(placed)])
         assert line["placed"] == placed, "a target with your bid on him says it beside the advised one"
+    _selftest_overlap()
     _selftest_placed()
     print("board self-test OK")
 
