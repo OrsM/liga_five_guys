@@ -154,7 +154,7 @@ Sources: LaLiga Fantasy help ([clauses](https://laligafantasy.zendesk.com/hc/en-
     python tools/golden.py --live [check|bless]   # the same at the 5 live cuts, over the parse cache
     python tools/auction_table.py                 # regenerates ffcore/auction_table.py; bless the goldens with it
     tools/lfg-rules                               # the sale rules over every replay cut, on a scratch copy (~3 min)
-    tools/lfg-rules holds | decided               # the hold back-test (#145) over a grid of policies | over the decision's own hold bids (~1 min)
+    tools/lfg-rules holds | decided               # the hold back-test (#145) over a grid of policies | over the decision's own hold bids, sold by the momentum exit and by the sale rule (~1 min)
     python tools/cases.py report                  # seven real players end to end (tools/cases/league.json.xz, a
                                                   # slice of the league as ingest stored it): expected vs actual by stage
     tools/lfg-dry-run [stage ... | --compare CUT...]  # the full run against a scratch copy, or a pinned before/after vs main; nothing published

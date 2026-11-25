@@ -217,8 +217,13 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   the expected credit) and the free squad slots (`SQUAD_MAX`, bids pending counted) to the holds, best expected profit first; any other buy keeps
   k = n (cap K x W: the points alone). `opportunity_rows` carries `profit` (`hurdle.profit`: the points of the proceeds over the bid and over his own points; money x n x
   LAMBDA) and orders by gain plus profit; the board adds it to the buy's gain in `approach(..., extra=)`, so the funding (bid margin, lock cash, the slot,
-  the sales) is `approach`'s as for every buy. A bid placed keeps its hold only while cash at the lock stays 0 or more (else k = n and the board lowers or withdraws it). Selling is not changed: a held riser is still sold by the rent rule at its reserve. Grade:
-  `tools/lfg-rules holds` (the rules' grid) and `tools/lfg-rules decided` (the decision's own bids at the real winning prices, cash 30M at each cut).
+  the sales) is `approach`'s as for every buy. A bid placed keeps its hold only while cash at the lock stays 0 or more (else k = n and the board lowers or withdraws it). A held riser is sold by the same Exit (#149): `worth.sale_reserve`, the reserve `worth.rent` takes, reads a sale that loses no points through
+  `hurdle.holding(exit)` (HOLD_NIGHTS nights, the hold as the rise, so the later price is `hurdle.held`), stopped at the closes left by the one stopping rule
+  (`worth.waiting_values`): he is not sold under what holding him is expected to fetch, where it was the capped sale rise (+3%), which turned the hold into a
+  flip. A sale that loses points, the cash cover and the `reserves` rows read the capped sale rise as before. Grade: `tools/lfg-rules holds` (the rules' grid) and
+  `tools/lfg-rules decided` (the decision's own bids at the real winning prices, cash 30M at each cut): rows `momentum` (the grid's exit: sold when the 3-day change is 0
+  or less) and `rule` (sold by `worth.sale_reserve` against one of the night's offers, mean of `RULE_DRAWS` seeds, `se` its standard error), for the decision's bids and
+  for the grid's headline buys (`hl`).
 - **`approach.approach(club, player, bid, win, rounds)`**: how to get a buy: the sales tonight on the standing offers (they raise
   cash and the debt limit, `rules.bid_margin`), the sales after the auction by the lock (`rules.cash_at_lock`; the price of a
   player with no offer is `SALE_ESTIMATE` x his value, and the lock margin is also shown with those sales `SALE_SD` lower),

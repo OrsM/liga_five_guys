@@ -160,6 +160,12 @@ def held(exit: Exit) -> float:
     return draw(exit.value) * (1 + exit.hold)
 
 
+def holding(exit: Exit) -> Exit:
+    """The exit of a player kept to his hold: HOLD_NIGHTS nights and his hold as the rise, so its later price is held(exit) and a night's
+    rise hold / HOLD_NIGHTS. The exit itself when he has no hold."""
+    return exit._replace(nights=HOLD_NIGHTS, rise=exit.hold) if exit.hold > 0 else exit
+
+
 def in_points(money: float, n: int, rate: float) -> float:
     """The points a sum of money is worth over n jornadas at rate: money x n x rate in millions (W = P / (n x rate) read the
     other way). Linear in money, zero at zero."""
@@ -368,6 +374,14 @@ def _selftest_exit() -> None:
         assert later(flat) == draw(value) and wait_cost(flat) == 0.0, "no rise: the draw, and waiting is free"
         assert proceeds(flat) == draw(value) and proceeds(e._replace(reserve=2 * value)) == max(2 * value, later(e))
     assert wait_cost(Exit(0.0, 10, 0.5)) == 0.0
+    for _ in range(500):
+        e = Exit(rng.uniform(1e5, 5e7), rng.randint(1, 12), rng.uniform(-0.3, 0.3), rng.uniform(0.0, 3e7), rng.choice([0.0, rng.uniform(0.0, 0.25)]))
+        k = holding(e)
+        assert holding(k) == k and k.value == e.value and k.reserve == e.reserve, "idempotent, keeps the value and the reserve"
+        if e.hold > 0:
+            assert abs(later(k) - held(e)) < 1e-6 and (k.nights, k.rise) == (HOLD_NIGHTS, e.hold) and abs(wait_cost(k) * HOLD_NIGHTS + e.hold) < 1e-12, "kept to his hold: later is held, a night's rise is the hold's share"
+        else:
+            assert k == e, "no hold: the exit itself"
 
 
 def _selftest_stand() -> None:

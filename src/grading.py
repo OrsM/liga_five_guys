@@ -5,6 +5,7 @@ import datetime as dt
 import math
 import os
 import random
+import statistics
 import sys
 from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
@@ -20,7 +21,7 @@ import salegrade
 import valuation
 import worth
 from approach import Club, Option, Plan, Rounds, Side, approach, cover, plan, secure
-from board import club_at, context, offers_at, stamped, standing
+from board import club_at, context, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
 from ffcore.clock import CLOSE, MADRID, Clock, run_now
@@ -1355,7 +1356,7 @@ def averaged(rows: Sequence[HoldStats]) -> HoldStats:
 def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash: float) -> str:
     """The hold replay of the decision's own bids (HoldDay.advised: the holds it funds with cash `cash` at each daily cut) on the
     real winning prices, constraints as the grid's (HOLD_SCENARIOS): two lines of the HoldStats as hold_report prints them and the M per
-    week at half the appreciation and under each constraint. `momentum` ends a hold as the grid does (the MOMENTUM_DAYS change 0 or
+    week at half the appreciation and under each constraint; and the same two exits on the grid's HEADLINE buys (`hl`). `momentum` ends a hold as the grid does (the MOMENTUM_DAYS change 0 or
     less); `rule` sells it as the decision does: a night's offer (one of the day's, drawn by each of RULE_DRAWS seeds, the figures their
     mean) at or over the reserve of worth.sale_reserve."""
     panel = hold_panel(replay)
@@ -1365,21 +1366,25 @@ def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash
     weeks = max(1, len(days)) / 7
     advised = sum(1 for x in listings if hold_bid(DECIDED, x, panel) is not None)
 
-    def stats(exit: str, rule: Constraint | None = None, edge: float = 1.0) -> HoldStats:
-        return averaged([hold_stats(holds_of(DECIDED if exit == "momentum" else DECIDED._replace(draw=i), listings, panel, locks, rule), panel, days, season, edge)
-                         for i in range(1 if exit == "momentum" else RULE_DRAWS)])
+    def draws(policy: HoldPolicy, rule: Constraint | None = None, edge: float = 1.0) -> list[HoldStats]:
+        return [hold_stats(holds_of(policy if policy.draw is None else policy._replace(draw=i), listings, panel, locks, rule), panel, days, season, edge)
+                for i in range(1 if policy.draw is None else RULE_DRAWS)]
 
-    def line(exit: str) -> str:
-        s = stats(exit)
-        return "%-8s %5.1f %5.1f %4.0f%% %8.1f%% %8.2f%% %6.1f %6.1f %4.0f%% %5.1f %5.1f %6.1f %6.1f %6.1f %6.1f %7.1f | %9.1f%s" % (
-            exit, s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day, s.gain / 1e6 / weeks, s.capital / 1e6,
+    def stats(policy: HoldPolicy, rule: Constraint | None = None, edge: float = 1.0) -> HoldStats:
+        return averaged(draws(policy, rule, edge))
+
+    def line(label: str, policy: HoldPolicy) -> str:
+        s, each = stats(policy), [x.gain / 1e6 / weeks for x in draws(policy)]
+        spread = statistics.stdev(each) / math.sqrt(len(each)) if len(each) > 1 else 0.0
+        return "%-8s %5.1f %5.1f %4.0f%% %8.1f%% %8.2f%% %6.2f %4.2f %6.1f %4.0f%% %5.1f %5.1f %6.1f %6.1f %6.1f %6.1f %7.1f | %9.2f%s" % (
+            label, s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day, s.gain / 1e6 / weeks, spread, s.capital / 1e6,
             100 * s.hit, s.loss_weeks, s.players, s.first_half / 1e6, s.second_half / 1e6, s.gain / 1e6, s.points / 1e6, s.above_mean / 1e6,
-            stats(exit, None, 0.5).gain / 1e6 / weeks, "".join("  %7.1f" % (stats(exit, c).gain / 1e6 / weeks) for c in HOLD_SCENARIOS.values()))
+            stats(policy, None, 0.5).gain / 1e6 / weeks, "".join("  %7.2f" % (stats(policy, c).gain / 1e6 / weeks) for c in HOLD_SCENARIOS.values()))
     return "\n".join([
         "decided holds: %d days from %s, cash %.0fM at each cut, %d listings, %d with an advised bid; M per week = gain / %.1f weeks" % (
             len(days), since, cash / 1e6, len(listings), advised, weeks),
-        "exit      bids  won win%  ret/trade ret/capday  M/wk  cap M  hit% lossw   ind  half1  half2  price  pts+  pts>mean |  half-edge" + "".join("  %7s" % k for k in HOLD_SCENARIOS),
-        line("momentum"), line("rule")])
+        "exit      bids  won win%  ret/trade ret/capday  M/wk   se  cap M  hit% lossw   ind  half1  half2  price  pts+  pts>mean |  half-edge" + "".join("  %7s" % k for k in HOLD_SCENARIOS),
+        line("momentum", DECIDED), line("rule", DECIDED._replace(draw=0)), line("hl mom", HEADLINE), line("hl rule", HEADLINE._replace(draw=0))])
 
 
 def decided_replay(loaded: loader.Loaded, cuts: Sequence[str], cash: float = 30e6) -> str:
@@ -2162,22 +2167,22 @@ def _selftest_holds() -> None:
     for reserve in (0.0, 1.0, 1.1, math.inf):
         night = {d: v._replace(offers=ratios, reserves={k: reserve for k in names}) for d, v in panel.items()}
         for listing in listings:
-            sold = HoldPolicy(None, math.inf, 0.0, 14, 3)
-            got = hold_exit(sold, listing, night)
-            assert got == hold_exit(sold, listing, night), "the draw is the seed's, the player's and the day's alone"
+            by_rule = HoldPolicy(None, math.inf, 0.0, 14, 3)
+            out = hold_exit(by_rule, listing, night)
+            assert out == hold_exit(by_rule, listing, night), "the draw is the seed's, the player's and the day's alone"
             limit = listing.day + dt.timedelta(days=14)
-            if got is None:
+            if out is None:
                 continue
-            if got.closed:
-                assert got.price is not None and any(abs(got.price / night[got.day].values[listing.player] - x) < 1e-9 for x in ratios.ratios), "sold at one of the night's offers"
-                assert got.day == limit or got.price / night[got.day].values[listing.player] >= reserve, "before the limit only an offer at the reserve sells"
-                assert reserve > 0.9 or got.day == listing.day + dt.timedelta(days=1), "a reserve at the lowest offer sells the first night"
-                early = {d: v for d, v in night.items() if d <= got.day}
-                assert hold_exit(sold, listing, early) == got, "no day after the sale is read"
+            if out.closed:
+                assert out.price is not None and any(abs(out.price / night[out.day].values[listing.player] - x) < 1e-9 for x in ratios.ratios), "sold at one of the night's offers"
+                assert out.day == limit or out.price / night[out.day].values[listing.player] >= reserve, "before the limit only an offer at the reserve sells"
+                assert reserve > 0.9 or out.day == listing.day + dt.timedelta(days=1), "a reserve at the lowest offer sells the first night"
+                early = {d: v for d, v in night.items() if d <= out.day}
+                assert hold_exit(by_rule, listing, early) == out, "no day after the sale is read"
                 if reserve == math.inf:
-                    assert got.day == limit, "a reserve nothing reaches holds to the limit"
-            position = Position(listing, 100.0, 100.0, got.day, got.value, got.closed, got.price)
-            assert abs(gain_of(position) - ((got.price if got.closed else got.value) - 100.0)) < 1e-9
+                    assert out.day == limit, "a reserve nothing reaches holds to the limit"
+            position = Position(listing, 100.0, 100.0, out.day, out.value, out.closed, out.price)
+            assert abs(gain_of(position) - ((out.value if not out.closed else out.price if out.price is not None else hurdle.draw(out.value)) - 100.0)) < 1e-9
     stats = [HoldStats(1, 2, 3.0, 4.0, 5.0, 6.0, 7.0, 8, 9, 10.0, 11.0, 12.0, 13.0), HoldStats(3, 4, 5.0, 6.0, 7.0, 8.0, 9.0, 10, 11, 12.0, 13.0, 14.0, 15.0)]
     assert averaged(stats) == HoldStats(2, 3, 4.0, 5.0, 6.0, 7.0, 8.0, 9, 10, 11.0, 12.0, 13.0, 14.0) and averaged(stats[:1]) == stats[0]
 

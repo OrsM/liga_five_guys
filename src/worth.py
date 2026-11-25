@@ -149,10 +149,12 @@ def sale_reserve(lost: float, n: int, rate: float, exit: hurdle.Exit, dist: Offe
     """The least offer, in euros, at which selling a player of this exit is worth it when the sale loses `lost` points over n
     jornadas at rate with `closes` closes left before the lock (hurdle.reserve of his Stake). A sale that loses points (more than
     NO_LOSS) is taken at (W + drift) / K: the offer above which his yield, drift included, is under the rate's bar. One that loses
-    none is taken at that or at what waiting for the best offer nets (stopped), whichever is more."""
+    none is taken at that or at what waiting for the best offer of the closes left nets (stopped), whichever is more; a player with a
+    hold (Exit.hold, the rise the buy credited) is kept to it (hurdle.holding): not sold under what holding him is expected to fetch
+    (hurdle.held), as the buy priced him, not at the capped rise of the sale."""
     if lost > NO_LOSS:
         return hurdle.reserve(hurdle.stake(lost, n, rate, exit)._replace(proceeds=0.0))
-    return hurdle.reserve(hurdle.stake(lost, n, rate, stopped(exit, dist, closes)))
+    return hurdle.reserve(hurdle.stake(lost, n, rate, stopped(hurdle.holding(exit), dist, closes)))
 
 
 def rent(standing: Standing, ctx: Context) -> Verdict:
@@ -281,6 +283,28 @@ def _selftest_option() -> None:
     assert not take_now(0.99, 0.49, False) and not take_now(None, None, False), "else left listed"
 
 
+def _selftest_hold() -> None:
+    study = _histogram((80, 80, 84, 82, 85, 72, 96, 71, 67, 33), 0.90, 0.021)
+    rng = random.Random(5)
+    for _ in range(300):
+        value, rise, closes = rng.uniform(1e5, 3e7), rng.uniform(-0.03, 0.03), rng.randint(0, 6)
+        n, rate = rng.randint(1, 30), rng.uniform(0.01, 0.1)
+        e = hurdle.Exit(value, rng.randint(1, 7), rise)
+        assert sale_reserve(0.0, n, rate, e, study, closes) == hurdle.reserve(hurdle.stake(0.0, n, rate, stopped(e, study, closes))), "no hold: the capped sale, stopped at the closes left"
+        holds = sorted(rng.uniform(0.001, 0.25) for _ in range(4))
+        reserves = [sale_reserve(0.0, n, rate, e._replace(hold=h), study, closes) for h in holds]
+        assert all(a <= b + 1e-6 for a, b in zip(reserves, reserves[1:])), "a bigger hold never lowers the reserve"
+        for h, r in zip(holds, reserves):
+            held = e._replace(hold=h)
+            assert r >= hurdle.held(held) - 1e-6, "a held player is not sold under what holding him fetches: the buy's price and the sale's agree"
+            assert sale_reserve(0.0, n, rate, held, study, closes + 1) >= r - 1e-6, "more closes left never lowers it"
+            assert sale_reserve(0.0, n, rate, held, NO_OFFERS, closes) == max(hurdle.held(held), h * value / hurdle.K), "no offers seen: held"
+    pts = hurdle.Exit(1e7, 3, 0.02, hold=0.1)
+    for lost in (0.5, 3.0):
+        assert sale_reserve(lost, 10, 0.045, pts, study, 4) == sale_reserve(lost, 10, 0.045, pts._replace(hold=0.0), study, 0) == hurdle.reserve(
+            hurdle.stake(lost, 10, 0.045, pts)._replace(proceeds=0.0)), "a sale that loses points reads no hold, no waiting"
+
+
 def _lost(player: str, ctx: Context) -> Mapping[str, float] | None:
     sale = ctx.sale(player)
     return None if sale.points is None else {n: 0.0 - v for n, v in sale.window.items() if v is not None}
@@ -388,6 +412,7 @@ def _selftest() -> None:
     rule: Rule = stub
     assert rule(Standing("x", hurdle.Exit(1.0), 1.0), Context({}, Window(), 0.0)) == Verdict(1.0, Reading(None, {}, ()), 2.0)
     _selftest_option()
+    _selftest_hold()
     _selftest_no_legal_eleven()
     print("worth self-test OK")
 
