@@ -150,11 +150,11 @@ def sale_reserve(lost: float, n: int, rate: float, exit: hurdle.Exit, dist: Offe
     jornadas at rate with `closes` closes left before the lock (hurdle.reserve of his Stake). A sale that loses points (more than
     NO_LOSS) is taken at (W + drift) / K: the offer above which his yield, drift included, is under the rate's bar. One that loses
     none is taken at that or at what waiting for the best offer of the closes left nets (stopped), whichever is more; a player with a
-    hold (Exit.hold, the rise the buy credited) is kept to it (hurdle.holding): not sold under what holding him is expected to fetch
-    (hurdle.held), as the buy priced him, not at the capped rise of the sale."""
+    hold (Exit.hold, the rise the buy credited) is kept to it (hurdle.holding): never under the reserve of his capped sale rise and not under what holding him is expected to fetch
+    (hurdle.held), as the buy priced him. The hold's drift is credited over the closes left on top of that terminal value: optimistic by up to closes / HOLD_NIGHTS of the hold."""
     if lost > NO_LOSS:
         return hurdle.reserve(hurdle.stake(lost, n, rate, exit)._replace(proceeds=0.0))
-    return hurdle.reserve(hurdle.stake(lost, n, rate, stopped(hurdle.holding(exit), dist, closes)))
+    return max(hurdle.reserve(hurdle.stake(lost, n, rate, stopped(kept, dist, closes))) for kept in (exit, hurdle.holding(exit)))
 
 
 def rent(standing: Standing, ctx: Context) -> Verdict:
@@ -296,9 +296,10 @@ def _selftest_hold() -> None:
         assert all(a <= b + 1e-6 for a, b in zip(reserves, reserves[1:])), "a bigger hold never lowers the reserve"
         for h, r in zip(holds, reserves):
             held = e._replace(hold=h)
+            assert r >= sale_reserve(0.0, n, rate, e, study, closes) - 1e-6, "a hold never lowers the reserve below the capped sale's"
             assert r >= hurdle.held(held) - 1e-6, "a held player is not sold under what holding him fetches: the buy's price and the sale's agree"
             assert sale_reserve(0.0, n, rate, held, study, closes + 1) >= r - 1e-6, "more closes left never lowers it"
-            assert sale_reserve(0.0, n, rate, held, NO_OFFERS, closes) == max(hurdle.held(held), h * value / hurdle.K), "no offers seen: held"
+            assert sale_reserve(0.0, n, rate, held, NO_OFFERS, closes) == max(hurdle.held(held), h * value / hurdle.K, sale_reserve(0.0, n, rate, e, NO_OFFERS, closes)), "no offers seen: held or the capped sale's"
     shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
     squad = {"%s%d" % (q, i): q for q, n in shape.items() for i in range(n)} | {"p": "DEF"}
     bench = Context(squad, Window((1,)), 0.0, study, squad=frozenset(squad), cells={1: {k: 1.0 for k in squad} | {"p": 0.0}}, closes=3)

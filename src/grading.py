@@ -1080,7 +1080,7 @@ class HoldExit(NamedTuple):
 
 
 def night_offer(today: HoldDay, player: str, day: dt.date, seed: int) -> float | None:
-    """The offer over value the player draws on the night of `day`: one of the offers seen that day (HoldDay.offers), chosen by the
+    """The offer over value the player draws on the night of `day`: one of the offers seen up to that day's cut (HoldDay.offers), chosen by the
     seed, the player and the day alone; None when none was seen."""
     return random.Random("%s|%s|%d" % (player, day, seed)).choice(today.offers.ratios) if today.offers.ratios else None
 
@@ -1349,15 +1349,15 @@ RULE_DRAWS = 40
 
 
 def averaged(rows: Sequence[HoldStats]) -> HoldStats:
-    """The HoldStats whose every figure is the mean of the rows' (the replicates of a draw)."""
-    return HoldStats(*(sum(column) / len(rows) for column in zip(*rows)))
+    """The HoldStats whose every figure is the mean of the rows' (the replicates of a draw), counts too."""
+    return HoldStats(**{f: sum(getattr(r, f) for r in rows) / len(rows) for f in HoldStats._fields})
 
 
 def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash: float) -> str:
     """The hold replay of the decision's own bids (HoldDay.advised: the holds it funds with cash `cash` at each daily cut) on the
     real winning prices, constraints as the grid's (HOLD_SCENARIOS): two lines of the HoldStats as hold_report prints them and the M per
     week at half the appreciation and under each constraint; and the same two exits on the grid's HEADLINE buys (`hl`). `momentum` ends a hold as the grid does (the MOMENTUM_DAYS change 0 or
-    less); `rule` sells it as the decision does: a night's offer (one of the day's, drawn by each of RULE_DRAWS seeds, the figures their
+    less); `rule` sells it as the decision does (the debt column too, by the same reserve where the live cover lowers its own; no 28-day cap live): a night's offer (one of the day's, drawn by each of RULE_DRAWS seeds, the figures their
     mean) at or over the reserve of worth.sale_reserve."""
     panel = hold_panel(replay)
     days = sorted(d for d in panel if d >= since)
@@ -1374,7 +1374,8 @@ def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash
         return averaged(draws(policy, rule, edge))
 
     def line(label: str, policy: HoldPolicy) -> str:
-        s, each = stats(policy), [x.gain / 1e6 / weeks for x in draws(policy)]
+        base = draws(policy)
+        s, each = averaged(base), [x.gain / 1e6 / weeks for x in base]
         spread = statistics.stdev(each) / math.sqrt(len(each)) if len(each) > 1 else 0.0
         return "%-8s %5.1f %5.1f %4.0f%% %8.1f%% %8.2f%% %6.2f %4.2f %6.1f %4.0f%% %5.1f %5.1f %6.1f %6.1f %6.1f %6.1f %7.1f | %9.2f%s" % (
             label, s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day, s.gain / 1e6 / weeks, spread, s.capital / 1e6,
