@@ -4,6 +4,7 @@ import contextlib
 import datetime as dt
 import math
 import os
+import random
 import sys
 from collections import Counter
 from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
@@ -19,7 +20,7 @@ import salegrade
 import valuation
 import worth
 from approach import Club, Option, Plan, Rounds, Side, approach, cover, plan, secure
-from board import club_at, context, stamped, standing
+from board import club_at, context, offers_at, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
 from ffcore.clock import CLOSE, MADRID, Clock, run_now
@@ -943,12 +944,16 @@ def cover_replay(loaded: loader.Loaded, cuts: Sequence[str], since: str = SALES_
 
 
 class HoldDay(NamedTuple):
-    """What the hold replay knows at one daily cut: the cut, each player's newest market value above 0, my squad and the bids the
-    decision advised at the cut on the listings it would hold (by player; none for the grid's replay)."""
+    """What the hold replay knows at one daily cut: the cut, each player's newest market value above 0, my squad, the bids the
+    decision advised at the cut on the listings it would hold (by player; none for the grid's replay), and what the sale rule reads
+    there: `reserves` the least offer over value the rule (worth.sale_reserve, a sale that loses no points) takes for each player
+    and `offers` the offers seen (none for the grid's replay)."""
     cut: str
     values: Mapping[str, float]
     squad: frozenset[str]
     advised: Mapping[str, float] = {}
+    reserves: Mapping[str, float] = {}
+    offers: worth.OfferDistribution = worth.NO_OFFERS
 
 
 Panel = Mapping[dt.date, HoldDay]
@@ -967,22 +972,25 @@ class Listing(NamedTuple):
 class HoldPolicy(NamedTuple):
     """Buy a listing whose price has moved by at least `momentum` over MOMENTUM_DAYS (None: whatever it did) and whose value is
     at most `value`, bidding ask x (1 + premium) (premium None: the bid the decision advised that day, HoldDay.advised); sell
-    when the MOMENTUM_DAYS change is 0 or less, after `hold` days at most."""
+    when the MOMENTUM_DAYS change is 0 or less (`draw` None) or when the night's offer reaches the rule's reserve (HoldDay.reserves; the offer
+    drawn from the night's offers by the seed `draw`), after `hold` days at most."""
     momentum: float | None
     value: float
     premium: float | None
     hold: int
+    draw: int | None = None
 
 
 class Position(NamedTuple):
-    """A won hold: the listing, the bid paid, the value at entry, the day of the exit, its value and whether it was sold
-    (False: still open, marked at the last value)."""
+    """A won hold: the listing, the bid paid, the value at entry, the day of the exit, its value, whether it was sold
+    (False: still open, marked at the last value) and the price it fetched (None: hurdle.draw of the value)."""
     listing: Listing
     bid: float
     value_in: float
     day_out: dt.date
     value_out: float
     closed: bool
+    price: float | None = None
 
 
 class Constraint(NamedTuple):
@@ -1062,16 +1070,39 @@ def bid_wins(bid: float, listing: Listing) -> bool:
 
 
 class HoldExit(NamedTuple):
-    """The day a hold ends, the value then and whether it was sold (False: still open, marked at the last value)."""
+    """The day a hold ends, the value then, whether it was sold (False: still open, marked at the last value) and the price it
+    fetched (None: hurdle.draw of the value)."""
     day: dt.date
     value: float
     closed: bool
+    price: float | None = None
+
+
+def night_offer(today: HoldDay, player: str, day: dt.date, seed: int) -> float | None:
+    """The offer over value the player draws on the night of `day`: one of the offers seen that day (HoldDay.offers), chosen by the
+    seed, the player and the day alone; None when none was seen."""
+    return random.Random("%s|%s|%d" % (player, day, seed)).choice(today.offers.ratios) if today.offers.ratios else None
+
+
+def night_sale(policy: HoldPolicy, listing: Listing, panel: Panel, day: dt.date, value: float, last: bool) -> HoldExit | None:
+    """The HoldExit if the hold ends on `day` (the player's value then `value`), None when it goes on: the last day always sells; else by
+    momentum (policy.draw None) when the change is 0 or less, by the rule when the night's offer reaches HoldDay.reserves, then
+    at that offer over value. A night with no offer or no reserve does not sell by the rule."""
+    if policy.draw is None:
+        moved = change(panel, listing.player, day)
+        return HoldExit(day, value, True) if last or moved is not None and moved <= 0 else None
+    today = panel[day]
+    ratio = night_offer(today, listing.player, day, policy.draw)
+    reserve = today.reserves.get(listing.player)
+    if ratio is not None and (last or reserve is not None and ratio >= reserve):
+        return HoldExit(day, value, True, ratio * value)
+    return HoldExit(day, value, True) if last else None
 
 
 def hold_exit(policy: HoldPolicy, listing: Listing, panel: Panel, deadline: dt.date | None = None) -> HoldExit | None:
-    """The HoldExit of a hold bought on the listing: the first later day whose change is 0 or less, else
-    the last day within policy.hold days (or by the deadline); still open when the panel ends before either (marked at the last
-    value, sold False). None when the player has no value after the listing's day. Reads each day only up to itself."""
+    """The HoldExit of a hold bought on the listing: the first later day the hold ends (night_sale: by momentum, or by the sale rule's
+    reserve), else the last day within policy.hold days (or by the deadline); still open when the panel ends before either (marked at
+    the last value, sold False). None when the player has no value after the listing's day. Reads each day only up to itself."""
     limit = listing.day + dt.timedelta(days=policy.hold)
     if deadline is not None:
         limit = min(limit, deadline)
@@ -1083,15 +1114,22 @@ def hold_exit(policy: HoldPolicy, listing: Listing, panel: Panel, deadline: dt.d
         if day > limit and seen is not None:
             return seen._replace(closed=True)
         seen = HoldExit(day, value, False)
-        moved = change(panel, listing.player, day)
-        if day >= limit or moved is not None and moved <= 0:
-            return HoldExit(day, value, True)
+        sold = night_sale(policy, listing, panel, day, value, day >= limit)
+        if sold is not None:
+            return sold
     return seen
 
 
+def sold_at(position: Position) -> float:
+    """What the position fetched: the price of its sale (hurdle.draw of the value when it was sold without one), the value when still open."""
+    if not position.closed:
+        return position.value_out
+    return hurdle.draw(position.value_out) if position.price is None else position.price
+
+
 def gain_of(position: Position) -> float:
-    """What the position made: the sale at hurdle.draw of the value (the value when still open) less the bid."""
-    return (hurdle.draw(position.value_out) if position.closed else position.value_out) - position.bid
+    """What the position made: what it fetched (sold_at) less the bid."""
+    return sold_at(position) - position.bid
 
 
 def days_held(position: Position) -> int:
@@ -1101,7 +1139,7 @@ def days_held(position: Position) -> int:
 
 def hold_gain(position: Position, edge: float = 1.0) -> float:
     """The gain with the appreciation (value out less the ask) scaled by edge; the premium and the sale haircut stay."""
-    haircut = position.value_out - hurdle.draw(position.value_out) if position.closed else 0.0
+    haircut = position.value_out - sold_at(position) if position.closed else 0.0
     return edge * (position.value_out - position.listing.ask) - (position.bid - position.listing.ask) - haircut
 
 
@@ -1132,7 +1170,7 @@ def admitted(policy: HoldPolicy, listing: Listing, bid: float, held: Sequence[Po
     if got is None:
         return None
     day = panel[listing.day]
-    position = Position(listing, bid, day.values[listing.player], got.day, got.value, got.closed)
+    position = Position(listing, bid, day.values[listing.player], got.day, got.value, got.closed, got.price)
     if rule is None:
         return position
     open_now = held_open(held, listing.day)
@@ -1289,23 +1327,37 @@ def hold_report(replay: Replay[HoldDay], season: Season, since: dt.date) -> str:
 
 def decided_day(loaded: loader.Loaded, world: state.World, cash: float, history: Sequence[loader.Opportunity]) -> HoldDay | None:
     """The HoldDay of the world with the bids its decision advises on the holds it funds (opportunity_rows with profit, at the
-    exchange rate of the cut), the cash `cash` and no bid placed; None for a Stale cut."""
+    exchange rate of the cut), the cash `cash` and no bid placed, and the reserve over value the sale rule takes for each player
+    with a value (worth.sale_reserve of a sale that loses no points, the closes left before the lock) with the offers seen; None for
+    a Stale cut."""
     decided = decision.decision_at(loaded, world)
     if isinstance(decided, decision.Stale):
         return None
     inp = decided.inputs._replace(money=decided.inputs.money._replace(cash=cash), bids=())
     _, cells = decision.cells_of(inp)
-    rows = decision.opportunity_rows(inp, hurdle.lam(history, world.cut, max(cells, default=0)))
-    return hold_day(loaded, world)._replace(advised={r["player"]: r["bid"] for r in rows if r["profit"] > 0 and r["bid"] is not None})
+    rate = hurdle.lam(history, world.cut, max(cells, default=0))
+    rows = decision.opportunity_rows(inp, rate)
+    day = hold_day(loaded, world)
+    offers, closes, ahead = offers_at(world), decision.clock_of(inp, decided.cut).n_closes, decision.rises_of(inp)
+    reserves = {k: worth.sale_reserve(0.0, 1, rate, decision.exit_of(inp, k, v, ahead.get(k, {})), offers, closes) / v for k, v in day.values.items()}
+    return day._replace(advised={r["player"]: r["bid"] for r in rows if r["profit"] > 0 and r["bid"] is not None}, reserves=reserves, offers=offers)
 
 
 DECIDED = HoldPolicy(None, math.inf, None, 28)
+RULE_DRAWS = 40
+
+
+def averaged(rows: Sequence[HoldStats]) -> HoldStats:
+    """The HoldStats whose every figure is the mean of the rows' (the replicates of a draw)."""
+    return HoldStats(*(sum(column) / len(rows) for column in zip(*rows)))
 
 
 def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash: float) -> str:
     """The hold replay of the decision's own bids (HoldDay.advised: the holds it funds with cash `cash` at each daily cut) on the
-    real winning prices, exit and constraints as the grid's (DECIDED, HOLD_SCENARIOS): a line of the HoldStats as hold_report
-    prints them and the M per week at half the appreciation and under each constraint."""
+    real winning prices, constraints as the grid's (HOLD_SCENARIOS): two lines of the HoldStats as hold_report prints them and the M per
+    week at half the appreciation and under each constraint. `momentum` ends a hold as the grid does (the MOMENTUM_DAYS change 0 or
+    less); `rule` sells it as the decision does: a night's offer (one of the day's, drawn by each of RULE_DRAWS seeds, the figures their
+    mean) at or over the reserve of worth.sale_reserve."""
     panel = hold_panel(replay)
     days = sorted(d for d in panel if d >= since)
     listings = [x for x in hold_listings(replay, panel) if x.day >= since]
@@ -1313,17 +1365,21 @@ def decided_report(replay: Replay[HoldDay], season: Season, since: dt.date, cash
     weeks = max(1, len(days)) / 7
     advised = sum(1 for x in listings if hold_bid(DECIDED, x, panel) is not None)
 
-    def week(rule: Constraint | None = None, edge: float = 1.0) -> float:
-        return hold_stats(holds_of(DECIDED, listings, panel, locks, rule), panel, days, season, edge).gain / 1e6 / weeks
-    s = hold_stats(holds_of(DECIDED, listings, panel, locks), panel, days, season)
+    def stats(exit: str, rule: Constraint | None = None, edge: float = 1.0) -> HoldStats:
+        return averaged([hold_stats(holds_of(DECIDED if exit == "momentum" else DECIDED._replace(draw=i), listings, panel, locks, rule), panel, days, season, edge)
+                         for i in range(1 if exit == "momentum" else RULE_DRAWS)])
+
+    def line(exit: str) -> str:
+        s = stats(exit)
+        return "%-8s %5.1f %5.1f %4.0f%% %8.1f%% %8.2f%% %6.1f %6.1f %4.0f%% %5.1f %5.1f %6.1f %6.1f %6.1f %6.1f %7.1f | %9.1f%s" % (
+            exit, s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day, s.gain / 1e6 / weeks, s.capital / 1e6,
+            100 * s.hit, s.loss_weeks, s.players, s.first_half / 1e6, s.second_half / 1e6, s.gain / 1e6, s.points / 1e6, s.above_mean / 1e6,
+            stats(exit, None, 0.5).gain / 1e6 / weeks, "".join("  %7.1f" % (stats(exit, c).gain / 1e6 / weeks) for c in HOLD_SCENARIOS.values()))
     return "\n".join([
         "decided holds: %d days from %s, cash %.0fM at each cut, %d listings, %d with an advised bid; M per week = gain / %.1f weeks" % (
             len(days), since, cash / 1e6, len(listings), advised, weeks),
-        "  bids won win%  ret/trade ret/capday  M/wk  cap M  hit% lossw ind  half1  half2  price  pts+  pts>mean |  half-edge" + "".join("  %7s" % k for k in HOLD_SCENARIOS),
-        "%6d %4d %4.0f%% %8.1f%% %8.2f%% %6.1f %6.1f %4.0f%% %5d %3d %6.1f %6.1f %6.1f %6.1f %7.1f | %9.1f%s" % (
-            s.bids, s.trades, 100 * s.trades / max(1, s.bids), 100 * s.per_trade, 100 * s.per_capital_day, s.gain / 1e6 / weeks, s.capital / 1e6,
-            100 * s.hit, s.loss_weeks, s.players, s.first_half / 1e6, s.second_half / 1e6, s.gain / 1e6, s.points / 1e6, s.above_mean / 1e6,
-            week(None, 0.5), "".join("  %7.1f" % week(rule) for rule in HOLD_SCENARIOS.values()))])
+        "exit      bids  won win%  ret/trade ret/capday  M/wk  cap M  hit% lossw   ind  half1  half2  price  pts+  pts>mean |  half-edge" + "".join("  %7s" % k for k in HOLD_SCENARIOS),
+        line("momentum"), line("rule")])
 
 
 def decided_replay(loaded: loader.Loaded, cuts: Sequence[str], cash: float = 30e6) -> str:
@@ -2102,6 +2158,28 @@ def _selftest_holds() -> None:
     assert bought.bids == sum(hold_bid(DECIDED, x, advice) is not None for x in listings)
     assert all(p.bid == advice[p.listing.day].advised[p.listing.player] and bid_wins(p.bid, p.listing) for p in bought.positions), "each position is a won advised bid, paid at its amount"
     assert holds_of(DECIDED, listings, panel).bids == 0, "a day with no advised bid buys nothing"
+    ratios = worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.05, 1.1, 1.2])
+    for reserve in (0.0, 1.0, 1.1, math.inf):
+        night = {d: v._replace(offers=ratios, reserves={k: reserve for k in names}) for d, v in panel.items()}
+        for listing in listings:
+            sold = HoldPolicy(None, math.inf, 0.0, 14, 3)
+            got = hold_exit(sold, listing, night)
+            assert got == hold_exit(sold, listing, night), "the draw is the seed's, the player's and the day's alone"
+            limit = listing.day + dt.timedelta(days=14)
+            if got is None:
+                continue
+            if got.closed:
+                assert got.price is not None and any(abs(got.price / night[got.day].values[listing.player] - x) < 1e-9 for x in ratios.ratios), "sold at one of the night's offers"
+                assert got.day == limit or got.price / night[got.day].values[listing.player] >= reserve, "before the limit only an offer at the reserve sells"
+                assert reserve > 0.9 or got.day == listing.day + dt.timedelta(days=1), "a reserve at the lowest offer sells the first night"
+                early = {d: v for d, v in night.items() if d <= got.day}
+                assert hold_exit(sold, listing, early) == got, "no day after the sale is read"
+                if reserve == math.inf:
+                    assert got.day == limit, "a reserve nothing reaches holds to the limit"
+            position = Position(listing, 100.0, 100.0, got.day, got.value, got.closed, got.price)
+            assert abs(gain_of(position) - ((got.price if got.closed else got.value) - 100.0)) < 1e-9
+    stats = [HoldStats(1, 2, 3.0, 4.0, 5.0, 6.0, 7.0, 8, 9, 10.0, 11.0, 12.0, 13.0), HoldStats(3, 4, 5.0, 6.0, 7.0, 8.0, 9.0, 10, 11, 12.0, 13.0, 14.0, 15.0)]
+    assert averaged(stats) == HoldStats(2, 3, 4.0, 5.0, 6.0, 7.0, 8.0, 9, 10, 11.0, 12.0, 13.0, 14.0) and averaged(stats[:1]) == stats[0]
 
 
 def _selftest_cover_grades() -> None:

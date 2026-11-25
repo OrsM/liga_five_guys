@@ -145,18 +145,24 @@ def waiting_reserve(standing: Standing, dist: OfferDistribution, m: int) -> floa
     return stopped(standing.exit, dist, m).reserve
 
 
+def sale_reserve(lost: float, n: int, rate: float, exit: hurdle.Exit, dist: OfferDistribution, closes: int) -> float:
+    """The least offer, in euros, at which selling a player of this exit is worth it when the sale loses `lost` points over n
+    jornadas at rate with `closes` closes left before the lock (hurdle.reserve of his Stake). A sale that loses points (more than
+    NO_LOSS) is taken at (W + drift) / K: the offer above which his yield, drift included, is under the rate's bar. One that loses
+    none is taken at that or at what waiting for the best offer nets (stopped), whichever is more."""
+    if lost > NO_LOSS:
+        return hurdle.reserve(hurdle.stake(lost, n, rate, exit)._replace(proceeds=0.0))
+    return hurdle.reserve(hurdle.stake(lost, n, rate, stopped(exit, dist, closes)))
+
+
 def rent(standing: Standing, ctx: Context) -> Verdict:
-    """The one sale rule: money and points at one rate. The reserve is hurdle.reserve of the Stake of the points the sale
-    loses (over the season of ctx.window) over ctx.jornadas() at ctx.rate, with his exit stopped at the ctx.closes left
-    (stopped). A sale that loses points (more than NO_LOSS) is taken at (W + drift) / K: the offer above which his yield,
-    drift included, is under the rate's bar. One that loses none is taken at that or at what waiting for the best offer
-    nets, whichever is more. The key is reserve minus offer (0 or less sells);
-    with no offer it is None. Where the sale has no Delta, key and reserve are None."""
+    """The one sale rule: money and points at one rate. The reserve is sale_reserve of the points the sale loses (over the season of
+    ctx.window) over ctx.jornadas() at ctx.rate, with his exit stopped at the ctx.closes left. The key is reserve minus offer (0 or
+    less sells); with no offer it is None. Where the sale has no Delta, key and reserve are None."""
     sale = ctx.sale(standing.player)
     if sale.points is None:
         return Verdict(None, sale, None)
-    got = hurdle.stake(0.0 - sale.points, ctx.jornadas(), ctx.rate, stopped(standing.exit, ctx.offers, ctx.closes))
-    reserve = hurdle.reserve(got._replace(proceeds=0.0) if got.points > NO_LOSS else got)
+    reserve = sale_reserve(0.0 - sale.points, ctx.jornadas(), ctx.rate, standing.exit, ctx.offers, ctx.closes)
     return Verdict(None if standing.offer is None else reserve - standing.offer, sale, reserve)
 
 
