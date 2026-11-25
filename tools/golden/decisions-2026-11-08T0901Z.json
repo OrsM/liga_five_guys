@@ -7,8 +7,8 @@
  "base": {
   "base": 0.0,
   "cash": -49572707.0,
-  "cash_if_lost": 972927.756344855,
-  "cost": 12.799961241190704,
+  "cash_if_lost": 1473984.9045450396,
+  "cost": 13.650067822185687,
   "feasible": true,
   "gain": 0.0,
   "held": [
@@ -29,26 +29,26 @@
    "Martin Satriano"
   ],
   "if_lost": [
-   "Dani Martinez",
+   "Iñigo Vicente",
    "Ferran Jutgla"
   ],
   "if_won": [
-   "Dani Martinez",
+   "Iñigo Vicente",
    "Ferran Jutgla"
   ],
-  "lock_margin": 972927.756344855,
+  "lock_margin": 1473984.9045450396,
   "lock_margin_low": -2688340.9719484644,
   "margin": 43286574.2,
-  "net": -12.799961241190704,
+  "net": -13.650067822185687,
   "not_listed": [],
-  "points_lost_if_lost": 12.799961241190704,
-  "points_lost_if_won": 12.799961241190704,
+  "points_lost_if_lost": 13.650067822185687,
+  "points_lost_if_won": 13.650067822185687,
   "raises": 2220850.0,
   "risk": {
-   "below_points": 331.69696505,
+   "below_points": 105.05338173,
    "low_inflow": 3863933.4121205388,
-   "p_short": 1.0,
-   "shortfall_if_low": 29305763.092879463
+   "p_short": 0.9999894491957775,
+   "shortfall_if_low": 6641404.760879462
   },
   "short": 0.0,
   "tonight": [
@@ -74,17 +74,17 @@
    "accepts": [],
    "act": [],
    "cash": -49572707.0,
-   "cash_after": 972927.756344855,
-   "label": "cover the cash: Roger Hinojo, Arnau Ortiz, Dani Martinez, Ferran Jutgla",
+   "cash_after": 1473984.9045450396,
+   "label": "cover the cash: Roger Hinojo, Arnau Ortiz, Iñigo Vicente, Ferran Jutgla",
    "lock": "2026-11-20T20:00Z",
    "needed": true,
    "options": [
     {
-     "cash_at_lock": 972927.756344855,
+     "cash_at_lock": 1473984.9045450396,
      "fallback": [
-      "Aitor Paredes"
+      "Robin Le Normand"
      ],
-     "points_lost": 12.799961241190704,
+     "points_lost": 13.650067822185687,
      "take_now": [
       {
        "key": "15316",
@@ -103,57 +103,57 @@
      ],
      "wait": [
       {
-       "key": "11861",
+       "key": "6442",
        "kind": "wait",
-       "least": 0.6690095350252754,
-       "name": "Dani Martinez",
+       "least": 23507800.808346033,
+       "name": "Iñigo Vicente",
        "reserves": [
         {
          "least": null,
          "until": "2026-11-08T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 23507800.808346033,
          "until": "2026-11-09T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 23468011.067581765,
          "until": "2026-11-10T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 23468011.067581765,
          "until": "2026-11-11T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 23468011.067581765,
          "until": "2026-11-12T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 23306663.58124172,
          "until": "2026-11-13T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 22783194.27840896,
          "until": "2026-11-14T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 22668011.10428648,
          "until": "2026-11-15T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 22247548.82785643,
          "until": "2026-11-16T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 21720044.68391653,
          "until": "2026-11-17T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 21053991.895458553,
          "until": "2026-11-18T21:24Z"
         },
         {
-         "least": 0.6690095350252754,
+         "least": 20218011.01773802,
          "until": "2026-11-19T21:24Z"
         },
         {
@@ -166,7 +166,7 @@
       {
        "key": "7842",
        "kind": "wait",
-       "least": 14238542.909477748,
+       "least": 14329309.19085664,
        "name": "Ferran Jutgla",
        "reserves": [
         {
@@ -174,47 +174,47 @@
          "until": "2026-11-08T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 14329309.19085664,
          "until": "2026-11-09T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 14244251.935876576,
          "until": "2026-11-10T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 14158134.910391398,
          "until": "2026-11-11T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 14064687.650913322,
          "until": "2026-11-12T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 13966966.973592818,
          "until": "2026-11-13T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 13856927.16014676,
          "until": "2026-11-14T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 13728613.265451392,
          "until": "2026-11-15T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 13577280.45010861,
          "until": "2026-11-16T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 13376127.285083214,
          "until": "2026-11-17T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 13082038.185928525,
          "until": "2026-11-18T21:24Z"
         },
         {
-         "least": 14238542.909477748,
+         "least": 12444265.14076731,
          "until": "2026-11-19T21:24Z"
         },
         {
@@ -226,12 +226,12 @@
       }
      ],
      "worst": {
-      "p": 0.09258532576319792,
-      "points": 14.422497478817377
+      "p": 2.4019127014763184e-05,
+      "points": 27.171545148978566
      }
     }
    ],
-   "points_lost": 12.799961241190704,
+   "points_lost": 13.650067822185687,
    "sells": [
     {
      "key": "15316",
@@ -248,57 +248,57 @@
      "until": "2026-11-08T21:24Z"
     },
     {
-     "key": "11861",
+     "key": "6442",
      "kind": "wait",
-     "least": 0.6690095350252754,
-     "name": "Dani Martinez",
+     "least": 23507800.808346033,
+     "name": "Iñigo Vicente",
      "reserves": [
       {
        "least": null,
        "until": "2026-11-08T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 23507800.808346033,
        "until": "2026-11-09T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 23468011.067581765,
        "until": "2026-11-10T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 23468011.067581765,
        "until": "2026-11-11T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 23468011.067581765,
        "until": "2026-11-12T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 23306663.58124172,
        "until": "2026-11-13T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 22783194.27840896,
        "until": "2026-11-14T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 22668011.10428648,
        "until": "2026-11-15T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 22247548.82785643,
        "until": "2026-11-16T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 21720044.68391653,
        "until": "2026-11-17T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 21053991.895458553,
        "until": "2026-11-18T21:24Z"
       },
       {
-       "least": 0.6690095350252754,
+       "least": 20218011.01773802,
        "until": "2026-11-19T21:24Z"
       },
       {
@@ -311,7 +311,7 @@
     {
      "key": "7842",
      "kind": "wait",
-     "least": 14238542.909477748,
+     "least": 14329309.19085664,
      "name": "Ferran Jutgla",
      "reserves": [
       {
@@ -319,47 +319,47 @@
        "until": "2026-11-08T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 14329309.19085664,
        "until": "2026-11-09T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 14244251.935876576,
        "until": "2026-11-10T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 14158134.910391398,
        "until": "2026-11-11T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 14064687.650913322,
        "until": "2026-11-12T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 13966966.973592818,
        "until": "2026-11-13T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 13856927.16014676,
        "until": "2026-11-14T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 13728613.265451392,
        "until": "2026-11-15T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 13577280.45010861,
        "until": "2026-11-16T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 13376127.285083214,
        "until": "2026-11-17T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 13082038.185928525,
        "until": "2026-11-18T21:24Z"
       },
       {
-       "least": 14238542.909477748,
+       "least": 12444265.14076731,
        "until": "2026-11-19T21:24Z"
       },
       {
@@ -372,10 +372,10 @@
    ],
    "step": "plan",
    "what": "cover",
-   "why": "Cash -49.6M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Accept Arnau Ortiz's offer of 0.64M before 22:24 tonight. 3) Wait for the offers of Dani Martinez. On 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 Nov accept his new offer if it is 0.00M or more; on 20 Nov, before 21:00, accept whatever it is. 4) Wait for the offers of Ferran Jutgla. On 9, 10, 11, 12, 13, 14, 15, 16, 17, 18 and 19 Nov accept his new offer if it is 14.24M or more; on 20 Nov, before 21:00, accept whatever it is. 5) If cash is still below 0 after that, sell Aitor Paredes (offer 29.22M), then, if still short, the cheapest other player. Expected: 12.8 points lost. Worst case 14.4 points, chance 9.3%. Not listed, so no offer is drawn at the close for: Aitor Paredes.",
+   "why": "Cash -49.6M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Accept Arnau Ortiz's offer of 0.64M before 22:24 tonight. 3) Do NOT take Iñigo Vicente's offer of 22.80M today. on 9 Nov accept his new offer if it is 23.51M or more; on 10 Nov accept his new offer if it is 23.47M or more; on 11 Nov accept his new offer if it is 23.47M or more; on 12 Nov accept his new offer if it is 23.47M or more; on 13 Nov accept his new offer if it is 23.31M or more; on 14 Nov accept his new offer if it is 22.78M or more; on 15 Nov accept his new offer if it is 22.67M or more; on 16 Nov accept his new offer if it is 22.25M or more; on 17 Nov accept his new offer if it is 21.72M or more; on 18 Nov accept his new offer if it is 21.05M or more; on 19 Nov accept his new offer if it is 20.22M or more; on 20 Nov, before 21:00, accept whatever it is. 4) Wait for the offers of Ferran Jutgla. on 9 Nov accept his new offer if it is 14.33M or more; on 10 Nov accept his new offer if it is 14.24M or more; on 11 Nov accept his new offer if it is 14.16M or more; on 12 Nov accept his new offer if it is 14.06M or more; on 13 Nov accept his new offer if it is 13.97M or more; on 14 Nov accept his new offer if it is 13.86M or more; on 15 Nov accept his new offer if it is 13.73M or more; on 16 Nov accept his new offer if it is 13.58M or more; on 17 Nov accept his new offer if it is 13.38M or more; on 18 Nov accept his new offer if it is 13.08M or more; on 19 Nov accept his new offer if it is 12.44M or more; on 20 Nov, before 21:00, accept whatever it is. 5) If cash is still below 0 after that, sell Robin Le Normand (offer 5.34M), then, if still short, the cheapest other player. Expected: 13.7 points lost. Worst case 27.2 points, chance 0.0%.",
    "worst": {
-    "p": 0.09258532576319792,
-    "points": 14.422497478817377
+    "p": 2.4019127014763184e-05,
+    "points": 27.171545148978566
    }
   },
   {
@@ -511,20 +511,20 @@
     }
    ],
    "risk": {
-    "below_points": 331.69696505,
+    "below_points": 105.05338173,
     "low_inflow": 3863933.4121205388,
-    "p_short": 1.0,
-    "shortfall_if_low": 29305763.092879463
+    "p_short": 0.9999894491957775,
+    "shortfall_if_low": 6641404.760879462
    },
-   "set_cash_after": 972927.756344855,
-   "set_points_lost": 12.799961241190704,
+   "set_cash_after": 1473984.9045450396,
+   "set_points_lost": 13.650067822185687,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49.6M; sells Arnau Ortiz now, Roger Hinojo now, Dani Martinez later, Ferran Jutgla later; expects +0.97M at the lock; if the eleven scores under 332 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49.6M; sells Arnau Ortiz now, Roger Hinojo now, Iñigo Vicente later, Ferran Jutgla later; expects +1.47M at the lock; if the eleven scores under 105 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
@@ -660,44 +660,44 @@
     }
    ],
    "risk": {
-    "below_points": 331.69696505,
+    "below_points": 105.05338173,
     "low_inflow": 3863933.4121205388,
-    "p_short": 1.0,
-    "shortfall_if_low": 29305763.092879463
+    "p_short": 0.9999894491957775,
+    "shortfall_if_low": 6641404.760879462
    },
-   "set_cash_after": 972927.756344855,
-   "set_points_lost": 12.799961241190704,
+   "set_cash_after": 1473984.9045450396,
+   "set_points_lost": 13.650067822185687,
    "step": "take offer",
    "trace": null,
    "trend": 0.18561000848040757,
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49.6M; sells Arnau Ortiz now, Roger Hinojo now, Dani Martinez later, Ferran Jutgla later; expects +0.97M at the lock; if the eleven scores under 332 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49.6M; sells Arnau Ortiz now, Roger Hinojo now, Iñigo Vicente later, Ferran Jutgla later; expects +1.47M at the lock; if the eleven scores under 105 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
-   "cost_points": 12.799961241190704,
+   "cost_points": 13.650067822185687,
    "expected_cover": [
-    "Dani Martinez",
+    "Iñigo Vicente",
     "Ferran Jutgla"
    ],
-   "label": "wait for the offers of Dani Martinez, Ferran Jutgla",
+   "label": "wait for the offers of Iñigo Vicente, Ferran Jutgla",
    "n_closes": 12,
    "need": 41950003.587879464,
    "needed": true,
    "risk": {
-    "below_points": 331.69696505,
+    "below_points": 105.05338173,
     "low_inflow": 3863933.4121205388,
-    "p_short": 1.0,
-    "shortfall_if_low": 29305763.092879463
+    "p_short": 0.9999894491957775,
+    "shortfall_if_low": 6641404.760879462
    },
    "step": "wait",
    "until": "2026-11-20T20:00Z",
    "what": "wait",
-   "why": "cash -49.6M; Dani Martinez, Ferran Jutgla waits for the offers still to come (12 closes), each at its reserve or more, whatever it is at the lock; if the eleven scores under 332 points the lock cash stays below 0; there is time to fix by hand"
+   "why": "cash -49.6M; Iñigo Vicente, Ferran Jutgla waits for the offers still to come (12 closes), each at its reserve or more, whatever it is at the lock; if the eleven scores under 105 points the lock cash stays below 0; there is time to fix by hand"
   },
   {
    "accepts": [
@@ -753,6 +753,11 @@
    {
     "gain": 6.266864678570501,
     "in": "Fernando Niño",
+    "out": "Iñigo Vicente"
+   },
+   {
+    "gain": 4.150510234351489,
+    "in": "Georges Mikautadze",
     "out": "Ferran Jutgla"
    },
    {
@@ -761,7 +766,7 @@
     "out": "Marcos Alonso"
    }
   ],
-  "best": 54.26842367994088,
+  "best": 53.4522953082372,
   "eleven": [
    "Mathew Ryan",
    "Natan",
@@ -776,7 +781,7 @@
    "Ferran Jutgla"
   ],
   "message": "",
-  "points": 46.963756501468815,
+  "points": 41.99711889541365,
   "stale": true,
   "unmapped": []
  },
@@ -980,9 +985,9 @@
    "accepts": [],
    "act": [],
    "action": {
-    "kind": "keep",
-    "until": null,
-    "why": "keeping him protects 1.1 points and the cash at the lock is covered without him"
+    "kind": "fallback",
+    "until": "2026-11-20T20:00Z",
+    "why": "sell him if the offers fall short of the deficit: the cheapest next (1.1 points lost)"
    },
    "amount": 5337731.0,
    "delta": {
@@ -1124,9 +1129,9 @@
    "accepts": [],
    "act": [],
    "action": {
-    "kind": "keep",
-    "until": null,
-    "why": "keeping him protects 9.1 points and the cash at the lock is covered without him"
+    "kind": "wait",
+    "until": "2026-11-20T20:00Z",
+    "why": "accept a new offer of 23.51M or more on 9 Nov or 10 Nov or 11 Nov or 12 Nov or 13 Nov or 14 Nov or 15 Nov or 16 Nov or 17 Nov or 18 Nov or 19 Nov, any offer on 20 Nov before the lock"
    },
    "amount": 22801375.0,
    "delta": {
@@ -1204,62 +1209,62 @@
    "replacement_why_not": null,
    "reserves": [
     {
-     "least": 23052378.18374209,
+     "least": null,
      "until": "2026-11-08T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 23507800.808346033,
      "until": "2026-11-09T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 23468011.067581765,
      "until": "2026-11-10T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 23468011.067581765,
      "until": "2026-11-11T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 23468011.067581765,
      "until": "2026-11-12T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 23306663.58124172,
      "until": "2026-11-13T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 22783194.27840896,
      "until": "2026-11-14T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 22668011.10428648,
      "until": "2026-11-15T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 22247548.82785643,
      "until": "2026-11-16T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 21720044.68391653,
      "until": "2026-11-17T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 21053991.895458553,
      "until": "2026-11-18T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 20218011.01773802,
      "until": "2026-11-19T21:24Z"
     },
     {
-     "least": 23052378.18374209,
+     "least": 0.0,
      "until": "2026-11-20T20:00Z"
     }
    ],
    "step": "take offer",
    "trace": null,
    "trend": -0.9599715530509632,
-   "verdict": "hold",
+   "verdict": "wait",
    "waiting": null,
    "what": "sell",
    "why_infeasible": null
@@ -3211,11 +3216,11 @@
    "xi": true
   },
   {
-   "best": true,
+   "best": false,
    "name": "Iñigo Vicente",
    "next": 4.966637606055167,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": true
   },
   {
@@ -3279,7 +3284,7 @@
    "name": "Dani Martinez",
    "next": 0.9661557206532556,
    "pos": "DEF",
-   "sold": true,
+   "sold": false,
    "xi": false
   },
   {
@@ -3307,7 +3312,7 @@
    "xi": false
   },
   {
-   "best": false,
+   "best": true,
    "name": "Georges Mikautadze",
    "next": 4.150509234351489,
    "pos": "DEL",

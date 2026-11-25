@@ -3,7 +3,7 @@ line-up role is worth in minutes. No data, no model: everything else may
 import this."""
 from __future__ import annotations
 
-__all__ = ["XI_SIZE", "DEBT_SHARE", "SALE_ESTIMATE", "SALE_SD", "bid_limit", "bid_margin", "cash_at_lock", "SQUAD_MAX", "Squad", "POSITIONS", "slot", "position", "FREE_FORMATIONS", "SHAPES", "MATCH_LEN"]
+__all__ = ["XI_SIZE", "DEBT_SHARE", "SALE_ESTIMATE", "SALE_SD", "OFFER_EXISTS", "bid_limit", "bid_margin", "cash_at_lock", "SQUAD_MAX", "Squad", "POSITIONS", "slot", "position", "FREE_FORMATIONS", "SHAPES", "MATCH_LEN"]
 
 POSITIONS = ("POR", "DEF", "MED", "DEL")
 
@@ -49,6 +49,7 @@ def bid_limit(cash: float, team_value: float, debt: float = DEBT_SHARE) -> float
 
 SALE_ESTIMATE = 0.997  # what a player with no standing offer is expected to sell at, over his value (the nightly offers' mean)
 SALE_SD = 0.057        # the spread of those offers over value
+OFFER_EXISTS = 0.93    # the chance a player listed when a close comes has an offer on it (grading.offer_existence: 669 of 716, 0.93, 95% 0.91 to 0.95)
 
 
 def bid_margin(cash: float, raised: float, team_value: float, sold_worth: float, bid: float, pending: float = 0.0,

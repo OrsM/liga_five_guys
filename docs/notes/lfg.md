@@ -152,25 +152,50 @@ jornada, scaled by the square root of the eleven's share still to play) and `inf
 a plan is feasible when cash at the lock is 0 or more at the EXPECTED credit; the board flags the risk (`risk` on `base` and the `do`
 lines: low_inflow, p_short, shortfall_if_low, below_points) and says it in the `why`.
 
-### The cash cover under a lock (#146, #139)
+### The cash cover under a lock (#146, #139, #151, #152)
 
 With cash below 0 and a lock ahead the first `do` line is the `cover`: the recommended of the OPTIONS `approach.secure` finds on the cheapest
 plan `approach.plan`. An option sells `now` at standing offers, waits for the offers of others and, for cash still below 0 after the last
-close, sells the cheapest fallback among the squad (every player is listed; priced at the 1/10 quantile of the offers) sized after seeing the
-offers. The offers a waiting player gets are draws created at the closes left and standing on the next day's cut (the offers on a cut are
-constant through the day and differ on every next one: 568 of 568 player-days in the replay); they are taken as independent draws of the
-nightly offers seen (the lag-1 correlation of a player's offer ratios is about 0.18, ignored), the normal of SALE_ESTIMATE and SALE_SD when
-none were seen. Cash above the deficit is worth no points, so a waiting player's offer is valued by the points the sale then saves, and the
-reserve at each close is `worth.waiting_values` over those payoffs: the one stopping rule, also behind `worth.offer_reserve_ratio` and
-`waiting_reserve` (payoff = the offer's ratio) for ordinary sales. The sets of players are searched best-first by the least points any
-cover with them can lose (A*), at most EVALUATIONS options judged; against the exhaustive search on 400 random towns it found the optimum in
-all, on the 22 real cuts since 2026-08-25 within 0.01 points on average (a ladder of sale rates, tried first, missed the optimum on the
-real cuts: lumpy sales make points per million a poor shadow price). Each option states what to take now, the reserve for each offer still to
-come, the expected points lost and cash at the lock, the worst case with its chance and the fallback. Every sells row has one `reserves`
-(until each close left, then the lock): the cover's for the players it sells, else `worth.waiting_reserve`; with cash below 0 an `action`
-(accept, wait, fallback, keep). The grade of the advice is `grading.cover_replay` (`tools/lfg-rules cover`): at each past daily cut with
-cash below 0 the option and the plan taking its offers now are followed over the offers drawn at the closes after it. With cash 0 or more the
-cover lines are absent.
+close, closes the gap with the RECOURSE chosen after seeing that close's offers. One objective: J = points lost less `Option.gain`, the points
+the prices fetched are worth over the players' expected offers (kappa x (price - `hurdle.draw` of his worth), kappa = `hurdle.in_points` per
+euro at the rate, summed over the players sold). Cash above the deficit is not wealth: a sale turns an asset into cash, so only the excess of the
+price over the expected offer counts (a sale at the expected offer gains 0, an overshoot of an indivisible fallback gains nothing, waiting for
+a better offer gains exactly its expected excess, a falling price costs). Rate 0 is the points-only objective.
+
+The offers are ONE model (`rules.OFFER_EXISTS`, `Club.drift`, the ratios seen): a listed player has an offer at a close with probability
+OFFER_EXISTS (0.93; `grading.offer_existence`: 669 of 716 squad players listed at a cut had one on the next, 95% 0.91 to 0.95; the 0.90 of the
+first look was players listed only after the close), its ratio over his value is an iid draw of the nightly offers seen (lag-1 correlation -0.013,
+n = 677 pairs, ratios by position 0.993 to 1.013: no term), the normal of SALE_ESTIMATE and SALE_SD when none were seen, and his value drifts
+by the price fold's forecast (`Club.drift`, from `decision.exit_of`, the one reader of the forecast; it tracks the realised change of the squad's
+values with correlation 0.7 and the same mean). The offers on a cut are constant through the day and differ on every next one (568 of 568
+player-days). `worth.waiting_values` is the one stopping rule (existence, a cost per night, payoffs that may change per close), also behind
+`worth.offer_reserve_ratio` and `waiting_reserve` for ordinary sales (existence 1 there, see #152).
+
+The recourse is ONE procedure, `approach.cover(..., gain)` / `covers(..., keep)`: the best set of the squad (not already sold or waited for) raising
+the lack at the offers drawn at the last close, by points less the gain of its members, a set none of whose members is superfluous (selling for the
+money alone is the sale rule's, `worth.rent`). `Closer.fill` evaluates it at the expected offers over which players have one (the best COVERS = 2
+sets, `first_available` inclusion-exclusion), `grading.follow` at the offers drawn (`approach.plan` with no close left still covers by points alone: #152 follow-up); an outcome no set closes
+loses the first jornada (`Side.lapse`: cash below 0 at its lock). The claim of the Closer is graded against its own simulation: `grading.cover_calibration`
+(`tools/lfg-rules calibration`) follows the recommended option over 200 iid draws of the model at every past cut with cash < 0 (23 cuts: claimed net
+439.7 against 440.7 simulated, 22 of 23 within 0.55 points, 2026-11-19 off by 1.2: one close, a 7% tail at 31.9 points).
+The sets of players are searched best-first by the least points any cover with them can lose (A*, a heuristic bound that ignores that a waiter may
+not be sold: no split of up to four players beats it by a quarter point on random towns), at most EVALUATIONS options judged.
+Each option states what to take now, the reserve for each offer still to come, the expected points lost and cash at the lock, the worst case with its
+chance and the fallback. Every sells row has one `reserves` (until each close left, then the lock): the cover's for the players it sells, else
+`worth.waiting_reserve`; with cash below 0 an `action` (accept, wait, fallback, keep).
+
+The grade of the advice is `grading.cover_replay` (`tools/lfg-rules cover [rate [graded rate]]`): at each past daily cut with cash below 0 the option
+and the plan taking its offers now are followed (`follow`, `follow_plan`) over the offers drawn at the closes after it, net = points lost less gain at
+the graded rate. A waiter stays in the squad: each slot is the realised offer on the next day's cut, no offer when that cut speaks for him and shows
+none, and otherwise (sold in the actual history, or no cut kept: `Closing.seen`) an iid draw of the model, seeded by (label, cut, player, close) and the
+same for every policy, counted apart (`Realised.filled`). With cash 0 or more the cover lines are absent.
+
+Grade of 2026-11-26 (23 cuts with cash < 0, mean of 8 labels of the drawn slots; net graded at 0.045 per M per jornada; `cover_grades` averages the 8 LABELS itself): the money cover 500.6 points,
+113.4M left, net 432.1; the cover of rate 0 (the cover before #151) 496.6 points, 88.7M, net 456.2; the plan taking its offers now 618.6 points (the first jornada lost where cash stays below 0), 92.9M,
+net 588.1, cash held 21 of 23 against 23 of 23 for both covers. Without 2026-10-03 (one 82M sale or none: bimodal, sd 15 in the option's own
+simulation, one branch realised) 379.4 against 394.7 and 526.7. On the 8 cuts no slot of which is drawn: net 164.4, 172.7 and 237.4. The money cover
+waits for better offers only where waiting is worth its risk (at 2026-11-25T2045Z, Laporte the only cover of 31M, a 7% chance of no offer at the last
+close costs more than the 0.5M of waiting gains: it says accept tonight, as the rate-0 cover does).
 
 ## 4. The board: cash, offers, funding a buy (2026-11-08)
 

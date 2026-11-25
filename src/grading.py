@@ -20,7 +20,7 @@ import hurdle
 import salegrade
 import valuation
 import worth
-from approach import Club, Option, Plan, Rounds, Side, approach, cover, plan, secure
+from approach import Club, Option, Plan, Rounds, Side, approach, cover, drifted, plan, ratios_of, secure
 from board import club_at, context, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
@@ -28,7 +28,7 @@ from ffcore.clock import CLOSE, MADRID, Clock, run_now
 from ffcore import records as rec
 from ffcore.store import RunRecords
 from ffcore.parse import snapshot_stamp, stamp
-from ffcore.rules import SQUAD_MAX, bid_margin, cash_at_lock
+from ffcore.rules import OFFER_EXISTS, SQUAD_MAX, bid_margin, cash_at_lock
 from salegrade import HORIZONS
 
 __all__ = ["FABRICATED_FROM", "backtest", "fabricated", "graded", "latest_values", "record_grades", "scored_at", "sound_offers", "standing_grades"]
@@ -823,16 +823,20 @@ def cover_day(loaded: loader.Loaded, world: state.World) -> CoverDay | None:
 
 
 class Realised(NamedTuple):
-    """What a policy did over the offers that followed: `points` the points its sales lose, `cash` cash at the lock after them,
-    `unseen` the offers a close lacked, counted at the expected draw."""
+    """What a policy did over the offers that followed: `points` the points its sales lose, `cash` cash at the lock after them, `filled` the
+    offer slots it read that no cut shows (the squad had sold the player, or no cut was kept: drawn iid, see Closing) and `gain` the points the
+    prices its sales fetched are worth over the players' expected offers (kappa x (price less hurdle.draw of his worth), summed, at the rate
+    the policy was advised at)."""
     points: float
     cash: float
-    unseen: int
+    filled: float
+    gain: float = 0.0
+    short: float = 0.0
 
     @property
     def held(self) -> bool:
-        """Whether cash at the lock is 0 or more."""
-        return self.cash >= -1e-6
+        """Whether cash at the lock is 0 or more (in every draw, for a mean)."""
+        return self.cash >= -1e-6 and self.short < 1e-9
 
 
 class CoverGrade(NamedTuple):
@@ -844,15 +848,29 @@ class CoverGrade(NamedTuple):
     cover: Realised
     now: Realised
 
+    def net(self, realised: Realised) -> float:
+        """The points `realised` lost less its gain: what the cover is judged by."""
+        return realised.points - realised.gain
 
-def closing_offers(day: CoverDay, later: Mapping[dt.date, CoverDay]) -> list[Mapping[str, float]]:
-    """The offer drawn at each close before the day's lock, as the market shows it: created at the close, it stands on the cut of the next
-    Madrid day (the later daily cut of that day); an empty Mapping where no cut was kept. Today's standing offers are the day's own
+
+class Closing(NamedTuple):
+    """What the market showed of one close: the `offers` by player on the cut that follows it and `seen` the players that cut speaks for (those
+    still in the squad then): a player in `seen` with no offer had none; any other player's offer is not observable."""
+    offers: Mapping[str, float]
+    seen: frozenset[str]
+
+
+NOT_SEEN = Closing({}, frozenset())
+
+
+def closing_offers(day: CoverDay, later: Mapping[dt.date, CoverDay]) -> list[Closing]:
+    """The Closing of each close before the day's lock, as the market shows it: the offer created at the close stands on the cut of the next
+    Madrid day (the later daily cut of that day); NOT_SEEN where no cut was kept. Today's standing offers are the day's own
     (`day.club.offers`), not a draw."""
-    out: list[Mapping[str, float]] = []
+    out: list[Closing] = []
     for close in day.clock.closes:
         seen = later.get(local_date(close) + dt.timedelta(days=1))
-        out.append(seen.club.offers if seen else {})
+        out.append(Closing(seen.club.offers, seen.club.squad) if seen else NOT_SEEN)
     return out
 
 
@@ -863,85 +881,223 @@ def local_date(stamp_text: str) -> dt.date:
     return when.astimezone(MADRID).date()
 
 
-def follow(day: CoverDay, side: Side, option: Option, offers: Sequence[Mapping[str, float]]) -> Realised:
-    """The Realised of `option` over the offers drawn at each close (closing_offers): the players of `now` sold at the day's standing offers,
-    each waiting player at the first draw at or above his reserve (any at the last; a missing last offer is his expected price), then for
-    cash still below 0 the cheapest fallback (approach.cover) at the last draw's offers (a missing one at his expected price)."""
+class Slot(NamedTuple):
+    """A player's offer at one close: the offer (None: no offer) and whether it was `drawn` rather than read off a cut."""
+    offer: float | None
+    drawn: bool
+
+
+def slot_of(day: CoverDay, closing: Closing, player: str, close: int, label: str) -> Slot:
+    """The Slot of `player` at the close-th close (from 0): his offer on the cut when it speaks for him, else an iid draw of the offer model
+    (it exists with probability OFFER_EXISTS, its ratio one of the offers seen by the day's cut, over his worth as the price fold has it drift), made by a generator seeded by
+    (`label`, the cut, the player, the close): the same for every policy followed over the same label."""
+    if player in closing.seen:
+        return Slot(closing.offers.get(player), False)
+    rng = random.Random("%s|%s|%s|%d" % (label, day.cut, player, close))
+    ratios = ratios_of(day.offers)
+    ratio = ratios[rng.randrange(len(ratios))]
+    return Slot(ratio * drifted(day.club.worth[player], day.club.drift.get(player, 0.0), close) if rng.random() < OFFER_EXISTS else None, True)
+
+
+def gained(day: CoverDay, side: Side, sales: Mapping[str, float], rate: float) -> float:
+    """The points the prices of `sales` (by player) are worth over the players' expected offers (hurdle.draw of his worth): hurdle.in_points of
+    the excess over the jornadas of the side at `rate`, negative below it."""
+    return sum(hurdle.in_points(price - hurdle.draw(day.club.worth[k]), len(side.rounds), rate) for k, price in sales.items())
+
+
+def follow(day: CoverDay, side: Side, option: Option, closings: Sequence[Closing], rate: float = hurdle.FALLBACK_LAMBDA, label: str = "",
+           graded: float | None = None) -> Realised:
+    """The Realised of `option` over the offers drawn at each close (closing_offers, or NOT_SEEN for every one: all drawn): the players of `now`
+    sold at the day's standing offers, each waiting player at the first offer at or above his reserve (any at the last; none if he has none
+    at the last close: he stays), then for cash still below 0 the recourse of the last close: approach.cover at its offers (a player with none
+    cannot be sold) by points less the gain of the sales at `rate`, as Closer.fill chooses (when none closes the gap the first jornada is lost, Side.lapse). Its gain is read at `graded` (`rate` by default)."""
     club = day.club
-    money = sum(club.offers[k] for k in option.now)
-    unseen = 0
-    offers = list(offers) or [{}]
+    sales = {k: club.offers[k] for k in option.now}
+    filled = 0
+    closings = list(closings) or [NOT_SEEN]
     for r in option.wait:
-        for j, seen in enumerate(offers):
-            offer = seen.get(r.player)
-            if offer is None and j == len(offers) - 1:
-                offer, unseen = hurdle.draw(club.worth[r.player]), unseen + 1
-            if offer is not None and offer >= r.least[j] - 1e-9:
-                money += offer
+        for j, closing in enumerate(closings):
+            slot = slot_of(day, closing, r.player, j, label)
+            filled += slot.drawn
+            if slot.offer is not None and slot.offer >= r.least[j] - 1e-9:
+                sales[r.player] = slot.offer
                 break
-    fixed = option.now | frozenset(r.player for r in option.wait)
-    cash = club.cash + club.inflow.expected + money
-    final = offers[-1]
-    price = {k: final.get(k, hurdle.draw(club.worth[k])) for k in club.squad}
-    covered = cover(side, fixed, club.squad - fixed, price, -cash if cash < 0 else 0.0)
+    fixed = frozenset(sales)
+    cash = club.cash + club.inflow.expected + sum(sales.values())
+    last = len(closings) - 1
+    slots = {k: slot_of(day, closings[last], k, last, label) for k in club.squad - fixed - frozenset(r.player for r in option.wait)}
+    price = {k: slot.offer or 0.0 for k, slot in slots.items()}
+    kappa = hurdle.in_points(1.0, len(side.rounds), rate)
+    covered = cover(side, fixed, frozenset(slots), price, -cash if cash < 0 else 0.0, {k: kappa * (p - hurdle.draw(club.worth[k])) for k, p in price.items()}, True)
+    scored = rate if graded is None else graded
     if covered is None:
-        return Realised(math.inf, cash, unseen)
-    return Realised(covered.cost, cash + sum(price[k] for k in covered.sells), unseen)
+        lost = side.cost(fixed)
+        return Realised(math.inf if lost is None else lost + side.lapse(fixed), cash, filled, gained(day, side, sales, scored))
+    sales |= {k: price[k] for k in covered.sells}
+    return Realised(covered.cost, cash + sum(price[k] for k in covered.sells), filled + sum(slots[k].drawn for k in covered.sells), gained(day, side, sales, scored))
 
 
-def follow_plan(day: CoverDay, side: Side, found: Plan, offers: Sequence[Mapping[str, float]]) -> Realised:
-    """The Realised of the plan taking its sales at their standing offers now and the rest at the first draw with an offer (his expected
-    price when none): no fallback, so cash at the lock may stay below 0."""
+def follow_plan(day: CoverDay, side: Side, found: Plan, closings: Sequence[Closing], rate: float = hurdle.FALLBACK_LAMBDA, label: str = "") -> Realised:
+    """The Realised of the plan taking its sales at their standing offers now and the rest at the first offer drawn (the player stays when
+    none is): no recourse, so cash at the lock may stay below 0 and then the first jornada is lost (Side.lapse). Its gain is read at `rate`."""
     club = day.club
-    money, unseen = 0.0, 0
+    sales: dict[str, float] = {}
+    filled = 0
     for k in found.sells:
         if k in club.offers:
-            money += club.offers[k]
+            sales[k] = club.offers[k]
             continue
-        later = [seen[k] for seen in offers if k in seen]
-        money += later[0] if later else hurdle.draw(club.worth[k])
-        unseen += not later
-    cost = side.cost(found.sells)
-    return Realised(math.inf if cost is None else cost, club.cash + club.inflow.expected + money, unseen)
+        for j, closing in enumerate(list(closings) or [NOT_SEEN]):
+            slot = slot_of(day, closing, k, j, label)
+            filled += slot.drawn
+            if slot.offer is not None:
+                sales[k] = slot.offer
+                break
+    cost = side.cost(frozenset(sales))
+    cash = club.cash + club.inflow.expected + sum(sales.values())
+    return Realised(math.inf if cost is None else cost + (side.lapse(frozenset(sales)) if cash < 0 else 0.0), cash, filled, gained(day, side, sales, rate))
 
 
-def cover_grades(days: Sequence[CoverDay]) -> list[CoverGrade]:
-    """The CoverGrade of each daily cut (ascending) with cash below 0, a close left, and a plan with options (secure): the recommended
-    option and the plan taking its offers now, each followed over the offers that came (follow, follow_plan)."""
+def cover_advice(day: CoverDay, rate: float) -> tuple[Side, Plan, Plan] | None:
+    """The Side, the plan and its secure (at `rate`, the points a million is worth per jornada) at a cut with cash below 0, a close left and a
+    feasible plan with options; None at any other."""
+    if day.club.cash >= 0 or day.clock.n_closes < 1:
+        return None
+    side = Side(day.club.squad, day.club.pos, day.rounds.cells, day.rounds.arrives)
+    base = plan(day.club, approach(day.club, None, 0.0, 1.0, day.rounds), day.rounds, day.clock.n_closes, side)
+    if base is None or not base.feasible:
+        return None
+    secured = secure(day.club, base, side, day.offers, day.clock.n_closes, rate)
+    return (side, base, secured) if secured.options else None
+
+
+LABELS = tuple("abcdefgh")
+
+
+def averaged_realised(done: Sequence[Realised]) -> Realised:
+    """The mean of Realised over the draws of the slots no cut shows (infinite points if any is)."""
+    return Realised(math.inf if any(r.points == math.inf for r in done) else statistics.fmean(r.points for r in done), statistics.fmean(r.cash for r in done),
+                    statistics.fmean(r.filled for r in done), statistics.fmean(r.gain for r in done), statistics.fmean(not r.held for r in done))
+
+
+def cover_grades(days: Sequence[CoverDay], rate: float = hurdle.FALLBACK_LAMBDA, graded: float = hurdle.FALLBACK_LAMBDA, labels: Sequence[str] = LABELS) -> list[CoverGrade]:
+    """The CoverGrade of each daily cut (ascending) with cash below 0, a close left, and a plan with options (cover_advice at `rate`): the
+    recommended option and the plan taking its offers now, each followed over the offers that came (follow, follow_plan) with its gain read
+    at `graded`, averaged over the draws of the slots no cut shows, one per label."""
     later = {day_of(d.cut): d for d in days}
     out = []
     for d in days:
-        if d.club.cash >= 0 or d.clock.n_closes < 1:
+        if (advice := cover_advice(d, rate)) is None:
             continue
-        side = Side(d.club.squad, d.club.pos, d.rounds.cells, d.rounds.arrives)
-        base = plan(d.club, approach(d.club, None, 0.0, 1.0, d.rounds), d.rounds, d.clock.n_closes, side)
-        if base is None or not base.feasible:
-            continue
-        secured = secure(d.club, base, side, d.offers, d.clock.n_closes)
-        if not secured.options:
-            continue
+        side, base, secured = advice
         seen = closing_offers(d, later)
-        out.append(CoverGrade(d.cut, -d.club.cash, secured.options[0].points, follow(d, side, secured.options[0], seen), follow_plan(d, side, base, seen)))
+        out.append(CoverGrade(d.cut, -d.club.cash, secured.options[0].points, averaged_realised([follow(d, side, secured.options[0], seen, rate, x, graded) for x in labels]),
+                              averaged_realised([follow_plan(d, side, base, seen, graded, x) for x in labels])))
     return out
+
+
+class Calibration(NamedTuple):
+    """One cut's claim against its own simulation: what the Closer expects of the recommended option (`claimed`, as a Realised and its `net`)
+    and the mean of `runs` follows over iid draws of the offer model (`simulated`, its `net` and the standard error `se` of that mean)."""
+    cut: str
+    claimed: Realised
+    claimed_net: float
+    simulated: Realised
+    simulated_net: float
+    se: float
+
+    @property
+    def delta(self) -> float:
+        """The claimed net less the simulated, in standard errors of the simulation."""
+        gap = self.claimed_net - self.simulated_net
+        return gap / self.se if self.se > 0 else (0.0 if abs(gap) < 1e-9 else math.inf)
+
+
+def cover_calibration(days: Sequence[CoverDay], rate: float = hurdle.FALLBACK_LAMBDA, runs: int = 300) -> list[Calibration]:
+    """The Calibration of the recommended option at each daily cut with cash below 0 (cover_advice at `rate`): the Closer's expected points, cash
+    and net against the means over `runs` iid replays (follow over NOT_SEEN closings: every offer drawn). What the Closer claims is what its
+    own model does when simulated."""
+    out = []
+    for d in days:
+        if (advice := cover_advice(d, rate)) is None:
+            continue
+        side, _, secured = advice
+        best = secured.options[0]
+        done = [r for i in range(runs) if (r := follow(d, side, best, [NOT_SEEN] * d.clock.n_closes, rate, "run%d" % i)).points < math.inf]
+        nets = [r.points - r.gain for r in done]
+        out.append(Calibration(d.cut, Realised(best.points, best.cash, 0, best.gain), best.net, Realised(statistics.fmean(r.points for r in done), statistics.fmean(r.cash for r in done), 0,
+                                                                                                          statistics.fmean(r.gain for r in done)),
+                               statistics.fmean(nets), statistics.stdev(nets) / math.sqrt(len(nets)) if len(nets) > 1 else 0.0))
+    return out
+
+
+def calibration_report(rows: Sequence[Calibration]) -> str:
+    """One line per cut: the claimed and simulated points, cash (M) and net, the difference of the nets in standard errors; then the worst
+    difference and the number beyond 2 standard errors."""
+    lines = ["%s  points %6.1f / %6.1f  cash %+7.1fM / %+7.1fM  net %7.2f / %7.2f  delta %+5.1f se" % (
+        r.cut, r.claimed.points, r.simulated.points, r.claimed.cash / 1e6, r.simulated.cash / 1e6, r.claimed_net, r.simulated_net, r.delta) for r in rows]
+    lines.append("cuts %d  claimed net %.1f  simulated %.1f  beyond 2 se: %d  worst %+.1f se" % (
+        len(rows), sum(r.claimed_net for r in rows), sum(r.simulated_net for r in rows), sum(abs(r.delta) > 2 for r in rows), max((r.delta for r in rows), key=abs, default=0.0)))
+    return "\n".join(lines)
 
 
 def cover_report(grades: Sequence[CoverGrade]) -> str:
     """One line per graded cut and the totals: points lost and how often cash at the lock held, the cover against the plan taking its offers
-    now, over the realised offers."""
-    rows = ["%s  deficit %5.1fM  expected %5.1f  cover %5.1f pts cash %+6.1fM %s  now %5.1f pts cash %+6.1fM %s" % (
+    now, over the realised offers; the totals also give the net (points lost less the gain, CoverGrade.net), the money left above 0 and the
+    offer slots drawn for lack of a cut (Realised.filled)."""
+    rows = ["%s  deficit %5.1fM  expected %5.1f  cover %5.1f pts cash %+6.1fM %s  now %5.1f pts cash %+6.1fM %s  filled %.1f/%.1f" % (
         g.cut, g.deficit / 1e6, g.expected, g.cover.points, g.cover.cash / 1e6, "held" if g.cover.held else "SHORT",
-        g.now.points, g.now.cash / 1e6, "held" if g.now.held else "SHORT") for g in grades]
+        g.now.points, g.now.cash / 1e6, "held" if g.now.held else "SHORT", g.cover.filled, g.now.filled) for g in grades]
     n = len(grades)
-    rows.append("cuts %d  cover: %.1f pts, held %d  now: %.1f pts, held %d" % (
+    rows.append("cuts %d  cover: %.1f pts, held %d, money left %.1fM, net %.1f  now: %.1f pts, held %d, money left %.1fM, net %.1f  filled slots: cover %.1f, now %.1f" % (
         n, sum(g.cover.points for g in grades if g.cover.points < math.inf), sum(g.cover.held for g in grades),
-        sum(g.now.points for g in grades if g.now.points < math.inf), sum(g.now.held for g in grades)))
+        sum(max(0.0, g.cover.cash) for g in grades) / 1e6, sum(g.net(g.cover) for g in grades if g.cover.points < math.inf),
+        sum(g.now.points for g in grades if g.now.points < math.inf), sum(g.now.held for g in grades),
+        sum(max(0.0, g.now.cash) for g in grades) / 1e6, sum(g.net(g.now) for g in grades if g.now.points < math.inf),
+        sum(g.cover.filled for g in grades), sum(g.now.filled for g in grades)))
     return "\n".join(rows)
 
 
-def cover_replay(loaded: loader.Loaded, cuts: Sequence[str], since: str = SALES_FROM) -> str:
-    """The cover_report over every daily cut from since (replayed_days): the grade of the cover advice, re-runnable every week."""
+class Existence(NamedTuple):
+    """How often a player of the squad listed when a close comes has an offer on the cut after it: of `listed` such players (on the market at the
+    cut before the close, still in the squad after it) `offered` had one."""
+    listed: int
+    offered: int
+
+    @property
+    def rate(self) -> float:
+        return self.offered / self.listed if self.listed else math.nan
+
+    def interval(self, z: float = 1.96) -> tuple[float, float]:
+        """The Wilson interval of the rate at `z` standard errors."""
+        n, p = self.listed, self.rate
+        if not n:
+            return (math.nan, math.nan)
+        centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+        half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+        return (centre - half, centre + half)
+
+
+def offer_existence(days: Sequence[CoverDay]) -> Existence:
+    """The Existence over the daily cuts: for each cut and the cut of the next Madrid day, the players in both squads and listed at the first
+    (not in its Club.unlisted), and how many of them have an offer on the second."""
+    later = {day_of(d.cut): d for d in days}
+    listed = offered = 0
+    for d in days:
+        if (after := later.get(day_of(d.cut) + dt.timedelta(days=1))) is None:
+            continue
+        here = (d.club.squad & after.club.squad) - d.club.unlisted
+        listed += len(here)
+        offered += sum(k in after.club.offers for k in here)
+    return Existence(listed, offered)
+
+
+def cover_replay(loaded: loader.Loaded, cuts: Sequence[str], since: str = SALES_FROM, rate: float = hurdle.FALLBACK_LAMBDA,
+                 graded: float = hurdle.FALLBACK_LAMBDA) -> str:
+    """The cover_report over every daily cut from since (replayed_days): the grade of the cover advice made at `rate`, its net read at `graded`
+    (a different rate grades the advice of another), re-runnable every week."""
     got = replayed_days(loaded, cuts, since, lambda w: cover_day(loaded, w))
-    return cover_report(cover_grades([got.days[c] for c in sorted(got.days)]))
+    return cover_report(cover_grades([got.days[c] for c in sorted(got.days)], rate, graded))
 
 
 class HoldDay(NamedTuple):
@@ -2224,38 +2380,49 @@ def _selftest_holds() -> None:
 
 
 def _selftest_cover_grades() -> None:
-    """The cover over realised offers: a waiting player sold at the first close that meets his reserve (any offer at the last), the
-    fallback closing what is still short, cash at the lock 0 or more whenever a fallback closes it; the plan taking its offers now never
-    loses fewer points than the cover on rich offers and may leave cash short on poor ones."""
+    """The cover over realised offers: a waiting player sold at the first close that meets his reserve (any at the last), the recourse closing
+    what is still short, cash at the lock 0 or more whenever it closes it; the plan taking its offers now never loses fewer points than the cover on
+    rich offers and may leave cash short on poor ones. A slot no cut shows is drawn, the same for every policy; the cover's claim is what its own
+    model does when simulated."""
     own = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 5 + ["MED"] * 5 + ["DEL"] * 3)}
     cells = {1: {k: 1.0 + 0.37 * i for i, k in enumerate(sorted(own))}}
     values = {k: 4e6 + 1e6 * (i % 3) for i, k in enumerate(sorted(own))}
     window = valuation.Window((1,))
     big = sorted(own)[-1]
     club = Club(frozenset(own), own, values, {big: 0.9 * values[big]}, -0.9 * values[big] - 1e6, 5e7)
-    day = CoverDay("2026-11-24T0901Z", club, Rounds(cells, window, window), Clock("2026-11-27T2000Z", ("2026-11-24T2124Z", "2026-11-25T2124Z", "2026-11-26T2124Z")), worth.NO_OFFERS)
+    ratios = worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.0, 1.05, 1.1])
+    day = CoverDay("2026-11-24T0901Z", club, Rounds(cells, window, window), Clock("2026-11-27T2000Z", ("2026-11-24T2124Z", "2026-11-25T2124Z", "2026-11-26T2124Z")), ratios)
     side = Side(club.squad, own, cells, window)
     found = plan(club, approach(club, None, 0.0, 1.0, day.rounds), day.rounds, 3, side)
     assert found is not None and found.feasible
-    got = secure(club, found, side, worth.NO_OFFERS, 3)
+    got = secure(club, found, side, ratios, 3)
     assert got.options
     best = got.options[0]
+    waiting = frozenset(r.player for r in best.wait)
     for ratio in (0.7, 0.9, 1.0, 1.2):
-        offers = [{k: ratio * v for k, v in values.items()} for _ in range(3)]
-        done = follow(day, side, best, offers)
-        sold = side.cost(best.now | {r.player for r in best.wait})
-        assert sold is not None and done.held and done.points >= sold - 1e-9 and done.unseen == 0
-        assert follow_plan(day, side, found, offers).points >= 0.0
-    rich = [{k: 1.5 * v for k, v in values.items()} for _ in range(3)]
-    sold = side.cost(best.now | {r.player for r in best.wait})
-    assert sold is not None and follow(day, side, best, rich).points <= sold + 1e-9, "offers above every reserve: no fallback"
-    assert follow(day, side, best, []).unseen == len(best.wait), "no offer seen: the expected draws"
+        seen = [Closing({k: ratio * v for k, v in values.items()}, club.squad)] * 3
+        done = follow(day, side, best, seen)
+        sold = side.cost(best.now | waiting)
+        assert sold is not None and done.held and done.points >= sold - 1e-9 and done.filled == 0, "every slot seen: none drawn"
+        assert follow_plan(day, side, found, seen).points >= 0.0
+    rich = [Closing({k: 1.5 * v for k, v in values.items()}, club.squad)] * 3
+    sold = side.cost(best.now | waiting)
+    assert sold is not None and follow(day, side, best, rich).points <= sold + 1e-9, "offers above every reserve: no recourse"
+    bare = [NOT_SEEN] * 3
+    once = follow(day, side, best, bare, label="a")
+    assert once == follow(day, side, best, bare, label="a") and once.filled >= len(best.wait), "no cut shows the offers: drawn, the same each time for one label"
+    assert follow(day, side, best, [Closing({}, club.squad)] * 3).filled == 0, "a cut that speaks for the squad and shows no offer: no offer, nothing drawn"
     cuts = {dt.date(2026, 11, d): day._replace(cut="2026-11-%02dT2045Z" % d, club=club._replace(offers={big: 1e6 * d})) for d in (24, 25, 26, 27)}
     arrived = closing_offers(day, cuts)
-    assert [x[big] for x in arrived] == [25e6, 26e6, 27e6], "the offer drawn at a close is the one standing on the next day's cut"
-    assert closing_offers(day, {}) == [{}, {}, {}], "no cut kept: no offer seen"
+    assert [x.offers[big] for x in arrived] == [25e6, 26e6, 27e6] and all(x.seen == club.squad for x in arrived), "the offer drawn at a close is the one standing on the next day's cut"
+    assert closing_offers(day, {}) == [NOT_SEEN] * 3, "no cut kept: nothing is seen"
     assert cover_grades([day._replace(club=club._replace(cash=1e6))]) == [], "cash 0 or more: nothing to grade"
     assert len(cover_grades([day])) == 1 and "cuts 1" in cover_report(cover_grades([day]))
+    for row in cover_calibration([day], hurdle.FALLBACK_LAMBDA, 120) + cover_calibration([day], 0.0, 120):
+        assert abs(row.claimed_net - row.simulated_net) <= max(3 * row.se, 0.25), "what the Closer claims is what its own model does when simulated"
+    twice = [day._replace(cut="2026-11-24T2045Z"), day._replace(cut="2026-11-25T2045Z", club=club._replace(offers={k: v for k, v in club.offers.items() if k != big}, unlisted=frozenset({big})))]
+    assert offer_existence(twice) == Existence(len(club.squad), len(club.squad & set(twice[1].club.offers))), "listed at the first cut, in both squads: those with an offer on the second"
+    assert 0.0 <= Existence(5, 4).interval()[0] <= 0.8 <= Existence(5, 4).interval()[1] <= 1.0
 
 
 def _selftest() -> None:
@@ -2332,12 +2499,21 @@ if __name__ == "__main__":
         os._exit(0)
     if sys.argv[1:2] == ["cover"]:
         loaded, cuts = read_storage()
-        print(cover_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None]), flush=True)
+        print(cover_replay(loaded, [c for c in cuts if snapshot_stamp(c) is not None], rate=float(sys.argv[2]) if sys.argv[2:3] else hurdle.FALLBACK_LAMBDA,
+                           graded=float(sys.argv[3]) if sys.argv[3:4] else hurdle.FALLBACK_LAMBDA), flush=True)
+        os._exit(0)
+    if sys.argv[1:2] == ["calibration"]:
+        loaded, cuts = read_storage()
+        replay = replayed_days(loaded, [c for c in cuts if snapshot_stamp(c) is not None], SALES_FROM, lambda w: cover_day(loaded, w))
+        days = [replay.days[c] for c in sorted(replay.days)]
+        print(calibration_report(cover_calibration(days, float(sys.argv[2]) if sys.argv[2:3] else hurdle.FALLBACK_LAMBDA, int(sys.argv[3]) if sys.argv[3:4] else 200)), flush=True)
+        shown = offer_existence(days)
+        print("offer existence: %d of %d listed players had an offer on the next cut: %.3f (95%% %.3f to %.3f); model %.2f" % ((shown.offered, shown.listed, shown.rate) + shown.interval() + (OFFER_EXISTS,)), flush=True)
         os._exit(0)
     if sys.argv[1:2] == ["rules"]:
         got = rule_scores(worth.CHALLENGERS)
         print(rule_report(got.scores), flush=True)
         print(paired_report(got.graded), flush=True)
         os._exit(0)
-    print("grading.py --selftest | accuracy | price | opportunities | rules | holds | decided | cover")
+    print("grading.py --selftest | accuracy | price | opportunities | rules | holds | decided | cover | calibration")
     raise SystemExit(2)

@@ -797,9 +797,12 @@ def club_at(inp: decision.Inputs, extras: decision.Extras) -> tuple[Club, Rounds
     mine = decision.squad_of(inp)
     pos = {p.player: p.pos for p in inp.players if p.pos in POSITIONS}
     _, cells = decision.cells_of(inp)
-    club = Club(mine, pos, {h.player: h.value for h in extras.held}, {o.player: o.money for o in extras.offers}, inp.money.cash,
+    worth = {h.player: h.value for h in extras.held}
+    steps = decision.rises_of(inp)
+    club = Club(mine, pos, worth, {o.player: o.money for o in extras.offers}, inp.money.cash,
                 inp.money.team_value, (len(inp.bids), sum(b.amount for b in inp.bids)), debt=inp.money.debt, inflow=inflow_of(inp.credits, mine, pos, cells),
-                unlisted=mine - extras.listed)
+                unlisted=mine - extras.listed,
+                drift={k: -hurdle.wait_cost(decision.exit_of(inp, k, worth[k], steps.get(k, {}))) for k in mine if k in worth})
     window = decision.window_of(decision.lock_times(inp), cells, None)
     return club, Rounds(cells, window, window)
 
@@ -825,7 +828,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     side = Side(club.squad, pos, cells, rounds.arrives)
     found = plan(club, base, rounds, clock.n_closes, side)
     if found is not None and club.cash < 0:
-        found = secure(club, found, side, offers, clock.n_closes)
+        found = secure(club, found, side, offers, clock.n_closes, rate)
     buys, considered = buy_lines(inp, names, club, got, plan_cost(base, found, club))
     sells = offer_lines(inp, names, offered, known, offers, rate, clock.n_closes, untils_of(clock))
     funds(buys, sells)

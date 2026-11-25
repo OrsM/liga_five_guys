@@ -40,6 +40,9 @@ class Standing(NamedTuple):
         return hurdle.later(self.exit)
 
 
+Payoffs = tuple[float, ...] | Callable[[int], tuple[float, ...]]
+
+
 class OfferDistribution(NamedTuple):
     """The offers over value seen, ascending (offer_ratio_distribution)."""
     ratios: tuple[float, ...]
@@ -100,20 +103,23 @@ def _tails(ratios: tuple[float, ...]) -> tuple[float, ...]:
     return tuple(itertools.accumulate(reversed(ratios), initial=0.0))[::-1]
 
 
-def waiting_values(m: int, payoffs: tuple[float, ...], c: float, hold: float) -> tuple[float, ...]:
-    """The value of waiting with k draws still to come, for k = 0 to m: rho_0 = hold and rho_k = mean of max(u, rho_(k-1)) over the
-    `payoffs` u of the offers of a distribution (ascending, one per offer, not empty), less c, the cost of a night waited. An offer is
-    taken at the close with k draws after it when its payoff is at least rho_k; with the payoffs the offers' ratios it is the
-    reserve ratio (offer_reserve_ratio), with those of a cover (the points a sale saves) the cover's. Nondecreasing in k when c is
-    0 and hold is at most the mean payoff; hold at most the lowest payoff makes the last close accept any offer."""
-    if m < 0 or not payoffs:
+def waiting_values(m: int, payoffs: Payoffs, c: float, hold: float, exists: float = 1.0) -> tuple[float, ...]:
+    """The value of waiting with k draws still to come, for k = 0 to m: rho_0 = hold and rho_k = rho_(k-1) + `exists` x (mean of
+    max(u, rho_(k-1)) over the `payoffs` u of the offers of a distribution, less rho_(k-1)), less c, the cost of a night waited: with
+    probability 1 - `exists` no offer is drawn. `payoffs` are ascending, one per offer, not empty, the same at each draw or, given as a
+    function of k, those of the draw taken with k draws still to come (itself counted). An offer is taken at the close with k draws
+    after it when its payoff is at least rho_k; with the payoffs the offers' ratios it is the reserve ratio (offer_reserve_ratio), with
+    those of a cover (the points a sale saves) the cover's. Nondecreasing in k when c is 0 and hold is at most the mean payoff; hold at
+    most the lowest payoff makes the last close accept any offer."""
+    if m < 0 or not (payoffs(1) if callable(payoffs) else payoffs):
         raise ValueError("m must be >= 0 and payoffs non-empty")
-    tail = _tails(payoffs)
     rho = hold
     out = [rho]
-    for _ in range(m):
-        i = bisect.bisect_left(payoffs, rho)
-        rho = (rho * i + tail[i]) / len(payoffs) - c
+    for k in range(1, m + 1):
+        u = payoffs(k) if callable(payoffs) else payoffs
+        tail = _tails(u)
+        i = bisect.bisect_left(u, rho)
+        rho += exists * ((rho * i + tail[i]) / len(u) - rho) - c
         out.append(rho)
     return tuple(out)
 
@@ -218,6 +224,15 @@ def _selftest_option() -> None:
         for _ in range(m):
             rho = sum(max(x, rho) for x in dist.ratios) / len(dist.ratios) - c
         assert abs(offer_reserve_ratio(m, c, dist, hold) - rho) < 1e-12, "the reserve is the plain recursion rho_k = mean max(X, rho_k-1) less c"
+    for _ in range(30):
+        dist = offer_ratio_distribution(wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 40)))
+        c, hold, m, may = wild.uniform(-0.02, 0.02), wild.uniform(0.0, 1.5), wild.randint(0, 6), wild.uniform(0.0, 1.0)
+        plain = waiting_values(m, dist.ratios, c, hold)
+        assert waiting_values(m, dist.ratios, c, hold, 1.0) == plain and waiting_values(m, lambda k: dist.ratios, c, hold, 1.0) == plain, "exists 1 and payoffs given by step are the plain recursion"
+        assert all(abs(a - (hold - k * c)) < 1e-12 for k, a in enumerate(waiting_values(m, dist.ratios, c, hold, 0.0))), "no offer is ever drawn: nothing to wait for"
+        floor = min(hold, dist.ratios[0])
+        assert all(a <= b + 1e-12 for a, b in zip(waiting_values(m, dist.ratios, 0.0, floor, may), waiting_values(m, dist.ratios, 0.0, floor))), "an offer that may not come is worth no more than one that does"
+        assert all(b >= a - 1e-12 for a, b in zip(waiting_values(m, dist.ratios, 0.0, 0.0), waiting_values(m, lambda k: tuple(x * (1 + 0.01 * k) for x in dist.ratios), 0.0, 0.0))), "dearer offers at later draws never lower the value of waiting"
     hand = offer_ratio_distribution([1.0, 0.9, 1.1, 1.0, 0.95])
     assert offer_percentile(NO_OFFERS, 1.0) is None, "no offers seen: no percentile"
     assert [offer_percentile(hand, x) for x in (0.8, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2)] == [0.0, 0.2, 0.4, 0.8, 0.8, 1.0, 1.0], "the empirical distribution function"
