@@ -191,7 +191,7 @@ def prices(club: Club, bought: bool, closes: int = 1) -> dict[str, float]:
     his worth) at his value of the last of `closes` closes (`drifted`, as the cover's recourse prices it: a standing offer expires at the close
     and is redrawn, and a value that falls or rises over the nights moves the sale). With no bid (`bought` False) the standing offer where
     there is one, else the expected draw."""
-    return {k: drifted(p.expected, club.drift.get(k, 0.0), closes - 1) if bought else p.now for k, p in pricing_of(club).items()}
+    return {k: hurdle.drifted(p.expected, club.drift.get(k, 0.0), closes - 1) if bought else p.now for k, p in pricing_of(club).items()}
 
 
 class Covered(NamedTuple):
