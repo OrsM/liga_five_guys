@@ -20,7 +20,7 @@ import hurdle
 import salegrade
 import valuation
 import worth
-from approach import Club, Option, Plan, Rounds, Side, approach, cover, drifted, plan, ratios_of, secure
+from approach import Closer, Club, Money, Option, Plan, Rounds, Side, approach, cover, gains, plan, ratios_of, secure
 from board import club_at, context, stamped, standing
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
@@ -889,20 +889,20 @@ class Slot(NamedTuple):
 
 def slot_of(day: CoverDay, closing: Closing, player: str, close: int, label: str) -> Slot:
     """The Slot of `player` at the close-th close (from 0): his offer on the cut when it speaks for him, else an iid draw of the offer model
-    (it exists with probability OFFER_EXISTS, its ratio one of the offers seen by the day's cut, over his worth as the price fold has it drift), made by a generator seeded by
+    (it exists with probability the offer model's, its ratio one of the offers seen by the day's cut, over his worth as the price fold has it drift), made by a generator seeded by
     (`label`, the cut, the player, the close): the same for every policy followed over the same label."""
     if player in closing.seen:
         return Slot(closing.offers.get(player), False)
     rng = random.Random("%s|%s|%s|%d" % (label, day.cut, player, close))
     ratios = ratios_of(day.offers)
     ratio = ratios[rng.randrange(len(ratios))]
-    return Slot(ratio * drifted(day.club.worth[player], day.club.drift.get(player, 0.0), close) if rng.random() < OFFER_EXISTS else None, True)
+    return Slot(worth.offer(ratio, day.club.worth[player], day.club.drift.get(player, 0.0), close) if rng.random() < day.offers.exists else None, True)
 
 
 def gained(day: CoverDay, side: Side, sales: Mapping[str, float], rate: float) -> float:
-    """The points the prices of `sales` (by player) are worth over the players' expected offers (hurdle.draw of his worth): hurdle.in_points of
-    the excess over the jornadas of the side at `rate`, negative below it."""
-    return sum(hurdle.in_points(price - hurdle.draw(day.club.worth[k]), len(side.rounds), rate) for k, price in sales.items())
+    """The points the prices of `sales` (by player) are worth over the players' expected offers: the sum of approach.gains at `rate` over the
+    jornadas of the side."""
+    return sum(gains(day.club, Money(rate, len(side.rounds)), sales).values())
 
 
 def follow(day: CoverDay, side: Side, option: Option, closings: Sequence[Closing], rate: float = hurdle.FALLBACK_LAMBDA, label: str = "",
@@ -927,8 +927,7 @@ def follow(day: CoverDay, side: Side, option: Option, closings: Sequence[Closing
     last = len(closings) - 1
     slots = {k: slot_of(day, closings[last], k, last, label) for k in club.squad - fixed - frozenset(r.player for r in option.wait)}
     price = {k: slot.offer or 0.0 for k, slot in slots.items()}
-    kappa = hurdle.in_points(1.0, len(side.rounds), rate)
-    covered = cover(side, fixed, frozenset(slots), price, -cash if cash < 0 else 0.0, {k: kappa * (p - hurdle.draw(club.worth[k])) for k, p in price.items()}, True)
+    covered = cover(side, fixed, frozenset(slots), price, -cash if cash < 0 else 0.0, gains(club, Money(rate, len(side.rounds)), price), True)
     scored = rate if graded is None else graded
     if covered is None:
         lost = side.cost(fixed)
@@ -2393,6 +2392,17 @@ def _selftest_cover_grades() -> None:
     ratios = worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.0, 1.05, 1.1])
     day = CoverDay("2026-11-24T0901Z", club, Rounds(cells, window, window), Clock("2026-11-27T2000Z", ("2026-11-24T2124Z", "2026-11-25T2124Z", "2026-11-26T2124Z")), ratios)
     side = Side(club.squad, own, cells, window)
+    for rate in (0.0, hurdle.FALLBACK_LAMBDA, 0.2):
+        sales = {k: v * (0.8 + 0.1 * i) for i, (k, v) in enumerate(sorted(values.items()))}
+        assert abs(gained(day, side, sales, rate) - sum(Closer(club, side, ratios, 3, rate).gain(k, p) for k, p in sales.items())) < 1e-9, "the replay and the Closer read one gain"
+    never, always = (day._replace(offers=ratios._replace(exists=e)) for e in (0.0, 1.0))
+    falling = day._replace(club=club._replace(drift={k: -0.01 for k in own}))
+    for j in range(3):
+        assert all(slot_of(never, NOT_SEEN, k, j, "x").offer is None and slot_of(never, NOT_SEEN, k, j, "x").drawn for k in own), "no offer exists: none is drawn"
+        drawn = [slot_of(always, NOT_SEEN, k, j, "x").offer for k in own]
+        assert all(o is not None for o in drawn), "every offer exists"
+        later = [slot_of(falling._replace(offers=always.offers), NOT_SEEN, k, j, "x").offer for k in own]
+        assert all(abs(a * (1 - 0.01 * j) - b) < 1e-6 for a, b in zip(drawn, later) if a is not None and b is not None), "the draw is the same ratio over the value as the club's drift has it"
     found = plan(club, approach(club, None, 0.0, 1.0, day.rounds), day.rounds, 3, side)
     assert found is not None and found.feasible
     got = secure(club, found, side, ratios, 3)

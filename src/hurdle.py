@@ -171,10 +171,16 @@ def in_points(money: float, n: int, rate: float) -> float:
     return money / 1e6 * n * rate
 
 
-def wait_cost(exit: Exit) -> float:
-    """The cost of a night of waiting, as a fraction of value: the exit's rise spread over its nights and negated, so a
-    falling price costs and a rising one pays. 0 for a value that is not positive."""
-    return 0.0 if exit.value <= 0 else -exit.rise / exit.nights
+def drift(exit: Exit) -> float:
+    """A night's change of the exit's value as a fraction of it: the rise spread over the nights, so a falling price is negative. 0 for a value that
+    is not positive. The one night's drift every sale reader takes (Club.drift, worth.stopped)."""
+    return 0.0 if exit.value <= 0 else exit.rise / exit.nights
+
+
+def drifted(value: float, drift: float, night: int) -> float:
+    """What a player of `value` is worth `night` nights from now (0 is tonight) when his value changes by `drift` (a fraction) a night: never below
+    0. Nonincreasing in the night when drift is negative."""
+    return max(0.0, value * (1.0 + drift * night))
 
 
 def proceeds(exit: Exit) -> float:
@@ -367,18 +373,24 @@ def _selftest_exit() -> None:
         value, nights, rise = rng.uniform(1e5, 5e7), rng.randint(1, 12), rng.uniform(-0.3, 0.3)
         e = Exit(value, nights, rise)
         assert abs(later(e) / draw(value) - 1 - rise) < 1e-9, "the later price reads the exit's rise"
-        assert abs(wait_cost(e) * nights + rise) < 1e-12, "the night's cost is the same rise spread over the same nights"
-        assert abs(later(e._replace(value=2 * value)) - 2 * later(e)) < 1e-3 and abs(wait_cost(e._replace(value=2 * value)) - wait_cost(e)) < 1e-12
+        assert abs(drift(e) * nights - rise) < 1e-12, "the night's drift is the same rise spread over the same nights"
+        assert abs(later(e._replace(value=2 * value)) - 2 * later(e)) < 1e-3 and abs(drift(e._replace(value=2 * value)) - drift(e)) < 1e-12
         flat = Exit(value, nights)
-        assert later(flat) == draw(value) and wait_cost(flat) == 0.0, "no rise: the draw, and waiting is free"
+        assert later(flat) == draw(value) and drift(flat) == 0.0, "no rise: the draw, and no drift"
         assert proceeds(flat) == draw(value) and proceeds(e._replace(reserve=2 * value)) == max(2 * value, later(e))
-    assert wait_cost(Exit(0.0, 10, 0.5)) == 0.0
+    assert drift(Exit(0.0, 10, 0.5)) == 0.0
+    for _ in range(200):
+        value, d, night = rng.uniform(1e5, 5e7), rng.uniform(-0.05, 0.05), rng.randint(0, 12)
+        assert drifted(value, d, 0) == value and drifted(value, d, night) >= 0.0, "tonight's value is the value; never below 0"
+        assert drifted(value, d, night + 1) <= drifted(value, d, night) + 1e-6 or d >= 0, "a falling price never rises with the nights"
+        assert abs(drifted(value, d, night) - value * (1 + d * night)) < 1e-6 or d * night < -1, "linear in the nights"
+        assert abs(drifted(draw(value), drift(Exit(value, night or 1, d * (night or 1))), night or 1) - later(Exit(value, night or 1, d * (night or 1)))) < 1e-3, "the exit's later price is the draw drifted over its nights"
     for _ in range(500):
         e = Exit(rng.uniform(1e5, 5e7), rng.randint(1, 12), rng.uniform(-0.3, 0.3), rng.uniform(0.0, 3e7), rng.choice([0.0, rng.uniform(0.0, 0.25)]))
         k = holding(e)
         assert holding(k) == k and k.value == e.value and k.reserve == e.reserve, "idempotent, keeps the value and the reserve"
         if e.hold > 0:
-            assert abs(later(k) - held(e)) < 1e-6 and (k.nights, k.rise) == (HOLD_NIGHTS, e.hold) and abs(wait_cost(k) * HOLD_NIGHTS + e.hold) < 1e-12, "kept to his hold: later is held, a night's rise is the hold's share"
+            assert abs(later(k) - held(e)) < 1e-6 and (k.nights, k.rise) == (HOLD_NIGHTS, e.hold) and abs(drift(k) * HOLD_NIGHTS - e.hold) < 1e-12, "kept to his hold: later is held, a night's rise is the hold's share"
         else:
             assert k == e, "no hold: the exit itself"
 

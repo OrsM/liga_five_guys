@@ -879,7 +879,7 @@ def club_at(inp: decision.Inputs, extras: decision.Extras) -> tuple[Club, Rounds
     club = Club(mine, pos, worth, {o.player: o.money for o in extras.offers}, inp.money.cash,
                 inp.money.team_value, (len(inp.bids), sum(b.amount for b in inp.bids)), debt=inp.money.debt, inflow=inflow_of(inp.credits, mine, pos, cells),
                 unlisted=mine - extras.listed,
-                drift={k: -hurdle.wait_cost(decision.exit_of(inp, k, worth[k], steps.get(k, {}))) for k in mine if k in worth})
+                drift={k: hurdle.drift(decision.exit_of(inp, k, worth[k], steps.get(k, {}))) for k in mine if k in worth})
     window = decision.window_of(decision.lock_times(inp), cells, None)
     return club, Rounds(cells, window, window)
 
@@ -904,7 +904,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     base = approach(club, None, 0.0, 1.0, rounds, money=money)
     clock = decision.clock_of(inp)
     side = Side(club.squad, pos, cells, rounds.arrives)
-    found = plan(club, base, rounds, clock.n_closes, side)
+    found = plan(club, base, rounds, clock.n_closes, side, rate)
     if found is not None and club.cash < 0:
         found = secure(club, found, side, offers, clock.n_closes, rate)
     buys, plans, rejected = buy_lines(inp, names, club, got, plan_cost(base, found, club), rate)
@@ -1477,12 +1477,12 @@ def _selftest() -> None:
         rows = [decision.Price("p", h, value * (1 + rng.uniform(-0.1, 0.1) * rng.choice([0, 1])), value) for h in rng.sample(range(1, 12), rng.randint(0, 5))]
         s = standing(decision.Inputs(money, prices=rows), "p", value, None)
         e = s.exit
-        assert abs(s.later / hurdle.draw(value) - 1 - e.rise) < 1e-9 and abs(hurdle.wait_cost(e) * e.nights + e.rise) < 1e-12 and abs(e.rise) <= hurdle.TREND_CAP + 1e-12, \
+        assert abs(s.later / hurdle.draw(value) - 1 - e.rise) < 1e-9 and abs(hurdle.drift(e) * e.nights - e.rise) < 1e-12 and abs(e.rise) <= hurdle.TREND_CAP + 1e-12, \
             "the buy side's later price, the waiting cost and the sale reserve read one capped rise over one horizon"
         points = rng.uniform(0, 20)
         assert worth.waiting_reserve(s, dist, 3) >= s.later
         flat = standing(decision.Inputs(money, prices=[decision.Price("p", h, value, value) for h in range(1, 6)]), "p", value, None)
-        assert flat.exit == hurdle.Exit(value, 5, 0.0) and flat.later == hurdle.draw(value) and hurdle.wait_cost(flat.exit) == 0.0, "no rise: today's draw"
+        assert flat.exit == hurdle.Exit(value, 5, 0.0) and flat.later == hurdle.draw(value) and hurdle.drift(flat.exit) == 0.0, "no rise: today's draw"
         assert hurdle.reserve(hurdle.stake(points, n, rate, flat.exit)) == max(points * 1e6 / (n * rate) , hurdle.draw(value)), "no rise: no drift in the reserve"
     asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
               "feasible": True, "delta": {"points": 0.0, "window": {"lock": 0.0, "next4": 0.0, "season": 0.0}, "gap": []},

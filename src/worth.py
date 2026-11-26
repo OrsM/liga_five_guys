@@ -14,7 +14,7 @@ from typing import NamedTuple
 
 import eleven
 import hurdle
-from ffcore.rules import SALE_ESTIMATE
+from ffcore.rules import OFFER_EXISTS, SALE_ESTIMATE
 import valuation
 from valuation import Reading, Window
 
@@ -44,8 +44,10 @@ Payoffs = tuple[float, ...] | Callable[[int], tuple[float, ...]]
 
 
 class OfferDistribution(NamedTuple):
-    """The offers over value seen, ascending (offer_ratio_distribution)."""
+    """The offer model of a sale: the offers over value seen, ascending (offer_ratio_distribution), and `exists` the chance a player listed when
+    a close comes has an offer on it (the ratios are those of the offers that exist). Every sale reader takes both from here."""
     ratios: tuple[float, ...]
+    exists: float = OFFER_EXISTS
 
 
 NO_OFFERS = OfferDistribution(())
@@ -83,10 +85,10 @@ class Verdict(NamedTuple):
 Rule = Callable[[Standing, Context], Verdict]
 
 
-def offer_ratio_distribution(ratios: Iterable[float]) -> OfferDistribution:
+def offer_ratio_distribution(ratios: Iterable[float], exists: float = OFFER_EXISTS) -> OfferDistribution:
     """The distribution of offer over value ratios: the ratios (one per offer, at its first sighting, as
-    current.offer_ratios gives them) sorted. Empty when there are none."""
-    return OfferDistribution(tuple(sorted(ratios)))
+    current.offer_ratios gives them) sorted, with the chance `exists` an offer exists. Empty when there are none."""
+    return OfferDistribution(tuple(sorted(ratios)), exists)
 
 
 def offer_percentile(dist: OfferDistribution, ratio: float) -> float | None:
@@ -103,14 +105,14 @@ def _tails(ratios: tuple[float, ...]) -> tuple[float, ...]:
     return tuple(itertools.accumulate(reversed(ratios), initial=0.0))[::-1]
 
 
-def waiting_values(m: int, payoffs: Payoffs, c: float, hold: float, exists: float = 1.0) -> tuple[float, ...]:
+def waiting_values(m: int, payoffs: Payoffs, hold: float, exists: float = 1.0) -> tuple[float, ...]:
     """The value of waiting with k draws still to come, for k = 0 to m: rho_0 = hold and rho_k = rho_(k-1) + `exists` x (mean of
-    max(u, rho_(k-1)) over the `payoffs` u of the offers of a distribution, less rho_(k-1)), less c, the cost of a night waited: with
-    probability 1 - `exists` no offer is drawn. `payoffs` are ascending, one per offer, not empty, the same at each draw or, given as a
-    function of k, those of the draw taken with k draws still to come (itself counted). An offer is taken at the close with k draws
-    after it when its payoff is at least rho_k; with the payoffs the offers' ratios it is the reserve ratio (offer_reserve_ratio), with
-    those of a cover (the points a sale saves) the cover's. Nondecreasing in k when c is 0 and hold is at most the mean payoff; hold at
-    most the lowest payoff makes the last close accept any offer."""
+    max(u, rho_(k-1)) over the `payoffs` u of the offers of a distribution, less rho_(k-1)): with probability 1 - `exists` no offer is drawn.
+    `payoffs` are ascending, one per offer, not empty, the same at each draw or, given as a function of k, those of the draw taken with k draws
+    still to come (itself counted). An offer is taken at the close with k draws after it when its payoff is at least rho_k; with the payoffs the
+    offers over value it is the reserve ratio (offer_reserve_ratio), with those of a cover (the points a sale saves) the cover's. Nondecreasing
+    in k when hold is at most the mean payoff and in `exists` when hold is at most the lowest payoff, which makes the last close accept any
+    offer."""
     if m < 0 or not (payoffs(1) if callable(payoffs) else payoffs):
         raise ValueError("m must be >= 0 and payoffs non-empty")
     rho = hold
@@ -119,31 +121,41 @@ def waiting_values(m: int, payoffs: Payoffs, c: float, hold: float, exists: floa
         u = payoffs(k) if callable(payoffs) else payoffs
         tail = _tails(u)
         i = bisect.bisect_left(u, rho)
-        rho += exists * ((rho * i + tail[i]) / len(u) - rho) - c
+        rho += exists * ((rho * i + tail[i]) / len(u) - rho)
         out.append(rho)
     return tuple(out)
 
 
-def offer_reserve_ratio(m: int, c: float, dist: OfferDistribution, hold: float) -> float:
-    """The offer over value at which selling tonight and waiting are worth the same, with m nights left to wait, a cost c
-    (a fraction of value) for each night waited and one offer a night drawn from dist, i.i.d. and expiring at the next
-    close. hold is what the player is worth if no offer is taken (rho_0); rho_k = mean of max(X, rho_{k-1}) over dist
-    minus c (waiting_values with the ratios as payoffs). m >= 0 and dist non-empty. Nondecreasing in m and nonincreasing in c
-    when hold is at most the mean of dist less c; with hold 0, rho_1 is the mean of dist less c, and with every ratio 1.0 rho_m
-    is 1 - c."""
+def offer(ratio: float, value: float, drift: float, night: int) -> float:
+    """The offer of `ratio` over the value of a player worth `value` tonight whose value changes by `drift` (a fraction) a night, `night` nights
+    from now (hurdle.drifted): the one place an offer is priced."""
+    return ratio * hurdle.drifted(value, drift, night)
+
+
+def offers_at(ratios: Sequence[float], value: float, drift: float, night: int) -> tuple[float, ...]:
+    """The offers (offer) of each of `ratios` (ascending) at that night: ascending."""
+    return tuple(offer(r, value, drift, night) for r in ratios)
+
+
+def offer_reserve_ratio(m: int, drift: float, dist: OfferDistribution, hold: float) -> float:
+    """The offer over tonight's value at which selling tonight and waiting are worth the same, with m nights left to wait and one offer a
+    night drawn from dist, i.i.d., expiring at the next close, existing with probability dist.exists, and over the value as it drifts (`drift` a
+    night, offers_at: the offer k draws before the end is of the night m + 1 - k from now). hold is what the player is worth if no offer is
+    taken (rho_0); rho_k is waiting_values over those offers with no other cost of waiting. m >= 0 and dist non-empty. Nondecreasing in m (with
+    hold at most the lowest offer) and in the drift."""
     if not dist.ratios:
         raise ValueError("m must be >= 0 and dist non-empty")
-    return waiting_values(m, dist.ratios, c, hold)[m]
+    return waiting_values(m, lambda k: offers_at(dist.ratios, 1.0, drift, m + 1 - k), hold, dist.exists)[m]
 
 
 def stopped(exit: hurdle.Exit, dist: OfferDistribution, m: int) -> hurdle.Exit:
     """The exit with its reserve set to the offer, in money, at which taking it now and waiting for a draw of dist at each of
-    the m closes left are worth the same: value times offer_reserve_ratio with the hurdle.wait_cost of the exit and hold =
+    the m closes left are worth the same: value times offer_reserve_ratio at the exit's hurdle.drift and hold =
     later over value, never below the later price; the later price when dist is empty or the value is not positive."""
     later = hurdle.later(exit)
     if not dist.ratios or exit.value <= 0:
         return exit._replace(reserve=later)
-    return exit._replace(reserve=max(later, exit.value * offer_reserve_ratio(m, hurdle.wait_cost(exit), dist, later / exit.value)))
+    return exit._replace(reserve=max(later, exit.value * offer_reserve_ratio(m, hurdle.drift(exit), dist, later / exit.value)))
 
 
 def waiting_reserve(standing: Standing, dist: OfferDistribution, m: int) -> float:
@@ -186,19 +198,21 @@ def take_now(ratio: float | None, share: float | None, funds: bool) -> bool:
 
 
 def _histogram(counts: Sequence[int], low: float, width: float) -> OfferDistribution:
-    return offer_ratio_distribution(low + width * (i + 0.5) for i, n in enumerate(counts) for _ in range(n))
+    return offer_ratio_distribution((low + width * (i + 0.5) for i, n in enumerate(counts) for _ in range(n)), 1.0)
 
 
-def _waiting_payoff(m: int, c: float, dist: OfferDistribution, hold: float, shift: float, seed: int, runs: int) -> float:
+def _waiting_payoff(m: int, drift: float, dist: OfferDistribution, hold: float, shift: float, seed: int, runs: int) -> float:
+    """The mean, over simulated waits of m nights, of what the player fetches (over tonight's value) when he takes the first offer of a night
+    that reaches the waiting value of the nights left, moved by `shift`."""
     rng = random.Random(seed)
-    ceilings = [offer_reserve_ratio(k, c, dist, hold) + shift for k in range(m)]
+    rho = waiting_values(m, lambda k: offers_at(dist.ratios, 1.0, drift, m + 1 - k), hold, dist.exists)
     total = 0.0
     for _ in range(runs):
-        payoff = hold - c * m
-        for night in range(m):
-            x = rng.choice(dist.ratios)
-            if x >= ceilings[m - night - 1]:
-                payoff = x - c * (night + 1)
+        payoff = hold
+        for night in range(1, m + 1):
+            x = offer(rng.choice(dist.ratios), 1.0, drift, night)
+            if rng.random() < dist.exists and x >= rho[m - night] + shift:
+                payoff = x
                 break
         total += payoff
     return total / runs
@@ -206,33 +220,38 @@ def _waiting_payoff(m: int, c: float, dist: OfferDistribution, hold: float, shif
 
 def _selftest_option() -> None:
     study = _histogram((80, 80, 84, 82, 85, 72, 96, 71, 67, 33), 0.90, 0.021)
-    flat = offer_ratio_distribution(0.9 + 0.2 * (i + 0.5) / 400 for i in range(400))
+    flat = offer_ratio_distribution((0.9 + 0.2 * (i + 0.5) / 400 for i in range(400)), 1.0)
     mean = sum(study.ratios) / len(study.ratios)
     assert offer_ratio_distribution([1.1, 0.9, 1.0]).ratios == (0.9, 1.0, 1.1), "the distribution is sorted"
-    for c in (0.0, 0.0017, 0.007):
-        assert abs(offer_reserve_ratio(1, c, study, 0.0) - (mean - c)) < 1e-12, "one night: the mean offer less the cost"
-        rhos = [offer_reserve_ratio(m, c, study, 0.0) for m in range(0, 12)]
-        assert all(a <= b + 1e-12 for a, b in zip(rhos, rhos[1:])), "more nights never lowers the reserve"
+    assert offer_ratio_distribution([1.0]).exists == OFFER_EXISTS and study.exists == 1.0, "the fitted existence is the default"
+    for d in (0.0, -0.0017, -0.007, 0.004):
+        assert abs(offer_reserve_ratio(1, d, study, 0.0) - mean * (1 + d)) < 1e-12, "one night: the mean offer at tomorrow's value"
+        rhos = [offer_reserve_ratio(m, d, study, 0.0) for m in range(0, 12)]
+        assert d < 0 or all(a <= b + 1e-12 for a, b in zip(rhos, rhos[1:])), "more nights never lowers the reserve of a price that does not fall"
     for m in (1, 3, 5, 7):
-        costs = [offer_reserve_ratio(m, c, study, 0.0) for c in (0.0, 0.0017, 0.007, 0.02)]
-        assert all(a >= b for a, b in zip(costs, costs[1:])), "a dearer night never raises the reserve"
+        falls = [offer_reserve_ratio(m, d, study, 0.0) for d in (-0.02, -0.007, -0.0017, 0.0, 0.004)]
+        assert all(a <= b for a, b in zip(falls, falls[1:])), "a faster fall never raises the reserve"
+        likely = [offer_reserve_ratio(m, 0.0, study._replace(exists=e), 0.5) for e in (0.0, 0.5, 0.93, 1.0)]
+        assert all(a <= b + 1e-12 for a, b in zip(likely, likely[1:])), "offers that are likelier to exist never lower the reserve"
+        assert likely[0] == 0.5, "no offer ever drawn: the hold"
     wild = random.Random(2)
     for _ in range(50):
-        dist = offer_ratio_distribution(wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 60)))
-        c, hold, m = wild.uniform(-0.03, 0.03), wild.uniform(0.0, 1.5), wild.randint(0, 8)
+        dist = offer_ratio_distribution((wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 60))), 1.0)
+        d, hold, m = wild.uniform(-0.03, 0.03), wild.uniform(0.0, 1.5), wild.randint(0, 8)
         rho = hold
-        for _ in range(m):
-            rho = sum(max(x, rho) for x in dist.ratios) / len(dist.ratios) - c
-        assert abs(offer_reserve_ratio(m, c, dist, hold) - rho) < 1e-12, "the reserve is the plain recursion rho_k = mean max(X, rho_k-1) less c"
+        for night in range(m, 0, -1):
+            rho = sum(max(offer(x, 1.0, d, night), rho) for x in dist.ratios) / len(dist.ratios)
+        assert abs(offer_reserve_ratio(m, d, dist, hold) - rho) < 1e-12, "the reserve is the plain recursion over the offers at their night's value"
     for _ in range(30):
-        dist = offer_ratio_distribution(wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 40)))
-        c, hold, m, may = wild.uniform(-0.02, 0.02), wild.uniform(0.0, 1.5), wild.randint(0, 6), wild.uniform(0.0, 1.0)
-        plain = waiting_values(m, dist.ratios, c, hold)
-        assert waiting_values(m, dist.ratios, c, hold, 1.0) == plain and waiting_values(m, lambda k: dist.ratios, c, hold, 1.0) == plain, "exists 1 and payoffs given by step are the plain recursion"
-        assert all(abs(a - (hold - k * c)) < 1e-12 for k, a in enumerate(waiting_values(m, dist.ratios, c, hold, 0.0))), "no offer is ever drawn: nothing to wait for"
+        dist = offer_ratio_distribution((wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 40))), 1.0)
+        hold, m, may = wild.uniform(0.0, 1.5), wild.randint(0, 6), wild.uniform(0.0, 1.0)
+        plain = waiting_values(m, dist.ratios, hold)
+        assert waiting_values(m, dist.ratios, hold, 1.0) == plain and waiting_values(m, lambda k: dist.ratios, hold, 1.0) == plain, "exists 1 and payoffs given by step are the plain recursion"
+        assert waiting_values(m, dist.ratios, hold, 0.0) == (hold,) * (m + 1), "no offer is ever drawn: nothing to wait for"
         floor = min(hold, dist.ratios[0])
-        assert all(a <= b + 1e-12 for a, b in zip(waiting_values(m, dist.ratios, 0.0, floor, may), waiting_values(m, dist.ratios, 0.0, floor))), "an offer that may not come is worth no more than one that does"
-        assert all(b >= a - 1e-12 for a, b in zip(waiting_values(m, dist.ratios, 0.0, 0.0), waiting_values(m, lambda k: tuple(x * (1 + 0.01 * k) for x in dist.ratios), 0.0, 0.0))), "dearer offers at later draws never lower the value of waiting"
+        assert all(a <= b + 1e-12 for a, b in zip(waiting_values(m, dist.ratios, floor, may), waiting_values(m, dist.ratios, floor))), "an offer that may not come is worth no more than one that does"
+        assert all(b >= a - 1e-12 for a, b in zip(waiting_values(m, dist.ratios, 0.0), waiting_values(m, lambda k: tuple(x * (1 + 0.01 * k) for x in dist.ratios), 0.0))), "dearer offers at later draws never lower the value of waiting"
+        assert offer_reserve_ratio(m, 0.0, dist._replace(exists=may), hold) == waiting_values(m, dist.ratios, hold, may)[m], "no drift: the recursion at the existence of the model"
     hand = offer_ratio_distribution([1.0, 0.9, 1.1, 1.0, 0.95])
     assert offer_percentile(NO_OFFERS, 1.0) is None, "no offers seen: no percentile"
     assert [offer_percentile(hand, x) for x in (0.8, 0.9, 0.95, 1.0, 1.05, 1.1, 1.2)] == [0.0, 0.2, 0.4, 0.8, 0.8, 1.0, 1.0], "the empirical distribution function"
@@ -242,11 +261,11 @@ def _selftest_option() -> None:
         assert all(0.0 <= g <= 1.0 for g in shares), "a share"
         assert all(a <= b for a, b in zip(shares, shares[1:])), "nondecreasing in the ratio"
         assert (offer_percentile(dist, min(dist.ratios)) or 0.0) > 0.0 and offer_percentile(dist, max(dist.ratios)) == 1.0
-    point = offer_ratio_distribution([1.0] * 7)
+    point = offer_ratio_distribution([1.0] * 7, 1.0)
     for m in (1, 2, 5):
-        for c in (0.0, 0.0017, 0.01):
-            assert abs(offer_reserve_ratio(m, c, point, 0.0) - (1.0 - c)) < 1e-12, "all ratios 1.0: 1 - c"
-    assert offer_reserve_ratio(3, 0.0017, study, 0.0) >= 1.03 and offer_reserve_ratio(5, 0.0017, study, 0.0) >= 1.04
+        for d in (0.0, -0.0017, -0.01):
+            assert abs(offer_reserve_ratio(m, d, point, 0.0) - (1.0 + d)) < 1e-12, "all ratios 1.0, all existing: tomorrow's value (waiting only for the first draw)"
+    assert offer_reserve_ratio(3, -0.0017, study, 0.0) >= 1.03 and offer_reserve_ratio(5, -0.0017, study, 0.0) >= 1.04
     v = 0.0
     for _ in range(5):
         v = (1 + v * v) / 2
@@ -264,10 +283,10 @@ def _selftest_option() -> None:
     assert all(r >= shelf.later for r in reserves) and waiting_reserve(shelf, NO_OFFERS, 5) == shelf.later, "never below later; no offers seen: later"
 
     for m in (1, 3, 5):
-        base = _waiting_payoff(m, 0.0017, study, 0.9, 0.0, 7, 20000)
-        assert abs(base - offer_reserve_ratio(m, 0.0017, study, 0.9)) < 0.003, "the reserve is the optimal waiting value"
+        base = _waiting_payoff(m, -0.0017, study, 0.9, 0.0, 7, 20000)
+        assert abs(base - offer_reserve_ratio(m, -0.0017, study, 0.9)) < 0.003, "the reserve is the optimal waiting value"
         for shift in (-0.02, -0.01, 0.01, 0.02):
-            assert _waiting_payoff(m, 0.0017, study, 0.9, shift, 7, 20000) <= base + 0.001, "no other threshold waits better"
+            assert _waiting_payoff(m, -0.0017, study, 0.9, shift, 7, 20000) <= base + 0.001, "no other threshold waits better"
 
     value = 1e7
     held = _waiting_payoff(MAX_NIGHTS, 0.0, study, SALE_ESTIMATE, 0.0, 11, 20000)
@@ -285,10 +304,10 @@ def _selftest_option() -> None:
     waits = bench_ctx._replace(closes=MAX_NIGHTS)
     for rise in (-0.03, 0.0, 0.03):
         e = stand.exit._replace(rise=rise)
-        for offer in (0.9 * value, 1.0 * value, 1.2 * value):
-            sold = rent(stand._replace(exit=e, offer=offer), waits)
+        for bid in (0.9 * value, 1.0 * value, 1.2 * value):
+            sold = rent(stand._replace(exit=e, offer=bid), waits)
             assert sold.reserve == waiting_reserve(stand._replace(exit=e), waits.offers, MAX_NIGHTS), "a bench player's reserve is his waiting reserve"
-            assert sold.key is not None and (sold.key <= 0) == (offer >= waiting_reserve(stand._replace(exit=e), waits.offers, MAX_NIGHTS)), "sold at or above it"
+            assert sold.key is not None and (sold.key <= 0) == (bid >= waiting_reserve(stand._replace(exit=e), waits.offers, MAX_NIGHTS)), "sold at or above it"
         idle = rent(stand._replace(exit=e, offer=1.0), bench_ctx)
         assert idle.reserve == hurdle.later(e) and waiting_reserve(stand._replace(exit=e), waits.offers, 0) == hurdle.later(e), "no closes left: the later price"
         assert hurdle.reserve(hurdle.stake(0.0, 1, waits.rate, stopped(e, waits.offers, MAX_NIGHTS))) == waiting_reserve(stand._replace(exit=e), waits.offers, MAX_NIGHTS), "sale reserve and buy proceeds read one exit"
