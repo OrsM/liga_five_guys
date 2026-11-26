@@ -465,7 +465,7 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
             made = hurdle.bid(curves[k], asking, stake)
             bid, win = (made.amount, made.win) if made is not None else (None, None)
         out.append({
-            "player": k, "pos": pos[k], "status": status, "asking": asking, "close_at": close, "window": where, "from_j": where.lock[0],
+            "player": k, "pos": pos[k], "status": status, "asking": asking, "value": value, "close_at": close, "window": where, "from_j": where.lock[0],
             "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
             "price_next": steps[1] if 1 in steps else None,
             "price_lock": steps[max(steps)] if steps else None,
@@ -642,8 +642,8 @@ def _selftest_opportunities() -> None:
         for r in opportunity_rows(inp, rate):
             n = hurdle.remaining(r["from_j"], 2)
             if r["bid"] is not None:
-                assert r["asking"] <= r["bid"] <= hurdle.cap(r["stake"]) == hurdle.K * r["gain"] * 1e6 / (n * rate), \
-                    "a bid only on a buy, never above the walk-away price K x W"
+                assert r["asking"] <= r["bid"] <= hurdle.cap(r["stake"]) == r["gain"] * 1e6 / (n * rate), \
+                    "a bid only on a buy, never above the walk-away price W"
     assert all(r["bid"] is None for r in opportunity_rows(inp, 1.0)), "at a dear enough rate nothing is bought"
     assert got["late"]["gain"] > 0 and (got["late"]["bid"], got["late"]["win"]) == (None, None), \
         "on the market with no curve: his gain is said, no bid or chance is made up"

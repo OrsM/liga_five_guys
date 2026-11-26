@@ -99,8 +99,8 @@ Every forecast is the same product, for every player and jornada
   top rival bid given one does, both by the player's momentum (the fixed table
   `ffcore/auction_table.py`, fitted over every closed auction, recent ones weighing more, our
   wins as left-censored): rising players draw rivals' bids, falling ones almost never. A listing is bid on at the level whose chance
-  times the surplus under the walk-away price K x W is greatest (`hurdle.bid`; W the
-  points' worth in millions at the exchange rate LAMBDA, K = 0.85; no surplus, no bid).
+  times the surplus under the walk-away price W is greatest (`hurdle.bid`; W the
+  points' worth in millions at the exchange rate LAMBDA, no band: K = 1; no surplus, no bid).
   The game offers for each listed player every night (an offer expires at the next close; a rival's direct offer lasts 48 h), centred on value
   (median 0.99x, 80% within 0.92-1.07x) and fresh each night. A sale gets
   tonight's offer or what waiting is worth, whichever is more

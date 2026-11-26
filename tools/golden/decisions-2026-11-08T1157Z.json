@@ -7,8 +7,8 @@
  "base": {
   "base": 0.0,
   "cash": -49472707.0,
-  "cash_if_lost": 1388258.931044384,
-  "cost": 12.798050102912434,
+  "cash_if_lost": 2147713.821464809,
+  "cost": 12.471904122632518,
   "feasible": true,
   "gain": 0.0,
   "held": [
@@ -30,24 +30,26 @@
    "Martin Satriano"
   ],
   "if_lost": [
+   "Ferran Jutgla",
    "Aitor Paredes"
   ],
   "if_won": [
+   "Ferran Jutgla",
    "Aitor Paredes"
   ],
-  "lock_margin": 1388258.931044384,
-  "lock_margin_low": -2381803.1635233983,
+  "lock_margin": 2147713.821464809,
+  "lock_margin_low": -3565843.4849943966,
   "margin": 43386574.2,
-  "net": -12.798050102912434,
+  "net": -12.471904122632518,
   "not_listed": [],
-  "points_lost_if_lost": 12.798050102912434,
-  "points_lost_if_won": 12.798050102912434,
+  "points_lost_if_lost": 12.471904122632518,
+  "points_lost_if_won": 12.471904122632518,
   "raises": 1576701.0,
   "risk": {
-   "below_points": 186.78197178,
+   "below_points": 51.07497780000001,
    "low_inflow": 4070471.220545605,
-   "p_short": 1.0,
-   "shortfall_if_low": 14607725.957454395
+   "p_short": 0.33818883188738,
+   "shortfall_if_low": 1037026.5594543964
   },
   "short": 0.0,
   "tonight": [
@@ -68,17 +70,18 @@
    "accepts": [],
    "act": [],
    "cash": -49472707.0,
-   "cash_after": 1388258.931044384,
-   "label": "cover the cash: Roger Hinojo, Aitor Paredes",
+   "cash_after": 2147713.821464809,
+   "label": "cover the cash: Roger Hinojo, Ferran Jutgla, Aitor Paredes",
    "lock": "2026-11-20T20:00Z",
    "needed": true,
    "options": [
     {
-     "cash_at_lock": 1388258.931044384,
+     "cash_at_lock": 2147713.821464809,
      "fallback": [
-      "Ferran Jutgla"
+      "Arnau Ortiz",
+      "Dani Martinez"
      ],
-     "points_lost": 12.798050102912434,
+     "points_lost": 12.471904122632518,
      "take_now": [
       {
        "key": "15316",
@@ -90,9 +93,70 @@
      ],
      "wait": [
       {
+       "key": "7842",
+       "kind": "wait",
+       "least": 14280781.538471414,
+       "name": "Ferran Jutgla",
+       "reserves": [
+        {
+         "least": null,
+         "until": "2026-11-08T21:24Z"
+        },
+        {
+         "least": 14280781.538471414,
+         "until": "2026-11-09T21:24Z"
+        },
+        {
+         "least": 14207623.037796583,
+         "until": "2026-11-10T21:24Z"
+        },
+        {
+         "least": 14130074.191885587,
+         "until": "2026-11-11T21:24Z"
+        },
+        {
+         "least": 14046781.055758614,
+         "until": "2026-11-12T21:24Z"
+        },
+        {
+         "least": 13955829.175342051,
+         "until": "2026-11-13T21:24Z"
+        },
+        {
+         "least": 13854236.902095683,
+         "until": "2026-11-14T21:24Z"
+        },
+        {
+         "least": 13737127.62130465,
+         "until": "2026-11-15T21:24Z"
+        },
+        {
+         "least": 13594839.047067683,
+         "until": "2026-11-16T21:24Z"
+        },
+        {
+         "least": 13411040.32005992,
+         "until": "2026-11-17T21:24Z"
+        },
+        {
+         "least": 13136564.399211343,
+         "until": "2026-11-18T21:24Z"
+        },
+        {
+         "least": 12456458.997542437,
+         "until": "2026-11-19T21:24Z"
+        },
+        {
+         "least": 0.0,
+         "until": "2026-11-20T20:00Z"
+        }
+       ],
+       "until": "2026-11-20T20:00Z"
+      },
+      {
        "key": "7916",
        "kind": "wait",
-       "least": 29462366.944233187,
+       "least": 29169895.638706908,
        "name": "Aitor Paredes",
        "reserves": [
         {
@@ -100,47 +164,47 @@
          "until": "2026-11-08T21:24Z"
         },
         {
-         "least": 29462366.944233187,
+         "least": 29169895.638706908,
          "until": "2026-11-09T21:24Z"
         },
         {
-         "least": 28591835.06976895,
+         "least": 28621683.891998976,
          "until": "2026-11-10T21:24Z"
         },
         {
-         "least": 27937615.499139883,
+         "least": 27955622.29390196,
          "until": "2026-11-11T21:24Z"
         },
         {
-         "least": 27937615.499139883,
+         "least": 27955622.29390196,
          "until": "2026-11-12T21:24Z"
         },
         {
-         "least": 27937615.499139883,
+         "least": 27955622.29390196,
          "until": "2026-11-13T21:24Z"
         },
         {
-         "least": 27344341.31148172,
+         "least": 27360635.837382652,
          "until": "2026-11-14T21:24Z"
         },
         {
-         "least": 26561483.796446312,
+         "least": 26557055.273773342,
          "until": "2026-11-15T21:24Z"
         },
         {
-         "least": 25873517.344604596,
+         "least": 25848080.062217526,
          "until": "2026-11-16T21:24Z"
         },
         {
-         "least": 25161845.859036967,
+         "least": 25151804.011550225,
          "until": "2026-11-17T21:24Z"
         },
         {
-         "least": 24361353.17351973,
+         "least": 24334463.359671682,
          "until": "2026-11-18T21:24Z"
         },
         {
-         "least": 22987615.050867762,
+         "least": 23005622.84461985,
          "until": "2026-11-19T21:24Z"
         },
         {
@@ -152,12 +216,12 @@
       }
      ],
      "worst": {
-      "p": 0.029122889717209482,
-      "points": 19.37685217906892
+      "p": 1.3682601222519394e-06,
+      "points": 26.305347888381448
      }
     }
    ],
-   "points_lost": 12.798050102912434,
+   "points_lost": 12.471904122632518,
    "sells": [
     {
      "key": "15316",
@@ -167,9 +231,70 @@
      "until": "2026-11-08T21:24Z"
     },
     {
+     "key": "7842",
+     "kind": "wait",
+     "least": 14280781.538471414,
+     "name": "Ferran Jutgla",
+     "reserves": [
+      {
+       "least": null,
+       "until": "2026-11-08T21:24Z"
+      },
+      {
+       "least": 14280781.538471414,
+       "until": "2026-11-09T21:24Z"
+      },
+      {
+       "least": 14207623.037796583,
+       "until": "2026-11-10T21:24Z"
+      },
+      {
+       "least": 14130074.191885587,
+       "until": "2026-11-11T21:24Z"
+      },
+      {
+       "least": 14046781.055758614,
+       "until": "2026-11-12T21:24Z"
+      },
+      {
+       "least": 13955829.175342051,
+       "until": "2026-11-13T21:24Z"
+      },
+      {
+       "least": 13854236.902095683,
+       "until": "2026-11-14T21:24Z"
+      },
+      {
+       "least": 13737127.62130465,
+       "until": "2026-11-15T21:24Z"
+      },
+      {
+       "least": 13594839.047067683,
+       "until": "2026-11-16T21:24Z"
+      },
+      {
+       "least": 13411040.32005992,
+       "until": "2026-11-17T21:24Z"
+      },
+      {
+       "least": 13136564.399211343,
+       "until": "2026-11-18T21:24Z"
+      },
+      {
+       "least": 12456458.997542437,
+       "until": "2026-11-19T21:24Z"
+      },
+      {
+       "least": 0.0,
+       "until": "2026-11-20T20:00Z"
+      }
+     ],
+     "until": "2026-11-20T20:00Z"
+    },
+    {
      "key": "7916",
      "kind": "wait",
-     "least": 29462366.944233187,
+     "least": 29169895.638706908,
      "name": "Aitor Paredes",
      "reserves": [
       {
@@ -177,47 +302,47 @@
        "until": "2026-11-08T21:24Z"
       },
       {
-       "least": 29462366.944233187,
+       "least": 29169895.638706908,
        "until": "2026-11-09T21:24Z"
       },
       {
-       "least": 28591835.06976895,
+       "least": 28621683.891998976,
        "until": "2026-11-10T21:24Z"
       },
       {
-       "least": 27937615.499139883,
+       "least": 27955622.29390196,
        "until": "2026-11-11T21:24Z"
       },
       {
-       "least": 27937615.499139883,
+       "least": 27955622.29390196,
        "until": "2026-11-12T21:24Z"
       },
       {
-       "least": 27937615.499139883,
+       "least": 27955622.29390196,
        "until": "2026-11-13T21:24Z"
       },
       {
-       "least": 27344341.31148172,
+       "least": 27360635.837382652,
        "until": "2026-11-14T21:24Z"
       },
       {
-       "least": 26561483.796446312,
+       "least": 26557055.273773342,
        "until": "2026-11-15T21:24Z"
       },
       {
-       "least": 25873517.344604596,
+       "least": 25848080.062217526,
        "until": "2026-11-16T21:24Z"
       },
       {
-       "least": 25161845.859036967,
+       "least": 25151804.011550225,
        "until": "2026-11-17T21:24Z"
       },
       {
-       "least": 24361353.17351973,
+       "least": 24334463.359671682,
        "until": "2026-11-18T21:24Z"
       },
       {
-       "least": 22987615.050867762,
+       "least": 23005622.84461985,
        "until": "2026-11-19T21:24Z"
       },
       {
@@ -230,10 +355,10 @@
    ],
    "step": "plan",
    "what": "cover",
-   "why": "Cash -49.5M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Wait for the offers of Aitor Paredes. on 9 Nov accept his new offer if it is 29.46M or more; on 10 Nov accept his new offer if it is 28.59M or more; on 11 Nov accept his new offer if it is 27.94M or more; on 12 Nov accept his new offer if it is 27.94M or more; on 13 Nov accept his new offer if it is 27.94M or more; on 14 Nov accept his new offer if it is 27.34M or more; on 15 Nov accept his new offer if it is 26.56M or more; on 16 Nov accept his new offer if it is 25.87M or more; on 17 Nov accept his new offer if it is 25.16M or more; on 18 Nov accept his new offer if it is 24.36M or more; on 19 Nov accept his new offer if it is 22.99M or more; on 20 Nov, before 21:00, accept whatever it is. 3) If cash is still below 0 after that, sell Ferran Jutgla (offer 13.57M), then, if still short, the cheapest other player. Expected: 12.8 points lost. Worst case 19.4 points, chance 2.9%.",
+   "why": "Cash -49.5M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Wait for the offers of Ferran Jutgla. on 9 Nov accept his new offer if it is 14.28M or more; on 10 Nov accept his new offer if it is 14.21M or more; on 11 Nov accept his new offer if it is 14.13M or more; on 12 Nov accept his new offer if it is 14.05M or more; on 13 Nov accept his new offer if it is 13.96M or more; on 14 Nov accept his new offer if it is 13.85M or more; on 15 Nov accept his new offer if it is 13.74M or more; on 16 Nov accept his new offer if it is 13.59M or more; on 17 Nov accept his new offer if it is 13.41M or more; on 18 Nov accept his new offer if it is 13.14M or more; on 19 Nov accept his new offer if it is 12.46M or more; on 20 Nov, before 21:00, accept whatever it is. 3) Wait for the offers of Aitor Paredes. on 9 Nov accept his new offer if it is 29.17M or more; on 10 Nov accept his new offer if it is 28.62M or more; on 11 Nov accept his new offer if it is 27.96M or more; on 12 Nov accept his new offer if it is 27.96M or more; on 13 Nov accept his new offer if it is 27.96M or more; on 14 Nov accept his new offer if it is 27.36M or more; on 15 Nov accept his new offer if it is 26.56M or more; on 16 Nov accept his new offer if it is 25.85M or more; on 17 Nov accept his new offer if it is 25.15M or more; on 18 Nov accept his new offer if it is 24.33M or more; on 19 Nov accept his new offer if it is 23.01M or more; on 20 Nov, before 21:00, accept whatever it is. 4) If cash is still below 0 after that, sell Arnau Ortiz (offer 0.64M), then, if still short, the cheapest other player. Expected: 12.5 points lost. Worst case 26.3 points, chance 0.0%.",
    "worst": {
-    "p": 0.029122889717209482,
-    "points": 19.37685217906892
+    "p": 1.3682601222519394e-06,
+    "points": 26.305347888381448
    }
   },
   {
@@ -369,43 +494,44 @@
     }
    ],
    "risk": {
-    "below_points": 186.78197178,
+    "below_points": 51.07497780000001,
     "low_inflow": 4070471.220545605,
-    "p_short": 1.0,
-    "shortfall_if_low": 14607725.957454395
+    "p_short": 0.33818883188738,
+    "shortfall_if_low": 1037026.5594543964
    },
-   "set_cash_after": 1388258.931044384,
-   "set_points_lost": 12.798050102912434,
+   "set_cash_after": 2147713.821464809,
+   "set_points_lost": 12.471904122632518,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49.5M; sells Roger Hinojo now, Aitor Paredes later; expects +1.39M at the lock; if the eleven scores under 187 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49.5M; sells Roger Hinojo now, Ferran Jutgla later, Aitor Paredes later; expects +2.15M at the lock; if the eleven scores under 51 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
-   "cost_points": 12.798050102912434,
+   "cost_points": 12.471904122632518,
    "expected_cover": [
+    "Ferran Jutgla",
     "Aitor Paredes"
    ],
-   "label": "wait for the offers of Aitor Paredes",
+   "label": "wait for the offers of Ferran Jutgla, Aitor Paredes",
    "n_closes": 12,
    "need": 42287614.779454395,
    "needed": true,
    "risk": {
-    "below_points": 186.78197178,
+    "below_points": 51.07497780000001,
     "low_inflow": 4070471.220545605,
-    "p_short": 1.0,
-    "shortfall_if_low": 14607725.957454395
+    "p_short": 0.33818883188738,
+    "shortfall_if_low": 1037026.5594543964
    },
    "step": "wait",
    "until": "2026-11-20T20:00Z",
    "what": "wait",
-   "why": "cash -49.5M; Aitor Paredes waits for the offers still to come (12 closes), each at its reserve or more, whatever it is at the lock; if the eleven scores under 187 points the lock cash stays below 0; there is time to fix by hand"
+   "why": "cash -49.5M; Ferran Jutgla, Aitor Paredes waits for the offers still to come (12 closes), each at its reserve or more, whatever it is at the lock; if the eleven scores under 51 points the lock cash stays below 0; there is time to fix by hand"
   }
  ],
  "generated_at": "2026-11-08T12:07Z",
@@ -413,7 +539,7 @@
  "lineup": {
   "advice": [
    {
-    "gain": 3.468589908324443,
+    "gain": 6.266864678570501,
     "in": "Fernando Niño",
     "out": "Ferran Jutgla"
    },
@@ -438,13 +564,66 @@
    "Ferran Jutgla"
   ],
   "message": "",
-  "points": 51.69173893223606,
+  "points": 48.89346516199,
   "stale": true,
   "unmapped": []
  },
  "lock_at": "2026-11-20T20:00:00+00:00",
  "market_at": "2026-11-08T11:57Z",
  "ping": "",
+ "plans": [],
+ "rejected": [
+  {
+   "asking": 174406657.0,
+   "gain": 124.94674226177595,
+   "key": "4288",
+   "name": "Raphinha",
+   "net": 0.24494584309894485,
+   "pos": "DEL",
+   "reason": "net_not_positive",
+   "why": "its funded net is not above 0.5 points (net +0.2)"
+  },
+  {
+   "asking": 59988796.0,
+   "gain": 13.09870740779646,
+   "key": "9573",
+   "name": "Jonathan David",
+   "net": -10.458197531112392,
+   "pos": "DEL",
+   "reason": "net_not_positive",
+   "why": "its funded net is not above 0.5 points (net -10.5)"
+  },
+  {
+   "asking": 22759060.0,
+   "gain": 8.216457459804452,
+   "key": "8413",
+   "name": "Pape Gueye",
+   "net": -2.1377221784726466,
+   "pos": "MED",
+   "reason": "net_not_positive",
+   "why": "its funded net is not above 0.5 points (net -2.1)"
+  },
+  {
+   "asking": 5397438.0,
+   "gain": 0.943155016950989,
+   "key": "6563",
+   "name": "Ivan Martin",
+   "net": -2.1561642727578043,
+   "pos": "MED",
+   "reason": "net_not_positive",
+   "why": "its funded net is not above 0.5 points (net -2.2)"
+  },
+  {
+   "asking": 5877862.0,
+   "gain": 0.7565298788937085,
+   "key": "6957",
+   "name": "Isi Palazon",
+   "net": -2.637527337570301,
+   "pos": "MED",
+   "reason": "net_not_positive",
+   "why": "its funded net is not above 0.5 points (net -2.6)"
+  }
+ ],
  "sells": [
   {
    "accepts": [],
@@ -546,9 +725,9 @@
    "accepts": [],
    "act": [],
    "action": {
-    "kind": "keep",
-    "until": null,
-    "why": "keeping him protects 0.0 points and the cash at the lock is covered without him"
+    "kind": "fallback",
+    "until": "2026-11-20T20:00Z",
+    "why": "sell him if the offers fall short of the deficit: the cheapest next (0.0 points lost)"
    },
    "amount": 644149.0,
    "delta": {
@@ -2983,7 +3162,7 @@
    "name": "Ferran Jutgla",
    "next": 2.798273770246058,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": true
   },
   {
@@ -3090,7 +3269,6 @@
    "price_next": -0.004630732542218352,
    "replaces": "Martin Satriano",
    "status": "rival",
-   "walk_away": 114100542.23927888,
    "win": null,
    "yield": 0.03235252812065797
   },
@@ -3108,7 +3286,6 @@
    "price_next": 0.0006879267303117054,
    "replaces": "Martin Satriano",
    "status": "unlisted",
-   "walk_away": 97847889.31590408,
    "win": null,
    "yield": 0.028680161175656655
   },
@@ -3126,7 +3303,6 @@
    "price_next": -0.0009202847799932856,
    "replaces": "Martin Satriano",
    "status": "market",
-   "walk_away": 90773274.2927432,
    "win": null,
    "yield": 0.027554246012210584
   },
@@ -3144,7 +3320,6 @@
    "price_next": 0.009225488536053428,
    "replaces": "Guido Rodriguez",
    "status": "unlisted",
-   "walk_away": 65725454.60750679,
    "win": null,
    "yield": 0.026641621849288113
   },
@@ -3162,7 +3337,6 @@
    "price_next": 0.008604170226873764,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "walk_away": 62438845.3126691,
    "win": null,
    "yield": 0.023408721561375283
   },
@@ -3180,7 +3354,6 @@
    "price_next": 0.003257687210259652,
    "replaces": "Marcos Alonso",
    "status": "unlisted",
-   "walk_away": 54295459.875089675,
    "win": null,
    "yield": 0.029317228618560873
   },
@@ -3198,7 +3371,6 @@
    "price_next": 0.012567982163317337,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "walk_away": 48897971.10750105,
    "win": null,
    "yield": 0.02294891375468529
   },
@@ -3216,7 +3388,6 @@
    "price_next": -0.004939596190610351,
    "replaces": "Guido Rodriguez",
    "status": "rival",
-   "walk_away": 35696077.66912946,
    "win": null,
    "yield": 0.021811562607877606
   },
@@ -3234,7 +3405,6 @@
    "price_next": 0.01933964879863259,
    "replaces": "Guido Rodriguez",
    "status": "unlisted",
-   "walk_away": 35094728.040890716,
    "win": null,
    "yield": 0.02827380945471542
   },
@@ -3252,7 +3422,6 @@
    "price_next": 0.001370723301550747,
    "replaces": "Guido Rodriguez",
    "status": "unlisted",
-   "walk_away": 33467367.68759721,
    "win": null,
    "yield": 0.017550164726571935
   }

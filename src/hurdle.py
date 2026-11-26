@@ -1,8 +1,8 @@
 """The one exchange rate between forecast points and money, and the tests that read it. A rate (LAMBDA, `lam`) is
 points per million per jornada remaining. A move's P is the points above the next man up over its window of n jornadas
-(Buyer.gain for a buy, the sale's lost points for a sale); W = P / (n x LAMBDA) is its worth in millions. One band K
-around W, and one Exit, what the player fetches when sold: the Stake of a move has two edges, the most worth paying
-(cap) and the least worth taking (reserve), each the larger of what his points are worth (W, inside the band) and what
+(Buyer.gain for a buy, the sale's lost points for a sale); W = P / (n x LAMBDA) is its worth in millions. No margin around W (K = 1: #155 found no source or
+outcome for the old 0.85 band), and one Exit, what the player fetches when sold: the Stake of a move has two edges, the most worth paying
+(cap) and the least worth taking (reserve), each the larger of what his points are worth (W) and what
 his Exit proceeds (a flip: bought to be sold, the capital tied across the locks the hold crosses charged). A buy bids
 the win-weighted surplus under its cap at its best (bid); a bid already placed is held, lowered, withdrawn or raised by
 the same surplus (stand)."""
@@ -25,7 +25,6 @@ MIN_DAYS = 5
 BAND = (8, 14)
 SINCE = "2026-11-21T0517Z"
 FALLBACK_LAMBDA = 0.045
-K = 0.85
 WIN_FLOOR = 0.25
 TREND_CAP = 0.03
 HOLD_NIGHTS = 14
@@ -218,17 +217,17 @@ def profit(stake: Stake, amount: float) -> float:
 
 
 def cap(stake: Stake) -> float:
-    """The most worth paying, in euros: the larger of K x W and the proceeds less the share k / n of them that tied the
+    """The most worth paying, in euros: the larger of W and the proceeds less the share k / n of them that tied the
     capital up. Nonnegative with no negative points; nondecreasing in points and in the exit's rise, nonincreasing in the
-    rate and in k, scale-invariant, and at most reserve(stake). With k = n it is K x W: a buy for his points alone."""
-    return max(K * stake.points * 1e6 / (stake.n * stake.rate), (1 - stake.k / stake.n) * stake.proceeds)
+    rate and in k, scale-invariant. With k = n it is W: a buy for his points alone."""
+    return max(stake.points * 1e6 / (stake.n * stake.rate), (1 - stake.k / stake.n) * stake.proceeds)
 
 
 def reserve(stake: Stake) -> float:
-    """The least worth taking, in euros: the larger of (W + drift) / K, what his points are worth and the price change
-    forgone by selling now inside the band, and the proceeds. Nondecreasing in points and in the exit's rise, nonincreasing
-    in the rate, scale-invariant, and at least cap(stake)."""
-    return max((stake.points * 1e6 / (stake.n * stake.rate) + stake.drift) / K, stake.proceeds)
+    """The least worth taking, in euros: the larger of W + drift (what his points are worth and the price change
+    forgone by selling now) and the proceeds. Nondecreasing in points and in the exit's rise, nonincreasing
+    in the rate, scale-invariant."""
+    return max(stake.points * 1e6 / (stake.n * stake.rate) + stake.drift, stake.proceeds)
 
 
 def _row(cut: str, player: str, gain: float, per_million: float | None, from_j: int = 13) -> Opportunity:
@@ -292,7 +291,7 @@ def _selftest_buy() -> None:
     flat = ((1.0, 1.0), (1.1, 1.0))
     assert bid(flat, 1e7, stake(10.0, 25, 0.02, Exit(1e7), 25)) == Bid(1e7, 1.0), "a sure win at the asking price bids the asking price"
     assert bid(((1.0, 0.1), (1.1, 0.2)), 1e7, stake(10.0, 25, 0.02, Exit(1e7), 25)) is None, "a chance under WIN_FLOOR: no bid"
-    assert cap(stake(25 * 0.02 * 10, 25, 0.02, Exit(0.0), 25)) == K * 10e6, "P worth exactly the rate on 10M: K x 10M"
+    assert cap(stake(25 * 0.02 * 10, 25, 0.02, Exit(0.0), 25)) == 10e6, "P worth exactly the rate on 10M: 10M"
     assert bid(flat, 1e7, stake(0.0, 25, 0.02, Exit(1e7), 25)) is None, "no points, capital tied the whole window: never bought"
 
 
@@ -304,7 +303,7 @@ def _selftest_stake() -> None:
         e = Exit(value, rng.choice([1, 7, 10]), rng.uniform(-TREND_CAP, TREND_CAP), rng.choice([0.0, rng.uniform(0.9, 1.1) * value]))
         k = rng.choice([0, 1, n])
         s = stake(points, n, rate, e, k)
-        assert cap(s) >= 0 and cap(s) <= reserve(s) + 1e-6, "a cap is never negative and never over the reserve"
+        assert cap(s) >= 0 and reserve(s) >= s.proceeds, "a cap is never negative and a reserve never under the proceeds"
         assert s.proceeds >= later(e) - 1e-9 and proceeds(e._replace(reserve=0.0)) == later(e), "the proceeds are never under the later price"
         assert cap(stake(points + 1, n, rate, e, k)) >= cap(s) and reserve(stake(points + 1, n, rate, e, k)) >= reserve(s), "monotone in points"
         richer = e._replace(rise=e.rise + 0.01)
@@ -315,12 +314,12 @@ def _selftest_stake() -> None:
         twice = stake(2 * points, n, rate, Exit(2 * value, e.nights, e.rise, 2 * e.reserve), k)
         assert abs(cap(twice) - 2 * cap(s)) < 1e-3 and abs(reserve(twice) - 2 * reserve(s)) < 1e-3, "scale-invariant"
         tied = stake(points, n, rate, e, n)
-        assert cap(tied) == K * points * 1e6 / (n * rate), "capital tied the whole window: the points alone, K x W"
+        assert cap(tied) == points * 1e6 / (n * rate), "capital tied the whole window: the points alone, W"
         assert cap(stake(0.0, n, rate, e, n)) == 0.0 and cap(stake(0.0, n, rate, Exit(value, 1, 0.0), n)) == 0.0, "no points, no free capital: cap 0"
         free = stake(points, n, rate, e, 0)
-        assert cap(free) == max(K * points * 1e6 / (n * rate), free.proceeds), "capital free between locks: the proceeds"
+        assert cap(free) == max(points * 1e6 / (n * rate), free.proceeds), "capital free between locks: the proceeds"
         assert reserve(stake(points, n, rate, e, 1)) == reserve(free), "the reserve does not read k"
-        assert reserve(s) >= (points * 1e6 / (n * rate) + e.rise * value) / K - 1e-6, "the price change forgone stays on W"
+        assert reserve(s) >= (points * 1e6 / (n * rate) + e.rise * value) - 1e-6, "the price change forgone stays on W"
     assert cap(stake(0.0, 5, 0.045, Exit(1e6), 0)) == draw(1e6), "free capital and nothing else: his draw"
 
 
@@ -355,7 +354,7 @@ def _selftest_sale() -> None:
         e = Exit(value, nights, rise)
         s = stake(points, n, rate, e)
         worth = points * 1e6 / (n * rate)
-        assert abs(reserve(s) - max((worth + rise * value) / K, proceeds(e))) < 1e-6, "the band: W plus the drift over K, or the exit's proceeds"
+        assert abs(reserve(s) - max((worth + rise * value), proceeds(e))) < 1e-6, "W plus the drift, or the exit's proceeds"
         assert cap(stake(points, n, rate, Exit(value), n)) * reserve(stake(points, n, rate, Exit(0.0))) - worth * worth < 1e-3 * (1 + worth * worth), "buy edge x sell edge is W squared"
         assert reserve(stake(points + 1, n, rate, e)) >= reserve(s) and reserve(stake(points, n, rate, e._replace(rise=rise + 0.01))) >= reserve(s)
         assert reserve(stake(points, n, rate, e._replace(nights=2 * nights))) == reserve(s), "the nights do not enter the reserve"

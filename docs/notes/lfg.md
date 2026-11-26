@@ -208,9 +208,9 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   swaps, never naming a sold player, and `lineup.stale` says the app's eleven is not that best), `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
   offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (the offer reaches the sale reserve, `hurdle.reserve` of
-  the player's `hurdle.Stake`: (W + rise x value) / K, K = 0.85, his yield, the points the sale loses plus LAMBDA x n x his
+  the player's `hurdle.Stake`: W + rise x value (no band: K = 1 on both sides, #155 and #52 found no source or outcome for the old 0.85), his yield, the points the sale loses plus LAMBDA x n x his
   expected price change over his Exit's horizon (the price forecast's furthest row, capped at +-3%), per million of the offer
-  per jornada, being under K x LAMBDA; and for a sale that loses no points at least the proceeds of his Exit stopped at the
+  per jornada, being under LAMBDA; and for a sale that loses no points at least the proceeds of his Exit stopped at the
   closes left (`worth.stopped`: what waiting for the best offer is worth); a sale that loses points also needs a use for the
   cash, a buy it funds tonight or the lock cover), wait (a sell whose offer is under 1.0 of value and the 0.5 percentile
   and funds nothing tonight: waiting is free), hold, or needs_replacement; `points_lost`, `rent` (the points the money
@@ -220,11 +220,17 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   `[label, value, kind]`, the page reads fields never prose), and `replacement` for a sale that leaves no eleven: the best
   pair (sell him, buy a player of the market) by `Approach.net`, funded by `approach.replacement`, or null with
   `replacement_why_not` (`no_cash`, `no_candidate`); a sale's Delta is 0 or less), and
-  `buys` (`decision.opportunity_rows`: the players on the market who add points to your best eleven, most first; a listing is
-  bought by `hurdle.bid`, the most win-weighted surplus under the walk-away price `hurdle.cap` of the row's `stake`, K x P / (n x LAMBDA), K = 0.85 (no surplus,
-  no bid: the same band K as the sale's) (`walk_away`, `yield`, `n` on
-  each row; a listing with no bid and none placed is counted in `considered`; a placed bid above the walk-away is `over`);
-  LAMBDA is `hurdle.lam`, stated as `lambda`; the first evaluated buys carry `funding` from `approach.approach`:
+  `buys`, `plans` and `rejected` (#154; `decision.opportunity_rows` gives the players on the market who add points to your best eleven).
+  One valuation: a buy's net is `Approach.net`, computed once with its funding, in the objective the cover uses (points lost less kappa x
+  (price fetched - expected offer) for every sale, less kappa x (bid - `hurdle.draw` of his worth) for the buy; kappa = `hurdle.in_points`
+  per euro at LAMBDA = `hurdle.lam`, stated as `lambda`; `approach.Money`). A lost bid is never costed under the cover's own plan
+  (`base` is `plan_cost`: the secured option's net). `approach.bidding` tries the bids of the auction curve (chance of WIN_FLOOR or
+  more) and the bid is the greatest net; `walk_away` is the price at which the net is 0, never a prefilter. Every listing on sale with a
+  gain is a funded plan (`plans`: net above `FUNDED_FLOOR`, ranked by net, one `line` each: bid and chance, who is sold tonight / if won / if
+  lost, net, net if won and if lost, cash at the lock, worst case, who it displaces, `advised`) or is in `rejected` with its `reason`
+  (`no_curve`, `no_win_chance`, `unfundable`, `net_not_positive`, `not_evaluated`) and net; `considered` is its length. There is no margin left (K deleted): a plan is advised (in `buys`, with the bids placed) when its net is above the floor. A placed bid is
+  judged by `hurdle.stand` at the funded walk-away. The old `hurdle.cap` screen remains only for `opportunity_rows`' own `bid` (alerts, the hold route);
+  the first evaluated buys carry `funding` from `approach.approach`:
   the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.
 - **`eleven.py`** (pure, no database): the eleven is fixed, never searched by formation. `points(squad, pos, value)` is V,
@@ -247,9 +253,9 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   up to the next lock (`Inputs.nights`), the rise held within +-`TREND_CAP`; the hold reads the row at `HOLD_NIGHTS` (14, the fit is calibrated
   there: fitted against realised rise over the 58-day panel agree up to a rise of 0.5, `HOLD_BOUND`) and credits `HOLD_EDGE` (0.5: a conservative choice, the replay at half the
   appreciation stays positive; at 0.75 and 1.0 the decided replay earns more) of it, for a player worth at most `HOLD_VALUE` (30M): `Exit.hold`, `hurdle.held_rise`. The price after the hold is
-  `hurdle.held(exit)` = `draw(value)` x (1 + hold), and the buy's Stake is `hurdle.hold_stake` (cap = max(K x W, held): the capital is free, k = 0) only when the hold is funded: `decision.held_bids` gives the cash at the lock (`rules.cash_at_lock` after the bids placed and
+  `hurdle.held(exit)` = `draw(value)` x (1 + hold), and the buy's Stake is `hurdle.hold_stake` (cap = max(W, held): the capital is free, k = 0) only when the hold is funded: `decision.held_bids` gives the cash at the lock (`rules.cash_at_lock` after the bids placed and
   the expected credit) and the free squad slots (`SQUAD_MAX`, bids pending counted) to the holds, best expected profit first; any other buy keeps
-  k = n (cap K x W: the points alone). `opportunity_rows` carries `profit` (`hurdle.profit`: the points of the proceeds over the bid and over his own points; money x n x
+  k = n (cap W: the points alone). `opportunity_rows` carries `profit` (`hurdle.profit`: the points of the proceeds over the bid and over his own points; money x n x
   LAMBDA) and orders by gain plus profit; the board adds it to the buy's gain in `approach(..., extra=)`, so the funding (bid margin, lock cash, the slot,
   the sales) is `approach`'s as for every buy. A bid placed keeps its hold only while cash at the lock stays 0 or more (else k = n and the board lowers or withdraws it). A held riser is sold by the same Exit (#149): `worth.sale_reserve`, the reserve `worth.rent` takes, reads a sale that loses no points through
   `hurdle.holding(exit)` (HOLD_NIGHTS nights, the hold as the rise, so the later price is `hurdle.held`), stopped at the closes left by the one stopping rule
