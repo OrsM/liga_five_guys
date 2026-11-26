@@ -425,6 +425,12 @@ class Buys(NamedTuple):
     ladders: list[Ladder]
 
 
+def resale_of(row: dict[str, Any]) -> float:
+    """What a buy of this opportunity row for his points is expected to fetch: hurdle.draw of his worth (his asking price with none) less the
+    fall the row's Stake charges (hurdle.falls). The one resale the funded net's buys and replacements read."""
+    return hurdle.draw(row.get("value") or row["asking"]) + hurdle.falls(row["stake"])
+
+
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], cost0: float, rate: float, n_closes: int) -> Buys:
     """The buys of the board, the funded plans and the candidates left out. Every player on the market with an asking price and a gain (or a bid
     placed; one who adds no points is no candidate) is a candidate, best gain first; the first EVALUATED_BUYS get a Bidding (approach.bidding): the funded net of each bid of the auction
@@ -451,7 +457,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         name = names.get(k, k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]), closes)
-        money = Money(rate, len(decision.window_of(locks, cells, None)), None if r["profit"] > 0 else hurdle.draw(r.get("value") or r["asking"]))
+        money = Money(rate, len(decision.window_of(locks, cells, None)), None if r["profit"] > 0 else resale_of(r))
         held_club = club._replace(pending=others)
 
         def fund(amount: float, win: float, r: dict[str, Any] = r, k: str = k, held_club: Club = held_club, rounds: Rounds = rounds,
@@ -598,7 +604,7 @@ def replacement_rows(inp: decision.Inputs, names: dict[str, str], club: Club, go
             k = r["player"]
             others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
             rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]), closes)
-            money = Money(rate, len(decision.window_of(locks, cells, None)), hurdle.draw(r.get("value") or r["asking"]))
+            money = Money(rate, len(decision.window_of(locks, cells, None)), resale_of(r))
 
             def fund(amount: float, win: float, k: str = k, others: tuple[int, float] = others, rounds: Rounds = rounds, money: Money = money) -> Approach:
                 return replacement(club._replace(pending=others), sold, k, amount, win, rounds, money, cost0)
@@ -1360,6 +1366,13 @@ def _selftest_worked_case() -> None:
     assert plan_["net"] > FUNDED_FLOOR and plan_["bid"] >= asking and plan_["walk_away"] > asking, "a net above the floor at the asking price and a zero-net price over it"
     assert plan_["funding"]["if_won"] or plan_["funding"]["tonight"], "his plan sells somebody"
     assert plan_["line"].startswith("buy star at") and "funded by selling" in plan_["line"]
+    before = plan_
+    for fall in (0.02, 0.1):
+        faller = dict(row, stake=stake._replace(drift=-fall * asking))
+        assert resale_of(row) == hurdle.draw(asking) >= resale_of(faller) and resale_of(dict(row, stake=stake._replace(drift=fall * asking))) == resale_of(row), "a fall lowers the resale, a rise does not raise it"
+        after = buy_lines(inp, names, club, [faller], 0.0, rate, 1).plans
+        assert all(x["net"] <= before["net"] + 1e-9 and x["bid"] <= before["bid"] + 1e-6 and x["walk_away"] <= before["walk_away"] + 1e-6 for x in after), "a forecast fall never raises a bid's net, the bid or its walk-away"
+        before = after[0] if after else before
 
 
 def _selftest_cover() -> None:

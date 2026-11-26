@@ -352,7 +352,7 @@ def sale_rises(inp: Inputs, steps: Mapping[int, float]) -> dict[int, float]:
 def exit_of(inp: Inputs, player: str, value: float, steps: Mapping[int, float] | None = None) -> hurdle.Exit:
     """The hurdle.Exit of a player of this value: the sale's furthest horizon in nights (sale_rises) and its rise there held
     within +-hurdle.TREND_CAP (a flat Exit of one night with no forecast), and the hold, hurdle.held_rise of the rise at
-    the furthest horizon within hurdle.HOLD_NIGHTS. `steps` is the player's rises_of row when the caller has it. The only reader of the
+    the furthest horizon within hurdle.HOLD_NIGHTS (negative for a fall, unclamped; a player with no such row has none). `steps` is the player's rises_of row when the caller has it. The only reader of the
     price forecast."""
     steps = rises_of(inp).get(player, {}) if steps is None else steps
     sale = sale_rises(inp, steps)
@@ -452,9 +452,9 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
         price = asking if asking is not None else value
         steps = sale_rises(inp, ahead.get(k, {}))
         n = hurdle.remaining(where.lock[0], last)
-        stake = hurdle.stake(gain, n, rate, hurdle.Exit(value or 0.0), n)
+        exit = exit_of(inp, k, value or 0.0, ahead.get(k, {}))
+        stake = hurdle.stake(gain, n, rate, hurdle.falling(exit), n)
         if status == "market" and asking is not None and k in curves:
-            exit = exit_of(inp, k, value or 0.0, ahead.get(k, {}))
             if exit.hold > 0:
                 held = hurdle.hold_stake(gain, n, rate, exit)
                 free = hurdle.bid(curves[k], asking, held)
@@ -957,6 +957,15 @@ def _selftest_one_reader() -> None:
         by = {x.h: x.expected_value / x.value - 1 for x in rows}
         assert e.value == value and (e.nights, e.rise) == ((max(by), max(-hurdle.TREND_CAP, min(hurdle.TREND_CAP, by[max(by)]))) if by else (1, 0.0)), \
             "one horizon: the furthest row's, its rise held within TREND_CAP"
+        near = {h: r for h, r in by.items() if h <= hurdle.HOLD_NIGHTS}
+        assert (e.hold < 0) == (bool(near) and near[max(near)] < 0) and (e.hold == near[max(near)] if e.hold < 0 else True), "a fall is the row the hold reads, unclamped"
+    risers = {"r1": 1e6, "r2": 2e6, "r3": 3e6}
+    unfallen = {r["player"]: r for r in opportunity_rows(_holds_inputs(1e7, risers, rise=0.0))}
+    for fall in (-0.005, -0.02, -0.1):
+        fallers = {r["player"]: r for r in opportunity_rows(_holds_inputs(1e7, risers, rise=fall))}
+        for k, r in fallers.items():
+            assert abs(r["stake"].drift - fall * hurdle.HOLD_NIGHTS * risers[k]) < 1e-6 and r["stake"].k == r["stake"].n and r["profit"] == 0.0, "a faller is charged his fall over the nights the forecast reaches"
+            assert (r["gain"], r["per_million"], r["window"]) == (unfallen[k]["gain"], unfallen[k]["per_million"], unfallen[k]["window"]), "the fall moves no gain and no yield, so no rate"
 
 
 def _selftest() -> None:

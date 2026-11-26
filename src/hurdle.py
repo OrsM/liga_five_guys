@@ -97,7 +97,7 @@ class Exit(NamedTuple):
     """What a player fetches when sold later, read from the price forecast: his value, the horizon in nights of its
     furthest row (1 with none), the rise at that horizon, a fraction of value (0 with none), the reserve, in euros: the
     value of waiting for the best offer of the closes left (worth.stopped; 0 until it is set), and the hold, the rise
-    credited to holding him (0 when none is: see held_rise). One horizon and one rise for a sale: a night's rise is rise /
+    credited to holding him (0 when none is: see held_rise); a negative hold is a forecast fall, charged to a buy (falls) and never a hold. One horizon and one rise for a sale: a night's rise is rise /
     nights; a hold has its own, over HOLD_NIGHTS."""
     value: float
     nights: int = 1
@@ -108,9 +108,10 @@ class Exit(NamedTuple):
 
 def held_rise(value: float, fitted: float) -> float:
     """The rise credited to holding a player of this value whose price fold fits `fitted` (a fraction) over HOLD_NIGHTS: HOLD_EDGE
-    of the fitted rise within 0 and HOLD_BOUND (the fit is calibrated up to that), 0 above HOLD_VALUE (nothing measured there).
-    Nondecreasing in the fitted rise, never negative, never above HOLD_EDGE x HOLD_BOUND."""
-    return 0.0 if value > HOLD_VALUE else HOLD_EDGE * max(0.0, min(HOLD_BOUND, fitted))
+    of the fitted rise within 0 and HOLD_BOUND (the fit is calibrated up to that), 0 above HOLD_VALUE (nothing measured there); a fall
+    is the fitted fall itself, whatever the value (the fit is calibrated there: fitted -13% against realised -12.5%). Nondecreasing
+    in the fitted rise, never above HOLD_EDGE x HOLD_BOUND; 0 for a player the fold has no row within HOLD_NIGHTS for."""
+    return fitted if fitted < 0 else 0.0 if value > HOLD_VALUE else HOLD_EDGE * min(HOLD_BOUND, fitted)
 
 
 def draw(value: float) -> float:
@@ -132,6 +133,12 @@ def holding(exit: Exit) -> Exit:
     """The exit of a player kept to his hold: HOLD_NIGHTS nights and his hold as the rise, so its later price is held(exit) and a night's
     rise hold / HOLD_NIGHTS. The exit itself when he has no hold."""
     return exit._replace(nights=HOLD_NIGHTS, rise=exit.hold) if exit.hold > 0 else exit
+
+
+def falling(exit: Exit) -> Exit:
+    """The exit of a player bought for his points: HOLD_NIGHTS nights, his fall (the negative hold, 0 when none) as the rise and no reserve,
+    so the drift of a Stake made of it is the price change he is expected to suffer (flat beyond the nights the forecast reaches)."""
+    return exit._replace(nights=HOLD_NIGHTS, rise=min(0.0, exit.hold), reserve=0.0)
 
 
 def in_points(money: float, n: int, rate: float) -> float:
@@ -180,6 +187,12 @@ def hold_stake(points: float, n: int, rate: float, exit: Exit) -> Stake:
     drift 0 (a buy reads no sale reserve) and the capital free (k = 0: cash that is left at the lock is worth nothing else). Its cap is
     never under the cap of stake(points, n, rate, exit, n), the points alone."""
     return Stake(points, rate, n, held(exit), 0.0, 0)
+
+
+def falls(stake: Stake) -> float:
+    """The price change a buy of this Stake suffers, in euros, 0 or less: the negative part of its drift. The one charge of a fall; a rise is credited
+    by the hold, not here. Nonincreasing in a falling drift, 0 at a drift of 0 or more."""
+    return min(0.0, stake.drift)
 
 
 def profit(stake: Stake, amount: float) -> float:
@@ -304,6 +317,8 @@ def _selftest_hold() -> None:
         value, n, rate = rng.uniform(1e5, 5e7), rng.choice([1, 2, 13, 26]), rng.choice([0.02, 0.045, 0.1])
         fitted = rng.uniform(-0.5, 1.5)
         h = held_rise(value, fitted)
+        if h < 0:
+            continue
         assert 0.0 <= h <= HOLD_EDGE * HOLD_BOUND and (value > HOLD_VALUE or fitted <= 0) <= (h == 0.0), "never negative, never above the bound; none for a fall or a dear player"
         assert held_rise(value, fitted + 0.1) >= h and held_rise(value, HOLD_BOUND + 1.0) == held_rise(value, HOLD_BOUND), "nondecreasing, flat above the bound"
         e = Exit(value, rng.choice([1, 7]), rng.uniform(-TREND_CAP, TREND_CAP), rng.choice([0.0, value]), h)
@@ -334,6 +349,20 @@ def _selftest_sale() -> None:
         assert reserve(stake(points + 1, n, rate, e)) >= reserve(s) and reserve(stake(points, n, rate, e._replace(rise=rise + 0.01))) >= reserve(s)
         assert reserve(stake(points, n, rate, e._replace(nights=2 * nights))) == reserve(s), "the nights do not enter the reserve"
     assert reserve(stake(0.0, 5, 0.045, Exit(1e6))) == draw(1e6), "no points: the exit's proceeds"
+
+
+def _selftest_fall() -> None:
+    rng = random.Random(155)
+    for _ in range(2000):
+        value, n, rate = rng.uniform(1e5, 5e7), rng.choice([1, 13, 26]), rng.choice([0.02, 0.045])
+        fitted = rng.uniform(-0.6, 1.5)
+        h = held_rise(value, fitted)
+        e = Exit(value, rng.choice([1, 7]), rng.uniform(-TREND_CAP, TREND_CAP), 0.0, h)
+        s = stake(rng.uniform(0, 5), n, rate, falling(e), n)
+        assert (h < 0) == (fitted < 0) and (h == fitted if fitted < 0 else h >= 0), "a fall is the fit itself, a rise is credited as before"
+        assert abs(s.drift - min(0.0, h) * value) < 1e-6 and falls(s) == s.drift <= 0.0, "a buy's drift is its fall times the value, 0 for a rise"
+        assert falls(s._replace(drift=abs(s.drift))) == 0.0 and falls(s._replace(drift=s.drift - 1.0)) <= falls(s), "a rise is not charged; nonincreasing in a falling drift"
+        assert h > 0 or holding(e) == e, "a faller is not held"
 
 
 def _selftest_exit() -> None:
@@ -370,6 +399,7 @@ def _selftest() -> None:
     _selftest_stake()
     _selftest_sale()
     _selftest_hold()
+    _selftest_fall()
     _selftest_exit()
     print("hurdle self-test OK")
 
