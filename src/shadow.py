@@ -29,6 +29,8 @@ __all__ = ["Move", "Limits", "Shadow", "Ladder", "Base", "solve", "base_of", "bu
 
 EPS = 1e-9
 STEPS = 200
+NODES = 100_000
+NEAR = 5
 BINDING = "cash_binding"
 DISPLACED = "displaced"
 PER_M = 1e6
@@ -64,7 +66,7 @@ class Shadow(NamedTuple):
     """The price of cash at the lock. `s` points per euro (0 when cash does not bind), `high` the density of the least dense move funded above
     it (None when none), `funded` the exact optimum within the limits, `lean` the best set at s that takes more than the capacity (empty when
     s = 0) and `rich` the one within it: the break is what `lean` has and `rich` has not. `free` the best set with cash free, `limits` what it was
-    solved over."""
+    solved over, `exact` whether every search ran to its end (else the numbers are the best found)."""
     s: float
     high: float | None
     funded: tuple[Move, ...]
@@ -72,6 +74,7 @@ class Shadow(NamedTuple):
     rich: tuple[Move, ...]
     free: tuple[Move, ...]
     limits: Limits
+    exact: bool = True
 
     @property
     def binding(self) -> bool:
@@ -128,16 +131,18 @@ class Frame(NamedTuple):
 
 
 class Found(NamedTuple):
+    """What `search` found: the `value` of the `picked` moves and whether the search ran to its end (`exact`) or stopped at NODES."""
     value: float
     picked: tuple[Move, ...]
+    exact: bool = True
 
 
 def search(groups: Sequence[Sequence[Move]], score: Callable[[Move], float], s: float, limits: Limits | None, slots: int,
-           incumbent: tuple[Move, ...] = ()) -> tuple[Move, ...]:
+           incumbent: tuple[Move, ...] = ()) -> Found:
     """The moves, at most one per group, that maximise the total of `score` and combine (`feasible`; with `limits` None there is no cash limit,
     and a move of no score is made only to free a squad place): branch and bound, groups in order of their best score, the bound the value so far
     plus the best of each group left (with limits, plus s x the cash left: weak duality, valid at any s >= 0). `incumbent` (feasible, scored by
-    net) starts the bound. Deterministic: ties go to the earlier move."""
+    net) starts the bound. Deterministic: ties go to the earlier move. Stops after NODES steps with the best found so far (`exact` False)."""
     capped = limits is not None
     rate = s if capped else 0.0
     cash = limits.cash if limits is not None else 0.0
@@ -148,7 +153,11 @@ def search(groups: Sequence[Sequence[Move]], score: Callable[[Move], float], s: 
     freed = [sum(min(0, min(m.slots for m in g)) for g in ordered[i:]) for i in range(len(ordered) + 1)]
     best = Found(sum(score(m) for m in incumbent), incumbent) if incumbent else Found(0.0, ()) if slots >= 0 else Found(float("-inf"), ())
     stack = [Frame(0, 0.0, (), frozenset(), 0.0, 0)]
+    steps = 0
     while stack:
+        steps += 1
+        if steps > NODES:
+            return best._replace(exact=False)
         f = stack.pop()
         if f.slots <= slots and (not capped or f.cash <= cash + EPS) and f.value > best.value + EPS:
             best = Found(f.value, f.picked)
@@ -161,28 +170,37 @@ def search(groups: Sequence[Sequence[Move]], score: Callable[[Move], float], s: 
             if (not capped and score(m) <= EPS and m.slots >= 0) or f.claimed & m.claims:
                 continue
             stack.append(Frame(f.i + 1, f.value + score(m), f.picked + (m,), f.claimed | m.claims, f.cash + m.need, f.slots + m.slots))
-    return best.picked
+    return best
 
 
 def solve(groups: Iterable[Sequence[Move]], limits: Limits) -> Shadow:
     """The Shadow of the moves over `limits` (cash 0 or more): s = 0 when the best set with cash free takes no more than the capacity, else the
     slope between the sets, best at one s, that take more and less than it (the Lagrangian cutting plane: each step adds a new set, so it ends),
-    and the funded set the exact optimum within the limits."""
+    and the funded set the exact optimum within the limits. `exact` is False when a search stopped at NODES or the cutting plane at STEPS: the
+    result is then the best found, not proven."""
     assert limits.cash >= 0.0, "a base plan that leaves cash below 0 has no shadow price"
     pool = [list(g) for g in groups if g]
-    free = search(pool, net_of, 0.0, None, limits.slots)
-    if used(free) <= limits.cash + EPS:
-        return Shadow(0.0, None, search(pool, net_of, 0.0, limits, limits.slots, free), (), free, free, limits)
+    slots = limits.slots
+    free = search(pool, net_of, 0.0, None, slots)
+    if used(free.picked) <= limits.cash + EPS:
+        funded = search(pool, net_of, 0.0, limits, slots, free.picked)
+        return Shadow(0.0, None, funded.picked, (), free.picked, free.picked, limits, free.exact and funded.exact)
     top = 1.0 + max((m.net / m.need for g in pool for m in g if m.need > EPS and m.net > 0), default=0.0)
-    lean, rich, s = free, search(pool, partial(weight, s=top), top, None, limits.slots), top
+    lean, s = free.picked, top
+    top_found = search(pool, partial(weight, s=top), top, None, slots)
+    rich, exact = top_found.picked, free.exact and top_found.exact
+    converged = False
     for _ in range(STEPS):
         s = (total(lean) - total(rich)) / (used(lean) - used(rich))
-        got = search(pool, partial(weight, s=s), s, None, limits.slots)
-        if total(got) - s * used(got) <= total(lean) - s * used(lean) + EPS * (1.0 + abs(total(lean))):
+        got = search(pool, partial(weight, s=s), s, None, slots)
+        exact = exact and got.exact
+        if total(got.picked) - s * used(got.picked) <= total(lean) - s * used(lean) + EPS * (1.0 + abs(total(lean))):
+            converged = True
             break
-        lean, rich = (got, rich) if used(got) > limits.cash + EPS else (lean, got)
+        lean, rich = (got.picked, rich) if used(got.picked) > limits.cash + EPS else (lean, got.picked)
+    funded = search(pool, net_of, s, limits, slots, rich)
     above = [m.net / m.need for m in rich if m.need > EPS and m.net > 0 and weight(m, s) > EPS]
-    return Shadow(s, min(above, default=None), search(pool, net_of, s, limits, limits.slots, rich), lean, rich, free, limits)
+    return Shadow(s, min(above, default=None), funded.picked, lean, rich, free.picked, limits, exact and converged and funded.exact)
 
 
 class Ladder(NamedTuple):
@@ -251,7 +269,7 @@ def toggles(club: Club, side: Side, base: Base, money: Money) -> list[list[Move]
             continue
         out.append([Move(k, "keep" if keep else "sale", ("keep:" if keep else "sale:") + k,
                          here - there + (-gain[k] if keep else gain[k]),
-                         price[k] if keep else -price[k], 1 if keep else -1, frozenset({("kept:" if keep else "sold:") + k}))])
+                         price[k] if keep else -price[k], 1 if keep else -1, frozenset({("kept:" if keep else "sold:") + k, "place:" + k}))])
     return out
 
 
@@ -260,10 +278,6 @@ def walk_away_at(offers: Sequence[Offer], base: Base, s: float, kappa: float) ->
     nets (a bid's cash moves with its price at its win chance, so past the ladder the net falls by (kappa + s) x win per euro). Nonincreasing in s
     for bids that take cash; s = 0 is the walk-away of approach.bidding."""
     return approach.zero_price([o._replace(found=o.found._replace(net=o.found.net - s * need_of(o, base))) for o in offers], kappa + s)
-
-
-def millions(x: float | None) -> float | None:
-    return None if x is None else x / PER_M
 
 
 def move_row(m: Move, s: float, names: Mapping[str, str], funded: bool, reason: str | None = None) -> dict[str, Any]:
@@ -275,9 +289,10 @@ def move_row(m: Move, s: float, names: Mapping[str, str], funded: bool, reason: 
 
 
 def refusal(group: Sequence[Move], found: Shadow) -> str:
-    """Why a listing with a funded bid that nets above 0 is not funded: `displaced` when the price of cash is 0 or a funded move claims what it does,
-    else cash_binding."""
-    return DISPLACED if not found.binding or any(clash(m, f) for m in group for f in found.funded) else BINDING
+    """Why a listing with a funded bid that nets above 0 is not funded: `displaced` when the price of cash is 0, a funded move claims what it does or the
+    squad places are full, else cash_binding."""
+    full = sum(f.slots for f in found.funded) + min(m.slots for m in group) > found.limits.slots
+    return DISPLACED if not found.binding or full or any(clash(m, f) for m in group for f in found.funded) else BINDING
 
 
 def report(club: Club, side: Side, base: Base | None, money: Money, ladders: Sequence[Ladder], names: Mapping[str, str]) -> dict[str, Any]:
@@ -308,14 +323,13 @@ def report(club: Club, side: Side, base: Base | None, money: Money, ladders: Seq
     spent = used(found.funded)
     return {"s": s * PER_M, "per_jornada": s * PER_M / money.n if money.n else None, "bracket": [s * PER_M, None if dense is None else dense * PER_M], "binding": found.binding,
             "capacity": base.cash / PER_M, "used": spent / PER_M, "to_zero": found.to_zero / PER_M, "slots": base.slots,
-            "cash_all_won": (base.cash - sum(m.hardest for m in found.funded)) / PER_M,
+            "cash_all_won": (base.cash - sum(m.hardest for m in found.funded)) / PER_M, "all_won_short": base.cash < sum(m.hardest for m in found.funded),
+            "exact": found.exact,
             "break": [names.get(m.key, m.key) + (" (%s)" % m.kind) for m in found.break_item],
             "funded": [move_row(m, s, names, True) for m in found.funded], "candidates": rows, "sales": moves,
             "base_sells": [names.get(k, k) for k in sorted(base.sells)], "lambda": money.rate,
             "line": line_of(found, names)}
 
-
-NEAR = 5
 
 
 def line_of(found: Shadow, names: Mapping[str, str]) -> str:
@@ -482,10 +496,12 @@ def _selftest_report() -> None:
                 if x.bidding.offers:
                     assert walk_away_at(x.bidding.offers, floor, 0.0, money.kappa) == x.bidding.walk_away, "s = 0: the walk-away of the board"
         for x in ladders:
-            if x.bidding.offers and floor:
-                lo, hi = 0.0, 1e-7
-                assert (walk_away_at(x.bidding.offers, floor, hi, money.kappa) or 0.0) <= (walk_away_at(x.bidding.offers, floor, lo, money.kappa) or 0.0) + 1.0 \
-                    or any(need_of(o, floor) < 0 for o in x.bidding.offers), "a bid that takes cash walks away no higher at a higher price of cash"
+            if x.bidding.offers and all(need_of(o, floor) >= 0 for o in x.bidding.offers):
+                walks = [walk_away_at(x.bidding.offers, floor, s * 1e-7, money.kappa) or 0.0 for s in (0.0, 0.5, 1.0, 2.0, 5.0)]
+                assert all(a >= b - 1e-6 for a, b in zip(walks, walks[1:])), "a bid that takes cash walks away no higher at a higher price of cash"
+        joint = solve([*(r for r in (buy_rungs(x, floor) for x in ladders) if r), *toggles(club, side, floor, money)], Limits(floor.cash, floor.slots))
+        assert feasible(list(joint.funded), joint.limits, joint.limits.slots), "joint feasibility: no player sold twice, the places, the cash"
+        assert joint.exact
     assert seen["binding"] >= 3 and seen["free"] >= 3 and seen["funded"] >= 3, seen
     club, rounds, side = _club(random.Random(3), -6e6)
     money = Money(rate, len(rounds.arrives))
@@ -496,6 +512,14 @@ def _selftest_report() -> None:
     assert alone["funded"] == [] and alone["candidates"] == [], "no listing: no buy"
     assert alone["binding"] and all(m["kind"] in ("keep", "sale") for m in alone["sales"]) and alone["s"] > 0, \
         "no buy and cash below 0: the price of cash is the density of the cover's marginal sale"
+    assert any(abs(m["per_million"] * 1.0 - alone["s"]) < 1e-9 * (1 + alone["s"]) for m in alone["sales"] if m["per_million"] is not None), \
+        "and s equals that density"
+    sale = Move("p", "sale", "sale:p", -1.0, -2e6, -1, frozenset({"sold:p", "place:p"}))
+    buy = Move("q", "buy", "buy:q", 5.0, 1e6, 1, frozenset({"place:p"}))
+    assert clash(sale, buy), "a sale of the player a buy replaces does not combine with it"
+    crowded = [[Move("g%d" % i, "buy", "g%d" % i, 1.0 + i % 7, 1e6 * (1 + i % 5), 1, frozenset({"c%d" % (i % 9)}), float(r)) for r in range(10)] for i in range(40)]
+    big = solve(crowded, Limits(20e6, 5))
+    assert not big.exact and feasible(list(big.funded), big.limits, 5), "a search that cannot finish says so and still returns a feasible set"
 
 
 def _selftest() -> None:
