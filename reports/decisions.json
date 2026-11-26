@@ -1,53 +1,53 @@
 {
- "generated_at": "2026-11-26T07:02Z",
- "market_at": "2026-11-26T07:02Z",
+ "generated_at": "2026-11-26T08:01Z",
+ "market_at": "2026-11-26T07:57Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-26T07:02Z",
-   "hours": 0.0,
+   "at": "2026-11-26T07:57Z",
+   "hours": 0.1,
    "status": "ok"
   }
  ],
@@ -231,8 +231,229 @@
   ],
   "stale": true
  },
- "buys": [],
- "considered": 5,
+ "buys": [
+  {
+   "name": "Alvaro Valles",
+   "pos": "POR",
+   "what": "buy",
+   "label": "buy Alvaro Valles",
+   "step": "bid",
+   "price": 48385252.0,
+   "asking": 48385252.0,
+   "amount": 48385252.0,
+   "win": 0.6424397761523034,
+   "advised": 48385252.0,
+   "advised_win": 0.6424397761523034,
+   "move": "bid",
+   "to": null,
+   "why": null,
+   "plan": false,
+   "done": false,
+   "key": "3686",
+   "gain": 43.18267599057696,
+   "net": 1.8556096381600433,
+   "net_label": null,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "replaces": "Mathew Ryan",
+   "per_million": 0.8924759964167792,
+   "n": 25,
+   "yield": 0.035699039856671166,
+   "walk_away": 51567943.38445533,
+   "reason": null,
+   "if_won_points": 2.888379124,
+   "if_lost_points": 0.0,
+   "displaces": [
+    "Vinicius Junior",
+    "Mathew Ryan"
+   ],
+   "price_next": -0.003531589051622319,
+   "price_lock": -0.006966963035881624,
+   "facts": [
+    [
+     "asking",
+     48385252.0,
+     "money"
+    ],
+    [
+     "walk-away price",
+     51567943.38445533,
+     "money"
+    ],
+    [
+     "bid",
+     48385252.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.6424397761523034,
+     "chance"
+    ],
+    [
+     "points added",
+     43.18267599057696,
+     "points"
+    ]
+   ],
+   "bids": 1,
+   "auction": {
+    "yours": false,
+    "listings": 21,
+    "thin": false,
+    "cell": "1/0/*"
+   },
+   "funding": {
+    "feasible": true,
+    "short": 0.0,
+    "tonight": [],
+    "raises": 0,
+    "margin": 18211705.800000012,
+    "lock_margin": 10262363.584999993,
+    "lock_margin_low": 5160039.730654985,
+    "if_won": [
+     "Vinicius Junior"
+    ],
+    "if_lost": [
+     "Aymeric Laporte"
+    ],
+    "held": [
+     "Natan",
+     "Dean Huijsen",
+     "Roger Hinojo",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Mikel Oyarzabal",
+     "Pepelu",
+     "Fernando Calero",
+     "Vinicius Junior",
+     "Aymeric Laporte",
+     "Sergio Carreira",
+     "Guido Rodriguez",
+     "Aitor Paredes",
+     "Martin Satriano"
+    ],
+    "cash_if_lost": 1297768.8269999996,
+    "not_listed": [],
+    "gain": 43.18267599057708,
+    "points_lost_if_won": 66.42439552554515,
+    "points_lost_if_lost": 25.870249533767947,
+    "net": 1.8556096381600433,
+    "base": 26.479794632739534
+   },
+   "accepts": [],
+   "act": [],
+   "line": "buy Alvaro Valles at 48.4 million (64% to win), funded by selling Vinicius Junior if won; Aymeric Laporte if lost: +1.9 points expected (+2.9 if won, +0.0 if lost); displaces Vinicius Junior, Mathew Ryan. Cash at the lock 10.3 million if won, 1.3 million if lost; worst case +0.0 points.",
+   "gain_with_better": 43.18267599057696
+  }
+ ],
+ "plans": [
+  {
+   "name": "Alvaro Valles",
+   "key": "3686",
+   "pos": "POR",
+   "asking": 48385252.0,
+   "bid": 48385252.0,
+   "win": 0.6424397761523034,
+   "walk_away": 51567943.38445533,
+   "net": 1.8556096381600433,
+   "gain": 43.18267599057696,
+   "if_won_points": 2.888379124,
+   "if_lost_points": 0.0,
+   "worst": 0.0,
+   "displaces": [
+    "Vinicius Junior",
+    "Mathew Ryan"
+   ],
+   "cash_if_won": 10262363.584999993,
+   "cash_if_lost": 1297768.8269999996,
+   "funding": {
+    "feasible": true,
+    "short": 0.0,
+    "tonight": [],
+    "raises": 0,
+    "margin": 18211705.800000012,
+    "lock_margin": 10262363.584999993,
+    "lock_margin_low": 5160039.730654985,
+    "if_won": [
+     "Vinicius Junior"
+    ],
+    "if_lost": [
+     "Aymeric Laporte"
+    ],
+    "held": [
+     "Natan",
+     "Dean Huijsen",
+     "Roger Hinojo",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Mikel Oyarzabal",
+     "Pepelu",
+     "Fernando Calero",
+     "Vinicius Junior",
+     "Aymeric Laporte",
+     "Sergio Carreira",
+     "Guido Rodriguez",
+     "Aitor Paredes",
+     "Martin Satriano"
+    ],
+    "cash_if_lost": 1297768.8269999996,
+    "not_listed": [],
+    "gain": 43.18267599057708,
+    "points_lost_if_won": 66.42439552554515,
+    "points_lost_if_lost": 25.870249533767947,
+    "net": 1.8556096381600433,
+    "base": 26.479794632739534
+   },
+   "line": "buy Alvaro Valles at 48.4 million (64% to win), funded by selling Vinicius Junior if won; Aymeric Laporte if lost: +1.9 points expected (+2.9 if won, +0.0 if lost); displaces Vinicius Junior, Mathew Ryan. Cash at the lock 10.3 million if won, 1.3 million if lost; worst case +0.0 points."
+  }
+ ],
+ "rejected": [
+  {
+   "name": "Pierre-Emerick Aubameyang",
+   "key": "3414",
+   "pos": "DEL",
+   "asking": 71034198.0,
+   "gain": 32.39240491291892,
+   "net": 0.4919998479188443,
+   "reason": "net_not_positive",
+   "why": "its funded net is not above the floor of 0.5 points (net +0.5)"
+  },
+  {
+   "name": "Marc Cucurella",
+   "key": "5013",
+   "pos": "DEF",
+   "asking": 63075952.0,
+   "gain": 26.51604540657705,
+   "net": -5.0556272974472485,
+   "reason": "net_not_positive",
+   "why": "its funded net is not above the floor of 0.5 points (net -5.1)"
+  },
+  {
+   "name": "Alejandro Catena",
+   "key": "6493",
+   "pos": "DEF",
+   "asking": 22800004.0,
+   "gain": 11.629780516021086,
+   "net": -6.639849236302069,
+   "reason": "net_not_positive",
+   "why": "its funded net is not above the floor of 0.5 points (net -6.6)"
+  },
+  {
+   "name": "Igor Zubeldia",
+   "key": "2802",
+   "pos": "DEF",
+   "asking": 3204072.0,
+   "gain": 0.7414189627329222,
+   "net": -2.0987967065321556,
+   "reason": "net_not_positive",
+   "why": "its funded net is not above the floor of 0.5 points (net -2.1)"
+  }
+ ],
+ "considered": 4,
  "base": {
   "feasible": true,
   "short": 0.0,
@@ -290,7 +511,6 @@
    "price_lock": 0.0037257083231516663,
    "n": 25,
    "yield": 0.03458173055910449,
-   "walk_away": 145808263.3159253,
    "available": false
   },
   {
@@ -308,7 +528,6 @@
    "price_lock": 0.00402232932438884,
    "n": 25,
    "yield": 0.029604936479834153,
-   "walk_away": 128482503.86004797,
    "available": false
   },
   {
@@ -326,7 +545,6 @@
    "price_lock": -0.00435280169982577,
    "n": 25,
    "yield": 0.028038688389892274,
-   "walk_away": 108637619.53166606,
    "available": false
   },
   {
@@ -344,7 +562,6 @@
    "price_lock": 0.016410943835875713,
    "n": 25,
    "yield": 0.025714132527314866,
-   "walk_away": 97196815.67092136,
    "available": false
   },
   {
@@ -362,7 +579,6 @@
    "price_lock": -0.0016643966329576987,
    "n": 25,
    "yield": 0.025850804738911562,
-   "walk_away": 91751337.02534641,
    "available": false
   },
   {
@@ -380,7 +596,6 @@
    "price_lock": 0.04125822105009691,
    "n": 25,
    "yield": 0.0329856856889398,
-   "walk_away": 70524781.51290195,
    "available": false
   },
   {
@@ -398,7 +613,6 @@
    "price_lock": 0.012003462942458798,
    "n": 25,
    "yield": 0.026329676128232924,
-   "walk_away": 60783391.45287298,
    "available": false
   },
   {
@@ -416,7 +630,6 @@
    "price_lock": 0.04735168206148321,
    "n": 25,
    "yield": 0.027828848320315642,
-   "walk_away": 58492837.44994467,
    "available": false
   },
   {
@@ -434,7 +647,6 @@
    "price_lock": 0.04581467556807084,
    "n": 25,
    "yield": 0.025903378294986065,
-   "walk_away": 57755713.191646285,
    "available": false
   },
   {
@@ -452,7 +664,6 @@
    "price_lock": -0.04000060581623832,
    "n": 25,
    "yield": 0.01622789345862317,
-   "walk_away": 50182326.76678398,
    "available": false
   }
  ],
@@ -1651,7 +1862,7 @@
    "feasible": false,
    "why_infeasible": "no_eleven",
    "replacement": null,
-   "replacement_why_not": "no_candidate",
+   "replacement_why_not": "no_cash",
    "offer_percentile": 0.9906868451688009,
    "offers_seen": 859,
    "per_million": null,
