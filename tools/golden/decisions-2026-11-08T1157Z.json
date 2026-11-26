@@ -3485,6 +3485,7 @@
   }
  ],
  "shadow": {
+  "all_won_short": false,
   "base_sells": [
    "Roger Hinojo",
    "Ferran Jutgla",
@@ -3577,6 +3578,7 @@
   ],
   "capacity": 2.148113820849215,
   "cash_all_won": 2.9070884417694063,
+  "exact": true,
   "funded": [
    {
     "bid": 22759060.0,
