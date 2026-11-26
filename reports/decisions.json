@@ -1,53 +1,53 @@
 {
- "generated_at": "2026-11-26T11:46Z",
- "market_at": "2026-11-26T11:37Z",
+ "generated_at": "2026-11-26T12:11Z",
+ "market_at": "2026-11-26T12:05Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-26T11:37Z",
-   "hours": 0.2,
+   "at": "2026-11-26T12:05Z",
+   "hours": 0.1,
    "status": "ok"
   }
  ],
@@ -244,9 +244,9 @@
    "win": 0.550254887357738,
    "advised": 48385252.0,
    "advised_win": 0.6424397761523034,
-   "move": "hold",
-   "to": null,
-   "why": "Your bid of 48.2 million has a 55% chance, against a walk-away price of 51.6 million and a yield of 0.036 points per million per jornada. It leaves an expected surplus of 1.8 million: keep it.",
+   "move": "raise",
+   "to": 48385252.0,
+   "why": "Your bid of 48.2 million has a 55% chance, against a zero-net price of 51.6 million and a yield of 0.036 points per million per jornada. Counting its chance of winning it nets +1.7 points against the plan with no buy. A bid of 48.4 million has a 64% chance and nets +1.9 points: raise it to 48.4 million.",
    "plan": false,
    "done": true,
    "key": "3686",
