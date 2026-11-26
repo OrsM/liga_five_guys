@@ -1,60 +1,60 @@
 {
- "generated_at": "2026-11-26T05:27Z",
- "market_at": "2026-11-26T05:24Z",
+ "generated_at": "2026-11-26T07:02Z",
+ "market_at": "2026-11-26T07:02Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-26T05:24Z",
+   "at": "2026-11-26T07:02Z",
    "hours": 0.0,
    "status": "ok"
   }
  ],
  "lock_at": "2026-11-27T20:00:00+00:00",
- "cash": -31066838.0,
+ "cash": -30866838.0,
  "cash_locked": 0,
- "can_bid": 66396957.80000001,
+ "can_bid": 66596957.80000001,
  "ping": "",
  "do": [
   {
@@ -85,7 +85,7 @@
      "wait": [],
      "fallback": [],
      "points_lost": 25.870249533767947,
-     "cash_at_lock": 424997.0,
+     "cash_at_lock": 624997.0,
      "worst": {
       "points": 25.870249533767947,
       "p": 1.0
@@ -93,14 +93,14 @@
     }
    ],
    "points_lost": 25.870249533767947,
-   "cash": -31066838.0,
-   "cash_after": 424997.0,
+   "cash": -30866838.0,
+   "cash_after": 624997.0,
    "worst": {
     "points": 25.870249533767947,
     "p": 1.0
    },
    "lock": "2026-11-27T20:00Z",
-   "why": "Cash -31.1M; lock Fri 27 Nov 21:00. 1) Accept Aymeric Laporte's offer of 31.49M before 22:24 tonight. Expected: 25.9 points lost. Worst case 25.9 points, chance 100.0%.",
+   "why": "Cash -30.9M; lock Fri 27 Nov 21:00. 1) Accept Aymeric Laporte's offer of 31.49M before 22:24 tonight. Expected: 25.9 points lost. Worst case 25.9 points, chance 100.0%.",
    "accepts": [],
    "act": []
   },
@@ -142,7 +142,7 @@
    "per_million": 0.8214906985816466,
    "verdict": "sell",
    "points_lost": 25.870249533767947,
-   "rent": 28.88642321803845,
+   "rent": 28.532249585225173,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -199,9 +199,9 @@
    "act": [],
    "for": [],
    "needed": true,
-   "why": "cash -31.1M; sells Aymeric Laporte now; expects +0.42M at the lock",
+   "why": "cash -30.9M; sells Aymeric Laporte now; expects +0.62M at the lock",
    "set_points_lost": 25.870249533767947,
-   "set_cash_after": 424997.0
+   "set_cash_after": 624997.0
   }
  ],
  "lineup": {
@@ -244,9 +244,9 @@
    }
   ],
   "raises": 31491835.0,
-  "margin": 66396957.80000001,
-  "lock_margin": 424997.0,
-  "lock_margin_low": -1370037.5950000025,
+  "margin": 66596957.80000001,
+  "lock_margin": 624997.0,
+  "lock_margin_low": -1170037.5950000025,
   "if_won": [],
   "if_lost": [],
   "held": [
@@ -264,7 +264,7 @@
    "Aitor Paredes",
    "Martin Satriano"
   ],
-  "cash_if_lost": 424997.0,
+  "cash_if_lost": 624997.0,
   "not_listed": [],
   "gain": 0.0,
   "points_lost_if_won": 25.870249533767947,
@@ -272,7 +272,7 @@
   "net": -25.870249533767947,
   "base": 0.0,
   "cost": 25.870249533767947,
-  "cash": -31066838.0
+  "cash": -30866838.0
  },
  "targets": [
   {
@@ -290,7 +290,7 @@
    "price_lock": 0.0037257083231516663,
    "n": 25,
    "yield": 0.03458173055910449,
-   "walk_away": 144020522.34422383,
+   "walk_away": 145808263.3159253,
    "available": false
   },
   {
@@ -308,7 +308,7 @@
    "price_lock": 0.00402232932438884,
    "n": 25,
    "yield": 0.029604936479834153,
-   "walk_away": 126907192.34426837,
+   "walk_away": 128482503.86004797,
    "available": false
   },
   {
@@ -326,7 +326,7 @@
    "price_lock": -0.00435280169982577,
    "n": 25,
    "yield": 0.028038688389892274,
-   "walk_away": 107305624.21749058,
+   "walk_away": 108637619.53166606,
    "available": false
   },
   {
@@ -344,7 +344,7 @@
    "price_lock": 0.016410943835875713,
    "n": 25,
    "yield": 0.025714132527314866,
-   "walk_away": 96005094.94301358,
+   "walk_away": 97196815.67092136,
    "available": false
   },
   {
@@ -362,7 +362,7 @@
    "price_lock": -0.0016643966329576987,
    "n": 25,
    "yield": 0.025850804738911562,
-   "walk_away": 90626382.78284782,
+   "walk_away": 91751337.02534641,
    "available": false
   },
   {
@@ -380,7 +380,7 @@
    "price_lock": 0.04125822105009691,
    "n": 25,
    "yield": 0.0329856856889398,
-   "walk_away": 69660084.00835977,
+   "walk_away": 70524781.51290195,
    "available": false
   },
   {
@@ -398,7 +398,7 @@
    "price_lock": 0.012003462942458798,
    "n": 25,
    "yield": 0.026329676128232924,
-   "walk_away": 60038132.18684754,
+   "walk_away": 60783391.45287298,
    "available": false
   },
   {
@@ -416,7 +416,7 @@
    "price_lock": 0.04735168206148321,
    "n": 25,
    "yield": 0.027828848320315642,
-   "walk_away": 57775662.444343194,
+   "walk_away": 58492837.44994467,
    "available": false
   },
   {
@@ -434,7 +434,7 @@
    "price_lock": 0.04581467556807084,
    "n": 25,
    "yield": 0.025903378294986065,
-   "walk_away": 57047575.99506761,
+   "walk_away": 57755713.191646285,
    "available": false
   },
   {
@@ -452,130 +452,147 @@
    "price_lock": -0.04000060581623832,
    "n": 25,
    "yield": 0.01622789345862317,
-   "walk_away": 49567046.126468636,
+   "walk_away": 50182326.76678398,
    "available": false
   }
  ],
- "lambda": 0.03669068279830432,
+ "lambda": 0.03624082189586624,
  "alerts": [],
  "auction": {
   "brier": [
    {
     "scope": "backtest:all",
     "n": 3593,
-    "model": 0.03117631716283318,
-    "pooled": 0.042238833285512964
+    "model": 0.0271185403909885,
+    "pooled": 0.04225655245184918
    },
    {
     "scope": "backtest:big",
-    "n": 330,
-    "model": 0.09924458572509097,
-    "pooled": 0.12132431979356036
+    "n": 342,
+    "model": 0.09767434516118242,
+    "pooled": 0.11715561537085084
    },
    {
     "scope": "backtest:norival",
     "n": 3349,
-    "model": 0.01952107349689152,
-    "pooled": 0.023942360972102665
+    "model": 0.017365818421667477,
+    "pooled": 0.023993958982340302
    },
    {
     "scope": "backtest:ours",
     "n": 276,
-    "model": 0.1776527156197445,
-    "pooled": 0.2480113323555428
+    "model": 0.13236317157398717,
+    "pooled": 0.24749194481509645
+   },
+   {
+    "scope": "backtest:rest",
+    "n": 3475,
+    "model": 0.02104086446332784,
+    "pooled": 0.03149665829354983
+   },
+   {
+    "scope": "backtest:riser",
+    "n": 177,
+    "model": 0.20130646147983372,
+    "pooled": 0.3628808235724077
    },
    {
     "scope": "backtest:rival",
     "n": 244,
-    "model": 0.1911493132170898,
-    "pooled": 0.2933654143412961
+    "model": 0.16097864643712007,
+    "pooled": 0.29291813249031323
    },
    {
     "scope": "backtest:small",
-    "n": 3263,
-    "model": 0.0242923059383327,
-    "pooled": 0.03424060755837363
+    "n": 3251,
+    "model": 0.019696182583727247,
+    "pooled": 0.03437729083440883
    },
    {
     "scope": "live:all",
     "n": 4729,
-    "model": 0.031210867890070344,
-    "pooled": 0.031210867890070344
+    "model": 0.025868726171614863,
+    "pooled": 0.025868726171614863
    },
    {
     "scope": "live:norival",
     "n": 4423,
-    "model": 0.02117887337129917,
-    "pooled": 0.02117887337129917
+    "model": 0.017938475354775673,
+    "pooled": 0.017938475354775673
    },
    {
     "scope": "live:ours",
     "n": 276,
-    "model": 0.15091495314701536,
-    "pooled": 0.15091495314701536
+    "model": 0.12100001414482921,
+    "pooled": 0.12100001414482921
+   },
+   {
+    "scope": "live:rest",
+    "n": 4473,
+    "model": 0.016169173406127894,
+    "pooled": 0.016169173406127894
+   },
+   {
+    "scope": "live:riser",
+    "n": 256,
+    "model": 0.19534567742170553,
+    "pooled": 0.19534567742170553
    },
    {
     "scope": "live:rival",
     "n": 306,
-    "model": 0.17621580827087066,
-    "pooled": 0.17621580827087066
+    "model": 0.14049454108298653,
+    "pooled": 0.14049454108298653
    },
    {
     "scope": "live:small",
     "n": 4729,
-    "model": 0.031210867890070344,
-    "pooled": 0.031210867890070344
+    "model": 0.025868726171614863,
+    "pooled": 0.025868726171614863
    }
   ],
   "drift": [
    {
-    "scope": "backtest:big",
-    "bin": "0.99-1.00",
-    "n": 46,
-    "stated": 1.0,
-    "observed": 0.9347826086956522
+    "scope": "backtest:ours",
+    "bin": "0.00-0.50",
+    "n": 40,
+    "stated": 0.31776797450795097,
+    "observed": 0.1
    },
    {
     "scope": "backtest:ours",
     "bin": "0.80-0.90",
-    "n": 59,
-    "stated": 0.8432176129983314,
-    "observed": 0.6779661016949152
+    "n": 41,
+    "stated": 0.8528281080990481,
+    "observed": 0.6097560975609756
    },
    {
     "scope": "backtest:ours",
-    "bin": "0.90-0.95",
-    "n": 38,
-    "stated": 0.9331301678035298,
-    "observed": 0.8157894736842105
+    "bin": "0.99-1.00",
+    "n": 81,
+    "stated": 0.9976026960975929,
+    "observed": 0.9506172839506173
    },
    {
-    "scope": "backtest:ours",
-    "bin": "0.95-0.99",
-    "n": 55,
-    "stated": 0.9703475608537341,
-    "observed": 0.8181818181818182
+    "scope": "live:ours",
+    "bin": "0.00-0.50",
+    "n": 34,
+    "stated": 0.31748642417578066,
+    "observed": 0.058823529411764705
    },
    {
     "scope": "live:ours",
     "bin": "0.50-0.80",
-    "n": 49,
-    "stated": 0.6602039372109761,
-    "observed": 0.3877551020408163
+    "n": 36,
+    "stated": 0.6886583296591184,
+    "observed": 0.3888888888888889
    },
    {
     "scope": "live:ours",
     "bin": "0.80-0.90",
-    "n": 58,
-    "stated": 0.8429752630780026,
-    "observed": 0.7068965517241379
-   },
-   {
-    "scope": "live:ours",
-    "bin": "0.90-0.95",
-    "n": 45,
-    "stated": 0.9319936268192769,
-    "observed": 0.8
+    "n": 34,
+    "stated": 0.8518566789255408,
+    "observed": 0.5882352941176471
    }
   ]
  },
@@ -618,7 +635,7 @@
    "per_million": 0.8214906985816466,
    "verdict": "sell",
    "points_lost": 25.870249533767947,
-   "rent": 28.88642321803845,
+   "rent": 28.532249585225173,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -714,7 +731,7 @@
    "per_million": 0.0,
    "verdict": "hold",
    "points_lost": 0.0,
-   "rent": 0.5934699597284324,
+   "rent": 0.5861934821245417,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -814,7 +831,7 @@
    "per_million": 0.764012830489253,
    "verdict": "hold",
    "points_lost": 66.42439552554515,
-   "rent": 79.74854377563899,
+   "rent": 78.77075461678776,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -914,7 +931,7 @@
    "per_million": 0.8321336882086358,
    "verdict": "hold",
    "points_lost": 53.737270523560255,
-   "rent": 59.23498757366365,
+   "rent": 58.50871313739101,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1014,7 +1031,7 @@
    "per_million": 0.8678672454619093,
    "verdict": "hold",
    "points_lost": 49.89792139802853,
-   "rent": 52.73815828063013,
+   "rent": 52.091540838063956,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1114,7 +1131,7 @@
    "per_million": 0.8823462808904843,
    "verdict": "hold",
    "points_lost": 4.790344428889966,
-   "rent": 4.97993281497271,
+   "rent": 4.91887434183009,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1214,7 +1231,7 @@
    "per_million": 1.0130176192518243,
    "verdict": "hold",
    "points_lost": 22.647969067467784,
-   "rent": 20.507280260682695,
+   "rent": 20.25584248681146,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1314,7 +1331,7 @@
    "per_million": 1.2086515401367173,
    "verdict": "hold",
    "points_lost": 57.39764815494641,
-   "rent": 43.56009221614856,
+   "rent": 43.02600615123761,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1414,7 +1431,7 @@
    "per_million": 1.6068719127542375,
    "verdict": "hold",
    "points_lost": 1.9899758867054516,
-   "rent": 1.135958215708621,
+   "rent": 1.1220303422247773,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1514,7 +1531,7 @@
    "per_million": 2.3308628784098353,
    "verdict": "hold",
    "points_lost": 46.550935195854436,
-   "rent": 18.319241481943585,
+   "rent": 18.0946310392775,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1640,7 +1657,7 @@
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
-   "rent": 17.04186636752546,
+   "rent": 16.832917697219482,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1766,7 +1783,7 @@
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
-   "rent": 58.27721949349914,
+   "rent": 57.562688158744606,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -1892,7 +1909,7 @@
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
-   "rent": 55.2591393222859,
+   "rent": 54.58161237572758,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
@@ -2018,7 +2035,7 @@
    "per_million": null,
    "verdict": "needs_replacement",
    "points_lost": null,
-   "rent": 8.905320370297956,
+   "rent": 8.796133101140141,
    "reserves": [
     {
      "until": "2026-11-26T21:24Z",
