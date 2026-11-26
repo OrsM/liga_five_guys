@@ -42,7 +42,7 @@ Everything else comes from the app's API and public pages.
    one id per player (FF's `ff_id`) with the app's and FF's slugs attached.
 3. **board** (`board.py`, `decision.py`, `approach.py`, `eleven.py`, `worth.py`): `reports/decisions.json`: your cash and what you
    can bid, your squad and its eleven, the line that lists your players for sale, and each standing offer on them
-   ranked by what taking it costs the eleven. `approach.approach` says how to get a buy: the bid, the sales that pay for it, and what they cost the eleven.
+   ranked by what taking it costs the eleven. Each advised buy that is not placed carries `why_not_placed` (bid_limit, slots, cash, win_chance or person, the first that holds). `approach.approach` says how to get a buy: the bid, the sales that pay for it, and what they cost the eleven.
 4. **publish** (`publish.py`): the report to the site, and its ping.
 5. **grade** (`grading.py`: each past lock's forecast, kept as `grade_cell`; `python src/grading.py accuracy`
    reads it, star group first), **health** (`health.py`). A failure from here on is noted and the run goes

@@ -205,7 +205,7 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
 - **`board.py`** (stage `board`): `decisions.json` from the league at t: `cash`, `can_bid` (cash plus 20% of team
   value, less pending bids: `rules.bid_limit`), `lock_at`, the squad with its best eleven for the next jornada (`board.best_without`:
   the squad less the plan's sales and the rule's sells, reached by swaps from the app's eleven; the `lineup` advice is those
-  swaps, never naming a sold player, and `lineup.stale` says the app's eleven is not that best), `do`
+  swaps, never naming a sold player, and `lineup.stale` says the app's eleven is not that best), `buys[].why_not_placed` (an advised buy that is not placed says why, one of `bid_limit` / `slots` / `cash` / `win_chance` / `person`, the first that holds in that order, from `board.why_not_placed` over `Room`: bid over `can_bid`; no squad place left (`decision.funds_of`); cash below 0 at the cut or the shadow's `cash_binding` (the cover owns the money); chance under `hurdle.WIN_FLOOR`; else nothing binds and it is for the person; None for a bid placed; read by no decision), `do`
   (one `list` line for your players not yet on the market, which `act.py` does from the phone), `sells` (each standing
   offer on your players, judged by `worth.rent` at LAMBDA: `verdict` sell (the offer reaches the sale reserve, `hurdle.reserve` of
   the player's `hurdle.Stake`: W + rise x value (no band: K = 1 on both sides, #155 and #52 found no source or outcome for the old 0.85), his yield, the points the sale loses plus LAMBDA x n x his

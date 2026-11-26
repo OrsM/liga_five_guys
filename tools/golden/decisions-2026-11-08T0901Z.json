@@ -195,6 +195,7 @@
    "walk_away": 181094568.52532047,
    "what": "buy",
    "why": null,
+   "why_not_placed": "bid_limit",
    "win": 0.9494219349524704,
    "yield": 0.02755424601221059
   },
@@ -333,6 +334,7 @@
    "walk_away": 30092561.177271903,
    "what": "buy",
    "why": null,
+   "why_not_placed": "cash",
    "win": 0.9604036822827211,
    "yield": 0.014193726796422603
   }

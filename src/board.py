@@ -523,6 +523,37 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     return Buys(lines, plans, left, ladders)
 
 
+WHY_NOT = ("bid_limit", "slots", "cash", "win_chance", "person")
+
+
+class Room(NamedTuple):
+    """What an advised bid is placed against, each read from where the board already has it: `cash` the cash at the cut, `can_bid` the bid limit
+    left (the can_bid of the document), `slots` the squad places left (decision.funds_of), `owned` the keys whose money the lock cover owns
+    (the shadow's `cash_binding` candidates)."""
+    cash: float
+    can_bid: float
+    slots: int
+    owned: frozenset[str]
+
+
+def why_not_placed(line: Doc, room: Room) -> str | None:
+    """Why an advised buy is not placed, one of WHY_NOT, None for a bid placed. The first that holds, in this order (a bid the rules of the game refuse
+    says so even when cash is also short, the judgement of the board next, the person last): `bid_limit` (the bid is above what bids can total:
+    room.can_bid), `slots` (no squad place is left), `cash` (cash at the cut below 0, or the cover owns the money the bid needs), `win_chance` (the chance at the advised bid is under hurdle.WIN_FLOOR),
+    else `person`: nothing binds, the advice stands and it is for you to place it."""
+    if line["done"]:
+        return None
+    if line["amount"] is not None and line["amount"] > room.can_bid:
+        return "bid_limit"
+    if room.slots <= 0:
+        return "slots"
+    if room.cash < 0 or line["key"] in room.owned:
+        return "cash"
+    if line["win"] is None or line["win"] < hurdle.WIN_FLOOR:
+        return "win_chance"
+    return "person"
+
+
 def overlapped(inp: decision.Inputs, lines: list[Doc], got: dict[str, dict[str, Any]]) -> None:
     """Sets `gain_with_better` on each buy line: the points he adds over his window to the squad plus the buys above him that are
     not holds; adds a fact when it is below his `gain`. The first line's is its own gain."""
@@ -940,6 +971,10 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
                "win": r["win"], "placed": r["placed"]} for r in arrival_rows(got, arrivals)]
     sells = offer_lines(inp, names, offered, known, offers, rate, clock.n_closes, untils_of(clock))
+    can_bid = max(0.0, bid_limit(cash, club.team_value, club.debt) - bids)
+    room = Room(cash, can_bid, decision.funds_of(inp).slots, frozenset(c["key"] for c in price_of_cash.get("candidates", []) if c.get("reason") == shadow.BINDING))
+    for b in buys:
+        b["why_not_placed"] = why_not_placed(b, room)
     funds(buys, sells)
     replacement_rows(inp, names, club, got, sells, rate, cost0, rounds.closes)
     settle(sells, found.sells if found is not None and found.feasible else frozenset(), found.now if found is not None else frozenset())
@@ -953,7 +988,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     return {
         "generated_at": stamped(cut()), "market_at": market_at(extras.market_read), "sources": sources(health),
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
-        "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, club.team_value, club.debt) - bids),
+        "cash": cash, "cash_locked": bids, "can_bid": can_bid,
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
         "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names, sold), "buys": buys, "plans": plans, "rejected": rejected, "considered": len(rejected), "shadow": price_of_cash,
         "base": base_doc(club, names, base, found), "targets": target_lines(names, got), "lambda": rate,
@@ -1500,7 +1535,22 @@ def _selftest_not_listed() -> None:
     assert seen > 0, "the cases include a sale of a player not listed"
 
 
+def _selftest_why_not() -> None:
+    import itertools
+    line = {"key": "k", "done": False, "amount": 5e6, "win": 0.9}
+    assert why_not_placed({**line, "done": True}, Room(-9e6, 0.0, 0, frozenset({"k"}))) is None, "a bid placed has no reason"
+    # every shape of the four conditions: one reason of the closed set, the first by the documented order
+    for cash, owned, big, full, low in itertools.product((-1e6, 3e6), (False, True), (False, True), (False, True), (False, True)):
+        room = Room(cash, 1e6 if big else 9e6, 0 if full else 3, frozenset({"k"}) if owned else frozenset())
+        got = why_not_placed({**line, "win": 0.1 if low else 0.9}, room)
+        want = [r for r, on in zip(WHY_NOT, (big, full, cash < 0 or owned, low, True)) if on][0]
+        assert got in WHY_NOT and got == want, "exactly one reason from the closed set: the first that binds, %s" % (got,)
+    assert why_not_placed({**line, "win": None}, Room(3e6, 9e6, 3, frozenset())) == "win_chance", "no chance known is not placeable"
+    assert why_not_placed({**line, "amount": 9e6}, Room(3e6, 9e6, 3, frozenset())) == "person", "a bid at the limit is within it"
+
+
 def _selftest() -> None:
+    _selftest_why_not()
     _selftest_cover()
     _selftest_not_listed()
     _selftest_params()
