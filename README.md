@@ -174,7 +174,7 @@ rather than reaching through them; ruff flags reads of private members.
 ## Layout
 
     src/            run, ingest, sources, crosswalk, decision (the
-                    inputs and the opportunities), board, approach, eleven, valuation, worth,
+                    inputs and the opportunities), board, approach, shadow (the price of lock cash, #156), eleven, valuation, worth,
                     publish, grading, salegrade, act, health, stats
     src/ffcore/     parsed (the parse cache), store and records (the record store),
                     tidy (paths, rows with their numbers parsed), clock (now, t, stamps),

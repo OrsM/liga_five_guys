@@ -16,7 +16,9 @@ from typing import Any, NamedTuple
 import decision
 import eleven
 import hurdle
+import shadow
 import worth
+from shadow import Ladder
 from approach import Approach, Bidding, Club, Money, Offer, Option, Plan, Rounds, Side, Stand, approach, bidding, plan, pricing_of, replacement, secure, stand
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
@@ -414,7 +416,16 @@ def stance_of(r: dict[str, Any], curve: Curve | None, trying: bool, bid: Bidding
     return Stance(placed, win, advised, advised_win, got.move, got.to), here
 
 
-def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], cost0: float, rate: float, n_closes: int) -> tuple[list[Doc], list[Doc], list[Doc]]:
+class Buys(NamedTuple):
+    """What buy_lines makes of the market: the `lines` (advised buys and bids placed), the funded `plans`, the candidates `left` out and the
+    `ladders` of every candidate looked at (shadow.Ladder: the bids tried and the Approach of each), the input of the shadow price."""
+    lines: list[Doc]
+    plans: list[Doc]
+    left: list[Doc]
+    ladders: list[Ladder]
+
+
+def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], cost0: float, rate: float, n_closes: int) -> Buys:
     """The buys of the board, the funded plans and the candidates left out. Every player on the market with an asking price and a gain (or a bid
     placed; one who adds no points is no candidate) is a candidate, best gain first; the first EVALUATED_BUYS get a Bidding (approach.bidding): the funded net of each bid of the auction
     curve against the plan with no buy (`cost0`, its cost in the one objective), the bid being the one of the greatest net and the walk-away price
@@ -433,6 +444,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     mine = [r for r in market if r["placed"] is not None]
     wanted = mine + [r for r in market if r["placed"] is None]
     out: list[Doc] = []
+    ladders: list[Ladder] = []
     for i, r in enumerate(wanted):
         k, placed = r["player"], r["placed"]
         curve = curves.get(k)
@@ -456,6 +468,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         clears = best is not None and net is not None and net > FUNDED_FLOOR
         if reason is None and not (net is not None and net > FUNDED_FLOOR):
             reason = "net_not_positive"
+        ladders.append(Ladder(k, name, r["replaces"], reason, bid))
         advised = best.amount if best is not None and clears else None
         advised_win = best.win if best is not None and clears else None
         at, shown = stance_of(r, curve, trying, bid, advised, advised_win, fund)
@@ -501,7 +514,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
               "if_lost_points": b["if_lost_points"], "worst": min(b["if_won_points"], b["if_lost_points"]), "displaces": b["displaces"],
               "cash_if_won": b["funding"]["lock_margin"], "cash_if_lost": b["funding"]["cash_if_lost"], "funding": b["funding"], "line": b["line"]}
              for b in funded_plans]
-    return lines, plans, left
+    return Buys(lines, plans, left, ladders)
 
 
 def overlapped(inp: decision.Inputs, lines: list[Doc], got: dict[str, dict[str, Any]]) -> None:
@@ -913,8 +926,11 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     offered = extras.offers
     club, rounds, base, found, clock = cover_of(inp, extras, offers, rate)
     cost0 = plan_cost(base, found, club)
-    buys, plans, rejected = buy_lines(inp, names, club, got, cost0, rate, rounds.closes)
+    bought = buy_lines(inp, names, club, got, cost0, rate, rounds.closes)
+    buys, plans, rejected = bought.lines, bought.plans, bought.left
     got = with_plans(got, buys, plans)
+    price_of_cash = shadow.report(club, Side(club.squad, club.pos, rounds.cells, rounds.arrives), shadow.base_of(club, base, found),
+                                  Money(rate, len(rounds.arrives)), bought.ladders, names)
     alerts = [{"name": names.get(r["player"], r["player"]), "gain": r["gain"], "asking": r["asking"], "bid": r["bid"],
                "win": r["win"], "placed": r["placed"]} for r in arrival_rows(got, arrivals)]
     sells = offer_lines(inp, names, offered, known, offers, rate, clock.n_closes, untils_of(clock))
@@ -933,7 +949,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": max(0.0, bid_limit(cash, club.team_value, club.debt) - bids),
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
-        "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names, sold), "buys": buys, "plans": plans, "rejected": rejected, "considered": len(rejected),
+        "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names, sold), "buys": buys, "plans": plans, "rejected": rejected, "considered": len(rejected), "shadow": price_of_cash,
         "base": base_doc(club, names, base, found), "targets": target_lines(names, got), "lambda": rate,
         "alerts": alerts, "auction": auction_card(),
         "sells": sells,
@@ -1269,7 +1285,8 @@ def _selftest_placed() -> None:
                 "price_lock": None, "placed": mine.get(k), "profit": 0.0, "window": decision.window_of({}, cells, None)} for k in keys]
         for r in got:
             r["stake"] = hurdle.stake(r["gain"], hurdle.remaining(1, max(cells)), rate or 0.045, hurdle.Exit(r["asking"]), 1)
-        shown, plans, left = buy_lines(inp, names, club, got, 0.0, rate, 1)
+        bought = buy_lines(inp, names, club, got, 0.0, rate, 1)
+        shown, plans, left = bought.lines, bought.plans, bought.left
         assert [b["key"] for b in shown if b["done"]] == [b["key"] for b in shown[:len(mine)]], "a bid placed comes before the ranked rows"
         assert {b["key"] for b in shown if b["done"]} == set(mine), "a bid placed is always a row of the buys"
         free = [r["player"] for r in got if r["placed"] is None and r["gain"] > 0]
@@ -1336,7 +1353,8 @@ def _selftest_worked_case() -> None:
     row = {"player": "star", "pos": "DEL", "status": "market", "asking": asking, "value": asking, "close_at": None, "replaces": "DEL2",
            "gain": gain, "per_million": gain / (asking / 1e6), "from_j": 1, "price_next": None, "price_lock": None, "placed": None, "profit": 0.0,
            "window": window, "stake": stake}
-    shown, plans, left = buy_lines(inp, names, club, [row], 0.0, rate, 1)
+    bought = buy_lines(inp, names, club, [row], 0.0, rate, 1)
+    plans, left = bought.plans, bought.left
     assert left == [] and [p["key"] for p in plans] == ["star"], "he is a funded plan, not a count of the considered"
     (plan_,) = plans
     assert plan_["net"] > FUNDED_FLOOR and plan_["bid"] >= asking and plan_["walk_away"] > asking, "a net above the floor at the asking price and a zero-net price over it"

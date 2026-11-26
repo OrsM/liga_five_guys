@@ -1501,7 +1501,7 @@ def decided_day(loaded: loader.Loaded, world: state.World, cash: float, history:
         return auction.momentum_class(auction.MOMENTUM_CUTS, change(k, world.cut)) == auction.RISER
     club, rounds, base, found, _ = cover_of(inp, decided.extras, offers, rate, decided.cut)
     wanted = [r for r in rows if r["status"] == "market" and (r["profit"] > 0 or riser(r["player"]))]
-    _, plans, _ = buy_lines(inp, {}, club, wanted, plan_cost(base, found, club), rate, rounds.closes)
+    plans = buy_lines(inp, {}, club, wanted, plan_cost(base, found, club), rate, rounds.closes).plans
     placed = [r for r in with_plans(wanted, [], plans) if r["bid"] is not None]
     return day._replace(advised={r["player"]: r["bid"] for r in placed}, reserves=reserves, offers=offers,
                         stated={r["player"]: r["win"] for r in placed}, risers=frozenset(r["player"] for r in wanted if riser(r["player"])))

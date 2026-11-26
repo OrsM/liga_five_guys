@@ -240,6 +240,22 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   the first evaluated buys carry `funding` from `approach.approach`:
   the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.
+- **Shadow price of cash at the lock (#156, shadow mode: reported, acted on by nothing).** `shadow.py` is the one place cash at the lock is priced.
+  Every move that touches it is a `shadow.Move`: its net (points against the plan with no buy: a bid's funded net, `Approach.net`; or the points a
+  sale of one squad player costs, or a keep of one the cover sells saves, plus the money value of his price over his expected offer) and its need
+  (euros of lock cash: a bid at its win chance x its amount, the cash after the plan if won and if lost weighted by the chance, less what the base
+  plan leaves; negative when its sales raise more than it costs). The base plan is the cover (`board.base_doc`'s) or the approach with no buy; its
+  cash at the lock is the capacity. Rungs of one bid ladder are alternatives, moves that claim the same player (a sale, a base seller kept, the
+  place of the eleven a buy takes) do not combine, the squad places are a hard limit inside every search. `shadow.solve` returns s: 0 when the best
+  set with cash free fits, else the slope between the two sets (best at one s) that straddle the capacity (Lagrangian cutting plane), i.e. the
+  density of the break move, with the bracket (s, the least dense move funded above it), the break, the exact funded set within the capacity (branch
+  and bound), and `to_zero`, the cash that would stop it mattering. s is in points per M of lock cash once (compare `per_jornada` = s / n with
+  LAMBDA); `walk_away_at_s` charges each bid s per M of its need (`approach.zero_price` over the shifted nets). `decisions.json` carries it as
+  `shadow` (`s`, `per_jornada`, `bracket`, `capacity`, `used`, `to_zero`, `break`, `funded`, `candidates` with `reason` None or `cash_binding` /
+  `displaced` / the board's own, `sales`, `line`); no other key reads it (a change of `shadow` moves no bid, ranking, walk-away or advice, and s = 0 is
+  exactly the board without it). Moves are additive; the points of two buys of one place are not summed because they claim it. Not yet in: a
+  second price for the squad places, rival-side cash, the replacement pairs, the bid limit (`rules.bid_margin`) as a joint constraint (it holds
+  per plan).
 - **`eleven.py`** (pure, no database): the eleven is fixed, never searched by formation. `points(squad, pos, value)` is V,
   the points of the best legal eleven of one jornada (the best shape's top players of each position summed), `None` when
   no legal eleven exists (fewer than 11 players or no shape fits; that depends on the positions alone, never on value).

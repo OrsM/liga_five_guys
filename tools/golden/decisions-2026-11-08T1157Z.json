@@ -3484,6 +3484,171 @@
    "why_infeasible": null
   }
  ],
+ "shadow": {
+  "base_sells": [
+   "Roger Hinojo",
+   "Ferran Jutgla",
+   "Aitor Paredes"
+  ],
+  "binding": true,
+  "bracket": [
+   0.153124573882129,
+   null
+  ],
+  "break": [
+   "Ferran Jutgla (keep)"
+  ],
+  "candidates": [
+   {
+    "bid": 174406657.0,
+    "funded": false,
+    "key": "4288",
+    "kind": "buy",
+    "name": "Raphinha",
+    "need": -4.146179909827208,
+    "net": 3.9004579607868743,
+    "net_at_s": 4.53533999271781,
+    "per_million": -0.940735338459885,
+    "reason": "displaced",
+    "rungs": 2,
+    "walk_away": 175923355.7683673,
+    "walk_away_at_s": 176100341.53690132
+   },
+   {
+    "bid": 59988796.0,
+    "funded": false,
+    "key": "9573",
+    "kind": "buy",
+    "name": "Jonathan David",
+    "need": -7.485227354705415,
+    "net": -9.41938936997603,
+    "net_at_s": -8.273217120875907,
+    "per_million": 1.2583972301195028,
+    "reason": "net_not_positive",
+    "rungs": 2,
+    "walk_away": 51509151.86192593,
+    "walk_away_at_s": 53402906.71836864
+   },
+   {
+    "bid": 22759060.0,
+    "funded": true,
+    "key": "8413",
+    "kind": "buy",
+    "name": "Pape Gueye",
+    "need": -1.1441306724263942,
+    "net": 8.096210241745917,
+    "net_at_s": 8.271404763426682,
+    "per_million": -7.076298570491103,
+    "reason": null,
+    "rungs": 2,
+    "walk_away": 30049512.94153667,
+    "walk_away_at_s": 29303664.771616995
+   },
+   {
+    "bid": 5505386.76,
+    "funded": false,
+    "key": "6563",
+    "kind": "buy",
+    "name": "Ivan Martin",
+    "need": -5.43540901988977,
+    "net": -0.39611681950840527,
+    "net_at_s": 0.4361778705372962,
+    "per_million": 0.07287709500037562,
+    "reason": "net_not_positive",
+    "rungs": 4,
+    "walk_away": 4130611.4656833503,
+    "walk_away_at_s": 5908938.5427357685
+   },
+   {
+    "bid": 5877862.0,
+    "funded": false,
+    "key": "6957",
+    "kind": "buy",
+    "name": "Isi Palazon",
+    "need": -4.64969465439919,
+    "net": -1.3165705471554254,
+    "net_at_s": -0.6045880345185364,
+    "per_million": 0.28315204438420183,
+    "reason": "net_not_positive",
+    "rungs": 1,
+    "walk_away": 4744583.821741544,
+    "walk_away_at_s": 5417672.11882501
+   }
+  ],
+  "capacity": 2.148113820849215,
+  "cash_all_won": 2.9070884417694063,
+  "funded": [
+   {
+    "bid": 22759060.0,
+    "funded": true,
+    "key": "8413",
+    "kind": "buy",
+    "name": "Pape Gueye",
+    "need": -1.1441306724263942,
+    "net": 8.096210241745917,
+    "net_at_s": 8.271404763426682,
+    "per_million": -7.076298570491103,
+    "reason": null
+   }
+  ],
+  "lambda": 0.045,
+  "line": "cash at the lock is worth 0.153 points per M (up to no more): 2.1M of capacity is used; Ferran Jutgla is refused; 40.6M more would stop it mattering",
+  "per_jornada": 0.0058894066877741924,
+  "s": 0.153124573882129,
+  "sales": [
+   {
+    "bid": null,
+    "funded": false,
+    "key": "7916",
+    "kind": "keep",
+    "name": "Aitor Paredes",
+    "need": 29.217808822000002,
+    "net": 10.36003520567806,
+    "net_at_s": 5.8860706800398,
+    "per_million": 0.35457947133521217,
+    "reason": "displaced"
+   },
+   {
+    "bid": null,
+    "funded": false,
+    "key": "11861",
+    "kind": "sale",
+    "name": "Dani Martinez",
+    "need": -0.611461097,
+    "net": 0.0,
+    "net_at_s": 0.09362971992362414,
+    "per_million": -0.0,
+    "reason": "costs_points"
+   },
+   {
+    "bid": null,
+    "funded": false,
+    "key": "11579",
+    "kind": "sale",
+    "name": "Arnau Ortiz",
+    "need": -0.644149,
+    "net": -0.019119632219999988,
+    "net_at_s": 0.07951540892159951,
+    "per_million": 0.029682002487002212,
+    "reason": "costs_points"
+   },
+   {
+    "bid": null,
+    "funded": false,
+    "key": "7842",
+    "kind": "keep",
+    "name": "Ferran Jutgla",
+    "need": 13.570699398,
+    "net": 2.078007562601215,
+    "net_at_s": 4.440892098500626e-16,
+    "per_million": 0.15312457388212902,
+    "reason": "cash_binding"
+   }
+  ],
+  "slots": 5,
+  "to_zero": 40.64039439915078,
+  "used": -1.1441306724263942
+ },
  "sources": [
   {
    "at": "2026-11-08T11:57Z",
