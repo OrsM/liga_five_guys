@@ -7,8 +7,8 @@
  "base": {
   "base": 0.0,
   "cash": -49472707.0,
-  "cash_if_lost": 2147713.821464809,
-  "cost": 12.471904122632518,
+  "cash_if_lost": 2148113.820849215,
+  "cost": 12.473973022062797,
   "feasible": true,
   "gain": 0.0,
   "held": [
@@ -37,13 +37,13 @@
    "Ferran Jutgla",
    "Aitor Paredes"
   ],
-  "lock_margin": 2147713.821464809,
+  "lock_margin": 2148113.820849215,
   "lock_margin_low": -3565843.4849943966,
   "margin": 43386574.2,
-  "net": -12.471904122632518,
+  "net": -12.473973022062797,
   "not_listed": [],
-  "points_lost_if_lost": 12.471904122632518,
-  "points_lost_if_won": 12.471904122632518,
+  "points_lost_if_lost": 12.473973022062797,
+  "points_lost_if_won": 12.473973022062797,
   "raises": 1576701.0,
   "risk": {
    "below_points": 51.07497780000001,
@@ -70,18 +70,18 @@
    "accepts": [],
    "act": [],
    "cash": -49472707.0,
-   "cash_after": 2147713.821464809,
+   "cash_after": 2148113.820849215,
    "label": "cover the cash: Roger Hinojo, Ferran Jutgla, Aitor Paredes",
    "lock": "2026-11-20T20:00Z",
    "needed": true,
    "options": [
     {
-     "cash_at_lock": 2147713.821464809,
+     "cash_at_lock": 2148113.820849215,
      "fallback": [
       "Arnau Ortiz",
       "Dani Martinez"
      ],
-     "points_lost": 12.471904122632518,
+     "points_lost": 12.473973022062797,
      "take_now": [
       {
        "key": "15316",
@@ -95,7 +95,7 @@
       {
        "key": "7842",
        "kind": "wait",
-       "least": 14280781.538471414,
+       "least": 14280401.060444186,
        "name": "Ferran Jutgla",
        "reserves": [
         {
@@ -103,47 +103,47 @@
          "until": "2026-11-08T21:24Z"
         },
         {
-         "least": 14280781.538471414,
+         "least": 14280401.060444186,
          "until": "2026-11-09T21:24Z"
         },
         {
-         "least": 14207623.037796583,
+         "least": 14207310.303418102,
          "until": "2026-11-10T21:24Z"
         },
         {
-         "least": 14130074.191885587,
+         "least": 14129831.985141424,
          "until": "2026-11-11T21:24Z"
         },
         {
-         "least": 14046781.055758614,
+         "least": 14046612.160634331,
          "until": "2026-11-12T21:24Z"
         },
         {
-         "least": 13955829.175342051,
+         "least": 13955740.08780397,
          "until": "2026-11-13T21:24Z"
         },
         {
-         "least": 13854236.902095683,
+         "least": 13858579.919577237,
          "until": "2026-11-14T21:24Z"
         },
         {
-         "least": 13737127.62130465,
+         "least": 13741846.476837492,
          "until": "2026-11-15T21:24Z"
         },
         {
-         "least": 13594839.047067683,
+         "least": 13598899.954011975,
          "until": "2026-11-16T21:24Z"
         },
         {
-         "least": 13411040.32005992,
+         "least": 13416861.63387654,
          "until": "2026-11-17T21:24Z"
         },
         {
-         "least": 13136564.399211343,
+         "least": 13146817.818047598,
          "until": "2026-11-18T21:24Z"
         },
         {
-         "least": 12456458.997542437,
+         "least": 12473950.778847946,
          "until": "2026-11-19T21:24Z"
         },
         {
@@ -156,7 +156,7 @@
       {
        "key": "7916",
        "kind": "wait",
-       "least": 29169895.638706908,
+       "least": 29156524.157547932,
        "name": "Aitor Paredes",
        "reserves": [
         {
@@ -164,11 +164,11 @@
          "until": "2026-11-08T21:24Z"
         },
         {
-         "least": 29169895.638706908,
+         "least": 29156524.157547932,
          "until": "2026-11-09T21:24Z"
         },
         {
-         "least": 28621683.891998976,
+         "least": 28625841.68838177,
          "until": "2026-11-10T21:24Z"
         },
         {
@@ -184,23 +184,23 @@
          "until": "2026-11-13T21:24Z"
         },
         {
-         "least": 27360635.837382652,
+         "least": 27362897.550744172,
          "until": "2026-11-14T21:24Z"
         },
         {
-         "least": 26557055.273773342,
+         "least": 26559923.37406526,
          "until": "2026-11-15T21:24Z"
         },
         {
-         "least": 25848080.062217526,
+         "least": 25850197.92101895,
          "until": "2026-11-16T21:24Z"
         },
         {
-         "least": 25151804.011550225,
+         "least": 25156250.516043212,
          "until": "2026-11-17T21:24Z"
         },
         {
-         "least": 24334463.359671682,
+         "least": 24351139.49975287,
          "until": "2026-11-18T21:24Z"
         },
         {
@@ -216,12 +216,12 @@
       }
      ],
      "worst": {
-      "p": 1.3682601222519394e-06,
-      "points": 26.305347888381448
+      "p": 1.4424897863302672e-06,
+      "points": 36.41223578130666
      }
     }
    ],
-   "points_lost": 12.471904122632518,
+   "points_lost": 12.473973022062797,
    "sells": [
     {
      "key": "15316",
@@ -233,7 +233,7 @@
     {
      "key": "7842",
      "kind": "wait",
-     "least": 14280781.538471414,
+     "least": 14280401.060444186,
      "name": "Ferran Jutgla",
      "reserves": [
       {
@@ -241,47 +241,47 @@
        "until": "2026-11-08T21:24Z"
       },
       {
-       "least": 14280781.538471414,
+       "least": 14280401.060444186,
        "until": "2026-11-09T21:24Z"
       },
       {
-       "least": 14207623.037796583,
+       "least": 14207310.303418102,
        "until": "2026-11-10T21:24Z"
       },
       {
-       "least": 14130074.191885587,
+       "least": 14129831.985141424,
        "until": "2026-11-11T21:24Z"
       },
       {
-       "least": 14046781.055758614,
+       "least": 14046612.160634331,
        "until": "2026-11-12T21:24Z"
       },
       {
-       "least": 13955829.175342051,
+       "least": 13955740.08780397,
        "until": "2026-11-13T21:24Z"
       },
       {
-       "least": 13854236.902095683,
+       "least": 13858579.919577237,
        "until": "2026-11-14T21:24Z"
       },
       {
-       "least": 13737127.62130465,
+       "least": 13741846.476837492,
        "until": "2026-11-15T21:24Z"
       },
       {
-       "least": 13594839.047067683,
+       "least": 13598899.954011975,
        "until": "2026-11-16T21:24Z"
       },
       {
-       "least": 13411040.32005992,
+       "least": 13416861.63387654,
        "until": "2026-11-17T21:24Z"
       },
       {
-       "least": 13136564.399211343,
+       "least": 13146817.818047598,
        "until": "2026-11-18T21:24Z"
       },
       {
-       "least": 12456458.997542437,
+       "least": 12473950.778847946,
        "until": "2026-11-19T21:24Z"
       },
       {
@@ -294,7 +294,7 @@
     {
      "key": "7916",
      "kind": "wait",
-     "least": 29169895.638706908,
+     "least": 29156524.157547932,
      "name": "Aitor Paredes",
      "reserves": [
       {
@@ -302,11 +302,11 @@
        "until": "2026-11-08T21:24Z"
       },
       {
-       "least": 29169895.638706908,
+       "least": 29156524.157547932,
        "until": "2026-11-09T21:24Z"
       },
       {
-       "least": 28621683.891998976,
+       "least": 28625841.68838177,
        "until": "2026-11-10T21:24Z"
       },
       {
@@ -322,23 +322,23 @@
        "until": "2026-11-13T21:24Z"
       },
       {
-       "least": 27360635.837382652,
+       "least": 27362897.550744172,
        "until": "2026-11-14T21:24Z"
       },
       {
-       "least": 26557055.273773342,
+       "least": 26559923.37406526,
        "until": "2026-11-15T21:24Z"
       },
       {
-       "least": 25848080.062217526,
+       "least": 25850197.92101895,
        "until": "2026-11-16T21:24Z"
       },
       {
-       "least": 25151804.011550225,
+       "least": 25156250.516043212,
        "until": "2026-11-17T21:24Z"
       },
       {
-       "least": 24334463.359671682,
+       "least": 24351139.49975287,
        "until": "2026-11-18T21:24Z"
       },
       {
@@ -355,10 +355,10 @@
    ],
    "step": "plan",
    "what": "cover",
-   "why": "Cash -49.5M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Wait for the offers of Ferran Jutgla. on 9 Nov accept his new offer if it is 14.28M or more; on 10 Nov accept his new offer if it is 14.21M or more; on 11 Nov accept his new offer if it is 14.13M or more; on 12 Nov accept his new offer if it is 14.05M or more; on 13 Nov accept his new offer if it is 13.96M or more; on 14 Nov accept his new offer if it is 13.85M or more; on 15 Nov accept his new offer if it is 13.74M or more; on 16 Nov accept his new offer if it is 13.59M or more; on 17 Nov accept his new offer if it is 13.41M or more; on 18 Nov accept his new offer if it is 13.14M or more; on 19 Nov accept his new offer if it is 12.46M or more; on 20 Nov, before 21:00, accept whatever it is. 3) Wait for the offers of Aitor Paredes. on 9 Nov accept his new offer if it is 29.17M or more; on 10 Nov accept his new offer if it is 28.62M or more; on 11 Nov accept his new offer if it is 27.96M or more; on 12 Nov accept his new offer if it is 27.96M or more; on 13 Nov accept his new offer if it is 27.96M or more; on 14 Nov accept his new offer if it is 27.36M or more; on 15 Nov accept his new offer if it is 26.56M or more; on 16 Nov accept his new offer if it is 25.85M or more; on 17 Nov accept his new offer if it is 25.15M or more; on 18 Nov accept his new offer if it is 24.33M or more; on 19 Nov accept his new offer if it is 23.01M or more; on 20 Nov, before 21:00, accept whatever it is. 4) If cash is still below 0 after that, sell Arnau Ortiz (offer 0.64M), then, if still short, the cheapest other player. Expected: 12.5 points lost. Worst case 26.3 points, chance 0.0%.",
+   "why": "Cash -49.5M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Wait for the offers of Ferran Jutgla. on 9 Nov accept his new offer if it is 14.28M or more; on 10 Nov accept his new offer if it is 14.21M or more; on 11 Nov accept his new offer if it is 14.13M or more; on 12 Nov accept his new offer if it is 14.05M or more; on 13 Nov accept his new offer if it is 13.96M or more; on 14 Nov accept his new offer if it is 13.86M or more; on 15 Nov accept his new offer if it is 13.74M or more; on 16 Nov accept his new offer if it is 13.60M or more; on 17 Nov accept his new offer if it is 13.42M or more; on 18 Nov accept his new offer if it is 13.15M or more; on 19 Nov accept his new offer if it is 12.47M or more; on 20 Nov, before 21:00, accept whatever it is. 3) Wait for the offers of Aitor Paredes. on 9 Nov accept his new offer if it is 29.16M or more; on 10 Nov accept his new offer if it is 28.63M or more; on 11 Nov accept his new offer if it is 27.96M or more; on 12 Nov accept his new offer if it is 27.96M or more; on 13 Nov accept his new offer if it is 27.96M or more; on 14 Nov accept his new offer if it is 27.36M or more; on 15 Nov accept his new offer if it is 26.56M or more; on 16 Nov accept his new offer if it is 25.85M or more; on 17 Nov accept his new offer if it is 25.16M or more; on 18 Nov accept his new offer if it is 24.35M or more; on 19 Nov accept his new offer if it is 23.01M or more; on 20 Nov, before 21:00, accept whatever it is. 4) If cash is still below 0 after that, sell Arnau Ortiz (offer 0.64M), then, if still short, the cheapest other player. Expected: 12.5 points lost. Worst case 36.4 points, chance 0.0%.",
    "worst": {
-    "p": 1.3682601222519394e-06,
-    "points": 26.305347888381448
+    "p": 1.4424897863302672e-06,
+    "points": 36.41223578130666
    }
   },
   {
@@ -499,8 +499,8 @@
     "p_short": 0.33818883188738,
     "shortfall_if_low": 1037026.5594543964
    },
-   "set_cash_after": 2147713.821464809,
-   "set_points_lost": 12.471904122632518,
+   "set_cash_after": 2148113.820849215,
+   "set_points_lost": 12.473973022062797,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
@@ -513,7 +513,7 @@
   {
    "accepts": [],
    "act": [],
-   "cost_points": 12.471904122632518,
+   "cost_points": 12.473973022062797,
    "expected_cover": [
     "Ferran Jutgla",
     "Aitor Paredes"
@@ -578,7 +578,7 @@
    "gain": 124.94674226177595,
    "key": "4288",
    "name": "Raphinha",
-   "net": 0.24494584309894485,
+   "net": 0.24460130578202133,
    "pos": "DEL",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net +0.2)"
@@ -588,7 +588,7 @@
    "gain": 13.09870740779646,
    "key": "9573",
    "name": "Jonathan David",
-   "net": -10.458197531112392,
+   "net": -10.458542068429315,
    "pos": "DEL",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -10.5)"
@@ -598,7 +598,7 @@
    "gain": 8.216457459804452,
    "key": "8413",
    "name": "Pape Gueye",
-   "net": -2.1377221784726466,
+   "net": -2.13806671578957,
    "pos": "MED",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -2.1)"
@@ -608,7 +608,7 @@
    "gain": 0.943155016950989,
    "key": "6563",
    "name": "Ivan Martin",
-   "net": -2.1561642727578043,
+   "net": -2.156508810074728,
    "pos": "MED",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -2.2)"
@@ -618,7 +618,7 @@
    "gain": 0.7565298788937085,
    "key": "6957",
    "name": "Isi Palazon",
-   "net": -2.637527337570301,
+   "net": -2.6378718748872245,
    "pos": "MED",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -2.6)"

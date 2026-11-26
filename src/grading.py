@@ -896,7 +896,7 @@ def slot_of(day: CoverDay, closing: Closing, player: str, close: int, label: str
     rng = random.Random("%s|%s|%s|%d" % (label, day.cut, player, close))
     ratios = ratios_of(day.offers)
     ratio = ratios[rng.randrange(len(ratios))]
-    return Slot(worth.offer(ratio, day.club.worth[player], day.club.drift.get(player, 0.0), close) if rng.random() < day.offers.exists else None, True)
+    return Slot(worth.offer_price(ratio, day.club.worth[player], day.club.drift.get(player, 0.0), close) if rng.random() < day.offers.exists else None, True)
 
 
 def gained(day: CoverDay, side: Side, sales: Mapping[str, float], rate: float) -> float:
@@ -963,7 +963,7 @@ def cover_advice(day: CoverDay, rate: float) -> tuple[Side, Plan, Plan] | None:
     if day.club.cash >= 0 or day.clock.n_closes < 1:
         return None
     side = Side(day.club.squad, day.club.pos, day.rounds.cells, day.rounds.arrives)
-    base = plan(day.club, approach(day.club, None, 0.0, 1.0, day.rounds), day.rounds, day.clock.n_closes, side)
+    base = plan(day.club, approach(day.club, None, 0.0, 1.0, day.rounds), day.rounds, day.clock.n_closes, side, rate=hurdle.FALLBACK_LAMBDA)
     if base is None or not base.feasible:
         return None
     secured = secure(day.club, base, side, day.offers, day.clock.n_closes, rate)
@@ -2403,7 +2403,7 @@ def _selftest_cover_grades() -> None:
         assert all(o is not None for o in drawn), "every offer exists"
         later = [slot_of(falling._replace(offers=always.offers), NOT_SEEN, k, j, "x").offer for k in own]
         assert all(abs(a * (1 - 0.01 * j) - b) < 1e-6 for a, b in zip(drawn, later) if a is not None and b is not None), "the draw is the same ratio over the value as the club's drift has it"
-    found = plan(club, approach(club, None, 0.0, 1.0, day.rounds), day.rounds, 3, side)
+    found = plan(club, approach(club, None, 0.0, 1.0, day.rounds), day.rounds, 3, side, rate=hurdle.FALLBACK_LAMBDA)
     assert found is not None and found.feasible
     got = secure(club, found, side, ratios, 3)
     assert got.options

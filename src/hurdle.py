@@ -173,7 +173,7 @@ def in_points(money: float, n: int, rate: float) -> float:
 
 def drift(exit: Exit) -> float:
     """A night's change of the exit's value as a fraction of it: the rise spread over the nights, so a falling price is negative. 0 for a value that
-    is not positive. The one night's drift every sale reader takes (Club.drift, worth.stopped)."""
+    is not positive."""
     return 0.0 if exit.value <= 0 else exit.rise / exit.nights
 
 

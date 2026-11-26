@@ -111,8 +111,8 @@ def waiting_values(m: int, payoffs: Payoffs, hold: float, exists: float = 1.0) -
     `payoffs` are ascending, one per offer, not empty, the same at each draw or, given as a function of k, those of the draw taken with k draws
     still to come (itself counted). An offer is taken at the close with k draws after it when its payoff is at least rho_k; with the payoffs the
     offers over value it is the reserve ratio (offer_reserve_ratio), with those of a cover (the points a sale saves) the cover's. Nondecreasing
-    in k when hold is at most the mean payoff and in `exists` when hold is at most the lowest payoff, which makes the last close accept any
-    offer."""
+    in k when the payoffs are the same at each draw and hold is at most the mean payoff, and in `exists` when hold is at most the lowest payoff
+    (which makes the last close accept any offer)."""
     if m < 0 or not (payoffs(1) if callable(payoffs) else payoffs):
         raise ValueError("m must be >= 0 and payoffs non-empty")
     rho = hold
@@ -126,7 +126,7 @@ def waiting_values(m: int, payoffs: Payoffs, hold: float, exists: float = 1.0) -
     return tuple(out)
 
 
-def offer(ratio: float, value: float, drift: float, night: int) -> float:
+def offer_price(ratio: float, value: float, drift: float, night: int) -> float:
     """The offer of `ratio` over the value of a player worth `value` tonight whose value changes by `drift` (a fraction) a night, `night` nights
     from now (hurdle.drifted): the one place an offer is priced."""
     return ratio * hurdle.drifted(value, drift, night)
@@ -134,7 +134,7 @@ def offer(ratio: float, value: float, drift: float, night: int) -> float:
 
 def offers_at(ratios: Sequence[float], value: float, drift: float, night: int) -> tuple[float, ...]:
     """The offers (offer) of each of `ratios` (ascending) at that night: ascending."""
-    return tuple(offer(r, value, drift, night) for r in ratios)
+    return tuple(offer_price(r, value, drift, night) for r in ratios)
 
 
 def offer_reserve_ratio(m: int, drift: float, dist: OfferDistribution, hold: float) -> float:
@@ -210,7 +210,7 @@ def _waiting_payoff(m: int, drift: float, dist: OfferDistribution, hold: float, 
     for _ in range(runs):
         payoff = hold
         for night in range(1, m + 1):
-            x = offer(rng.choice(dist.ratios), 1.0, drift, night)
+            x = offer_price(rng.choice(dist.ratios), 1.0, drift, night)
             if rng.random() < dist.exists and x >= rho[m - night] + shift:
                 payoff = x
                 break
@@ -233,14 +233,14 @@ def _selftest_option() -> None:
         assert all(a <= b for a, b in zip(falls, falls[1:])), "a faster fall never raises the reserve"
         likely = [offer_reserve_ratio(m, 0.0, study._replace(exists=e), 0.5) for e in (0.0, 0.5, 0.93, 1.0)]
         assert all(a <= b + 1e-12 for a, b in zip(likely, likely[1:])), "offers that are likelier to exist never lower the reserve"
-        assert likely[0] == 0.5, "no offer ever drawn: the hold"
+        assert abs(likely[0] - 0.5) < 1e-12, "no offer ever drawn: the hold"
     wild = random.Random(2)
     for _ in range(50):
         dist = offer_ratio_distribution((wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 60))), 1.0)
         d, hold, m = wild.uniform(-0.03, 0.03), wild.uniform(0.0, 1.5), wild.randint(0, 8)
         rho = hold
         for night in range(m, 0, -1):
-            rho = sum(max(offer(x, 1.0, d, night), rho) for x in dist.ratios) / len(dist.ratios)
+            rho = sum(max(offer_price(x, 1.0, d, night), rho) for x in dist.ratios) / len(dist.ratios)
         assert abs(offer_reserve_ratio(m, d, dist, hold) - rho) < 1e-12, "the reserve is the plain recursion over the offers at their night's value"
     for _ in range(30):
         dist = offer_ratio_distribution((wild.uniform(0.7, 1.4) for _ in range(wild.randint(1, 40))), 1.0)

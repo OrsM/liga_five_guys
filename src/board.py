@@ -904,7 +904,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
     base = approach(club, None, 0.0, 1.0, rounds, money=money)
     clock = decision.clock_of(inp)
     side = Side(club.squad, pos, cells, rounds.arrives)
-    found = plan(club, base, rounds, clock.n_closes, side, rate)
+    found = plan(club, base, rounds, clock.n_closes, side, rate=rate)
     if found is not None and club.cash < 0:
         found = secure(club, found, side, offers, clock.n_closes, rate)
     buys, plans, rejected = buy_lines(inp, names, club, got, plan_cost(base, found, club), rate)
@@ -1341,7 +1341,7 @@ def _selftest_cover() -> None:
         clock = Clock("2026-11-27T2000Z", tuple("2026-11-%02dT2124Z" % (26 - n_closes + 1 + i) for i in range(n_closes)))
         dist = rng.choice([worth.NO_OFFERS, worth.offer_ratio_distribution([0.9, 0.95, 1.0, 1.0, 1.05, 1.1])])
         rounds = Rounds({1: points}, valuation.Window((1,)), valuation.Window((1,)))
-        base_plan = plan(club, approach(club, None, 0.0, 1.0, rounds), rounds, n_closes)
+        base_plan = plan(club, approach(club, None, 0.0, 1.0, rounds), rounds, n_closes, rate=hurdle.FALLBACK_LAMBDA)
         assert base_plan is not None
         sells = [{"what": "sell", "key": k, "name": k, "offer": offers[k], "verdict": "sell", "points_lost": 0.0,
                   "for": [k] if rng.random() < 0.15 else []} for k in sorted(offers)]

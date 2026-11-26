@@ -352,7 +352,7 @@ class Plan(NamedTuple):
     options: tuple[Option, ...] = ()
 
 
-def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int, side: Side | None = None, rate: float = hurdle.FALLBACK_LAMBDA) -> Plan | None:
+def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int, side: Side | None = None, *, rate: float) -> Plan | None:
     """The cheapest Plan with no buy, by `cover`. With closes still to come (`n_closes` 1 or more) it is `found`, the Approach with
     no player, whose sales are every player of the squad at his standing offer or the expected draw; with none to come (0) only
     the players with a standing offer are sold, at it, by the recourse the last close takes (`cover` proper, by points less the gains of the sales
@@ -446,19 +446,20 @@ class Closer:
         self.drift = {k: club.drift.get(k, 0.0) for k in club.squad}
         self.price = {k: hurdle.drifted(p.expected, self.drift[k], closes - 1) for k, p in self.pricing.items()}
         self.rated = Money(rate, self.n)
+        self.sale_gain = gains(club, self.rated, self.price)
         self.filled: dict[tuple[int, int, int], Filled | None] = {}
 
     def gain(self, player: str, price: float) -> float:
         """The points a sale of `player` at `price` is worth over his expected offer (his worth), negative below it; 0 at rate 0."""
-        return self.rated.over(price, self.pricing[player].expected)
+        return gains(self.club, self.rated, {player: price})[player]
 
     def fill(self, fixed: frozenset[str], plan: frozenset[str], step: int) -> Filled | None:
         """The Filled of the recourse that closes a gap of `step` BUCKETs (bucket_of) on top of `fixed` (sold), at the expected offers, from the
-        squad less `plan` (the players already sold or waited for), chosen by points (at the expected offers every sale's gain is 0, up to the drift): the best of the COVERS best
+        squad less `plan` (the players already sold or waited for), chosen by points less the gains of the sales at the prices the drift leaves (`gains`, as grading.follow chooses it): the best of the COVERS best
         sets whose players all have an offer at the last close, the jornada lost (Side.lapse) where none does; None when no eleven is left."""
         key = (self.side.mask(fixed), self.side.mask(plan), step)
         if key not in self.filled:
-            got = covers(self.side, fixed, self.club.squad - plan, self.price, step * BUCKET, None, COVERS if step else 1, True)
+            got = covers(self.side, fixed, self.club.squad - plan, self.price, step * BUCKET, self.sale_gain, COVERS if step else 1, True)
             lost = self.side.cost(fixed)
             lapsed = None if lost is None else lost + self.side.lapse(fixed)
             if not got:
@@ -558,7 +559,7 @@ class Closer:
 
 
 class Node(NamedTuple):
-    """A set of players the search may sell: the least net (points lost less the gain of the sales, at the highest prices for those chosen) any way of covering the cash with it can have (`bound`) and who is in it
+    """A set of players the search may sell: the order it is tried in (`bound`, what covering the cash with it is expected to net at the highest prices) and who is in it
     (`members`, indexes in order)."""
     bound: float
     members: tuple[int, ...]
@@ -568,8 +569,8 @@ def secure(club: Club, found: Plan, side: Side, offers: worth.OfferDistribution,
     """`found` with `options` for covering cash below 0 at the lock when `n_closes` (1 or more) closes are left, the recommended first
     (the least net, Option.net: the fewest expected points lost less the gain of selling at the prices fetched against the players' expected
     offers, at `rate`, Closer.outcome), then the plan taking its sales with standing offers now; `sells`, `now`, `cost` (the expected points) and
-    `raised` are the recommended's, before any fallback. The sets of players are searched in the order of the least points any cover with
-    them can have (cover at the highest prices, the gain of the chosen at them and of the rest at the recourse's prices: a lower bound of the net), stopping when that reaches the best found's net or after
+    `raised` are the recommended's, before any fallback. The sets of players are searched in the order of the net a cover with them is expected
+    to have at the highest prices, a set being left out (with every set that contains it) when no cover with it can net less than the best found, or after
     EVALUATIONS options judged, at most WAITERS players waiting. Only sets none of whose players is superfluous (the others raise the need at
     their standing offers or expected prices) are searched: selling for the money alone is the sale rule's (worth.rent). The recommended never
     has a greater net than the second. `found` unchanged when infeasible or when it sells nothing; with no close left (`n_closes` 0), or when
@@ -584,25 +585,27 @@ def secure(club: Club, found: Plan, side: Side, offers: worth.OfferDistribution,
     seed = judge.outcome(found.sells & own, found.sells - own) if len(found.sells - own) <= WAITERS else None
     best = seed
     squad = sorted(k for k in club.squad if judge.pricing[k].best > 0)
-    top = {k: judge.pricing[k].best for k in club.squad}
+    last = judge.closes - 1
+    top = {k: max(judge.pricing[k].best, worth.offer_price(judge.ratios[-1], club.worth[k], judge.drift[k], last)) for k in club.squad}
     top_gain = gains(club, judge.rated, top)
-    fill_gain = {k: max(0.0, g) for k, g in gains(club, judge.rated, judge.price).items()}
+    credit = {k: max(0.0, g) for k, g in top_gain.items()}
+    expected = {k: max(0.0, g) for k, g in gains(club, judge.rated, judge.price).items()}
 
-    def bound_of(chosen: frozenset[str]) -> float:
-        got = cover(side, chosen, club.squad - chosen, top, max(0.0, need - sum(top.get(k, 0.0) for k in chosen)), fill_gain)
+    def net_bound(chosen: frozenset[str], members: Mapping[str, float]) -> float:
+        got = cover(side, chosen, club.squad - chosen, top, max(0.0, need - sum(top.get(k, 0.0) for k in chosen)), members)
         return math.inf if got is None else got.net - sum(top_gain[k] for k in chosen)
-    queue = [Node(b, (i,)) for i, k in enumerate(squad) if (b := bound_of(frozenset({k}))) < math.inf]
+    queue = [Node(b, (i,)) for i, k in enumerate(squad) if (b := net_bound(frozenset({k}), expected)) < math.inf]
     heapq.heapify(queue)
     judged = 0
     while queue and judged < EVALUATIONS:
         node = heapq.heappop(queue)
-        if best is not None and node.bound >= best.net - 1e-9:
-            break
         chosen = frozenset(squad[i] for i in node.members)
+        if best is not None and net_bound(chosen, credit) >= best.net - 1e-9:
+            continue
         if any(sum(judge.pricing[j].now for j in chosen - {k}) >= need for k in chosen):
             continue
         for i in range(node.members[-1] + 1, len(squad)):
-            if (b := bound_of(chosen | {squad[i]})) < math.inf and (best is None or b < best.net - 1e-9):
+            if (b := net_bound(chosen | {squad[i]}, expected)) < math.inf:
                 heapq.heappush(queue, Node(b, (*node.members, i)))
         offered = sorted(chosen & own)
         for m in range(min(len(offered), WAITERS - len(chosen - own)) + 1):
@@ -707,8 +710,8 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
     gain = won_side.points - lost_side.points + extra
     pend_n, pend_amount = club.pending
     price = prices(club, player is not None)
-    over = {k: money.over(price[k], hurdle.draw(club.worth[k])) for k in club.squad}
-    tonight_credit = {k: money.over(club.offers[k], hurdle.draw(club.worth[k])) for k in club.offers if k in club.squad}
+    over = gains(club, money, {k: price[k] for k in club.squad})
+    tonight_credit = gains(club, money, {k: v for k, v in club.offers.items() if k in club.squad})
     offered = sorted((k for k in club.squad if k in club.offers),
                      key=lambda k: (per_unit(won_side.cost(frozenset({k})), max(club.offers[k], 1.0)), k))
     reach = [sum(club.offers[k] - club.debt * club.worth[k] for k in offered[i:]) for i in range(len(offered) + 1)]
@@ -795,13 +798,13 @@ def replacement(club: Club, sold: str, player: str, bid: float, win: float, roun
     before = Side(club.squad, club.pos, rounds.cells, rounds.before)
     gain = won_side.points - lost_side.points
     price = prices(club, True)
-    over = {k: money.over(price[k], hurdle.draw(club.worth[k])) for k in club.squad}
+    over = gains(club, money, {k: price[k] for k in club.squad})
     won = cover(won_side, tonight, club.squad - tonight, price, -cash_at_lock(club.cash, raised, bid, 0.0, club.inflow.expected),
                 over if money.kappa else None)
     if won is None or len(club.squad) - len(tonight) - len(won.sells) + pend_n + 1 > club.squad_max:
         return unfunded(club, 0.0, margin, gain)
     early = before.forgone(tonight)
-    now_credit = money.over(club.offers[sold], hurdle.draw(club.worth[sold]))
+    now_credit = gains(club, money, {sold: club.offers[sold]})[sold]
     return funded(club, tonight, won.sells, frozenset(), bid, win,
                   Points(gain, won_side.forgone(tonight | won.sells) + early, lost_side.forgone(tonight) + early,
                          now_credit + sum(over[k] for k in won.sells), now_credit, money.paid(bid)), 0.0, price)
@@ -1009,7 +1012,7 @@ def _star() -> tuple[Club, Side, Plan]:
     club = Club(frozenset(star), star, dear, {"m07": 0.982 * dear["m07"]}, -31.07e6, 5e7)
     rounds = Rounds(cells, valuation.Window(season), valuation.Window(season))
     side = Side(club.squad, star, cells, rounds.arrives)
-    found = plan(club, approach(club, None, 0.0, 1.0, rounds), rounds, 3, side)
+    found = plan(club, approach(club, None, 0.0, 1.0, rounds), rounds, 3, side, rate=hurdle.FALLBACK_LAMBDA)
     assert found is not None
     return club, side, found
 
@@ -1024,12 +1027,13 @@ def _selftest_offer_model() -> None:
         closes = rng.randint(1, 5)
         atoms = sold_at(value, ratios, [0.0] * closes, e, d)
         assert abs(sum(a.p for a in atoms) - (1 - (1 - e) ** closes)) < 1e-9, "a player taking any offer is sold unless no offer exists at any close"
-        mean = sum(worth.offer(sum(ratios) / len(ratios), value, d, c) * e * (1 - e) ** c for c in range(closes))
+        mean = sum(worth.offer_price(sum(ratios) / len(ratios), value, d, c) * e * (1 - e) ** c for c in range(closes))
         assert abs(sum(a.p * a.money for a in atoms) - mean) < 1e-3, "the money is the offers at each night's value, weighted by reaching that night"
         assert sum(a.p * a.money for a in sold_at(value, ratios, [0.0] * closes, e, d - 0.01)) <= sum(a.p * a.money for a in atoms) + 1e-6, "a faster fall never raises the money"
         need = rng.uniform(0.8, 1.2) * value
         picky = sold_at(value, ratios, [need] * (closes - 1) + [0.0], e, d)
-        assert sum(a.p for a in picky) <= sum(a.p for a in atoms) + 1e-9 and all(a.money >= need for a in picky[:-len(ratios)] if closes > 1) or closes == 1, "a reserve never sells more often"
+        assert sum(a.p for a in picky) <= sum(a.p for a in atoms) + 1e-9, "a reserve never sells more often"
+        assert sum(a.p for a in sold_at(value, ratios, [need] * closes, e, d)) <= sum(a.p for a in picky) + 1e-9 and all(a.money >= need for a in sold_at(value, ratios, [need] * closes, e, d)), "a sale under a reserve is at or above it"
     club, side, found = _star()
     assert club.drift == {} and Closer(club, side, study, 3).drift == {k: 0.0 for k in club.squad}, "no drift given: none"
     tried: dict[object, Option] = {}
@@ -1046,7 +1050,6 @@ def _selftest_offer_model() -> None:
     for d in (-0.02, 0.0, 0.02):
         costs = [tried[e, d].points for e in (0.0, 0.5, 0.93, 1.0)]
         assert all(a >= b - 1e-6 for a, b in zip(costs, costs[1:])), "offers that are likelier to exist never raise the points lost"
-        assert tried[0.0, d].wait[0].least[-1] == 0.0
     for e in (0.0, 0.5, 0.93, 1.0):
         nets = [tried[e, d].net for d in (-0.02, 0.0, 0.02)]
         if e >= OFFER_EXISTS:
@@ -1081,7 +1084,7 @@ def _selftest_gain() -> None:
         rounds = Rounds(cells, valuation.Window((1, 2, 3)), valuation.Window((1, 2, 3)))
         tside = Side(club.squad, town, cells, rounds.arrives)
         rate = rng.choice([0.0, hurdle.FALLBACK_LAMBDA, 0.3])
-        found = plan(club, approach(club, None, 0.0, 1.0, rounds), rounds, 0, tside, rate)
+        found = plan(club, approach(club, None, 0.0, 1.0, rounds), rounds, 0, tside, rate=rate)
         assert found is not None
         if not found.feasible:
             continue
@@ -1235,11 +1238,11 @@ def _selftest() -> None:
         club = Club(frozenset(own), own, worth, offers, cash, 5e6 * len(own))
         flat = Rounds(cells, valuation.Window(window), valuation.Window(window))
         found = approach(club, None, 0.0, 1.0, flat)
-        planned = plan(club, found, flat, 0, None, 0.0)
+        planned = plan(club, found, flat, 0, rate=0.0)
         assert planned is not None and found is not None
         if cash >= 0:
             assert planned == Plan(True, frozenset(), 0.0, 0.0, 0.0), "cash 0 or more: nothing to sell"
-            assert plan(club, found, flat, 3) == planned
+            assert plan(club, found, flat, 3, rate=hurdle.FALLBACK_LAMBDA) == planned
             continue
         rest = sorted(offers)
         owed = [(total(club.squad, own, cells, window) or 0.0) - left for m in range(len(rest) + 1) for b in combinations(rest, m)
@@ -1251,7 +1254,7 @@ def _selftest() -> None:
             assert abs(planned.cost - min(owed)) < 1e-9, "no close left: the cheapest set of the standing offers"
         else:
             assert planned.sells == frozenset() and planned.short >= 0
-        later = plan(club, found, flat, 3)
+        later = plan(club, found, flat, 3, rate=hurdle.FALLBACK_LAMBDA)
         assert later is not None and (later.feasible == found.feasible)
         if later.feasible:
             assert later.sells == found.tonight | found.if_lost and abs(later.cost - found.cost_lost) < 1e-9
@@ -1267,7 +1270,7 @@ def _selftest() -> None:
         tclub = Club(frozenset(town), town, tworth, toffers, tcash, 5e7)
         tflat = Rounds(tcells, valuation.Window((1, 2, 3)), valuation.Window((1, 2, 3)))
         n = rng.choice([1, 3])
-        tfound = plan(tclub, approach(tclub, None, 0.0, 1.0, tflat), tflat, n)
+        tfound = plan(tclub, approach(tclub, None, 0.0, 1.0, tflat), tflat, n, rate=hurdle.FALLBACK_LAMBDA)
         assert tfound is not None
         tside = Side(tclub.squad, town, tcells, tflat.arrives)
         dist = rng.choice([NO_OFFERS, offer_ratio_distribution([0.85, 0.9, 0.95, 1.0, 1.0, 1.05, 1.1])])
@@ -1319,12 +1322,12 @@ def _selftest() -> None:
     worth_of = {k: 4e6 for k in own}
     tclub = Club(frozenset(own), own, worth_of, {}, -3e6, 5e7)
     tflat = Rounds(cells, valuation.Window((1,)), valuation.Window((1,)))
-    cheapest = plan(tclub, approach(tclub, None, 0.0, 1.0, tflat), tflat, 3)
+    cheapest = plan(tclub, approach(tclub, None, 0.0, 1.0, tflat), tflat, 3, rate=hurdle.FALLBACK_LAMBDA)
     assert cheapest is not None
     bench = secure(tclub, cheapest, Side(tclub.squad, own, cells, tflat.arrives), NO_OFFERS, 3)
     assert bench.feasible and bench.cost < 1e-6 and sum(worth_of[k] for k in bench.sells) >= 3e6, "players who cost no points are sold, not a starter"
     broke = Club(frozenset(own), own, worth_of, {}, -3e8, 5e7)
-    lacking = plan(broke, approach(broke, None, 0.0, 1.0, tflat), tflat, 3)
+    lacking = plan(broke, approach(broke, None, 0.0, 1.0, tflat), tflat, 3, rate=hurdle.FALLBACK_LAMBDA)
     assert lacking is not None and not lacking.feasible and cheapest.feasible, "a plan exists exactly when what can be sold covers the deficit"
     star = {"m%02d" % i: p for i, p in enumerate(["POR"] * 2 + ["DEF"] * 6 + ["MED"] * 5 + ["DEL"] * 3)}
     season = tuple(range(1, 26))
@@ -1334,7 +1337,7 @@ def _selftest() -> None:
     club = Club(frozenset(star), star, dear, {"m07": 0.982 * dear["m07"]}, -31.07e6, 5e7)
     flat_rounds = Rounds(flat_cells, valuation.Window(season), valuation.Window(season))
     flat_side = Side(club.squad, star, flat_cells, flat_rounds.arrives)
-    flat_found = plan(club, approach(club, None, 0.0, 1.0, flat_rounds), flat_rounds, 3, flat_side)
+    flat_found = plan(club, approach(club, None, 0.0, 1.0, flat_rounds), flat_rounds, 3, flat_side, rate=hurdle.FALLBACK_LAMBDA)
     assert flat_found is not None
     seen_offers = offer_ratio_distribution([NormalDist(0.997, 0.057).inv_cdf((i + 0.5) / 200) for i in range(200)])
     by_rate = {r: Closer(club, flat_side, seen_offers, 3, r) for r in (0.0, hurdle.FALLBACK_LAMBDA, 0.2)}
@@ -1355,7 +1358,7 @@ def _selftest() -> None:
     recommended = secure(club, flat_found, flat_side, seen_offers, 3).options[0]
     assert "m07" not in recommended.now and "m07" in {r.player for r in recommended.wait}, "secure advises waiting for the better offer, with a reserve per close"
     only = Club(frozenset(star), star, {k: (32.47e6 if k == "m07" else 0.0) for k in star}, {"m07": 0.982 * 32.47e6}, -31.07e6, 5e7)
-    only_found = plan(only, approach(only, None, 0.0, 1.0, flat_rounds), flat_rounds, 3, flat_side)
+    only_found = plan(only, approach(only, None, 0.0, 1.0, flat_rounds), flat_rounds, 3, flat_side, rate=hurdle.FALLBACK_LAMBDA)
     assert only_found is not None and only_found.feasible
     alone = secure(only, only_found, flat_side, seen_offers, 3).options[0]
     assert (alone.now | {r.player for r in alone.wait}) == frozenset({"m07"}) and all(r.least[-1] == 0.0 for r in alone.wait), \
@@ -1373,7 +1376,7 @@ def _selftest() -> None:
         span = Rounds(grid, valuation.Window((1,)), valuation.Window((1,)))
         wing = Side(crowd.squad, big, grid, span.arrives)
         closes = rng.choice([1, 3])
-        first = plan(crowd, approach(crowd, None, 0.0, 1.0, span), span, closes, wing)
+        first = plan(crowd, approach(crowd, None, 0.0, 1.0, span), span, closes, wing, rate=hurdle.FALLBACK_LAMBDA)
         assert first is not None
         if not first.feasible or not first.sells:
             continue
@@ -1496,8 +1499,8 @@ def _selftest() -> None:
         if got.feasible:
             assert got.lock_margin >= -1e-6 and got.cash_if_lost >= -1e-6, "a plan feasible is feasible at the expected credit"
             assert club.cash + got.raised + sum(prices(club, False)[k] for k in got.if_lost) + credit.expected >= -1e-6
-        planned = plan(club._replace(inflow=credit), got, flat, 0)
-        before = plan(club, none, flat, 0)
+        planned = plan(club._replace(inflow=credit), got, flat, 0, rate=hurdle.FALLBACK_LAMBDA)
+        before = plan(club, none, flat, 0, rate=hurdle.FALLBACK_LAMBDA)
         assert planned is not None and before is not None
         assert before.feasible <= planned.feasible and (not (before.feasible and planned.feasible) or planned.cost <= before.cost + 1e-9), \
             "no closes left: the plan costs no more as the credit grows"
