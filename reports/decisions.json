@@ -1,52 +1,52 @@
 {
- "generated_at": "2026-11-26T21:27Z",
- "market_at": "2026-11-26T21:27Z",
+ "generated_at": "2026-11-26T21:31Z",
+ "market_at": "2026-11-26T21:31Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-26T21:27Z",
+   "at": "2026-11-26T21:31Z",
    "hours": 0.0,
    "status": "ok"
   }
@@ -55,7 +55,7 @@
  "cash": -79110552.0,
  "cash_locked": 0,
  "can_bid": 27981986.60000001,
- "ping": "on the market: Joao Cancelo (+29 points), Gonçalo Guedes (+12 points), Iñigo Vicente (+9 points), Ramon Terrats (+8 points), Arnau Martinez (+6 points), Juan Foyth (+5 points), Thiago Fernandez (+4 points), Marc Casado (+1 points)",
+ "ping": "",
  "do": [
   {
    "what": "cover",
@@ -175,8 +175,8 @@
    "act": [],
    "for": [
     "Iñigo Vicente",
-    "Joao Cancelo",
     "Gonçalo Guedes",
+    "Joao Cancelo",
     "Ramon Terrats",
     "Arnau Martinez",
     "Juan Foyth",
@@ -189,10 +189,10 @@
    "set_cash_after": 18363573.0
   },
   {
-   "name": "Alvaro Valles",
+   "name": "Fernando Calero, Roger Hinojo, Sergio Carreira",
    "pos": "",
    "what": "list",
-   "label": "list Alvaro Valles",
+   "label": "list Fernando Calero, Roger Hinojo, Sergio Carreira",
    "step": "list",
    "amount": null,
    "done": false,
@@ -209,12 +209,28 @@
    "plan": false,
    "act": [
     {
-     "player_team": "120040297",
-     "player": "2541",
+     "player_team": "117924195",
+     "player": "2398",
      "market": null,
      "bid": null,
-     "pos": "POR",
-     "value": 48143714.0
+     "pos": "DEF",
+     "value": 717948.0
+    },
+    {
+     "player_team": "118848268",
+     "player": "3162",
+     "market": null,
+     "bid": null,
+     "pos": "DEF",
+     "value": 1189768.0
+    },
+    {
+     "player_team": "117924193",
+     "player": "2604",
+     "market": null,
+     "bid": null,
+     "pos": "DEF",
+     "value": 5223253.0
     }
    ]
   }
@@ -369,136 +385,6 @@
    "gain_with_better": 8.749871150102564
   },
   {
-   "name": "Joao Cancelo",
-   "pos": "DEF",
-   "what": "buy",
-   "label": "buy Joao Cancelo",
-   "step": "bid",
-   "price": 35274698.0,
-   "asking": 35274698.0,
-   "amount": 35980191.96,
-   "win": 0.9732453507493575,
-   "advised": 35980191.96,
-   "advised_win": 0.9732453507493575,
-   "move": "bid",
-   "to": null,
-   "why": null,
-   "plan": false,
-   "done": false,
-   "key": "1882",
-   "gain": 28.864048755772927,
-   "net": 23.929726573788315,
-   "net_label": null,
-   "per": "season",
-   "more": false,
-   "detail": null,
-   "trace": null,
-   "flip": null,
-   "replaces": "Aitor Paredes",
-   "per_million": 0.8182649432115032,
-   "n": 24,
-   "yield": 0.03409437263381263,
-   "walk_away": 61202903.99602154,
-   "reason": null,
-   "if_won_points": 24.923169076,
-   "if_lost_points": -12.208414793,
-   "displaces": [
-    "Aitor Paredes"
-   ],
-   "price_next": 2.1124015632256743e-05,
-   "price_lock": 4.167252585962622e-05,
-   "facts": [
-    [
-     "asking",
-     35274698.0,
-     "money"
-    ],
-    [
-     "walk-away price",
-     61202903.99602154,
-     "money"
-    ],
-    [
-     "bid",
-     35980191.96,
-     "money"
-    ],
-    [
-     "chance to win",
-     0.9732453507493575,
-     "chance"
-    ],
-    [
-     "points added",
-     28.864048755772927,
-     "points"
-    ],
-    [
-     "points added if the buys above are won too",
-     27.195575934206794,
-     "points"
-    ]
-   ],
-   "bids": 0,
-   "auction": {
-    "yours": false,
-    "listings": 62,
-    "thin": false,
-    "cell": "0/0/3"
-   },
-   "funding": {
-    "feasible": true,
-    "short": 0.0,
-    "tonight": [
-     {
-      "name": "Vinicius Junior",
-      "offer": 97474125.0,
-      "ratio": 1.085653754594161
-     },
-     {
-      "name": "Mathew Ryan",
-      "offer": 17992788.0,
-      "ratio": 1.0626778225626647
-     },
-     {
-      "name": "Fernando Calero",
-      "offer": 762868.0,
-      "ratio": 1.0625672054243482
-     }
-    ],
-    "raises": 116229781.0,
-    "margin": 86744914.03999999,
-    "lock_margin": 1139037.039999999,
-    "lock_margin_low": 1139037.039999999,
-    "if_won": [],
-    "if_lost": [],
-    "held": [
-     "Natan",
-     "Dean Huijsen",
-     "Roger Hinojo",
-     "Pablo Fornals",
-     "Mikel Oyarzabal",
-     "Pepelu",
-     "Aymeric Laporte",
-     "Sergio Carreira",
-     "Guido Rodriguez",
-     "Aitor Paredes",
-     "Martin Satriano"
-    ],
-    "cash_if_lost": 37119229.0,
-    "not_listed": [],
-    "gain": 28.864048755772956,
-    "points_lost_if_won": 70.70805248673446,
-    "points_lost_if_lost": 79.71065842770031,
-    "net": 23.929726573788315,
-    "base": 59.240447998504436
-   },
-   "accepts": [],
-   "act": [],
-   "line": "buy Joao Cancelo at 36.0 million (97% to win), funded by selling tonight Vinicius Junior, Mathew Ryan, Fernando Calero: +23.9 points expected (+24.9 if won, -12.2 if lost); displaces Aitor Paredes. Cash at the lock 1.1 million if won, 37.1 million if lost; worst case -12.2 points.",
-   "gain_with_better": 27.195575934206794
-  },
-  {
    "name": "Gonçalo Guedes",
    "pos": "DEL",
    "what": "buy",
@@ -565,7 +451,7 @@
     ],
     [
      "points added if the buys above are won too",
-     6.761071549868497,
+     6.900456795743914,
      "points"
     ]
    ],
@@ -626,7 +512,137 @@
    "accepts": [],
    "act": [],
    "line": "buy Gonçalo Guedes at 29.1 million (96% to win), funded by selling tonight Vinicius Junior, Mathew Ryan, Fernando Calero: +22.9 points expected (+24.5 if won, -12.2 if lost); displaces Martin Satriano. Cash at the lock 8.0 million if won, 37.1 million if lost; worst case -12.2 points.",
-   "gain_with_better": 6.761071549868497
+   "gain_with_better": 6.900456795743914
+  },
+  {
+   "name": "Joao Cancelo",
+   "pos": "DEF",
+   "what": "buy",
+   "label": "buy Joao Cancelo",
+   "step": "bid",
+   "price": 35274698.0,
+   "asking": 35274698.0,
+   "amount": 36332938.94,
+   "win": 0.9259283325007593,
+   "advised": 36332938.94,
+   "advised_win": 0.9259283325007593,
+   "move": "bid",
+   "to": null,
+   "why": null,
+   "plan": false,
+   "done": false,
+   "key": "1882",
+   "gain": 28.864048755772927,
+   "net": 21.87684773985969,
+   "net_label": null,
+   "per": "season",
+   "more": false,
+   "detail": null,
+   "trace": null,
+   "flip": null,
+   "replaces": "Aitor Paredes",
+   "per_million": 0.8182649432115032,
+   "n": 24,
+   "yield": 0.03409437263381263,
+   "walk_away": 58460390.801245436,
+   "reason": null,
+   "if_won_points": 24.603573064,
+   "if_lost_points": -12.208414793,
+   "displaces": [
+    "Aitor Paredes"
+   ],
+   "price_next": 2.1124015632256743e-05,
+   "price_lock": 4.167252585962622e-05,
+   "facts": [
+    [
+     "asking",
+     35274698.0,
+     "money"
+    ],
+    [
+     "walk-away price",
+     58460390.801245436,
+     "money"
+    ],
+    [
+     "bid",
+     36332938.94,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.9259283325007593,
+     "chance"
+    ],
+    [
+     "points added",
+     28.864048755772927,
+     "points"
+    ],
+    [
+     "points added if the buys above are won too",
+     27.056190688331377,
+     "points"
+    ]
+   ],
+   "bids": 1,
+   "auction": {
+    "yours": false,
+    "listings": 21,
+    "thin": false,
+    "cell": "1/0/*"
+   },
+   "funding": {
+    "feasible": true,
+    "short": 0.0,
+    "tonight": [
+     {
+      "name": "Vinicius Junior",
+      "offer": 97474125.0,
+      "ratio": 1.085653754594161
+     },
+     {
+      "name": "Mathew Ryan",
+      "offer": 17992788.0,
+      "ratio": 1.0626778225626647
+     },
+     {
+      "name": "Fernando Calero",
+      "offer": 762868.0,
+      "ratio": 1.0625672054243482
+     }
+    ],
+    "raises": 116229781.0,
+    "margin": 86392167.06,
+    "lock_margin": 786290.0600000024,
+    "lock_margin_low": 786290.0600000024,
+    "if_won": [],
+    "if_lost": [],
+    "held": [
+     "Natan",
+     "Dean Huijsen",
+     "Roger Hinojo",
+     "Pablo Fornals",
+     "Mikel Oyarzabal",
+     "Pepelu",
+     "Aymeric Laporte",
+     "Sergio Carreira",
+     "Guido Rodriguez",
+     "Aitor Paredes",
+     "Martin Satriano"
+    ],
+    "cash_if_lost": 37119229.0,
+    "not_listed": [],
+    "gain": 28.864048755772956,
+    "points_lost_if_won": 70.70805248673446,
+    "points_lost_if_lost": 79.71065842770031,
+    "net": 21.87684773985969,
+    "base": 59.240447998504436
+   },
+   "accepts": [],
+   "act": [],
+   "line": "buy Joao Cancelo at 36.3 million (93% to win), funded by selling tonight Vinicius Junior, Mathew Ryan, Fernando Calero: +21.9 points expected (+24.6 if won, -12.2 if lost); displaces Aitor Paredes. Cash at the lock 0.8 million if won, 37.1 million if lost; worst case -12.2 points.",
+   "gain_with_better": 27.056190688331377
   },
   {
    "name": "Ramon Terrats",
@@ -1308,73 +1324,6 @@
    "line": "buy Iñigo Vicente at 18.6 million (96% to win), funded by selling tonight Vinicius Junior, Fernando Calero: +32.8 points expected (+34.2 if won, -0.2 if lost); displaces Martin Satriano. Cash at the lock 0.5 million if won, 19.1 million if lost; worst case -0.2 points."
   },
   {
-   "name": "Joao Cancelo",
-   "key": "1882",
-   "pos": "DEF",
-   "asking": 35274698.0,
-   "bid": 35980191.96,
-   "win": 0.9732453507493575,
-   "walk_away": 61202903.99602154,
-   "net": 23.929726573788315,
-   "gain": 28.864048755772927,
-   "if_won_points": 24.923169076,
-   "if_lost_points": -12.208414793,
-   "worst": -12.208414793,
-   "displaces": [
-    "Aitor Paredes"
-   ],
-   "cash_if_won": 1139037.039999999,
-   "cash_if_lost": 37119229.0,
-   "funding": {
-    "feasible": true,
-    "short": 0.0,
-    "tonight": [
-     {
-      "name": "Vinicius Junior",
-      "offer": 97474125.0,
-      "ratio": 1.085653754594161
-     },
-     {
-      "name": "Mathew Ryan",
-      "offer": 17992788.0,
-      "ratio": 1.0626778225626647
-     },
-     {
-      "name": "Fernando Calero",
-      "offer": 762868.0,
-      "ratio": 1.0625672054243482
-     }
-    ],
-    "raises": 116229781.0,
-    "margin": 86744914.03999999,
-    "lock_margin": 1139037.039999999,
-    "lock_margin_low": 1139037.039999999,
-    "if_won": [],
-    "if_lost": [],
-    "held": [
-     "Natan",
-     "Dean Huijsen",
-     "Roger Hinojo",
-     "Pablo Fornals",
-     "Mikel Oyarzabal",
-     "Pepelu",
-     "Aymeric Laporte",
-     "Sergio Carreira",
-     "Guido Rodriguez",
-     "Aitor Paredes",
-     "Martin Satriano"
-    ],
-    "cash_if_lost": 37119229.0,
-    "not_listed": [],
-    "gain": 28.864048755772956,
-    "points_lost_if_won": 70.70805248673446,
-    "points_lost_if_lost": 79.71065842770031,
-    "net": 23.929726573788315,
-    "base": 59.240447998504436
-   },
-   "line": "buy Joao Cancelo at 36.0 million (97% to win), funded by selling tonight Vinicius Junior, Mathew Ryan, Fernando Calero: +23.9 points expected (+24.9 if won, -12.2 if lost); displaces Aitor Paredes. Cash at the lock 1.1 million if won, 37.1 million if lost; worst case -12.2 points."
-  },
-  {
    "name": "Gonçalo Guedes",
    "key": "2242",
    "pos": "DEL",
@@ -1440,6 +1389,73 @@
     "base": 59.240447998504436
    },
    "line": "buy Gonçalo Guedes at 29.1 million (96% to win), funded by selling tonight Vinicius Junior, Mathew Ryan, Fernando Calero: +22.9 points expected (+24.5 if won, -12.2 if lost); displaces Martin Satriano. Cash at the lock 8.0 million if won, 37.1 million if lost; worst case -12.2 points."
+  },
+  {
+   "name": "Joao Cancelo",
+   "key": "1882",
+   "pos": "DEF",
+   "asking": 35274698.0,
+   "bid": 36332938.94,
+   "win": 0.9259283325007593,
+   "walk_away": 58460390.801245436,
+   "net": 21.87684773985969,
+   "gain": 28.864048755772927,
+   "if_won_points": 24.603573064,
+   "if_lost_points": -12.208414793,
+   "worst": -12.208414793,
+   "displaces": [
+    "Aitor Paredes"
+   ],
+   "cash_if_won": 786290.0600000024,
+   "cash_if_lost": 37119229.0,
+   "funding": {
+    "feasible": true,
+    "short": 0.0,
+    "tonight": [
+     {
+      "name": "Vinicius Junior",
+      "offer": 97474125.0,
+      "ratio": 1.085653754594161
+     },
+     {
+      "name": "Mathew Ryan",
+      "offer": 17992788.0,
+      "ratio": 1.0626778225626647
+     },
+     {
+      "name": "Fernando Calero",
+      "offer": 762868.0,
+      "ratio": 1.0625672054243482
+     }
+    ],
+    "raises": 116229781.0,
+    "margin": 86392167.06,
+    "lock_margin": 786290.0600000024,
+    "lock_margin_low": 786290.0600000024,
+    "if_won": [],
+    "if_lost": [],
+    "held": [
+     "Natan",
+     "Dean Huijsen",
+     "Roger Hinojo",
+     "Pablo Fornals",
+     "Mikel Oyarzabal",
+     "Pepelu",
+     "Aymeric Laporte",
+     "Sergio Carreira",
+     "Guido Rodriguez",
+     "Aitor Paredes",
+     "Martin Satriano"
+    ],
+    "cash_if_lost": 37119229.0,
+    "not_listed": [],
+    "gain": 28.864048755772956,
+    "points_lost_if_won": 70.70805248673446,
+    "points_lost_if_lost": 79.71065842770031,
+    "net": 21.87684773985969,
+    "base": 59.240447998504436
+   },
+   "line": "buy Joao Cancelo at 36.3 million (93% to win), funded by selling tonight Vinicius Junior, Mathew Ryan, Fernando Calero: +21.9 points expected (+24.6 if won, -12.2 if lost); displaces Aitor Paredes. Cash at the lock 0.8 million if won, 37.1 million if lost; worst case -12.2 points."
   },
   {
    "name": "Ramon Terrats",
@@ -1802,16 +1818,16 @@
     "key": "1882",
     "name": "Joao Cancelo",
     "kind": "buy",
-    "net": 23.651988340137414,
-    "need": 14.734916030024037,
-    "per_million": 1.605166143596872,
-    "net_at_s": 13.809776504195547,
-    "bid": 35274698.0,
+    "net": 21.87684773985969,
+    "need": 14.886041567566105,
+    "per_million": 1.4696215673295745,
+    "net_at_s": 11.933691348056165,
+    "bid": 36332938.94,
     "funded": false,
     "reason": "displaced",
-    "rungs": 3,
-    "walk_away": 61202903.99602154,
-    "walk_away_at_s": 43745561.41029888
+    "rungs": 6,
+    "walk_away": 58460390.801245436,
+    "walk_away_at_s": 43989203.93269663
    },
    {
     "key": "2242",
@@ -2162,7 +2178,7 @@
    "pos": "MED",
    "status": "rival",
    "gain": 53.79560650204894,
-   "asking": null,
+   "asking": 131846243.0,
    "bid": null,
    "win": null,
    "placed": null,
@@ -2176,72 +2192,7 @@
   }
  ],
  "lambda": 0.03624082189586624,
- "alerts": [
-  {
-   "name": "Joao Cancelo",
-   "gain": 28.864048755772927,
-   "asking": 35274698.0,
-   "bid": 35980191.96,
-   "win": 0.9732453507493575,
-   "placed": null
-  },
-  {
-   "name": "Gonçalo Guedes",
-   "gain": 11.549643623113887,
-   "asking": 26221660.0,
-   "bid": 29106042.6,
-   "win": 0.9576259011010732,
-   "placed": null
-  },
-  {
-   "name": "Iñigo Vicente",
-   "gain": 8.749871150102564,
-   "asking": 18637024.0,
-   "bid": 18637024.0,
-   "win": 0.9604036822827211,
-   "placed": null
-  },
-  {
-   "name": "Ramon Terrats",
-   "gain": 8.241003467303294,
-   "asking": 15278086.0,
-   "bid": 15278086.0,
-   "win": 0.9604036822827211,
-   "placed": null
-  },
-  {
-   "name": "Arnau Martinez",
-   "gain": 5.552730232338327,
-   "asking": 1988301.0,
-   "bid": 1988301.0,
-   "win": 0.9969899152445568,
-   "placed": null
-  },
-  {
-   "name": "Juan Foyth",
-   "gain": 4.791381789767115,
-   "asking": 6466412.0,
-   "bid": 6466412.0,
-   "win": 0.9929371212785172,
-   "placed": null
-  },
-  {
-   "name": "Thiago Fernandez",
-   "gain": 4.27285548997483,
-   "asking": 1374247.0,
-   "bid": 1374247.0,
-   "win": 0.9969899152445568,
-   "placed": null
-  },
-  {
-   "name": "Marc Casado",
-   "gain": 1.1302177187292415,
-   "asking": 2426355.0,
-   "bid": 2426355.0,
-   "win": 0.9929371212785172,
-   "placed": null
-  }
- ],
+ "alerts": [],
  "auction": {
   "brier": [
    {
@@ -2472,8 +2423,8 @@
    "act": [],
    "for": [
     "Iñigo Vicente",
-    "Joao Cancelo",
     "Gonçalo Guedes",
+    "Joao Cancelo",
     "Ramon Terrats"
    ],
    "action": {
@@ -2573,8 +2524,8 @@
    "act": [],
    "for": [
     "Iñigo Vicente",
-    "Joao Cancelo",
     "Gonçalo Guedes",
+    "Joao Cancelo",
     "Ramon Terrats",
     "Arnau Martinez",
     "Juan Foyth",
@@ -2677,8 +2628,8 @@
    "accepts": [],
    "act": [],
    "for": [
-    "Joao Cancelo",
-    "Gonçalo Guedes"
+    "Gonçalo Guedes",
+    "Joao Cancelo"
    ],
    "action": {
     "kind": "accept",
