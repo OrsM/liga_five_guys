@@ -382,8 +382,8 @@ def funds_of(inp: Inputs) -> Funds:
 
 
 class Hold(NamedTuple):
-    """A listing that may be bought to hold: its hurdle.hold_stake, the bid hurdle.bid makes under it and the money that bid is
-    expected to earn (the chance of winning x (the price expected after the hold - the bid))."""
+    """A listing that may be bought to hold: its hurdle.hold_stake, the bid hurdle.bid makes under it (the amount the hold's cash is set aside for
+    and its profit measured at: the board's bid is the funded net's, board.with_plans) and the money that bid is expected to earn (the chance of winning x (the price expected after the hold - the bid))."""
     stake: hurdle.Stake
     bid: hurdle.Bid
     expected: float
@@ -412,11 +412,11 @@ def clock_of(inp: Inputs, at: str | None = None) -> Clock:
 
 def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[dict[str, Any]]:
     """Each player of the universe who would play in the eleven of his window (Buyer.gain the points he adds), with his yield
-    per million over the season (per_million), his hurdle.Stake over his window at rate (`stake`) and, for a listing with an
-    auction curve, the bid hurdle.bid makes on it (bid and win None when there is none). A buy is for his points alone, capital
+    per million over the season (per_million) and his hurdle.Stake over his window at rate (`stake`); no bid: what to bid is the funded net's
+    (board.buy_lines, board.with_plans). A buy is for his points alone, capital
     tied the whole window, unless the listing is a hold the cash funds (held_bids: his price forecast credits a rise, cash at the
-    lock and a squad slot are left): then his Stake is hurdle.hold_stake and `profit` the points his expected proceeds less the bid
-    are worth (0 for any other row). A row's `window` is read from his auction's close; a player not yet on the market arrives no sooner than the
+    lock and a squad slot are left): then his Stake is hurdle.hold_stake and `profit` the points his expected proceeds less the hold's bid
+    (`held`, None for any other row) are worth (0 for any other row). A row's `window` is read from his auction's close; a player not yet on the market arrives no sooner than the
     next auction close (next_close). Most points plus profit first."""
     pos, cells = cells_of(inp)
     last = max(cells, default=0)
@@ -451,8 +451,6 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
         gain = buyer.gain(k)
         price = asking if asking is not None else value
         steps = sale_rises(inp, ahead.get(k, {}))
-        bid: float | None = None
-        win: float | None = None
         n = hurdle.remaining(where.lock[0], last)
         stake = hurdle.stake(gain, n, rate, hurdle.Exit(value or 0.0), n)
         if status == "market" and asking is not None and k in curves:
@@ -462,19 +460,17 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
                 free = hurdle.bid(curves[k], asking, held)
                 if free is not None:
                     holds[k] = Hold(held, free, free.win * (held.proceeds - free.amount))
-            made = hurdle.bid(curves[k], asking, stake)
-            bid, win = (made.amount, made.win) if made is not None else (None, None)
         out.append({
             "player": k, "pos": pos[k], "status": status, "asking": asking, "value": value, "close_at": close, "window": where, "from_j": where.lock[0],
             "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
             "price_next": steps[1] if 1 in steps else None,
             "price_lock": steps[max(steps)] if steps else None,
-            "bid": bid, "win": win, "placed": placed.get(k), "stake": stake, "profit": 0.0})
+            "placed": placed.get(k), "stake": stake, "profit": 0.0, "held": None})
     funded = held_bids(funds_of(inp), {k: (h.expected, h.bid.amount, k in placed) for k, h in holds.items()})
     for r in out:
         if r["player"] in funded:
             hold = holds[r["player"]]
-            r["stake"], r["bid"], r["win"] = hold.stake, hold.bid.amount, hold.bid.win
+            r["stake"], r["held"] = hold.stake, hold.bid.amount
             r["profit"] = hurdle.profit(hold.stake, hold.bid.amount)
     return sorted(out, key=lambda o: (-(o["gain"] + o["profit"]), o["player"]))
 
@@ -635,21 +631,12 @@ def _selftest_opportunities() -> None:
         closes=[Close("late", "2026-11-06T21:24Z")])
     got = {r["player"]: r for r in opportunity_rows(inp)}
     assert got["star"]["gain"] == 12.0 and got["star"]["replaces"] == "m4", "star for m4 is 6 a jornada"
-    assert (got["star"]["bid"], got["star"]["win"]) == (10e6, 1.0), "the best win-weighted surplus under the walk-away price"
+    assert all("bid" not in r and "win" not in r for r in got.values()), "a row carries no bid: what to bid is the funded net's (board.with_plans)"
     assert got["good"]["gain"] == 6.0 and got["good"]["placed"] == 5.5e6, "a bid placed is kept"
-    assert (got["good"]["bid"], got["good"]["win"]) == (6e6, 0.7), "a surer win is worth the dearer bid"
-    for rate in (0.01, 0.1, 0.5, 1.0):
-        for r in opportunity_rows(inp, rate):
-            n = hurdle.remaining(r["from_j"], 2)
-            if r["bid"] is not None:
-                assert r["asking"] <= r["bid"] <= hurdle.cap(r["stake"]) == r["gain"] * 1e6 / (n * rate), \
-                    "a bid only on a buy, never above the walk-away price W"
-    assert all(r["bid"] is None for r in opportunity_rows(inp, 1.0)), "at a dear enough rate nothing is bought"
-    assert got["late"]["gain"] > 0 and (got["late"]["bid"], got["late"]["win"]) == (None, None), \
-        "on the market with no curve: his gain is said, no bid or chance is made up"
+    assert got["late"]["gain"] > 0, "on the market with no curve: his gain is said"
     assert got["keeper"]["gain"] == 0.0 and got["keeper"]["replaces"] == "k", "a worse keeper would replace the keeper and adds nothing"
     assert got["late"]["gain"] == 7.0 and got["late"]["from_j"] == 2, "an auction closing after jornada 1's lock counts from jornada 2: your eleven is frozen at the lock"
-    assert got["rival"]["status"] == "rival" and got["rival"]["bid"] is None, "a target is judged without being on sale"
+    assert got["rival"]["status"] == "rival" and got["rival"]["held"] is None, "a target is judged without being on sale"
     assert got["rival"]["gain"] == 5.0 and got["rival"]["from_j"] == 2, \
         "a target arrives at the next auction close at the earliest, here after jornada 1's lock: it cannot score jornada 1"
     early = {r["player"]: r for r in opportunity_rows(inp._replace(closes=[Close("late", "2026-11-05T21:24Z")]))}
@@ -686,24 +673,24 @@ def _selftest_holds() -> None:
     got = {r["player"]: r for r in opportunity_rows(_holds_inputs(1e7, risers))}
     for k, r in got.items():
         e = exit_of(_holds_inputs(1e7, risers), k, risers[k])
-        assert r["gain"] == 0.0 and r["bid"] is not None and r["profit"] > 0 and r["asking"] <= r["bid"] <= hurdle.cap(r["stake"]) <= hurdle.held(e), \
+        assert r["gain"] == 0.0 and r["held"] is not None and r["profit"] > 0 and r["asking"] <= r["held"] <= hurdle.cap(r["stake"]) <= hurdle.held(e), \
             "a riser the cash funds is bought to hold: a bid on no points, under the price he is expected to fetch"
-        assert r["stake"].k < r["stake"].n and r["profit"] == hurdle.profit(r["stake"], r["bid"])
+        assert r["stake"].k < r["stake"].n and r["profit"] == hurdle.profit(r["stake"], r["held"])
     ranked = [r["player"] for r in opportunity_rows(_holds_inputs(1e7, risers))]
     assert ranked == sorted(risers, key=lambda k: (-got[k]["profit"], k)), "most points plus profit first"
     for cash in (-1e6, 0.0):
         broke = opportunity_rows(_holds_inputs(cash, risers))
-        assert all(r["bid"] is None and r["profit"] == 0.0 and r["stake"].k == r["stake"].n for r in broke), "no cash at the lock: capital is tied, no bid on no points"
+        assert all(r["held"] is None and r["profit"] == 0.0 and r["stake"].k == r["stake"].n for r in broke), "no cash at the lock: capital is tied, no bid on no points"
     for cash in (0.0, 2e6, 4e6, 6.5e6, 1e7):
         spent = [r for r in opportunity_rows(_holds_inputs(cash, risers)) if r["profit"] > 0]
-        assert sum(r["bid"] for r in spent) <= cash + 1e-6, "the holds together leave cash at the lock 0 or more"
+        assert sum(r["held"] for r in spent) <= cash + 1e-6, "the holds together leave cash at the lock 0 or more"
     for room in (0, 1, 2, 3):
         taken = [r for r in opportunity_rows(_holds_inputs(1e8, risers, 11 + room)) if r["profit"] > 0]
         assert len(taken) == min(room, len(risers)), "a hold needs a free slot, and the slots are shared"
     pending = opportunity_rows(_holds_inputs(1e7, risers, 12, placed={"r1": 1.1e6}))
     assert sum(r["profit"] > 0 for r in pending) == 1, "a bid placed holds its slot: the one slot left is taken by a hold, not by two"
     flat = opportunity_rows(_holds_inputs(1e7, risers, rise=0.0)) + opportunity_rows(_holds_inputs(1e7, risers, rise=-0.02))
-    assert all(r["bid"] is None and r["profit"] == 0.0 for r in flat), "no rise, no hold"
+    assert all(r["held"] is None and r["profit"] == 0.0 for r in flat), "no rise, no hold"
     weak = opportunity_rows(_holds_inputs(1e7, risers, rise=0.0002))
     assert all(r["profit"] == 0.0 for r in weak), "a rise the haircut eats is not bought"
     rich = opportunity_rows(_holds_inputs(1e7, {"big": 4e7}))

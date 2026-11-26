@@ -157,7 +157,7 @@ def features(loaded: loader.Loaded, world: state.World, d: decision.Decided, got
     return {
         "money": inp.money,
         "squad": sorted((p for p in inp.players if p.mine), key=lambda p: p.player),
-        "opportunities": [{k: r[k] for k in ("player", "status", "gain", "bid", "win")} for r in best],
+        "opportunities": [{k: r[k] for k in ("player", "status", "gain", "held")} for r in best],
         "cash": sorted(d.seen.cash, key=lambda c: c.manager),
         "auctions": sorted(d.seen.auctions, key=lambda a: a.player),
         "cells": {name: sorted((c for c in inp.cells if c.player == k), key=lambda c: c.jornada)

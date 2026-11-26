@@ -1259,144 +1259,124 @@
  },
  "opportunities": [
   {
-   "bid": null,
    "gain": 160.29465923988732,
+   "held": null,
    "player": "11520",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 137.38712779891492,
+   "held": null,
    "player": "3429",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 111.76007698452887,
+   "held": null,
    "player": "4288",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 88.19957990085038,
+   "held": null,
    "player": "11439",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 83.59735263033303,
+   "held": null,
    "player": "8386",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 78.30251074043375,
+   "held": null,
    "player": "11709",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 65.50326395666153,
+   "held": null,
    "player": "2771",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 43.35856608908117,
+   "held": null,
    "player": "3758",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 41.97112011119122,
+   "held": null,
    "player": "7257",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 39.68222650684974,
+   "held": null,
    "player": "3686",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 39.65077634229938,
+   "held": null,
    "player": "11830",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 39.62399641293935,
+   "held": null,
    "player": "7279",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 38.12591149598336,
+   "held": null,
    "player": "1931",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 37.1184727796961,
+   "held": null,
    "player": "9750",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 37.043992970997785,
+   "held": null,
    "player": "5995",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   },
   {
-   "bid": null,
    "gain": 36.50849271423023,
+   "held": null,
    "player": "9990",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 35.852144660924075,
+   "held": null,
    "player": "7645",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 35.31674656011633,
+   "held": null,
    "player": "8712",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 33.77660459688994,
+   "held": null,
    "player": "322",
-   "status": "unlisted",
-   "win": null
+   "status": "unlisted"
   },
   {
-   "bid": null,
    "gain": 33.76276020633667,
+   "held": null,
    "player": "9931",
-   "status": "rival",
-   "win": null
+   "status": "rival"
   }
  ],
  "price_momentum": {

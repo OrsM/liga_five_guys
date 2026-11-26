@@ -21,7 +21,7 @@ import salegrade
 import valuation
 import worth
 from approach import Closer, Club, Money, Option, Plan, Rounds, Side, approach, cover, gains, plan, ratios_of, secure
-from board import club_at, context, stamped, standing
+from board import buy_lines, club_at, context, cover_of, offers_at, plan_cost, stamped, standing, with_plans
 from ffcore import auction, auction_facts, auction_table, current, forecast_facts, league, ledger, loader, price_fold, season_facts, state, store
 from ffcore import observations as ob
 from ffcore.clock import CLOSE, MADRID, Clock, run_now
@@ -678,12 +678,6 @@ def first_sales(cuts: Sequence[Cut], rules: Mapping[str, worth.Rule]) -> dict[st
                     out[name].append(Choice(stood.player, cut.at, stood.offer))
                     gone.add(stood.player)
     return out
-
-
-def offers_at(world: state.World) -> worth.OfferDistribution:
-    """The distribution of offer over value (worth.offer_ratio_distribution) of the market offers the world has seen: each
-    was created before it was first observed, so none is created after the cut."""
-    return worth.offer_ratio_distribution(x.ratio for x in current.offer_ratios(world))
 
 
 def replayed_cut(decided: decision.Decided | decision.Stale, offers: worth.OfferDistribution = worth.NO_OFFERS,
@@ -1487,7 +1481,7 @@ def hold_report(replay: Replay[HoldDay], season: Season, since: dt.date) -> str:
 def decided_day(loaded: loader.Loaded, world: state.World, cash: float, history: Sequence[loader.Opportunity]) -> HoldDay | None:
     """The HoldDay of the world with the bids its decision advises on the holds it funds and on every riser (a player whose
     momentum is in the top class, auction.RISER, at the cut) it bids on, funded as a hold or not (opportunity_rows with profit, at the
-    exchange rate of the cut), the cash `cash` and no bid placed, and the reserve over value the sale rule takes for each player
+    exchange rate of the cut), each the bid of its funded net (board.buy_lines, the board's one valuation: only a plan above the floor is bid, and at most EVALUATED_BUYS of them are looked at), with the cash `cash` and no bid placed, `risers` every riser looked at, and the reserve over value the sale rule takes for each player
     with a value (worth.sale_reserve of a sale that loses no points, the closes left before the lock) with the offers seen; None for
     a Stale cut."""
     decided = decision.decision_at(loaded, world)
@@ -1501,11 +1495,16 @@ def decided_day(loaded: loader.Loaded, world: state.World, cash: float, history:
     offers, closes, ahead = offers_at(world), decision.clock_of(inp, decided.cut).n_closes, decision.rises_of(inp)
     reserves = {k: worth.sale_reserve(0.0, 1, rate, decision.exit_of(inp, k, v, ahead.get(k, {})), offers, closes) / v for k, v in day.values.items()}
     change = price_fold.price_change_at(price_fold.price_state(world))
-    bids = [r for r in rows if r["bid"] is not None]
-    risers = frozenset(r["player"] for r in bids if auction.momentum_class(auction.MOMENTUM_CUTS, change(r["player"], world.cut)) == auction.RISER)
-    placed = [r for r in bids if r["profit"] > 0 or r["player"] in risers]
+
+    def riser(k: str) -> bool:
+        """Whether the player's momentum at the cut is in the top class (auction.RISER)."""
+        return auction.momentum_class(auction.MOMENTUM_CUTS, change(k, world.cut)) == auction.RISER
+    club, rounds, base, found, _ = cover_of(inp, decided.extras, offers, rate, decided.cut)
+    wanted = [r for r in rows if r["status"] == "market" and (r["profit"] > 0 or riser(r["player"]))]
+    _, plans, _ = buy_lines(inp, {}, club, wanted, plan_cost(base, found, club), rate, rounds.closes)
+    placed = [r for r in with_plans(wanted, [], plans) if r["bid"] is not None]
     return day._replace(advised={r["player"]: r["bid"] for r in placed}, reserves=reserves, offers=offers,
-                        stated={r["player"]: r["win"] for r in placed}, risers=risers)
+                        stated={r["player"]: r["win"] for r in placed}, risers=frozenset(r["player"] for r in wanted if riser(r["player"])))
 
 
 DECIDED = HoldPolicy(None, math.inf, None, 28)

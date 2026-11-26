@@ -229,7 +229,14 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   gain is a funded plan (`plans`: net above `FUNDED_FLOOR`, ranked by net, one `line` each: bid and chance, who is sold tonight / if won / if
   lost, net, net if won and if lost, cash at the lock, worst case, who it displaces, `advised`) or is in `rejected` with its `reason`
   (`no_curve`, `no_win_chance`, `unfundable`, `net_not_positive`, `not_evaluated`) and net; `considered` is its length. There is no margin left (K deleted): a plan is advised (in `buys`, with the bids placed) when its net is above the floor. A placed bid is
-  judged by `hurdle.stand` at the funded walk-away. The old `hurdle.cap` screen remains only for `opportunity_rows`' own `bid` (alerts, the hold route);
+  judged by the same net (`approach.stand`: withdraw when no bid tried nets above 0, lower or raise to the bid of the greatest net when its own
+  net is not above 0, raise when a dearer bid nets more, else hold); `hurdle.stand` is gone. One bid per row: `opportunity_rows` carries none (only `held`,
+  the amount a funded hold's cash is set aside for, whose `hurdle.cap` is the hold route's); `board.with_plans` gives every row the bid and chance of its
+  funded plan (or the advised bid of the line of a bid placed), and the alerts, the targets, the `dec_opportunity` record and the hold replay
+  (`grading.decided_day`, through `board.buy_lines` at the cash it is given) read that, never a price rule of their own. A sale after the result is priced
+  as the cover's recourse prices it (`approach.prices`: the expected offer at the value of the last close, `Club.drift`), so its credit is kappa x
+  (that price less the expected offer), no longer 0 (the premium of waiting for a better offer than the expected one is not credited: it needs the
+  stopping rule over the payoffs of the plan, a follow-up); The hold replay (`lfg-rules decided`) therefore grades only the bids the board would place (funded net above the floor, at most EVALUATED_BUYS looked at): at the cut-over 131 bids became 21 (all risers), so reports before and after are not comparable, and `dec_opportunity` bid/win are the funded plan's from that run on (earlier records are the old hurdle bid). `replacement` nets are against the same `cost0` as a buy's and clamp the lost branch likewise;
   the first evaluated buys carry `funding` from `approach.approach`:
   the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.

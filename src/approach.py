@@ -43,10 +43,12 @@ class Club(NamedTuple):
 class Rounds(NamedTuple):
     """The jornadas a bid is valued over and the forecast of each: `now` those a sale made now counts for, `arrives` those
     a buy won counts for (inside `now`: a buy closing after a lock does not count for it), `cells` each jornada's forecast
-    per player."""
+    per player, `closes` the closes left before the lock (1 or more: the sales after a result are made at the last, as the cover's recourse
+    is)."""
     cells: valuation.Cells
     now: valuation.Window
     arrives: valuation.Window
+    closes: int = 1
 
     @property
     def before(self) -> tuple[int, ...]:
@@ -184,11 +186,12 @@ def pricing_of(club: Club, ratios: Sequence[float] = ()) -> dict[str, Pricing]:
     return out
 
 
-def prices(club: Club, bought: bool) -> dict[str, float]:
+def prices(club: Club, bought: bool, closes: int = 1) -> dict[str, float]:
     """What each player of the squad raises when sold after the result of a bid (`bought`): the expected draw (hurdle.draw of
-    his worth), since a standing offer expires at the close and is redrawn. With no bid (`bought` False) the standing offer where
+    his worth) at his value of the last of `closes` closes (`drifted`, as the cover's recourse prices it: a standing offer expires at the close
+    and is redrawn, and a value that falls or rises over the nights moves the sale). With no bid (`bought` False) the standing offer where
     there is one, else the expected draw."""
-    return {k: p.expected if bought else p.now for k, p in pricing_of(club).items()}
+    return {k: drifted(p.expected, club.drift.get(k, 0.0), closes - 1) if bought else p.now for k, p in pricing_of(club).items()}
 
 
 class Covered(NamedTuple):
@@ -681,6 +684,11 @@ def gains(club: Club, money: Money, price: Mapping[str, float]) -> dict[str, flo
     return {k: money.over(p, hurdle.draw(club.worth[k])) for k, p in price.items()}
 
 
+def lost_branch(cost: float, base: float) -> float:
+    """The cost of the branch where the bid is lost, never under `base`: after a lost bid the plan is a plan with no buy, and none beats the best."""
+    return max(cost, base)
+
+
 def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rounds, base: float = 0.0,
              sides: dict[tuple[frozenset[str], tuple[int, ...]], Side] | None = None, extra: float = 0.0,
              money: Money = Money()) -> Approach | None:
@@ -709,7 +717,7 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
         return None
     gain = won_side.points - lost_side.points + extra
     pend_n, pend_amount = club.pending
-    price = prices(club, player is not None)
+    price = prices(club, player is not None, rounds.closes)
     over = gains(club, money, {k: price[k] for k in club.squad})
     tonight_credit = gains(club, money, {k: v for k, v in club.offers.items() if k in club.squad})
     offered = sorted((k for k in club.squad if k in club.offers),
@@ -740,7 +748,7 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
                 after_won, after_lost = sum(over[k] for k in won.sells), sum(over[k] for k in lost.sells)
                 lost_cost = lost.cost + early - now_credit - after_lost
                 if player is not None:
-                    lost_cost = max(lost_cost, base)
+                    lost_cost = lost_branch(lost_cost, base)
                 ev = win * (won.cost - after_won + early - now_credit) + (1 - win) * lost_cost
                 if best is None or ev < best.value:
                     best = Choice(ev, a, won.sells, lost.sells, won.cost + early, lost.cost + early, now_credit + after_won, lost.cost + early - lost_cost)
@@ -780,13 +788,13 @@ def funded(club: Club, tonight: frozenset[str], if_won: frozenset[str], if_lost:
         base, points.credit_won, points.credit_lost, points.paid)
 
 
-def replacement(club: Club, sold: str, player: str, bid: float, win: float, rounds: Rounds, money: Money = Money()) -> Approach:
+def replacement(club: Club, sold: str, player: str, bid: float, win: float, rounds: Rounds, money: Money = Money(), base: float = 0.0) -> Approach:
     """How to replace `sold` (a player whose offer is taken tonight and whose sale leaves no legal eleven) by a bid on `player`:
     the Approach of the pair, `sold` the only sale tonight, the sales after the result chosen by `cover`. A jornada with no
     legal eleven scores nothing, so costs count it: before the buy arrives, and if the bid is lost, the squad plays nothing
     where it has no eleven. Infeasible (`short` the money lacking, 0 when the squad or the lock cash cannot be met) when the
     bid is not covered by the offer and the sales after the result, or the squad would exceed its maximum. Money is valued
-    as in `approach`."""
+    as in `approach`, and so is the net: against `base` (the cost of the plan with no buy), with the cost of a lost bid never under it."""
     pend_n, pend_amount = club.pending
     tonight = frozenset({sold})
     raised = club.offers[sold]
@@ -797,7 +805,7 @@ def replacement(club: Club, sold: str, player: str, bid: float, win: float, roun
     lost_side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
     before = Side(club.squad, club.pos, rounds.cells, rounds.before)
     gain = won_side.points - lost_side.points
-    price = prices(club, True)
+    price = prices(club, True, rounds.closes)
     over = gains(club, money, {k: price[k] for k in club.squad})
     won = cover(won_side, tonight, club.squad - tonight, price, -cash_at_lock(club.cash, raised, bid, 0.0, club.inflow.expected),
                 over if money.kappa else None)
@@ -805,9 +813,10 @@ def replacement(club: Club, sold: str, player: str, bid: float, win: float, roun
         return unfunded(club, 0.0, margin, gain)
     early = before.forgone(tonight)
     now_credit = gains(club, money, {sold: club.offers[sold]})[sold]
+    lost_cost = lost_branch(lost_side.forgone(tonight) + early - now_credit, base)
     return funded(club, tonight, won.sells, frozenset(), bid, win,
                   Points(gain, won_side.forgone(tonight | won.sells) + early, lost_side.forgone(tonight) + early,
-                         now_credit + sum(over[k] for k in won.sells), now_credit, money.paid(bid)), 0.0, price)
+                         now_credit + sum(over[k] for k in won.sells), lost_side.forgone(tonight) + early - lost_cost, money.paid(bid)), base, price)
 
 
 class Offer(NamedTuple):
@@ -861,6 +870,31 @@ def bidding(curve: Iterable[tuple[float, float]], asking: float, fund: Callable[
             break
     best = min(offers, key=lambda o: (-o.found.net, o.amount), default=None)
     return Bidding(tuple(offers), best, zero_price(offers, kappa))
+
+
+STAND_MARGIN = 0.1
+
+
+class Stand(NamedTuple):
+    """What to do with a bid placed: `move` (hold, lower, withdraw or raise) and `to`, the amount to move it to (lower and raise; None otherwise)."""
+    move: str
+    to: float | None
+
+
+def stand(found: Bidding, here: Approach | None, placed: float) -> Stand:
+    """The move for a bid placed at `placed` on a listing whose Bidding is `found`, `here` the Approach that funds it at `placed` (None when none
+    does): the same funded net that advises a new bid, never a second valuation. withdraw iff no bid tried has a net above 0. Otherwise lower
+    (to the best bid) when the placed bid's net is not above 0 and the best is under it, raise (to the best) when its net is not above 0 and
+    the best is over it, or when the best bid is dearer than the placed one and nets more; else hold: a placed bid whose net is above 0 is never lowered."""
+    best = found.best
+    here_net = here.net if here is not None and here.feasible else None
+    if best is None or max(best.found.net, here_net if here_net is not None else best.found.net) <= 0:
+        return Stand("withdraw", None)
+    if here_net is None or here_net <= 0:
+        return Stand("lower" if best.amount < placed else "raise", best.amount) if best.amount != placed else Stand("hold", None)
+    if best.amount > placed and best.found.net > here_net + STAND_MARGIN:
+        return Stand("raise", best.amount)
+    return Stand("hold", None)
 
 
 def _town(rng: random.Random, case: int) -> tuple[Club, Rounds, float, float]:
@@ -941,6 +975,53 @@ def _selftest_money() -> None:
         twice = approach(double, "star", 2 * bid, win, rounds, base_j, None, 0.0, Money(rate / 2, n, None if spend.resale is None else 2 * spend.resale))
         assert twice is not None and twice.feasible and abs(twice.net - got.net) < 1e-6, "twice the money at half the rate is the same plan and the same net"
     assert exercised >= 5 and clamped >= 1, (exercised, clamped)
+
+
+def _selftest_after_result() -> None:
+    rng = random.Random(155)
+    changed = 0
+    for case in range(9):
+        club, rounds, bid, win = _town(rng, case)
+        n = len(rounds.arrives)
+        spend = Money(0.3, n, hurdle.draw(rng.choice([6e6, 10e6, 14e6])))
+        base = approach(club, None, 0.0, 1.0, rounds, money=Money(0.3, n))
+        assert base is not None
+        plain = approach(club, "star", bid, win, rounds, -base.net, None, 0.0, spend)
+        assert plain is not None
+        for drift in (-0.02, 0.02):
+            moving = club._replace(drift={k: drift for k in club.squad})
+            same = approach(moving, "star", bid, win, rounds, -base.net, None, 0.0, spend)
+            assert same is not None and same.feasible == plain.feasible and abs(same.net - plain.net) < 1e-9, "one close left: the sale after the result is at the expected offer"
+            later = approach(moving, "star", bid, win, rounds._replace(closes=3), -base.net, None, 0.0, spend)
+            assert later is not None
+            if not plain.feasible:
+                continue
+            assert (later.net <= plain.net + 1e-9) if drift < 0 else (later.net >= plain.net - 1e-9 and later.feasible), \
+                "every sale after the result fetches less (more) as the value falls (rises) over the nights: the best net can not be more (less)"
+            changed += abs(later.net - plain.net) > 1e-6
+            if not (plain.if_won or plain.if_lost) and not (later.if_won or later.if_lost):
+                assert abs(later.net - plain.net) < 1e-9, "nothing sold after the result: the drift does not matter"
+    assert changed >= 3, changed
+    rng = random.Random(156)
+    for case in range(30):
+        squad_pos = {"m%02d" % i: p for i, p in enumerate(["POR"] + ["DEF"] * 4 + ["MED"] * 4 + ["DEL"] * 2)}
+        leaver = rng.choice(sorted(squad_pos))
+        places = squad_pos | {"new": squad_pos[leaver]}
+        now = valuation.Window((1, 2, 3))
+        rounds = Rounds(_cells(rng, places, (1, 2, 3), [0, 1, 2, 3, 5]), now, valuation.Window(now[case % 3:]))
+        club = Club(frozenset(squad_pos), places, {k: 4e6 for k in squad_pos}, {leaver: rng.choice([4e6, 6e6])}, 20e6, 5e7)
+        floor = rng.choice([0.0, 1.0, 6.0])
+        got = replacement(club, leaver, "new", 6e6, rng.choice([0.4, 0.8]), rounds, Money(0.3, 3, hurdle.draw(5e6)), floor)
+        assert got.feasible and got.base == floor
+        assert got.cost_lost - got.credit_lost >= floor - 1e-9, "after a lost bid no plan beats the plan with no buy, a pair's as a buy's"
+    walk = bidding(((1.0, 0.5), (1.1, 0.8), (1.2, 0.95)), 10e6, lambda amount, win: _stub(3.0 - (amount - 10e6) / 1e6 * 1.0), 1e-6)
+    assert walk.best is not None and walk.best.amount == 10e6
+    held = {m: stand(walk, _stub(x), 11e6).move for m, x in (("a", 2.5), ("b", -1.0))}
+    assert held == {"a": "hold", "b": "lower"}, held
+    assert stand(walk, None, 12e6).move == "lower" and stand(walk, None, 9e6).move == "raise", "unfundable at the placed amount: to the best bid"
+    assert stand(walk, _stub(2.0), 10e6) == Stand("hold", None) and stand(walk._replace(best=walk.offers[1]), _stub(1.0), 10e6) == Stand("raise", 11e6)
+    nothing = bidding(((1.0, 0.5),), 10e6, lambda amount, win: _stub(-1.0), 1e-6)
+    assert stand(nothing, _stub(-1.0), 10e6) == Stand("withdraw", None) and stand(nothing._replace(best=None), None, 10e6).move == "withdraw"
 
 
 def _stub(net: float) -> Approach:
@@ -1525,6 +1606,7 @@ def _selftest() -> None:
     day = {1: {"a": 1.0, "s": 5.0}}
     assert approach(nothing, "s", 1e6, 0.5, Rounds(day, valuation.Window((1,)), valuation.Window((1,)))) is None, "no eleven: nothing to say"
     _selftest_money()
+    _selftest_after_result()
     _selftest_bidding()
     _selftest_offer_model()
     _selftest_gain()

@@ -7,8 +7,8 @@
  "base": {
   "base": 0.0,
   "cash": -49572707.0,
-  "cash_if_lost": 1885505.6314633694,
-  "cost": 12.687192401168458,
+  "cash_if_lost": 1881026.8150589673,
+  "cost": 12.685799352901839,
   "feasible": true,
   "gain": 0.0,
   "held": [
@@ -37,15 +37,15 @@
    "Ferran Jutgla",
    "Aitor Paredes"
   ],
-  "lock_margin": 1885505.6314633694,
+  "lock_margin": 1881026.8150589673,
   "lock_margin_low": -3872381.2934194626,
   "margin": 43286574.2,
-  "net": -12.687192401168458,
+  "net": -12.685799352901839,
   "not_listed": [
    "Aitor Paredes"
   ],
-  "points_lost_if_lost": 12.687192401168458,
-  "points_lost_if_won": 12.687192401168458,
+  "points_lost_if_lost": 12.685799352901839,
+  "points_lost_if_won": 12.685799352901839,
   "raises": 1576701.0,
   "risk": {
    "below_points": 52.07497780000001,
@@ -62,28 +62,302 @@
    }
   ]
  },
- "buys": [],
+ "buys": [
+  {
+   "accepts": [],
+   "act": [],
+   "advised": 174406657.0,
+   "advised_win": 0.9494219349524704,
+   "amount": 174406657.0,
+   "asking": 174406657.0,
+   "auction": {
+    "cell": "0/0/3",
+    "listings": 62,
+    "thin": false,
+    "yours": false
+   },
+   "bids": 0,
+   "detail": null,
+   "displaces": [
+    "Pepelu",
+    "Martin Satriano"
+   ],
+   "done": false,
+   "facts": [
+    [
+     "asking",
+     174406657.0,
+     "money"
+    ],
+    [
+     "walk-away price",
+     181200052.82241312,
+     "money"
+    ],
+    [
+     "bid",
+     174406657.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.9494219349524704,
+     "chance"
+    ],
+    [
+     "points added",
+     124.946742261776,
+     "points"
+    ]
+   ],
+   "flip": null,
+   "funding": {
+    "base": 10.940645795370884,
+    "cash_if_lost": 121426747.41212054,
+    "feasible": true,
+    "gain": 124.94674226177608,
+    "held": [
+     "Arnau Ortiz",
+     "Gerard Martin",
+     "Miguel Roman",
+     "Roger Hinojo",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Pepelu",
+     "Marcos Alonso",
+     "Adria Pedrosa",
+     "Robin Le Normand",
+     "German Valera",
+     "Guido Rodriguez",
+     "Martin Satriano"
+    ],
+    "if_lost": [],
+    "if_won": [
+     "Pepelu"
+    ],
+    "lock_margin": 622021.4728803737,
+    "lock_margin_low": -3971208.597582941,
+    "margin": 984345.1999999881,
+    "net": 12.411475741800267,
+    "not_listed": [],
+    "points_lost_if_lost": 131.62190936482693,
+    "points_lost_if_won": 125.2634692381564,
+    "raises": 165597601.0,
+    "short": 0.0,
+    "tonight": [
+     {
+      "name": "Natan",
+      "offer": 49571725.0,
+      "ratio": 0.9736207836390577
+     },
+     {
+      "name": "Georges Mikautadze",
+      "offer": 47188627.0,
+      "ratio": 1.0458380507121436
+     },
+     {
+      "name": "Fernando Niño",
+      "offer": 46035874.0,
+      "ratio": 0.9573894399963531
+     },
+     {
+      "name": "Iñigo Vicente",
+      "offer": 22801375.0,
+      "ratio": 0.976677574954734
+     }
+    ]
+   },
+   "gain": 124.946742261776,
+   "gain_with_better": 124.946742261776,
+   "if_lost_points": -122.279327263,
+   "if_won_points": 19.586789419,
+   "key": "4288",
+   "label": "buy Raphinha",
+   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Natan, Georges Mikautadze, Fernando Niño, Iñigo Vicente, then Pepelu if won: +12.4 points expected (+19.6 if won, -122.3 if lost); displaces Pepelu, Martin Satriano. Cash at the lock 0.6 million if won, 121.4 million if lost; worst case -122.3 points.",
+   "more": false,
+   "move": "bid",
+   "n": 26,
+   "name": "Raphinha",
+   "net": 12.411475741800267,
+   "net_label": null,
+   "per": "season",
+   "per_million": 0.7164103963174754,
+   "plan": false,
+   "pos": "DEL",
+   "price": 174406657.0,
+   "price_lock": -0.0009202847799932856,
+   "price_next": -0.0009202847799932856,
+   "reason": null,
+   "replaces": "Martin Satriano",
+   "step": "bid",
+   "to": null,
+   "trace": null,
+   "walk_away": 181200052.82241312,
+   "what": "buy",
+   "why": null,
+   "win": 0.9494219349524704,
+   "yield": 0.02755424601221059
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "advised": 22759060.0,
+   "advised_win": 0.9604036822827211,
+   "amount": 22759060.0,
+   "asking": 22759060.0,
+   "auction": {
+    "cell": "0/0/2",
+    "listings": 110,
+    "thin": false,
+    "yours": false
+   },
+   "bids": 0,
+   "detail": null,
+   "displaces": [
+    "Arnau Ortiz",
+    "Dani Martinez",
+    "Pepelu",
+    "Ferran Jutgla",
+    "Guido Rodriguez"
+   ],
+   "done": false,
+   "facts": [
+    [
+     "asking",
+     22759060.0,
+     "money"
+    ],
+    [
+     "walk-away price",
+     30258882.807812035,
+     "money"
+    ],
+    [
+     "bid",
+     22759060.0,
+     "money"
+    ],
+    [
+     "chance to win",
+     0.9604036822827211,
+     "chance"
+    ],
+    [
+     "points added",
+     8.398932874368136,
+     "points"
+    ],
+    [
+     "points added if the buys above are won too",
+     7.8901274304842985,
+     "points"
+    ]
+   ],
+   "flip": null,
+   "funding": {
+    "base": 10.940645795370884,
+    "cash_if_lost": 12327618.040375728,
+    "feasible": true,
+    "gain": 8.398932874368256,
+    "held": [
+     "Arnau Ortiz",
+     "Natan",
+     "Georges Mikautadze",
+     "Gerard Martin",
+     "Miguel Roman",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Pepelu",
+     "Marcos Alonso",
+     "Adria Pedrosa",
+     "Robin Le Normand",
+     "Iñigo Vicente",
+     "Fernando Niño",
+     "German Valera",
+     "Guido Rodriguez",
+     "Martin Satriano"
+    ],
+    "if_lost": [
+     "Arnau Ortiz",
+     "Dani Martinez",
+     "Pepelu"
+    ],
+    "if_won": [
+     "Arnau Ortiz",
+     "Dani Martinez",
+     "Pepelu",
+     "Ferran Jutgla"
+    ],
+    "lock_margin": 2600550.63334434,
+    "lock_margin_low": -2810733.8702654215,
+    "margin": 21793808.60000001,
+    "net": 8.330058729765483,
+    "not_listed": [],
+    "points_lost_if_lost": 25.277529663302857,
+    "points_lost_if_won": 20.744196600168834,
+    "raises": 1576701.0,
+    "short": 0.0,
+    "tonight": [
+     {
+      "name": "Roger Hinojo",
+      "offer": 1576701.0,
+      "ratio": 1.015893991944759
+     }
+    ]
+   },
+   "gain": 8.398932874368136,
+   "gain_with_better": 7.8901274304842985,
+   "if_lost_points": -3.073444163,
+   "if_won_points": 8.800211783,
+   "key": "8413",
+   "label": "buy Pape Gueye",
+   "line": "buy Pape Gueye at 22.8 million (96% to win), funded by selling tonight Roger Hinojo, then Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla if won; Arnau Ortiz, Dani Martinez, Pepelu if lost: +8.3 points expected (+8.8 if won, -3.1 if lost); displaces Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla, Guido Rodriguez. Cash at the lock 2.6 million if won, 12.3 million if lost; worst case -3.1 points.",
+   "more": false,
+   "move": "bid",
+   "n": 26,
+   "name": "Pape Gueye",
+   "net": 8.330058729765483,
+   "net_label": null,
+   "per": "season",
+   "per_million": 0.3690368967069877,
+   "plan": false,
+   "pos": "MED",
+   "price": 22759060.0,
+   "price_lock": -0.007349746432289694,
+   "price_next": -0.007349746432289694,
+   "reason": null,
+   "replaces": "Guido Rodriguez",
+   "step": "bid",
+   "to": null,
+   "trace": null,
+   "walk_away": 30258882.807812035,
+   "what": "buy",
+   "why": null,
+   "win": 0.9604036822827211,
+   "yield": 0.014193726796422603
+  }
+ ],
  "can_bid": 43286574.2,
  "cash": -49572707.0,
  "cash_locked": 0,
- "considered": 5,
+ "considered": 3,
  "do": [
   {
    "accepts": [],
    "act": [],
    "cash": -49572707.0,
-   "cash_after": 1885505.6314633694,
+   "cash_after": 1881026.8150589673,
    "label": "cover the cash: Roger Hinojo, Ferran Jutgla, Aitor Paredes",
    "lock": "2026-11-20T20:00Z",
    "needed": true,
    "options": [
     {
-     "cash_at_lock": 1885505.6314633694,
+     "cash_at_lock": 1881026.8150589673,
      "fallback": [
       "Arnau Ortiz",
       "Dani Martinez"
      ],
-     "points_lost": 12.687192401168458,
+     "points_lost": 12.685799352901839,
      "take_now": [
       {
        "key": "15316",
@@ -97,7 +371,7 @@
       {
        "key": "7842",
        "kind": "wait",
-       "least": 14279759.815769022,
+       "least": 14278887.500291958,
        "name": "Ferran Jutgla",
        "reserves": [
         {
@@ -105,43 +379,43 @@
          "until": "2026-11-08T21:24Z"
         },
         {
-         "least": 14279759.815769022,
+         "least": 14278887.500291958,
          "until": "2026-11-09T21:24Z"
         },
         {
-         "least": 14206381.380234549,
+         "least": 14205321.609729435,
          "until": "2026-11-10T21:24Z"
         },
         {
-         "least": 14128548.567795916,
+         "least": 14127247.518541824,
          "until": "2026-11-11T21:24Z"
         },
         {
-         "least": 14044886.08958397,
+         "least": 14043268.593970647,
          "until": "2026-11-12T21:24Z"
         },
         {
-         "least": 13953447.011693513,
+         "least": 13951401.710298356,
          "until": "2026-11-13T21:24Z"
         },
         {
-         "least": 13848638.307124278,
+         "least": 13847508.008984845,
          "until": "2026-11-14T21:24Z"
         },
         {
-         "least": 13730245.608987726,
+         "least": 13728349.714817895,
          "until": "2026-11-15T21:24Z"
         },
         {
-         "least": 13586617.937693946,
+         "least": 13583569.473500166,
          "until": "2026-11-16T21:24Z"
         },
         {
-         "least": 13398491.041127639,
+         "least": 13393365.723702298,
          "until": "2026-11-17T21:24Z"
         },
         {
-         "least": 13050030.703886595,
+         "least": 13053967.259475641,
          "until": "2026-11-18T21:24Z"
         },
         {
@@ -158,7 +432,7 @@
       {
        "key": "7916",
        "kind": "wait",
-       "least": 28994481.98549918,
+       "least": 29008481.831368577,
        "name": "Aitor Paredes",
        "reserves": [
         {
@@ -166,11 +440,11 @@
          "until": "2026-11-08T21:24Z"
         },
         {
-         "least": 28994481.98549918,
+         "least": 29008481.831368577,
          "until": "2026-11-09T21:24Z"
         },
         {
-         "least": 28548020.367329545,
+         "least": 28544354.074027076,
          "until": "2026-11-10T21:24Z"
         },
         {
@@ -182,27 +456,27 @@
          "until": "2026-11-12T21:24Z"
         },
         {
-         "least": 28086828.64160002,
+         "least": 28085031.458588813,
          "until": "2026-11-13T21:24Z"
         },
         {
-         "least": 27238275.54614053,
+         "least": 27236790.04800953,
          "until": "2026-11-14T21:24Z"
         },
         {
-         "least": 26496356.641332604,
+         "least": 26494664.352271467,
          "until": "2026-11-15T21:24Z"
         },
         {
-         "least": 25816037.457946017,
+         "least": 25813187.339474104,
          "until": "2026-11-16T21:24Z"
         },
         {
-         "least": 25128543.528374612,
+         "least": 25123016.11670091,
          "until": "2026-11-17T21:24Z"
         },
         {
-         "least": 24270116.415748496,
+         "least": 24257762.9054002,
          "until": "2026-11-18T21:24Z"
         },
         {
@@ -218,12 +492,12 @@
       }
      ],
      "worst": {
-      "p": 1.3693875832622943e-06,
-      "points": 36.89718402030326
+      "p": 1.3284936126933593e-06,
+      "points": 27.092438378293537
      }
     }
    ],
-   "points_lost": 12.687192401168458,
+   "points_lost": 12.685799352901839,
    "sells": [
     {
      "key": "15316",
@@ -235,7 +509,7 @@
     {
      "key": "7842",
      "kind": "wait",
-     "least": 14279759.815769022,
+     "least": 14278887.500291958,
      "name": "Ferran Jutgla",
      "reserves": [
       {
@@ -243,43 +517,43 @@
        "until": "2026-11-08T21:24Z"
       },
       {
-       "least": 14279759.815769022,
+       "least": 14278887.500291958,
        "until": "2026-11-09T21:24Z"
       },
       {
-       "least": 14206381.380234549,
+       "least": 14205321.609729435,
        "until": "2026-11-10T21:24Z"
       },
       {
-       "least": 14128548.567795916,
+       "least": 14127247.518541824,
        "until": "2026-11-11T21:24Z"
       },
       {
-       "least": 14044886.08958397,
+       "least": 14043268.593970647,
        "until": "2026-11-12T21:24Z"
       },
       {
-       "least": 13953447.011693513,
+       "least": 13951401.710298356,
        "until": "2026-11-13T21:24Z"
       },
       {
-       "least": 13848638.307124278,
+       "least": 13847508.008984845,
        "until": "2026-11-14T21:24Z"
       },
       {
-       "least": 13730245.608987726,
+       "least": 13728349.714817895,
        "until": "2026-11-15T21:24Z"
       },
       {
-       "least": 13586617.937693946,
+       "least": 13583569.473500166,
        "until": "2026-11-16T21:24Z"
       },
       {
-       "least": 13398491.041127639,
+       "least": 13393365.723702298,
        "until": "2026-11-17T21:24Z"
       },
       {
-       "least": 13050030.703886595,
+       "least": 13053967.259475641,
        "until": "2026-11-18T21:24Z"
       },
       {
@@ -296,7 +570,7 @@
     {
      "key": "7916",
      "kind": "wait",
-     "least": 28994481.98549918,
+     "least": 29008481.831368577,
      "name": "Aitor Paredes",
      "reserves": [
       {
@@ -304,11 +578,11 @@
        "until": "2026-11-08T21:24Z"
       },
       {
-       "least": 28994481.98549918,
+       "least": 29008481.831368577,
        "until": "2026-11-09T21:24Z"
       },
       {
-       "least": 28548020.367329545,
+       "least": 28544354.074027076,
        "until": "2026-11-10T21:24Z"
       },
       {
@@ -320,27 +594,27 @@
        "until": "2026-11-12T21:24Z"
       },
       {
-       "least": 28086828.64160002,
+       "least": 28085031.458588813,
        "until": "2026-11-13T21:24Z"
       },
       {
-       "least": 27238275.54614053,
+       "least": 27236790.04800953,
        "until": "2026-11-14T21:24Z"
       },
       {
-       "least": 26496356.641332604,
+       "least": 26494664.352271467,
        "until": "2026-11-15T21:24Z"
       },
       {
-       "least": 25816037.457946017,
+       "least": 25813187.339474104,
        "until": "2026-11-16T21:24Z"
       },
       {
-       "least": 25128543.528374612,
+       "least": 25123016.11670091,
        "until": "2026-11-17T21:24Z"
       },
       {
-       "least": 24270116.415748496,
+       "least": 24257762.9054002,
        "until": "2026-11-18T21:24Z"
       },
       {
@@ -357,10 +631,10 @@
    ],
    "step": "plan",
    "what": "cover",
-   "why": "Cash -49.6M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Wait for the offers of Ferran Jutgla. on 9 Nov accept his new offer if it is 14.28M or more; on 10 Nov accept his new offer if it is 14.21M or more; on 11 Nov accept his new offer if it is 14.13M or more; on 12 Nov accept his new offer if it is 14.04M or more; on 13 Nov accept his new offer if it is 13.95M or more; on 14 Nov accept his new offer if it is 13.85M or more; on 15 Nov accept his new offer if it is 13.73M or more; on 16 Nov accept his new offer if it is 13.59M or more; on 17 Nov accept his new offer if it is 13.40M or more; on 18 Nov accept his new offer if it is 13.05M or more; on 19 Nov accept his new offer if it is 12.48M or more; on 20 Nov, before 21:00, accept whatever it is. 3) Wait for the offers of Aitor Paredes. on 9 Nov accept his new offer if it is 28.99M or more; on 10 Nov accept his new offer if it is 28.55M or more; on 11 Nov accept his new offer if it is 28.26M or more; on 12 Nov accept his new offer if it is 28.26M or more; on 13 Nov accept his new offer if it is 28.09M or more; on 14 Nov accept his new offer if it is 27.24M or more; on 15 Nov accept his new offer if it is 26.50M or more; on 16 Nov accept his new offer if it is 25.82M or more; on 17 Nov accept his new offer if it is 25.13M or more; on 18 Nov accept his new offer if it is 24.27M or more; on 19 Nov accept his new offer if it is 23.26M or more; on 20 Nov, before 21:00, accept whatever it is. 4) If cash is still below 0 after that, sell Arnau Ortiz (offer 0.64M), then, if still short, the cheapest other player. Expected: 12.7 points lost. Worst case 36.9 points, chance 0.0%. Not listed, so no offer is drawn at the close for: Aitor Paredes.",
+   "why": "Cash -49.6M; lock Fri 20 Nov 21:00. 1) Accept Roger Hinojo's offer of 1.58M before 22:24 tonight. 2) Wait for the offers of Ferran Jutgla. on 9 Nov accept his new offer if it is 14.28M or more; on 10 Nov accept his new offer if it is 14.21M or more; on 11 Nov accept his new offer if it is 14.13M or more; on 12 Nov accept his new offer if it is 14.04M or more; on 13 Nov accept his new offer if it is 13.95M or more; on 14 Nov accept his new offer if it is 13.85M or more; on 15 Nov accept his new offer if it is 13.73M or more; on 16 Nov accept his new offer if it is 13.58M or more; on 17 Nov accept his new offer if it is 13.39M or more; on 18 Nov accept his new offer if it is 13.05M or more; on 19 Nov accept his new offer if it is 12.48M or more; on 20 Nov, before 21:00, accept whatever it is. 3) Wait for the offers of Aitor Paredes. on 9 Nov accept his new offer if it is 29.01M or more; on 10 Nov accept his new offer if it is 28.54M or more; on 11 Nov accept his new offer if it is 28.26M or more; on 12 Nov accept his new offer if it is 28.26M or more; on 13 Nov accept his new offer if it is 28.09M or more; on 14 Nov accept his new offer if it is 27.24M or more; on 15 Nov accept his new offer if it is 26.49M or more; on 16 Nov accept his new offer if it is 25.81M or more; on 17 Nov accept his new offer if it is 25.12M or more; on 18 Nov accept his new offer if it is 24.26M or more; on 19 Nov accept his new offer if it is 23.26M or more; on 20 Nov, before 21:00, accept whatever it is. 4) If cash is still below 0 after that, sell Arnau Ortiz (offer 0.64M), then, if still short, the cheapest other player. Expected: 12.7 points lost. Worst case 27.1 points, chance 0.0%. Not listed, so no offer is drawn at the close for: Aitor Paredes.",
    "worst": {
-    "p": 1.3693875832622943e-06,
-    "points": 36.89718402030326
+    "p": 1.3284936126933593e-06,
+    "points": 27.092438378293537
    }
   },
   {
@@ -422,7 +696,9 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [],
+   "for": [
+    "Pape Gueye"
+   ],
    "gain": 0.0,
    "key": "15316",
    "label": "sell Roger Hinojo",
@@ -501,21 +777,21 @@
     "p_short": 0.43566748487674994,
     "shortfall_if_low": 1343564.3678794624
    },
-   "set_cash_after": 1885505.6314633694,
-   "set_points_lost": 12.687192401168458,
+   "set_cash_after": 1881026.8150589673,
+   "set_points_lost": 12.685799352901839,
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why": "cash -49.6M; sells Roger Hinojo now, Ferran Jutgla later, Aitor Paredes later; expects +1.89M at the lock; if the eleven scores under 52 points the lock cash stays below 0; there is time to fix by hand",
+   "why": "cash -49.6M; sells Roger Hinojo now, Ferran Jutgla later, Aitor Paredes later; expects +1.88M at the lock; if the eleven scores under 52 points the lock cash stays below 0; there is time to fix by hand",
    "why_infeasible": null
   },
   {
    "accepts": [],
    "act": [],
-   "cost_points": 12.687192401168458,
+   "cost_points": 12.685799352901839,
    "expected_cover": [
     "Ferran Jutgla",
     "Aitor Paredes"
@@ -587,17 +863,22 @@
  "lineup": {
   "advice": [
    {
-    "gain": 6.266864678570501,
-    "in": "Fernando Niño",
-    "out": "Ferran Jutgla"
+    "gain": 3.6167747609991534,
+    "in": "Adria Pedrosa",
+    "out": "Natan"
    },
    {
-    "gain": 1.0378034999015626,
-    "in": "Adria Pedrosa",
-    "out": "Marcos Alonso"
+    "gain": 3.2602788551126674,
+    "in": "Robin Le Normand",
+    "out": "Iñigo Vicente"
+   },
+   {
+    "gain": 1.2075272518779994,
+    "in": "Miguel Roman",
+    "out": "Ferran Jutgla"
    }
   ],
-  "best": 54.26842367994088,
+  "best": 45.31010878590662,
   "eleven": [
    "Mathew Ryan",
    "Natan",
@@ -612,64 +893,197 @@
    "Ferran Jutgla"
   ],
   "message": "",
-  "points": 46.963756501468815,
+  "points": 37.22553091791681,
   "stale": true,
   "unmapped": []
  },
  "lock_at": "2026-11-20T20:00:00+00:00",
  "market_at": "2026-11-08T09:01Z",
  "ping": "",
- "plans": [],
- "rejected": [
+ "plans": [
   {
    "asking": 174406657.0,
+   "bid": 174406657.0,
+   "cash_if_lost": 121426747.41212054,
+   "cash_if_won": 622021.4728803737,
+   "displaces": [
+    "Pepelu",
+    "Martin Satriano"
+   ],
+   "funding": {
+    "base": 10.940645795370884,
+    "cash_if_lost": 121426747.41212054,
+    "feasible": true,
+    "gain": 124.94674226177608,
+    "held": [
+     "Arnau Ortiz",
+     "Gerard Martin",
+     "Miguel Roman",
+     "Roger Hinojo",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Pepelu",
+     "Marcos Alonso",
+     "Adria Pedrosa",
+     "Robin Le Normand",
+     "German Valera",
+     "Guido Rodriguez",
+     "Martin Satriano"
+    ],
+    "if_lost": [],
+    "if_won": [
+     "Pepelu"
+    ],
+    "lock_margin": 622021.4728803737,
+    "lock_margin_low": -3971208.597582941,
+    "margin": 984345.1999999881,
+    "net": 12.411475741800267,
+    "not_listed": [],
+    "points_lost_if_lost": 131.62190936482693,
+    "points_lost_if_won": 125.2634692381564,
+    "raises": 165597601.0,
+    "short": 0.0,
+    "tonight": [
+     {
+      "name": "Natan",
+      "offer": 49571725.0,
+      "ratio": 0.9736207836390577
+     },
+     {
+      "name": "Georges Mikautadze",
+      "offer": 47188627.0,
+      "ratio": 1.0458380507121436
+     },
+     {
+      "name": "Fernando Niño",
+      "offer": 46035874.0,
+      "ratio": 0.9573894399963531
+     },
+     {
+      "name": "Iñigo Vicente",
+      "offer": 22801375.0,
+      "ratio": 0.976677574954734
+     }
+    ]
+   },
    "gain": 124.946742261776,
+   "if_lost_points": -122.279327263,
+   "if_won_points": 19.586789419,
    "key": "4288",
+   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Natan, Georges Mikautadze, Fernando Niño, Iñigo Vicente, then Pepelu if won: +12.4 points expected (+19.6 if won, -122.3 if lost); displaces Pepelu, Martin Satriano. Cash at the lock 0.6 million if won, 121.4 million if lost; worst case -122.3 points.",
    "name": "Raphinha",
-   "net": -0.34952448525001145,
+   "net": 12.411475741800267,
    "pos": "DEL",
-   "reason": "net_not_positive",
-   "why": "its funded net is not above the floor of 0.5 points (net -0.3)"
+   "walk_away": 181200052.82241312,
+   "win": 0.9494219349524704,
+   "worst": -122.279327263
   },
+  {
+   "asking": 22759060.0,
+   "bid": 22759060.0,
+   "cash_if_lost": 12327618.040375728,
+   "cash_if_won": 2600550.63334434,
+   "displaces": [
+    "Arnau Ortiz",
+    "Dani Martinez",
+    "Pepelu",
+    "Ferran Jutgla",
+    "Guido Rodriguez"
+   ],
+   "funding": {
+    "base": 10.940645795370884,
+    "cash_if_lost": 12327618.040375728,
+    "feasible": true,
+    "gain": 8.398932874368256,
+    "held": [
+     "Arnau Ortiz",
+     "Natan",
+     "Georges Mikautadze",
+     "Gerard Martin",
+     "Miguel Roman",
+     "Mathew Ryan",
+     "Pablo Fornals",
+     "Pepelu",
+     "Marcos Alonso",
+     "Adria Pedrosa",
+     "Robin Le Normand",
+     "Iñigo Vicente",
+     "Fernando Niño",
+     "German Valera",
+     "Guido Rodriguez",
+     "Martin Satriano"
+    ],
+    "if_lost": [
+     "Arnau Ortiz",
+     "Dani Martinez",
+     "Pepelu"
+    ],
+    "if_won": [
+     "Arnau Ortiz",
+     "Dani Martinez",
+     "Pepelu",
+     "Ferran Jutgla"
+    ],
+    "lock_margin": 2600550.63334434,
+    "lock_margin_low": -2810733.8702654215,
+    "margin": 21793808.60000001,
+    "net": 8.330058729765483,
+    "not_listed": [],
+    "points_lost_if_lost": 25.277529663302857,
+    "points_lost_if_won": 20.744196600168834,
+    "raises": 1576701.0,
+    "short": 0.0,
+    "tonight": [
+     {
+      "name": "Roger Hinojo",
+      "offer": 1576701.0,
+      "ratio": 1.015893991944759
+     }
+    ]
+   },
+   "gain": 8.398932874368136,
+   "if_lost_points": -3.073444163,
+   "if_won_points": 8.800211783,
+   "key": "8413",
+   "line": "buy Pape Gueye at 22.8 million (96% to win), funded by selling tonight Roger Hinojo, then Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla if won; Arnau Ortiz, Dani Martinez, Pepelu if lost: +8.3 points expected (+8.8 if won, -3.1 if lost); displaces Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla, Guido Rodriguez. Cash at the lock 2.6 million if won, 12.3 million if lost; worst case -3.1 points.",
+   "name": "Pape Gueye",
+   "net": 8.330058729765483,
+   "pos": "MED",
+   "walk_away": 30258882.807812035,
+   "win": 0.9604036822827211,
+   "worst": -3.073444163
+  }
+ ],
+ "rejected": [
   {
    "asking": 59988796.0,
    "gain": 13.09870740779649,
    "key": "9573",
    "name": "Jonathan David",
-   "net": -10.626419170250596,
+   "net": -9.449485095590958,
    "pos": "DEL",
    "reason": "net_not_positive",
-   "why": "its funded net is not above the floor of 0.5 points (net -10.6)"
-  },
-  {
-   "asking": 22759060.0,
-   "gain": 8.398932874368136,
-   "key": "8413",
-   "name": "Pape Gueye",
-   "net": -2.090602607326879,
-   "pos": "MED",
-   "reason": "net_not_positive",
-   "why": "its funded net is not above the floor of 0.5 points (net -2.1)"
+   "why": "its funded net is not above the floor of 0.5 points (net -9.4)"
   },
   {
    "asking": 5397438.0,
    "gain": 0.943155016950989,
    "key": "6563",
    "name": "Ivan Martin",
-   "net": -2.2693435414434155,
+   "net": -0.44080838178186355,
    "pos": "MED",
    "reason": "net_not_positive",
-   "why": "its funded net is not above the floor of 0.5 points (net -2.3)"
+   "why": "its funded net is not above the floor of 0.5 points (net -0.4)"
   },
   {
    "asking": 5877862.0,
    "gain": 0.8702902301502959,
    "key": "6957",
    "name": "Isi Palazon",
-   "net": -2.5903608024115936,
+   "net": -1.2483052337365343,
    "pos": "MED",
    "reason": "net_not_positive",
-   "why": "its funded net is not above the floor of 0.5 points (net -2.6)"
+   "why": "its funded net is not above the floor of 0.5 points (net -1.2)"
   }
  ],
  "sells": [
@@ -737,7 +1151,9 @@
    ],
    "feasible": true,
    "flip": null,
-   "for": [],
+   "for": [
+    "Pape Gueye"
+   ],
    "gain": 0.0,
    "key": "15316",
    "label": "sell Roger Hinojo",
@@ -764,6 +1180,590 @@
    "step": "take offer",
    "trace": null,
    "trend": -2.025866749265319,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "kind": "accept",
+    "until": "2026-11-08T21:24Z",
+    "why": "loses no points; his sale is not needed for cash"
+   },
+   "amount": 22801375.0,
+   "delta": {
+    "gap": [],
+    "points": -9.115850850200104,
+    "window": {
+     "lock": -0.8161283717036838,
+     "next4": -2.4854551697070804,
+     "season": -9.115850850200104
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     23345857.0,
+     "money"
+    ],
+    [
+     "offer",
+     22801375.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.976677574954734,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.8161283717036838,
+     "points"
+    ],
+    [
+     "points, next4",
+     -2.4854551697070804,
+     "points"
+    ],
+    [
+     "points, season",
+     -9.115850850200104,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [
+    "Raphinha"
+   ],
+   "gain": -9.115850850200104,
+   "key": "6442",
+   "label": "sell Iñigo Vicente",
+   "more": false,
+   "name": "Iñigo Vicente",
+   "offer": 22801375.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.39979390936731246,
+   "plan": false,
+   "points_lost": 9.115850850200104,
+   "pos": "DEL",
+   "ratio": 0.976677574954734,
+   "rent": 26.67760875,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserves": [
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-08T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-09T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-10T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-11T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-12T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-13T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-14T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-15T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-16T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-17T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-18T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-19T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-20T20:00Z"
+    }
+   ],
+   "step": "take offer",
+   "trace": null,
+   "trend": -0.9599715530509632,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "kind": "accept",
+    "until": "2026-11-08T21:24Z",
+    "why": "loses no points; his sale is not needed for cash"
+   },
+   "amount": 47188627.0,
+   "delta": {
+    "gap": [],
+    "points": -22.99422601632068,
+    "window": {
+     "lock": 0.0,
+     "next4": -1.7630572899664685,
+     "season": -22.99422601632068
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     45120396.0,
+     "money"
+    ],
+    [
+     "offer",
+     47188627.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     1.0458380507121436,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     0.0,
+     "points"
+    ],
+    [
+     "points, next4",
+     -1.7630572899664685,
+     "points"
+    ],
+    [
+     "points, season",
+     -22.99422601632068,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [
+    "Raphinha"
+   ],
+   "gain": -22.99422601632068,
+   "key": "12139",
+   "label": "sell Georges Mikautadze",
+   "more": false,
+   "name": "Georges Mikautadze",
+   "offer": 47188627.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.4872832179737012,
+   "plan": false,
+   "points_lost": 22.99422601632068,
+   "pos": "DEL",
+   "ratio": 1.0458380507121436,
+   "rent": 55.21069359,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserves": [
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-08T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-09T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-10T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-11T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-12T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-13T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-14T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-15T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-16T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-17T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-18T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-19T21:24Z"
+    },
+    {
+     "least": 45578374.44787107,
+     "until": "2026-11-20T20:00Z"
+    }
+   ],
+   "step": "take offer",
+   "trace": null,
+   "trend": 1.3189711608554608,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "kind": "accept",
+    "until": "2026-11-08T21:24Z",
+    "why": "loses no points; his sale is not needed for cash"
+   },
+   "amount": 46035874.0,
+   "delta": {
+    "gap": [],
+    "points": -24.692918423759465,
+    "window": {
+     "lock": -2.116354444219013,
+     "next4": -4.13936317458294,
+     "season": -24.692918423759465
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     48084794.0,
+     "money"
+    ],
+    [
+     "offer",
+     46035874.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9573894399963531,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -2.116354444219013,
+     "points"
+    ],
+    [
+     "points, next4",
+     -4.13936317458294,
+     "points"
+    ],
+    [
+     "points, season",
+     -24.692918423759465,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [
+    "Raphinha"
+   ],
+   "gain": -24.692918423759465,
+   "key": "7081",
+   "label": "sell Fernando Niño",
+   "more": false,
+   "name": "Fernando Niño",
+   "offer": 46035874.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.5363842646662789,
+   "plan": false,
+   "points_lost": 24.692918423759465,
+   "pos": "DEL",
+   "ratio": 0.9573894399963531,
+   "rent": 53.86197258,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserves": [
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-08T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-09T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-10T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-11T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-12T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-13T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-14T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-15T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-16T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-17T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-18T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-19T21:24Z"
+    },
+    {
+     "least": 47325553.34981512,
+     "until": "2026-11-20T20:00Z"
+    }
+   ],
+   "step": "take offer",
+   "trace": null,
+   "trend": -1.2828104837476024,
+   "verdict": "sell",
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "kind": "accept",
+    "until": "2026-11-08T21:24Z",
+    "why": "loses no points; his sale is not needed for cash"
+   },
+   "amount": 49571725.0,
+   "delta": {
+    "gap": [],
+    "points": -34.36225350983227,
+    "window": {
+     "lock": -1.511310122384181,
+     "next4": -6.641237123149523,
+     "season": -34.36225350983227
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     50914818.0,
+     "money"
+    ],
+    [
+     "offer",
+     49571725.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9736207836390577,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -1.511310122384181,
+     "points"
+    ],
+    [
+     "points, next4",
+     -6.641237123149523,
+     "points"
+    ],
+    [
+     "points, season",
+     -34.36225350983227,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [
+    "Raphinha"
+   ],
+   "gain": -34.36225350983227,
+   "key": "11813",
+   "label": "sell Natan",
+   "more": false,
+   "name": "Natan",
+   "offer": 49571725.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.6931825251155225,
+   "plan": false,
+   "points_lost": 34.36225350983227,
+   "pos": "DEF",
+   "ratio": 0.9736207836390577,
+   "rent": 57.99891825,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserves": [
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-08T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-09T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-10T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-11T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-12T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-13T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-14T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-15T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-16T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-17T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-18T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-19T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-20T20:00Z"
+    }
+   ],
+   "step": "take offer",
+   "trace": null,
+   "trend": -0.41770354506100393,
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
@@ -1063,438 +2063,6 @@
    "action": {
     "kind": "keep",
     "until": null,
-    "why": "keeping him protects 9.1 points and the cash at the lock is covered without him"
-   },
-   "amount": 22801375.0,
-   "delta": {
-    "gap": [],
-    "points": -9.115850850200104,
-    "window": {
-     "lock": -0.8161283717036838,
-     "next4": -2.4854551697070804,
-     "season": -9.115850850200104
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     23345857.0,
-     "money"
-    ],
-    [
-     "offer",
-     22801375.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.976677574954734,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "points, lock",
-     -0.8161283717036838,
-     "points"
-    ],
-    [
-     "points, next4",
-     -2.4854551697070804,
-     "points"
-    ],
-    [
-     "points, season",
-     -9.115850850200104,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [],
-   "gain": -9.115850850200104,
-   "key": "6442",
-   "label": "sell Iñigo Vicente",
-   "more": false,
-   "name": "Iñigo Vicente",
-   "offer": 22801375.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.39979390936731246,
-   "plan": false,
-   "points_lost": 9.115850850200104,
-   "pos": "DEL",
-   "ratio": 0.976677574954734,
-   "rent": 26.67760875,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserves": [
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-08T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-09T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-10T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-11T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-12T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-13T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-14T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-15T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-16T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-17T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-18T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-19T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-20T20:00Z"
-    }
-   ],
-   "step": "take offer",
-   "trace": null,
-   "trend": -0.9599715530509632,
-   "verdict": "hold",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "action": {
-    "kind": "keep",
-    "until": null,
-    "why": "keeping him protects 23.0 points and the cash at the lock is covered without him"
-   },
-   "amount": 47188627.0,
-   "delta": {
-    "gap": [],
-    "points": -22.99422601632068,
-    "window": {
-     "lock": 0.0,
-     "next4": -1.7630572899664685,
-     "season": -22.99422601632068
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     45120396.0,
-     "money"
-    ],
-    [
-     "offer",
-     47188627.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     1.0458380507121436,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "points, lock",
-     0.0,
-     "points"
-    ],
-    [
-     "points, next4",
-     -1.7630572899664685,
-     "points"
-    ],
-    [
-     "points, season",
-     -22.99422601632068,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [],
-   "gain": -22.99422601632068,
-   "key": "12139",
-   "label": "sell Georges Mikautadze",
-   "more": false,
-   "name": "Georges Mikautadze",
-   "offer": 47188627.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.4872832179737012,
-   "plan": false,
-   "points_lost": 22.99422601632068,
-   "pos": "DEL",
-   "ratio": 1.0458380507121436,
-   "rent": 55.21069359,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserves": [
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-08T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-09T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-10T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-11T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-12T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-13T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-14T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-15T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-16T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-17T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-18T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-19T21:24Z"
-    },
-    {
-     "least": 45578374.44787107,
-     "until": "2026-11-20T20:00Z"
-    }
-   ],
-   "step": "take offer",
-   "trace": null,
-   "trend": 1.3189711608554608,
-   "verdict": "hold",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "action": {
-    "kind": "keep",
-    "until": null,
-    "why": "keeping him protects 24.7 points and the cash at the lock is covered without him"
-   },
-   "amount": 46035874.0,
-   "delta": {
-    "gap": [],
-    "points": -24.692918423759465,
-    "window": {
-     "lock": -2.116354444219013,
-     "next4": -4.13936317458294,
-     "season": -24.692918423759465
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     48084794.0,
-     "money"
-    ],
-    [
-     "offer",
-     46035874.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9573894399963531,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "points, lock",
-     -2.116354444219013,
-     "points"
-    ],
-    [
-     "points, next4",
-     -4.13936317458294,
-     "points"
-    ],
-    [
-     "points, season",
-     -24.692918423759465,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [],
-   "gain": -24.692918423759465,
-   "key": "7081",
-   "label": "sell Fernando Niño",
-   "more": false,
-   "name": "Fernando Niño",
-   "offer": 46035874.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.5363842646662789,
-   "plan": false,
-   "points_lost": 24.692918423759465,
-   "pos": "DEL",
-   "ratio": 0.9573894399963531,
-   "rent": 53.86197258,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserves": [
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-08T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-09T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-10T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-11T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-12T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-13T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-14T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-15T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-16T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-17T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-18T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-19T21:24Z"
-    },
-    {
-     "least": 47325553.34981512,
-     "until": "2026-11-20T20:00Z"
-    }
-   ],
-   "step": "take offer",
-   "trace": null,
-   "trend": -1.2828104837476024,
-   "verdict": "hold",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "action": {
-    "kind": "keep",
-    "until": null,
     "why": "keeping him protects 25.1 points and the cash at the lock is covered without him"
    },
    "amount": 40009473.0,
@@ -1772,150 +2340,6 @@
    "step": "take offer",
    "trace": null,
    "trend": 0.1486109849343848,
-   "verdict": "hold",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "action": {
-    "kind": "keep",
-    "until": null,
-    "why": "keeping him protects 34.4 points and the cash at the lock is covered without him"
-   },
-   "amount": 49571725.0,
-   "delta": {
-    "gap": [],
-    "points": -34.36225350983227,
-    "window": {
-     "lock": -1.511310122384181,
-     "next4": -6.641237123149523,
-     "season": -34.36225350983227
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     50914818.0,
-     "money"
-    ],
-    [
-     "offer",
-     49571725.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9736207836390577,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "points, lock",
-     -1.511310122384181,
-     "points"
-    ],
-    [
-     "points, next4",
-     -6.641237123149523,
-     "points"
-    ],
-    [
-     "points, season",
-     -34.36225350983227,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [],
-   "gain": -34.36225350983227,
-   "key": "11813",
-   "label": "sell Natan",
-   "more": false,
-   "name": "Natan",
-   "offer": 49571725.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.6931825251155225,
-   "plan": false,
-   "points_lost": 34.36225350983227,
-   "pos": "DEF",
-   "ratio": 0.9736207836390577,
-   "rent": 57.99891825,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserves": [
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-08T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-09T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-10T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-11T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-12T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-13T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-14T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-15T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-16T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-17T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-18T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-19T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-20T20:00Z"
-    }
-   ],
-   "step": "take offer",
-   "trace": null,
-   "trend": -0.41770354506100393,
    "verdict": "hold",
    "waiting": null,
    "what": "sell",
@@ -3092,11 +3516,11 @@
    "xi": true
   },
   {
-   "best": true,
+   "best": false,
    "name": "Natan",
    "next": 4.771587977496843,
    "pos": "DEF",
-   "sold": false,
+   "sold": true,
    "xi": true
   },
   {
@@ -3108,7 +3532,7 @@
    "xi": true
   },
   {
-   "best": false,
+   "best": true,
    "name": "Marcos Alonso",
    "next": 2.5789702610975906,
    "pos": "DEF",
@@ -3148,11 +3572,11 @@
    "xi": true
   },
   {
-   "best": true,
+   "best": false,
    "name": "Iñigo Vicente",
    "next": 4.966637606055167,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": true
   },
   {
@@ -3188,7 +3612,7 @@
    "xi": false
   },
   {
-   "best": false,
+   "best": true,
    "name": "Robin Le Normand",
    "next": 3.260277855112667,
    "pos": "DEF",
@@ -3220,7 +3644,7 @@
    "xi": false
   },
   {
-   "best": false,
+   "best": true,
    "name": "Miguel Roman",
    "next": 1.2075262518779994,
    "pos": "MED",
@@ -3236,11 +3660,11 @@
    "xi": false
   },
   {
-   "best": true,
+   "best": false,
    "name": "Fernando Niño",
    "next": 6.266863678570501,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": false
   },
   {
@@ -3248,7 +3672,7 @@
    "name": "Georges Mikautadze",
    "next": 4.150509234351489,
    "pos": "DEL",
-   "sold": false,
+   "sold": true,
    "xi": false
   },
   {
@@ -3298,7 +3722,7 @@
   {
    "asking": 174406657.0,
    "available": true,
-   "bid": null,
+   "bid": 174406657.0,
    "gain": 124.946742261776,
    "n": 26,
    "name": "Raphinha",
@@ -3309,7 +3733,7 @@
    "price_next": -0.0009202847799932856,
    "replaces": "Martin Satriano",
    "status": "market",
-   "win": null,
+   "win": 0.9494219349524704,
    "yield": 0.02755424601221059
   },
   {
