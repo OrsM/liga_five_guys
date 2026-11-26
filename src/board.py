@@ -44,7 +44,7 @@ UNFUNDED = "cannot be funded"
 FUNDED_FLOOR = 0.5
 EVALUATED_NOTE = "not evaluated: it is beyond the best listings by gain that are"
 REASONS = {"no_curve": "no chance of winning is known for this auction", "no_win_chance": "no bid has the chance %.0f%% needed" % (100 * hurdle.WIN_FLOOR),
-           "unfundable": "no sales fund even the asking price", "net_not_positive": "its funded net is not above %.1f points" % FUNDED_FLOOR,
+           "unfundable": "no sales fund even the asking price", "net_not_positive": "its funded net is not above the floor of %.1f points" % FUNDED_FLOOR,
            "not_evaluated": EVALUATED_NOTE}
 TOP_TARGETS = 10
 TOP_REPLACEMENTS = 8
@@ -424,7 +424,7 @@ def stance_of(r: dict[str, Any], curve: Curve | None, walk: float | None, best: 
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], cost0: float, rate: float = hurdle.FALLBACK_LAMBDA
               ) -> tuple[list[Doc], list[Doc], list[Doc]]:
     """The buys of the board, the funded plans and the candidates left out. Every player on the market with an asking price and a gain (or a bid
-    placed) is a candidate, best gain first; the first EVALUATED_BUYS get a Bidding (approach.bidding): the funded net of each bid of the auction
+    placed; one who adds no points is no candidate) is a candidate, best gain first; the first EVALUATED_BUYS get a Bidding (approach.bidding): the funded net of each bid of the auction
     curve against the plan with no buy (`cost0`, its cost in the one objective), the bid being the one of the greatest net and the walk-away price
     the one at which it is 0. A plan whose best net is above FUNDED_FLOOR is a funded plan (`plans`, by net, one `line` each); of them those whose
     is above FUNDED_FLOOR is advised (`buys`, with the bids placed first, a bid placed whatever its net: a move of hold, lower,
@@ -446,7 +446,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         name = names.get(k, k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]))
-        money = Money(rate, len(rounds.arrives), None if r["profit"] > 0 else hurdle.draw(r.get("value") or r["asking"]))
+        money = Money(rate, len(decision.window_of(locks, cells, None)), None if r["profit"] > 0 else hurdle.draw(r.get("value") or r["asking"]))
         held_club = club._replace(pending=others)
 
         def fund(amount: float, win: float, r: dict[str, Any] = r, k: str = k, held_club: Club = held_club, rounds: Rounds = rounds,
@@ -592,7 +592,7 @@ def replacement_rows(inp: decision.Inputs, names: dict[str, str], club: Club, go
             k = r["player"]
             others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
             rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]))
-            money = Money(rate, len(rounds.arrives), hurdle.draw(r.get("value") or r["asking"]))
+            money = Money(rate, len(decision.window_of(locks, cells, None)), hurdle.draw(r.get("value") or r["asking"]))
 
             def fund(amount: float, win: float, k: str = k, others: tuple[int, float] = others, rounds: Rounds = rounds, money: Money = money) -> Approach:
                 return replacement(club._replace(pending=others), sold, k, amount, win, rounds, money)

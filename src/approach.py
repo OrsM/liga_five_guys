@@ -366,6 +366,7 @@ UNFILLED = 1e6
 WAITERS = 2
 EVALUATIONS = 50
 COVERS = 2
+STEP = 0.02
 MISSED = 4
 
 
@@ -640,7 +641,8 @@ class Points(NamedTuple):
 
 
 class Money(NamedTuple):
-    """How a plan's money is valued: `rate` (hurdle.LAMBDA, points per million per jornada) over `n` jornadas, the one conversion
+    """How a plan's money is valued: `rate` (hurdle.LAMBDA, points per million per jornada) over `n` jornadas (one n for the whole board: the
+    window of a sale made now, so the cover's, the base's and every buy's nets are in one unit), the one conversion
     hurdle.in_points makes; `resale` what the player bought is expected to fetch (hurdle.draw of his worth; None: the bid, a buy at his
     price). `kappa` is the points a euro is worth. Rate 0 values money at nothing: the net is points alone."""
     rate: float = 0.0
@@ -798,10 +800,11 @@ class Offer(NamedTuple):
 
 class Bidding(NamedTuple):
     """The bids tried on one listing, `offers` in ascending price (those with a chance of WIN_FLOOR or more, up to the first the sales cannot fund
-    or the one past the best whose net has fallen below 0), `best` the one of the greatest net (the lowest price on ties; None when none was
-    funded) and `walk_away` the price at which the net is 0: interpolated between the last net of 0 or more and the first below it, the highest
-    price tried when the net never falls below 0, and from the first net and kappa x its chance when it is below 0 already (None when kappa is 0
-    or that price is not positive)."""
+    or the one past the best whose net has fallen below 0, or the first of a chance of 1: dearer bids only lose
+    net), `best` the one of the greatest net (the lowest price on ties; None when none was funded) and `walk_away` the price at which the net is
+    0: interpolated between the last net of 0 or more and the first below it; otherwise, from the one tried (the first when all are below 0, the
+    last when none is), its price plus its net over kappa x its chance, which is exact while the funding does not change with the price (the
+    highest price tried when kappa is 0; None when the first net is below 0 and the price not positive)."""
     offers: tuple[Offer, ...]
     best: Offer | None
     walk_away: float | None
@@ -813,7 +816,8 @@ def zero_price(offers: Sequence[Offer], kappa: float) -> float | None:
         return None
     below = next((i for i, o in enumerate(offers) if o.found.net < 0 and all(x.found.net < 0 for x in offers[i:])), None)
     if below is None:
-        return offers[-1].amount
+        last = offers[-1]
+        return last.amount + last.found.net / (kappa * last.win) if kappa > 0 and last.win > 0 else last.amount
     if below == 0:
         first = offers[0]
         got = first.amount + first.found.net / (kappa * first.win) if kappa > 0 and first.win > 0 else None
@@ -825,16 +829,16 @@ def zero_price(offers: Sequence[Offer], kappa: float) -> float | None:
 def bidding(curve: Iterable[tuple[float, float]], asking: float, fund: Callable[[float, float], Approach | None], kappa: float,
             floor: float = hurdle.WIN_FLOOR) -> Bidding:
     """The Bidding on a listing at `asking` with the auction `curve` (ratio, chance pairs): `fund` (amount, chance) gives the Approach of a bid.
-    Ratios under 1 and chances under `floor` are not bid. The net is the one objective: the bid is its greatest, and the walk-away its zero."""
+    Ratios under 1 and chances under `floor` are not bid, nor those whose chance is under STEP over the last tried (the net moves by the price, not the chance). The net is the one objective: the bid is its greatest, and the walk-away its zero."""
     offers: list[Offer] = []
     for ratio, p in sorted(curve):
-        if ratio < 1.0 or p < floor:
+        if ratio < 1.0 or p < floor or offers and p < offers[-1].win + STEP:
             continue
         found = fund(asking * ratio, p)
         if found is None or not found.feasible:
             break
         offers.append(Offer(asking * ratio, p, found))
-        if len(offers) > 1 and found.net < 0 and found.net < offers[-2].found.net:
+        if p >= 0.999 or len(offers) > 1 and found.net < 0 and found.net < offers[-2].found.net:
             break
     best = min(offers, key=lambda o: (-o.found.net, o.amount), default=None)
     return Bidding(tuple(offers), best, zero_price(offers, kappa))
@@ -941,7 +945,8 @@ def _selftest_bidding() -> None:
         got = bidding(curve, asking, fund, kappa)
         tried = [(r, p) for r, p in curve if r >= 1.0 and p >= hurdle.WIN_FLOOR]
         assert [o.amount for o in got.offers] == sorted(o.amount for o in got.offers) and all(o.win >= hurdle.WIN_FLOOR and o.amount >= asking for o in got.offers)
-        assert [(o.amount / asking) for o in got.offers] == [r for r, _ in tried[:len(got.offers)]], "ascending ratios from the curve"
+        assert [o.amount / asking for o in got.offers] == sorted({r for r, _ in tried} & {o.amount / asking for o in got.offers}) and \
+            all(b.win >= a.win + 0.02 - 1e-9 for a, b in zip(got.offers, got.offers[1:])), "ascending ratios of the curve, each a step of chance over the last"
         if not tried:
             assert got.best is None and got.walk_away is None and not got.offers
             seen["none"] += 1
@@ -952,7 +957,8 @@ def _selftest_bidding() -> None:
             continue
         nets = [o.found.net for o in got.offers]
         if all(x >= 0 for x in nets):
-            assert away == got.offers[-1].amount, "net never below 0: the highest price tried"
+            last = got.offers[-1]
+            assert abs(away - (last.amount + last.found.net / (kappa * last.win))) < 1e-3, "net never below 0: the price where the last would reach 0"
             seen["never"] += 1
         elif nets[0] < 0 and all(x < 0 for x in nets):
             first = got.offers[0]

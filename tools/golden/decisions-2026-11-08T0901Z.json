@@ -629,7 +629,7 @@
    "net": -0.34808125604455853,
    "pos": "DEL",
    "reason": "net_not_positive",
-   "why": "its funded net is not above 0.5 points (net -0.3)"
+   "why": "its funded net is not above the floor of 0.5 points (net -0.3)"
   },
   {
    "asking": 59988796.0,
@@ -639,7 +639,7 @@
    "net": -10.624975941045143,
    "pos": "DEL",
    "reason": "net_not_positive",
-   "why": "its funded net is not above 0.5 points (net -10.6)"
+   "why": "its funded net is not above the floor of 0.5 points (net -10.6)"
   },
   {
    "asking": 22759060.0,
@@ -649,7 +649,7 @@
    "net": -2.089159378121426,
    "pos": "MED",
    "reason": "net_not_positive",
-   "why": "its funded net is not above 0.5 points (net -2.1)"
+   "why": "its funded net is not above the floor of 0.5 points (net -2.1)"
   },
   {
    "asking": 5397438.0,
@@ -659,7 +659,7 @@
    "net": -2.2679003122379626,
    "pos": "MED",
    "reason": "net_not_positive",
-   "why": "its funded net is not above 0.5 points (net -2.3)"
+   "why": "its funded net is not above the floor of 0.5 points (net -2.3)"
   },
   {
    "asking": 5877862.0,
@@ -669,7 +669,7 @@
    "net": -2.5889175732061407,
    "pos": "MED",
    "reason": "net_not_positive",
-   "why": "its funded net is not above 0.5 points (net -2.6)"
+   "why": "its funded net is not above the floor of 0.5 points (net -2.6)"
   }
  ],
  "sells": [
