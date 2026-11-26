@@ -1,53 +1,53 @@
 {
- "generated_at": "2026-11-26T20:54Z",
- "market_at": "2026-11-26T20:45Z",
+ "generated_at": "2026-11-26T21:20Z",
+ "market_at": "2026-11-26T21:19Z",
  "sources": [
   {
    "src": "api_leagues",
-   "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "at": "2026-11-26T21:19Z",
+   "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_lineup",
-   "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "at": "2026-11-26T21:19Z",
+   "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_market",
-   "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "at": "2026-11-26T21:19Z",
+   "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_offers",
    "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "hours": 0.6,
    "status": "ok"
   },
   {
    "src": "api_standings",
-   "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "at": "2026-11-26T21:19Z",
+   "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "api_teams",
-   "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "at": "2026-11-26T21:19Z",
+   "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "lineups",
-   "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "at": "2026-11-26T21:19Z",
+   "hours": 0.0,
    "status": "ok"
   },
   {
    "src": "market",
-   "at": "2026-11-26T20:45Z",
-   "hours": 0.1,
+   "at": "2026-11-26T21:19Z",
+   "hours": 0.0,
    "status": "ok"
   }
  ],
