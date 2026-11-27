@@ -902,8 +902,8 @@ def gained(day: CoverDay, side: Side, sales: Mapping[str, float], rate: float) -
 def follow(day: CoverDay, side: Side, option: Option, closings: Sequence[Closing], rate: float = hurdle.FALLBACK_LAMBDA, label: str = "",
            graded: float | None = None) -> Realised:
     """The Realised of `option` over the offers drawn at each close (closing_offers, or NOT_SEEN for every one: all drawn): the players of `now`
-    sold at the day's standing offers, each waiting player at the first offer at or above his reserve (any at the last; none if he has none
-    at the last close: he stays), then for cash still below 0 the recourse of the last close: approach.cover at its offers (a player with none
+    sold at the day's standing offers, each waiting player at the first offer at or above his reserve (at the last, one that beats keeping him; none if he has
+    none that does at the last close: he stays), then for cash still below 0 the recourse of the last close: approach.cover at its offers (a player with none
     cannot be sold) by points less the gain of the sales at `rate`, as Closer.fill chooses (when none closes the gap the first jornada is lost, Side.lapse). Its gain is read at `graded` (`rate` by default)."""
     club = day.club
     sales = {k: club.offers[k] for k in option.now}
@@ -2378,7 +2378,7 @@ def _selftest_holds() -> None:
 
 
 def _selftest_cover_grades() -> None:
-    """The cover over realised offers: a waiting player sold at the first close that meets his reserve (any at the last), the recourse closing
+    """The cover over realised offers: a waiting player sold at the first close that meets his reserve (at the last, one that beats keeping him), the recourse closing
     what is still short, cash at the lock 0 or more whenever it closes it; the plan taking its offers now never loses fewer points than the cover on
     rich offers and may leave cash short on poor ones. A slot no cut shows is drawn, the same for every policy; the cover's claim is what its own
     model does when simulated."""
@@ -2427,6 +2427,9 @@ def _selftest_cover_grades() -> None:
     assert closing_offers(day, {}) == [NOT_SEEN] * 3, "no cut kept: nothing is seen"
     assert cover_grades([day._replace(club=club._replace(cash=1e6))]) == [], "cash 0 or more: nothing to grade"
     assert len(cover_grades([day])) == 1 and "cuts 1" in cover_report(cover_grades([day]))
+    for e in (0.5, 0.93, 1.0):
+        for row in cover_calibration([day._replace(offers=ratios._replace(exists=e))], hurdle.FALLBACK_LAMBDA, 120):
+            assert abs(row.claimed_net - row.simulated_net) <= max(3 * row.se, 0.25), "the claim holds at low existence too"
     for row in cover_calibration([day], hurdle.FALLBACK_LAMBDA, 120) + cover_calibration([day], 0.0, 120):
         assert abs(row.claimed_net - row.simulated_net) <= max(3 * row.se, 0.25), "what the Closer claims is what its own model does when simulated"
     twice = [day._replace(cut="2026-11-24T2045Z"), day._replace(cut="2026-11-25T2045Z", club=club._replace(offers={k: v for k, v in club.offers.items() if k != big}, unlisted=frozenset({big})))]

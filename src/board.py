@@ -7,9 +7,12 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 import random
+import itertools
 from itertools import combinations
 import sys
+import types
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any, NamedTuple
 
@@ -19,7 +22,7 @@ import hurdle
 import shadow
 import worth
 from shadow import Ladder
-from approach import Approach, Bidding, Club, Money, Offer, Option, Plan, Rounds, Side, Stand, approach, bidding, plan, pricing_of, replacement, secure, stand
+from approach import Approach, Bidding, Club, Money, Offer, Option, Plan, Reserve, Rounds, Side, Stand, approach, bidding, plan, pricing_of, replacement, secure, stand
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
@@ -702,7 +705,7 @@ def untils_of(clock: Clock) -> list[str]:
 
 def reserves_doc(untils: Sequence[str], leasts: Sequence[float | None]) -> list[Doc]:
     """The reserve of a sells row: the least offer accepted until each moment (None: the offer is not taken)."""
-    return [{"until": u, "least": x} for u, x in zip(untils, leasts)]
+    return [{"until": u, "least": x if x is None or math.isfinite(x) else None} for u, x in zip(untils, leasts)]
 
 
 def local(stamp_text: str) -> dt.datetime:
@@ -737,7 +740,7 @@ def terms(club: Club, option: Option, names: dict[str, str], untils: Sequence[st
     offer expires) or wait (kind "wait", `reserves` the least offer accepted until each moment, none for today's standing offer)."""
     out = [{"name": names.get(k, k), "key": k, "kind": "accept", "least": club.offers[k], "until": untils[0] if untils else None}
            for k in sorted(option.now, key=lambda k: (-club.offers[k], k))]
-    return out + [{"name": names.get(r.player, r.player), "key": r.player, "kind": "wait", "least": r.least[0],
+    return out + [{"name": names.get(r.player, r.player), "key": r.player, "kind": "wait", "least": r.least[0] if math.isfinite(r.least[0]) else None,
                    "reserves": reserves_doc(untils, [None, *r.least]), "until": untils[-1] if untils else None} for r in option.wait]
 
 
@@ -761,26 +764,36 @@ def waiting_days(closes: Sequence[str]) -> list[dt.datetime]:
     return [local(c) + dt.timedelta(days=1) for c in closes]
 
 
+def offer_text(least: float) -> str:
+    """What a reserve accepts in words: any offer (least under a euro), an offer of `least` or more, or none (infinite: he is kept)."""
+    return "any offer" if least < 1.0 else "an offer of %s or more" % price_text(least) if math.isfinite(least) else "no offer"
+
+
+def new_offer_text(least: float) -> str:
+    """What a reserve before the last close does with that day's new offer, in words (offer_text decides how a reserve reads)."""
+    return "accept his new offer if it is %s or more" % price_text(least) if math.isfinite(least) else "refuse his new offer, whatever it is"
+
+
 def waiting_text(name: str, standing: float | None, least: Sequence[float], closes: Sequence[str], lock: str) -> str:
     """The sentence of a player waited for: his standing offer is not taken, the new offers are accepted at their least on the days it
-    applies (the offers before the last), and at the lock whatever the last is."""
+    applies (the offers before the last), and at the lock the last close's (offer_text)."""
     days, end = waiting_days(closes), local(lock)
     first = "Do NOT take %s's offer of %s today. " % (name, price_text(standing)) if standing is not None else "Wait for the offers of %s. " % name
     body = least[:-1]
-    last = "on %s, before %s, accept whatever it is." % (day_text(days[-1]), clock_text(end))
+    last = "on %s, before %s, accept %s." % (day_text(days[-1]), clock_text(end), offer_text(least[-1]))
     if not body:
         return first + last.capitalize()
     if max(body) - min(body) < 1.0:
-        return first + "On %s accept his new offer if it is %s or more; %s" % (days_text(days[:len(body)]), price_text(body[0]), last)
-    return first + "%s; %s" % ("; ".join("on %s accept his new offer if it is %s or more" % (day_text(d), price_text(x)) for d, x in zip(days, body)), last)
+        return first + "On %s %s; %s" % (days_text(days[:len(body)]), new_offer_text(body[0]), last)
+    return first + "%s; %s" % ("; ".join("on %s %s" % (day_text(d), new_offer_text(x)) for d, x in zip(days, body)), last)
 
 
 def waiting_why(least: Sequence[float], closes: Sequence[str]) -> str:
-    """A waiting player's row in words: the least offer accepted on the days it applies, any offer on the last day before the lock."""
+    """A waiting player's row in words: the least offer accepted on the days it applies, the last close's rule on the last day before the lock."""
     days, body = waiting_days(closes), least[:-1]
-    last = "any offer on %s before the lock" % day_text(days[-1])
-    return last.capitalize() if not body else "accept a new offer of %s or more on %s, %s" % (
-        price_text(max(body)), " or ".join(day_text(d) for d in days[:len(body)]), last)
+    last = "%s on %s before the lock" % (offer_text(least[-1]), day_text(days[-1]))
+    return last.capitalize() if not body else "accept %s on %s, %s" % (
+        offer_text(max(body)), " or ".join(day_text(d) for d in days[:len(body)]), last)
 
 
 def advice_text(club: Club, names: dict[str, str], best: Option, second: Option | None, clock: Clock, at: dt.datetime) -> str:
@@ -881,7 +894,7 @@ def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clo
             "n_closes": clock.n_closes, "expected_cover": names_waiting, "until": stamped(clock.lock),
             "need": max(0.0, -(club.cash + club.inflow.expected + sum(club.offers[k] for k in plan.now))),
             "cost_points": plan.cost, **risk_doc(club, before),
-            "why": "cash %.1fM; %s waits for the offers still to come (%d closes), each at its reserve or more, whatever it is at the lock%s" % (
+            "why": "cash %.1fM; %s waits for the offers still to come (%d closes), each at its reserve or more, at the lock too%s" % (
                 club.cash / 1e6, ", ".join(names_waiting), clock.n_closes, risk_clause(club, before)),
             "accepts": [], "act": []})
     return out
@@ -1473,7 +1486,7 @@ def _selftest_cover() -> None:
         assert {r["key"] for r in takes_} == found.now and all(r["set_points_lost"] == found.cost for r in takes_)
         assert [r["offer"] for r in takes_] == sorted((r["offer"] for r in takes_), reverse=True), "the largest offer first"
         assert all(r["offer"] > 0 for r in takes_), "a sale that raises no cash is not in the cover"
-        assert {t["key"] for t in head["sells"]} == (found.sells if found.options else found.now) and all(t["least"] >= 0 for t in head["sells"])
+        assert {t["key"] for t in head["sells"]} == (found.sells if found.options else found.now) and all(t["least"] is None or t["least"] >= 0 for t in head["sells"])
         assert all(t["until"] == (untils_of(clock)[0] if t["kind"] == "accept" else untils_of(clock)[-1]) for t in head["sells"])
         if n_closes == 0:
             assert not waits and {r["key"] for r in takes_} == found.sells <= frozenset(offers), "no close left: every sale of the plan is taken"
@@ -1488,6 +1501,14 @@ def _selftest_cover() -> None:
             seen_wait += 1
         seen_take += len(takes_)
     assert seen_take >= 5 and seen_wait >= 3 and seen_empty >= 5 and seen_credit >= 3, (seen_take, seen_wait, seen_empty, seen_credit)
+    never = Reserve("a", (math.inf, math.inf))
+    row = terms(types.SimpleNamespace(offers={}), types.SimpleNamespace(now=frozenset(), wait=(never,)), {}, ["2026-11-26T20:00Z", "2026-11-27T20:00Z"])  # type: ignore[arg-type]
+    strict = json.loads(json.dumps(row, allow_nan=False), parse_constant=lambda c: 1 / 0)
+    assert strict[0]["least"] is None and [r["least"] for r in strict[0]["reserves"]] == [None, None], "a reserve no offer reaches is None in the document, never Infinity"
+    closes = ["2026-11-25T21:24Z", "2026-11-26T21:24Z", "2026-11-27T19:00Z"]
+    for reserves in itertools.product((0.0, 5e6, math.inf), repeat=3):
+        for text in (waiting_text("A", 4e6, reserves, closes, "2026-11-27T20:00Z"), waiting_text("A", None, reserves, closes, "2026-11-27T20:00Z"), waiting_why(reserves, closes)):
+            assert "inf" not in text.lower() and "nan" not in text.lower(), "a reserve of any size, none or infinite reads in words, never as a number: " + text
     squad = {"%s%d" % (p, i): p for p, n in {"POR": 2, "DEF": 5, "MED": 5, "DEL": 3}.items() for i in range(n)}
     inp = _inp_of(squad)
     names = {k: k for k in squad}

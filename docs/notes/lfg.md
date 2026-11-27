@@ -169,7 +169,10 @@ n = 677 pairs, ratios by position 0.993 to 1.013: no term), the normal of SALE_E
 by the price fold's forecast (`Club.drift`, from `decision.exit_of`, the one reader of the forecast; it tracks the realised change of the squad's
 values with correlation 0.7 and the same mean). The offers on a cut are constant through the day and differ on every next one (568 of 568
 player-days). `worth.waiting_values` is the one stopping rule (existence, a cost per night, payoffs that may change per close), also behind
-`worth.offer_reserve_ratio` and `waiting_reserve` for ordinary sales (existence 1 there, see #152).
+`worth.offer_reserve_ratio` and `waiting_reserve` for ordinary sales (existence 1 there, see #152). Its `hold` is what NOT selling is worth: no
+offer, an offer declined and a lapsed listing all give it; in `Closer.money` it is the unsold payoff (the player kept, not in the recourse's pool, no
+asset debit), so the last close takes an offer iff selling at it beats keeping him (not "any offer"), an offer never hurts (net is nonincreasing in
+existence and in drift) and existence 0 is the no-sale branch. At existence 1 the result is the pre-#152 one exactly when keeping him is worth no more than selling at the lowest offer of the last close; otherwise the last close now declines the worst offers. `Closer.fill` lists the COVERS best recourse sets and keeps the shortest prefix that leaves at most UNCOVERED chance of none being available (the rest is the lapse's when the sets are exhausted).
 
 The recourse is ONE procedure, `approach.cover(..., gain)` / `covers(..., keep)`: the best set of the squad (not already sold or waited for) raising
 the lack at the offers drawn at the last close, by points less the gain of its members, a set none of whose members is superfluous (selling for the

@@ -110,9 +110,10 @@ def waiting_values(m: int, payoffs: Payoffs, hold: float, exists: float = 1.0) -
     max(u, rho_(k-1)) over the `payoffs` u of the offers of a distribution, less rho_(k-1)): with probability 1 - `exists` no offer is drawn.
     `payoffs` are ascending, one per offer, not empty, the same at each draw or, given as a function of k, those of the draw taken with k draws
     still to come (itself counted). An offer is taken at the close with k draws after it when its payoff is at least rho_k; with the payoffs the
-    offers over value it is the reserve ratio (offer_reserve_ratio), with those of a cover (the points a sale saves) the cover's. Nondecreasing
-    in k when the payoffs are the same at each draw and hold is at most the mean payoff, and in `exists` when hold is at most the lowest payoff
-    (which makes the last close accept any offer)."""
+    offers over value it is the reserve ratio (offer_reserve_ratio), with those of a cover (the points a sale saves) the cover's. `hold` is what
+    not selling is worth to the caller, the same whether no offer came, one came and was declined, or the listing lapsed: so the last close takes
+    an offer iff its payoff is at least hold. Nondecreasing in `exists` for any hold (an offer is an option: declining it is free) and in k when
+    the payoffs are the same at each draw; rho_k is at least hold."""
     if m < 0 or not (payoffs(1) if callable(payoffs) else payoffs):
         raise ValueError("m must be >= 0 and payoffs non-empty")
     rho = hold

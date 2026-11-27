@@ -15,7 +15,7 @@ import eleven
 import hurdle
 import valuation
 import worth
-from ffcore.rules import DEBT_SHARE, OFFER_EXISTS, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
+from ffcore.rules import DEBT_SHARE, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
 from inflow import NONE, Inflow
 from worth import NO_OFFERS, offer_ratio_distribution
 
@@ -313,14 +313,14 @@ def first_available(sets: Sequence[frozenset[str]], exists: float) -> list[float
 
 class Reserve(NamedTuple):
     """What a waiting player is to be sold for: at the j-th of the closes left an offer of `least[j]` or more is accepted (the last is
-    the lowest, 0 when any offer is)."""
+    the lowest: 0 when any offer is, infinite when none is, he is then kept)."""
     player: str
     least: tuple[float, ...]
 
 
 class Option(NamedTuple):
     """A way to bring cash to 0 or more at the lock: sell `now` at their standing offers, wait for the offers of `wait` (each
-    sold at the first close whose offer is at or above its Reserve, at the last close whatever it is) and, when cash would still be
+    sold at the first close whose offer is at or above its Reserve, at the last close one that beats keeping him) and, when cash would still be
     below 0, sell the cheapest of the `fallback` players (cheapest per money first) after seeing the last close's offers. `points`
     and `cash` the expectations (points lost; cash at the lock, the credit at its expected), `worst` the most points it can lose and
     `p_worst` the chance of that; `gain` the expected points the prices fetched above the players' worth are worth (kappa x (price less the
@@ -381,7 +381,8 @@ BUCKET = 50_000.0
 UNFILLED = 1e6
 WAITERS = 2
 EVALUATIONS = 50
-COVERS = 2
+COVERS = 6
+UNCOVERED = 0.01
 STEP = 0.02
 MISSED = 4
 
@@ -458,24 +459,28 @@ class Closer:
 
     def fill(self, fixed: frozenset[str], plan: frozenset[str], step: int) -> Filled | None:
         """The Filled of the recourse that closes a gap of `step` BUCKETs (bucket_of) on top of `fixed` (sold), at the expected offers, from the
-        squad less `plan` (the players already sold or waited for), chosen by points less the gains of the sales at the prices the drift leaves (`gains`, as grading.follow chooses it): the best of the COVERS best
-        sets whose players all have an offer at the last close, the jornada lost (Side.lapse) where none does; None when no eleven is left."""
+        squad less `plan` (the players already sold or waited for), chosen by points less the gains of the sales at the prices the drift leaves (`gains`, as grading.follow chooses it): the best of the best
+        sets whose players all have an offer at the last close, the jornada lost (Side.lapse) where none does. The COVERS best sets are listed and the shortest prefix kept that leaves at most
+        UNCOVERED chance that none is available (one call, not a doubling: it profiled faster). That chance goes to the lapse when the sets are exhausted
+        (all there are), else to the last set kept: exact to UNCOVERED, but optimistic at low existence when the COVERS cap binds; None when no eleven is left."""
         key = (self.side.mask(fixed), self.side.mask(plan), step)
         if key not in self.filled:
             got = covers(self.side, fixed, self.club.squad - plan, self.price, step * BUCKET, self.sale_gain, COVERS if step else 1, True)
+            exhausted = len(got) < COVERS or not step
+            while len(got) > 1 and 1.0 - sum(first_available([x.sells for x in got[:-1]], self.exists)) <= UNCOVERED:
+                got = got[:-1]
+            chance = first_available([x.sells for x in got], self.exists)
+            missing = 1.0 - sum(chance)
             lost = self.side.cost(fixed)
             lapsed = None if lost is None else lost + self.side.lapse(fixed)
             if not got:
                 self.filled[key] = None if lapsed is None else Filled(lapsed, 0.0, 0.0, frozenset(), lapsed, 1.0)
             else:
-                chance = first_available([x.sells for x in got], self.exists)
-                missing = 1.0 - sum(chance)
-                if len(got) < COVERS or not step:
-                    outcomes = [(w, x.cost, sum(self.price[k] for k in x.sells), sum(self.gain(k, self.price[k]) for k in x.sells)) for x, w in zip(got, chance)]
-                    outcomes.append((missing, lapsed if lapsed is not None else 0.0, 0.0, 0.0))
-                else:
+                if not exhausted:
                     chance[-1] += missing
-                    outcomes = [(w, x.cost, sum(self.price[k] for k in x.sells), sum(self.gain(k, self.price[k]) for k in x.sells)) for x, w in zip(got, chance)]
+                outcomes = [(w, x.cost, sum(self.price[k] for k in x.sells), sum(self.gain(k, self.price[k]) for k in x.sells)) for x, w in zip(got, chance)]
+                if exhausted:
+                    outcomes.append((missing, lapsed if lapsed is not None else 0.0, 0.0, 0.0))
                 seen = [o for o in outcomes if o[0] > 1e-12]
                 worst = max(o[1] for o in seen)
                 self.filled[key] = Filled(sum(w * c for w, c, _, _ in seen), sum(w * m for w, _, m, _ in seen), sum(w * g for w, _, _, g in seen),
@@ -484,7 +489,9 @@ class Closer:
 
     def least(self, player: str, payoff: Callable[[float], float], rho: float) -> float:
         """The least offer to `player` whose `payoff` (nondecreasing in the offer) reaches `rho`, to a euro; infinite when even the highest
-        offer does not."""
+        offer does not; 0 when an offer of nothing does (any offer is)."""
+        if payoff(0.0) >= rho - 1e-9:
+            return 0.0
         top = self.ratios[-1] * self.club.worth[player]
         if payoff(top) < rho - 1e-9:
             return math.inf
@@ -498,8 +505,10 @@ class Closer:
         """The Reserves of the waiting players and, for each, how it can end: sold (the Atoms of the money it raises, their probabilities
         summing to the chance of a sale) or not sold (one Atom of no money: no offer was drawn at the last close). Each is sold by
         worth.waiting_values over the net the sale then leaves (the payoff of an offer: the gain of selling at it plus the recourse's less its
-        points, for what cash would still lack, the others of the plan at their expected price) with no cost of waiting, the last close taking
-        any offer."""
+        points, for what cash would still lack, the others of the plan at their expected price) with no cost of waiting. Not sold is worth `unsold`:
+        he is kept (no gain, no asset debit, not in the recourse's pool) and the recourse covers what cash lacks from the rest; no offer, an offer
+        declined and a lapsed listing all give it, so the last close takes an offer iff selling at it is worth at least that (a reserve that
+        may exceed every offer: then he is not sold) and an offer, being an option, never hurts."""
         club = self.club
         plan = now | wait
         base = club.cash + club.inflow.expected + sum(club.offers[k] for k in now)
@@ -514,8 +523,10 @@ class Closer:
                 if draws not in seen:
                     seen[draws] = tuple(payoff(price) for price in worth.offers_at(self.ratios, club.worth[k], self.drift[k], self.closes - draws))
                 return seen[draws]
-            rho = worth.waiting_values(self.closes - 1, payoffs, payoffs(1)[0], self.exists)
-            leasts = (*(self.least(k, payoff, rho[self.closes - 1 - j]) for j in range(self.closes - 1)), 0.0)
+            kept = self.fill(plan - {k}, plan, bucket_of(-rest))
+            unsold = -UNFILLED if kept is None else kept.gain - kept.points
+            rho = worth.waiting_values(self.closes - 1, payoffs, unsold, self.exists)
+            leasts = tuple(self.least(k, payoff, rho[self.closes - 1 - j]) for j in range(self.closes))
             reserves.append(Reserve(k, leasts))
             sold = sold_at(club.worth[k], self.ratios, leasts, self.exists, self.drift[k])
             missed = 1.0 - sum(x.p for x in sold)
@@ -1133,12 +1144,54 @@ def _selftest_offer_model() -> None:
         assert all(a >= b - 1e-6 for a, b in zip(costs, costs[1:])), "offers that are likelier to exist never raise the points lost"
     for e in (0.0, 0.5, 0.93, 1.0):
         nets = [tried[e, d].net for d in (-0.02, 0.0, 0.02)]
-        if e >= OFFER_EXISTS:
-            assert all(a >= b - 1e-6 for a, b in zip(nets, nets[1:])), "at the fitted existence or more a price that rises is never worse for the wait, a falling one never better"
+        assert all(a >= b - 1e-6 for a, b in zip(nets, nets[1:])), "a price that rises is never worse for the wait, a falling one never better, at any existence"
+    for d in (-0.02, 0.0, 0.02):
+        nets = [tried[e, d].net for e in (0.0, 0.5, 0.93, 1.0)]
+        assert all(a >= b - 1e-6 for a, b in zip(nets, nets[1:])), "offers that are likelier to exist never raise the net: an offer is an option, declining it is free"
+    assert all(abs(tried[0.0, d].net - tried[0.0, 0.0].net) < 1e-6 and sum(a.p for end in Closer(club._replace(drift={"m07": d}), side, study._replace(exists=0.0), 3).money(frozenset(), frozenset({"m07"}))[1][0] if end.sold for a in end.atoms) < 1e-12
+               for d in (-0.02, 0.0, 0.02)), "no offer ever exists: the option is the no-sale branch, whatever the drift"
+    _selftest_unsold(club, side, study)
     twins = [Closer(club, side, study._replace(exists=e), 3, 0.1) for e in (0.2, 0.9)]
     assert all(c.exists == e for c, e in zip(twins, (0.2, 0.9))), "the Closer reads the existence of the offer model"
     assert secure(club, found, side, study._replace(exists=1.0), 3).options and secure(club, found, side, study._replace(exists=0.2), 3).options[0].points >= \
         secure(club, found, side, study._replace(exists=1.0), 3).options[0].points - 1e-6, "the secured option reads the existence"
+
+
+def _selftest_unsold(club: Club, side: Side, study: worth.OfferDistribution) -> None:
+    """Not selling is worth one thing (the unsold payoff: the player kept, no gain, not in the recourse's pool), whether no offer came, one came
+    and was declined or the listing lapsed; the waiting recursion is translation and scale invariant, and at existence 1 the hold does not
+    matter where it is at most the lowest payoff (the old rule, which held the lowest offer, agrees exactly there)."""
+    rng = random.Random(5)
+    for _ in range(40):
+        m, e = rng.randint(0, 5), rng.choice([0.0, 0.2, 0.5, 0.93, 1.0])
+        u = tuple(sorted(rng.uniform(-9, 9) for _ in range(rng.randint(1, 6))))
+        hold, c, s = rng.uniform(-12, 12), rng.uniform(-5, 5), rng.uniform(0.2, 5)
+        base = worth.waiting_values(m, u, hold, e)
+        assert all(abs(a - (b + c)) < 1e-9 for a, b in zip(worth.waiting_values(m, tuple(x + c for x in u), hold + c, e), base)), "a constant added to every payoff and to the hold shifts the values"
+        assert all(abs(a - b * s) < 1e-9 for a, b in zip(worth.waiting_values(m, tuple(x * s for x in u), hold * s, e), base)), "payoffs and hold scaled scale the values"
+        assert all(a >= hold - 1e-12 for a in base) and all(a <= b + 1e-12 for a, b in zip(base, base[1:])), "waiting is worth at least not selling, more with more closes"
+        assert all(a <= b + 1e-12 for a, b in zip(base, worth.waiting_values(m, u, hold, min(1.0, e + 0.1)))), "likelier offers never lower the value, for any hold"
+        if e == 0.0:
+            assert base == (hold,) * (m + 1), "no offer ever exists: the value is not selling"
+        if e == 1.0:
+            assert worth.waiting_values(m, u, min(hold, u[0]), 1.0)[1:] == worth.waiting_values(m, u, u[0], 1.0)[1:], "at existence 1 a hold at or under the lowest payoff is no part of the values"
+    none = Closer(club._replace(drift={"m07": 0.0}), side, study._replace(exists=0.0), 3, hurdle.FALLBACK_LAMBDA)
+    poor = study._replace(ratios=tuple(1e-3 * r for r in study.ratios), exists=1.0)
+    declined = Closer(club._replace(drift={"m07": 0.0}), side, poor, 3, hurdle.FALLBACK_LAMBDA).outcome(frozenset(), frozenset({"m07"}))
+    missing = none.outcome(frozenset(), frozenset({"m07"}))
+    assert declined is not None and missing is not None and abs(declined.net - missing.net) < 1e-6 and abs(declined.points - missing.points) < 1e-6 and \
+        abs(declined.cash - missing.cash) < 1e-6, "an offer declined, no offer and a lapsed listing all give the unsold payoff"
+    assert all(r.least[-1] == math.inf for r in declined.wait), "no offer reaches the unsold payoff: the last close declines whatever comes"
+    for d in (-0.02, 0.0, 0.02):
+        sure = Closer(club._replace(drift={"m07": d}), side, study._replace(exists=1.0), 3, hurdle.FALLBACK_LAMBDA)
+        (reserve,), (ends,) = sure.money(frozenset(), frozenset({"m07"}))
+        taken = sum(a.p for end in ends if end.sold for a in end.atoms)
+        lowest = worth.offer_price(sure.ratios[0], club.worth["m07"], d, 2)
+        assert reserve.least[-1] > lowest + 1e-9 or abs(taken - 1.0) < 1e-9, "at existence 1, where keeping him is worth no more than the lowest offer, every offer is taken: the old rule"
+    step = bucket_of(5e6)
+    lacks = [Closer(club, side, study._replace(exists=e), 3).fill(frozenset(), frozenset(), step) for e in (1.0, 0.93, 0.5, 0.2)]
+    points = [f.points for f in lacks if f is not None]
+    assert len(points) == len(lacks) and all(a <= b + 1e-9 for a, b in zip(points, points[1:])), "the recourse never costs fewer points when its offers are less likely to exist, however many sets that takes"
 
 
 def _selftest_gain() -> None:
@@ -1368,8 +1421,8 @@ def _selftest() -> None:
         assert best.cash >= -1e-6, "the expected cash at the lock is 0 or more"
         assert best.worst >= best.points - 1e-9 and 0.0 < best.p_worst <= 1.0 + 1e-9
         for r in best.wait:
-            assert len(r.least) == n and r.least[-1] == 0.0 and all(a >= b - 1e-9 for a, b in zip(r.least, r.least[1:])), \
-                "the reserve never rises as the lock nears, and the last close takes any offer"
+            assert len(r.least) == n and all(a >= b - 1e-9 for a, b in zip(r.least, r.least[1:])), \
+                "the reserve never rises as the lock nears"
             seen_wait += 1
         assert len(set(secured.options)) == len(secured.options)
         judge = Closer(tclub, tside, dist, n)
@@ -1428,7 +1481,7 @@ def _selftest() -> None:
         assert now_option is not None and wait_option is not None
         leasts[level] = wait_option.wait[0].least
         assert abs((wait_option.net - now_option.net) - ((wait_option.points - now_option.points) - (wait_option.gain - now_option.gain))) < 1e-9
-        assert wait_option.wait[0].least[-1] == 0.0, "the last close takes any offer"
+        assert wait_option.wait[0].least[-1] <= wait_option.wait[0].least[0], "the last close's reserve is the lowest"
     assert all(a <= b + 1.0 for a, b in zip(leasts[0.0], leasts[hurdle.FALLBACK_LAMBDA])) and all(a <= b + 1.0 for a, b in zip(leasts[hurdle.FALLBACK_LAMBDA], leasts[0.2])), \
         "the dearer the money, the higher the reserve: waiting is for the money above the deficit, at the one exchange rate"
     assert leasts[hurdle.FALLBACK_LAMBDA][0] > 0.982 * dear["m07"], "the standing offer, under the mean draw, is not enough to stop waiting"
@@ -1442,8 +1495,8 @@ def _selftest() -> None:
     only_found = plan(only, approach(only, None, 0.0, 1.0, flat_rounds), flat_rounds, 3, flat_side, rate=hurdle.FALLBACK_LAMBDA)
     assert only_found is not None and only_found.feasible
     alone = secure(only, only_found, flat_side, seen_offers, 3).options[0]
-    assert (alone.now | {r.player for r in alone.wait}) == frozenset({"m07"}) and all(r.least[-1] == 0.0 for r in alone.wait), \
-        "when one sale alone covers the deficit it is still sold, the last close takes whatever it is"
+    assert (alone.now | {r.player for r in alone.wait}) == frozenset({"m07"}) and all(r.least[-1] <= only.worth[r.player] for r in alone.wait), \
+        "when one sale alone covers the deficit it is still sold, and the last close declines only an offer that leaves the gap uncovered at a loss"
     rng = random.Random(77)
     checked = 0
     for _ in range(70):
