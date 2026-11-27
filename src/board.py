@@ -22,7 +22,7 @@ import hurdle
 import shadow
 import worth
 from shadow import Ladder
-from approach import Approach, Bidding, Club, Money, Offer, Option, Plan, Reserve, Rounds, Side, Stand, approach, bidding, given, given_at, plan, pricing_of, replacement, secure, stand
+from approach import Approach, Bidding, Club, Money, Offer, Option, Plan, Reserve, Rounds, Side, Spend, Stand, approach, bidding, given, given_at, plan, pricing_of, replacement, secure, stand
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
@@ -350,6 +350,8 @@ class Stance(NamedTuple):
     advised_win: float | None
     move: str
     to: float | None = None
+    cut: float | None = None
+    spent: Spend = Spend()
 
 
 def millions(x: float) -> str:
@@ -380,6 +382,10 @@ def stance_why(at: Stance, walk: float | None, rate_yield: float | None, net: fl
                                                       net_words(net, label))
     if at.move == "withdraw":
         return text + "No bid on this auction nets above 0: withdraw it."
+    if at.cut is not None and best is not None:
+        short = "A bid of %s has a %.0f%% chance and nets %+.1f points, but the cash at the lock (or the bid limit), with the raises already advised on the other bids placed, does not cover it" % (
+            millions(at.cut), 100 * best.win, best.found.net)
+        return text + short + (": raise it only to %s." % millions(at.to) if at.to is not None else ": Keep it.")
     if at.move in ("lower", "raise") and best is not None and at.to is not None:
         return text + "A bid of %s has a %.0f%% chance and nets %+.1f points: %s it to %s." % (millions(at.to), 100 * best.win, best.found.net, at.move, millions(at.to))
     return text + ("Keep it: no chance is known for this auction." if at.win is None else "Keep it.")
@@ -427,10 +433,12 @@ def displaced(names: dict[str, str], sold: Iterable[str], replaces: str | None) 
 
 
 def stance_of(r: dict[str, Any], curve: Curve | None, trying: bool, bid: Bidding, advised: float | None, advised_win: float | None,
-              fund: Callable[[float, float], Approach | None]) -> tuple[Stance, Approach | None]:
+              fund: Callable[[float, float], Approach | None], spent: Spend = Spend()) -> tuple[Stance, Approach | None]:
     """The Stance of a listing and the Approach it is shown with. With a bid placed it is approach.stand (the funded net of the placed bid against
     the best of the Bidding: hold, lower, withdraw or raise; hold when no Bidding was made or no curve is known), funded at the placed amount;
-    otherwise the best Offer's bid when it is advised (bid), else pass."""
+    otherwise the best Offer's bid when it is advised (bid), else pass. The raises of the bids placed are cumulative (`spent`, approach.Spend: the raises
+    advised before this one): a raise the cash at the lock does not cover is cut back or held (approach.stand), and the bid advised is then the one
+    the move leaves, not the best bid."""
     placed = r["placed"]
     if placed is None:
         return Stance(bid.best.amount if bid.best else None, bid.best.win if bid.best else None, advised, advised_win, "bid" if advised is not None else "pass"), \
@@ -439,8 +447,10 @@ def stance_of(r: dict[str, Any], curve: Curve | None, trying: bool, bid: Bidding
         return Stance(placed, None, None, None, "hold"), None
     win = chance(curve, placed / r["asking"])
     here = fund(placed, win)
-    got = stand(bid, here, placed) if trying else Stand("hold", None)
-    return Stance(placed, win, advised, advised_win, got.move, got.to), here
+    got = stand(bid, here, placed, spent) if trying else Stand("hold", None)
+    if got.cut is not None and advised is not None:
+        advised, advised_win = (placed, win) if got.to is None else (got.to, chance(curve, got.to / r["asking"]))
+    return Stance(placed, win, advised, advised_win, got.move, got.to, got.cut, got.spent), here
 
 
 class Buys(NamedTuple):
@@ -535,6 +545,33 @@ def joint_chain(squad: frozenset[str], pos: dict[str, str], cells: valuation.Cel
     return final
 
 
+def stance_in(c: Case, joint: Joint, spent: Spend) -> tuple[Stance, Approach | None]:
+    """The Stance of a case judged in the chain (its Bidding given the better buys, `joint`): the one place the advised bid and the funding given
+    the others are made. The raises of the bids placed share the cash at the lock, spent in the ORDER OF THE CHAIN (marginal net, best first;
+    buy_lines threads `spent` through it), so a bid of a lower marginal net never takes the room of one of a higher."""
+    best = joint.bid.best
+    clears = best is not None and best.found.net > FUNDED_FLOOR
+
+    def given_fund(amount: float, win: float) -> Approach | None:
+        return given_at(c.fund(amount, win), win, joint.loss)
+    return stance_of(c.r, c.curve, c.trying, joint.bid, best.amount if best is not None and clears else None, best.win if best is not None and clears else None,
+                     given_fund, spent)
+
+
+def placed_stances(cases: list[Case], chain: dict[str, Joint]) -> dict[str, tuple[Stance, Approach | None]]:
+    """The Stance of each bid placed among `cases`, judged in the order of `chain` (the order the joint chain chose them in: marginal net, best first),
+    each raise spending the cash at the lock the earlier ones left (approach.Spend)."""
+    out: dict[str, tuple[Stance, Approach | None]] = {}
+    spent = Spend()
+    for k in chain:
+        c = next((x for x in cases if x.r["player"] == k), None)
+        if c is not None and c.r["placed"] is not None:
+            out[k] = stance_in(c, chain[k], spent)
+            if out[k][0].move == "raise":
+                spent = out[k][0].spent
+    return out
+
+
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], cost0: float, rate: float, n_closes: int) -> Buys:
     """The buys of the board, the funded plans and the candidates left out. Every player on the market with an asking price and a gain (or a bid
     placed; one who adds no points is no candidate) is a candidate, best gain first; the first EVALUATED_BUYS get a Bidding (approach.bidding): the funded net of each bid of the auction
@@ -579,6 +616,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     chain = joint_chain(squad, pos, cells, [c for c in cases if c.r["placed"] is not None or reason_of(c.curve, c.trying, c.bid, "net_not_positive") is None], memo)
     out: list[Doc] = []
     ladders: list[Ladder] = []
+    stances = placed_stances(cases, chain)
     for c in cases:
         r, curve, trying, alone = c.r, c.curve, c.trying, c.bid
         k, placed = r["player"], r["placed"]
@@ -592,15 +630,8 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
         else:
             reason = auction_reason if auction_reason is not None else reason_of(curve, trying, bid, "covered")
         best = bid.best
-        net = best.found.net if best is not None else None
         walk = bid.walk_away if best is not None else None
-        clears = best is not None and net is not None and net > FUNDED_FLOOR
-        advised = best.amount if best is not None and clears else None
-        advised_win = best.win if best is not None and clears else None
-
-        def given_fund(amount: float, win: float, c: Case = c, loss: float = loss) -> Approach | None:
-            return given_at(c.fund(amount, win), win, loss)
-        at, shown = stance_of(r, curve, trying, bid, advised, advised_win, given_fund)
+        at, shown = stances[k] if placed is not None else stance_in(c, joint, Spend())
         amount, win = at.amount, at.win
         found = shown if shown is not None and shown.feasible else None
         funding = None if shown is None or amount is None else funding_doc(club, names, shown, amount)
@@ -1481,7 +1512,7 @@ def _selftest_placed() -> None:
     ratios = (0.9, 1.0, 1.02, 1.05, 1.1, 1.2, 1.3, 1.5)
     moves: set[str] = set()
     reasons: set[str | None] = set()
-    overs = nolabel = advised_n = 0
+    overs = nolabel = advised_n = raises = 0
     for _ in range(40):
         keys = sorted(market)
         curves = [decision.CurvePoint(k, r, min(1.0, rng.choice([0.0, 0.1, 0.3]) + (r - 1.0) * rng.choice([0.5, 2.0, 5.0]))) for k in keys for r in ratios]
@@ -1536,11 +1567,52 @@ def _selftest_placed() -> None:
             nolabel += over and b["net"] is None
             moves.add(b["move"])
         assert all(b["why"] is None for b in shown[len(mine):]), "no words for a bid not placed"
+        raising = [b for b in shown[:len(mine)] if b["move"] == "raise"]
+        extra = sum(b["to"] - b["amount"] for b in raising)
+        assert all(extra <= min(b["funding"]["lock_margin"], b["funding"]["margin"]) + 1e-6 for b in raising if b["funding"]["feasible"]), \
+            "the raises advised together never spend more than the cash at the lock (or the bid limit) any of them has left"
+        raises += len(raising)
+    assert raises > 0, "raises were exercised"
     assert moves >= {"hold", "lower", "withdraw"}, moves
     assert overs > 0, "the net of a bid over the walk-away was exercised"
     assert nolabel > 0, "a bid over the walk-away with no net was exercised"
     assert {None, "net_not_positive"} <= reasons or {"net_not_positive", "unfundable"} <= reasons or len(reasons) >= 2, reasons
     assert advised_n > 0 and "net_not_positive" in reasons, "funded plans and a rejected net were exercised"
+
+
+def _selftest_chain_room() -> None:
+    """Two bids placed that both want a raise, the cash at the lock for one: the one the chain puts first (the greater marginal net) keeps its raise,
+    in either input order and at any scale; the raises together never pass the room; a bid of a lower net never takes the room of a higher."""
+    curve: Curve = ((1.0, 0.2), (1.1, 0.6), (1.3, 1.0))
+    squeezed = 0
+    for scale in (1.0, 4.0, 0.3):
+        asking = 10e6 * scale
+        for room_of in (0.2, 0.7, 1.5, 100.0):
+            left = room_of * 0.1 * asking
+            cases = {}
+            for key, top in (("hi", 9.0), ("lo", 4.0)):
+                def fund(amount: float, win: float, top: float = top, left: float = left) -> Approach:
+                    return Approach(True, 0.0, frozenset(), frozenset(), frozenset(), frozenset(), 0.0, left, left, left, 0.0, 0.0, 0.0, 0.0,
+                                    win * (top - (amount - asking) / asking * 3.0) - 1.0)
+                r = {"player": key, "placed": asking * 0.98, "asking": asking, "gain": 1.0}
+                cases[key] = Case(r, curve, True, bidding(curve, asking, fund, 0.0), fund, Money())
+            chain = {k: Joint(cases[k].bid, 0.0, None) for k in ("hi", "lo")}
+            hi, lo = cases["hi"].bid.best, cases["lo"].bid.best
+            assert hi is not None and lo is not None and hi.found.net > lo.found.net
+            for order in (["hi", "lo"], ["lo", "hi"]):
+                got = placed_stances([cases[k] for k in order], chain)
+                assert list(got) == ["hi", "lo"], "judged in the chain's order, not the input's"
+                moves = {k: got[k][0] for k in got}
+                spend = sum(m.to - asking * 0.98 for m in moves.values() if m.move == "raise" and m.to is not None)
+                assert spend <= left + 1e-6, "the raises together stay within the cash at the lock"
+                if moves["lo"].move == "raise":
+                    assert moves["hi"].move == "raise", "a lower net never raises while the higher is held"
+                squeezed += moves["hi"].move == "raise" and moves["lo"].move != "raise"
+                alone = placed_stances([cases["hi"]], {"hi": chain["hi"]})["hi"][0]
+                assert (moves["hi"].move, moves["hi"].to) == (alone.move, alone.to), "the higher net's raise is as if it were alone"
+                if left > 1.2 * (alone.to or 0.0) - 1.2 * asking * 0.98 and alone.move == "raise" and room_of >= 100:
+                    assert moves["lo"].move == "raise", "room for both: both raise"
+    assert squeezed >= 3, "room for one of the two was exercised at every scale"
 
 
 def _selftest_worked_case() -> None:
@@ -1918,7 +1990,7 @@ def _selftest() -> None:
         {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"
     curve: Curve = ((1.0, 0.2), (1.1, 0.6), (1.3, 1.0))
     asking = 10e6
-    stub = Approach(True, 0.0, frozenset(), frozenset(), frozenset(), frozenset(), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    stub = Approach(True, 0.0, frozenset(), frozenset(), frozenset(), frozenset(), 0.0, 1e12, 1e12, 1e12, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     def fund(amount: float, win: float) -> Approach:
         return stub._replace(net=win * (6.0 - (amount - asking) / 1e6 * 1.5) - 1.0)
@@ -1948,6 +2020,21 @@ def _selftest() -> None:
                                      "replaces": "x", "per_million": None, "price_next": None, "price_lock": None,
                                      "stake": hurdle.stake(1.0, 26, 0.045, hurdle.Exit(asking), 26)}])
         assert line["placed"] == placed, "a target with your bid on him says it beside the advised one"
+    cuts = 0
+    for left in (0.0, 0.2e6, 1e6, 1e12):
+        for placed in (10e6, 10.5e6, 11e6, 12e6):
+            def tight(amount: float, win: float, left: float = left) -> Approach:
+                return fund(amount, win)._replace(margin=left, lock_margin=left)
+            at, _ = stance_of({"placed": placed, "asking": asking}, curve, True, found, advised, found.best.win, tight)
+            assert at.move != "raise" or at.to is not None and at.to - placed <= left + 1e-6, "a raise never spends more than the cash at the lock has left"
+            if at.cut is not None:
+                cuts += 1
+                assert at.cut == advised and (at.advised, at.advised_win) == ((placed, chance(curve, placed / asking)) if at.to is None else (at.to, chance(curve, at.to / asking))), \
+                    "a cut raise advises what the move leaves"
+                why = stance_why(at, None, None, 1.0, None, found.best) or ""
+                assert "does not cover" in why and (("Keep it" in why) == (at.move == "hold")), "and says so in words"
+    assert cuts > 0, "a raise the cash does not cover was exercised"
+    _selftest_chain_room()
     _selftest_overlap()
     _selftest_placed()
     _selftest_worked_case()

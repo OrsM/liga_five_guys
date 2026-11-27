@@ -929,32 +929,80 @@ def given_at(here: Approach | None, win: float | None, loss: float) -> Approach 
 STAND_MARGIN = 0.1
 
 
+class Spend(NamedTuple):
+    """The raises already advised on the bids placed, which share one cash at the lock (and one bid limit): `total` their extra spend over what the bids
+    placed cost, `floor` the least room (`room`) any of them rests on. A raise of `delta` on a bid whose room is `h` fits when delta <= min(h, floor) - total:
+    the cash it leaves, in the case it is won with every raise advised before it won too, is not below 0. Raises are cumulative, in the order stand is called."""
+    total: float = 0.0
+    floor: float = math.inf
+
+    def left(self, room: float) -> float:
+        """What a raise on a bid of room `room` may still add."""
+        return min(room, self.floor) - self.total
+
+    def after(self, delta: float, room: float) -> "Spend":
+        return Spend(self.total + delta, min(self.floor, room))
+
+
+def room(found: Approach | None) -> float:
+    """What a bid funded as `found` can still spend before the cash at the lock, if it is won, or the bid limit, would be below 0: the least of `lock_margin`
+    and `margin` (-inf when it is not funded)."""
+    return min(found.margin, found.lock_margin) if found is not None and found.feasible else -math.inf
+
+
 class Stand(NamedTuple):
-    """What to do with a bid placed: `move` (hold, lower, withdraw or raise) and `to`, the amount to move it to (lower and raise; None otherwise)."""
+    """What to do with a bid placed: `move` (hold, lower, withdraw or raise) and `to`, the amount to move it to (lower and raise; None otherwise).
+    `cut` is the dearer bid the cash at the lock did not allow when the raise was cut back to `to` or held (else None); `spent` the raises advised
+    up to and with this one."""
     move: str
     to: float | None
+    cut: float | None = None
+    spent: Spend = Spend()
 
 
-def stand(found: Bidding, here: Approach | None, placed: float) -> Stand:
+def stand(found: Bidding, here: Approach | None, placed: float, spent: Spend = Spend()) -> Stand:
     """The move for a bid placed at `placed` on a listing whose Bidding is `found`, `here` the Approach that funds it at `placed` (None when none
     does): the same funded net that advises a new bid, never a second valuation. withdraw iff no bid tried has a net above 0. Otherwise lower
     (to the best bid) when the placed bid's net is not above 0 and the best is under it, raise (to the best) when its net is not above 0 and
     the best is over it, or when the best bid is dearer than the placed one and nets more; else, a placed bid whose net is above 0 is never lowered,
     and one under its cleared amount (hurdle.cleared: just under a round number) is raised to it when the walk-away and what `here` has left of
-    the bid limit and of the cash at the lock allow it; else hold."""
+    the bid limit and of the cash at the lock allow it; else hold. Every raise, on either path, must fit the room (`room(here)`: the cash at the lock if
+    the bid is won, and the bid limit) that the raises already advised (`spent`) have left; when the best bid does not fit, the raise is cut back to the
+    dearest bid of the Bidding that fits (its net read there, no new valuation) and still nets as the raise requires, else the bid is held; `cut` says it.
+    With no `here` funded, the room is the one the bid's own funding leaves, less what it adds over `placed`."""
     best = found.best
     here_net = here.net if here is not None and here.feasible else None
     if best is None or max(best.found.net, here_net if here_net is not None else best.found.net) <= 0:
         return Stand("withdraw", None)
     if here_net is None or here_net <= 0:
-        return Stand("lower" if best.amount < placed else "raise", best.amount) if best.amount != placed else Stand("hold", None)
+        if best.amount == placed:
+            return Stand("hold", None)
+        if best.amount < placed:
+            return Stand("lower", best.amount)
+        return _raise(found, here, placed, spent, lambda o: o.found.net > 0)
     if best.amount > placed and best.found.net > here_net + STAND_MARGIN:
-        return Stand("raise", best.amount)
+        return _raise(found, here, placed, spent, lambda o: o.found.net > here_net + STAND_MARGIN)
     clear = hurdle.cleared(placed)
     if here is not None and clear > placed and clear <= (found.walk_away if found.walk_away is not None else placed) \
-            and here.margin >= clear - placed and here.lock_margin >= clear - placed:
-        return Stand("raise", clear)
+            and clear - placed <= spent.left(room(here)):
+        return Stand("raise", clear, None, spent.after(clear - placed, room(here)))
     return Stand("hold", None)
+
+
+def _raise(found: Bidding, here: Approach | None, placed: float, spent: Spend, nets: Callable[[Offer], bool]) -> Stand:
+    """The raise of a bid placed at `placed` to the best bid of `found`, or to the dearest bid under it that `nets` accepts and that fits (Stand: cut says
+    the best bid did not), or a hold when none fits."""
+    assert found.best is not None
+
+    def fits(o: Offer) -> bool:
+        own = room(here) if here is not None and here.feasible else room(o.found) + o.amount - placed
+        return o.amount - placed <= spent.left(own) + 1e-6
+    ok = [o for o in found.offers if placed < o.amount <= found.best.amount and nets(o) and fits(o)]
+    got = max(ok, key=lambda o: o.amount, default=None) if found.best not in ok else found.best
+    if got is None:
+        return Stand("hold", None, found.best.amount, spent)
+    own = room(here) if here is not None and here.feasible else room(got.found) + got.amount - placed
+    return Stand("raise", got.amount, None if got is found.best else found.best.amount, spent.after(got.amount - placed, own))
 
 
 def _town(rng: random.Random, case: int) -> tuple[Club, Rounds, float, float]:
@@ -1076,16 +1124,16 @@ def _selftest_after_result() -> None:
         assert got.cost_lost - got.credit_lost >= floor - 1e-9, "after a lost bid no plan beats the plan with no buy, a pair's as a buy's"
     walk = bidding(((1.0, 0.5), (1.1, 0.8), (1.2, 0.95)), 10e6, lambda amount, win: _stub(3.0 - (amount - 10e6) / 1e6 * 1.0), 1e-6)
     assert walk.best is not None and walk.best.amount == hurdle.cleared(10e6)
-    held = {m: stand(walk, _stub(x), 11e6).move for m, x in (("a", 2.5), ("b", -1.0))}
-    assert held == {"a": "hold", "b": "lower"}, held
+    held = {m: stand(walk, _stub(x)._replace(margin=0.0, lock_margin=0.0), 11e6).move for m, x in (("a", 2.5), ("b", -1.0))}
+    assert held == {"a": "hold", "b": "lower"}, held  # no room (margin, lock_margin 0): the cleared amount is not bid
     assert stand(walk, None, 12e6).move == "lower" and stand(walk, None, 9e6).move == "raise", "unfundable at the placed amount: to the best bid"
-    assert stand(walk, _stub(2.0), walk.best.amount) == Stand("hold", None) and stand(walk._replace(best=walk.offers[1]), _stub(1.0), walk.best.amount) == Stand("raise", walk.offers[1].amount)
+    assert stand(walk, _stub(2.0), walk.best.amount) == Stand("hold", None) and stand(walk._replace(best=walk.offers[1]), _stub(1.0), walk.best.amount)[:2] == ("raise", walk.offers[1].amount)
     nothing = bidding(((1.0, 0.5),), 10e6, lambda amount, win: _stub(-1.0), 1e-6)
     assert stand(nothing, _stub(-1.0), 10e6) == Stand("withdraw", None) and stand(nothing._replace(best=None), None, 10e6).move == "withdraw"
 
 
 def _stub(net: float) -> Approach:
-    return Approach(True, 0.0, frozenset(), frozenset(), frozenset(), frozenset(), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, net)
+    return Approach(True, 0.0, frozenset(), frozenset(), frozenset(), frozenset(), 0.0, 1e12, 1e12, 1e12, 0.0, 0.0, 0.0, 0.0, net)
 
 
 def _selftest_bidding() -> None:
@@ -1143,6 +1191,7 @@ def _selftest_bidding() -> None:
     refused = bidding(((1.0, 0.9), (1.1, 1.0)), 1e6, lambda amount, win: _unfundable(), 1e-6)
     assert refused.best is None and refused.offers == () and refused.walk_away is None, "no funded price: nothing is bid"
     _selftest_limits()
+    _selftest_raise_cash()
 
 
 def _selftest_limits() -> None:
@@ -1177,17 +1226,74 @@ def _selftest_limits() -> None:
         free = rng.choice([0.0, clear - at - 1.0, clear - at, 1e9])
         here = _stub(rng.choice([-1.0, 0.5, 2.0]))._replace(margin=free, lock_margin=free)
         mv = stand(placed, here, at)
-        if mv.move == "raise" and mv.to == clear and clear > at and clear != placed.best.amount:
+        if mv.move == "raise" and mv.to == clear and clear > at and clear != placed.best.amount and mv.cut is None:
             assert here.net > 0 and clear <= placed.walk_away and free >= clear - at, "raised to the cleared amount: net above 0, within the walk-away and the room"
         if clear == at and here.net > 0 and placed.best.amount <= at:
             assert mv.move == "hold", "a placed amount already cleared, its net above 0, is left alone"
         if here.net <= 0:
-            assert mv.to is None or mv.to == placed.best.amount, "a net not above 0 moves to the best bid, not to the cleared amount"
+            assert mv.to is None or mv.to == placed.best.amount or mv.cut is not None, "a net not above 0 moves to the best bid (or the dearest bid of the room), not to the cleared amount"
         if mv.to is not None and mv.move == "raise":
             assert mv.to > at and (mv.to <= placed.walk_away or mv.to == placed.best.amount), "a raise never lowers, and stays within the walk-away"
     snug = _stub(2.9)._replace(margin=1e9, lock_margin=1e9)
     low = 10_100_000.0 - 5.0
-    assert stand(placed, snug, low) == Stand("raise", hurdle.cleared(low)) == Stand("raise", 10_100_011.0), "just under a round number: raised to the cleared amount"
+    assert stand(placed, snug, low)[:2] == ("raise", hurdle.cleared(low)) == ("raise", 10_100_011.0), "just under a round number: raised to the cleared amount"
+
+
+def _selftest_raise_cash() -> None:
+    """A raise never takes the cash at the lock (or the bid limit) below 0, on either path, alone or with the other raises advised: the cash a placed bid
+    leaves if won, `room`, less the raises already advised (Spend) fits the extra the raise spends; a raise that fits is the advised one, a raise that does
+    not is cut back to the dearest bid tried that fits (monotone in the room) or held, and the whole holds when every amount is scaled."""
+    rng = random.Random(27)
+    ladder = ((1.0, 0.3), (1.02, 0.5), (1.05, 0.7), (1.1, 0.85), (1.2, 0.95))
+    cut = raised = 0
+    for scale in (1.0, 3.0, 0.25):
+        asking = 10e6 * scale
+        peak = bidding(ladder, asking, lambda amount, win: _stub(win * 3.0 - 0.5 * abs(amount / asking - 1.15)), 1e-6)
+        assert peak.best is not None and len(peak.offers) >= 4
+        for case in range(300):
+            placed = asking * rng.choice([0.97, 1.0, 1.01, 1.03])
+            lock = rng.choice([0.0, 0.2, 0.5, 1.0, 2.0, 5.0, 50.0]) * asking * 0.1
+            here = _stub(rng.choice([-1.0, 0.5, 1.0]))._replace(lock_margin=lock, margin=rng.choice([lock, 1e12]))
+            chain = Spend(rng.choice([0.0, 0.1 * lock, 0.6 * lock]), rng.choice([math.inf, 2 * lock]))
+            at = stand(peak, here, placed, chain)
+            if at.move == "raise" and at.to is not None:
+                raised += 1
+                extra = at.to - placed
+                assert extra <= chain.left(room(here)) + 1e-6 and chain.total + extra <= min(here.lock_margin, here.margin, chain.floor) + 1e-6, "cash at the lock if won stays 0 or more"
+                assert at.spent == chain.after(extra, room(here)), "the raises are cumulative"
+                if at.cut is not None:
+                    cut += 1
+                    assert at.cut == peak.best.amount and at.to < at.cut and at.to in [o.amount for o in peak.offers], "cut back to a bid tried"
+                    assert all(o.amount - placed > chain.left(room(here)) for o in peak.offers if o.amount > at.to and o.amount <= at.cut and o.found.net > 0), "the dearest that fits"
+                else:
+                    assert at.to == peak.best.amount or at.to == hurdle.cleared(placed), "a raise that fits is the advised one"
+            elif at.cut is not None:
+                assert at.move == "hold" and at.cut == peak.best.amount, "a raise that does not fit is held, and says so"
+            wide = stand(peak, here._replace(lock_margin=1e12, margin=1e12), placed)
+            if at.move == "raise" and at.cut is None and here.net > 0 or here.net <= 0 and at.move == "raise" and at.cut is None:
+                assert (wide.move, wide.to) == (at.move, at.to), "a raise that fits is unchanged by more room"
+            more = stand(peak, here, placed, chain._replace(total=0.0))
+            if at.move == "raise" and more.move == "raise" and at.to is not None and more.to is not None:
+                assert more.to >= at.to, "the less already spent, the dearer the raise: monotone"
+            elif at.move == "raise" and at.cut is not None:
+                assert more.move == "raise", "more room never turns a cut raise into a hold"
+    assert cut > 50 and raised > 200, (cut, raised)
+    # cumulative across several placed bids in any order: the extra spent never passes the room of any of them
+    for _ in range(200):
+        bids = [(10e6 * rng.choice([1.0, 2.0, 4.0]), _stub(rng.choice([-1.0, 1.0]))._replace(lock_margin=rng.choice([0.2e6, 1e6, 3e6, 20e6]))) for _ in range(rng.randint(2, 5))]
+        chain, rooms = Spend(), []
+        for asking, here in bids:
+            def net(amount: float, win: float, a: float = asking) -> Approach:
+                return _stub(win * 3.0 - 0.5 * abs(amount / a - 1.15))
+            book = bidding(ladder, asking, net, 1e-6)
+            at = stand(book, here._replace(margin=here.lock_margin), asking, chain)
+            if at.move == "raise":
+                chain = at.spent
+                rooms.append(here.lock_margin)
+                assert chain.total <= min(rooms) + 1e-6, "total extra spend across the raises stays within the least lock cash"
+    # no bid funded at the placed amount: the room is the bid's own funding at the target
+    book = bidding(ladder, 10e6, lambda amount, win: _stub(win * 3.0 - 0.5 * abs(amount / 10e6 - 1.15))._replace(lock_margin=0.5e6 + (amount - 10e6) * 0.0), 1e-6)
+    assert stand(book, None, 9e6, Spend(1e6, math.inf)).move == "hold" and stand(book, None, 9e6, Spend(0.4e6, math.inf)).move == "raise", "cash at the target, less the others' raises"
 
 
 def _unfundable() -> Approach:
