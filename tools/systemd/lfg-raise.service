@@ -1,0 +1,9 @@
+[Unit]
+Description=liga_five_guys — DRY RUN ONLY: what raising the placed bids to the advised ones would do (cannot send a bid)
+After=network-online.target
+
+[Service]
+Type=oneshot
+NoNewPrivileges=yes
+ExecStart=%h/claude_projects/liga_five_guys/tools/lfg-raise
+TimeoutStartSec=3min

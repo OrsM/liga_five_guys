@@ -345,6 +345,23 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   (each market player by `valuation.Buyer`); `decision_at`, `replay` and `decisions` run it at one cut or over many. Nothing else of the old decision survives.
 - **Taps:** only `list` is done from the phone (`act.py`; an already-listed player, error 030.01.52, counts as listed).
 - **Listing is automatic:** `lfg-list` (timer: every 5 min and 22:19 Madrid) runs `act.py ensure`, which lists every squad player without a listing (read from the app's `teams` and `market`; one POST `market/sell` each, at max(value, the app's now)) and logs to `~/.local/state/lfg/list.log` only when it listed or refused something; the board's `list` line then appears only when that has failed.
+- **Bid raiser (DRY RUN ONLY, default off, cannot send):** `act.py raise [--dry]` (wrapper `tools/lfg-raise`; unit and timer files
+  `tools/systemd/lfg-raise.*`, written but NOT installed or enabled) weighs each board buy line with `move == "raise"` and writes what
+  raising the owner's placed bid to the board's `to` would do, as a `place_dry` record (cut, at, evening, pass 1|2, player, market id,
+  amount placed, `to`, target, delta, would-raise, skip reason) appended to `~/.local/state/lfg/place_dry.jsonl` (run-record line format,
+  versioned reader, kind in `ffcore.records.KINDS`). It implements no rule: `to`, `amount`, `walk_away` and `funding.lock_margin` are the
+  board's; its own checks, in order: kill switch file `NO_RAISE`; `RAISE_MODE` file off (default, also when missing or garbled) | dry | live
+  (live is REFUSED: `raise_bid`, the one function that would hold the app's bid call, raises NotImplementedError and nothing reaches it);
+  Madrid clock in [22:00, 22:22:30); a board over 20 min old, or whose `market_at` is before the latest look (newest raw snapshot), is STALE: the evening's flip-run board always is, so a dry pass still weighs it and marks each row `stale` with `age_min` (the gap to what the owner placed from that same board is the measurement; live, refused here, would skip it); the
+  market read now (a GET, as `ensure_listed` does; the login is made only in dry mode): a bid of yours on him, not closing within 90 s,
+  holding exactly the board's `amount` (else "owner changed it"); one entry per (market item, evening, pass) in `raise.dry.done.jsonl`
+  so a repeat writes nothing, at most 2 raises of an auction per evening; target = floor(min(`to`, walk-away, can_bid + amount)), above
+  the placed bid only (never lowers, withdraws or opens a bid); lines in board-net order, cumulative delta within the smallest `lock_margin`
+  of the lines raised so far (a later roomy margin never lifts an earlier tighter cap) and `can_bid`. Until `approach.stand` itself keeps a raise within `lock_margin` (separate fix), `lock_margin` is the cap here.
+  **The experiment:** `RAISE_MODE=dry` for 10 evenings; compare each night's would-raise `to` with the amount the owner finally placed
+  (flips: placed lost and `to` was above the rival's price; waste: placed won and `to` above it: pure extra spend). Not yet approved by
+  the owner, all three needed before anything goes live: one supervised capture of the app's own bid call, wiring `raise_bid` (and the
+  re-read check after it), and switching the mode file to live (first capped). Design: `~/.cache/place-design/DESIGN.md`.
 - **`dec_offer`** (the record of each standing offer at a run's cut, version 3): `delta_next4`, `delta_season` (the
   sale's Delta, 0 for a bench player, null when no eleven remains), `fields` (the squad after the sale fields a legal eleven),
   `gap`, and from 2026-11-27 `verdict` (the sells row's word after `board.settle`: sell, wait, hold or needs_replacement) and

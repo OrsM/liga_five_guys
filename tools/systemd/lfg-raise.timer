@@ -1,0 +1,10 @@
+[Unit]
+Description=DRY RUN ONLY: weigh raising the placed bids just after the 22:04 and 22:19 looks (not enabled; does nothing unless RAISE_MODE says dry)
+
+[Timer]
+OnCalendar=*-*-* 22:06:00 Europe/Madrid
+OnCalendar=*-*-* 22:20:30 Europe/Madrid
+Persistent=false
+
+[Install]
+WantedBy=timers.target

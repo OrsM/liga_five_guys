@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# DRY RUN ONLY: what raising the owner's placed bids to the board's advised bids would have done, for the experiment in docs/notes/lfg.md.
+# It cannot send a bid (act.py raise_bid is not wired) and does nothing unless ~/.local/state/lfg/RAISE_MODE says dry; the kill switch is a
+# file ~/.local/state/lfg/NO_RAISE. Its unit (lfg-raise.timer) is NOT enabled. Rows go to ~/.local/state/lfg/place_dry.jsonl.
+# Silent when it did nothing; a pass that weighed lines is appended to raise.log. Takes the run lock (a look or a run in flight is waited for).
+
+set -uo pipefail
+
+STATE="${LFG_STATE:-$HOME/.local/state/lfg}"
+mkdir -p "$STATE"
+export LFG_STATE="$STATE"
+REPO="${LFG_REPO:-$HOME/claude_projects/liga_five_guys}"
+
+exec 9>"$STATE/run.lock"
+flock -w "${LFG_LOCK_WAIT:-60}" 9 || { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) raise: run lock held, skipped" >> "$STATE/raise.log"; exit 0; }
+
+OUT=$(cd "$REPO" && PYTHONPATH=src "$HOME/.local/bin/uv" run --frozen python src/act.py raise "$@" 2> "$STATE/raise.err")
+RC=$?
+if [ "$RC" -ne 0 ]; then
+    OUT=$(python3 -c '
+import json, sys
+err = open(sys.argv[1], encoding="utf-8").read().strip().splitlines()[-1:] or ["no output"]
+print(json.dumps({"mode": "?", "stopped": err[0][:200], "rows": []}))' "$STATE/raise.err")
+fi
+if printf '%s' "$OUT" | python3 -c '
+import json, sys
+got = json.load(sys.stdin)
+sys.exit(0 if got["rows"] or (got["stopped"] and got["mode"] == "dry") or got["mode"] == "?" else 1)'; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $OUT" | tee -a "$STATE/raise.log"
+fi
+[ "$RC" -eq 0 ]

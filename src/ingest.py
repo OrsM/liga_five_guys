@@ -63,6 +63,12 @@ def snapshots() -> list[Path]:
     return sorted(RAW.glob("dt=*.tar.xz"), key=_stamp_of)
 
 
+def latest_stamp() -> str | None:
+    """The stamp (2026-11-27T2135Z) of the newest raw snapshot, the last look or fetch, or None."""
+    got = snapshots()
+    return _stamp_of(got[-1]) if got else None
+
+
 def _read(path: Path, only: set[str] | None = None) -> dict[str, str]:
     want = None if only is None else set(only) | {MANIFEST}
     with tarfile.open(path, "r:xz") as tf:

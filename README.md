@@ -189,7 +189,8 @@ rather than reaching through them; ruff flags reads of private members.
                     laliga_api, parse, text, auth, league
     tools/          gate, selftests.sh, frontiers.py, golden.py (and golden/),
                     auction_table.py, lfg-rules, lfg-dry-run, capped, locked-run, peek.py,
-                    cases.py (and cases/)
+                    cases.py (and cases/), lfg-raise (DRY RUN ONLY bid raiser: `act.py raise`; cannot send a bid, mode file
+                    default off, unit files in tools/systemd/ not installed; see docs/notes/lfg.md "Bid raiser")
     inputs/         league.ini
     data/raw/       archived pages, append-only
     data/tidy/      parse caches (what parse fills is rebuilt from raw: the

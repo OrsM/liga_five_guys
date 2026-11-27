@@ -257,6 +257,8 @@ def _selftest() -> None:
                                                    rng.random(), None, None, None, 4.2, 0.3, None)],
             "dec_offer": [rec.DecOffer("2026-11-0%dT1000Z" % i, "Pedri", "9%d" % i, "2026-11-01T09:00:00Z", 2e6, 1.9e6, rng.random(), None,
                                        5, 0.0, -3.0, True, "", "", 0.1)],
+            "place_dry": [rec.PlaceDry("2026-11-0%dT20:00Z" % i, "2026-11-0%dT21:06:00Z" % i, "2026-11-0%d" % i, 1, "Pedri", "m%d" % i,
+                                       2e6, 2.5e6, 2.4e6, 4e5, True, None), rec.PlaceDry("c", "a", "d", 2, "Gavi", None, 1.0, 2.0, None, None, False, "no bid")],
             "sale_score": [rec.SaleScore(i, "miguel", "all", "lock", 30, rng.random(), 0.05, -1.0, 1.0, -2.0, 2.0)]}
 
     with tempfile.TemporaryDirectory() as tmp:

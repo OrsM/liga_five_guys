@@ -16,7 +16,7 @@ import numpy as np
 import numpy.typing as npt
 
 __all__ = ["AuctionBrier", "AuctionCalibration", "DEC_OFFER_V1", "DecOffer", "DecOpportunity", "GRADE_CELL_DTYPE", "GradeCell", "KINDS", "KindSpec",
-           "LATEST", "Latest", "MeasureLog", "PLAYER_BYTES", "Param", "READERS", "Run", "RunMeasure", "SaleScore", "StoreError",
+           "LATEST", "Latest", "MeasureLog", "PLAYER_BYTES", "Param", "PlaceDry", "READERS", "Run", "RunMeasure", "SaleScore", "StoreError",
            "change", "decode", "encode", "grade_cell_array", "grade_cell_rows", "header", "latest", "parse_header"]
 
 
@@ -136,6 +136,30 @@ DEC_OFFER_V1 = ("cut", "player", "offer_id", "created_at", "offer", "value", "ra
                 "lost_season", "funds", "bench", "trend")
 
 
+class PlaceDry(NamedTuple):
+    """One line of a dry pass of the bid raiser (act.py raise): the buy of a board at `cut` (its generated_at), `at` the time of the
+    pass (UTC), `look_date` the Madrid evening and `pass_no` 1 or 2 within it, the market item `market_id`, `amount` the bid the app held
+    at the pass (what would be raised from), `to` the board's advised bid, `target` what the raiser would send (the least of `to`,
+    the walk-away and the room, floored to the euro; None when no bid was read), `delta` target less amount, `would_raise` whether
+    the line passed every check and `skip` why not (None when it did); `stale` whether the board was over 20 min old or made before
+    the last look (a dry pass still weighs it: the gap to what the owner placed from that board is what is measured) and `age_min` its age
+    in minutes (None: not recorded, version 1). Nothing here was sent."""
+    cut: str
+    at: str
+    look_date: str
+    pass_no: int
+    player: str
+    market_id: str | None
+    amount: float
+    to: float
+    target: float | None
+    delta: float | None
+    would_raise: bool
+    skip: str | None
+    stale: bool = False
+    age_min: float | None = None
+
+
 class SaleScore(NamedTuple):
     run_id: int
     group: str
@@ -167,9 +191,10 @@ KINDS: Mapping[str, KindSpec] = {s.name: s for s in (
     KindSpec("grade_cell", GradeCell, "grade_cell.npy"),
     KindSpec("dec_opportunity", DecOpportunity, "opportunity.jsonl"),
     KindSpec("dec_offer", DecOffer, "offer.jsonl"),
+    KindSpec("place_dry", PlaceDry, "place_dry.jsonl"),
     KindSpec("sale_score", SaleScore, "sale_score.jsonl"))}
 
-LATEST: Mapping[str, int] = {name: 3 if name == "dec_offer" else 1 for name in KINDS}
+LATEST: Mapping[str, int] = {name: {"dec_offer": 3, "place_dry": 2}.get(name, 1) for name in KINDS}
 
 PLAYER_BYTES = 24
 GRADE_CELL_DTYPE = np.dtype([("from_j", "<i4"), ("jornada", "<i4"), ("player", f"S{PLAYER_BYTES}"),
@@ -199,7 +224,8 @@ def _dec_offer_v1(obj: Mapping[str, Any]) -> DecOffer:
 
 
 READERS: Mapping[tuple[str, int], Callable[[Mapping[str, Any]], Any]] = {
-    (name, v): _read_v1(name) for name, v in LATEST.items()} | {("dec_offer", 1): _dec_offer_v1, ("dec_offer", 2): _read_v1("dec_offer", ("verdict", "reserve"))}
+    (name, v): _read_v1(name) for name, v in LATEST.items()} | {("dec_offer", 1): _dec_offer_v1, ("dec_offer", 2): _read_v1("dec_offer", ("verdict", "reserve")),
+    ("place_dry", 1): _read_v1("place_dry", ("stale", "age_min"))}
 
 
 def header(kind: str) -> str:
@@ -295,6 +321,7 @@ def _selftest() -> None:
                                           None, None, None, 4.2, 0.3, None),
         "dec_offer": DecOffer("2026-11-01T1000Z", "Pedri", "49892747", "2026-11-01T09:00:00Z", 6795815.0, 1 / 3, None, 0.1 + 0.2,
                               752, 0.0, -0.0, True, "14;15", "Gavi;Raphinha", None, "wait", 1.5e6),
+        "place_dry": PlaceDry("2026-11-01T20:00Z", "2026-11-01T21:06:00Z", "2026-11-01", 1, "Pedri ñ", "m1", 1 / 3, 0.1 + 0.2, None, None, False, "x"),
         "sale_score": SaleScore(7, "m1", "eleven-proxy bound", "season", 12, -3.5, -0.25, -9.0, 2.0, -11.5, 4.5)}
     assert set(sample) == set(KINDS) == set(LATEST), "every kind has a sample, a spec and a version"
     for kind, row in sample.items():
