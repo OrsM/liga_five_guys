@@ -15,6 +15,7 @@ import eleven
 import hurdle
 import valuation
 import worth
+from ffcore.auction import Curve
 from ffcore.rules import DEBT_SHARE, SALE_ESTIMATE, SALE_SD, SQUAD_MAX, bid_margin, cash_at_lock
 from inflow import NONE, Inflow
 from worth import NO_OFFERS, offer_ratio_distribution
@@ -865,19 +866,44 @@ def zero_price(offers: Sequence[Offer], kappa: float) -> float | None:
     return before.amount + (after.amount - before.amount) * before.found.net / (before.found.net - after.found.net)
 
 
+def advised_offer(curve: Curve, asking: float, ratio: float, chance: float, fund: Callable[[float, float], Approach | None]) -> Offer | None:
+    """The Offer of one rung of the ladder: the one place a rung's ratio becomes an amount. The amount is the rung's asking x ratio cleared
+    (hurdle.cleared: above the round grid, where the rivals' prices pile), its win chance and its funded net read at that amount, not at the rung's
+    (what is bid is what is priced). Over a limit the funding cannot meet (the bid limit: Approach.short is the euros over it) the amount is clamped to
+    the limit (whole euros, never under the rung's own amount); if the clamped amount is not funded either (the cash at the lock, the squad cap) the
+    rung's own amount is bid. None when even that is not funded."""
+    plain = asking * ratio
+    amount = hurdle.cleared(plain)
+    found = fund(amount, hurdle.at_amount(curve, asking, amount).win)
+    if found is not None and not found.feasible and found.short > 0 and amount - found.short >= plain - 1:
+        amount = max(plain, math.floor(amount - found.short))
+        found = fund(amount, hurdle.at_amount(curve, asking, amount).win)
+    if found is None or not found.feasible:
+        amount = plain
+        found = fund(amount, chance)
+    if found is None or not found.feasible:
+        return None
+    return Offer(amount, hurdle.at_amount(curve, asking, amount).win if amount != plain else chance, found)
+
+
 def bidding(curve: Iterable[tuple[float, float]], asking: float, fund: Callable[[float, float], Approach | None], kappa: float,
             floor: float = hurdle.WIN_FLOOR) -> Bidding:
     """The Bidding on a listing at `asking` with the auction `curve` (ratio, chance pairs): `fund` (amount, chance) gives the Approach of a bid.
-    Ratios under 1 and chances under `floor` are not bid, nor those whose chance is under STEP over the last tried (the net moves by the price, not the chance). The net is the one objective: the bid is its greatest, and the walk-away its zero."""
+    The rungs are the curve's ratios of 1 or more whose chance is `floor` or more and at least STEP over the last tried (the net moves by the price,
+    not the chance), as the curve gives them; each is bid at its amount cleared of the round numbers (advised_offer), its chance and net read there.
+    The net is the one objective: the bid is its greatest, and the walk-away its zero."""
+    cv = tuple(sorted(curve))
     offers: list[Offer] = []
-    for ratio, p in sorted(curve):
-        if ratio < 1.0 or p < floor or offers and p < offers[-1].win + STEP:
+    last = None
+    for ratio, p in cv:
+        if ratio < 1.0 or p < floor or last is not None and p < last + STEP:
             continue
-        found = fund(asking * ratio, p)
-        if found is None or not found.feasible:
+        offer = advised_offer(cv, asking, ratio, p, fund)
+        if offer is None:
             break
-        offers.append(Offer(asking * ratio, p, found))
-        if p >= 0.999 or len(offers) > 1 and found.net < 0 and found.net < offers[-2].found.net:
+        offers.append(offer)
+        last = p
+        if p >= 0.999 or len(offers) > 1 and offer.found.net < 0 and offer.found.net < offers[-2].found.net:
             break
     best = min(offers, key=lambda o: (-o.found.net, o.amount), default=None)
     return Bidding(tuple(offers), best, zero_price(offers, kappa))
@@ -1041,11 +1067,11 @@ def _selftest_after_result() -> None:
         assert got.feasible and got.base == floor
         assert got.cost_lost - got.credit_lost >= floor - 1e-9, "after a lost bid no plan beats the plan with no buy, a pair's as a buy's"
     walk = bidding(((1.0, 0.5), (1.1, 0.8), (1.2, 0.95)), 10e6, lambda amount, win: _stub(3.0 - (amount - 10e6) / 1e6 * 1.0), 1e-6)
-    assert walk.best is not None and walk.best.amount == 10e6
+    assert walk.best is not None and walk.best.amount == hurdle.cleared(10e6)
     held = {m: stand(walk, _stub(x), 11e6).move for m, x in (("a", 2.5), ("b", -1.0))}
     assert held == {"a": "hold", "b": "lower"}, held
     assert stand(walk, None, 12e6).move == "lower" and stand(walk, None, 9e6).move == "raise", "unfundable at the placed amount: to the best bid"
-    assert stand(walk, _stub(2.0), 10e6) == Stand("hold", None) and stand(walk._replace(best=walk.offers[1]), _stub(1.0), 10e6) == Stand("raise", 11e6)
+    assert stand(walk, _stub(2.0), walk.best.amount) == Stand("hold", None) and stand(walk._replace(best=walk.offers[1]), _stub(1.0), walk.best.amount) == Stand("raise", walk.offers[1].amount)
     nothing = bidding(((1.0, 0.5),), 10e6, lambda amount, win: _stub(-1.0), 1e-6)
     assert stand(nothing, _stub(-1.0), 10e6) == Stand("withdraw", None) and stand(nothing._replace(best=None), None, 10e6).move == "withdraw"
 
@@ -1070,15 +1096,23 @@ def _selftest_bidding() -> None:
             return _stub(win * (top - kappa * (amount - asking)) + (win * 1.0 if shape == "plus" else 0.0))
         got = bidding(curve, asking, fund, kappa)
         tried = [(r, p) for r, p in curve if r >= 1.0 and p >= hurdle.WIN_FLOOR]
-        assert [o.amount for o in got.offers] == sorted(o.amount for o in got.offers) and all(o.win >= hurdle.WIN_FLOOR and o.amount >= asking for o in got.offers)
-        assert [o.amount / asking for o in got.offers] == sorted({r for r, _ in tried} & {o.amount / asking for o in got.offers}) and \
-            all(b.win >= a.win + 0.02 - 1e-9 for a, b in zip(got.offers, got.offers[1:])), "ascending ratios of the curve, each a step of chance over the last"
+        steady = all(a[1] <= b[1] for a, b in zip(sorted(curve), sorted(curve)[1:]))
+        assert [o.amount for o in got.offers] == sorted(o.amount for o in got.offers) and all(o.amount >= asking for o in got.offers)
+        rungs = sorted({r for r, _ in tried})
+        assert all(any(o.amount == hurdle.cleared(asking * r) for r in rungs) for o in got.offers), "each bid is a rung of the curve, cleared of the round numbers"
+        assert not steady or [o.win for o in got.offers] == sorted(o.win for o in got.offers) and all(o.win >= hurdle.WIN_FLOOR for o in got.offers), "on a curve that never falls the chance never falls up the ladder"
+        for o in got.offers:
+            r = next(r for r in rungs if o.amount == hurdle.cleared(asking * r))
+            assert o.amount >= asking * r and (not steady or o.win >= dict(tried)[r] - 1e-12), "never under the rung's amount, and its chance is read at the amount: not below the rung's"
+            assert o.win == hurdle.at_amount(tuple(sorted(curve)), asking, o.amount).win
         if not tried:
             assert got.best is None and got.walk_away is None and not got.offers
             seen["none"] += 1
             continue
         assert got.best is not None and all(o.found.net <= got.best.found.net + 1e-12 for o in got.offers), "the bid is the greatest net tried"
         away = got.walk_away
+        if away is not None and got.best.found.net > 0:
+            assert got.best.amount <= away + 1e-6, "a bid whose net is above 0 is never over the walk-away"
         if away is None:
             continue
         nets = [o.found.net for o in got.offers]
@@ -1100,6 +1134,32 @@ def _selftest_bidding() -> None:
     assert all(v > 20 for v in seen.values()), seen
     refused = bidding(((1.0, 0.9), (1.1, 1.0)), 1e6, lambda amount, win: _unfundable(), 1e-6)
     assert refused.best is None and refused.offers == () and refused.walk_away is None, "no funded price: nothing is bid"
+    _selftest_limits()
+
+
+def _selftest_limits() -> None:
+    """A bid cleared of the round numbers never passes a limit the funding has: over the bid limit (short says by how much) it is clamped to the
+    limit, never under the rung's own amount; over a limit that does not say (the cash at the lock) the rung's own amount is bid."""
+    ladder = ((1.0, 0.3), (1.01, 0.5), (1.02, 0.7), (1.05, 0.9), (1.1, 1.0))
+    asking = 10e6
+    for limit in (10_000_000.0, 10_000_005.0, 10_000_011.0, 10_000_400.0, 10_149_999.5, 10_200_000.0, 10_700_000.0, 11_500_000.0):
+        for says in (True, False):
+            def fund(amount: float, win: float, limit: float = limit, says: bool = says) -> Approach | None:
+                return _stub(win * 3.0 - amount / asking) if amount <= limit else _unfundable()._replace(short=amount - limit if says else 0.0)
+            got = bidding(ladder, asking, fund, 1e-6)
+            assert all(o.amount <= limit for o in got.offers), "never over the limit"
+            assert all(o.amount >= asking * r for o, r in zip(got.offers, (1.0, 1.01, 1.02, 1.05, 1.1))), "never under the rung's own amount"
+            if says and limit >= 10_000_011.0 or not says and limit >= hurdle.cleared(asking):
+                assert got.offers and got.offers[0].amount == hurdle.cleared(asking), "room for the cleared amount: it is bid"
+            if says and limit < hurdle.cleared(asking) and limit >= asking:
+                assert got.offers[0].amount == math.floor(limit), "over the limit by the clearance: clamped to the limit"
+            if not says and limit < hurdle.cleared(asking) and limit >= asking:
+                assert got.offers[0].amount == asking, "a limit that is not said: the rung's own amount"
+    placed = bidding(ladder, asking, lambda amount, win: _stub(win * 3.0 - amount / asking), 1e-6)
+    assert placed.best is not None
+    here = _stub(placed.best.found.net)
+    for over in (0.0, 1.0, 5e4, 2e5):
+        assert stand(placed, here, placed.best.amount + over).move == "hold", "a placed bid at or above the advised amount, its net above 0, is left alone"
 
 
 def _unfundable() -> Approach:

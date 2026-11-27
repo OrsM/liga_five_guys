@@ -228,7 +228,27 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   (price fetched - expected offer) for every sale, less kappa x (bid - `hurdle.draw` of his worth) for the buy; kappa = `hurdle.in_points`
   per euro at LAMBDA = `hurdle.lam`, stated as `lambda`; `approach.Money`). A lost bid is never costed under the cover's own plan
   (`base` is `plan_cost`: the secured option's net). `approach.bidding` tries the bids of the auction curve (chance of WIN_FLOOR or
-  more) and the bid is the greatest net; `walk_away` is the price at which the net is 0, never a prefilter. Every listing on sale with a
+  more) and the bid is the greatest net; `walk_away` is the price at which the net is 0, never a prefilter. **The amount of a rung is cleared of the round numbers
+  (2026-11-27, measured by ~/.cache/bid-margin/REPORT.md)**: in the one function that turns a rung into an amount (`approach.advised_offer`, for the hold route
+  `hurdle.best_on_grid`), amount = `hurdle.cleared(asking x ratio)` = the least m x g + 11 EUR at or above it, g = 10^(k-2), k = floor(log10 of the amount) (g is
+  0.1 to 1% of it; the +11 and the grid are the only constants and nothing is fitted). Evidence: of 170 rival-won results in the league's history, 29 (17%)
+  are 0 to 10 EUR above a multiple of g (residues 0 x8, 1 x10, 2 x2, 3 x3, 5 x3, 7 x2, 10 x1; uniform expectation 0.14), in both halves of the season (15/96, 14/74); a bid at or
+  just under a round amount loses to the pile just above it, and +1 EUR is not enough (3 of the 5 recoverable losses need more). Replay on our 95 settled bids (first price, so
+  exact): 5 of the 41 losses are won (all lost by 0.02 to 0.4%; players 3738, 13888, 9531, 17275, 14210), the wins cost +0.146% on average (max 0.48%), about 0.03
+  points on a 25M player against about 30 points a win; the rule is chosen in-sample among 12 variants, the cluster is the independent evidence. Stated form: the report's
+  ceil(amount / g) x g + 11 would add a whole grid step to an amount between a round number and 11 EUR over it; the least m x g + 11 at or above the amount flips the same 5 losses,
+  costs less (0.165% against 0.171% over all bids), and is idempotent (an amount already cleared is left alone). Not applied under 10^4 EUR (no player). Rules of the amount:
+  never under the rung's own amount, nondecreasing in it, at most one grid step over it. **The amount is what is priced**: the win chance (`hurdle.at_amount`, the curve interpolated at
+  amount / asking) and the funded net of a rung are read at the amount advised, so `Offer.win` is the chance of `Offer.amount` (not below the rung's on a curve that never falls) and
+  the ladder's rungs (WIN_FLOOR, STEP, the walk-away's interpolation over the offers' own amounts), the win curve and the objective are unchanged. Limits: over the bid limit (`Approach.short`,
+  the euros over it) the amount is clamped to the limit in whole euros, never under the rung's own amount; if that is not funded either (the cash at the lock, the squad cap) the rung's own amount
+  is bid; a bid whose net is above 0 is never over the walk-away. The hold route's `hurdle.bid` reads the same: each rung at its cleared amount, never over the cap. A bid placed is judged at the
+  amount placed (`stand`, `board.stance_of`: the chance read there) and never lowered while its net is above 0, cleared or not. Readers: the board's `amount`/`advised`/`walk_away`, the alerts
+  and `targets` (`arrival_rows`), `dec_opportunity` bid and win, `grading.decided_day` (the advised bids replayed are the cleared ones, at the chance of the amount), the shadow's rungs
+  (`shadow.buy_rungs` reads each Offer's amount, win and Approach, so its need and walk-away are of the cleared amounts) and the website (the amount only) all read `Offer`, none a ratio.
+  **Falsifier**: over the next 30 or more settled bids, losses by 0.5% or less of our bid should fall from 7.4% of bids (7 of 95) to 2% or less; if 5% or more remain the rounding theory is
+  dead and the rounding is dropped (`hurdle.cleared` becomes the identity, one line); also the share of rival-won prices within 10 EUR above a grid number stays at 15% or more (17% now).
+  This is the amount only; the larger lever measured with it (the placed bid sat below the advised one in 15 of 19 since 11-08: advised would have won 18 of 19) is placement, not this. Every listing on sale with a
   gain is a funded plan (`plans`: net above `FUNDED_FLOOR`, ranked by net, one `line` each: bid and chance, who is sold tonight / if won / if
   lost, net, net if won and if lost, cash at the lock, worst case, who it displaces, `advised`) or is in `rejected` with its `reason`
   (`no_curve`, `no_win_chance`, `unfundable`, `net_not_positive`, `not_evaluated`, `covered`) and net; `considered` is its length.  **Nets are joint (`board.joint_chain`, #joint step 1: display and advice only; `shadow` unchanged).** A set of buys is worth less than the sum of its

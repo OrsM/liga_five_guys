@@ -8,6 +8,7 @@ the win-weighted surplus under its cap at its best (bid): the hold route's, whic
 bid, and whether a bid placed stands, is the funded net's (approach.bidding, approach.stand)."""
 from __future__ import annotations
 
+import math
 import random
 import statistics
 import sys
@@ -15,7 +16,7 @@ from collections.abc import Iterable
 from datetime import timedelta
 from typing import NamedTuple
 
-from ffcore.auction import Curve
+from ffcore.auction import Curve, chance
 from ffcore.loader import Opportunity
 from ffcore.parse import snapshot_stamp, stamp
 from ffcore.rules import SALE_ESTIMATE
@@ -31,6 +32,8 @@ HOLD_NIGHTS = 14
 HOLD_BOUND = 0.5
 HOLD_EDGE = 0.5
 HOLD_VALUE = 30e6
+CLEARANCE = 11
+GRID_MIN = 10 ** 4
 
 
 def remaining(first: int, last: int) -> int:
@@ -70,27 +73,47 @@ class Bid(NamedTuple):
     win: float
 
 
+def cleared(amount: float) -> float:
+    """The amount to bid for a ladder amount: the least m x grid + CLEARANCE euros at or above it, grid = 10^(k-2) for k = floor(log10 amount)
+    (the round grid, 1% of the amount or less). Rival winning prices pile just above round numbers (29 of 170 within
+    10 euros above one, 0.14 expected), so an amount at or just under a round number loses to rivals at round + 0..10; this one sits above it. Never
+    under `amount`, never more than one grid step and CLEARANCE over it, nondecreasing, idempotent (an amount already there, a bid placed, is
+    left alone: no bid is lowered). Not applied under GRID_MIN, a size the game has no player at."""
+    whole = math.ceil(amount)
+    if whole < GRID_MIN:
+        return float(whole)
+    step = 10 ** (len(str(whole)) - 3)
+    return float(-(-(whole - CLEARANCE) // step) * step + CLEARANCE)
+
+
+def at_amount(curve: Curve, asking: float, amount: float) -> Bid:
+    """The bid of `amount` and its chance read from the curve at that amount (chance interpolates between the rungs; the one place an amount is priced)."""
+    return Bid(amount, chance(curve, amount / asking))
+
+
 def best_on_grid(curve: Curve, asking: float, cap: float) -> tuple[float, float, float] | None:
-    """The (surplus, ratio, chance) of the curve's point with a ratio of 1 or more that has the most chance x
-    (cap - asking x ratio), the lowest ratio on ties; None when the curve has no such point."""
+    """The (surplus, amount, chance) of the curve's rung with a ratio of 1 or more that has the most chance x (cap - amount), the amount being the
+    rung's asking x ratio cleared (`cleared`, never over the cap, never under the rung's amount) and the chance read at it; the lowest amount on
+    ties; None when the curve has no such rung."""
     best: tuple[float, float, float] | None = None
-    for r, p in curve:
+    for r, _ in curve:
         if r < 1.0:
             continue
-        score = p * (cap - asking * r)
+        got = at_amount(curve, asking, max(asking * r, min(cleared(asking * r), cap)))
+        score = got.win * (cap - got.amount)
         if best is None or score > best[0]:
-            best = (score, r, p)
+            best = (score, got.amount, got.win)
     return best
 
 
 def bid(curve: Curve, asking: float, stake: Stake) -> Bid | None:
-    """The bid on a listing at asking whose Stake is stake: the best_on_grid point under cap(stake); None when its surplus
+    """The bid on a listing at asking whose Stake is stake: the best_on_grid rung under cap(stake); None when its surplus
     is not positive (a listing whose cap is under its asking price, as one of a player with no points and no proceeds
     above it) or when its chance is under WIN_FLOOR. A bid is never above the cap nor under the asking price."""
     best = best_on_grid(curve, asking, cap(stake))
     if best is None or best[0] <= 0 or best[2] < WIN_FLOOR:
         return None
-    return Bid(asking * best[1], best[2])
+    return Bid(best[1], best[2])
 
 
 class Exit(NamedTuple):
@@ -266,21 +289,47 @@ def _selftest_buy() -> None:
         else:
             seen_bid += 1
             assert asking - 1e-6 <= got.amount <= top + 1e-6, "between the asking and the cap"
-            assert got.win >= WIN_FLOOR and got.amount / asking in ratios
+            plain = [asking * r for r in ratios if got.amount == max(asking * r, min(cleared(asking * r), top))]
+            assert got.win >= WIN_FLOOR and plain and got.amount >= plain[0], "a rung of the curve, cleared of the round numbers, never under the rung's amount"
+            assert got.win == chance(curve, got.amount / asking), "its chance is read at the amount"
+            assert not all(a[1] <= b[1] for a, b in zip(curve, curve[1:])) or got.win >= chance(curve, plain[0] / asking), "on a curve that never falls: not below the rung's"
             mine = got.win * (top - got.amount)
-            assert all(mine >= p * (top - asking * r) - 1e-6 for r, p in curve if r >= 1.0), "the best surplus of the grid"
+            assert all(mine >= x.win * (top - x.amount) - 1e-6 for r, _ in curve if r >= 1.0
+                       for x in [at_amount(curve, asking, max(asking * r, min(cleared(asking * r), top)))]), "the best surplus of the rungs, each at its cleared amount"
             dearer = bid(curve, asking, stake(points, n, 2 * rate, e, k))
             assert dearer is None or dearer.amount <= got.amount + 1e-6, "a dearer rate never raises the bid"
             more = bid(curve, asking, stake(points * 1.5, n, rate, e, k))
             assert more is not None and more.amount >= got.amount - 1e-6, "more points never lower the bid"
-            twice = bid(curve, 2 * asking, stake(2 * points, n, rate, Exit(2 * asking, e.nights, e.rise, 2 * e.reserve), k))
-            assert twice is not None and abs(twice.amount - 2 * got.amount) < 1e-3 and twice.win == got.win, "scale-invariant"
     assert seen_bid > 100 and seen_none > 100, (seen_bid, seen_none)
     flat = ((1.0, 1.0), (1.1, 1.0))
-    assert bid(flat, 1e7, stake(10.0, 25, 0.02, Exit(1e7), 25)) == Bid(1e7, 1.0), "a sure win at the asking price bids the asking price"
+    assert bid(flat, 1e7, stake(10.0, 25, 0.02, Exit(1e7), 25)) == Bid(1e7 + CLEARANCE, 1.0), "a sure win at the asking price bids the asking price cleared of the round number"
     assert bid(((1.0, 0.1), (1.1, 0.2)), 1e7, stake(10.0, 25, 0.02, Exit(1e7), 25)) is None, "a chance under WIN_FLOOR: no bid"
     assert cap(stake(25 * 0.02 * 10, 25, 0.02, Exit(0.0), 25)) == 10e6, "P worth exactly the rate on 10M: 10M"
     assert bid(flat, 1e7, stake(0.0, 25, 0.02, Exit(1e7), 25)) is None, "no points, capital tied the whole window: never bought"
+
+
+def _selftest_cleared() -> None:
+    rng = random.Random(11)
+    sizes = [rng.uniform(1e4, 1e9) for _ in range(4000)] + [rng.choice([1, 10, 100]) * 10 ** rng.randint(5, 8) + rng.choice([-1.5, -1, 0, 0.5, 1, 10, 11, 12, 11.4]) for _ in range(2000)]
+    last = (0.0, 0.0)
+    for b in sorted(sizes):
+        c = cleared(b)
+        step = 10 ** (len(str(math.ceil(b))) - 3)
+        assert c >= b and c == int(c), "never under the unrounded amount, whole euros"
+        assert c % step == CLEARANCE and (c - CLEARANCE) % step == 0, "CLEARANCE euros above a multiple of the grid (strictly above every round multiple by at least that)"
+        assert all(c - m * step > 0 and (c - m * step >= CLEARANCE) for m in (int(c // step) - 1, int(c // step))), "above the round number below it by CLEARANCE, and every one under it"
+        assert c - b < step + 1 and (c - b) / b < 0.0105, "never more than one grid step dearer: at most 1% of the amount at any size"
+        assert cleared(c) == c, "idempotent: an amount already cleared (a bid placed) is left alone"
+        assert c >= last[1] and (b < last[0] or c >= last[1]), "nondecreasing in the amount"
+        last = (b, c)
+        for rival in (c - CLEARANCE + d for d in range(0, CLEARANCE)):
+            assert c > rival, "a rival at the round number or up to CLEARANCE - 1 above it loses to it"
+    for b in (999_999.0, 1e6, 1e6 - 0.5, 9_999_999.0, 1e7, 99_999_999.5):
+        assert cleared(b) == cleared(math.ceil(b)) and cleared(b) % 11 >= 0 and cleared(b) >= b
+    for b, rival, got in ((27_995_415.0, 28_000_002.0, 28_000_011.0), (11_569_267.0, 11_571_003.0, 11_600_011.0), (1_105_291.0, 1_110_002.0, 1_110_011.0),
+                          (14_079_528.0, 14_080_000.0, 14_100_011.0), (18_185_815.0, 18_185_816.0, 18_200_011.0)):
+        assert cleared(b) == got > rival, "the five losses of the replay (by 0.02 to 0.4%) are won"
+    assert cleared(1.0) == 1.0 and cleared(9_998.5) == 9_999.0, "no round grid under GRID_MIN"
 
 
 def _selftest_stake() -> None:
@@ -395,6 +444,7 @@ def _selftest_exit() -> None:
 
 def _selftest() -> None:
     _selftest_lam()
+    _selftest_cleared()
     _selftest_buy()
     _selftest_stake()
     _selftest_sale()
