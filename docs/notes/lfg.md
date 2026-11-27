@@ -240,6 +240,7 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   as the cover's recourse prices it (`approach.prices`: the expected offer at the value of the last close, `Club.drift`), so its credit is kappa x
   (that price less the expected offer), no longer 0 (the premium of waiting for a better offer than the expected one is not credited: it needs the
   stopping rule over the payoffs of the plan, a follow-up); The hold replay (`lfg-rules decided`) therefore grades only the bids the board would place (funded net above the floor, at most EVALUATED_BUYS looked at): at the cut-over 131 bids became 21 (all risers), so reports before and after are not comparable, and `dec_opportunity` bid/win are the funded plan's from that run on (earlier records are the old hurdle bid). `replacement` nets are against the same `cost0` as a buy's and clamp the lost branch likewise;
+  The stored `dec_opportunity` `bid` is the hurdle bid before 2026-11-26T1133Z and the funded plan's bid from then (rows carry no marker and are never rewritten): a reader of stored bids must respect that boundary.
   the first evaluated buys carry `funding` from `approach.approach`:
   the sales tonight, the margin under the bid limit, the sales if won, the cash if lost, the points the sales cost, the net gain). `finish` and `band` are
   placeholders the page still reads.
