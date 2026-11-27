@@ -31,7 +31,8 @@ TREND_CAP = 0.03
 HOLD_NIGHTS = 14
 HOLD_BOUND = 0.5
 HOLD_EDGE = 0.5
-HOLD_VALUE = 30e6
+HOLD_VALUE = 30e6          # above it the hold credit is HOLD_ABOVE_FACTOR x the credit below
+HOLD_ABOVE_FACTOR = 0.5
 CLEARANCE = 11
 GRID_MIN = 10 ** 4
 
@@ -131,10 +132,14 @@ class Exit(NamedTuple):
 
 def held_rise(value: float, fitted: float) -> float:
     """The rise credited to holding a player of this value whose price fold fits `fitted` (a fraction) over HOLD_NIGHTS: HOLD_EDGE
-    of the fitted rise within 0 and HOLD_BOUND (the fit is calibrated up to that), 0 above HOLD_VALUE (nothing measured there); a fall
-    is the fitted fall itself, whatever the value (the fit is calibrated there: fitted -13% against realised -12.5%). Nondecreasing
-    in the fitted rise, never above HOLD_EDGE x HOLD_BOUND; 0 for a player the fold has no row within HOLD_NIGHTS for."""
-    return fitted if fitted < 0 else 0.0 if value > HOLD_VALUE else HOLD_EDGE * min(HOLD_BOUND, fitted)
+    of the fitted rise within 0 and HOLD_BOUND (the fit is calibrated up to that); above HOLD_VALUE only HOLD_ABOVE_FACTOR of that
+    (out of sample the realised/fitted rise there is 0.88, CI 0.71-1.05, 116 episodes, but 0.66 then 1.04 across the halves: not
+    stable, so half the credit, below both halves); a fall is the fitted fall itself, whatever the value (the fit is calibrated
+    there: fitted -13% against realised -12.5%). Nondecreasing in the fitted rise, never above HOLD_EDGE x HOLD_BOUND, never
+    higher for a dearer player; 0 for a player the fold has no row within HOLD_NIGHTS for."""
+    if fitted < 0:
+        return fitted
+    return HOLD_EDGE * min(HOLD_BOUND, fitted) * (HOLD_ABOVE_FACTOR if value > HOLD_VALUE else 1.0)
 
 
 def draw(value: float) -> float:
@@ -369,7 +374,11 @@ def _selftest_hold() -> None:
         h = held_rise(value, fitted)
         if h < 0:
             continue
-        assert 0.0 <= h <= HOLD_EDGE * HOLD_BOUND and (value > HOLD_VALUE or fitted <= 0) <= (h == 0.0), "never negative, never above the bound; none for a fall or a dear player"
+        assert 0.0 <= h <= HOLD_EDGE * HOLD_BOUND and (fitted <= 0) <= (h == 0.0), "never negative, never above the bound; none for a fall"
+        assert held_rise(HOLD_VALUE, fitted) == HOLD_EDGE * min(HOLD_BOUND, fitted), "at or below HOLD_VALUE the credit is the plain one"
+        assert abs(held_rise(value, fitted) - held_rise(1.0, fitted) * (HOLD_ABOVE_FACTOR if value > HOLD_VALUE else 1.0)) < 1e-12, "above HOLD_VALUE exactly HOLD_ABOVE_FACTOR of it: the one constant"
+        assert held_rise(value + 1e6, fitted) <= held_rise(value, fitted) + 1e-12, "crossing HOLD_VALUE upward never raises the credit"
+        assert value <= HOLD_VALUE or held_rise(2 * value, fitted) == h, "above the line the credit is the same fraction at any value (scale-free), and held_rise takes no rate: LAMBDA-independent"
         assert held_rise(value, fitted + 0.1) >= h and held_rise(value, HOLD_BOUND + 1.0) == held_rise(value, HOLD_BOUND), "nondecreasing, flat above the bound"
         e = Exit(value, rng.choice([1, 7]), rng.uniform(-TREND_CAP, TREND_CAP), rng.choice([0.0, value]), h)
         assert abs(held(e) - draw(value) * (1 + h)) < 1e-6 and held(e._replace(hold=h + 0.1)) >= held(e) and held(e) >= draw(value)

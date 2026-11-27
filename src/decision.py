@@ -694,7 +694,8 @@ def _selftest_holds() -> None:
     weak = opportunity_rows(_holds_inputs(1e7, risers, rise=0.0002))
     assert all(r["profit"] == 0.0 for r in weak), "a rise the haircut eats is not bought"
     rich = opportunity_rows(_holds_inputs(1e7, {"big": 4e7}))
-    assert all(r["profit"] == 0.0 for r in rich), "a value above HOLD_VALUE has no measured rise"
+    cheap = opportunity_rows(_holds_inputs(1e7, {"big": 2.9e7}))
+    assert all(0.0 <= r["profit"] <= c["profit"] for r, c in zip(rich, cheap)), "a value above HOLD_VALUE earns no more than one below it"
     rng = random.Random(8)
     for _ in range(400):
         wanted = {"p%d" % i: (rng.uniform(0, 5), rng.uniform(1, 9), rng.random() < 0.3) for i in range(rng.randint(0, 6))}
@@ -715,7 +716,7 @@ def _selftest_exit_reads() -> None:
     assert sale_rises(base._replace(nights=2), rises_of(base)["p"]).keys() == {1, 2}
     short = exit_of(Inputs(Money(0.0, 0.0, 0.0, 0, 0), prices=rows[:3]), "p", 100.0)
     assert abs(short.hold - hurdle.HOLD_EDGE * 0.09) < 1e-12, "with fewer nights than HOLD_NIGHTS: the furthest row"
-    assert exit_of(base, "q", 100.0) == hurdle.Exit(100.0) and exit_of(base, "p", 5e7).hold == 0.0 and exit_of(base, "p", 5e7).rise == hurdle.TREND_CAP
+    assert exit_of(base, "q", 100.0) == hurdle.Exit(100.0) and exit_of(base, "p", 5e7).hold == hurdle.HOLD_ABOVE_FACTOR * wide.hold and exit_of(base, "p", 5e7).rise == hurdle.TREND_CAP
 
 
 def _selftest_gain_is_value() -> None:
