@@ -651,6 +651,7 @@
    "accepts": [],
    "act": [],
    "amount": 1576701.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": 0.0,
@@ -796,7 +797,8 @@
    "waiting": null,
    "what": "sell",
    "why": "cash -49.6M; sells Roger Hinojo now, Ferran Jutgla later, Aitor Paredes later; expects +3.30M at the lock; if the eleven scores under 52 points the lock cash stays below 0; there is time to fix by hand",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
   },
   {
    "accepts": [],
@@ -875,20 +877,15 @@
    {
     "gain": 3.6167747609991534,
     "in": "Adria Pedrosa",
-    "out": "Natan"
-   },
-   {
-    "gain": 3.2602788551126674,
-    "in": "Robin Le Normand",
-    "out": "Iñigo Vicente"
-   },
-   {
-    "gain": 1.2075272518779994,
-    "in": "Miguel Roman",
     "out": "Ferran Jutgla"
+   },
+   {
+    "gain": 0.6813075940150766,
+    "in": "Robin Le Normand",
+    "out": "Marcos Alonso"
    }
   ],
-  "best": 45.31010878590662,
+  "best": 51.26183785648304,
   "eleven": [
    "Mathew Ryan",
    "Natan",
@@ -903,7 +900,7 @@
    "Ferran Jutgla"
   ],
   "message": "",
-  "points": 37.22553091791681,
+  "points": 46.963756501468815,
   "stale": true,
   "unmapped": []
  },
@@ -1114,6 +1111,7 @@
     "why": "in the cover of the cash at the lock: accept the offer of 1.58M before the close"
    },
    "amount": 1576701.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": 0.0,
@@ -1201,153 +1199,8 @@
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "action": {
-    "kind": "accept",
-    "until": "2026-11-08T21:24Z",
-    "why": "loses no points; his sale is not needed for cash"
-   },
-   "amount": 22801375.0,
-   "delta": {
-    "gap": [],
-    "points": -9.115850850200104,
-    "window": {
-     "lock": -0.8161283717036838,
-     "next4": -2.4854551697070804,
-     "season": -9.115850850200104
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     23345857.0,
-     "money"
-    ],
-    [
-     "offer",
-     22801375.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.976677574954734,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "points, lock",
-     -0.8161283717036838,
-     "points"
-    ],
-    [
-     "points, next4",
-     -2.4854551697070804,
-     "points"
-    ],
-    [
-     "points, season",
-     -9.115850850200104,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [
-    "Raphinha"
-   ],
-   "gain": -9.115850850200104,
-   "key": "6442",
-   "label": "sell Iñigo Vicente",
-   "more": false,
-   "name": "Iñigo Vicente",
-   "offer": 22801375.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.39979390936731246,
-   "plan": false,
-   "points_lost": 9.115850850200104,
-   "pos": "DEL",
-   "ratio": 0.976677574954734,
-   "rent": 26.67760875,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserves": [
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-08T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-09T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-10T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-11T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-12T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-13T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-14T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-15T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-16T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-17T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-18T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-19T21:24Z"
-    },
-    {
-     "least": 23052378.18374209,
-     "until": "2026-11-20T20:00Z"
-    }
-   ],
-   "step": "take offer",
-   "trace": null,
-   "trend": -0.9599715530509632,
-   "verdict": "sell",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
   },
   {
    "accepts": [],
@@ -1358,6 +1211,7 @@
     "why": "loses no points; his sale is not needed for cash"
    },
    "amount": 47188627.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": -22.99422601632068,
@@ -1493,7 +1347,8 @@
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
   },
   {
    "accepts": [],
@@ -1504,6 +1359,7 @@
     "why": "loses no points; his sale is not needed for cash"
    },
    "amount": 46035874.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": -24.692918423759465,
@@ -1639,153 +1495,8 @@
    "verdict": "sell",
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
-  },
-  {
-   "accepts": [],
-   "act": [],
-   "action": {
-    "kind": "accept",
-    "until": "2026-11-08T21:24Z",
-    "why": "loses no points; his sale is not needed for cash"
-   },
-   "amount": 49571725.0,
-   "delta": {
-    "gap": [],
-    "points": -34.36225350983227,
-    "window": {
-     "lock": -1.511310122384181,
-     "next4": -6.641237123149523,
-     "season": -34.36225350983227
-    }
-   },
-   "detail": null,
-   "done": false,
-   "facts": [
-    [
-     "value",
-     50914818.0,
-     "money"
-    ],
-    [
-     "offer",
-     49571725.0,
-     "money"
-    ],
-    [
-     "offer over value",
-     0.9736207836390577,
-     "ratio"
-    ],
-    [
-     "offer percentile",
-     null,
-     "chance"
-    ],
-    [
-     "offers seen",
-     0,
-     "count"
-    ],
-    [
-     "points, lock",
-     -1.511310122384181,
-     "points"
-    ],
-    [
-     "points, next4",
-     -6.641237123149523,
-     "points"
-    ],
-    [
-     "points, season",
-     -34.36225350983227,
-     "points"
-    ]
-   ],
-   "feasible": true,
-   "flip": null,
-   "for": [
-    "Raphinha"
-   ],
-   "gain": -34.36225350983227,
-   "key": "11813",
-   "label": "sell Natan",
-   "more": false,
-   "name": "Natan",
-   "offer": 49571725.0,
-   "offer_percentile": null,
-   "offers_seen": 0,
-   "per": "season",
-   "per_million": 0.6931825251155225,
-   "plan": false,
-   "points_lost": 34.36225350983227,
-   "pos": "DEF",
-   "ratio": 0.9736207836390577,
-   "rent": 57.99891825,
-   "replacement": null,
-   "replacement_why_not": null,
-   "reserves": [
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-08T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-09T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-10T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-11T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-12T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-13T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-14T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-15T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-16T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-17T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-18T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-19T21:24Z"
-    },
-    {
-     "least": 50550038.56525188,
-     "until": "2026-11-20T20:00Z"
-    }
-   ],
-   "step": "take offer",
-   "trace": null,
-   "trend": -0.41770354506100393,
-   "verdict": "sell",
-   "waiting": null,
-   "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
   },
   {
    "accepts": [],
@@ -1796,6 +1507,7 @@
     "why": "keeping him protects 0.0 points and the cash at the lock is covered without him"
    },
    "amount": 644149.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": 0.0,
@@ -1929,7 +1641,8 @@
    "verdict": "hold",
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
   },
   {
    "accepts": [],
@@ -1940,6 +1653,7 @@
     "why": "keeping him protects 1.1 points and the cash at the lock is covered without him"
    },
    "amount": 5337731.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": -1.1472965242369355,
@@ -2073,7 +1787,156 @@
    "verdict": "hold",
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "kind": "fallback",
+    "until": "2026-11-20T20:00Z",
+    "why": "sell him if the offers fall short of the deficit: the cheapest next (9.1 points lost)"
+   },
+   "amount": 22801375.0,
+   "call": "your call: selling him loses 9.1 points over the season and raises 22.8M (98% of his value)",
+   "delta": {
+    "gap": [],
+    "points": -9.115850850200104,
+    "window": {
+     "lock": -0.8161283717036838,
+     "next4": -2.4854551697070804,
+     "season": -9.115850850200104
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     23345857.0,
+     "money"
+    ],
+    [
+     "offer",
+     22801375.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.976677574954734,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -0.8161283717036838,
+     "points"
+    ],
+    [
+     "points, next4",
+     -2.4854551697070804,
+     "points"
+    ],
+    [
+     "points, season",
+     -9.115850850200104,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [
+    "Raphinha"
+   ],
+   "gain": -9.115850850200104,
+   "key": "6442",
+   "label": "sell Iñigo Vicente",
+   "more": false,
+   "name": "Iñigo Vicente",
+   "offer": 22801375.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.39979390936731246,
+   "plan": false,
+   "points_lost": 9.115850850200104,
+   "pos": "DEL",
+   "ratio": 0.976677574954734,
+   "rent": 26.67760875,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserves": [
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-08T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-09T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-10T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-11T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-12T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-13T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-14T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-15T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-16T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-17T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-18T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-19T21:24Z"
+    },
+    {
+     "least": 23052378.18374209,
+     "until": "2026-11-20T20:00Z"
+    }
+   ],
+   "step": "take offer",
+   "trace": null,
+   "trend": -0.9599715530509632,
+   "verdict": null,
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -2084,6 +1947,7 @@
     "why": "keeping him protects 25.1 points and the cash at the lock is covered without him"
    },
    "amount": 40009473.0,
+   "call": "your call: selling him loses 25.1 points over the season and raises 40.0M (91% of his value)",
    "delta": {
     "gap": [],
     "points": -25.138699206258252,
@@ -2214,10 +2078,11 @@
    "step": "take offer",
    "trace": null,
    "trend": 1.9707289480553332,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -2228,6 +2093,7 @@
     "why": "keeping him protects 2.0 points and the cash at the lock is covered without him"
    },
    "amount": 2953995.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": -2.027018247263868,
@@ -2361,7 +2227,156 @@
    "verdict": "hold",
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
+  },
+  {
+   "accepts": [],
+   "act": [],
+   "action": {
+    "kind": "keep",
+    "until": null,
+    "why": "keeping him protects 34.4 points and the cash at the lock is covered without him"
+   },
+   "amount": 49571725.0,
+   "call": "your call: selling him loses 34.4 points over the season and raises 49.6M (97% of his value)",
+   "delta": {
+    "gap": [],
+    "points": -34.36225350983227,
+    "window": {
+     "lock": -1.511310122384181,
+     "next4": -6.641237123149523,
+     "season": -34.36225350983227
+    }
+   },
+   "detail": null,
+   "done": false,
+   "facts": [
+    [
+     "value",
+     50914818.0,
+     "money"
+    ],
+    [
+     "offer",
+     49571725.0,
+     "money"
+    ],
+    [
+     "offer over value",
+     0.9736207836390577,
+     "ratio"
+    ],
+    [
+     "offer percentile",
+     null,
+     "chance"
+    ],
+    [
+     "offers seen",
+     0,
+     "count"
+    ],
+    [
+     "points, lock",
+     -1.511310122384181,
+     "points"
+    ],
+    [
+     "points, next4",
+     -6.641237123149523,
+     "points"
+    ],
+    [
+     "points, season",
+     -34.36225350983227,
+     "points"
+    ]
+   ],
+   "feasible": true,
+   "flip": null,
+   "for": [
+    "Raphinha"
+   ],
+   "gain": -34.36225350983227,
+   "key": "11813",
+   "label": "sell Natan",
+   "more": false,
+   "name": "Natan",
+   "offer": 49571725.0,
+   "offer_percentile": null,
+   "offers_seen": 0,
+   "per": "season",
+   "per_million": 0.6931825251155225,
+   "plan": false,
+   "points_lost": 34.36225350983227,
+   "pos": "DEF",
+   "ratio": 0.9736207836390577,
+   "rent": 57.99891825,
+   "replacement": null,
+   "replacement_why_not": null,
+   "reserves": [
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-08T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-09T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-10T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-11T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-12T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-13T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-14T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-15T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-16T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-17T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-18T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-19T21:24Z"
+    },
+    {
+     "least": 50550038.56525188,
+     "until": "2026-11-20T20:00Z"
+    }
+   ],
+   "step": "take offer",
+   "trace": null,
+   "trend": -0.41770354506100393,
+   "verdict": null,
+   "waiting": null,
+   "what": "sell",
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -2372,6 +2387,7 @@
     "why": "keeping him protects 29.0 points and the cash at the lock is covered without him"
    },
    "amount": 36847734.0,
+   "call": "your call: selling him loses 29.0 points over the season and raises 36.8M (99% of his value)",
    "delta": {
     "gap": [],
     "points": -29.011334233473008,
@@ -2502,10 +2518,11 @@
    "step": "take offer",
    "trace": null,
    "trend": -1.167641877951558,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -2516,6 +2533,7 @@
     "why": "keeping him protects 8.4 points and the cash at the lock is covered without him"
    },
    "amount": 9145609.0,
+   "call": null,
    "delta": {
     "gap": [],
     "points": -8.410174463482235,
@@ -2649,7 +2667,8 @@
    "verdict": "hold",
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": false
   },
   {
    "accepts": [],
@@ -2660,6 +2679,7 @@
     "why": "keeping him protects 26.1 points and the cash at the lock is covered without him"
    },
    "amount": 25283889.0,
+   "call": "your call: selling him loses 26.1 points over the season and raises 25.3M (108% of his value)",
    "delta": {
     "gap": [],
     "points": -26.136232465991043,
@@ -2790,10 +2810,11 @@
    "step": "take offer",
    "trace": null,
    "trend": -0.802633666539891,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -2804,6 +2825,7 @@
     "why": "keeping him protects 50.6 points and the cash at the lock is covered without him"
    },
    "amount": 44527367.0,
+   "call": "your call: selling him loses 50.6 points over the season and raises 44.5M (94% of his value)",
    "delta": {
     "gap": [],
     "points": -50.6196576523555,
@@ -2934,10 +2956,11 @@
    "step": "take offer",
    "trace": null,
    "trend": 1.9936865166470912,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -2948,6 +2971,7 @@
     "why": "keeping him protects 22.8 points and the cash at the lock is covered without him"
    },
    "amount": 18882612.0,
+   "call": "your call: selling him loses 22.8 points over the season and raises 18.9M (95% of his value)",
    "delta": {
     "gap": [],
     "points": -22.78723428950775,
@@ -3078,10 +3102,11 @@
    "step": "take offer",
    "trace": null,
    "trend": 1.9785105195726127,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -3092,6 +3117,7 @@
     "why": "keeping him protects 27.0 points and the cash at the lock is covered without him"
    },
    "amount": 21289009.0,
+   "call": "your call: selling him loses 27.0 points over the season and raises 21.3M (108% of his value)",
    "delta": {
     "gap": [],
     "points": -27.044997145474554,
@@ -3222,10 +3248,11 @@
    "step": "take offer",
    "trace": null,
    "trend": 0.7009092811851191,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -3236,6 +3263,7 @@
     "why": "keeping him protects 17.6 points and the cash at the lock is covered without him"
    },
    "amount": 10813953.0,
+   "call": "your call: selling him loses 17.6 points over the season and raises 10.8M (90% of his value)",
    "delta": {
     "gap": [],
     "points": -17.589957634873144,
@@ -3366,10 +3394,11 @@
    "step": "take offer",
    "trace": null,
    "trend": 0.6019579764866829,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   },
   {
    "accepts": [],
@@ -3380,6 +3409,7 @@
     "why": "keeping him protects 79.2 points and the cash at the lock is covered without him"
    },
    "amount": 18261001.0,
+   "call": "your call: selling him loses 79.2 points over the season and raises 18.3M (99% of his value)",
    "delta": {
     "gap": [],
     "points": -79.23082403197941,
@@ -3510,10 +3540,11 @@
    "step": "take offer",
    "trace": null,
    "trend": -1.0060886321197136,
-   "verdict": "hold",
+   "verdict": null,
    "waiting": null,
    "what": "sell",
-   "why_infeasible": null
+   "why_infeasible": null,
+   "your_call": true
   }
  ],
  "shadow": {
@@ -3702,11 +3733,11 @@
    "xi": true
   },
   {
-   "best": false,
+   "best": true,
    "name": "Natan",
    "next": 4.771587977496843,
    "pos": "DEF",
-   "sold": true,
+   "sold": false,
    "xi": true
   },
   {
@@ -3718,7 +3749,7 @@
    "xi": true
   },
   {
-   "best": true,
+   "best": false,
    "name": "Marcos Alonso",
    "next": 2.5789702610975906,
    "pos": "DEF",
@@ -3758,11 +3789,11 @@
    "xi": true
   },
   {
-   "best": false,
+   "best": true,
    "name": "Iñigo Vicente",
    "next": 4.966637606055167,
    "pos": "DEL",
-   "sold": true,
+   "sold": false,
    "xi": true
   },
   {
@@ -3830,7 +3861,7 @@
    "xi": false
   },
   {
-   "best": true,
+   "best": false,
    "name": "Miguel Roman",
    "next": 1.2075262518779994,
    "pos": "MED",
