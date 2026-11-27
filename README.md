@@ -81,8 +81,8 @@ Every forecast is the same product, for every player and jornada
   has left the league (out for good); its injury flags lag futbolfantasy's.
 - One selector, `forecast_facts.cell` (points if he plays, the chance he plays, a
   moment's every player and jornada left), feeds the board and every
-  backtest; `forecast_facts.forecast_used` is it as used (no chance for a player who
-  arrives at a club after its match).
+  backtest; `forecast_facts.forecast_used` is it as used (no chance for a player whose
+  listing closes after the jornada's first kickoff, `forecast_facts.late_arrivals`).
 - **Points history** (`season_facts.scored`): each change in a player's points
   total, given to the latest match his club had played.
 - **Uncertainty** (`ffcore/forecast.py`): match-level points as the pool

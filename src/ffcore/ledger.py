@@ -2,6 +2,7 @@
 the feed's events (current.feed_ledger) plus the exits the squad snapshots show beyond those the feed records, each a
 sale at the player's last value; cash is each manager's budget less what he paid, plus what he received and his
 bonuses, plus the untracked gap for everyone, which is your real balance less the same sum for you.
+Rivals' cash is informational (no decision reads it): their bonus is not tracked and your untracked gap is added to theirs.
 Named rules, each tested:
   exits_counted_not_matched: an exit is inferred only beyond the feed: the k-th exit of a (manager, player) is inferred
     only if the feed holds fewer than k rows with that seller and player (a sale and a transfer both name their

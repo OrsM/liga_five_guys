@@ -4,7 +4,7 @@ Merged on 2026-11-06 from `simplify.md`, `model.md`, `plan.md`, `gain.md`, `plan
 agreements in memory. Each section says where it came from `[source]`. Nothing is deleted yet: the last section lists
 what this draft leaves out and why. Review it; what you cut here is cut for good once the old files go.
 
-**The aim:** finish first in the league. The tool is a decision aid: it ranks moves, builds a plan, and a phone page
+**The aim:** maximise expected points (decided 2026-11-22; not the chance of finishing first). The tool is a decision aid: it ranks moves, builds a plan, and a phone page
 shows it. You act on the account; the tool never does.
 
 ---
