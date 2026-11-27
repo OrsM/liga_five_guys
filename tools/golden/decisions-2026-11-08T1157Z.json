@@ -75,6 +75,7 @@
     "yours": false
    },
    "bids": 0,
+   "covered_by": null,
    "detail": null,
    "displaces": [
     "Arnau Ortiz",
@@ -175,6 +176,7 @@
    "n": 26,
    "name": "Pape Gueye",
    "net": 7.864856422731874,
+   "net_alone": 7.864856422731874,
    "net_label": null,
    "per": "season",
    "per_million": 0.36101919234821,
@@ -209,6 +211,7 @@
     "yours": false
    },
    "bids": 0,
+   "covered_by": null,
    "detail": null,
    "displaces": [
     "Dani Martinez",
@@ -224,7 +227,7 @@
     ],
     [
      "walk-away price",
-     175835481.42927575,
+     175653548.98031232,
      "money"
     ],
     [
@@ -240,6 +243,11 @@
     [
      "points added",
      124.94674226177595,
+     "points"
+    ],
+    [
+     "net if bought alone",
+     3.6763061956958527,
      "points"
     ],
     [
@@ -274,7 +282,7 @@
     "lock_margin": 216890.98024958372,
     "lock_margin_low": -4413153.321053542,
     "margin": 286804.40000000596,
-    "net": 3.6763061956958527,
+    "net": 3.2123629813873977,
     "not_listed": [],
     "points_lost_if_lost": 141.18203122796945,
     "points_lost_if_won": 135.26915756092012,
@@ -324,12 +332,13 @@
    "if_won_points": 10.821621778,
    "key": "4288",
    "label": "buy Raphinha",
-   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Georges Mikautadze, Fernando Niño, Gerard Martin, Iñigo Vicente, Miguel Roman, Roger Hinojo, Arnau Ortiz, then Dani Martinez, Pepelu if won: +3.7 points expected (+10.8 if won, -130.5 if lost); displaces Dani Martinez, Pepelu, Martin Satriano. Cash at the lock 0.2 million if won, 120.4 million if lost; worst case -130.5 points.",
+   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Georges Mikautadze, Fernando Niño, Gerard Martin, Iñigo Vicente, Miguel Roman, Roger Hinojo, Arnau Ortiz, then Dani Martinez, Pepelu if won: +3.2 points expected (+10.8 if won, -130.5 if lost); displaces Dani Martinez, Pepelu, Martin Satriano. Cash at the lock 0.2 million if won, 120.4 million if lost; worst case -130.5 points.",
    "more": false,
    "move": "bid",
    "n": 26,
    "name": "Raphinha",
-   "net": 3.6763061956958527,
+   "net": 3.2123629813873977,
+   "net_alone": 3.6763061956958527,
    "net_label": null,
    "per": "season",
    "per_million": 0.7164103963174752,
@@ -343,7 +352,7 @@
    "step": "bid",
    "to": null,
    "trace": null,
-   "walk_away": 175835481.42927575,
+   "walk_away": 175653548.98031232,
    "what": "buy",
    "why": null,
    "why_not_placed": "bid_limit",
@@ -939,6 +948,7 @@
    "line": "buy Pape Gueye at 22.8 million (96% to win), funded by selling tonight Roger Hinojo, then Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla if won; Arnau Ortiz, Dani Martinez, Pepelu if lost: +7.9 points expected (+8.3 if won, -3.1 if lost); displaces Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla, Guido Rodriguez. Cash at the lock 2.9 million if won, 12.6 million if lost; worst case -3.1 points.",
    "name": "Pape Gueye",
    "net": 7.864856422731874,
+   "net_alone": 7.864856422731874,
    "pos": "MED",
    "walk_away": 29844913.977634013,
    "win": 0.9604036822827211,
@@ -979,7 +989,7 @@
     "lock_margin": 216890.98024958372,
     "lock_margin_low": -4413153.321053542,
     "margin": 286804.40000000596,
-    "net": 3.6763061956958527,
+    "net": 3.2123629813873977,
     "not_listed": [],
     "points_lost_if_lost": 141.18203122796945,
     "points_lost_if_won": 135.26915756092012,
@@ -1027,11 +1037,12 @@
    "if_lost_points": -130.451390053,
    "if_won_points": 10.821621778,
    "key": "4288",
-   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Georges Mikautadze, Fernando Niño, Gerard Martin, Iñigo Vicente, Miguel Roman, Roger Hinojo, Arnau Ortiz, then Dani Martinez, Pepelu if won: +3.7 points expected (+10.8 if won, -130.5 if lost); displaces Dani Martinez, Pepelu, Martin Satriano. Cash at the lock 0.2 million if won, 120.4 million if lost; worst case -130.5 points.",
+   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Georges Mikautadze, Fernando Niño, Gerard Martin, Iñigo Vicente, Miguel Roman, Roger Hinojo, Arnau Ortiz, then Dani Martinez, Pepelu if won: +3.2 points expected (+10.8 if won, -130.5 if lost); displaces Dani Martinez, Pepelu, Martin Satriano. Cash at the lock 0.2 million if won, 120.4 million if lost; worst case -130.5 points.",
    "name": "Raphinha",
-   "net": 3.6763061956958527,
+   "net": 3.2123629813873977,
+   "net_alone": 3.6763061956958527,
    "pos": "DEL",
-   "walk_away": 175835481.42927575,
+   "walk_away": 175653548.98031232,
    "win": 0.9494219349524704,
    "worst": -130.451390053
   }
@@ -1039,30 +1050,36 @@
  "rejected": [
   {
    "asking": 59988796.0,
+   "covered_by": null,
    "gain": 13.09870740779646,
    "key": "9573",
    "name": "Jonathan David",
    "net": -10.770068010621987,
+   "net_alone": -10.770068010621987,
    "pos": "DEL",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -10.8)"
   },
   {
    "asking": 5397438.0,
+   "covered_by": null,
    "gain": 0.943155016950989,
    "key": "6563",
    "name": "Ivan Martin",
    "net": -0.4419771743381311,
+   "net_alone": -0.4419771743381311,
    "pos": "MED",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -0.4)"
   },
   {
    "asking": 5877862.0,
+   "covered_by": null,
    "gain": 0.7565298788937085,
    "key": "6957",
    "name": "Isi Palazon",
    "net": -1.4493119985419156,
+   "net_alone": -1.4493119985419156,
    "pos": "MED",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -1.4)"

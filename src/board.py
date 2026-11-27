@@ -22,7 +22,7 @@ import hurdle
 import shadow
 import worth
 from shadow import Ladder
-from approach import Approach, Bidding, Club, Money, Offer, Option, Plan, Reserve, Rounds, Side, Stand, approach, bidding, plan, pricing_of, replacement, secure, stand
+from approach import Approach, Bidding, Club, Money, Offer, Option, Plan, Reserve, Rounds, Side, Stand, approach, bidding, given, given_at, plan, pricing_of, replacement, secure, stand
 from ffcore import current, league, loader, price_fold, state
 from ffcore import forecast as model, pricing, rules, tidy
 from ffcore import observations as ob
@@ -50,7 +50,7 @@ FUNDED_FLOOR = 0.5
 EVALUATED_NOTE = "not evaluated: it is beyond the best listings by gain that are"
 REASONS = {"no_curve": "no chance of winning is known for this auction", "no_win_chance": "no bid has the chance %.0f%% needed" % (100 * hurdle.WIN_FLOOR),
            "unfundable": "no sales fund even the asking price", "net_not_positive": "its funded net is not above the floor of %.1f points" % FUNDED_FLOOR,
-           "not_evaluated": EVALUATED_NOTE}
+           "not_evaluated": EVALUATED_NOTE, "covered": "it takes a place another buy already takes"}
 TOP_TARGETS = 10
 TOP_REPLACEMENTS = 8
 EXAMINED_REPLACEMENTS = 40
@@ -393,8 +393,11 @@ def plan_line(b: Doc) -> str:
 
 def rejected_line(b: Doc) -> Doc:
     """The compact row of a candidate that is not a funded plan: who, why (a code and words), the net where it has one and the gain."""
-    return {"name": b["name"], "key": b["key"], "pos": b["pos"], "asking": b["asking"], "gain": b["gain"], "net": b["net"], "reason": b["reason"],
-            "why": REASONS[b["reason"]] + ("" if b["net"] is None else " (net %+.1f)" % b["net"])}
+    alone = b["net_alone"] is not None and b["net"] is not None and abs(b["net_alone"] - b["net"]) > 5e-3
+    return {"name": b["name"], "key": b["key"], "pos": b["pos"], "asking": b["asking"], "gain": b["gain"], "net": b["net"], "net_alone": b["net_alone"],
+            "covered_by": b["covered_by"], "reason": b["reason"],
+            "why": REASONS[b["reason"]] + (" (covered by %s)" % b["covered_by"] if b["reason"] == "covered" and b["covered_by"] else "")
+            + ("" if b["net"] is None else " (net %+.1f%s)" % (b["net"], ", %+.1f alone" % b["net_alone"] if alone else ""))}
 
 
 def displaced(names: dict[str, str], sold: Iterable[str], replaces: str | None) -> list[str]:
@@ -434,6 +437,83 @@ def resale_of(row: dict[str, Any]) -> float:
     return hurdle.draw(row.get("value") or row["asking"]) + hurdle.falls(row["stake"])
 
 
+class Case(NamedTuple):
+    """A candidate of buy_lines looked at alone: its opportunity row `r`, `curve`, whether it was `trying`, its Bidding `bid` against the plan with
+    no buy, the `fund` of one bid and its `money`."""
+    r: dict[str, Any]
+    curve: Curve | None
+    trying: bool
+    bid: Bidding
+    fund: Callable[[float, float], Approach | None]
+    money: Money
+
+
+def reason_of(curve: Curve | None, trying: bool, bid: Bidding, low: str) -> str | None:
+    """Why a listing has no funded plan, one of REASONS (None: it has one, the net of its best bid above FUNDED_FLOOR); `low` is the reason of a best
+    net not above it."""
+    best = bid.best
+    return ("no_curve" if curve is None else "not_evaluated" if not trying else "no_win_chance" if not any(p >= hurdle.WIN_FLOOR and ratio >= 1.0 for ratio, p in curve)
+            else "unfundable" if best is None else low if not best.found.net > FUNDED_FLOOR else None)
+
+
+def placed_win(c: Case) -> float:
+    """The chance of the bid placed on a candidate at its amount (1 when no chance is known for the auction)."""
+    return 1.0 if c.curve is None else chance(c.curve, c.r["placed"] / c.r["asking"])
+
+
+class Joint(NamedTuple):
+    """A candidate judged in the chain: its Bidding `bid` given the better ones chosen before it, the `loss` (points, win-weighted per unit of win
+    chance) its gain fell by, and `by` the chosen buy that covers it most (None unless it is left out as covered)."""
+    bid: Bidding
+    loss: float
+    by: str | None
+
+
+def joint_chain(squad: frozenset[str], pos: dict[str, str], cells: valuation.Cells, pool: list[Case], memo: valuation.Memo) -> dict[str, Joint]:
+    """The Joint of each candidate of `pool` (the bids placed and the buys funded alone, each with its Bidding alone): the greedy chain, the one place
+    the board's nets are made joint (grading reads it through buy_lines). Each step takes the candidate of the greatest marginal net (approach.given:
+    its net with the points it adds lowered to what it adds to the squad plus the buys chosen so far, win-weighted, valuation.expected_gain), a
+    bid placed among them, judged given only the better ones chosen before it; a bid placed with no Bidding goes first. A free candidate
+    is chosen only while its marginal is above FUNDED_FLOOR, then the rest of the free are left out, covered (`by` the chosen buy that takes
+    most of their gain); a bid placed is always in the chain. A chosen buy is held at the chance of its bid (a placed bid's chance at its amount, 1
+    when none is known) unless it is a hold (sold again) or a placed bid whose marginal net is not above 0 (`stand` withdraws it). The marginals
+    sum to the set's net in any order and none exceeds the net alone. Cost: each candidate is looked at once per step over at most 2^JOINT_MAX
+    squads (valuation.JOINT_MAX of the buys held), each squad and gain remembered in `memo`: about the candidates x 2^7 gains."""
+    held: dict[str, float] = {}
+    left = {c.r["player"]: c for c in pool}
+    final: dict[str, Joint] = {}
+    out: list[str] = []
+
+    def marginal(k: str) -> Joint:
+        c = left[k]
+        loss = c.r["gain"] - valuation.expected_gain(squad, k, held, c.r["window"], pos, cells, memo)
+        return Joint(given(c.bid, loss, c.money.kappa), loss, None)
+
+    def net(k: str, j: Joint) -> float:
+        return j.bid.best.found.net if j.bid.best is not None else float("inf") if left[k].r["placed"] is not None else float("-inf")
+
+    while left:
+        step = {k: marginal(k) for k in left}
+        first = min(step, key=lambda k: (-net(k, step[k]), -left[k].r["gain"], k))
+        c, got = left[first], step[first]
+        if c.r["placed"] is None and not net(first, got) > FUNDED_FLOOR:
+            for k in [k for k, x in left.items() if x.r["placed"] is None]:
+                out.append(k)
+                del left[k]
+            continue
+        final[first] = got
+        top = got.bid.best
+        if c.r["profit"] <= 0 and (c.r["placed"] is None or top is None or top.found.net > 0):
+            held[first] = placed_win(c) if c.r["placed"] is not None else top.win if top is not None else 0.0
+        del left[first]
+    for k in out:
+        c = next(x for x in pool if x.r["player"] == k)
+        loss = c.r["gain"] - valuation.expected_gain(squad, k, held, c.r["window"], pos, cells, memo)
+        cover = {x: valuation.expected_gain(squad, k, {x: w}, c.r["window"], pos, cells, memo) for x, w in held.items()}
+        final[k] = Joint(given(c.bid, loss, c.money.kappa), loss, min(cover, key=lambda x: (cover[x], x)) if cover and loss > 1e-9 else None)
+    return final
+
+
 def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list[dict[str, Any]], cost0: float, rate: float, n_closes: int) -> Buys:
     """The buys of the board, the funded plans and the candidates left out. Every player on the market with an asking price and a gain (or a bid
     placed; one who adds no points is no candidate) is a candidate, best gain first; the first EVALUATED_BUYS get a Bidding (approach.bidding): the funded net of each bid of the auction
@@ -441,7 +521,12 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     the one at which it is 0. A plan whose best net is above FUNDED_FLOOR is a funded plan (`plans`, by net, one `line` each); of them those whose
     is above FUNDED_FLOOR is advised (`buys`, with the bids placed first, a bid placed whatever its net: a move of hold, lower,
     withdraw or raise, a `why` in words, approach.stand on the funded net). Every other candidate is in `rejected` with its `reason` and net;
-    none is dropped without being counted. `n_closes` the closes left before the lock: a sale after a result is priced at the last (approach.prices)."""
+    none is dropped without being counted. Nets are joint (joint_chain): a placed bid's net is judged given the other bids placed, an advised
+    buy's given the bids placed and the better advised ones; `net_alone` keeps the net funded alone, and a candidate whose net given them is not
+    above FUNDED_FLOOR is rejected as `covered`, naming the buy that covers it. The bids placed are candidates of the same chain (judged given the
+    better ones before them, not given all the others). Not joint: cash (each plan is funded alone against the full cash, so two buys that
+    together exceed it show a joint net that is too high); a bid placed whose chance is unknown counts as won; only the JOINT_MAX likeliest buys
+    held are conditioned on (the rest ignored, ties by key), which can only overstate a gain. `n_closes` the closes left before the lock: a sale after a result is priced at the last (approach.prices)."""
     pos, cells = decision.cells_of(inp)
     locks = decision.lock_times(inp)
     closes = n_closes
@@ -452,12 +537,10 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     market = [r for r in got if r["status"] == "market" and r["asking"] is not None and (r["gain"] + r["profit"] > 0 or r["placed"] is not None)]
     mine = [r for r in market if r["placed"] is not None]
     wanted = mine + [r for r in market if r["placed"] is None]
-    out: list[Doc] = []
-    ladders: list[Ladder] = []
+    cases: list[Case] = []
     for i, r in enumerate(wanted):
-        k, placed = r["player"], r["placed"]
+        k = r["player"]
         curve = curves.get(k)
-        name = names.get(k, k)
         others = (len(bids) - (k in bids), sum(bids.values()) - bids.get(k, 0.0))
         rounds = Rounds(cells, decision.window_of(locks, cells, None), decision.window_of(locks, cells, r["close_at"]), closes)
         money = Money(rate, len(decision.window_of(locks, cells, None)), None if r["profit"] > 0 else resale_of(r))
@@ -469,32 +552,51 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
             return approach(held_club, k, amount, win, rounds, cost0, sides, earns, money)
         trying = i < EVALUATED_BUYS and curve is not None
         bid = bidding(curve, r["asking"], fund, money.kappa) if trying and curve is not None else Bidding((), None, None)
+        cases.append(Case(r, curve, trying, bid, fund, money))
+    squad = decision.squad_of(inp)
+    memo = valuation.Memo()
+    chain = joint_chain(squad, pos, cells, [c for c in cases if c.r["placed"] is not None or reason_of(c.curve, c.trying, c.bid, "net_not_positive") is None], memo)
+    out: list[Doc] = []
+    ladders: list[Ladder] = []
+    for c in cases:
+        r, curve, trying, alone = c.r, c.curve, c.trying, c.bid
+        k, placed = r["player"], r["placed"]
+        name = names.get(k, k)
+        auction_reason = reason_of(curve, trying, alone, "net_not_positive")
+        ladders.append(Ladder(k, name, r["replaces"], auction_reason, alone))
+        joint = chain.get(k, Joint(alone, 0.0, None))
+        loss, bid = joint.loss, joint.bid
+        if placed is not None:
+            reason = reason_of(curve, trying, bid, "net_not_positive")
+        else:
+            reason = auction_reason if auction_reason is not None else reason_of(curve, trying, bid, "covered")
         best = bid.best
-        reason = ("no_curve" if curve is None else "not_evaluated" if not trying else "no_win_chance" if not any(p >= hurdle.WIN_FLOOR and ratio >= 1.0 for ratio, p in curve)
-                  else "unfundable" if best is None else None)
         net = best.found.net if best is not None else None
         walk = bid.walk_away if best is not None else None
         clears = best is not None and net is not None and net > FUNDED_FLOOR
-        if reason is None and not (net is not None and net > FUNDED_FLOOR):
-            reason = "net_not_positive"
-        ladders.append(Ladder(k, name, r["replaces"], reason, bid))
         advised = best.amount if best is not None and clears else None
         advised_win = best.win if best is not None and clears else None
-        at, shown = stance_of(r, curve, trying, bid, advised, advised_win, fund)
+
+        def given_fund(amount: float, win: float, c: Case = c, loss: float = loss) -> Approach | None:
+            return given_at(c.fund(amount, win), win, loss)
+        at, shown = stance_of(r, curve, trying, bid, advised, advised_win, given_fund)
         amount, win = at.amount, at.win
         found = shown if shown is not None and shown.feasible else None
         funding = None if shown is None or amount is None else funding_doc(club, names, shown, amount)
         shown_net = found.net if found is not None else None
+        net_alone = (shown_net + at.win * loss if shown_net is not None and at.win is not None else None) if placed is not None else \
+            (alone.best.found.net if alone.best is not None else None)
         label = None if shown_net is not None else UNFUNDED if shown is not None else GAIN_ONLY
         auction = seen.get(k)
         won_pts, lost_pts = outcomes(found) if found is not None else (None, None)
+        covering = names.get(joint.by, joint.by) if joint.by else None
         out.append({
             "name": name, "pos": r["pos"], "what": "buy", "label": "buy " + name, "step": "placed" if placed is not None else "bid",
             "price": r["asking"], "asking": r["asking"], "amount": amount, "win": win, "advised": at.advised, "advised_win": at.advised_win,
             "move": at.move, "to": at.to,
             "why": stance_why(at, walk, r["per_million"] / r["stake"].n if r["per_million"] is not None else None, shown_net, label, best),
             "plan": False, "done": placed is not None,
-            "key": k, "gain": r["gain"], "net": shown_net, "net_label": label, "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
+            "key": k, "gain": r["gain"], "net": shown_net, "net_alone": net_alone, "covered_by": covering, "net_label": label, "per": "season", "more": False, "detail": None, "trace": None, "flip": None,
             "replaces": names.get(r["replaces"], r["replaces"]), "per_million": r["per_million"], **priced(r), "walk_away": walk,
             "reason": reason, "if_won_points": won_pts, "if_lost_points": lost_pts,
             "displaces": [] if found is None else displaced(names, found.if_won, r["replaces"]),
@@ -503,6 +605,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
                       ["chance to win", win, "chance"]]
             + ([["advised bid", at.advised, "money"], ["chance at the advised bid", at.advised_win, "chance"]] if placed is not None else [])
             + [["points added", r["gain"], "points"]]
+            + ([["net if bought alone", net_alone, "points"]] if net_alone is not None and shown_net is not None and abs(net_alone - shown_net) > 5e-3 else [])
             + ([["price expected after the hold", r["stake"].proceeds, "money"], ["points the hold earns", hurdle.profit(r["stake"], amount) if amount else 0.0, "points"]]
                if r["stake"].k < r["stake"].n and amount else []),
             "bids": auction.bids if auction else None,
@@ -519,7 +622,7 @@ def buy_lines(inp: decision.Inputs, names: dict[str, str], club: Club, got: list
     lines = placed_lines + advised_lines
     overlapped(inp, lines, {r["player"]: r for r in got})
     plans = [{"name": b["name"], "key": b["key"], "pos": b["pos"], "asking": b["asking"], "bid": b["amount"], "win": b["win"], "walk_away": b["walk_away"],
-              "net": b["net"], "gain": b["gain"], "if_won_points": b["if_won_points"],
+              "net": b["net"], "net_alone": b["net_alone"], "gain": b["gain"], "if_won_points": b["if_won_points"],
               "if_lost_points": b["if_lost_points"], "worst": min(b["if_won_points"], b["if_lost_points"]), "displaces": b["displaces"],
               "cash_if_won": b["funding"]["lock_margin"], "cash_if_lost": b["funding"]["cash_if_lost"], "funding": b["funding"], "line": b["line"]}
              for b in funded_plans]
@@ -1556,6 +1659,129 @@ def _selftest_not_listed() -> None:
     assert seen > 0, "the cases include a sale of a player not listed"
 
 
+def _joint_case(k: str, gain: float, wins: Sequence[float], window: tuple[int, ...], profit: float = 0.0, placed: float | None = None) -> Case:
+    offers = tuple(Offer(1e7 * (1 + 0.1 * i), w, Approach(True, 0.0, frozenset(), frozenset(), frozenset(), frozenset(), 0.0, 0.0, 0.0, 0.0, 0.0, gain,
+                                                         0.0, 0.0, w * gain - 2.0 * (1 + i))) for i, w in enumerate(wins))
+    bid = Bidding(offers, min(offers, key=lambda o: (-o.found.net, o.amount)), None)
+    row = {"player": k, "gain": gain, "profit": profit, "window": window, "placed": None if placed is None else 1e7, "asking": 1e7}
+    return Case(row, ((1.0, 1.0 if placed is None else placed),), True, bid, lambda amount, win: None, Money(0.045, 1, None))
+
+
+def _best(b: Bidding) -> Offer:
+    assert b.best is not None
+    return b.best
+
+
+def _selftest_joint() -> None:
+    rng = random.Random(27)
+    window = (5, 6, 7)
+    covered = chained = 0
+    for case in range(120):
+        sizes = rng.choice([{"POR": 2, "DEF": 5, "MED": 5, "DEL": 3}, {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}, {"POR": 2, "DEF": 6, "MED": 4, "DEL": 4}])
+        market = {"M%d" % i: rng.choice(list(sizes)) for i in range(7)}
+        pos = {"%s%d" % (p, i): p for p, n in sizes.items() for i in range(n)} | market
+        cells = {j: {k: float(rng.randint(0, 6)) if case % 2 else rng.uniform(0, 9) for k in pos} for j in window}
+        squad = frozenset(k for k in pos if k not in market)
+        buyer = valuation.Buyer(squad, window, pos, cells)
+        pool = [_joint_case(k, buyer.gain(k), sorted(rng.sample([0.3, 0.5, 0.7, 0.9, 1.0], 3)), window, rng.choice([0.0, 0.0, 0.0, 1.0]))
+                for k in sorted(market) if buyer.gain(k) > 0]
+        if not pool:
+            continue
+        out = joint_chain(squad, pos, cells, pool, valuation.Memo())
+        alone = {c.r["player"]: c for c in pool}
+        assert set(out) == set(alone), "every candidate of the pool gets a Bidding"
+        assert all(_best(out[k].bid).found.net <= _best(alone[k].bid).found.net + 1e-9 for k in out), "a net given other buys is never above the net alone"
+        chain = sorted((k for k in out if _best(out[k].bid).found.net > FUNDED_FLOOR), key=lambda k: -_best(out[k].bid).found.net)
+        nets = [_best(out[k].bid).found.net for k in chain]
+        assert nets == sorted(nets, reverse=True), "marginal nets of the chain fall"
+        again = joint_chain(squad, pos, cells, list(reversed(pool)), valuation.Memo())
+        assert {k: (_best(b.bid).amount, _best(b.bid).found.net) for k, b in again.items()} == {k: (_best(b.bid).amount, _best(b.bid).found.net) for k, b in out.items()}, \
+            "the chain does not depend on the order the pool is listed in"
+        first = max(pool, key=lambda c: (_best(c.bid).found.net, c.r["player"]))
+        solo = joint_chain(squad, pos, cells, [first], valuation.Memo())[first.r["player"]]
+        assert abs(_best(solo.bid).found.net - _best(first.bid).found.net) < 1e-9, "a set of one is judged as it is alone"
+        covered += len(set(out) - set(chain))
+        chained += len(chain) > 1
+        bought = {k: _best(out[k].bid).win for k in chain if alone[k].r["profit"] <= 0}
+        if len(bought) == len(chain) and all(_best(out[k].bid).amount == _best(alone[k].bid).amount for k in chain):
+            held: dict[str, float] = {}
+            lost = 0.0
+            for k in chain:
+                lost += _best(alone[k].bid).found.net - _best(out[k].bid).found.net
+                held[k] = bought[k]
+            keys = sorted(bought)
+            worth_of = 0.0
+            for mask in range(1 << len(keys)):
+                p, won = 1.0, set()
+                for i, k in enumerate(keys):
+                    p *= bought[k] if mask >> i & 1 else 1.0 - bought[k]
+                    if mask >> i & 1:
+                        won.add(k)
+                worth_of += p * sum((eleven.points(squad | won, pos, cells[j]) or 0.0) - (eleven.points(squad, pos, cells[j]) or 0.0) for j in window)
+            assert abs(lost - (sum(bought[k] * alone[k].r["gain"] for k in chain) - worth_of)) < 1e-6, \
+                "the nets fall together by exactly what the set is worth less than the sum of its gains"
+    assert covered > 0 and chained > 10, "overlap and a chain of more than one were exercised"
+    pos = {"POR0": "POR", "POR1": "POR", "POR2": "POR", **{"%s%d" % (p, i): p for p, n in {"DEF": 4, "MED": 4, "DEL": 2}.items() for i in range(n)}}
+    cells = {j: {k: 5.0 for k in pos} | {"POR0": 1.0, "POR1": 7.0, "POR2": 6.5} for j in window}
+    squad = frozenset(k for k in pos if k not in ("POR1", "POR2"))
+    two = [_joint_case("POR1", 18.0, [1.0], window), _joint_case("POR2", 16.5, [1.0], window)]
+    out = joint_chain(squad, pos, cells, two, valuation.Memo())
+    assert _best(out["POR1"].bid).found.net > FUNDED_FLOOR, "the better keeper is bought"
+    assert not _best(out["POR2"].bid).found.net > FUNDED_FLOOR and _best(out["POR2"].bid).found.net < _best(two[1].bid).found.net - 5.0, \
+        "the keeper who takes the same place is covered, his net far below the net alone"
+    keepers = frozenset(k for k in pos if k not in ("POR1", "POR2", "POR3"))
+    pos3 = pos | {"POR3": "POR"}
+    cells3 = {j: row | {"POR3": 7.0} for j, row in cells.items()}
+    twin = [_joint_case("POR1", 18.0, [1.0], window, placed=1.0), _joint_case("POR3", 18.0, [1.0], window, placed=1.0)]
+    out = joint_chain(keepers, pos3, cells3, twin, valuation.Memo())
+    nets = sorted(_best(out[k].bid).found.net for k in out)
+    assert nets[1] > FUNDED_FLOOR and nets[0] <= 0, "two identical placed keepers: one is kept, the other nets nothing given it"
+    assert sorted(stand(out[k].bid, _best(out[k].bid).found, 1e7).move for k in out) == ["hold", "withdraw"], "and exactly one is advised to hold"
+    for order in (twin, twin[::-1]):
+        again = joint_chain(keepers, pos3, cells3, order, valuation.Memo())
+        assert {k: _best(b.bid).found.net for k, b in again.items()} == {k: _best(b.bid).found.net for k, b in out.items()}, "placed bids: the order listed does not matter"
+    worse = _joint_case("POR2", 16.5, [0.5], window, placed=0.5)
+    better = _joint_case("POR1", 18.0, [1.0], window)
+    out = joint_chain(squad, pos, cells, [worse, better], valuation.Memo())
+    assert _best(out["POR1"].bid).found.net == _best(better.bid).found.net and out["POR1"].loss == 0.0, "a worse placed bid does not cover a better advised line"
+    assert _best(out["POR2"].bid).found.net < _best(worse.bid).found.net - 4.0, "the worse placed bid is judged given the better one"
+    both = _joint_case("POR1", 18.0, [1.0], window, placed=1.0)
+    out = joint_chain(squad, pos, cells, [worse, both], valuation.Memo())
+    assert out["POR1"].loss == 0.0 and out["POR2"].loss > 0.0, "the better of two placed bids is judged alone"
+    out = joint_chain(squad, pos, cells, [_joint_case("POR1", 18.0, [1.0], window), _joint_case("POR2", 16.5, [1.0], window)], valuation.Memo())
+    assert out["POR2"].by == "POR1" and out["POR1"].by is None, "a covered candidate names the buy that covers it"
+
+
+def _selftest_placed_covered() -> None:
+    shape = {"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}
+    squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)}
+    market = {"POR10": "POR", "POR11": "POR", "POR12": "POR", "DEF10": "DEF"}
+    names = {k: k for k in squad | market}
+    base = _inp_of(squad, market)
+    top = {"POR10": 12.0, "POR11": 12.0, "POR12": 11.0, "POR0": 1.0}
+    inp = base._replace(cells=[decision.Cell(c.player, c.jornada, top.get(c.player, 3.0)) for c in base.cells],
+                        curves=[decision.CurvePoint(k, r, 0.5 if r < 1.0 else 1.0) for k in market for r in (0.9, 1.0, 1.02, 1.05, 1.1, 1.2)],
+                        bids=[decision.Bid("POR10", 10e6), decision.Bid("POR11", 10e6)])
+    pos, cells = decision.cells_of(inp)
+    club = Club(frozenset(squad), pos, {k: 4e6 for k in squad}, {}, 5e7, 1e8)
+    buyer = valuation.Buyer(frozenset(squad), decision.window_of({}, cells, None), pos, cells)
+    got: list[dict[str, Any]] = [{"player": k, "pos": market[k], "status": "market", "asking": 10e6, "value": 10e6, "close_at": None, "replaces": "POR0",
+                                  "gain": buyer.gain(k), "per_million": None, "from_j": 1, "price_next": None, "price_lock": None,
+                                  "placed": 10e6 if k in ("POR10", "POR11") else None, "profit": 0.0, "window": decision.window_of({}, cells, None)} for k in sorted(market)]
+    for r in got:
+        r["stake"] = hurdle.stake(r["gain"], hurdle.remaining(1, max(cells)), 0.045, hurdle.Exit(r["asking"]), 1)
+    bought = buy_lines(inp, names, club, got, 0.0, 0.045, 1)
+    shown = {b["key"]: b for b in bought.lines}
+    moves = sorted(shown[k]["move"] for k in ("POR10", "POR11"))
+    assert moves == ["hold", "withdraw"], "two identical placed keepers: one is kept, the other withdrawn"
+    out = next(shown[k] for k in ("POR10", "POR11") if shown[k]["move"] == "withdraw")
+    assert out["net"] < out["net_alone"] and "withdraw" in out["why"], "the withdrawn one says so in words"
+    assert any(f[0] == "net if bought alone" for f in out["facts"]), "and shows the net it would have alone"
+    assert all(x["key"] != "POR12" for x in bought.plans), "a keeper covered by the two placed is no funded plan"
+    covered = [x for x in bought.left if x["key"] == "POR12"]
+    assert covered and covered[0]["reason"] == "covered" and "covered by POR1" in covered[0]["why"], "and is rejected as covered, naming who covers it"
+
+
 def _selftest_why_not() -> None:
     import itertools
     line = {"key": "k", "done": False, "amount": 5e6, "win": 0.9}
@@ -1571,6 +1797,8 @@ def _selftest_why_not() -> None:
 
 
 def _selftest() -> None:
+    _selftest_joint()
+    _selftest_placed_covered()
     _selftest_why_not()
     _selftest_cover()
     _selftest_not_listed()

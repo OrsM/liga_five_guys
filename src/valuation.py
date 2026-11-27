@@ -8,7 +8,7 @@ from typing import NamedTuple
 import eleven
 from ffcore.rules import XI_SIZE, in_force
 
-__all__ = ["Window", "READERS", "NEXT_JORNADAS", "window_at", "Move", "Value", "Delta", "Cells", "NOTHING", "selling", "squad_at", "value_of", "delta", "Reading", "read", "Buyer"]
+__all__ = ["Window", "READERS", "NEXT_JORNADAS", "window_at", "Move", "Value", "Delta", "Cells", "NOTHING", "selling", "squad_at", "value_of", "delta", "Reading", "read", "Buyer", "JOINT_MAX", "Memo", "expected_gain"]
 
 Cells = Mapping[int, Mapping[str, float]]
 
@@ -139,6 +139,47 @@ class Buyer:
         return total
 
 
+JOINT_MAX = 7
+
+
+class Memo:
+    """What expected_gain remembers over one squad, positions and cells: the Buyer of each (squad plus a set of buys, window) and each gain asked of it."""
+
+    def __init__(self) -> None:
+        self.buyers: dict[tuple[frozenset[str], tuple[int, ...]], Buyer] = {}
+        self.gains: dict[tuple[frozenset[str], tuple[int, ...], str], float] = {}
+
+
+def expected_gain(squad: frozenset[str], player: str, chosen: Mapping[str, float], window: tuple[int, ...], pos: Mapping[str, str], cells: Cells,
+                  memo: Memo | None = None) -> float:
+    """The points `player` adds over `window` to the squad plus the buys of `chosen` (player -> chance it is won, each won independently), averaged
+    over which are won: the sum over the subsets W of chosen of p(W) x Buyer(squad + W, window).gain(player), no second valuation. With no chosen
+    it is Buyer(squad, window).gain; every chance 1 it is the gain over squad plus all of them, every chance 0 the gain alone. It never exceeds
+    the gain alone and never rises as `chosen` grows (the value of a squad is submodular), nor the gain of a player already in it: 0.
+    Bounded: only the JOINT_MAX likeliest of `chosen` (ties by key) are held, so at most 2^JOINT_MAX Buyers; the rest are ignored, which
+    can only overstate the gain."""
+    held = sorted(((min(1.0, w), k) for k, w in chosen.items() if w > 0.0 and k != player and k not in squad), key=lambda x: (-x[0], x[1]))[:JOINT_MAX]
+    seen = Memo() if memo is None else memo
+    total = 0.0
+    for mask in range(1 << len(held)):
+        p = 1.0
+        won: set[str] = set()
+        for i, (w, k) in enumerate(held):
+            if mask >> i & 1:
+                p, won = p * w, won | {k}
+            else:
+                p *= 1.0 - w
+        if p <= 0.0:
+            continue
+        base = frozenset(won)
+        if (base, window, player) not in seen.gains:
+            if (base, window) not in seen.buyers:
+                seen.buyers[(base, window)] = Buyer(squad | base, window, pos, cells)
+            seen.gains[(base, window, player)] = seen.buyers[(base, window)].gain(player)
+        total += p * seen.gains[(base, window, player)]
+    return total
+
+
 def _league(rng: random.Random, ties: bool, jornadas: tuple[int, ...]) -> tuple[dict[str, str], dict[int, dict[str, float]]]:
     sizes = {"POR": rng.randint(1, 3), "DEF": rng.randint(4, 7), "MED": rng.randint(4, 7), "DEL": rng.randint(2, 5)}
     pos = {"%s%d" % (p, i): p for p, n in sizes.items() for i in range(n)}
@@ -187,6 +228,81 @@ def _selftest_window() -> None:
     early, late = window_at(locks, every, "2026-11-20T10:00Z"), window_at(locks, every, "2026-11-30T10:00Z")
     assert early[0] == 5 and late[0] == 6, "a move made after a lock does not count for it"
     assert window_at({}, (), None) == () and window_at(locks, (1, 2), None) == ()
+
+
+def _selftest_joint(rng: random.Random) -> None:
+    window = (5, 6, 7)
+
+    def value(squad: frozenset[str], pos: Mapping[str, str], cells: Cells) -> float:
+        return sum(eleven.points(squad, pos, cells[j]) or 0.0 for j in window)
+
+    def worth_of(squad: frozenset[str], chosen: Mapping[str, float], pos: Mapping[str, str], cells: Cells) -> float:
+        """F(S) by brute force: the expected value of the squad plus the buys won, less the squad's, over every subset."""
+        keys = sorted(chosen)
+        total = 0.0
+        for mask in range(1 << len(keys)):
+            p, won = 1.0, set()
+            for i, k in enumerate(keys):
+                p *= chosen[k] if mask >> i & 1 else 1.0 - chosen[k]
+                if mask >> i & 1:
+                    won.add(k)
+            total += p * (value(squad | won, pos, cells) - value(squad, pos, cells))
+        return total
+
+    seen = {"covered": 0, "cases": 0}
+    for case in range(260):
+        pos, cells = _league(rng, case % 2 == 0, window)
+        extra = {"Y%d" % i: rng.choice(["POR", "DEF", "MED", "DEL"]) for i in range(6)}
+        pos = pos | extra
+        cells = {j: row | {k: float(rng.randint(0, 5)) if case % 2 == 0 else rng.uniform(0, 9) for k in extra} for j, row in cells.items()}
+        squad = frozenset(rng.sample(sorted(pos), rng.randint(XI_SIZE, len(pos) - 4)))
+        if eleven.points(squad, pos, {}) is None:
+            continue
+        outside = sorted(set(pos) - squad)
+        picks = rng.sample(outside, min(len(outside), rng.randint(2, 5)))
+        w = {k: rng.choice([0.0, 0.25, 0.5, 0.9, 1.0]) for k in picks}
+        k = picks[0]
+        rest = {j: x for j, x in w.items() if j != k}
+        got = expected_gain(squad, k, rest, window, pos, cells)
+        alone = Buyer(squad, window, pos, cells).gain(k)
+        seen["cases"] += 1
+        assert expected_gain(squad, k, {}, window, pos, cells) == alone, "with nothing chosen it is the Buyer's gain"
+        assert -1e-9 <= got <= alone + 1e-9, "monotone and bounded by the gain alone"
+        assert abs(expected_gain(squad, k, {j: 0.0 for j in rest}, window, pos, cells) - alone) < 1e-9, "w = 0: the gain alone"
+        full = {j: 1.0 for j in rest}
+        assert abs(expected_gain(squad, k, full, window, pos, cells) - (value(squad | set(rest) | {k}, pos, cells) - value(squad | set(rest), pos, cells))) < 1e-9, \
+            "w = 1: the plain eleven difference over the squad plus the buys"
+        assert abs(expected_gain(squad, k, w, window, pos, cells) - expected_gain(squad, k, rest, window, pos, cells)) < 1e-9, "a player is not conditioned on himself"
+        direct = worth_of(squad, w, pos, cells)
+        for order in (list(picks), picks[::-1], rng.sample(picks, len(picks))):
+            held: dict[str, float] = {}
+            chain = 0.0
+            for j in order:
+                chain += w[j] * expected_gain(squad, j, held, window, pos, cells)
+                held[j] = w[j]
+            assert abs(chain - direct) < 1e-9, "the chain of marginals telescopes to the value of the set, in any order"
+        assert direct <= sum(w[j] * Buyer(squad, window, pos, cells).gain(j) for j in picks) + 1e-9, "a set is worth at most the sum of its buys alone"
+        smaller = {j: x for j, x in list(rest.items())[:max(0, len(rest) - 1)]}
+        assert expected_gain(squad, k, {j: 1.0 for j in rest}, window, pos, cells) <= expected_gain(squad, k, {j: 1.0 for j in smaller}, window, pos, cells) + 1e-9, \
+            "submodular: more buys held never raise the gain"
+        for scale in (0.5, 3.0):
+            scaled = {j: {m: scale * x for m, x in row.items()} for j, row in cells.items()}
+            assert abs(expected_gain(squad, k, rest, window, pos, scaled) - scale * got) < 1e-9 * (1 + scale * got), "forecasts scaled scale the gain"
+        memo = Memo()
+        assert abs(expected_gain(squad, k, rest, window, pos, cells, memo) - got) < 1e-9 and abs(expected_gain(squad, k, rest, window, pos, cells, memo) - got) < 1e-9, \
+            "a remembered gain is the same"
+    assert seen["cases"] > 100
+    pos = {"POR0": "POR", "POR1": "POR", "POR2": "POR", **{"%s%d" % (p, i): p for p, n in {"DEF": 4, "MED": 4, "DEL": 2}.items() for i in range(n)}}
+    cells = {j: {k: 5.0 for k in pos} | {"POR0": 1.0, "POR1": 7.0, "POR2": 4.0} for j in window}
+    squad = frozenset(k for k in pos if k not in ("POR1", "POR2"))
+    assert abs(expected_gain(squad, "POR2", {"POR1": 1.0}, window, pos, cells)) < 1e-9, "a keeper the other chosen keeper already out-scores adds nothing: covered"
+    assert abs(expected_gain(squad, "POR2", {"POR1": 0.5}, window, pos, cells) - 0.5 * 3.0 * len(window)) < 1e-9, "and half of his gain when the other is won half the time"
+    assert abs(expected_gain(squad, "POR1", {"POR2": 1.0}, window, pos, cells) - 3.0 * len(window)) < 1e-9, "the better keeper still adds his margin over the other"
+    many = {"%s%d" % ("X", i): 0.5 for i in range(JOINT_MAX + 3)}
+    big = dict(pos) | {k: "DEL" for k in many}
+    cells_big = {j: dict(cells[j]) | {k: float(i) for i, k in enumerate(many)} for j in window}
+    keep = expected_gain(squad, "POR1", many, window, big, cells_big)
+    assert abs(keep - expected_gain(squad, "POR1", {}, window, big, cells_big)) < 1e-9, "a bounded set of held buys still answers"
 
 
 def _selftest() -> None:
@@ -264,6 +380,7 @@ def _selftest() -> None:
     assert squad_at(here, NOTHING, 5, locks) == here
     _selftest_window()
     _selftest_read(rng)
+    _selftest_joint(rng)
     print("valuation self-test OK")
 
 

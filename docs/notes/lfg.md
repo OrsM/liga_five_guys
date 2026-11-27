@@ -231,7 +231,24 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   more) and the bid is the greatest net; `walk_away` is the price at which the net is 0, never a prefilter. Every listing on sale with a
   gain is a funded plan (`plans`: net above `FUNDED_FLOOR`, ranked by net, one `line` each: bid and chance, who is sold tonight / if won / if
   lost, net, net if won and if lost, cash at the lock, worst case, who it displaces, `advised`) or is in `rejected` with its `reason`
-  (`no_curve`, `no_win_chance`, `unfundable`, `net_not_positive`, `not_evaluated`) and net; `considered` is its length. There is no margin left (K deleted): a plan is advised (in `buys`, with the bids placed) when its net is above the floor. A placed bid is
+  (`no_curve`, `no_win_chance`, `unfundable`, `net_not_positive`, `not_evaluated`, `covered`) and net; `considered` is its length.  **Nets are joint (`board.joint_chain`, #joint step 1: display and advice only; `shadow` unchanged).** A set of buys is worth less than the sum of its
+  nets (2026-11-27T0901Z: eight lines that all displace the same player, stated nets 65.1, joint 40.6, exact optimum 35.4). `valuation.expected_gain(Q, k, {chosen: w})`
+  is the points k adds over his window to the squad plus the chosen buys, averaged over which are won (each independently at the chance of its bid):
+  the sum over subsets W of the chosen of p(W) x `Buyer(Q + W).gain(k)`, no second valuation. The eleven's value is monotone and submodular
+  (measured: 0 violations in 3000 exhaustive checks and 781 random leagues), so the gain only falls as buys are held and the greedy chain is nearly exact (14 of 15 cuts equal
+  to the exact optimum). A buy's net given the held ones is its net less win x (gain alone - expected gain), taken at every bid of its ladder
+  (`approach.given`; the bid, walk-away and `stand` then read the shifted nets unchanged). The chain is one greedy loop over the bids placed AND the funded
+  candidates, one at a time by greatest marginal net, each judged given only the better ones already chosen (so of two placed bids covering one place the worse is
+  judged given the better, and `stand` withdraws only it; a placed bid is always in the chain, a funded candidate only while its marginal is above
+  `FUNDED_FLOOR`); each chosen is held at the chance of its bid (a placed bid's chance at its amount, 1 when none is known; a hold, which is sold again, and a placed
+  bid whose marginal net is not above 0, which `stand` withdraws, are not held). `net` is the marginal one and `net_alone` the net funded alone,
+  on every line, plan and rejected row; the marginals telescope to the set's net, in any order, and none exceeds the net alone. A candidate whose marginal is not above the floor is
+  `rejected` as `covered` (it takes a place another buy already takes; `covered_by` and the words name the buy that takes most of its gain). Bounded: at most `JOINT_MAX` = 7 held buys are conditioned on (the likeliest; the rest are
+  ignored, which only overstates a gain), so at most 2^7 squads per candidate, each squad and gain remembered over the chain; a candidate beyond the best
+  EVALUATED_BUYS has no Bidding and is not chained. Targets, `gain`, `replaces`, `per_million` and the shadow's ladders stay the independent (alone) facts. One place makes the chain
+  (`buy_lines`), so `grading.decided_day` reads the same. `gain_with_better` (all-won chain, a fact) is kept. Cash is NOT joint: each plan is funded alone against the full
+  cash, so two buys that together exceed it show a joint net that is too high.
+  TODO (2026-11-27, step 2): `shadow` still prices every buy alone (claims `place:`), so the advice shown here and `shadow.solve` can disagree until `buy_rungs` and `search` score by the marginal (design: ~/.cache/joint-design/FORMULATION.md section 1). There is no margin left (K deleted): a plan is advised (in `buys`, with the bids placed) when its net is above the floor. A placed bid is
   judged by the same net (`approach.stand`: withdraw when no bid tried nets above 0, lower or raise to the bid of the greatest net when its own
   net is not above 0, raise when a dearer bid nets more, else hold); `hurdle.stand` is gone. One bid per row: `opportunity_rows` carries none (only `held`,
   the amount a funded hold's cash is set aside for, whose `hurdle.cap` is the hold route's); `board.with_plans` gives every row the bid and chance of its

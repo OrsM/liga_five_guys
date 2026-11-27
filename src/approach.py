@@ -883,6 +883,21 @@ def bidding(curve: Iterable[tuple[float, float]], asking: float, fund: Callable[
     return Bidding(tuple(offers), best, zero_price(offers, kappa))
 
 
+def given(found: Bidding, loss: float, kappa: float) -> Bidding:
+    """The Bidding `found` with every bid's net lowered by its win chance times `loss` (the points the buy's gain falls by, win-weighted, once other
+    buys are held): the bids stay, the best and the walk-away (zero_price) are read again. `loss` 0 gives `found`; the one way a net is judged
+    given other buys, so `stand` and the board read it unchanged. A loss under 1e-9 is rounding and leaves `found` as it is."""
+    if not found.offers or abs(loss) < 1e-9:
+        return found
+    offers = tuple(o._replace(found=o.found._replace(net=o.found.net - o.win * loss)) for o in found.offers)
+    return Bidding(offers, min(offers, key=lambda o: (-o.found.net, o.amount)), zero_price(offers, kappa))
+
+
+def given_at(here: Approach | None, win: float | None, loss: float) -> Approach | None:
+    """The Approach `here` of one bid with its net lowered as `given` lowers it (None, or a bid of unknown chance, unchanged)."""
+    return here if here is None or win is None else here._replace(net=here.net - win * loss)
+
+
 STAND_MARGIN = 0.1
 
 
