@@ -1518,7 +1518,7 @@ def _selftest_placed() -> None:
             assert b["win"] == chance(curve_of[b["key"]], placed / 10e6) and b["why"] and b["yield"] is None
             if b["move"] != "withdraw" and b["advised"] is not None:
                 assert b["move"] != "lower" or b["to"] == b["advised"] < placed, "a bid placed is lowered to the bid of the greatest funded net"
-                assert b["move"] != "raise" or b["to"] == b["advised"] > placed, "or raised to it"
+                assert b["move"] != "raise" or b["to"] in (b["advised"], hurdle.cleared(placed)) and b["to"] > placed, "or raised to it, or to its own cleared amount (just under a round number)"
             if b["advised"] is not None:
                 assert b["move"] != "withdraw", "a bid of a net above the floor somewhere on the grid is never withdrawn"
                 if b["net"] is not None and b["net"] <= 0 and b["advised"] != placed:
@@ -1813,13 +1813,13 @@ def _selftest_placed_covered() -> None:
     top = {"POR10": 12.0, "POR11": 12.0, "POR12": 11.0, "POR0": 1.0}
     inp = base._replace(cells=[decision.Cell(c.player, c.jornada, top.get(c.player, 3.0)) for c in base.cells],
                         curves=[decision.CurvePoint(k, r, 0.5 if r < 1.0 else 1.0) for k in market for r in (0.9, 1.0, 1.02, 1.05, 1.1, 1.2)],
-                        bids=[decision.Bid("POR10", 10e6), decision.Bid("POR11", 10e6)])
+                        bids=[decision.Bid("POR10", hurdle.cleared(10e6)), decision.Bid("POR11", hurdle.cleared(10e6))])
     pos, cells = decision.cells_of(inp)
     club = Club(frozenset(squad), pos, {k: 4e6 for k in squad}, {}, 5e7, 1e8)
     buyer = valuation.Buyer(frozenset(squad), decision.window_of({}, cells, None), pos, cells)
     got: list[dict[str, Any]] = [{"player": k, "pos": market[k], "status": "market", "asking": 10e6, "value": 10e6, "close_at": None, "replaces": "POR0",
                                   "gain": buyer.gain(k), "per_million": None, "from_j": 1, "price_next": None, "price_lock": None,
-                                  "placed": 10e6 if k in ("POR10", "POR11") else None, "profit": 0.0, "window": decision.window_of({}, cells, None)} for k in sorted(market)]
+                                  "placed": hurdle.cleared(10e6) if k in ("POR10", "POR11") else None, "profit": 0.0, "window": decision.window_of({}, cells, None)} for k in sorted(market)]
     for r in got:
         r["stake"] = hurdle.stake(r["gain"], hurdle.remaining(1, max(cells)), 0.045, hurdle.Exit(r["asking"]), 1)
     bought = buy_lines(inp, names, club, got, 0.0, 0.045, 1)

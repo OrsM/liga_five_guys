@@ -1168,23 +1168,23 @@ def _selftest_limits() -> None:
     assert all(b.amount > a.amount for a, b in zip(placed.offers, placed.offers[1:])), "the offers strictly increase in amount"
     room = _stub(placed.best.found.net)._replace(margin=1e9, lock_margin=1e9)
     for over in (0.0, 1.0, 5e4, 2e5):
-        got = stand(placed, room, hurdle.cleared(placed.best.amount) + over)
-        assert got.move == "hold" or got.to is not None and got.to > hurdle.cleared(placed.best.amount) + over, "a placed bid at or above its cleared amount, its net above 0, is never lowered"
+        mv = stand(placed, room, hurdle.cleared(placed.best.amount) + over)
+        assert mv.move == "hold" or mv.to is not None and mv.to > hurdle.cleared(placed.best.amount) + over, "a placed bid at or above its cleared amount, its net above 0, is never lowered"
     rng = random.Random(5)
     for _ in range(500):
         at = rng.uniform(asking, placed.walk_away * 1.01)
         clear = hurdle.cleared(at)
         free = rng.choice([0.0, clear - at - 1.0, clear - at, 1e9])
         here = _stub(rng.choice([-1.0, 0.5, 2.0]))._replace(margin=free, lock_margin=free)
-        got = stand(placed, here, at)
-        if got.move == "raise" and got.to == clear and clear > at and clear != placed.best.amount:
+        mv = stand(placed, here, at)
+        if mv.move == "raise" and mv.to == clear and clear > at and clear != placed.best.amount:
             assert here.net > 0 and clear <= placed.walk_away and free >= clear - at, "raised to the cleared amount: net above 0, within the walk-away and the room"
         if clear == at and here.net > 0 and placed.best.amount <= at:
-            assert got.move == "hold", "a placed amount already cleared, its net above 0, is left alone"
+            assert mv.move == "hold", "a placed amount already cleared, its net above 0, is left alone"
         if here.net <= 0:
-            assert got.to is None or got.to == placed.best.amount, "a net not above 0 moves to the best bid, not to the cleared amount"
-        if got.to is not None and got.move == "raise":
-            assert got.to > at and (got.to <= placed.walk_away or got.to == placed.best.amount), "a raise never lowers, and stays within the walk-away"
+            assert mv.to is None or mv.to == placed.best.amount, "a net not above 0 moves to the best bid, not to the cleared amount"
+        if mv.to is not None and mv.move == "raise":
+            assert mv.to > at and (mv.to <= placed.walk_away or mv.to == placed.best.amount), "a raise never lowers, and stays within the walk-away"
     snug = _stub(2.9)._replace(margin=1e9, lock_margin=1e9)
     low = 10_100_000.0 - 5.0
     assert stand(placed, snug, low) == Stand("raise", hurdle.cleared(low)) == Stand("raise", 10_100_011.0), "just under a round number: raised to the cleared amount"
