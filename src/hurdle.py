@@ -322,6 +322,7 @@ def _selftest_cleared() -> None:
         assert cleared(c) == c, "idempotent: an amount already cleared (a bid placed) is left alone"
         assert c >= last[1] and (b < last[0] or c >= last[1]), "nondecreasing in the amount"
         last = (b, c)
+        assert abs(cleared(2 * b) - 2 * c) <= 10 ** (len(str(math.ceil(2 * b))) - 3) + 2 * CLEARANCE, "scale: twice the amount is cleared to about twice, up to a grid step and the clearance"
         for rival in (c - CLEARANCE + d for d in range(0, CLEARANCE)):
             assert c > rival, "a rival at the round number or up to CLEARANCE - 1 above it loses to it"
     for b in (999_999.0, 1e6, 1e6 - 0.5, 9_999_999.0, 1e7, 99_999_999.5):

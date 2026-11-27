@@ -901,6 +901,8 @@ def bidding(curve: Iterable[tuple[float, float]], asking: float, fund: Callable[
         offer = advised_offer(cv, asking, ratio, p, fund)
         if offer is None:
             break
+        if offers and offer.amount <= offers[-1].amount:
+            continue
         offers.append(offer)
         last = p
         if p >= 0.999 or len(offers) > 1 and offer.found.net < 0 and offer.found.net < offers[-2].found.net:
@@ -937,7 +939,9 @@ def stand(found: Bidding, here: Approach | None, placed: float) -> Stand:
     """The move for a bid placed at `placed` on a listing whose Bidding is `found`, `here` the Approach that funds it at `placed` (None when none
     does): the same funded net that advises a new bid, never a second valuation. withdraw iff no bid tried has a net above 0. Otherwise lower
     (to the best bid) when the placed bid's net is not above 0 and the best is under it, raise (to the best) when its net is not above 0 and
-    the best is over it, or when the best bid is dearer than the placed one and nets more; else hold: a placed bid whose net is above 0 is never lowered."""
+    the best is over it, or when the best bid is dearer than the placed one and nets more; else, a placed bid whose net is above 0 is never lowered,
+    and one under its cleared amount (hurdle.cleared: just under a round number) is raised to it when the walk-away and what `here` has left of
+    the bid limit and of the cash at the lock allow it; else hold."""
     best = found.best
     here_net = here.net if here is not None and here.feasible else None
     if best is None or max(best.found.net, here_net if here_net is not None else best.found.net) <= 0:
@@ -946,6 +950,10 @@ def stand(found: Bidding, here: Approach | None, placed: float) -> Stand:
         return Stand("lower" if best.amount < placed else "raise", best.amount) if best.amount != placed else Stand("hold", None)
     if best.amount > placed and best.found.net > here_net + STAND_MARGIN:
         return Stand("raise", best.amount)
+    clear = hurdle.cleared(placed)
+    if here is not None and clear > placed and clear <= (found.walk_away if found.walk_away is not None else placed) \
+            and here.margin >= clear - placed and here.lock_margin >= clear - placed:
+        return Stand("raise", clear)
     return Stand("hold", None)
 
 
@@ -1156,10 +1164,30 @@ def _selftest_limits() -> None:
             if not says and limit < hurdle.cleared(asking) and limit >= asking:
                 assert got.offers[0].amount == asking, "a limit that is not said: the rung's own amount"
     placed = bidding(ladder, asking, lambda amount, win: _stub(win * 3.0 - amount / asking), 1e-6)
-    assert placed.best is not None
-    here = _stub(placed.best.found.net)
+    assert placed.best is not None and placed.walk_away is not None
+    assert all(b.amount > a.amount for a, b in zip(placed.offers, placed.offers[1:])), "the offers strictly increase in amount"
+    room = _stub(placed.best.found.net)._replace(margin=1e9, lock_margin=1e9)
     for over in (0.0, 1.0, 5e4, 2e5):
-        assert stand(placed, here, placed.best.amount + over).move == "hold", "a placed bid at or above the advised amount, its net above 0, is left alone"
+        got = stand(placed, room, hurdle.cleared(placed.best.amount) + over)
+        assert got.move == "hold" or got.to is not None and got.to > hurdle.cleared(placed.best.amount) + over, "a placed bid at or above its cleared amount, its net above 0, is never lowered"
+    rng = random.Random(5)
+    for _ in range(500):
+        at = rng.uniform(asking, placed.walk_away * 1.01)
+        clear = hurdle.cleared(at)
+        free = rng.choice([0.0, clear - at - 1.0, clear - at, 1e9])
+        here = _stub(rng.choice([-1.0, 0.5, 2.0]))._replace(margin=free, lock_margin=free)
+        got = stand(placed, here, at)
+        if got.move == "raise" and got.to == clear and clear > at and clear != placed.best.amount:
+            assert here.net > 0 and clear <= placed.walk_away and free >= clear - at, "raised to the cleared amount: net above 0, within the walk-away and the room"
+        if clear == at and here.net > 0 and placed.best.amount <= at:
+            assert got.move == "hold", "a placed amount already cleared, its net above 0, is left alone"
+        if here.net <= 0:
+            assert got.to is None or got.to == placed.best.amount, "a net not above 0 moves to the best bid, not to the cleared amount"
+        if got.to is not None and got.move == "raise":
+            assert got.to > at and (got.to <= placed.walk_away or got.to == placed.best.amount), "a raise never lowers, and stays within the walk-away"
+    snug = _stub(2.9)._replace(margin=1e9, lock_margin=1e9)
+    low = 10_100_000.0 - 5.0
+    assert stand(placed, snug, low) == Stand("raise", hurdle.cleared(low)) == Stand("raise", 10_100_011.0), "just under a round number: raised to the cleared amount"
 
 
 def _unfundable() -> Approach:
