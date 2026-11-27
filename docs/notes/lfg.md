@@ -216,7 +216,7 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   per jornada, being under LAMBDA; and for a sale that loses no points at least the proceeds of his Exit stopped at the
   closes left (`worth.stopped`: what waiting for the best offer is worth); a sale that loses points also needs a use for the
   cash, a buy it funds tonight or the lock cover), wait (a sell whose offer is under 1.0 of value and the 0.5 percentile
-  and funds nothing tonight: waiting is free), hold, or needs_replacement; `points_lost`, `rent` (the points the money
+  and funds nothing tonight: waiting is free), hold, or needs_replacement; **`verdict` is null for a player in the eleven of the decision** (`board.the_eleven`: the app's lineup when legal, else the best eleven; the one place that says who is in it), with `your_call` true and `call` its words (points the sale loses over the season, the money, offer over value): the owner's rule, #69 (his own eleven sales beat the rule in the graded replay, so the board gives the numbers, not TAKE/HOLD; `needs_replacement` stays, it is a fact). `settle` never gives such a row a verdict, not even a sale in the cover's `now`: a sale the cash cover needs is a cost, named in the cover line (`needed`, `set_points_lost`, `why`), not advice. Bench rows are unchanged; `points_lost`, `rent` (the points the money
   earns at LAMBDA over n), sells first, then by the points the sale loses per million it raises; each row typed: `delta`
   (`points` over the season, `window` over lock, next4 and season, `gap` the jornadas left without a legal eleven; all
   null when the squad after the sale has no legal eleven), `feasible`, `why_infeasible` (`"no_eleven"`), `facts` (a list of

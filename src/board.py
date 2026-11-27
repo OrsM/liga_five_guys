@@ -85,15 +85,25 @@ def best_without(inp: decision.Inputs, sold: frozenset[str]) -> eleven.Settled |
     return eleven.best_eleven(squad_without(inp, sold) | gone, pos, {**e, **{k: SOLD_VALUE for k in gone}}, fielded)
 
 
+def the_eleven(inp: decision.Inputs, sold: frozenset[str] = frozenset()) -> frozenset[str]:
+    """The eleven of the decision: the app's lineup when it has a legal one, else the best eleven of squad_without(sold) (empty when none).
+    Who is "in the eleven" is read here and nowhere else."""
+    pos, _ = decision.cells_of(inp)
+    fielded = decision.lineup_of(inp, pos).eleven
+    if fielded is not None:
+        return fielded
+    settled = best_without(inp, sold)
+    return settled.eleven if settled else frozenset()
+
+
 def squad_rows(inp: decision.Inputs, names: dict[str, str], sold: frozenset[str] = frozenset()) -> list[Doc]:
-    """Your squad, a row each: xi in the app's lineup, best in the best eleven of squad_without(sold), sold in sold."""
+    """Your squad, a row each: xi in the eleven of the decision (the_eleven), best in the best eleven of squad_without(sold), sold in sold."""
     pos, _ = decision.cells_of(inp)
     mine = decision.squad_of(inp)
     e = next_value(inp)
-    fielded = decision.lineup_of(inp, pos).eleven
     settled = best_without(inp, sold)
     best = settled.eleven if settled else frozenset()
-    xi = fielded if fielded is not None else best
+    xi = the_eleven(inp, sold)
     order = sorted(mine, key=lambda k: (k not in xi, POSITIONS.index(pos[k]) if k in pos else len(POSITIONS), -e.get(k, 0.0), k))
     return [{"name": names.get(k, k), "pos": pos.get(k, ""), "next": e.get(k, 0.0), "xi": k in xi, "best": k in best,
              "sold": k in sold, "key": k} for k in order]
@@ -157,12 +167,14 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
                 offers: worth.OfferDistribution = worth.NO_OFFERS, rate: float = hurdle.FALLBACK_LAMBDA, closes: int = 0,
                 at: Sequence[str] = ()) -> list[Doc]:
     """A sells row for each standing offer, judged by worth.LIVE at rate with `closes` left before the lock: verdict sell (the offer reaches the reserve),
-    hold, or needs_replacement (no legal eleven without him), before settle; lost the points the sale loses (None: no
+    hold, or needs_replacement (no legal eleven without him), before settle; None with `your_call` set and `call` its words for a player in the
+    eleven of the decision (the_eleven; #69: the numbers are the row's, the choice is the owner's, no advice), his sale being a cost when the cover needs it; lost the points the sale loses (None: no
     Delta) as points_lost, rent the points the money earns at rate over the jornadas of the sale; by per_million (points lost per
     million raised), lowest first. `reserves` the least offer worth.waiting_reserve accepts until each of the moments `at` (untils_of: the closes, then the lock; the
     last with no draw after it)."""
     ctx = context(inp, offers, rate, closes)
     n = ctx.jornadas()
+    xi = the_eleven(inp)
     out = []
     for offer in got:
         k, value, money = offer.player, offer.value, offer.money
@@ -173,6 +185,7 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
         ratio = money / value if value else None
         share = None if ratio is None else worth.offer_percentile(offers, ratio)
         name = names.get(k, k)
+        yours = k in xi and verdict.key is not None
         out.append({
             "name": name, "pos": fact.pos or ctx.pos.get(k, ""), "what": "sell", "label": "sell " + name, "step": "take offer",
             "offer": money, "waiting": None, "trend": fact.trend, "plan": False, "amount": money, "done": False, "key": k,
@@ -182,7 +195,8 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
             "replacement": None, "replacement_why_not": None,
             "offer_percentile": share, "offers_seen": len(offers.ratios),
             "per_million": None if lost is None or not money else lost / (money / 1e6),
-            "verdict": "needs_replacement" if verdict.key is None else "sell" if verdict.key <= 0 else "hold",
+            "verdict": None if yours else "needs_replacement" if verdict.key is None else "sell" if verdict.key <= 0 else "hold",
+            "your_call": yours, "call": your_call_text(lost, money, ratio) if yours else None,
             "points_lost": lost, "rent": rate * n * money / 1e6,
             "reserves": reserves_doc(at, [worth.waiting_reserve(standing(inp, k, value, money), offers, len(at) - 1 - j) for j in range(len(at))]),
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
@@ -190,6 +204,12 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
                       *[["points, " + name, sale.window[name], "points"] for name in READERS]],
             "accepts": [], "act": []})
     return sorted(out, key=lambda d: (d["per_million"] is None, d["per_million"], d["key"]))
+
+
+def your_call_text(lost: float | None, money: float, ratio: float | None) -> str:
+    """The words of a sale of a player in the eleven: what it costs and raises, then that the choice is the owner's."""
+    return "your call: selling him loses %s points over the season and raises %.1fM%s" % (
+        "?" if lost is None else "%.1f" % lost, money / 1e6, "" if ratio is None else " (%.0f%% of his value)" % (100 * ratio))
 
 
 class Shown(NamedTuple):
@@ -769,13 +789,14 @@ def settle(sells: list[Doc], cover: frozenset[str], now: frozenset[str] = frozen
     """The verdicts of the sells rows once the cash's uses are known (rows with "for" set by funds; cover the sales of the
     plan that brings cash to 0 at the lock, now those of them taken at their standing offer): a sale that loses points is a sell
     only when its cash has a use (it funds a buy tonight or is in cover), else hold; a sell not taken tonight (worth.take_now)
-    is wait; a sale in now is a sell. Then sells first, by per_million."""
+    is wait; a sale in now is a sell, but a row that is the owner's call (your_call) keeps no verdict: a sale the cover needs is a cost
+    (cover_lines), not advice. Then sells first, by per_million."""
     for sale in sells:
         if sale["verdict"] == "sell" and (sale["points_lost"] or 0.0) > worth.NO_LOSS and not sale["for"] and sale["key"] not in cover:
             sale["verdict"] = "hold"
         if sale["verdict"] == "sell" and not worth.take_now(sale["ratio"], sale["offer_percentile"], bool(sale["for"])):
             sale["verdict"] = "wait"
-        if sale["key"] in now and sale["verdict"] != "needs_replacement":
+        if sale["key"] in now and sale["verdict"] != "needs_replacement" and not sale["your_call"]:
             sale["verdict"] = "sell"
     sells.sort(key=lambda d: (d["verdict"] != "sell", d["per_million"] is None, d["per_million"], d["key"]))
 
@@ -1300,19 +1321,50 @@ def _selftest_sells() -> None:
 def _selftest_settle() -> None:
     rng = random.Random(21)
     for _ in range(400):
-        rows: list[Doc] = [{"key": "p%d" % i, "verdict": rng.choice(["sell", "hold", "needs_replacement"]), "points_lost": rng.choice([0.0, 2.0, None]),
+        rows: list[Doc] = [{"key": "p%d" % i, "verdict": rng.choice(["sell", "hold", "needs_replacement", None]), "points_lost": rng.choice([0.0, 2.0, None]),
                             "for": rng.choice([[], ["B"]]), "ratio": rng.choice([0.9, 1.0, 1.1, None]), "offer_percentile": rng.choice([0.1, 0.5, None]),
                             "per_million": rng.choice([None, 0.0, 1.0, 2.0])} for i in range(rng.randint(0, 8))]
+        for r in rows:
+            r["your_call"] = r["verdict"] is None
         before = {r["key"]: r["verdict"] for r in rows}
         cover = frozenset(r["key"] for r in rows if rng.random() < 0.3)
         settle(rows, cover)
         for r in rows:
+            assert (r["verdict"] is None) == r["your_call"], "a player in the eleven keeps no verdict, whatever the cover and the sales taken now"
             assert r["verdict"] == before[r["key"]] or before[r["key"]] == "sell", "only a sell is settled"
             if r["verdict"] in ("sell", "wait") and (r["points_lost"] or 0.0) > 0:
                 assert r["for"] or r["key"] in cover, "a sale that loses points is made only when its cash has a use"
             if r["verdict"] == "sell":
                 assert worth.take_now(r["ratio"], r["offer_percentile"], bool(r["for"])), "a sell is taken tonight"
         assert [r["verdict"] == "sell" for r in rows] == sorted((r["verdict"] == "sell" for r in rows), reverse=True), "sells first"
+
+
+def _selftest_your_call() -> None:
+    rng = random.Random(69)
+    for _ in range(40):
+        shape = rng.choice([{"POR": 1, "DEF": 4, "MED": 4, "DEL": 2}, {"POR": 1, "DEF": 3, "MED": 4, "DEL": 3}, {"POR": 1, "DEF": 4, "MED": 3, "DEL": 3}])
+        bench = {"%s9%d" % (p, i): p for i, p in enumerate(rng.sample(["POR", "DEF", "DEF", "MED", "MED", "DEL", "DEL"], rng.randint(2, 5)))}
+        squad = {"%s%d" % (p, i): p for p, n in shape.items() for i in range(n)} | bench
+        base = _inp_of(squad)
+        app = [decision.Slot("s" + k, k, squad[k], k) for k in sorted(squad) if k not in bench] if rng.random() < 0.7 else []
+        inp = base._replace(lineup=app)
+        xi = the_eleven(inp)
+        assert len(xi) == 11 and (not app or xi == frozenset(s.player for s in app)), "the eleven is the app's when it has one, else the best"
+        rows = offer_lines(inp, {k: k for k in squad}, [decision.Offer(k, 5e6, 5.1e6) for k in sorted(squad)], {})
+        assert {r["key"] for r in rows} == set(squad)
+        for r in rows:
+            if r["verdict"] == "needs_replacement":
+                assert not r["feasible"] and not r["your_call"]
+            elif r["key"] in xi:
+                assert r["verdict"] is None and r["your_call"] and "your call" in r["call"], "an eleven sale: numbers and your call, no verdict"
+                assert r["delta"]["points"] is not None and r["points_lost"] is not None and r["offer"] and r["ratio"] is not None, "the numbers stay"
+            else:
+                assert r["verdict"] in ("sell", "hold") and not r["your_call"] and r["call"] is None, "a bench sale keeps its verdict"
+        for r in rows:
+            r["for"] = []
+        settle(rows, frozenset(r["key"] for r in rows), frozenset(r["key"] for r in rows))
+        assert all((r["verdict"] is None) == (r["key"] in xi and r["verdict"] != "needs_replacement") or r["verdict"] == "needs_replacement" for r in rows)
+        assert all(r["verdict"] == "sell" for r in rows if r["key"] not in xi and r["feasible"]), "the cover's sales of the bench are still sales"
 
 
 def _selftest_replacements() -> None:
@@ -1806,6 +1858,7 @@ def _selftest() -> None:
     _selftest_alerts()
     _selftest_sells()
     _selftest_settle()
+    _selftest_your_call()
     _selftest_replacements()
     _selftest_one_meaning()
     _selftest_world()
