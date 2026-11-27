@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping, Sequence
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -110,7 +110,9 @@ class DecOffer(NamedTuple):
     selling him over the next four jornadas and the season (0 for a bench player), None when no legal eleven remains without him
     (a replacement must be bought first) or when the row is from before the Delta existed; fields whether the squad after the sale
     fields a legal eleven (None: not recorded); gap the jornadas the sale leaves without one joined by ';' (empty: none; None: not
-    recorded); funds the names of the buys it funds tonight joined by ';' (empty: none)."""
+    recorded); funds the names of the buys it funds tonight joined by ';' (empty: none); verdict the board's word on the offer (sell,
+    wait, hold or needs_replacement, as the sells document states it after settle; None: not recorded) and reserve the least offer the
+    sale rule takes for him (None: none stated, or not recorded)."""
     cut: str
     player: str
     offer_id: str
@@ -126,6 +128,8 @@ class DecOffer(NamedTuple):
     gap: str | None
     funds: str
     trend: float | None
+    verdict: str | None = None
+    reserve: float | None = None
 
 
 DEC_OFFER_V1 = ("cut", "player", "offer_id", "created_at", "offer", "value", "ratio", "percentile", "offers_seen", "lost4", "lost8",
@@ -165,19 +169,19 @@ KINDS: Mapping[str, KindSpec] = {s.name: s for s in (
     KindSpec("dec_offer", DecOffer, "offer.jsonl"),
     KindSpec("sale_score", SaleScore, "sale_score.jsonl"))}
 
-LATEST: Mapping[str, int] = {name: 2 if name == "dec_offer" else 1 for name in KINDS}
+LATEST: Mapping[str, int] = {name: 3 if name == "dec_offer" else 1 for name in KINDS}
 
 PLAYER_BYTES = 24
 GRADE_CELL_DTYPE = np.dtype([("from_j", "<i4"), ("jornada", "<i4"), ("player", f"S{PLAYER_BYTES}"),
                              ("predicted", "<f8"), ("plays", "<f8"), ("flagged", "<i4")])
 
 
-def _read_v1(kind: str) -> Callable[[Mapping[str, Any]], Any]:
-    row = KINDS[kind].row
+def _read_v1(kind: str, absent: Sequence[str] = ()) -> Callable[[Mapping[str, Any]], Any]:
+    row, fields = KINDS[kind].row, [f for f in KINDS[kind].row._fields if f not in absent]
 
     def read(obj: Mapping[str, Any]) -> Any:
-        if set(obj) != set(row._fields):
-            raise StoreError("%s row has fields %s, expected %s" % (kind, sorted(obj), sorted(row._fields)))
+        if set(obj) != set(fields):
+            raise StoreError("%s row has fields %s, expected %s" % (kind, sorted(obj), sorted(fields)))
         return row(**obj)
     return read
 
@@ -195,7 +199,7 @@ def _dec_offer_v1(obj: Mapping[str, Any]) -> DecOffer:
 
 
 READERS: Mapping[tuple[str, int], Callable[[Mapping[str, Any]], Any]] = {
-    (name, v): _read_v1(name) for name, v in LATEST.items()} | {("dec_offer", 1): _dec_offer_v1}
+    (name, v): _read_v1(name) for name, v in LATEST.items()} | {("dec_offer", 1): _dec_offer_v1, ("dec_offer", 2): _read_v1("dec_offer", ("verdict", "reserve"))}
 
 
 def header(kind: str) -> str:
@@ -290,7 +294,7 @@ def _selftest() -> None:
         "dec_opportunity": DecOpportunity("2026-11-01T1000Z", "Pedri", "MED", "open", None, None, 4, None, 1.5,
                                           None, None, None, 4.2, 0.3, None),
         "dec_offer": DecOffer("2026-11-01T1000Z", "Pedri", "49892747", "2026-11-01T09:00:00Z", 6795815.0, 1 / 3, None, 0.1 + 0.2,
-                              752, 0.0, -0.0, True, "14;15", "Gavi;Raphinha", None),
+                              752, 0.0, -0.0, True, "14;15", "Gavi;Raphinha", None, "wait", 1.5e6),
         "sale_score": SaleScore(7, "m1", "eleven-proxy bound", "season", 12, -3.5, -0.25, -9.0, 2.0, -11.5, 4.5)}
     assert set(sample) == set(KINDS) == set(LATEST), "every kind has a sample, a spec and a version"
     for kind, row in sample.items():
@@ -304,9 +308,17 @@ def _selftest() -> None:
     v1 = {"cut": "2026-11-01T1000Z", "player": "Pedri", "offer_id": "9", "created_at": "c", "offer": 2.0, "value": 1.5, "ratio": None,
            "percentile": 0.5, "offers_seen": 4, "lost4": 1.5, "lost8": None, "lost_season": 0.0, "funds": "Gavi", "bench": True, "trend": 0.25}
     up = decode("dec_offer", parse_header(b'{"format": "dec_offer", "v": 1}', "dec_offer"), (json.dumps(v1) + "\n").encode())
-    assert up == DecOffer("2026-11-01T1000Z", "Pedri", "9", "c", 2.0, 1.5, None, 0.5, 4, -1.5, 0.0, None, None, "Gavi", 0.25), \
+    assert up == DecOffer("2026-11-01T1000Z", "Pedri", "9", "c", 2.0, 1.5, None, 0.5, 4, -1.5, 0.0, None, None, "Gavi", 0.25, None, None), \
         "an old row reads as a DecOffer: the loss negated into the Delta, fields and gap not recorded"
-    assert LATEST["dec_offer"] == 2 and parse_header(header("dec_offer").encode(), "dec_offer") == 2
+    v2 = {f: getattr(up, f) for f in DecOffer._fields[:-2]}
+    assert decode("dec_offer", 2, (json.dumps(v2) + "\n").encode()) == up, "a version 2 row reads as a DecOffer with no verdict or reserve"
+    assert LATEST["dec_offer"] == 3 and parse_header(header("dec_offer").encode(), "dec_offer") == 3
+    try:
+        decode("dec_offer", 2, (json.dumps(v2 | {"verdict": "hold"}) + "\n").encode())
+    except StoreError:
+        pass
+    else:
+        raise AssertionError("a version 2 row with a version 3 field is refused")
     try:
         decode("dec_offer", 1, (json.dumps(v1 | {"delta_next4": 1.0}) + "\n").encode())
     except StoreError:

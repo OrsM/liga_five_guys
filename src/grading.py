@@ -592,6 +592,59 @@ def sale_scores(sold: Sequence[Sold], season: Season, fielded: dict[int, set[str
     return [*known_scores(ME, mine, season, fielded, facts), *league_scores(sold, season, fielded, facts)]
 
 
+BOARD = "board"
+
+
+class Stated(NamedTuple):
+    """An offer as the board judged it at a cut: the sale it would have been (the player, the minute after the cut's snapshot as
+    replayed_cut has it, the offer), and the verdict word of the sells document (a key of salegrade.VERDICT_CASES)."""
+    trade: Trade
+    verdict: str
+
+
+def stated_offers(rows: Iterable[rec.DecOffer]) -> list[Stated]:
+    """The dec_offer rows whose verdict is a key of salegrade.VERDICT_CASES as Stated, ascending by cut, player, then offer id; a row
+    with no verdict (recorded before it was) or needs_replacement, and a row whose cut is no snapshot, is left out. The offer is judged
+    as stated: only the rows say what the board said."""
+    out = []
+    for r in sorted(rows, key=lambda r: (r.cut, r.player, r.offer_id)):
+        at = snapshot_stamp(r.cut)
+        if r.verdict in salegrade.VERDICT_CASES and at is not None:
+            out.append(Stated(Trade(r.player, at + MINUTE, r.offer, ME), r.verdict))
+    return out
+
+
+def decisions(stated: Iterable[Stated], locks: Sequence[dt.datetime]) -> list[Stated]:
+    """One decision per player, lock window (lock_after the offer's moment) and verdict: the earliest of the offers judged so, the same
+    offer being restated at every cut of the window (the unit that keeps one player's repeated rows from counting as many
+    independent sales). Ascending by moment, then player (the lowest offer first when several are alike)."""
+    first: dict[tuple[str, dt.datetime | None, str], Stated] = {}
+    for x in sorted(stated, key=lambda x: (x.trade.at, x.trade.player, x.verdict, x.trade.amount)):
+        first.setdefault((x.trade.player, lock_after(x.trade.at, locks), x.verdict), x)
+    return list(first.values())
+
+
+def judged_sales(offers: Sequence[Stated], season: Season, fielded: dict[int, set[str]],
+                 facts: Mapping[dt.datetime, MomentFacts]) -> list[salegrade.Judged]:
+    """The offers that have a course (course), each as the sale it would have been, graded at RATE (the sale as made
+    at the offer, by the same course as a real sale), with its verdict case."""
+    out = []
+    for x in offers:
+        sold = Sold(x.trade.at, sale_facts(x.trade, [], None, facts), ME)
+        got = course(sold, season, fielded, facts)
+        if got is not None:
+            out.append(salegrade.Judged(salegrade.VERDICT_CASES[x.verdict], salegrade.grade(sold.sale, got, RATE)))
+    return out
+
+
+def board_scores(offers: Sequence[Stated], season: Season, fielded: dict[int, set[str]],
+                 facts: Mapping[dt.datetime, MomentFacts]) -> list[Scored]:
+    """The Scores (salegrade.verdict_scores) of the offers' stated verdicts judged_sales grades, group BOARD; none when no offer
+    has a course."""
+    judged = judged_sales(offers, season, fielded, facts)
+    return [Scored(BOARD, x) for x in salegrade.verdict_scores(judged)] if judged else []
+
+
 def fabricated(cut: str, first_fielded: str | None) -> bool:
     """Whether a dec_offer row of the cut (a stamp, 2026-11-20T1940Z) with no `fields` states a made-up loss: the cut is at or after
     FABRICATED_FROM and before first_fielded, the first cut of a row that carries `fields` (None: no row does yet)."""
@@ -629,15 +682,17 @@ def latest_values(measure: str) -> dict[str, float]:
 
 def record_sales(loaded: loader.Loaded, records: RunRecords) -> None:
     """Every manager's sales from SALES_FROM with a done jornada at their lock, graded at RATE, are added to the run's
-    records as sale_score (sale_scores: my sales by case, then each rival's, all rivals' and the league's by proxy), whatever
-    the run before held; and my sales summarised (salegrade.measure_values) are added to the measure_log as sale_grade with
+    records as sale_score (sale_scores: my sales by case, then each rival's, all rivals' and the league's by proxy; then board_scores: the
+    verdicts the board stated on offers, from every stored dec_offer row and this run's), whatever the run before held; and my sales summarised (salegrade.measure_values) are added to the measure_log as sale_grade with
     jornadas_done, unless the latest one logged has the same all.lock.n (graded_count) and jornadas_done. loaded is the
     storage the caller has read (read_storage)."""
     now = season(loaded)
-    facts = facts_for(loaded, wanted_moments(trades(now, "sell", SALES_FROM), now.locks, now.done))
+    offers = decisions(stated_offers([*store.records("dec_offer"), *records.rows("dec_offer")]), sorted(now.locks.values()))
+    facts = facts_for(loaded, wanted_moments([*trades(now, "sell", SALES_FROM), *(x.trade for x in offers)], now.locks, now.done))
     fielded = fielded_at_locks(now.locks, now.done, facts)
     sold = sold_since(now, SALES_FROM, facts)
-    records.add("sale_score", [{"group": x.group, **x.score._asdict()} for x in sale_scores(sold, now, fielded, facts)])
+    records.add("sale_score", [{"group": x.group, **x.score._asdict()} for x in [*sale_scores(sold, now, fielded, facts),
+                                                                                *board_scores(offers, now, fielded, facts)]])
     marks = {"all.lock.n": float(graded_count(now)), "jornadas_done": float(len(now.done))}
     latest = latest_values("sale_grade")
     if all(latest.get(k) == v for k, v in marks.items()):
@@ -1931,7 +1986,8 @@ def _selftest_record_sales() -> None:
     ok = salegrade.Course(flat, flat, flat)
     stub: dict[str, Any] = {
         "season": lambda loaded: _season(entries, locks, held["done"], positions={"p": "MED"}),
-        "facts_for": lambda loaded, wanted: {}, "sold_since": lambda now, day, facts: sold,
+        "facts_for": lambda loaded, wanted: {m: MomentFacts({"p": 5e6}, frozenset(), frozenset(), frozenset()) for m in wanted},
+        "sold_since": lambda now, day, facts: sold,
         "course": lambda s, now, fielded, facts: ok if len(now.done) else None,
         "fielded_at_locks": lambda locks, done, facts: {}}
     kept = {k: globals()[k] for k in stub}
@@ -1951,8 +2007,77 @@ def _selftest_record_sales() -> None:
             assert again == 0 and [r._replace(run_id=1) for r in rows] == scores, "nothing new: no measure rows, the same scores"
             held["done"] = {1, 2}
             assert logged(3)[0] == first, "a jornada done: a new set"
+            stated = [{"cut": "2026-09-01T1200Z", "player": "p", "offer_id": "1", "created_at": "c", "offer": 6e6, "value": 5e6, "ratio": None,
+                       "percentile": None, "offers_seen": 0, "delta_next4": 0.0, "delta_season": 0.0, "fields": True, "gap": "", "funds": "",
+                       "trend": None, "verdict": word, "reserve": 5e6} for word in ("sell", "hold")]
+            _published(4, "a", dec_offer=stated)
+            rows = logged(5)[1]
+            board = [r for r in rows if r.group == BOARD]
+            assert {r.group for r in rows} == {ME, "m1", "rivals", "league", BOARD} and {r.case for r in board} >= {"take", "take.win", "hold", "hold.win"}, \
+                "once a stored row states a verdict, the run records its scores as group board"
+            assert sum(r.n for r in board if r.case in ("take", "wait", "hold") and r.horizon == "lock") == 2
         finally:
             globals().update(kept)
+
+
+def _selftest_board_verdicts() -> None:
+    """The stated verdicts are graded as sales made at the offer: rows with no verdict (or none that states a case) and rows of no snapshot are
+    left out, an offer restated at the cuts of a lock window is one decision (a different verdict, player or window is another), an offer judged
+    nets what a real sale at that moment and amount nets, the cases partition the decisions that have a course, and record_sales adds them
+    as group board only once a row states a verdict."""
+    rng = random.Random(5)
+    base = dt.datetime(2026, 9, 1, 12, tzinfo=dt.timezone.utc)
+    lock = {1: base + dt.timedelta(days=3), 2: base + dt.timedelta(days=10), 3: base + dt.timedelta(days=17)}
+    players = ["a", "b", "c", "d"]
+
+    def cut(day: float) -> str:
+        return (base + dt.timedelta(days=day)).strftime("%Y-%m-%dT%H%MZ")
+
+    def row(day: float, player: str, verdict: str | None, offer: float = 5e6, reserve: float | None = 4.5e6) -> rec.DecOffer:
+        return rec.DecOffer(cut(day), player, "id%s%s%s%s" % (player, day, offer, verdict), "c", offer, 5e6, None, None, 0, 0.0, 0.0, True, "", "", None, verdict, reserve)
+    words = [*salegrade.VERDICT_CASES, "needs_replacement", None]
+    for _ in range(12):
+        rows = [row(rng.choice([0.0, 0.1, 0.3, 4.0, 4.2, 11.0]), rng.choice(players), rng.choice(words), rng.choice([4e6, 5e6, 6e6])) for _ in range(rng.randint(0, 30))]
+        rows.append(rec.DecOffer("nonsense", "a", "x", "c", 1.0, 1.0, None, None, 0, 0.0, 0.0, True, "", "", None, "sell", 1.0))
+        got = stated_offers(rows)
+        assert [x.verdict for x in got] == [r.verdict for r in sorted((r for r in rows if r.verdict in salegrade.VERDICT_CASES and r.cut != "nonsense"),
+                                                                     key=lambda r: (r.cut, r.player, r.offer_id))], \
+            "only rows stating a verdict case, at a snapshot, in cut order"
+        assert stated_offers(rows[::-1]) == got, "the order of the rows does not matter"
+        locks = sorted(lock.values())
+        one = decisions(got, locks)
+        assert decisions(one, locks) == one and decisions(got[::-1], locks) == one, "a decision of a decision is itself; the order does not matter"
+        keys = [(x.trade.player, lock_after(x.trade.at, locks), x.verdict) for x in one]
+        assert len(set(keys)) == len(keys) == len({(x.trade.player, lock_after(x.trade.at, locks), x.verdict) for x in got}), "one per player, window and verdict"
+        for x in one:
+            assert x.trade.at == min(y.trade.at for y in got if (y.trade.player, lock_after(y.trade.at, locks), y.verdict) == (x.trade.player, lock_after(x.trade.at, locks), x.verdict)), \
+                "the earliest of its window"
+    facts_all = {t: MomentFacts({p: 5e6 for p in players}, frozenset("ab"), frozenset(), frozenset(players))
+                 for t in [*(lock[j] - MINUTE for j in lock), *(lock[j] for j in lock), *(base + dt.timedelta(days=d) for d in (0, 0.1, 0.3, 4.0, 4.2, 11.0))]}
+    scored = {p: {1: rng.uniform(0, 6), 2: rng.uniform(0, 6)} for p in players}
+    now = _season((), lock, {1, 2}, scored, dict.fromkeys(players, "MED"), {("MED", 1): 2.0, ("MED", 2): 2.0})
+    fielded = {1: set("ab"), 2: set("ab")}
+    rows = [row(0.0, "a", "sell", 6e6, 5e6), row(0.3, "a", "sell", 6e6, 5e6), row(0.0, "b", "hold", 4e6, 8e6), row(0.0, "c", "wait", 5.1e6, 5e6),
+            row(0.0, "d", "hold", 4e6, 4.1e6), row(4.0, "a", "sell", 7e6, 5e6), row(11.0, "b", "sell", 5e6, 5e6), row(0.0, "d", None)]
+    offers = decisions(stated_offers(rows), sorted(lock.values()))
+    assert len(offers) == 6, "the restated offer of a is one decision, its next window another, the row with no verdict none"
+    scores = board_scores(offers, now, fielded, facts_all)
+    assert {x.group for x in scores} == {BOARD} and scores == board_scores(offers[::-1], now, fielded, facts_all)
+    by = {(x.score.case, x.score.horizon): x.score for x in scores}
+    judged = judged_sales(offers, now, fielded, facts_all)
+    covered = [x for x in offers if x.trade.at < lock[2]]
+    assert len(covered) < len(offers) and [j.case for j in judged] == [salegrade.VERDICT_CASES[x.verdict] for x in covered], \
+        "a case for each offer that has a course (a done jornada ahead of it), in order"
+    for h in HORIZONS:
+        assert sum(by[(c, h)].n for c in ("take", "wait", "hold")) == len(judged), "the verdict cases partition the decisions"
+    for x, j in zip(covered, judged):
+        real = Sold(x.trade.at, sale_facts(x.trade, [], None, facts_all), ME)
+        followed_by = course(real, now, fielded, facts_all)
+        assert followed_by is not None and j.graded == salegrade.grade(real.sale, followed_by, RATE), "an offer judged is a sale made at it"
+    assert board_scores([], now, fielded, facts_all) == [], "no offer, no group"
+    assert board_scores(offers, now._replace(done=set()), fielded, facts_all) == [], "no jornada done: no course, no group"
+    plain = [rec.DecOffer(r.cut, r.player, r.offer_id, r.created_at, r.offer, r.value, None, None, 0, 0.0, 0.0, True, "", "", None) for r in rows]
+    assert stated_offers(plain) == [], "rows recorded before verdicts state none"
 
 
 def _selftest_league() -> None:
@@ -2449,6 +2574,7 @@ def _selftest() -> None:
     _selftest_cover()
     _selftest_moment_facts()
     _selftest_record_sales()
+    _selftest_board_verdicts()
     _selftest_league()
     _selftest_lock_forecast()
     _selftest_fold_sets()

@@ -21,6 +21,8 @@ BOOTSTRAP_TAIL = 2.5
 PAIRED_SEED = 133
 PAIRED_TAIL = 5.0
 GATE_HORIZONS = ("next4", "season")
+VERDICT_CASES = {"sell": "take", "wait": "wait", "hold": "hold"}
+WIN = ".win"
 
 
 class Sale(NamedTuple):
@@ -151,6 +153,27 @@ def proxy_scores(proxied: Sequence[Readings]) -> list[Score]:
             for case, side in (("bench-proxy", "benched"), ("eleven-proxy bound", "fielded")) for h in HORIZONS]
 
 
+class Judged(NamedTuple):
+    """A sale the board judged before it was made: its verdict case (a value of VERDICT_CASES) and the sale graded as if made at the offer."""
+    case: str
+    graded: Graded
+
+
+def wins(case: str, members: Sequence[Graded], horizon: str) -> Score:
+    """The Score named case + WIN of how often the members' sale beat holding (net above 0) at the horizon: each member is
+    counted as 1 (a win) or 0 carrying 1M, so total_net is the number of wins, per_million the share of the n, and the
+    leave-one-out range and the bootstrap interval (score) are of the number of wins: divide them by n for shares."""
+    return score(case + WIN, [Graded(g.sale._replace(amount=1e6), {h: float(g.net[h] > 0) for h in HORIZONS}) for g in members], horizon)
+
+
+def verdict_scores(judged: Sequence[Judged]) -> list[Score]:
+    """For each case of VERDICT_CASES (take, wait, hold), per horizon, the Score of its sales' net (what selling at the offer realised against
+    holding: take should be above 0, hold at or below) and its wins Score (take: the precision, hold: the miss rate). A sale is in one case;
+    the same sales in any order give the same Scores; a case with no sale gives zeros."""
+    groups = {case: [j.graded for j in judged if j.case == case] for case in VERDICT_CASES.values()}
+    return [x for case, members in groups.items() for h in HORIZONS for x in (score(case, members, h), wins(case, members, h))]
+
+
 class Piece(NamedTuple):
     n: int
     net: float
@@ -259,6 +282,46 @@ def _selftest_paired() -> None:
     assert not gate(down, high, low).passed and "season" in gate(down, high, low).reasons[0]
 
 
+def _selftest_verdicts() -> None:
+    import random
+    tol = 1e-9
+    rng = random.Random(11)
+    cases_ = list(VERDICT_CASES.values())
+
+    def made(n: int, bias: float) -> list[Judged]:
+        out = []
+        for i in range(n):
+            amount = rng.uniform(1e6, 9e6)
+            out.append(Judged(rng.choice(cases_), Graded(Sale("p%d" % i, amount, amount, rng.random() < 0.5, False, False),
+                                                         {h: rng.gauss(bias, 4.0) for h in HORIZONS})))
+        return out
+    for n, bias in ((0, 0.0), (1, 2.0), (9, -3.0), (40, 0.5), (120, 3.0)):
+        judged = made(n, bias)
+        got = verdict_scores(judged)
+        assert got == verdict_scores(judged[::-1]) == verdict_scores(judged + judged[:0]), "the order of the sales does not matter"
+        by = {(x.case, x.horizon): x for x in got}
+        assert len(by) == len(got) == len(HORIZONS) * 2 * len(cases_), "a Score per case, wins and horizon, no duplicates"
+        for h in HORIZONS:
+            assert sum(by[(c, h)].n for c in cases_) == n, "a sale is in one verdict case"
+            for c in cases_:
+                members = [j.graded for j in judged if j.case == c]
+                won, net = by[(c + WIN, h)], by[(c, h)]
+                assert won.n == net.n == len(members)
+                assert abs(won.total_net - sum(g.net[h] > 0 for g in members)) < tol, "total_net of a win case counts the wins"
+                if members:
+                    assert abs(won.per_million - won.total_net / len(members)) < tol, "per_million of a win case is the share"
+                    assert 0 <= won.bootstrap_lo <= won.total_net <= won.bootstrap_hi <= len(members) + tol, "the interval of the wins is inside 0..n"
+                    assert max(0.0, won.total_net - 1) - tol <= won.loo_min <= won.loo_max <= won.total_net + tol, "one sale left out moves the wins by at most 1"
+                    assert abs(net.total_net - sum(g.net[h] for g in members)) < 1e-6, "a case's net is the sum of its sales' nets"
+                else:
+                    assert won == Score(c + WIN, h, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), "no sale in the case: zeros"
+    for c in cases_:
+        k = rng.randint(2, 8)
+        every = [Judged(c, Graded(Sale("p%d" % i, 2e6, 2e6, True, False, False), _flat(1.0 + i))) for i in range(k)]
+        top = {(x.case, x.horizon): x for x in verdict_scores(every)}
+        assert top[(c + WIN, "season")].per_million == 1.0 and top[(c + WIN, "season")].bootstrap_lo == float(k), "all wins: share 1, no spread"
+
+
 def _selftest() -> None:
     tol = 1e-9
     course_a = Course(
@@ -358,6 +421,7 @@ def _selftest() -> None:
     prox = proxy_scores(proxied)
     assert [s.case for s in prox] == ["bench-proxy"] * 3 + ["eleven-proxy bound"] * 3 and all(s.n == len(pairs) for s in prox)
     _selftest_paired()
+    _selftest_verdicts()
     print("salegrade self-test OK")
 
 

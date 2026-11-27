@@ -32,18 +32,22 @@ from ffcore import identity, parsed, store
 from ffcore import observations as ob
 from ffcore.clock import cut
 from ffcore.identity import Unmatched
+import salegrade
 from ffcore.records import AuctionCalibration, SaleScore
 from ffcore.season_facts import stamp_jd
 from ffcore.store import RunRecords
 from publish import notify
 
-__all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "said", "sale_gate_line", "sale_scores", "snapshots_of", "text", "trouble"]
+__all__ = ["Snapshot", "Health", "drifting", "main", "parser_health", "said", "sale_gate_line", "sale_scores", "snapshots_of", "text", "trouble", "verdicts"]
 
 SENT = Path.home() / ".local/state/lfg/health.sent"
 UNMATCHED_FROM = 5e6
 HEALTH_SOURCES = ("market", "lineups", "api_standings", "api_lineup", "api_teams", "api_leagues", "api_market", "api_offers")
 HEALTH_USUAL = 21
 SALE_GATE_N = 40
+VERDICT_HORIZON = "season"
+VERDICT_COINFLIP = 0.5
+VERDICT_MIN_N = SALE_GATE_N // 2
 
 
 class Snapshot(NamedTuple):
@@ -154,13 +158,44 @@ def sale_gate_line(scores: Iterable[SaleScore]) -> str | None:
             % (n, SALE_GATE_N))
 
 
+class Verdicts(NamedTuple):
+    """The summary line of the stated sell verdicts (figures) and the words of what fails (no figures: the notice must not change run to run)."""
+    line: str
+    failing: tuple[str, ...]
+
+
+def verdicts(scores: Iterable[SaleScore]) -> Verdicts | None:
+    """The summary of the board's stated sell verdicts at VERDICT_HORIZON (group board, as grading.board_scores records them): TAKE precision
+    and HOLD miss with n and the bootstrap 95% interval of each share, and the net points per take; None when the scores hold no board sale.
+    failing names a verdict worse than a coin only when it has VERDICT_MIN_N sales or more: "TAKE precision below a coin" (its interval lies below
+    VERDICT_COINFLIP) or "HOLD miss above a coin" (its interval lies above it)."""
+    by = {s.case: s for s in scores if s.group == "board" and s.horizon == VERDICT_HORIZON}
+    take, hold = by.get("take" + salegrade.WIN), by.get("hold" + salegrade.WIN)
+    if take is None or hold is None or not (take.n or hold.n):
+        return None
+
+    def share(x: SaleScore) -> str:
+        return "no sale" if not x.n else "%.0f%% (%.0f..%.0f%%) of %d" % (
+            100 * x.per_million, 100 * x.bootstrap_lo / x.n, 100 * x.bootstrap_hi / x.n, x.n)
+    mean = by["take"].total_net / take.n if take.n else 0.0
+    failing = (["TAKE precision below a coin"] if take.n >= VERDICT_MIN_N and take.bootstrap_hi / take.n < VERDICT_COINFLIP else []) + (
+        ["HOLD miss above a coin"] if hold.n >= VERDICT_MIN_N and hold.bootstrap_lo / hold.n > VERDICT_COINFLIP else [])
+    return Verdicts("sell verdicts (%s): TAKE precision %s, net %+.1f per take; HOLD miss %s" % (VERDICT_HORIZON, share(take), mean, share(hold)),
+                    tuple(failing))
+
+
 def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterable[AuctionCalibration],
          sales: Iterable[SaleScore] = ()) -> str:
-    """trouble of health and unmatched, one line the drifting bins, and one line sale_gate_line of sales; empty if all is well."""
+    """trouble of health and unmatched, one line the drifting bins, one line sale_gate_line of sales and the words of the stated verdicts
+    when they are failing (verdicts); empty if all is well."""
     lines = trouble(health, unmatched)
-    gate = sale_gate_line(sales)
+    held = list(sales)
+    gate = sale_gate_line(held)
     if gate:
         lines.append(gate)
+    stated = verdicts(held)
+    if stated and stated.failing:
+        lines.append("sell verdicts failing: " + "; ".join(stated.failing))
     bins = list(drift)
     if bins:
         worst = bins[0]
@@ -193,6 +228,8 @@ def main(records: RunRecords | None = None, sent: Path = SENT, obs: ob.Observati
     nothing to say."""
     told = said(records, obs)
     excluded = offers_excluded(records)
+    stated = verdicts(sale_scores(records.rows("sale_score") if records is not None else ()))
+    print("health: %s" % (stated.line if stated else "no sell verdict has been graded yet"))
     print("health: %d dec_offer rows excluded from grading as made up (grading.FABRICATED_FROM)" % excluded)
     if not told:
         sent.unlink(missing_ok=True)
@@ -276,6 +313,27 @@ def _selftest() -> None:
             assert "has 40 bench" in text((), (), (), sale_scores()), "the latest run that has sale_score: told from the store"
             assert "has 41 bench" in text((), (), (), sale_scores(bench(41, 6))), "this run's sale_score replaces it"
             assert text((), (), drifting(), bench(SALE_GATE_N)).count("\n") == 2, "the gate is one line beside the others"
+
+            def stated(take: tuple[int, int, int, int], hold: tuple[int, int, int, int]) -> list[SaleScore]:
+                rows = []
+                for case, (n, wins, lo, hi) in (("take", take), ("hold", hold)):
+                    rows += [SaleScore(4, "board", case, "season", n, 2.0 * n, 0.0, 0.0, 0.0, 0.0, 0.0),
+                             SaleScore(4, "board", case + salegrade.WIN, "season", n, float(wins), wins / n if n else 0.0, 0.0, 0.0, float(lo), float(hi)),
+                             SaleScore(4, "board", case + salegrade.WIN, "lock", n, 0.0, 0.0, 0.0, 0.0, 0.0, float(n))]
+                return rows
+            big, small = VERDICT_MIN_N * 2, VERDICT_MIN_N - 1
+            none, sound = (0, 0, 0, 0), (big, big // 2, big // 2 - 2, big // 2 + 2)
+            assert verdicts([]) is None and verdicts(bench(SALE_GATE_N)) is None and verdicts(stated(none, none)) is None, "no board sale: no line"
+            worse_take, worse_hold = (big, 1, 0, big // 4), (big, big - 1, 3 * big // 4, big)
+            for take, hold, words in ((sound, sound, ()), (worse_take, sound, ("TAKE",)), (sound, worse_hold, ("HOLD",)), (worse_take, worse_hold, ("TAKE", "HOLD")),
+                                      ((small, 0, 0, 1), (small, small, small - 1, small), ()), (sound, none, ()), (none, worse_hold, ("HOLD",))):
+                summary = verdicts(stated(take, hold))
+                assert summary is not None and "season" in summary.line, "the figures are in the line"
+                assert [w.split()[0] for w in summary.failing] == list(words), (take, hold, summary.failing)
+                told = text((), (), (), stated(take, hold))
+                assert (told == "") == (not words) and all(w in told for w in summary.failing), "a failing verdict is told, in words"
+                assert not any(c.isdigit() for c in told), "the notice carries no figure, so it is the same until a verdict changes"
+            assert text((), (), (), stated(worse_take, sound)) == text((), (), (), stated(((big + 6), 2, 0, big // 5), (small, 3, 1, 5))), "different figures, same words, same notice"
         finally:
             if kept is None:
                 os.environ.pop("FF_ROOT")

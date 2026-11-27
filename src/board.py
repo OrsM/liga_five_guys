@@ -197,7 +197,7 @@ def offer_lines(inp: decision.Inputs, names: dict[str, str], got: list[decision.
             "per_million": None if lost is None or not money else lost / (money / 1e6),
             "verdict": None if yours else "needs_replacement" if verdict.key is None else "sell" if verdict.key <= 0 else "hold",
             "your_call": yours, "call": your_call_text(lost, money, ratio) if yours else None,
-            "points_lost": lost, "rent": rate * n * money / 1e6,
+            "points_lost": lost, "rent": rate * n * money / 1e6, "reserve": verdict.reserve,
             "reserves": reserves_doc(at, [worth.waiting_reserve(standing(inp, k, value, money), offers, len(at) - 1 - j) for j in range(len(at))]),
             "facts": [["value", value, "money"], ["offer", money, "money"], ["offer over value", ratio, "ratio"],
                       ["offer percentile", share, "chance"], ["offers seen", len(offers.ratios), "count"],
@@ -238,7 +238,8 @@ def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[di
     """The dec_offer rows of the cut: one per row of the sells document, in its order, every field the document's (the
     value from its facts, delta_next4 and delta_season its Delta's, fields whether the sale leaves a legal eleven, gap the jornadas it
     leaves without one joined by ';', funds the names of its "for" joined by ';') and the offer's id and
-    creation stamp from the stood offer of that player and money (the lowest id first when several are alike)."""
+    creation stamp from the stood offer of that player and money (the lowest id first when several are alike); verdict the row's verdict as settled and
+    reserve its sale rule's reserve."""
     waiting: dict[tuple[str, float], list[Stood]] = {}
     for x in sorted(stood, key=lambda s: s.offer_id):
         waiting.setdefault((x.player, x.money), []).append(x)
@@ -251,7 +252,7 @@ def offer_rows(at: str, sells: Sequence[Doc], stood: Iterable[Stood]) -> list[di
                      "offer": sale["offer"], "value": value, "ratio": sale["ratio"], "percentile": sale["offer_percentile"],
                      "offers_seen": sale["offers_seen"], "delta_next4": delta["window"]["next4"],
                      "delta_season": delta["points"], "fields": sale["feasible"], "gap": ";".join(map(str, delta["gap"])),
-                     "funds": ";".join(sale["for"]), "trend": sale["trend"]})
+                     "funds": ";".join(sale["for"]), "trend": sale["trend"], "verdict": sale["verdict"], "reserve": sale["reserve"]})
     return rows
 
 
@@ -1294,7 +1295,8 @@ def _selftest_sells() -> None:
     assert not any(k in r for r in bare for k in ("note", "lost")), "the page reads fields, never prose"
     assert [r["key"] for r in bare] == sorted(squad), "rows with no figure: in key order"
     rows = [{"what": "sell", "key": r["key"], "delta": r["delta"], "feasible": r["feasible"], "offer": r["offer"], "facts": r["facts"],
-             "ratio": r["ratio"], "offer_percentile": None, "offers_seen": 0, "trend": None, "for": []} for r in bare]
+             "ratio": r["ratio"], "offer_percentile": None, "offers_seen": 0, "trend": None, "for": [], "verdict": r["verdict"],
+             "reserve": r["reserve"]} for r in bare]
     made = offer_rows("cut", rows, [Stood(r["key"], r["offer"], "id" + r["key"], "c") for r in rows])
     assert all(m["delta_next4"] is None and m["delta_season"] is None and m["fields"] is False and m["gap"] for m in made), \
         "the record states no number and no legal eleven for a sale with none, and the jornadas it leaves without"
@@ -1891,13 +1893,13 @@ def _selftest() -> None:
         assert flat.exit == hurdle.Exit(value, 5, 0.0) and flat.later == hurdle.draw(value) and hurdle.drift(flat.exit) == 0.0, "no rise: today's draw"
         assert hurdle.reserve(hurdle.stake(points, n, rate, flat.exit)) == max(points * 1e6 / (n * rate) , hurdle.draw(value)), "no rise: no drift in the reserve"
     asked = [{"key": "p", "offer": 2.0, "ratio": 1.1, "offer_percentile": 0.8, "offers_seen": 5, "trend": None, "for": ["A", "B"],
-              "feasible": True, "delta": {"points": 0.0, "window": {"lock": 0.0, "next4": 0.0, "season": 0.0}, "gap": []},
+              "verdict": "sell", "reserve": 1.5, "feasible": True, "delta": {"points": 0.0, "window": {"lock": 0.0, "next4": 0.0, "season": 0.0}, "gap": []},
               "facts": [["value", 1.8, "money"], ["offer", 2.0, "money"]]},
              {"key": "p", "offer": 2.0, "ratio": None, "offer_percentile": None, "offers_seen": 0, "trend": 0.5, "for": [],
-              "feasible": True, "delta": {"points": -3.0, "window": {"lock": -0.5, "next4": -1.0, "season": -3.0}, "gap": []},
+              "verdict": "hold", "reserve": 9.0, "feasible": True, "delta": {"points": -3.0, "window": {"lock": -0.5, "next4": -1.0, "season": -3.0}, "gap": []},
               "facts": [["value", 0.0, "money"]]},
              {"key": "q", "offer": 3.0, "ratio": 1.0, "offer_percentile": 0.5, "offers_seen": 5, "trend": 1.0, "for": [],
-              "feasible": False, "delta": {"points": None, "window": {"lock": None, "next4": None, "season": None}, "gap": [3, 4]},
+              "verdict": "needs_replacement", "reserve": None, "feasible": False, "delta": {"points": None, "window": {"lock": None, "next4": None, "season": None}, "gap": [3, 4]},
               "facts": [["value", 3.0, "money"]]}]
     held = [decision.Held("p", "t1", None, 1.8), decision.Held("q", "t2", None, 3.0), decision.Held("r", "t3", None, 1.0)]
     pending = [current.Offer("20", "t1", "pending", 2.0, "c20", "", ""), current.Offer("10", "t1", "pending", 2.0, "c10", "", ""),
@@ -1910,6 +1912,7 @@ def _selftest() -> None:
     assert [m["offer_id"] for m in offer_rows("cut", asked, stood[::-1])] == ["10", "20", "30"], "the order of the standing offers does not matter"
     assert [(m["value"], m["funds"], m["delta_next4"], m["delta_season"], m["fields"], m["gap"]) for m in made] == [
         (1.8, "A;B", 0.0, 0.0, True, ""), (0.0, "", -1.0, -3.0, True, ""), (3.0, "", None, None, False, "3;4")]
+    assert [(m["verdict"], m["reserve"]) for m in made] == [("sell", 1.5), ("hold", 9.0), ("needs_replacement", None)], "the verdict and reserve as the row states them"
     assert all(set(m) == set(rec.DecOffer._fields) for m in made), "a field for each field of the kind, no more"
     assert advice((("c", "b", 2.0), ("d", "c", 1.0), ("e", "x", 0.5)), {"d": "D"}) == [
         {"in": "D", "out": "b", "gain": 3.0}, {"in": "e", "out": "x", "gain": 0.5}], "a player swapped in and then out is one swap"

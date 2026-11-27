@@ -726,6 +726,7 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 1516029.106876829,
    "reserves": [
     {
      "least": 1516029.106876829,
@@ -1139,6 +1140,7 @@
    "rent": 1.84474017,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 1516029.106876829,
    "reserves": [
     {
      "least": 1576701.0,
@@ -1239,6 +1241,7 @@
    "rent": 55.21069359,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 20248309.640237696,
    "reserves": [
     {
      "least": 45578374.44787107,
@@ -1387,6 +1390,7 @@
    "rent": 53.86197258,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 20392224.446943555,
    "reserves": [
     {
      "least": 47325553.34981512,
@@ -1533,6 +1537,7 @@
    "rent": 0.7536543299999999,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 661716.5025955649,
    "reserves": [
     {
      "least": 661716.5025955649,
@@ -1679,6 +1684,7 @@
    "rent": 6.245145269999999,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 798216.8406719748,
    "reserves": [
     {
      "least": 5604033.760676484,
@@ -1827,6 +1833,7 @@
    "rent": 26.67760875,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 7471214.670593876,
    "reserves": [
     {
      "least": 23052378.18374209,
@@ -1973,6 +1980,7 @@
    "rent": 46.811083409999995,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 22110180.966526046,
    "reserves": [
     {
      "least": 44920422.389159985,
@@ -2119,6 +2127,7 @@
    "rent": 3.45617415,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 1737253.019668029,
    "reserves": [
     {
      "least": 3197317.97486366,
@@ -2265,6 +2274,7 @@
    "rent": 43.111848779999995,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 24089781.27929398,
    "reserves": [
     {
      "least": 36527018.04325403,
@@ -2411,6 +2421,7 @@
    "rent": 10.70036253,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 6771917.928459648,
    "reserves": [
     {
      "least": 8644508.626371246,
@@ -2559,6 +2570,7 @@
    "rent": 57.99891825,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 38544578.95012027,
    "reserves": [
     {
      "least": 50550038.56525188,
@@ -2705,6 +2717,7 @@
    "rent": 29.58215013,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 21877735.922580943,
    "reserves": [
     {
      "least": 23107960.930816043,
@@ -2851,6 +2864,7 @@
    "rent": 22.092656039999998,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 19773215.526304957,
    "reserves": [
     {
      "least": 20192788.511698235,
@@ -2997,6 +3011,7 @@
    "rent": 24.908140529999997,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 22901848.722742565,
    "reserves": [
     {
      "least": 19863110.726006858,
@@ -3143,6 +3158,7 @@
    "rent": 52.09701938999999,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 48711758.70813487,
    "reserves": [
     {
      "least": 48030867.766243,
@@ -3289,6 +3305,7 @@
    "rent": 12.65232501,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 14859985.442544146,
    "reserves": [
     {
      "least": 12077432.185110012,
@@ -3435,6 +3452,7 @@
    "rent": 21.36537117,
    "replacement": null,
    "replacement_why_not": null,
+   "reserve": 67533241.05544223,
    "reserves": [
     {
      "least": 18188846.305546436,

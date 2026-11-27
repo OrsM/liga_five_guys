@@ -345,13 +345,28 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   (each market player by `valuation.Buyer`); `decision_at`, `replay` and `decisions` run it at one cut or over many. Nothing else of the old decision survives.
 - **Taps:** only `list` is done from the phone (`act.py`; an already-listed player, error 030.01.52, counts as listed).
 - **Listing is automatic:** `lfg-list` (timer: every 5 min and 22:19 Madrid) runs `act.py ensure`, which lists every squad player without a listing (read from the app's `teams` and `market`; one POST `market/sell` each, at max(value, the app's now)) and logs to `~/.local/state/lfg/list.log` only when it listed or refused something; the board's `list` line then appears only when that has failed.
-- **`dec_offer`** (the record of each standing offer at a run's cut, version 2): `delta_next4`, `delta_season` (the
+- **`dec_offer`** (the record of each standing offer at a run's cut, version 3): `delta_next4`, `delta_season` (the
   sale's Delta, 0 for a bench player, null when no eleven remains), `fields` (the squad after the sale fields a legal eleven),
-  `gap`; version 1 rows (`lost4`, `lost_season`) are read as v2 through `records`. Grading leaves out, by
+  `gap`, and from 2026-11-27 `verdict` (the sells row's word after `board.settle`: sell, wait, hold or needs_replacement) and
+  `reserve` (the least offer the sale rule takes); version 1 rows (`lost4`, `lost_season`) and version 2 rows (no verdict) are
+  read as v3 through `records` with those fields None. Grading leaves out, by
   `grading.sound_offers`, the rows without `fields` from `grading.FABRICATED_FROM` (2026-11-20T19:40Z, when a squad of 11
   with no bench was given the whole eleven as every player's loss) until the first row that has `fields`; the store is
-  not edited, and `health` prints the number excluded. Grading does not read `dec_offer` yet, so `sound_offers` is
-  exposed and unconsumed.
+  not edited, and `health` prints the number excluded.
+- **The stated sell verdicts are graded each run** (#69 E; `grading.record_sales` -> `board_scores`, rows of `sale_score` with group
+  `board`). Every stored row that states a verdict (sell, wait, hold; none for needs_replacement or an eleven player's "your call") is
+  an offer judged before the sale: it is graded as the sale it would have been (the player, the minute after the cut, the offer; the same
+  `course` and `salegrade.grade` at `RATE` as a real sale: eleven cover less points sold if he was in the eleven, plus `RATE` x (offer less
+  his value at the horizon's end)), at the lock, next4 and season horizons. The unit is one decision per player, lock window and verdict
+  (`grading.decisions`: the earliest offer, since the same offer is restated at every cut of the window and one player's rows are not
+  independent sales). Cases (`salegrade.verdict_scores`): `take` (sell), `wait`, `hold`: the Score of the net of selling at those offers (take
+  should be above 0, hold at or below) and `<case>.win`, the wins Score (net above 0): `total_net` is the number of wins, `per_million` the
+  share, interval of the count (divide by n). **TAKE precision** = `take.win` share; **HOLD miss** = `hold.win` share. Intervals are the
+  scorer's own (leave-one-out range, bootstrap 95%). `health` prints the summary each run (`health.verdicts`) and puts words in the trouble
+  text only for a verdict worse than a coin with at least `VERDICT_MIN_N` (20) sales: TAKE precision interval below 50% or HOLD miss
+  interval above it; the notice has no figures, so it does not change run to run. Rows recorded before the verdict was stored (all of them
+  until 2026-11-27) are not graded; the reserve is recorded for a later calibration. First reading, by replaying today's rule over the
+  older rows (a one-off, not kept): 4 take (precision 50%, 0..100%), 20 hold (miss 35%, 15..55%), net at hold offers -43 (-77..-15).
 - **Not true any more:** the horizon of 8 jornadas (`board.AHEAD`, `worth.PER_MILLION_AHEAD`), the sale note strings
   (`offer_note`), the `INF` cost, `eleven.remove*`, `worth.lost_points`, the recommender, `plan_rows`, `worth_on`, the ledger and sale due times, `sim_*` and
   `decision_*` tables, the hold, the line-up reminder (`remind.py`, `lock_due`, `lineup_alert`); since 2026-11-22 (one
