@@ -66,9 +66,9 @@
   {
    "accepts": [],
    "act": [],
-   "advised": 174406657.0,
-   "advised_win": 0.9494219349524704,
-   "amount": 174406657.0,
+   "advised": 175000011.0,
+   "advised_win": 0.954509014482673,
+   "amount": 175000011.0,
    "asking": 174406657.0,
    "auction": {
     "cell": "0/0/3",
@@ -92,17 +92,17 @@
     ],
     [
      "walk-away price",
-     181066034.90866548,
+     181178176.00643307,
      "money"
     ],
     [
      "bid",
-     174406657.0,
+     175000011.0,
      "money"
     ],
     [
      "chance to win",
-     0.9494219349524704,
+     0.954509014482673,
      "chance"
     ],
     [
@@ -136,10 +136,10 @@
     "if_won": [
      "Pepelu"
     ],
-    "lock_margin": 622021.4728803737,
-    "lock_margin_low": -3971208.597582941,
-    "margin": 984345.1999999881,
-    "net": 12.181524141552536,
+    "lock_margin": 28667.47288037371,
+    "lock_margin_low": -4564562.597582941,
+    "margin": 390991.1999999881,
+    "net": 12.239609822077796,
     "not_listed": [],
     "points_lost_if_lost": 131.62190936482693,
     "points_lost_if_won": 125.2634692381564,
@@ -171,16 +171,16 @@
    "gain": 124.946742261776,
    "gain_with_better": 124.946742261776,
    "if_lost_points": -122.330987453,
-   "if_won_points": 19.347339793,
+   "if_won_points": 18.653115613,
    "key": "4288",
    "label": "buy Raphinha",
-   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Natan, Georges Mikautadze, Fernando Niño, Iñigo Vicente, then Pepelu if won: +12.2 points expected (+19.3 if won, -122.3 if lost); displaces Pepelu, Martin Satriano. Cash at the lock 0.6 million if won, 121.4 million if lost; worst case -122.3 points.",
+   "line": "buy Raphinha at 175.0 million (95% to win), funded by selling tonight Natan, Georges Mikautadze, Fernando Niño, Iñigo Vicente, then Pepelu if won: +12.2 points expected (+18.7 if won, -122.3 if lost); displaces Pepelu, Martin Satriano. Cash at the lock 0.0 million if won, 121.4 million if lost; worst case -122.3 points.",
    "more": false,
    "move": "bid",
    "n": 26,
    "name": "Raphinha",
-   "net": 12.181524141552536,
-   "net_alone": 12.181524141552536,
+   "net": 12.239609822077796,
+   "net_alone": 12.239609822077796,
    "net_label": null,
    "per": "season",
    "per_million": 0.7164103963174754,
@@ -194,19 +194,19 @@
    "step": "bid",
    "to": null,
    "trace": null,
-   "walk_away": 181066034.90866548,
+   "walk_away": 181178176.00643307,
    "what": "buy",
    "why": null,
    "why_not_placed": "bid_limit",
-   "win": 0.9494219349524704,
+   "win": 0.954509014482673,
    "yield": 0.02755424601221059
   },
   {
    "accepts": [],
    "act": [],
-   "advised": 22759060.0,
-   "advised_win": 0.9604036822827211,
-   "amount": 22759060.0,
+   "advised": 22800011.0,
+   "advised_win": 0.9625099835593263,
+   "amount": 22800011.0,
    "asking": 22759060.0,
    "auction": {
     "cell": "0/0/2",
@@ -233,17 +233,17 @@
     ],
     [
      "walk-away price",
-     29636404.48316082,
+     29634192.232085235,
      "money"
     ],
     [
      "bid",
-     22759060.0,
+     22800011.0,
      "money"
     ],
     [
      "chance to win",
-     0.9604036822827211,
+     0.9625099835593263,
      "chance"
     ],
     [
@@ -253,7 +253,7 @@
     ],
     [
      "net if bought alone",
-     8.092905075594734,
+     8.0713913356246,
      "points"
     ],
     [
@@ -297,10 +297,10 @@
      "Pepelu",
      "Ferran Jutgla"
     ],
-    "lock_margin": 2600550.63334434,
-    "lock_margin_low": -2810733.8702654215,
-    "margin": 21793808.60000001,
-    "net": 7.628961861286258,
+    "lock_margin": 2559599.63334434,
+    "lock_margin_low": -2851684.8702654215,
+    "margin": 21752857.60000001,
+    "net": 7.603939331065547,
     "not_listed": [],
     "points_lost_if_lost": 25.277529663302857,
     "points_lost_if_won": 20.744196600168834,
@@ -317,16 +317,16 @@
    "gain": 8.398932874368136,
    "gain_with_better": 7.8901274304842985,
    "if_lost_points": -3.125104353,
-   "if_won_points": 8.555410451,
+   "if_won_points": 8.507497781,
    "key": "8413",
    "label": "buy Pape Gueye",
-   "line": "buy Pape Gueye at 22.8 million (96% to win), funded by selling tonight Roger Hinojo, then Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla if won; Arnau Ortiz, Dani Martinez, Pepelu if lost: +7.6 points expected (+8.6 if won, -3.1 if lost); displaces Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla, Guido Rodriguez. Cash at the lock 2.6 million if won, 12.3 million if lost; worst case -3.1 points.",
+   "line": "buy Pape Gueye at 22.8 million (96% to win), funded by selling tonight Roger Hinojo, then Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla if won; Arnau Ortiz, Dani Martinez, Pepelu if lost: +7.6 points expected (+8.5 if won, -3.1 if lost); displaces Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla, Guido Rodriguez. Cash at the lock 2.6 million if won, 12.3 million if lost; worst case -3.1 points.",
    "more": false,
    "move": "bid",
    "n": 26,
    "name": "Pape Gueye",
-   "net": 7.628961861286258,
-   "net_alone": 8.092905075594734,
+   "net": 7.603939331065547,
+   "net_alone": 8.0713913356246,
    "net_label": null,
    "per": "season",
    "per_million": 0.3690368967069877,
@@ -340,11 +340,11 @@
    "step": "bid",
    "to": null,
    "trace": null,
-   "walk_away": 29636404.48316082,
+   "walk_away": 29634192.232085235,
    "what": "buy",
    "why": null,
    "why_not_placed": "cash",
-   "win": 0.9604036822827211,
+   "win": 0.9625099835593263,
    "yield": 0.014193726796422603
   }
  ],
@@ -910,9 +910,9 @@
  "plans": [
   {
    "asking": 174406657.0,
-   "bid": 174406657.0,
+   "bid": 175000011.0,
    "cash_if_lost": 121426747.41212054,
-   "cash_if_won": 622021.4728803737,
+   "cash_if_won": 28667.47288037371,
    "displaces": [
     "Pepelu",
     "Martin Satriano"
@@ -941,10 +941,10 @@
     "if_won": [
      "Pepelu"
     ],
-    "lock_margin": 622021.4728803737,
-    "lock_margin_low": -3971208.597582941,
-    "margin": 984345.1999999881,
-    "net": 12.181524141552536,
+    "lock_margin": 28667.47288037371,
+    "lock_margin_low": -4564562.597582941,
+    "margin": 390991.1999999881,
+    "net": 12.239609822077796,
     "not_listed": [],
     "points_lost_if_lost": 131.62190936482693,
     "points_lost_if_won": 125.2634692381564,
@@ -975,22 +975,22 @@
    },
    "gain": 124.946742261776,
    "if_lost_points": -122.330987453,
-   "if_won_points": 19.347339793,
+   "if_won_points": 18.653115613,
    "key": "4288",
-   "line": "buy Raphinha at 174.4 million (95% to win), funded by selling tonight Natan, Georges Mikautadze, Fernando Niño, Iñigo Vicente, then Pepelu if won: +12.2 points expected (+19.3 if won, -122.3 if lost); displaces Pepelu, Martin Satriano. Cash at the lock 0.6 million if won, 121.4 million if lost; worst case -122.3 points.",
+   "line": "buy Raphinha at 175.0 million (95% to win), funded by selling tonight Natan, Georges Mikautadze, Fernando Niño, Iñigo Vicente, then Pepelu if won: +12.2 points expected (+18.7 if won, -122.3 if lost); displaces Pepelu, Martin Satriano. Cash at the lock 0.0 million if won, 121.4 million if lost; worst case -122.3 points.",
    "name": "Raphinha",
-   "net": 12.181524141552536,
-   "net_alone": 12.181524141552536,
+   "net": 12.239609822077796,
+   "net_alone": 12.239609822077796,
    "pos": "DEL",
-   "walk_away": 181066034.90866548,
-   "win": 0.9494219349524704,
+   "walk_away": 181178176.00643307,
+   "win": 0.954509014482673,
    "worst": -122.330987453
   },
   {
    "asking": 22759060.0,
-   "bid": 22759060.0,
+   "bid": 22800011.0,
    "cash_if_lost": 12327618.040375728,
-   "cash_if_won": 2600550.63334434,
+   "cash_if_won": 2559599.63334434,
    "displaces": [
     "Arnau Ortiz",
     "Dani Martinez",
@@ -1032,10 +1032,10 @@
      "Pepelu",
      "Ferran Jutgla"
     ],
-    "lock_margin": 2600550.63334434,
-    "lock_margin_low": -2810733.8702654215,
-    "margin": 21793808.60000001,
-    "net": 7.628961861286258,
+    "lock_margin": 2559599.63334434,
+    "lock_margin_low": -2851684.8702654215,
+    "margin": 21752857.60000001,
+    "net": 7.603939331065547,
     "not_listed": [],
     "points_lost_if_lost": 25.277529663302857,
     "points_lost_if_won": 20.744196600168834,
@@ -1051,15 +1051,15 @@
    },
    "gain": 8.398932874368136,
    "if_lost_points": -3.125104353,
-   "if_won_points": 8.555410451,
+   "if_won_points": 8.507497781,
    "key": "8413",
-   "line": "buy Pape Gueye at 22.8 million (96% to win), funded by selling tonight Roger Hinojo, then Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla if won; Arnau Ortiz, Dani Martinez, Pepelu if lost: +7.6 points expected (+8.6 if won, -3.1 if lost); displaces Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla, Guido Rodriguez. Cash at the lock 2.6 million if won, 12.3 million if lost; worst case -3.1 points.",
+   "line": "buy Pape Gueye at 22.8 million (96% to win), funded by selling tonight Roger Hinojo, then Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla if won; Arnau Ortiz, Dani Martinez, Pepelu if lost: +7.6 points expected (+8.5 if won, -3.1 if lost); displaces Arnau Ortiz, Dani Martinez, Pepelu, Ferran Jutgla, Guido Rodriguez. Cash at the lock 2.6 million if won, 12.3 million if lost; worst case -3.1 points.",
    "name": "Pape Gueye",
-   "net": 7.628961861286258,
-   "net_alone": 8.092905075594734,
+   "net": 7.603939331065547,
+   "net_alone": 8.0713913356246,
    "pos": "MED",
-   "walk_away": 29636404.48316082,
-   "win": 0.9604036822827211,
+   "walk_away": 29634192.232085235,
+   "win": 0.9625099835593263,
    "worst": -3.125104353
   }
  ],
@@ -1070,8 +1070,8 @@
    "gain": 13.09870740779649,
    "key": "9573",
    "name": "Jonathan David",
-   "net": -10.805963571393631,
-   "net_alone": -10.805963571393631,
+   "net": -10.818801685783368,
+   "net_alone": -10.818801685783368,
    "pos": "DEL",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -10.8)"
@@ -1082,8 +1082,8 @@
    "gain": 0.943155016950989,
    "key": "6563",
    "name": "Ivan Martin",
-   "net": -0.4924685717682973,
-   "net_alone": -0.4924685717682973,
+   "net": -0.4949632377406328,
+   "net_alone": -0.4949632377406328,
    "pos": "MED",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -0.5)"
@@ -1094,8 +1094,8 @@
    "gain": 0.8702902301502959,
    "key": "6957",
    "name": "Isi Palazon",
-   "net": -1.3868465202797307,
-   "net_alone": -1.3868465202797307,
+   "net": -1.38920964065961,
+   "net_alone": -1.38920964065961,
    "pos": "MED",
    "reason": "net_not_positive",
    "why": "its funded net is not above the floor of 0.5 points (net -1.4)"
@@ -3556,7 +3556,7 @@
   ],
   "binding": true,
   "bracket": [
-   0.009798754037864708,
+   0.008765972656219315,
    null
   ],
   "break": [
@@ -3565,95 +3565,95 @@
   ],
   "candidates": [
    {
-    "bid": 174406657.0,
+    "bid": 175000011.0,
     "funded": true,
     "key": "4288",
     "kind": "buy",
     "name": "Raphinha",
-    "need": -3.4302758512515408,
-    "net": 12.181524141552536,
-    "net_at_s": 12.215136570900977,
-    "per_million": -3.5511791674445337,
+    "need": -2.2493708609949463,
+    "net": 12.239609822077796,
+    "net_at_s": 12.259327745538974,
+    "per_million": -5.4413480828430165,
     "reason": null,
     "rungs": 3,
-    "walk_away": 181066034.90866548,
-    "walk_away_at_s": 181067109.68805778
+    "walk_away": 181178176.00643307,
+    "walk_away_at_s": 181178888.75589582
    },
    {
-    "bid": 59988796.0,
+    "bid": 60000011.0,
     "funded": false,
     "key": "9573",
     "kind": "buy",
     "name": "Jonathan David",
-    "need": -6.024988458896857,
-    "net": -10.805963571393631,
-    "net_at_s": -10.746926191403928,
-    "per_million": 1.7935243602727409,
+    "need": -6.016195148146311,
+    "net": -10.818801685783368,
+    "net_at_s": -10.76606388362024,
+    "per_million": 1.7982797132364996,
     "reason": "net_not_positive",
     "rungs": 2,
-    "walk_away": 50260912.15792424,
-    "walk_away_at_s": 50394412.543834925
+    "walk_away": 50263436.64111704,
+    "walk_away_at_s": 50382952.70586738
    },
    {
-    "bid": 22759060.0,
+    "bid": 22800011.0,
     "funded": false,
     "key": "8413",
     "kind": "buy",
     "name": "Pape Gueye",
-    "need": 0.3161082233821647,
-    "net": 8.092905075594734,
-    "net_at_s": 8.089807608864465,
-    "per_million": 25.60169105696017,
+    "need": 0.37601210421595677,
+    "net": 8.0713913356246,
+    "net_at_s": 8.068095223800636,
+    "per_million": 21.465775290544695,
     "reason": "displaced",
     "rungs": 2,
-    "walk_away": 30049285.72166214,
-    "walk_away_at_s": 29983532.82691966
+    "walk_away": 30049285.721662138,
+    "walk_away_at_s": 29990411.59539155
    },
    {
-    "bid": 5505386.76,
+    "bid": 5510011.0,
     "funded": false,
     "key": "6563",
     "kind": "buy",
     "name": "Ivan Martin",
-    "need": -3.975170124081211,
-    "net": -0.4924685717682973,
-    "net_at_s": -0.45351685746375736,
-    "per_million": 0.12388616245251202,
+    "need": -3.966178620968461,
+    "net": -0.4949632377406328,
+    "net_at_s": -0.4601958243995416,
+    "per_million": 0.12479600266207191,
     "reason": "net_not_positive",
     "rungs": 4,
-    "walk_away": 4008407.6044619526,
-    "walk_away_at_s": 4066923.465455834
+    "walk_away": 4034601.5192234274,
+    "walk_away_at_s": 4086238.878357407
    },
    {
-    "bid": 5877862.0,
+    "bid": 5880011.0,
     "funded": false,
     "key": "6957",
     "kind": "buy",
     "name": "Isi Palazon",
-    "need": -3.1894557585906322,
-    "net": -1.3868465202797307,
-    "net_at_s": -1.35559382778665,
-    "per_million": 0.43482230990172294,
+    "need": -3.1868730544827097,
+    "net": -1.38920964065961,
+    "net_at_s": -1.3612735986051723,
+    "per_million": 0.43591621533387537,
     "reason": "net_not_positive",
     "rungs": 1,
-    "walk_away": 4684091.638493386,
-    "walk_away_at_s": 4720684.70877677
+    "walk_away": 4684298.441123477,
+    "walk_away_at_s": 4717056.576304858
    }
   ],
   "capacity": 3.3018149082327075,
-  "cash_all_won": 1.2334825698803737,
+  "cash_all_won": 0.6401285698803738,
   "exact": true,
   "funded": [
    {
-    "bid": 174406657.0,
+    "bid": 175000011.0,
     "funded": true,
     "key": "4288",
     "kind": "buy",
     "name": "Raphinha",
-    "need": -3.4302758512515408,
-    "net": 12.181524141552536,
-    "net_at_s": 12.215136570900977,
-    "per_million": -3.5511791674445337,
+    "need": -2.2493708609949463,
+    "net": 12.239609822077796,
+    "net_at_s": 12.259327745538974,
+    "per_million": -5.4413480828430165,
     "reason": null
    },
    {
@@ -3664,15 +3664,15 @@
     "name": "Dani Martinez",
     "need": -0.611461097,
     "net": 0.0,
-    "net_at_s": 0.005991556893225933,
+    "net_at_s": 0.005360051256643866,
     "per_million": -0.0,
     "reason": null
    }
   ],
   "lambda": 0.045,
-  "line": "cash at the lock is worth 0.010 points per M (up to no more): 3.3M of capacity is used; Aitor Paredes, Ferran Jutgla is refused; 39.5M more would stop it mattering",
-  "per_jornada": 0.00037687515530248874,
-  "s": 0.009798754037864708,
+  "line": "cash at the lock is worth 0.009 points per M (up to no more): 3.3M of capacity is used; Aitor Paredes, Ferran Jutgla is refused; 39.5M more would stop it mattering",
+  "per_jornada": 0.00033715279446997365,
+  "s": 0.008765972656219315,
   "sales": [
    {
     "bid": null,
@@ -3682,7 +3682,7 @@
     "name": "Dani Martinez",
     "need": -0.611461097,
     "net": 0.0,
-    "net_at_s": 0.005991556893225933,
+    "net_at_s": 0.005360051256643866,
     "per_million": -0.0,
     "reason": null
    },
@@ -3694,7 +3694,7 @@
     "name": "Aitor Paredes",
     "need": 29.217808822000002,
     "net": 10.556403075994695,
-    "net_at_s": 10.270104953822562,
+    "net_at_s": 10.3002805627864,
     "per_million": 0.3613002994271798,
     "reason": "displaced"
    },
@@ -3706,14 +3706,14 @@
     "name": "Ferran Jutgla",
     "need": 13.570699398,
     "net": 2.078007562601215,
-    "net_at_s": 1.9450316170784143,
+    "net_at_s": 1.959047182752575,
     "per_million": 0.15312457388212902,
     "reason": "displaced"
    }
   ],
   "slots": 5,
   "to_zero": 39.4866933117673,
-  "used": -4.041736948251541
+  "used": -2.860831957994946
  },
  "sources": [
   {
@@ -3939,7 +3939,7 @@
   {
    "asking": 174406657.0,
    "available": true,
-   "bid": 174406657.0,
+   "bid": 175000011.0,
    "gain": 124.946742261776,
    "n": 26,
    "name": "Raphinha",
@@ -3950,7 +3950,7 @@
    "price_next": -0.0009202847799932856,
    "replaces": "Martin Satriano",
    "status": "market",
-   "win": 0.9494219349524704,
+   "win": 0.954509014482673,
    "yield": 0.02755424601221059
   },
   {
