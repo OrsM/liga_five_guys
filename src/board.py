@@ -1065,15 +1065,6 @@ def sources(health: Iterable[Health]) -> list[Doc]:
     return [{"src": x.src, "at": stamped(x.last_at), "hours": x.hours_since, "status": x.status} for x in sorted(health, key=lambda h: h.src)]
 
 
-def auction_card() -> Doc:
-    run = decision.latest_auction_run()
-    if run is None:
-        return {"brier": [], "drift": []}
-    return {"brier": [{"scope": b.scope, "n": b.n, "model": b.model, "pooled": b.pooled} for b in decision.brier_by_scope(run)],
-            "drift": [{"scope": d.scope, "bin": d.bin, "n": d.n, "stated": d.stated, "observed": d.observed}
-                      for d in decision.drifting_bins(run)]}
-
-
 def with_plans(got: Sequence[dict[str, Any]], buys: Sequence[Doc], plans: Sequence[Doc]) -> list[dict[str, Any]]:
     """The rows of got with their `bid` and `win`: the bid of the greatest funded net that is advised (the funded plan of a player with no bid of his
     own placed, the `advised` of the line of one with), None for a player with none. The one bid a row carries: alerts, targets and the record of
@@ -1159,9 +1150,9 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
         "lock_at": min(locks).replace("Z", ":00+00:00") if locks else None,
         "cash": cash, "cash_locked": bids, "can_bid": can_bid,
         "ping": "on the market: " + ", ".join("%s (+%.0f points)" % (a["name"], a["gain"]) for a in alerts) if alerts else "",
-        "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names, sold), "buys": buys, "plans": plans, "rejected": rejected, "considered": len(rejected), "shadow": price_of_cash,
+        "do": owed + list_line(inp, names, extras), "lineup": lineup_doc(inp, names, sold), "buys": buys, "plans": plans, "rejected": rejected, "shadow": price_of_cash,
         "base": base_doc(club, names, base, found), "targets": target_lines(names, got), "lambda": rate,
-        "alerts": alerts, "auction": auction_card(),
+        "alerts": alerts,
         "sells": sells,
         "squad": [{k: v for k, v in r.items() if k != "key"} for r in squad]}
 

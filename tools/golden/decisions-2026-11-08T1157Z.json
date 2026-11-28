@@ -1,9 +1,5 @@
 {
  "alerts": [],
- "auction": {
-  "brier": [],
-  "drift": []
- },
  "base": {
   "base": 0.0,
   "cash": -49472707.0,
@@ -349,7 +345,6 @@
  "can_bid": 43386574.2,
  "cash": -49472707.0,
  "cash_locked": 0,
- "considered": 3,
  "do": [
   {
    "accepts": [],

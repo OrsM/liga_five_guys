@@ -252,7 +252,7 @@ were removed on 2026-11-08 (tag `pre-chop-2026-11-08` has them). What is left is
   This is the amount only; the larger lever measured with it (the placed bid sat below the advised one in 15 of 19 since 11-08: advised would have won 18 of 19) is placement, not this. Every listing on sale with a
   gain is a funded plan (`plans`: net above `FUNDED_FLOOR`, ranked by net, one `line` each: bid and chance, who is sold tonight / if won / if
   lost, net, net if won and if lost, cash at the lock, worst case, who it displaces, `advised`) or is in `rejected` with its `reason`
-  (`no_curve`, `no_win_chance`, `unfundable`, `net_not_positive`, `not_evaluated`, `covered`) and net; `considered` is its length.  **Nets are joint (`board.joint_chain`, #joint step 1: display and advice only; `shadow` unchanged).** A set of buys is worth less than the sum of its
+  (`no_curve`, `no_win_chance`, `unfundable`, `net_not_positive`, `not_evaluated`, `covered`) and net.  **Nets are joint (`board.joint_chain`, #joint step 1: display and advice only; `shadow` unchanged).** A set of buys is worth less than the sum of its
   nets (2026-11-27T0901Z: eight lines that all displace the same player, stated nets 65.1, joint 40.6, exact optimum 35.4). `valuation.expected_gain(Q, k, {chosen: w})`
   is the points k adds over his window to the squad plus the chosen buys, averaged over which are won (each independently at the chance of its bid):
   the sum over subsets W of the chosen of p(W) x `Buyer(Q + W).gain(k)`, no second valuation. The eleven's value is monotone and submodular

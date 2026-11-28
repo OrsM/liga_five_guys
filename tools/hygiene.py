@@ -19,9 +19,7 @@ EXEMPT = {
     "params": "2026-12-31 written every run, read only by tools/peek: use it (diff the constants between runs) or delete the kind",
     "place_dry": "2026-12-15 the raise experiment's rows; act.py reads its own file, nothing reads the store kind (sunset rule: Processes)",
     "shadow": "2026-12-31 shadow mode until #156 acts on the price of cash",
-    "auction": "2026-12-15 no reader in this repo or on the phone page (Fantasy.jsx): show it or delete the key and board.auction_card",
     "ping": "2027-03-01 read by the website server (server/index.js), outside this repo",
-    "considered": "2026-12-15 only a test reads it, and it is len(rejected): delete the key (moves the goldens: bless with the reason)",
     **dict.fromkeys(["sources", "lock_at", "cash", "cash_locked", "lambda", "alerts", "plans", "sells", "targets"],
                     "2027-03-01 read by the phone page (website Fantasy.jsx), outside this repo"),
 }

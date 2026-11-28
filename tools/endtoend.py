@@ -76,7 +76,7 @@ def _selftest() -> None:
         assert {t["status"] for t in doc["targets"]} >= {"rival"} or not doc["targets"], doc["targets"]
         assert len(doc["targets"]) == min(TOP_TARGETS, sum(1 for r in got if r["gain"] > 0)), "the targets: those with a gain"
         for_sale = sum(1 for r in got if r["gain"] > 0 and r["status"] == "market" and r["asking"] is not None)
-        assert len(doc["plans"]) + len(doc["rejected"]) == for_sale and doc["considered"] == len(doc["rejected"]), \
+        assert len(doc["plans"]) + len(doc["rejected"]) == for_sale, \
             "every listing on sale with a gain is a funded plan or in the rejected with its reason: none is dropped silently"
         assert {b["key"] for b in doc["buys"]} <= {p["key"] for p in doc["plans"]} and all(r["reason"] for r in doc["rejected"]), "the buys are funded plans"
         assert all(b["net"] is None or b["net"] > 0 for b in doc["buys"]), "no buy that adds nothing to doing nothing is shown"

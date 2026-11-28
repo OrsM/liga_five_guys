@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, NamedTuple, Sequence
 
 import eleven
-from ffcore import current, forecast_facts, jornadas, price_fold, season_facts, state, store
+from ffcore import current, forecast_facts, jornadas, price_fold, season_facts, state
 from ffcore.current import AppLineup, Identity, PlayerClub
 from ffcore.decision_facts import DEFAULT_POS, PlayerFact, Seen, SeenAuction, my_cash, my_squad, seen_at
 from ffcore.ledger import Cash, League
@@ -29,7 +29,6 @@ from ffcore.clock import Clock, clock_at, cut
 from ffcore.parse import snapshot_stamp
 from ffcore.tidy import APP_FRESH_HOURS
 from ffcore.price_fold import Expected
-from ffcore.records import AuctionBrier, AuctionCalibration
 from ffcore.season_facts import ListingClose, RoundLock
 from ffcore.auction import Curve
 from ffcore.rules import DEBT_SHARE, POSITIONS, SQUAD_MAX, XI_SIZE, cash_at_lock
@@ -40,8 +39,7 @@ from valuation import Window, window_at
 
 __all__ = ["Inputs", "squad_of", "Lineup", "lineup_of", "cells_of", "lock_times", "window_of", "next_close", "arrival", "window_value", "curves_of", "clock_of", "opportunity_rows",
            "Fact", "UNKNOWN", "Offer", "Held",
-           "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions",
-           "latest_auction_run", "brier_by_scope", "drifting_bins"]
+           "Extras", "extras_at", "Stale", "Decided", "fresh", "arrivals", "decision_at", "decisions"]
 
 
 class Player(NamedTuple):
@@ -504,21 +502,6 @@ class Held(NamedTuple):
     player_team: str
     player_id: str | None
     value: float
-
-
-def latest_auction_run() -> int | None:
-    """The run that last measured the auction forecast (the greatest run_id with an auction_brier row), None if none has."""
-    return max((b.run_id for b in store.records("auction_brier")), default=None)
-
-
-def brier_by_scope(run: int) -> list[AuctionBrier]:
-    """The run's auction_brier rows by scope."""
-    return sorted(store.records("auction_brier", run), key=lambda b: b.scope)
-
-
-def drifting_bins(run: int) -> list[AuctionCalibration]:
-    """The run's auction_calibration rows that drift, by scope then bin."""
-    return sorted((c for c in store.records("auction_calibration", run) if c.drift == 1), key=lambda c: (c.scope, c.bin))
 
 
 class Extras(NamedTuple):
