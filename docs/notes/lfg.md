@@ -26,6 +26,7 @@ shows it. You act on the account; the tool never does.
   (`decision_facts` takes the highest).
   Unlisted players have no sale until listed (list before the last close before the lock, or there is none).
 - A buy whose auction closes after the jornada's first kickoff plays none of that jornada (`late_arrivals`, from the same lock).
+- **The app does NOT auto-substitute.** The points paid for a jornada are exactly the realised points of the eleven fielded at the lock: a starter who plays 0 minutes is not replaced by a bench player, even a legal same-position one (measured on j2-j13: 12 of 12 jornadas pay the starters only, diff 0; 4 informative cases: j2, j5, j11, j12). The bench earns nothing after the lock; its only value is as a choice at the lock. So a bench depth term in V is not warranted (injury flags known at the lock are already in the cells; rotation cannot be known), and the hindsight best eleven of realised scores overstates the value of depth.
 - Clauses are paid at once; no protection after a transfer; one shield a matchday. Clause buys of rivals' players are
   not used and not priced for now. Not modelled: rivals taking your players (exposure), `buyout_until`; the shield flag
   (`playerTeam.isShielded`) is dropped by the parser and was never true in 302 sampled rows.
