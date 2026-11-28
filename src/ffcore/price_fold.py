@@ -108,6 +108,32 @@ class Sums(NamedTuple):
     fyy: float
     fn: int
 
+    def __add__(self, o: "Sums") -> "Sums":  # type: ignore[override]
+        return Sums(self.sxy + o.sxy, self.sxx + o.sxx, self.fxy + o.fxy, self.fxx + o.fxx, self.fyy + o.fyy, self.fn + o.fn)
+
+
+NO_SUMS = Sums(0.0, 0.0, 0.0, 0.0, 0.0, 0)
+
+
+class Acc:
+    """The running Sums of one horizon while its pairs are added: mutable because _add_pairs is the fold's hot loop (a Sums per pair cost ~10% of board time); local to the fold, never escapes (sums() is the value read)."""
+    __slots__ = ("sxy", "sxx", "fxy", "fxx", "fyy", "fn")
+
+    def __init__(self) -> None:
+        self.sxy = self.sxx = self.fxy = self.fxx = self.fyy = 0.0
+        self.fn = 0
+
+    def sums(self) -> Sums:
+        return Sums(self.sxy, self.sxx, self.fxy, self.fxx, self.fyy, self.fn)
+
+
+class Predicted(NamedTuple):
+    h: int
+    value: float
+    fit: float
+    actual: float | None
+    again: float
+
 
 class DayFit(NamedTuple):
     h: int
@@ -242,35 +268,31 @@ def _signal(k: Constants, step: float, s1: float | None, s2: float | None) -> fl
     return k.w0 * c + k.w1 * older + k.w2 * (older if c2 is None else c2)
 
 
-def _add_pairs(acc: list[list[float]], k: Constants, ch: list[Change], j: int, value: float, lo: int, top: int) -> None:
+def _add_pairs(acc: list[Acc], k: Constants, ch: list[Change], j: int, value: float, lo: int, top: int) -> None:
     """The pairs ending in value at a player's change number j (ch[:j] are the starts), lo <= h <= top, added to
     acc: row h - 1 holds sxy, sxx, fxy, fxx, fyy, fn of horizon h; acc grows to the longest h reached (each h up
     to it has a row)."""
     m = min(j, top)
     while len(acc) < m:
-        acc.append([0.0, 0.0, 0.0, 0.0, 0.0, 0])
+        acc.append(Acc())
     clip, focus = k.clip, k.focus
     for h in range(lo, m + 1):
         a = ch[j - h]
         s = acc[h - 1]
         x = a.x
-        s[1] += x * x
+        s.sxx += x * x
         av = a.value
         if av == 0:
             continue
         y = 100 * (value / av - 1)
         lim = clip * h
         y = -lim if y < -lim else lim if y > lim else y
-        s[0] += x * y
+        s.sxy += x * y
         if av >= focus:
-            s[2] += x * y
-            s[3] += x * x
-            s[4] += y * y
-            s[5] += 1
-
-
-def _plus(a: Sums, v: list[float]) -> Sums:
-    return Sums(a.sxy + v[0], a.sxx + v[1], a.fxy + v[2], a.fxx + v[3], a.fyy + v[4], a.fn + int(v[5]))
+            s.fxy += x * y
+            s.fxx += x * x
+            s.fyy += y * y
+            s.fn += 1
 
 
 def _quarter_median(counts: Iterable[int]) -> int:
@@ -282,12 +304,10 @@ def _quarter_median(counts: Iterable[int]) -> int:
     return max(1, int((ns[(m + 1) // 2 - 1] + ns[(m + 2) // 2 - 1]) / 2) // 4)
 
 
-def _fit_days(s: PriceState, acc: list[list[float]], day: str, lo: int) -> None:
+def _fit_days(s: PriceState, acc: list[Acc], day: str, lo: int) -> None:
     for h in range(lo, len(acc) + 1):
-        v = acc[h - 1]
-        s.days[h].append(DayFit(h, day, v[0], v[1], v[2], v[3], v[4], int(v[5])))
-        before = s.cum[h][-1] if s.cum[h] else Sums(0.0, 0.0, 0.0, 0.0, 0.0, 0)
-        s.cum[h].append(_plus(before, v))
+        s.days[h].append(DayFit(h, day, *acc[h - 1].sums()))
+        s.cum[h].append((s.cum[h][-1] if s.cum[h] else NO_SUMS) + acc[h - 1].sums())
 
 
 def _widen(s: PriceState, top: int) -> None:
@@ -297,7 +317,7 @@ def _widen(s: PriceState, top: int) -> None:
     if top < lo:
         return
     for made in s.closed_changes:
-        acc: list[list[float]] = []
+        acc: list[Acc] = []
         for ff, j in made:
             ch = s.changes[ff]
             _add_pairs(acc, s.k, ch, j, ch[j].value, lo, top)
@@ -308,7 +328,7 @@ def _widen(s: PriceState, top: int) -> None:
 
 def _close(s: PriceState, rows: list[ob.Market]) -> None:
     s.daily.extend(rows)
-    acc: list[list[float]] = []
+    acc: list[Acc] = []
     made: list[tuple[str, int]] = []
     day = rows[0].observed_at[:10]
     for r in _valued(rows):
@@ -478,16 +498,14 @@ def momentum_pairs(s: PriceState) -> list[Pair]:
 def momentum_sums(s: PriceState) -> list[HorizonSums]:
     """The fit's sums per horizon h <= hmax: the closed days' and the live day's pairs."""
     top = price_hmax(s)
-    live: list[list[float]] = []
+    live: list[Acc] = []
     for c in _live_changes(s):
         _add_pairs(live, s.k, s.changes.get(c.ff_id, []), c.i, c.value, 1, top)
     out = []
     for h in range(1, top + 1):
         if not s.cum.get(h) and h > len(live):
             continue
-        base = s.cum[h][-1] if s.cum.get(h) else Sums(0.0, 0.0, 0.0, 0.0, 0.0, 0)
-        add = live[h - 1] if h <= len(live) else [0.0, 0.0, 0.0, 0.0, 0.0, 0]
-        out.append(HorizonSums(h, _plus(base, add)))
+        out.append(HorizonSums(h, (s.cum[h][-1] if s.cum.get(h) else NO_SUMS) + (live[h - 1].sums() if h <= len(live) else NO_SUMS)))
     return out
 
 
@@ -567,11 +585,10 @@ def price_trend_at(s: PriceState) -> Callable[[str, str], float | None]:
     def trend_at(player: str, day: str) -> float | None:
         days, values = kept.by_player.get(player, ([], []))
         i = bisect.bisect_right(days, day) - 1
-        closed = (days[i], values[i]) if i >= 0 else None
         newest = max((t for t in reversed(fresh.get(player, ())) if t.day <= day), key=lambda t: t.day, default=None)
-        if newest is not None and (closed is None or newest.day >= closed[0]):
+        if newest is not None and (i < 0 or newest.day >= days[i]):
             return newest.trend
-        return closed[1] if closed else None
+        return values[i] if i >= 0 else None
     return trend_at
 
 
@@ -654,7 +671,7 @@ def price_grade(s: PriceState) -> list[Grade]:
     changes = price_series(s)
     days = sorted({c.day for c in changes})
     first = days[len(days) // 4] if days else ""
-    pred: list[tuple[int, float, float, float | None, float]] = []
+    pred: list[Predicted] = []
     ends_of = {h: [d.end_day for d in s.days.get(h, [])] for h in GRADE_HORIZONS}
     for ch, b in _ends(s):
         for h in GRADE_HORIZONS:
@@ -670,11 +687,11 @@ def price_grade(s: PriceState) -> list[Grade]:
             act = 100 * (b.value / a.value - 1) if a.value != 0 else None
             p = fit.sxy / fit.sxx * a.x
             again = h * _clip(a.step, s.k.clip)
-            pred.append((h, a.value, p, act, again))
+            pred.append(Predicted(h, a.value, p, act, again))
     out = []
     for scope in ("focus", "all"):
         for h in GRADE_HORIZONS:
-            rows = [r for r in pred if r[0] == h and (scope == "all" or r[1] >= s.k.focus)]
+            rows = [r for r in pred if r.h == h and (scope == "all" or r.value >= s.k.focus)]
             if not rows:
                 continue
             both = [(p, act, again) for _, _, p, act, again in rows if act is not None]
@@ -733,6 +750,10 @@ def _selftest() -> None:
     obs = ob.of({"market": rows})
     only = {"price": FOLD}
 
+    rng = random.Random(3)
+    for _ in range(50):
+        a, b = (Sums(rng.uniform(-9, 9), rng.uniform(-9, 9), rng.uniform(-9, 9), rng.uniform(-9, 9), rng.uniform(-9, 9), rng.randint(0, 9)) for _ in range(2))
+        assert tuple(x + y for x, y in zip(a, b)) == tuple(a + b) == tuple(b + a) and a + NO_SUMS == a, "Sums adds field by field"
     def read(w: st.World) -> Any:
         return everything(price_state(w))
     cuts = ["2026-09-01T0900Z", "2026-09-10T0800Z", "2026-09-30T2100Z", "2026-10-09T2000Z", "2026-10-10T0000Z"]

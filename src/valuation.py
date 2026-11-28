@@ -22,6 +22,11 @@ class Window(tuple[int, ...]):
     inside the next. The decision value of a move is read over `season`; the others are shown for risk."""
 
     @property
+    def first(self) -> int:
+        """The first jornada of the window."""
+        return self[0]
+
+    @property
     def lock(self) -> Window:
         return Window(self[:1])
 

@@ -389,17 +389,23 @@ class Hold(NamedTuple):
     expected: float
 
 
-def held_bids(funds: Funds, wanted: Mapping[str, tuple[float, float, bool]]) -> frozenset[str]:
+class Want(NamedTuple):
+    profit: float
+    amount: float
+    placed: bool
+
+
+def held_bids(funds: Funds, wanted: Mapping[str, Want]) -> frozenset[str]:
     """The players whose hold is funded: of `wanted` (player: the expected profit, the bid, whether it is already placed), best
     profit first (then player), each that leaves cash at the lock 0 or more and a slot (a bid already placed took one and its
     amount), cash and slots taken as they go."""
     taken: set[str] = set()
     cash, slots = funds
-    for k, (profit, amount, placed) in sorted(wanted.items(), key=lambda kv: (-kv[1][0], kv[0])):
-        claim = 0.0 if placed else amount
-        if cash_at_lock(cash, 0.0, claim, 0.0) >= 0 and (placed or slots > 0):
+    for k, w in sorted(wanted.items(), key=lambda kv: (-kv[1].profit, kv[0])):
+        claim = 0.0 if w.placed else w.amount
+        if cash_at_lock(cash, 0.0, claim, 0.0) >= 0 and (w.placed or slots > 0):
             taken.add(k)
-            cash, slots = cash - claim, slots - (not placed)
+            cash, slots = cash - claim, slots - (not w.placed)
     return frozenset(taken)
 
 
@@ -451,7 +457,7 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
         gain = buyer.gain(k)
         price = asking if asking is not None else value
         steps = sale_rises(inp, ahead.get(k, {}))
-        n = hurdle.remaining(where.lock[0], last)
+        n = hurdle.remaining(where.first, last)
         exit = exit_of(inp, k, value or 0.0, ahead.get(k, {}))
         stake = hurdle.stake(gain, n, rate, hurdle.falling(exit), n)
         if status == "market" and asking is not None and k in curves:
@@ -461,12 +467,12 @@ def opportunity_rows(inp: Inputs, rate: float = hurdle.FALLBACK_LAMBDA) -> list[
                 if free is not None:
                     holds[k] = Hold(held, free, free.win * (held.proceeds - free.amount))
         out.append({
-            "player": k, "pos": pos[k], "status": status, "asking": asking, "value": value, "close_at": close, "window": where, "from_j": where.lock[0],
+            "player": k, "pos": pos[k], "status": status, "asking": asking, "value": value, "close_at": close, "window": where, "from_j": where.first,
             "replaces": got.replaces, "gain": gain, "per_million": gain / (price / 1e6) if price else None,
             "price_next": steps[1] if 1 in steps else None,
             "price_lock": steps[max(steps)] if steps else None,
             "placed": placed.get(k), "stake": stake, "profit": 0.0, "held": None})
-    funded = held_bids(funds_of(inp), {k: (h.expected, h.bid.amount, k in placed) for k, h in holds.items()})
+    funded = held_bids(funds_of(inp), {k: Want(h.expected, h.bid.amount, k in placed) for k, h in holds.items()})
     for r in out:
         if r["player"] in funded:
             hold = holds[r["player"]]
@@ -698,12 +704,12 @@ def _selftest_holds() -> None:
     assert all(0.0 <= r["profit"] <= c["profit"] for r, c in zip(rich, cheap)), "a value above HOLD_VALUE earns no more than one below it"
     rng = random.Random(8)
     for _ in range(400):
-        wanted = {"p%d" % i: (rng.uniform(0, 5), rng.uniform(1, 9), rng.random() < 0.3) for i in range(rng.randint(0, 6))}
+        wanted = {"p%d" % i: Want(rng.uniform(0, 5), rng.uniform(1, 9), rng.random() < 0.3) for i in range(rng.randint(0, 6))}
         funds = Funds(rng.uniform(-3, 20), rng.randint(0, 4))
         funded = held_bids(funds, wanted)
-        assert sum(wanted[k][1] for k in funded if not wanted[k][2]) <= max(0.0, funds.cash) + 1e-9, "the holds taken fit the cash"
-        assert sum(not wanted[k][2] for k in funded) <= funds.slots
-        assert held_bids(funds, {k: (2 * v[0], v[1], v[2]) for k, v in wanted.items()}) == funded, "only the order of profits counts"
+        assert sum(wanted[k].amount for k in funded if not wanted[k].placed) <= max(0.0, funds.cash) + 1e-9, "the holds taken fit the cash"
+        assert sum(not wanted[k].placed for k in funded) <= funds.slots
+        assert held_bids(funds, {k: v._replace(profit=2 * v.profit) for k, v in wanted.items()}) == funded, "only the order of profits counts"
 
 
 def _selftest_exit_reads() -> None:

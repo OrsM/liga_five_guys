@@ -92,18 +92,24 @@ def at_amount(curve: Curve, asking: float, amount: float) -> Bid:
     return Bid(amount, chance(curve, amount / asking))
 
 
-def best_on_grid(curve: Curve, asking: float, cap: float) -> tuple[float, float, float] | None:
-    """The (surplus, amount, chance) of the curve's rung with a ratio of 1 or more that has the most chance x (cap - amount), the amount being the
+class Rung(NamedTuple):
+    surplus: float
+    amount: float
+    chance: float
+
+
+def best_on_grid(curve: Curve, asking: float, cap: float) -> Rung | None:
+    """The Rung (surplus, amount, chance) of the curve's rung with a ratio of 1 or more that has the most chance x (cap - amount), the amount being the
     rung's asking x ratio cleared (`cleared`, never over the cap, never under the rung's amount) and the chance read at it; the lowest amount on
     ties; None when the curve has no such rung."""
-    best: tuple[float, float, float] | None = None
+    best: Rung | None = None
     for r, _ in curve:
         if r < 1.0:
             continue
         got = at_amount(curve, asking, max(asking * r, min(cleared(asking * r), cap)))
         score = got.win * (cap - got.amount)
-        if best is None or score > best[0]:
-            best = (score, got.amount, got.win)
+        if best is None or score > best.surplus:
+            best = Rung(score, got.amount, got.win)
     return best
 
 
@@ -112,9 +118,9 @@ def bid(curve: Curve, asking: float, stake: Stake) -> Bid | None:
     is not positive (a listing whose cap is under its asking price, as one of a player with no points and no proceeds
     above it) or when its chance is under WIN_FLOOR. A bid is never above the cap nor under the asking price."""
     best = best_on_grid(curve, asking, cap(stake))
-    if best is None or best[0] <= 0 or best[2] < WIN_FLOOR:
+    if best is None or best.surplus <= 0 or best.chance < WIN_FLOOR:
         return None
-    return Bid(best[1], best[2])
+    return Bid(best.amount, best.chance)
 
 
 class Exit(NamedTuple):
