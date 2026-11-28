@@ -13,6 +13,8 @@ Named rules, each tested:
   drift_is_the_latest_calibration: the drifting bins told are those of the newest calibration, this run's when it
     scored the auctions, else the latest published run's that has any.
 
+  slow_is_above_the_usual: a stage is told when its seconds this run are above COST_FACTOR times the median of its seconds in the
+    last COST_RUNS runs and above its floor (COST_FLOORS, else COST_FLOOR_S); grade is never judged; silent for a stage with fewer than COST_RUNS earlier runs.
   sale_gate_is_the_latest_sale_score: the bench sales told are Miguel's n at the season horizon of the newest sale_score,
     this run's when it graded the sales, else the latest published run's that has any; told from SALE_GATE_N on.
 
@@ -20,6 +22,7 @@ Named rules, each tested:
 """
 from __future__ import annotations
 
+import statistics
 import sys
 from collections.abc import Iterable
 from pathlib import Path
@@ -30,12 +33,12 @@ from ffcore import observations as ob
 from ffcore.clock import cut
 from ffcore.identity import Unmatched
 import salegrade
-from ffcore.records import AuctionCalibration, SaleScore
+from ffcore.records import AuctionCalibration, RunMeasure, SaleScore
 from ffcore.source_health import HEALTH_SOURCES, Health, Snapshot, parser_health, snapshots_of, tenth
 from ffcore.store import RunRecords
 from publish import notify
 
-__all__ = ["drifting", "main", "said", "sale_gate_line", "sale_scores", "text", "trouble", "verdicts"]
+__all__ = ["drifting", "main", "said", "sale_gate_line", "sale_scores", "slow_stages", "text", "trouble", "verdicts"]
 
 SENT = Path.home() / ".local/state/lfg/health.sent"
 UNMATCHED_FROM = 5e6
@@ -43,6 +46,11 @@ SALE_GATE_N = 40
 VERDICT_HORIZON = "season"
 VERDICT_COINFLIP = 0.5
 VERDICT_MIN_N = SALE_GATE_N // 2
+COST_RUNS = 14
+COST_FACTOR = 1.5
+COST_FLOOR_S = 2.0
+COST_FLOORS = {"parse": 8.0}  # new snapshots make parse jump from 1.4 s to 3-7 s: only more than that is drift
+COST_SKIP = ("grade",)  # bimodal by design: about 4 s when the grades stand, 2 min or more when the code changed them
 
 
 def health_line(h: Health) -> str:
@@ -117,10 +125,26 @@ def verdicts(scores: Iterable[SaleScore]) -> Verdicts | None:
                     tuple(failing))
 
 
+def slow_stages(now: Iterable[RunMeasure], before: Iterable[RunMeasure]) -> list[str]:
+    """The stages (by name) whose seconds in now are above their floor and above COST_FACTOR times the median of their seconds in
+    before (rule slow_is_above_the_usual; before is the rows of the COST_RUNS runs before, see usual_measures)."""
+    usual: dict[str, list[float]] = {}
+    for m in before:
+        if m.measure == "seconds":
+            usual.setdefault(m.stage, []).append(m.value)
+    return sorted(m.stage for m in now if m.measure == "seconds" and m.stage not in COST_SKIP and m.value > COST_FLOORS.get(m.stage, COST_FLOOR_S) and len(usual.get(m.stage, ())) >= COST_RUNS
+                  and m.value > COST_FACTOR * statistics.median(usual[m.stage]))
+
+
+def usual_measures(run: int) -> list[RunMeasure]:
+    """The run_measures of the COST_RUNS runs before run (those that exist in the store)."""
+    return [m for m in store.records("run_measures", since=run - COST_RUNS) if m.run_id < run]
+
+
 def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterable[AuctionCalibration],
-         sales: Iterable[SaleScore] = ()) -> str:
+         sales: Iterable[SaleScore] = (), slow: Iterable[str] = ()) -> str:
     """trouble of health and unmatched, one line the drifting bins, one line sale_gate_line of sales and the words of the stated verdicts
-    when they are failing (verdicts); empty if all is well."""
+    when they are failing (verdicts), one line the slow stages (no figure, so it is the same until the set changes); empty if all is well."""
     lines = trouble(health, unmatched)
     held = list(sales)
     gate = sale_gate_line(held)
@@ -129,6 +153,9 @@ def text(health: Iterable[Health], unmatched: Iterable[Unmatched], drift: Iterab
     stated = verdicts(held)
     if stated and stated.failing:
         lines.append("sell verdicts failing: " + "; ".join(stated.failing))
+    slower = list(slow)
+    if slower:
+        lines.append("stages slower than their usual: " + ", ".join(slower))
     bins = list(drift)
     if bins:
         worst = bins[0]
@@ -147,7 +174,8 @@ def said(records: RunRecords | None = None, obs: ob.Observations | None = None) 
     people = identity.crosswalk(obs, at)
     return text(parser_health(snapshots_of(obs, at), at), identity.unmatched(people, obs, at),
                 drifting(records.rows("auction_calibration") if records is not None else ()),
-                sale_scores(records.rows("sale_score") if records is not None else ()))
+                sale_scores(records.rows("sale_score") if records is not None else ()),
+                slow_stages(records.rows("run_measures"), usual_measures(records.run)) if records is not None else ())
 
 
 def offers_excluded(records: RunRecords | None = None) -> int:
@@ -192,6 +220,22 @@ def _selftest() -> None:
         return Unmatched("id", name, "x", value, no_app, not no_app)
 
     assert text((), (), ()) == "", "nothing fetched yet: nothing to say"
+    def secs(run: int, **stages: float) -> list[RunMeasure]:
+        return [RunMeasure(run, st, "seconds", v) for st, v in stages.items()] + [RunMeasure(run, st, "rows", 1e9) for st in stages]
+
+    flat = [m for i in range(COST_RUNS) for m in secs(i, board=10.0 + i % 3, grade=1.0, parse=4.0)]
+    assert slow_stages(secs(99, board=10.0, grade=1.0, parse=4.0), flat) == [], "flat: silent"
+    assert slow_stages(secs(99, board=21.0, grade=1.0, parse=4.0), flat) == ["board"], "a stage that doubles is named"
+    assert slow_stages(secs(99, board=10.0, grade=1.0, parse=5.9), flat) == [], "under COST_FACTOR times its median: silent"
+    assert slow_stages(secs(99, board=10.0, grade=1.9, parse=4.0), flat) == [], "a stage under COST_FLOOR_S is ignored however slow"
+    assert slow_stages(secs(99, board=30.0, parse=9.0, new=50.0), flat[:-3 * (COST_RUNS - 2) + 3]) == [], "fewer than COST_RUNS runs: silent"
+    assert slow_stages(secs(99, new=50.0), flat) == [], "a stage never seen before: silent"
+    real = [m for i in range(COST_RUNS) for m in secs(i, board=7.0 + i % 3 * 0.5, grade=(4.0, 120.0)[i % 2], parse=(1.4, 1.4, 4.2, 1.5, 3.1, 1.3, 7.0)[i % 7])]
+    assert slow_stages(secs(99, board=7.5, grade=4.0, parse=7.0), real) == [], "spiky parse and bimodal grade: silent"
+    assert slow_stages(secs(99, board=7.5, grade=360.0, parse=7.9), real) == [], "grade is never judged, parse under its floor"
+    assert slow_stages(secs(99, board=15.0, grade=360.0, parse=9.0), real) == ["board", "parse"], "board doubling and parse past its floor"
+    assert text((), (), (), (), ["board"]) == "parser trouble:\nstages slower than their usual: board" and text((), (), (), (), []) == "", "told in words, no figure"
+
     snaps = (feed("market", 1, 5) + feed("lineups", 1, 3) + feed("api_standings", 30, 10)
              + feed("api_teams", 8, 10, gap=4.0) + feed("api_leagues", 1, 10, count=6)
              + feed("api_market", 1, 2) + feed("api_offers", 1, 10, count=5))

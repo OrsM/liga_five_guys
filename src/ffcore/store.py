@@ -214,8 +214,9 @@ def grade_cells(run_id: int) -> npt.NDArray[Any]:
     return array
 
 
-def records(kind: str, run_id: int | None = None) -> Iterator[Any]:
-    """Every row of a kind, runs in run_id order and each file in its written order (all runs when run_id is None).
+def records(kind: str, run_id: int | None = None, since: int = 0) -> Iterator[Any]:
+    """Every row of a kind, runs in run_id order and each file in its written order (all runs when run_id is None; only the runs
+    from run `since` on, which spares reading the older ones).
     The rows of kind runs are runs()'s."""
     if kind not in KINDS:
         raise StoreError("no record kind %r" % kind)
@@ -223,7 +224,7 @@ def records(kind: str, run_id: int | None = None) -> Iterator[Any]:
         yield from (r for r in runs() if run_id in (None, r.run_id))
         return
     for r in runs():
-        if run_id not in (None, r.run_id):
+        if run_id not in (None, r.run_id) or r.run_id < since:
             continue
         meta = _meta(_runs_dir() / str(r.run_id))
         if kind not in meta["counts"]:

@@ -486,6 +486,21 @@ players). Market closes daily 22:24 CET.
 - Property tests; flag duplication preemptively.
 - Do not touch the account (bids, accepting offers) without your explicit go. Live runs may be triggered freely.
 
+**Processes (2026-11-28).** Nothing runs unattended, and no record or key is written, without a consumer, a cost and a review date;
+`tools/hygiene.py` (a gate suite) fails when a unit file in `tools/systemd` has no row here, when a review date below has passed, when a
+record kind or a `decisions.json` key has no reader in `src`/`tools` and no dated entry in its `EXEMPT`, or when that entry is due.
+The health stage names any stage above 1.5x the median of its previous 14 runs and 2 s (`health.slow_stages`), except `grade`, which is bimodal by
+design (about 4 s when the grades stand, 2 min or more when the code changed them) and never judged, and `parse`, whose floor is 8 s (new snapshots make it jump 1.4 s to 3-7 s).
+
+| process | purpose | consumer | cost | review | sunset rule |
+|---|---|---|---|---|---|
+| `lfg-run` | the sweep: every stage of `run.py`, report committed (lfg.service, installed outside the repo) | the report page, the phone ping | one run: about 3 min (grade 4 s cached, 2 min not), one run directory of the store | 2027-02-01 | none: the product |
+| `lfg-watch` | runs the sweep when the report button leaves `rerun.json` | the owner, via the report page | a poll each minute, nothing when idle | 2027-02-01 | none |
+| `lfg-accept` | does the lines accepted on the report page (timer: every 5 s) | the owner (`accept.json` beside the report) | a read of one file each tick; an account action only on a press | 2027-02-01 | none |
+| `lfg-list` | lists every squad player without a listing (timer: every 5 min and 22:19 Madrid) | the owner (the market listings, `list.log`) | one GET a pass, one POST a listing; `list.log` grows only when it lists | 2027-02-01 | none |
+| `lfg-look` | stores a look at the open auctions at 22:04, 22:14 and 22:19 Madrid (`lfg-run` with `LFG_LOOK=1`) | the board (`market_at`), grading of the auctions | three raw snapshots a night | 2027-02-01 | none |
+| `lfg-raise` | EXPERIMENT, DRY RUN ONLY since 2026-11-28: weighs raising the owner's placed bids to the board's `to` (22:06 and 22:20:30; unit not enabled) | the owner, reading `place_dry.jsonl` against the amounts he placed | two market GETs a night, a few `place_dry` rows | 2026-12-15 | about 10 evenings of would-raise against the owner's placed amounts; then either wire `raise_bid` and go live with the owner's explicit go, or remove `act.py raise`, `tools/lfg-raise` and its units |
+
 ---
 
 ## 10. What this draft leaves out, and why (your call on each)
