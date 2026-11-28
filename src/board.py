@@ -32,7 +32,7 @@ from ffcore.clock import MADRID, Clock, cut, shown
 from ffcore.parse import snapshot_stamp
 from ffcore.store import RunRecords
 from ffcore.rules import POSITIONS, bid_limit
-from health import Health
+from ffcore.source_health import Health
 import valuation
 from inflow import NONE, Inflow, inflow_of, risk_of
 from valuation import READERS
@@ -1122,7 +1122,7 @@ def board(inp: decision.Inputs, got: list[dict[str, Any]], arrivals: list[str],
           extras: decision.Extras, health: Iterable[Health], offers: worth.OfferDistribution = worth.NO_OFFERS,
           rate: float = hurdle.FALLBACK_LAMBDA) -> Doc:
     """The decisions document of the cut; extras are what the World gives beside the inputs, health the status of each
-    source (health.parser_health over the loaded snapshots), offers the nightly offers seen by the cut (offers_at) and
+    source (source_health.parser_health over the loaded snapshots), offers the nightly offers seen by the cut (offers_at) and
     rate the exchange rate LAMBDA the buys and sales are read at (hurdle.lam), stated as `lambda`."""
     cash = inp.money.cash
     locks = [x.lock for x in inp.locks]

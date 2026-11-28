@@ -108,7 +108,7 @@ computes one, and a fact is never stored twice.
 **Rules.** A layer reads ingest's facts, the cut and earlier layers' exports; never a later layer, never a raw table.
 A test seeds its module's inputs as rows (no Python mirror of a table). A change is judged by its layer's measure; old
 output is a score to beat, not to reproduce. `tools/frontiers.py` (run by `tools/gate`) checks the import graph:
-a module may not import a later layer; `python tools/frontiers.py --table` prints the layers.
+a module may not import a later layer (rules, ingest, forecast, decision, board, grading, run: every module of src/ is assigned; a new one must be added to OWNS); `python tools/frontiers.py --table` prints the layers. `ffcore/source_health.py` (ingest) holds the source-health facts, `health.py` (grading) tells them.
 
 **The auction table.** The win chance of a bid at ratio b over the ask is W(b | x) = (1 - q) + q F(b), a fixed `Model` in
 `ffcore/auction_table.py`: q is the chance some rival bids, by (rival bid visible at the look, momentum class, ask band) with

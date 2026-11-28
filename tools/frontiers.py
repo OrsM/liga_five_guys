@@ -1,8 +1,8 @@
 """Layer check (CLAUDE.md, principle 2: a layer reads only what an earlier layer exports), read-only.
 Parses every .py under src/ and src/ffcore with ast and maps each module to its layer through OWNS (layers in order:
-ingest, forecast, decision, board, grading). An import of a module of a LATER layer, in production code (top-level
+rules, ingest, forecast, decision, board, grading, run). An import of a module of a LATER layer, in production code (top-level
 _selftest functions excluded, lazy imports inside functions counted), is a crossing, printed grouped by the importing
-layer with file:line. A module in no layer (a utility or a stage) is listed as unassigned and not checked.
+layer with file:line. Every module of src/ is assigned (a module in no layer is listed as unassigned and not checked: a new one must be added).
 A for statement or comprehension that unpacks an Inputs row by position is a crossing of its module as well.
 Exit 1 if there is one. `--table` prints the layers and their modules as markdown."""
 import ast
@@ -13,14 +13,17 @@ from pathlib import Path
 from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parent.parent
-ORDER = ["ingest", "forecast", "decision", "board", "grading"]
-OWNS = {"ingest": "ingest", "crosswalk": "ingest", "league": "ingest", "jornadas": "ingest", "tidy": "ingest", "observations": "ingest",
-        "parsed": "ingest", "identity": "ingest", "state": "ingest", "current": "ingest", "season_facts": "ingest", "ledger": "ingest",
-        "store": "ingest", "records": "ingest", "auction_facts": "ingest",
-        "forecast": "forecast", "forecast_facts": "forecast", "price_fold": "forecast",
-        "auction": "decision", "inflow": "decision", "decision": "decision", "hurdle": "decision", "valuation": "decision", "decision_facts": "decision", "loader": "decision",
-        "board": "board", "shadow": "board",
-        "grading": "grading", "salegrade": "grading"}
+ORDER = ["rules", "ingest", "forecast", "decision", "board", "grading", "run"]
+OWNS = {**dict.fromkeys(["rules", "pricing", "parse", "text", "names", "clock", "stats", "source", "publish"], "rules"),
+        **dict.fromkeys(["ingest", "crosswalk", "league", "jornadas", "tidy", "observations", "parsed", "identity", "state", "current",
+                         "season_facts", "ledger", "store", "records", "auction_facts", "auth", "sources", "footballdata", "futbolfantasy",
+                         "laliga_api", "source_health"], "ingest"),
+        **dict.fromkeys(["forecast", "forecast_facts", "price_fold", "eleven"], "forecast"),
+        **dict.fromkeys(["auction", "auction_table", "inflow", "decision", "hurdle", "valuation", "worth", "approach", "decision_facts",
+                         "loader"], "decision"),
+        **dict.fromkeys(["board", "shadow"], "board"),
+        **dict.fromkeys(["grading", "salegrade", "health"], "grading"),
+        **dict.fromkeys(["act", "run"], "run")}
 
 
 class Crossing(NamedTuple):
@@ -130,15 +133,17 @@ def _selftest() -> None:
     self-test's are not; a clean graph has none."""
     clean = {"state": "x = 1\n", "forecast_facts": "from ffcore import state\n", "auction": "from ffcore.forecast_facts import f\n",
              "board": "import ffcore.auction\nfrom ffcore import state, auction\n", "grading": "from board import b\n",
-             "stats": "import grading\n", "eleven": "x = 1\n"}
+             "run": "import grading\n", "mystery": "import run\n"}
     assert crossings(clean) == [], "earlier and same layers, and a module in no layer, cross nothing"
     seeded = {**clean, "state": "def f():\n    from ffcore import forecast_facts\n",
-              "forecast_facts": "import ffcore.board\n", "auction": "from grading import g\n"}
+              "forecast_facts": "import ffcore.board\n", "auction": "from grading import g\n", "stats": "import state\n",
+              "hurdle": "import board\n", "grading": "import run\n"}
     got = {(c.file, c.layer) for c in crossings(seeded)}
-    assert got == {("state", "ingest"), ("forecast_facts", "forecast"), ("auction", "decision")}, got
+    assert got == {("state", "ingest"), ("forecast_facts", "forecast"), ("auction", "decision"), ("stats", "rules"),
+                  ("hurdle", "decision"), ("grading", "grading")}, got
     assert {c.line for c in crossings(seeded) if c.file == "state"} == {2}, "a lazy import inside a function is found, at its line"
     assert crossings({**clean, "state": "def _selftest():\n    import board\n\nX = 1\n"}) == [], "a self-test may import anything"
-    assert crossings({**clean, "state": "import eleven\n"}) == [], "a module in no layer is not a crossing"
+    assert crossings({**clean, "state": "import mystery\n"}) == [], "a module in no layer is not a crossing"
     assert positional_reads("for a, b in inp.bids:\n    pass\n") == [1]
     assert positional_reads("ys = [a for a, b in inp.bids]\n") == [1]
     assert positional_reads("for c in inp.universe:\n    pass\n") == []

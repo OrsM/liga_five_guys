@@ -17,16 +17,16 @@ Named rules, each tested:
   replay_cuts_are_app_snapshots: the distinct observed_at stamps of the api_teams snapshots, from since on, in order.
   opportunity_latest_by_cut_and_player: of the opportunity records of every published run, a cut's player has the row of
     the latest run that kept him; the rows come by cut then player.
-  snapshots_are_of_the_whole: Loaded.snapshots are health.snapshots_of the whole observations up to the cut, before the
+  snapshots_are_of_the_whole: Loaded.snapshots are source_health.snapshots_of the whole observations up to the cut, before the
     fold of SNAPSHOT_FOLDED cuts three of the sources down to their newest snapshot.
-  health_at_judges_what_was_seen: health_at(loaded, cut) is health.parser_health of the snapshots not after the cut."""
+  health_at_judges_what_was_seen: health_at(loaded, cut) is source_health.parser_health of the snapshots not after the cut."""
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import ingest
-from health import Health, Snapshot, parser_health, snapshots_of
+from ffcore.source_health import Health, Snapshot, parser_health, snapshots_of
 from ffcore import forecast_facts, identity, league, ledger, parsed, store
 from ffcore import observations as ob
 from ffcore.current import Identity
@@ -118,7 +118,7 @@ def folded(obs: ob.Observations, cut: str | None) -> ob.Observations:
 
 
 def snapshots_in(obs: ob.Observations, cut: str | None) -> tuple[Snapshot, ...]:
-    """health.snapshots_of obs up to the cut (all of them without one)."""
+    """source_health.snapshots_of obs up to the cut (all of them without one)."""
     return snapshots_of(obs, identity.END_OF_TIME if cut is None else cut)
 
 
