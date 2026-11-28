@@ -79,10 +79,10 @@ def parser_health(snapshots: Iterable[Snapshot], cut: str) -> tuple[Health, ...]
 
 
 def _selftest() -> None:
-    feed = [Snapshot("x", "2026-10-15T%02d00Z" % (12 - 2 * i), 10) for i in range(8)]
-    got = parser_health(feed, "2026-10-15T1300Z")
-    assert got == (Health("x", "2026-10-15T1200Z", 10, 10.0, 1.0, 2.0, "ok", "2026-10-15T1200Z"),), got
-    assert parser_health(feed[:5], "2026-10-15T1300Z") == (), "usual_needs_five"
+    feed = [Snapshot("x", "2026-10-15T%02d00Z" % (20 - 2 * i), 10) for i in range(8)]
+    got = parser_health(feed, "2026-10-15T2100Z")
+    assert got == (Health("x", "2026-10-15T2000Z", 10, 10.0, 1.0, 2.0, "ok", "2026-10-15T2000Z"),), got
+    assert parser_health(feed[:5], "2026-10-15T2100Z") == (), "usual_needs_five"
     print("source_health self-test OK")
 
 
