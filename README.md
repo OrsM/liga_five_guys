@@ -131,7 +131,7 @@ which move wins.
 - **Everything freezes at the jornada's first kickoff, for every player; a player who joins after it cannot play that jornada.**
   Each jornada pays 100,000 x the team's points about 04:40 Madrid after its last match.
 - **A negative balance at the matchday's start scores 0 points; debt is
-  capped at 20% of team value.** Enforced by `rules.bid_limit` and `rules.cash_at_lock` in the board's funding (`approach.py`) and by
+  capped at 20% of team value.** Enforced by `rules.bid_limit` and `rules.cash_at_lock` (read everywhere as `Club.lock_cash`) in the board's funding (`approach.py`) and by
   the app (bids). Not modelled for rivals: the standings ignore every
   manager's cash, so a rival below zero at the lock still scores.
 - **Raising a clause costs half the raise** (1M pays for +2M). Not modelled:

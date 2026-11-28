@@ -149,7 +149,7 @@ After each jornada the game pays every manager `inflow.BONUS_PER_POINT` (100,000
 paid earlier than their last kickoff, so the rule undercounts there), and it is part of cash once credited. `inflow.Inflow` is the
 credit due after the cut and by the next lock: its expected (points so far from the standings' `fixture_points` plus the forecast of the
 fielded eleven's players whose club kicks off after the cut), its low case (10th percentile; spread `JORNADA_SD` = 12 points over a whole
-jornada, scaled by the square root of the eleven's share still to play) and `inflow.risk_of`. `Club.inflow` enters `rules.cash_at_lock`:
+jornada, scaled by the square root of the eleven's share still to play) and `inflow.risk_of`. `Club.inflow` enters `rules.cash_at_lock` through `Club.lock_cash(raised, bid, later, credit)`, the one spelling of cash at the lock (approach, board and grading call it, none re-sums; 'if won' and 'if lost' are the same call with and without the bid, a need is `-lock_cash(...)`):
 a plan is feasible when cash at the lock is 0 or more at the EXPECTED credit; the board flags the risk (`risk` on `base` and the `do`
 lines: low_inflow, p_short, shortfall_if_low, below_points) and says it in the `why`.
 

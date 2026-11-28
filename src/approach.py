@@ -40,6 +40,11 @@ class Club(NamedTuple):
     unlisted: frozenset[str] = frozenset()
     drift: Mapping[str, float] = {}
 
+    def lock_cash(self, raised: float = 0.0, bid: float = 0.0, later: float = 0.0, credit: float | None = None) -> float:
+        """The one spelling of cash at the lock (rules.cash_at_lock of this club): its cash, `raised` tonight, less the `bid` won, plus the sales
+        made `later` and the `credit` due (the inflow's expected when None; 0.0 leaves it out). 'If lost' is 'if won' with no bid; a need is `-lock_cash(...)`."""
+        return cash_at_lock(self.cash, raised, bid, later, self.inflow.expected if credit is None else credit)
+
 
 class Rounds(NamedTuple):
     """The jornadas a bid is valued over and the forecast of each: `now` those a sale made now counts for, `arrives` those
@@ -312,6 +317,20 @@ def first_available(sets: Sequence[frozenset[str]], exists: float) -> list[float
     return out
 
 
+class Outcome(NamedTuple):
+    """One way a gap can close: chance `p`, points `cost`, money `raised`, `gain`."""
+    p: float
+    cost: float
+    raised: float
+    gain: float
+
+
+class Gap(NamedTuple):
+    """The players `sold` and the BUCKETs of cash still `lack`ing."""
+    sold: frozenset[str]
+    lack: int
+
+
 class Reserve(NamedTuple):
     """What a waiting player is to be sold for: at the j-th of the closes left an offer of `least[j]` or more is accepted (the last is
     the lowest: 0 when any offer is, infinite when none is, he is then kept)."""
@@ -370,9 +389,9 @@ def plan(club: Club, found: Approach | None, rounds: Rounds, n_closes: int, side
         sells = found.tonight | found.if_lost
         return Plan(True, sells, sum(price[k] for k in sells), found.cost_lost, 0.0)
     pool = club.squad if n_closes > 0 else frozenset(club.offers) & club.squad
-    got = None if n_closes > 0 else cover(side, frozenset(), pool, price, -(club.cash + club.inflow.expected), gains(club, Money(rate, len(side.rounds)), price), True)
+    got = None if n_closes > 0 else cover(side, frozenset(), pool, price, -club.lock_cash(), gains(club, Money(rate, len(side.rounds)), price), True)
     if got is None:
-        return Plan(False, frozenset(), 0.0, 0.0, max(0.0, -(club.cash + club.inflow.expected) - sum(price[k] for k in pool)))
+        return Plan(False, frozenset(), 0.0, 0.0, max(0.0, -club.lock_cash() - sum(price[k] for k in pool)))
     return Plan(True, got.sells, sum(price[k] for k in got.sells), got.cost, 0.0)
 
 
@@ -479,13 +498,13 @@ class Closer:
             else:
                 if not exhausted:
                     chance[-1] += missing
-                outcomes = [(w, x.cost, sum(self.price[k] for k in x.sells), sum(self.gain(k, self.price[k]) for k in x.sells)) for x, w in zip(got, chance)]
+                outcomes = [Outcome(w, x.cost, sum(self.price[k] for k in x.sells), sum(self.gain(k, self.price[k]) for k in x.sells)) for x, w in zip(got, chance)]
                 if exhausted:
-                    outcomes.append((missing, lapsed if lapsed is not None else 0.0, 0.0, 0.0))
-                seen = [o for o in outcomes if o[0] > 1e-12]
-                worst = max(o[1] for o in seen)
-                self.filled[key] = Filled(sum(w * c for w, c, _, _ in seen), sum(w * m for w, _, m, _ in seen), sum(w * g for w, _, _, g in seen),
-                                          got[0].sells, worst, sum(w for w, c, _, _ in seen if c > worst - 1e-9))
+                    outcomes.append(Outcome(missing, lapsed if lapsed is not None else 0.0, 0.0, 0.0))
+                seen = [o for o in outcomes if o.p > 1e-12]
+                worst = max(o.cost for o in seen)
+                self.filled[key] = Filled(sum(o.p * o.cost for o in seen), sum(o.p * o.raised for o in seen), sum(o.p * o.gain for o in seen),
+                                          got[0].sells, worst, sum(o.p for o in seen if o.cost > worst - 1e-9))
         return self.filled[key]
 
     def least(self, player: str, payoff: Callable[[float], float], rho: float) -> float:
@@ -512,7 +531,7 @@ class Closer:
         may exceed every offer: then he is not sold) and an offer, being an option, never hurts."""
         club = self.club
         plan = now | wait
-        base = club.cash + club.inflow.expected + sum(club.offers[k] for k in now)
+        base = club.lock_cash(sum(club.offers[k] for k in now))
         reserves, ends = [], []
         for k in sorted(wait):
             rest = base + sum(self.price[j] for j in wait if j != k)
@@ -540,8 +559,8 @@ class Closer:
         club = self.club
         plan = now | wait
         reserves, ends = self.money(now, wait)
-        base = club.cash + club.inflow.expected + sum(club.offers[k] for k in now)
-        steps: dict[tuple[frozenset[str], int], Step] = {}
+        base = club.lock_cash(sum(club.offers[k] for k in now))
+        steps: dict[Gap, Step] = {}
         for combo in product(*ends):
             atoms: Sequence[Atom] = UNIT
             for end in combo:
@@ -550,7 +569,7 @@ class Closer:
             if sold != plan:
                 atoms = thinned(atoms, MISSED)
             for a in atoms:
-                key = (sold, bucket_of(-(base + a.money)))
+                key = Gap(sold, bucket_of(-(base + a.money)))
                 seen = steps.get(key, Step(0.0, 0.0))
                 steps[key] = Step(seen.p + a.p, seen.money + a.p * a.money)
         points = cash = gain = worst = p_worst = 0.0
@@ -566,8 +585,8 @@ class Closer:
             elif filled.worst > worst - 1e-9:
                 p_worst += step.p * filled.p_worst
         gain += self.rated.over(sum(club.offers[k] for k in now), sum(self.pricing[k].expected for k in now))
-        short = {key: step for key, step in steps.items() if key[1] > 0}
-        lack = sum(s.p * key[1] for key, s in short.items()) / sum(s.p for s in short.values()) if short else 0.0
+        short = {key: step for key, step in steps.items() if key.lack > 0}
+        lack = sum(s.p * key.lack for key, s in short.items()) / sum(s.p for s in short.values()) if short else 0.0
         likely = self.fill(plan, plan, max(1, round(lack))) if short else None
         order = tuple(sorted(likely.sells, key=lambda k: (per_unit(self.side.cost(plan | {k}), self.price[k]), k))) if likely else ()
         return Option(now, reserves, order, points, cash, worst, p_worst, gain)
@@ -595,7 +614,7 @@ def secure(club: Club, found: Plan, side: Side, offers: worth.OfferDistribution,
     if n_closes < 1:
         return found._replace(now=found.sells)
     judge = Closer(club, side, offers, n_closes, rate)
-    need = -(club.cash + club.inflow.expected)
+    need = -club.lock_cash()
     own = frozenset(club.offers)
     seed = judge.outcome(found.sells & own, found.sells - own) if len(found.sells - own) <= WAITERS else None
     best = seed
@@ -751,8 +770,7 @@ def approach(club: Club, player: str | None, bid: float, win: float, rounds: Rou
         raised, sold = sum(club.offers[k] for k in a), sum(club.worth[k] for k in a)
         margin = bid_margin(club.cash, raised, club.team_value, sold, bid, pend_amount, club.debt)
         if margin >= -1e-6:
-            need_won = -cash_at_lock(club.cash, raised, bid, 0.0, club.inflow.expected)
-            need_lost = -(club.cash + raised + club.inflow.expected)
+            need_won, need_lost = -club.lock_cash(raised, bid), -club.lock_cash(raised)
             credits = over if money.kappa else None
             won = cover(won_side, a, club.squad - a, price, need_won, credits)
             lost = cover(lost_side, a, club.squad - a, price, need_lost, credits)
@@ -792,9 +810,9 @@ def funded(club: Club, tonight: frozenset[str], if_won: frozenset[str], if_lost:
     return Approach(
         True, 0.0, tonight, (frozenset(club.offers) & club.squad) - tonight, if_won, if_lost, raised,
         bid_margin(club.cash, raised, club.team_value, sum(club.worth[k] for k in tonight), bid, club.pending[1], club.debt),
-        cash_at_lock(club.cash, raised, bid, later, club.inflow.expected),
-        cash_at_lock(club.cash, raised, bid, later * (1 - SALE_SD), club.inflow.low),
-        club.cash + raised + sum(price[k] for k in if_lost) + club.inflow.expected,
+        club.lock_cash(raised, bid, later),
+        club.lock_cash(raised, bid, later * (1 - SALE_SD), club.inflow.low),
+        club.lock_cash(raised, later=sum(price[k] for k in if_lost)),
         gain, cost_won, cost_lost,
         base - (win * (cost_won - points.credit_won + points.paid - gain) + (1 - win) * (cost_lost - points.credit_lost)),
         base, points.credit_won, points.credit_lost, points.paid)
@@ -811,15 +829,15 @@ def replacement(club: Club, sold: str, player: str, bid: float, win: float, roun
     tonight = frozenset({sold})
     raised = club.offers[sold]
     margin = bid_margin(club.cash, raised, club.team_value, club.worth[sold], bid, pend_amount, club.debt)
-    if margin < -1e-6 or club.cash + raised + club.inflow.expected < -1e-6:
-        return unfunded(club, max(0.0, -margin, -(club.cash + raised + club.inflow.expected)), margin, 0.0)
+    if margin < -1e-6 or club.lock_cash(raised) < -1e-6:
+        return unfunded(club, max(0.0, -margin, -club.lock_cash(raised)), margin, 0.0)
     won_side = Side(club.squad | {player}, club.pos, rounds.cells, rounds.arrives)
     lost_side = Side(club.squad, club.pos, rounds.cells, rounds.arrives)
     before = Side(club.squad, club.pos, rounds.cells, rounds.before)
     gain = won_side.points - lost_side.points
     price = prices(club, True, rounds.closes)
     over = gains(club, money, {k: price[k] for k in club.squad})
-    won = cover(won_side, tonight, club.squad - tonight, price, -cash_at_lock(club.cash, raised, bid, 0.0, club.inflow.expected),
+    won = cover(won_side, tonight, club.squad - tonight, price, -club.lock_cash(raised, bid),
                 over if money.kappa else None)
     if won is None or len(club.squad) - len(tonight) - len(won.sells) + pend_n + 1 > club.squad_max:
         return unfunded(club, 0.0, margin, gain)
@@ -1059,10 +1077,10 @@ def _selftest_money() -> None:
                     late = points((here if star else squad) - a - b, tuple(rounds.arrives))
                     return None if early is None or late is None else early + late
                 won = [x for r in range(len(rest) + 1) for b in combinations(rest, r)
-                       if cash_at_lock(club.cash, pa, bid, sum(price[k] for k in b)) >= -1e-6
+                       if club.lock_cash(pa, bid, sum(price[k] for k in b), 0.0) >= -1e-6
                        and len(here - a - frozenset(b)) <= SQUAD_MAX and (x := after(True, frozenset(b))) is not None]
                 lost = [x for r in range(len(rest) + 1) for b in combinations(rest, r)
-                        if club.cash + pa + sum(price[k] for k in b) >= -1e-6 and (x := after(False, frozenset(b))) is not None]
+                        if club.lock_cash(pa, later=sum(price[k] for k in b), credit=0.0) >= -1e-6 and (x := after(False, frozenset(b))) is not None]
                 if won and lost:
                     value = win * (max(won) + credit - spend.paid(bid)) + (1 - win) * min(max(lost) + credit, total - base_j)
                     best = value if best is None else max(best, value)
@@ -1192,6 +1210,23 @@ def _selftest_bidding() -> None:
     assert refused.best is None and refused.offers == () and refused.walk_away is None, "no funded price: nothing is bid"
     _selftest_limits()
     _selftest_raise_cash()
+    _selftest_lock_cash()
+
+
+def _selftest_lock_cash() -> None:
+    """Club.lock_cash over random clubs: the canonical rule; monotone in sales and credit, nonincreasing in the bid, additive in sales,
+    scale invariant; 'lost' is 'won' without the bid (one selector)."""
+    rng = random.Random(7)
+    for _ in range(300):
+        club = Club(frozenset(), {}, {}, {}, rng.uniform(-50e6, 50e6), 0.0, inflow=Inflow(rng.uniform(0, 5e6), rng.uniform(0, 2e6), None, ()))
+        raised, bid, later, extra = (rng.uniform(0, 30e6) for _ in range(4))
+        got = club.lock_cash(raised, bid, later)
+        assert abs(got - cash_at_lock(club.cash, raised, bid, later, club.inflow.expected)) < 1e-6 and club.lock_cash(credit=0.0) == club.cash, "the canonical rule"
+        assert club.lock_cash(raised + extra, bid, later) >= got <= club.lock_cash(raised, bid, later + extra) and club.lock_cash(raised, bid + extra, later) <= got
+        assert club.lock_cash(raised, bid, later, club.inflow.expected + extra) >= got, "nondecreasing in the credit"
+        assert abs(club.lock_cash(raised + extra, bid, later) - got - extra) < 1e-6 and abs(club.lock_cash(raised, 0.0, later) - got - bid) < 1e-6
+        double = club._replace(cash=2 * club.cash, inflow=Inflow(2 * club.inflow.expected, 0.0, None, ()))
+        assert abs(double.lock_cash(2 * raised, 2 * bid, 2 * later) - 2 * got) < 1e-6, "scale invariant"
 
 
 def _selftest_limits() -> None:
@@ -1433,7 +1468,7 @@ def _selftest_gain() -> None:
             continue
         seen += 1
         pay = gains(club, Money(rate, len(tside.rounds)), prices(club, False))
-        need = -(club.cash + club.inflow.expected)
+        need = -club.lock_cash()
         pool = sorted(offers)
         nets = [(tside.cost(frozenset(b)) or 0.0) - sum(pay[k] for k in b) for m in range(1, len(pool) + 1) for b in combinations(pool, m)
                 if tside.cost(frozenset(b)) is not None and sum(offers[k] for k in b) >= need - 1e-6 and all(sum(offers[j] for j in b if j != k) < need - 1e-6 for k in b)]
@@ -1484,10 +1519,10 @@ def _selftest() -> None:
                     continue
                 rest = sorted(squad - a)
                 won = [x for m in range(len(rest) + 1) for b in combinations(rest, m)
-                       if cash_at_lock(club.cash, pa, bid, sum(price[k] for k in b)) >= -1e-6
+                       if club.lock_cash(pa, bid, sum(price[k] for k in b), 0.0) >= -1e-6
                        and len(here - a - frozenset(b)) <= SQUAD_MAX and (x := after_sales(a, frozenset(b), True)) is not None]
                 lost = [x for m in range(len(rest) + 1) for b in combinations(rest, m)
-                        if club.cash + pa + sum(price[k] for k in b) >= -1e-6 and (x := after_sales(a, frozenset(b), False)) is not None]
+                        if club.lock_cash(pa, later=sum(price[k] for k in b), credit=0.0) >= -1e-6 and (x := after_sales(a, frozenset(b), False)) is not None]
                 if won and lost:
                     ev = win * max(won) + (1 - win) * max(lost)
                     want = ev if want is None else max(want, ev)
@@ -1503,7 +1538,6 @@ def _selftest() -> None:
         seen_early += bool(rounds.before and got.tonight)
         assert got.tonight <= frozenset(offers) and not got.tonight & got.if_won and not got.tonight & got.if_lost
         assert got.margin >= -1e-6 and got.lock_margin >= -1e-6 and got.lock_margin_low <= got.lock_margin + 1e-9
-        assert club.cash + got.raised + sum(price[k] for k in got.if_lost) >= -1e-6, "cash at the lock if the bid is lost"
         assert len(here - got.tonight - got.if_won) <= SQUAD_MAX
         assert got.held == frozenset(offers) - got.tonight
         assert eleven.best_eleven(here - got.tonight - got.if_won, pos, cells[arrives[0]]) is not None, "an eleven remains"
@@ -1593,7 +1627,7 @@ def _selftest() -> None:
                 and (left := total(club.squad - frozenset(b), own, cells, window)) is not None]
         assert planned.feasible == bool(owed)
         if planned.feasible:
-            assert planned.sells <= frozenset(offers) and club.cash + planned.raised >= -1e-6, "the sales bring cash to 0 or more"
+            assert planned.sells <= frozenset(offers), "the plan sells only standing offers"
             assert abs(planned.cost - min(owed)) < 1e-9, "no close left: the cheapest set of the standing offers"
         else:
             assert planned.sells == frozenset() and planned.short >= 0
@@ -1789,7 +1823,7 @@ def _selftest() -> None:
             assert none.feasible and none.cost_won == none.cost_lost == 0.0 and not none.tonight and not none.if_lost, \
                 "cash 0 or more: the plan with no buy sells nothing and costs nothing"
         elif none.feasible:
-            assert none.cost_won == none.cost_lost >= 0.0 and club.cash + none.raised + sum(prices(club, False)[k] for k in none.if_lost) >= -1e-6
+            assert none.cost_won == none.cost_lost >= 0.0
             full = Side(club.squad, places, forecast, window)
             price = prices(club, False)
             rest = sorted(own)
@@ -1841,7 +1875,6 @@ def _selftest() -> None:
             seen_free_by_credit += cash < 0
         if got.feasible:
             assert got.lock_margin >= -1e-6 and got.cash_if_lost >= -1e-6, "a plan feasible is feasible at the expected credit"
-            assert club.cash + got.raised + sum(prices(club, False)[k] for k in got.if_lost) + credit.expected >= -1e-6
         planned = plan(club._replace(inflow=credit), got, flat, 0, rate=hurdle.FALLBACK_LAMBDA)
         before = plan(club, none, flat, 0, rate=hurdle.FALLBACK_LAMBDA)
         assert planned is not None and before is not None

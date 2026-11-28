@@ -323,7 +323,7 @@ def base_doc(club: Club, names: dict[str, str], base: Approach | None, found: Pl
     before the lock, its `risk` (risk_doc) on the cash the plan leaves before it. With cash below 0 and a secured plan (approach.secure)
     its sales, cost and cash replace the approach's: one plan in the document."""
     secured = found is not None and club.cash < 0 and found.feasible and bool(found.options)
-    before = club.cash + found.raised if secured and found is not None else \
+    before = club.lock_cash(found.raised, credit=0.0) if secured and found is not None else \
         club.cash if base is None or not base.feasible else base.cash_if_lost - club.inflow.expected
     doc = {**funding_doc(club, names, base, 0.0), "cost": plan_points(base, found, club), "cash": club.cash, **risk_doc(club, before)}
     if secured and found is not None and base is not None and base.feasible:
@@ -1030,9 +1030,9 @@ def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clo
     rows = {r["key"]: r for r in sells}
     untils = untils_of(clock)
     taken = sorted((r for k in plan.sells if k in plan.now and (r := rows.get(k)) is not None), key=lambda r: (-r["offer"], r["key"]))
-    best = plan.options[0] if plan.options else Option(plan.now, (), (), plan.cost, club.cash + plan.raised + club.inflow.expected, plan.cost, 1.0)
+    best = plan.options[0] if plan.options else Option(plan.now, (), (), plan.cost, club.lock_cash(plan.raised), plan.cost, 1.0)
     second = plan.options[1] if len(plan.options) > 1 else None
-    before = club.cash + plan.raised
+    before = club.lock_cash(plan.raised, credit=0.0)
     now_names, later_names = [names.get(k, k) for k in sorted(plan.now)], [names.get(k, k) for k in sorted(plan.sells - plan.now)]
     why = "cash %.1fM; sells %s; expects %+.2fM at the lock%s" % (
         club.cash / 1e6, ", ".join([*("%s now" % n for n in now_names), *("%s later" % n for n in later_names)]), best.cash / 1e6, risk_clause(club, before))
@@ -1048,7 +1048,7 @@ def cover_lines(names: dict[str, str], club: Club, plan: Plan | None, clock: Clo
         out.append({
             "what": "wait", "label": "wait for the offers of " + ", ".join(names_waiting), "step": "wait", "needed": True,
             "n_closes": clock.n_closes, "expected_cover": names_waiting, "until": stamped(clock.lock),
-            "need": max(0.0, -(club.cash + club.inflow.expected + sum(club.offers[k] for k in plan.now))),
+            "need": max(0.0, -club.lock_cash(sum(club.offers[k] for k in plan.now))),
             "cost_points": plan.cost, **risk_doc(club, before),
             "why": "cash %.1fM; %s waits for the offers still to come (%d closes), each at its reserve or more, at the lock too%s" % (
                 club.cash / 1e6, ", ".join(names_waiting), clock.n_closes, risk_clause(club, before)),

@@ -972,7 +972,7 @@ def follow(day: CoverDay, side: Side, option: Option, closings: Sequence[Closing
                 sales[r.player] = slot.offer
                 break
     fixed = frozenset(sales)
-    cash = club.cash + club.inflow.expected + sum(sales.values())
+    cash = club.lock_cash(sum(sales.values()))
     last = len(closings) - 1
     slots = {k: slot_of(day, closings[last], k, last, label) for k in club.squad - fixed - frozenset(r.player for r in option.wait)}
     price = {k: slot.offer or 0.0 for k, slot in slots.items()}
@@ -1002,7 +1002,7 @@ def follow_plan(day: CoverDay, side: Side, found: Plan, closings: Sequence[Closi
                 sales[k] = slot.offer
                 break
     cost = side.cost(frozenset(sales))
-    cash = club.cash + club.inflow.expected + sum(sales.values())
+    cash = club.lock_cash(sum(sales.values()))
     return Realised(math.inf if cost is None else cost + (side.lapse(frozenset(sales)) if cash < 0 else 0.0), cash, filled, gained(day, side, sales, rate))
 
 
