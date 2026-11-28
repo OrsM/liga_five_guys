@@ -31,7 +31,7 @@ from ffcore.clock import cut
 from ffcore.identity import Unmatched
 import salegrade
 from ffcore.records import AuctionCalibration, SaleScore
-from ffcore.source_health import Health, Snapshot, parser_health, snapshots_of, tenth
+from ffcore.source_health import HEALTH_SOURCES, Health, Snapshot, parser_health, snapshots_of, tenth
 from ffcore.store import RunRecords
 from publish import notify
 
